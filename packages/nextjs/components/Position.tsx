@@ -10,6 +10,14 @@ interface PositionProps {
 }
 
 export const Position: FC<PositionProps> = ({ icon, name, balance, currentRate, optimalRate }) => {
+  // Format number with consistent locale
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Math.abs(num));
+  };
+
   return (
     <div className="grid grid-cols-5 items-center w-full p-4 bg-base-200 rounded-lg gap-4">
       {/* Icon and Name Section */}
@@ -24,7 +32,7 @@ export const Position: FC<PositionProps> = ({ icon, name, balance, currentRate, 
       <div className="text-center col-span-1">
         <div className="text-sm text-base-content/70">Balance</div>
         <div className={`font-medium ${balance >= 0 ? "text-green-500" : "text-red-500"}`}>
-          {balance >= 0 ? "+" : "-"}${Math.abs(balance).toLocaleString()}
+          {balance >= 0 ? "+" : "-"}${formatNumber(balance)}
         </div>
       </div>
 

@@ -1,3 +1,5 @@
+// 0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf ARBI USDC
+
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { Contract } from "ethers";
@@ -22,10 +24,15 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("YourContract", {
+  await deploy("CompoundGateway", {
     from: deployer,
     // Contract constructor arguments
-    args: [deployer],
+    args: [
+        "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // ARBI USDC
+        "0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07", //USDT
+        "0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA", //USDC.e
+        "0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486", //WETH
+    ],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -33,8 +40,15 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   });
 
   // Get the deployed contract to interact with it after deploying.
-  const yourContract = await hre.ethers.getContract<Contract>("YourContract", deployer);
-  console.log("👋 Initial greeting:", await yourContract.greeting());
+  const CompoundGateway = await hre.ethers.getContract<Contract>("CompoundGateway", deployer);
+  const usdcToken = await CompoundGateway.getBaseToken("0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf");
+  console.log("👋 Base Token USDC:", usdcToken);
+  const usdtToken = await CompoundGateway.getBaseToken("0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07");
+  console.log("👋 Base Token USDT:", usdtToken);
+  const usdcEToken = await CompoundGateway.getBaseToken("0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA");
+  console.log("👋 Base Token USDC.e:", usdcEToken);
+  const wethToken = await CompoundGateway.getBaseToken("0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486");
+  console.log("👋 Base Token WETH:", wethToken);
 };
 
 export default deployYourContract;

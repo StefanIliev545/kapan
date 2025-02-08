@@ -2,7 +2,7 @@ import { FC } from "react";
 import Image from "next/image";
 import { Position } from "./Position";
 
-interface ProtocolPosition {
+export interface ProtocolPosition {
   icon: string;
   name: string;
   balance: number;
@@ -14,6 +14,7 @@ interface ProtocolViewProps {
   protocolName: string;
   protocolIcon: string;
   ltv: number;
+  maxLtv: number;
   suppliedPositions: ProtocolPosition[];
   borrowedPositions: ProtocolPosition[];
 }
@@ -22,6 +23,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   protocolName,
   protocolIcon,
   ltv,
+  maxLtv,
   suppliedPositions,
   borrowedPositions,
 }) => {
@@ -29,22 +31,28 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     <div className="w-full p-6 space-y-8">
       {/* Protocol Header */}
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="text-2xl font-bold">{protocolName}</div>
+        <div className="flex items-center gap-2">
           <div className="w-10 h-10 relative">
             <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
           </div>
+          <div className="text-2xl font-bold">{protocolName}</div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-lg text-base-content/70">LTV</span>
-          <span className="text-xl font-medium">{ltv}%</span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-base-content/70">Current LTV</span>
+            <span className="text-xl font-medium">{ltv}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-base-content/70">Max LTV</span>
+            <span className="text-xl font-medium">{maxLtv}%</span>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-8">
         {/* Supplied Assets */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-4">Supplied Assets</h2>
+          <h2 className="text-xl font-semibold mb-4 text-center">Supplied Assets</h2>
           {suppliedPositions.length > 0 ? (
             <div className="space-y-2">
               {suppliedPositions.map((position, index) => (
@@ -58,7 +66,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
         {/* Borrowed Assets */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-4">Borrowed Assets</h2>
+          <h2 className="text-xl font-semibold mb-4 text-center">Borrowed Assets</h2>
           {borrowedPositions.length > 0 ? (
             <div className="space-y-2">
               {borrowedPositions.map((position, index) => (
@@ -108,6 +116,7 @@ export const ExampleProtocolView: FC = () => {
       protocolName="Aave V3"
       protocolIcon="/logos/aave-logo.svg"
       ltv={65}
+      maxLtv={80}
       suppliedPositions={exampleSuppliedPositions}
       borrowedPositions={exampleBorrowedPositions}
     />
