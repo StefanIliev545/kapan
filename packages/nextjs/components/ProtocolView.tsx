@@ -29,15 +29,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     <div className="w-full p-6 space-y-8">
       {/* Protocol Header */}
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2">
-          <span className="text-lg text-base-content/70">LTV</span>
-          <span className="text-xl font-medium">{ltv}%</span>
-        </div>
         <div className="flex items-center gap-4">
           <div className="text-2xl font-bold">{protocolName}</div>
           <div className="w-10 h-10 relative">
             <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-lg text-base-content/70">LTV</span>
+          <span className="text-xl font-medium">{ltv}%</span>
         </div>
       </div>
 
