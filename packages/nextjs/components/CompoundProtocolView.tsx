@@ -1,114 +1,166 @@
-import { FC, useEffect, useState, useRef } from "react";
+import { FC, useEffect, useState, useRef, useMemo } from "react";
 import { ProtocolView, ProtocolPosition } from "./ProtocolView";
 import { useAccount, useWalletClient } from "wagmi";
-import { useScaffoldContract, externalContracts } from "~~/hooks/scaffold-eth";
+import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 import { formatUnits } from "viem";
 
 export const CompoundProtocolView: FC = () => {
+  // State to hold positions and LTV.
   const [suppliedPositions, setSuppliedPositions] = useState<ProtocolPosition[]>([]);
   const [borrowedPositions, setBorrowedPositions] = useState<ProtocolPosition[]>([]);
   const [currentLtv, setCurrentLtv] = useState<number>(0);
-
+  
   const { address: connectedAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
+
+  // Load the CompoundGateway contract.
   const { data: compoundGateway } = useScaffoldContract({
     contractName: "CompoundGateway",
     walletClient,
   });
 
+  // Load the ERC‑20 token contracts.
   const { data: usdc } = useScaffoldContract({
     contractName: "USDC",
     walletClient,
   });
-
   const { data: usdt } = useScaffoldContract({
     contractName: "USDT",
     walletClient,
   });
-
   const { data: usdcE } = useScaffoldContract({
     contractName: "USDCe",
     walletClient,
   });
-
-  const { data: eth } = useScaffoldContract({
-    contractName: "eth",
+  const { data: weth } = useScaffoldContract({
+    contractName: "WETH",
     walletClient,
   });
 
-  // Use a ref to hold the contract instance so that it does not cause re-renders
-  const contractRef = useRef(compoundGateway);
-  // When compoundGateway is available (or updated), store it in our ref.
+  // Pin the CompoundGateway contract so that its reference remains stable.
+  const compoundGatewayRef = useRef(compoundGateway);
   useEffect(() => {
     if (compoundGateway) {
-      contractRef.current = compoundGateway;
+      compoundGatewayRef.current = compoundGateway;
     }
   }, [compoundGateway]);
 
+  // Pin each token contract in its own ref.
+  const usdcRef = useRef(usdc);
   useEffect(() => {
-    // Run only if we have a contract and a connected address.
-    if (!contractRef.current || !contractRef.current.read || !connectedAddress) return;
+    if (usdc) usdcRef.current = usdc;
+  }, [usdc]);
 
-    const tokens: Record<string, string> = {
-      WETH: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
-      USDC: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-      USDT: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
-      "USDC.e": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
-    };
+  const usdtRef = useRef(usdt);
+  useEffect(() => {
+    if (usdt) usdtRef.current = usdt;
+  }, [usdt]);
+
+  const usdcERef = useRef(usdcE);
+  useEffect(() => {
+    if (usdcE) usdcERef.current = usdcE;
+  }, [usdcE]);
+
+  const wethRef = useRef(weth);
+  useEffect(() => {
+    if (weth) wethRef.current = weth;
+  }, [weth]);
+
+  // Build a stable token list from the pinned contracts.
+  const tokens = useMemo(() => {
+    const list: { name: string; address: string; contract: any }[] = [];
+    if (wethRef.current?.address) {
+      list.push({ name: "WETH", address: wethRef.current.address, contract: wethRef.current });
+    }
+    if (usdcRef.current?.address) {
+      list.push({ name: "USDC", address: usdcRef.current.address, contract: usdcRef.current });
+    }
+    if (usdtRef.current?.address) {
+      list.push({ name: "USDT", address: usdtRef.current.address, contract: usdtRef.current });
+    }
+    if (usdcERef.current?.address) {
+      list.push({ name: "USDC.e", address: usdcERef.current.address, contract: usdcERef.current });
+    }
+    return list;
+  }, [
+    wethRef.current?.address,
+    usdcRef.current?.address,
+    usdtRef.current?.address,
+    usdcERef.current?.address,
+  ]);
+
+  // Map token names to logo file paths from the public folder.
+  const tokenLogos: Record<string, string> = {
+    WETH: "/logos/ethereum.svg",
+    USDC: "/logos/usdc.svg",
+    USDT: "/logos/usdt.svg", // Make sure you add this logo file.
+    "USDC.e": "/logos/usdc.svg", // Using the USDC logo; adjust if needed.
+  };
+
+  // Fetch and update positions from the CompoundGateway.
+  useEffect(() => {
+    if (!connectedAddress || tokens.length === 0 || !compoundGatewayRef.current?.read) return;
 
     const fetchCompoundData = async () => {
       try {
         const newSuppliedPositions: ProtocolPosition[] = [];
         const newBorrowedPositions: ProtocolPosition[] = [];
 
-        // Function to convert the raw rate into an APY value.
+        // Helper: convert raw rates to an APY percentage.
         const convertRateToAPY = (rate: bigint) => Number(rate) / 1e25;
 
-        // For each token, fetch the supply rate, borrow rate, balance, and borrow balance.
+        // Process each token concurrently.
         await Promise.all(
-          Object.entries(tokens).map(async ([tokenName, tokenAddress]) => {
+          tokens.map(async (token) => {
+            // Retrieve the token's decimals (default to 18 if unavailable).
+            let decimals = 18;
+            try {
+              decimals = Number(await token.contract.read.decimals());
+            } catch (err) {
+              console.warn(`Could not fetch decimals for ${token.name}; defaulting to 18.`);
+            }
+
             const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw] = await Promise.all([
-              contractRef.current?.read.getSupplyRate([tokenAddress]),
-              contractRef.current?.read.getBorrowRate([tokenAddress]),
-              contractRef.current?.read.getBalance([tokenAddress, connectedAddress]),
-              contractRef.current?.read.getBorrowBalance([tokenAddress, connectedAddress]),
+              compoundGatewayRef.current!.read.getSupplyRate([token.address]),
+              compoundGatewayRef.current!.read.getBorrowRate([token.address]),
+              compoundGatewayRef.current!.read.getBalance([token.address, connectedAddress]),
+              compoundGatewayRef.current!.read.getBorrowBalance([token.address, connectedAddress]),
             ]);
 
-            const balance = Number(formatUnits(balanceRaw ?? BigInt(0), 6));
-            const borrowBalance = Number(formatUnits(borrowBalanceRaw ?? BigInt(0), 6));
+            const balance = Number(formatUnits(balanceRaw ?? BigInt(0), decimals));
+            const borrowBalance = Number(formatUnits(borrowBalanceRaw ?? BigInt(0), decimals));
 
-            console.log(`${tokenName}:`, {
-              address: tokenAddress,
+            console.log(`${token.name}:`, {
+              tokenAddress: token.address,
               supplyRate: supplyRate?.toString(),
               borrowRate: borrowRate?.toString(),
               balance,
               borrowBalance,
             });
 
+            // Create a position based on the fetched data.
             if (borrowBalance > 0) {
               newBorrowedPositions.push({
-                icon: "/logos/ethereum-logo.svg",
-                name: tokenName,
-                balance: -borrowBalance, // Use a negative value to indicate a borrow.
+                icon: tokenLogos[token.name],
+                name: token.name,
+                balance: -borrowBalance, // Negative indicates borrowing.
                 currentRate: convertRateToAPY(borrowRate ?? BigInt(0)),
-                optimalRate: convertRateToAPY(borrowRate ?? BigInt(25)),
+                optimalRate: convertRateToAPY(borrowRate ?? BigInt(0)),
               });
             } else if (balance > 0) {
               newSuppliedPositions.push({
-                icon: "/logos/ethereum-logo.svg",
-                name: tokenName,
+                icon: tokenLogos[token.name],
+                name: token.name,
                 balance,
-                currentRate: convertRateToAPY(supplyRate ?? BigInt(25)),
-                optimalRate: convertRateToAPY(supplyRate ?? BigInt(25)),
+                currentRate: convertRateToAPY(supplyRate ?? BigInt(0)),
+                optimalRate: convertRateToAPY(supplyRate ?? BigInt(0)),
               });
             }
-          }),
+          })
         );
 
-        // Update state only once with the final data.
         setSuppliedPositions(newSuppliedPositions);
         setBorrowedPositions(newBorrowedPositions);
-        // For now, we hardcode the LTV; in a real-world case, this might come from the contract.
         setCurrentLtv(75);
       } catch (error) {
         console.error("Error fetching Compound data:", error);
@@ -116,16 +168,18 @@ export const CompoundProtocolView: FC = () => {
     };
 
     fetchCompoundData();
-  }, [connectedAddress]); // Only re-run this effect if the connected address changes
+  }, [connectedAddress, tokens]);
 
   return (
     <ProtocolView
       protocolName="Compound V3"
       protocolIcon="/logos/compound.svg"
       ltv={currentLtv}
-      maxLtv={90} // Ideally, this comes from the contract as well.
+      maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
     />
   );
 };
+
+export default CompoundProtocolView;
