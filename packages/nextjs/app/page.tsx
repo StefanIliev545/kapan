@@ -2,7 +2,7 @@
 
 import type { NextPage } from "next";
 import { ExampleProtocolView } from "~~/components/ProtocolView";
-import { CompoundProtocolView } from "~~/components/CompoundProtocolView";
+import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 const Home: NextPage = () => {
   return (
     <>

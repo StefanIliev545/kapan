@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     CompoundGateway: {
-      address: "0x1e011a7Fe24AA92b2623eB6efEE51E640A109236",
+      address: "0xe4C19783231316a3a25eE17c730b9AB7890Aee65",
       abi: [
         {
           inputs: [
@@ -162,6 +162,74 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "getCompoundData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "supplyRate",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "borrowRate",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "balance",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "borrowBalance",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "contract ICompoundComet",
+              name: "comet",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "getDepositedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collaterals",
+              type: "address[]",
+            },
+            {
+              internalType: "uint128[]",
+              name: "balances",
+              type: "uint128[]",
             },
           ],
           stateMutability: "view",
