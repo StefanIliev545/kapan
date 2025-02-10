@@ -7,9 +7,10 @@ interface PositionProps {
   balance: number;
   currentRate: number;
   optimalRate: number;
+  type: "supply" | "borrow";
 }
 
-export const Position: FC<PositionProps> = ({ icon, name, balance, currentRate, optimalRate }) => {
+export const Position: FC<PositionProps> = ({ icon, name, balance, currentRate, optimalRate, type }) => {
   // Format number with consistent locale
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -19,7 +20,9 @@ export const Position: FC<PositionProps> = ({ icon, name, balance, currentRate, 
   };
 
   return (
-    <div className="grid grid-cols-5 items-center w-full p-4 bg-base-200 rounded-lg gap-4">
+    <div className={`grid grid-cols-5 items-center w-full p-4 rounded-lg gap-4 ${
+      type === "supply" ? "bg-base-200" : "bg-base-200/50"
+    }`}>
       {/* Icon and Name Section */}
       <div className="flex items-center space-x-3 col-span-1">
         <div className="w-8 h-8 relative">
@@ -31,8 +34,8 @@ export const Position: FC<PositionProps> = ({ icon, name, balance, currentRate, 
       {/* Balance Section */}
       <div className="text-center col-span-1">
         <div className="text-sm text-base-content/70">Balance</div>
-        <div className={`font-medium ${balance >= 0 ? "text-green-500" : "text-red-500"}`}>
-          {balance >= 0 ? "+" : "-"}${formatNumber(balance)}
+        <div className={`font-medium ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
+          {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
         </div>
       </div>
 
@@ -60,6 +63,7 @@ export const ExamplePosition: FC = () => {
       balance={1000.50}
       currentRate={3.5}
       optimalRate={4.2}
+      type="supply"
     />
   );
 };

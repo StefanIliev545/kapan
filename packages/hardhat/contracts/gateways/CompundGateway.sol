@@ -103,6 +103,11 @@ contract CompoundGateway is IGateway {
         }
     }
 
+    function getPrice(address token) public view returns (uint256) {
+        address priceFeed = tokenToComet[token].baseTokenPriceFeed();
+        return tokenToComet[token].getPrice(priceFeed);
+    }
+
     // New function: Aggregates all compound data needed for the readHook.
     // Returns supply rate, borrow rate, balance, and borrow balance for the given token and account.
     function getCompoundData(address token, address account)
@@ -112,7 +117,9 @@ contract CompoundGateway is IGateway {
             uint256 supplyRate,
             uint256 borrowRate,
             uint256 balance,
-            uint256 borrowBalance
+            uint256 borrowBalance,
+            uint256 price,
+            uint256 priceScale
         )
     {
         ICompoundComet comet = tokenToComet[token];
@@ -120,5 +127,7 @@ contract CompoundGateway is IGateway {
         borrowRate = comet.getBorrowRate(comet.getUtilization());
         balance = comet.balanceOf(account);
         borrowBalance = comet.borrowBalanceOf(account);
+        price = getPrice(token);
+        priceScale = comet.priceScale();
     }
 }

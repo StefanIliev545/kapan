@@ -56,7 +56,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           {suppliedPositions.length > 0 ? (
             <div className="space-y-2">
               {suppliedPositions.map((position, index) => (
-                <Position key={`supplied-${position.name}-${index}`} {...position} />
+                <Position key={`supplied-${position.name}-${index}`} {...position} type="supply" />
               ))}
             </div>
           ) : (
@@ -70,7 +70,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           {borrowedPositions.length > 0 ? (
             <div className="space-y-2">
               {borrowedPositions.map((position, index) => (
-                <Position key={`borrowed-${position.name}-${index}`} {...position} />
+                <Position key={`borrowed-${position.name}-${index}`} {...position} type="borrow" />
               ))}
             </div>
           ) : (

@@ -19,7 +19,9 @@ interface ICompoundComet {
     
     // Returns the AssetInfo struct for the asset at index i.
     function getAssetInfo(uint8 i) external view returns (AssetInfo memory);
-    
+    function getAssetInfoByAddress(address asset) external view returns (AssetInfo memory);
+    function getPrice(address priceFeed) external view returns (uint128);
+
     // Returns the collateral balance of a given account for a given asset.
     function collateralBalanceOf(address account, address asset) external view returns (uint128);
 
@@ -30,4 +32,6 @@ interface ICompoundComet {
     function getBorrowRate(uint utilization) external view returns (uint64);
     function getUtilization() external view returns (uint);
     function baseToken() external view returns (address);
+    function baseTokenPriceFeed() external view returns (address);
+    function priceScale() external pure returns (uint64);
 }

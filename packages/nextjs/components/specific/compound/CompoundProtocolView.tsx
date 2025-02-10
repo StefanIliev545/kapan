@@ -72,12 +72,11 @@ export const CompoundProtocolView: FC = () => {
 
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
-    const SECONDS_PER_YEAR = 60n * 60n * 24n * 365n;
-    const SCALE = BigInt(1e18);
-    const apr = (ratePerSecond * SECONDS_PER_YEAR * 100n) / SCALE;
-    return Number(apr);
+    const SECONDS_PER_YEAR = 60 * 60 * 24 * 365; // as a number
+    const SCALE = 1e18; // as a number
+    return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
   };
-
+  
   // Aggregate positions using useMemo.
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
@@ -92,30 +91,30 @@ export const CompoundProtocolView: FC = () => {
       decimalsRaw: any,
     ) => {
       if (!tokenAddress || !compoundData || !decimalsRaw) return;
-      const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw] = compoundData;
+      const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price, priceScale] = compoundData;
       const decimals = Number(decimalsRaw);
       const supplyAPR = supplyRate ? convertRateToAPR(BigInt(supplyRate)) : 0;
       const borrowAPR = borrowRate ? convertRateToAPR(BigInt(borrowRate)) : 0;
       const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
       const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
 
-      if (borrowBalance > 0) {
-        borrowed.push({
-          icon: tokenLogos[tokenName],
-          name: tokenName,
-          balance: -borrowBalance, // Negative indicates borrowing.
-          currentRate: borrowAPR,
-          optimalRate: borrowAPR,
-        });
-      } else if (balance > 0) {
-        supplied.push({
-          icon: tokenLogos[tokenName],
-          name: tokenName,
-          balance: balance,
-          currentRate: supplyAPR,
-          optimalRate: supplyAPR,
-        });
-      }
+      console.log(`${tokenName} price: ${price}`);
+
+      borrowed.push({
+        icon: tokenLogos[tokenName],
+        name: tokenName,
+        balance: -borrowBalance, // Negative indicates borrowing.
+        currentRate: borrowAPR,
+        optimalRate: borrowAPR,
+      });
+
+      supplied.push({
+        icon: tokenLogos[tokenName],
+        name: tokenName,
+        balance: balance,
+        currentRate: supplyAPR,
+        optimalRate: supplyAPR,
+      });
     };
 
     computePosition("WETH", wethAddress, wethCompoundData, wethDecimals);

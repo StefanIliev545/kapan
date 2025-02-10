@@ -24,35 +24,22 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("CompoundGateway", {
+  await deploy("AaveGateway", {
     from: deployer,
     // Contract constructor arguments
     args: [
-        "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // ARBI USDC
-        "0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07", //USDT
-        "0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA", //USDC.e
-        "0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486", //WETH
+        "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", //Pool Addresses Provider
+        "0x5c5228aC8BC1528482514aF3e27E692495148717", //Ui Provider
     ],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
-
-  // Get the deployed contract to interact with it after deploying.
-  const CompoundGateway = await hre.ethers.getContract<Contract>("CompoundGateway", deployer);
-  const usdcToken = await CompoundGateway.getBaseToken("0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf");
-  console.log("👋 Base Token USDC:", usdcToken);
-  const usdtToken = await CompoundGateway.getBaseToken("0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07");
-  console.log("👋 Base Token USDT:", usdtToken);
-  const usdcEToken = await CompoundGateway.getBaseToken("0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA");
-  console.log("👋 Base Token USDC.e:", usdcEToken);
-  const wethToken = await CompoundGateway.getBaseToken("0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486");
-  console.log("👋 Base Token WETH:", wethToken);
 };
 
 export default deployYourContract;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags YourContract
-deployYourContract.tags = ["CompoundGateway"];
+deployYourContract.tags = ["AAVEGateway"];

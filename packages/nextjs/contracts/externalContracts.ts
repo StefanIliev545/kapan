@@ -272,4 +272,8 @@ export const contractNameToLogo = (contractName: keyof typeof contractLogos) => 
   return contractLogos[contractName];
 };
 
+export const tokenNameToLogo = (tokenName: string) => {
+  return `/logos/${tokenName.toLowerCase()}.svg`;
+};
+
 export default externalContracts satisfies GenericContractsDeclaration;

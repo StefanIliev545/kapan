@@ -9,6 +9,7 @@ interface IGateway {
 
 
     function getBalance(address token, address user) external view returns (uint256);
+    function getBorrowBalance(address token, address user) external view returns (uint256);
     function getBorrowRate(address token) external view returns (uint256);
     function getSupplyRate(address token) external view returns (uint256);
     function getLtv(address token, address user) external view returns (uint256);
