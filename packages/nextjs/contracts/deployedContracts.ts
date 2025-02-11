@@ -357,7 +357,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xfFD89CD4cA0e083f25E1bFFc2fb480e251Cc2208",
+      address: "0xFe6543D91309b23f73EdB59f0dc98BF6f012D03F",
       abi: [
         {
           inputs: [
@@ -379,6 +379,11 @@ const deployedContracts = {
             {
               internalType: "contract ICompoundComet",
               name: "_ethComet",
+              type: "address",
+            },
+            {
+              internalType: "contract FeedRegistryInterface",
+              name: "_priceFeed",
               type: "address",
             },
           ],
@@ -694,6 +699,56 @@ const deployedContracts = {
               type: "address",
             },
             {
+              internalType: "contract AggregatorV3Interface",
+              name: "feed",
+              type: "address",
+            },
+          ],
+          name: "overrideFeed",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "overrideFeeds",
+          outputs: [
+            {
+              internalType: "contract AggregatorV3Interface",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "priceFeed",
+          outputs: [
+            {
+              internalType: "contract FeedRegistryInterface",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
               internalType: "address",
               name: "user",
               type: "address",
@@ -765,7 +820,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x6718b9232B15d61C602a7C60acfF41606c129Abb",
+      address: "0xbC373a3a2A2cb66772b6d3e1E8714a631a1F6670",
       abi: [
         {
           inputs: [

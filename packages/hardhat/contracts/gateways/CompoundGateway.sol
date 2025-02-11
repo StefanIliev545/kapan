@@ -3,10 +3,15 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "../interfaces/IGateway.sol";
 import "../interfaces/ICompoundComet.sol";
+import {FeedRegistryInterface} from "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
+import {Denominations} from "@chainlink/contracts/src/v0.8/Denominations.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract CompoundGateway is IGateway {
 
     mapping(address => ICompoundComet) public tokenToComet;
+    FeedRegistryInterface public priceFeed;
+    mapping(address => AggregatorV3Interface) public overrideFeeds;
 
     modifier whenCometExists(address token) {
         if (address(tokenToComet[token]) != address(0)) {
@@ -18,7 +23,8 @@ contract CompoundGateway is IGateway {
         ICompoundComet _USDCComet, 
         ICompoundComet _USDTComet, 
         ICompoundComet _USDCeComet, 
-        ICompoundComet _ethComet
+        ICompoundComet _ethComet,
+        FeedRegistryInterface _priceFeed
     ) {
         require(address(_USDCComet.baseToken()) != address(0), "USDCComet is not set");
         require(address(_USDTComet.baseToken()) != address(0), "USDTComet is not set");
@@ -29,6 +35,11 @@ contract CompoundGateway is IGateway {
         tokenToComet[address(_USDTComet.baseToken())] = _USDTComet;
         tokenToComet[address(_USDCeComet.baseToken())] = _USDCeComet;
         tokenToComet[address(_ethComet.baseToken())] = _ethComet;
+        priceFeed = _priceFeed;
+    }
+
+    function overrideFeed(address token, AggregatorV3Interface feed) external {
+        overrideFeeds[token] = feed;
     }
 
     function getSupplyRate(address token) external view whenCometExists(token) returns (uint256 supplyRate, bool success) {
@@ -112,8 +123,22 @@ contract CompoundGateway is IGateway {
     }
 
     function getPrice(address token) public view returns (uint256) {
-        address priceFeed = tokenToComet[token].baseTokenPriceFeed();
-        return tokenToComet[token].getPrice(priceFeed);
+        if (address(overrideFeeds[token]) != address(0)) {
+            (, int256 price,,,) = overrideFeeds[token].latestRoundData();
+            return uint256(price);
+        }
+
+        if (address(priceFeed) != address(0)) {
+            (, int256 price,,,) = priceFeed.latestRoundData(token, Denominations.USD);
+            return uint256(price);
+        }
+
+        address theirFeed = tokenToComet[token].baseTokenPriceFeed();
+        if (theirFeed != address(0)) {
+            return tokenToComet[token].getPrice(theirFeed);
+        }
+
+        return 0;
     }
 
     // New function: Aggregates all compound data needed for the readHook.

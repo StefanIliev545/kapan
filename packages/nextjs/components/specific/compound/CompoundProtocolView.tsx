@@ -87,7 +87,7 @@ export const CompoundProtocolView: FC = () => {
       const decimals = Number(decimalsRaw);
       const supplyAPR = supplyRate ? convertRateToAPR(BigInt(supplyRate)) : 0;
       const borrowAPR = borrowRate ? convertRateToAPR(BigInt(borrowRate)) : 0;
-      const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
+      const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) * Number(formatUnits(price, 8)) : 0;
       const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
 
       console.log(`${tokenName} address: ${tokenAddress}`);
