@@ -99,6 +99,7 @@ export const CompoundProtocolView: FC = () => {
         balance: -borrowBalance,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
+        collateralView: <CompoundCollateralView baseToken={tokenAddress} />,
       });
 
       supplied.push({
@@ -145,13 +146,6 @@ export const CompoundProtocolView: FC = () => {
         suppliedPositions={suppliedPositions}
         borrowedPositions={borrowedPositions}
       />
-      {/* Add CompoundCollateralView for each market */}
-      <div className="container mx-auto px-6">
-        {wethAddress && <CompoundCollateralView baseToken={wethAddress} />}
-        {usdcAddress && <CompoundCollateralView baseToken={usdcAddress} />}
-        {usdtAddress && <CompoundCollateralView baseToken={usdtAddress} />}
-        {usdcEAddress && <CompoundCollateralView baseToken={usdcEAddress} />}
-      </div>
     </div>
   );
 };

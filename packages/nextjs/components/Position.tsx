@@ -13,18 +13,20 @@ interface PositionProps {
   currentRate: number;
   optimalRate?: number; // Optional since we'll fetch it
   type: "supply" | "borrow";
-  protocolName: string;  // Which protocol the position belongs to
-  tokenAddress: string;  // To fetch the optimal rate
+  protocolName: string; // Which protocol the position belongs to
+  tokenAddress: string; // To fetch the optimal rate
+  collateralView?: React.ReactNode; // Optional collateral view content
 }
 
-export const Position: FC<PositionProps> = ({ 
-  icon, 
-  name, 
-  balance, 
-  currentRate, 
+export const Position: FC<PositionProps> = ({
+  icon,
+  name,
+  balance,
+  currentRate,
   type,
   protocolName,
   tokenAddress,
+  collateralView,
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -34,159 +36,213 @@ export const Position: FC<PositionProps> = ({
   const hasBalance = type === "supply" ? balance > 0 : balance < 0;
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract.
-  // The contract returns a tuple [optimalProtocol, optimalRate] where optimalRate is a fixed-point value.
   const { data: optimalRateData } = useScaffoldReadContract({
     contractName: "OptimalInterestRateFinder",
     functionName: type === "supply" ? "findOptimalSupplyRate" : "findOptimalBorrowRate",
     args: [tokenAddress],
   });
 
-  // Debug log to see what we're getting.
   console.log(`Optimal rate data for ${name}: `, optimalRateData);
 
-  // When the contract returns data, assume it is in the form: [string, bigint]
-  // optimalRateData is returned in fixed-point representation (8 extra decimals),
-  // so we divide by 1e8 to convert back to a percentage.
   let optimalProtocol = "";
   let optimalRateDisplay = 0;
   if (optimalRateData) {
     const [proto, rate] = optimalRateData;
     optimalProtocol = proto;
-    // Convert fixed‑point value back to a percentage.
     optimalRateDisplay = Number(rate) / 1e8;
   }
 
-  // Debug log for protocol comparison.
   console.log(
     `Protocol comparison: ${optimalProtocol.toLowerCase()} vs ${protocolName.split(" ")[0].toLowerCase()}`
   );
 
-  // Format numbers using a consistent locale.
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatNumber = (num: number) =>
+    new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(Math.abs(num));
-  };
 
-  // Retrieve protocol logo.
-  const getProtocolLogo = (protocol: string) => {
-    return tokenNameToLogo(protocol);
-  };
+  const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
   return (
     <>
-      <div
-        className={`grid grid-cols-1 md:grid-cols-7 items-center w-full p-4 rounded-lg gap-4 ${
-          type === "supply" ? "bg-base-200" : "bg-base-200/50"
-        }`}
-      >
-        {/* Main Content - Stacks on mobile */}
-        <div className="flex flex-col md:flex-row md:col-span-5 gap-4">
-          {/* Icon, Name, and Info Section */}
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-lg">{name}</span>
-              <div className="dropdown dropdown-end dropdown-bottom">
-                <label tabIndex={0} className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                  <Image 
-                    src="/logos/info-button.svg" 
-                    alt="info" 
-                    width={18}
-                    height={18}
-                    className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
-                  />
-                </label>
-                <div 
-                  tabIndex={0} 
-                  className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-                  style={{ 
-                    right: 'auto',
-                    transform: 'translateX(-50%)',
-                    left: '50%',
-                  }}
-                >
-                  <div className="card-body">
-                    <h3 className="card-title text-sm">{name} Details</h3>
-                    <div className="text-xs space-y-1">
-                      <p className="text-base-content/70">Contract Address:</p>
-                      <p className="font-mono break-all">{tokenAddress}</p>
-                      <p className="text-base-content/70">Protocol:</p>
-                      <p>{protocolName}</p>
-                      <p className="text-base-content/70">Type:</p>
-                      <p className="capitalize">{type} Position</p>
+      <div className="collapse">
+        {/* Place the toggle input as the first child when collateralView exists */}
+        {collateralView && (
+          <input
+            type="checkbox"
+            id={`collateral-${name}`}
+            className="collapse-toggle hidden"
+          />
+        )}
+
+        <div
+          className={`grid grid-cols-1 md:grid-cols-7 items-center w-full p-4 rounded-lg gap-4 ${
+            type === "supply" ? "bg-base-200" : "bg-base-200/50"
+          }`}
+        >
+          {/* Main Content */}
+          <div className="flex flex-col md:flex-row md:col-span-5 gap-4">
+            {/* Icon, Name, and Info Section */}
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
+                <Image
+                  src={icon}
+                  alt={`${name} icon`}
+                  layout="fill"
+                  className="rounded-full"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-lg">{name}</span>
+                <div className="dropdown dropdown-end dropdown-bottom">
+                  <label
+                    tabIndex={0}
+                    className="cursor-pointer flex items-center justify-center h-[1.125em]"
+                  >
+                    <Image
+                      src="/logos/info-button.svg"
+                      alt="info"
+                      width={18}
+                      height={18}
+                      className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
+                    />
+                  </label>
+                  <div
+                    tabIndex={0}
+                    className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
+                    style={{
+                      right: "auto",
+                      transform: "translateX(-50%)",
+                      left: "50%",
+                    }}
+                  >
+                    <div className="card-body">
+                      <h3 className="card-title text-sm">{name} Details</h3>
+                      <div className="text-xs space-y-1">
+                        <p className="text-base-content/70">Contract Address:</p>
+                        <p className="font-mono break-all">{tokenAddress}</p>
+                        <p className="text-base-content/70">Protocol:</p>
+                        <p>{protocolName}</p>
+                        <p className="text-base-content/70">Type:</p>
+                        <p className="capitalize">{type} Position</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Stats Section - Flex row on mobile, grid on desktop */}
-          <div className="flex md:grid md:grid-cols-3 justify-between items-center gap-4">
-            {/* Balance Section */}
-            <div className="text-center">
-              <div className="text-sm text-base-content/70">Balance</div>
-              <div className={`font-medium ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
-                {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
+            {/* Stats Section */}
+            <div className="flex md:grid md:grid-cols-3 justify-between items-center gap-4">
+              <div className="text-center">
+                <div className="text-sm text-base-content/70">Balance</div>
+                <div
+                  className={`font-medium ${
+                    type === "supply" ? "text-green-500" : "text-red-500"
+                  }`}
+                >
+                  {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-base-content/70">Current Rate</div>
+                <div className="font-medium">{currentRate.toFixed(2)}%</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-base-content/70">Optimal Rate</div>
+                <div
+                  className={`font-medium ${
+                    optimalProtocol.toLowerCase() !==
+                    protocolName.split(" ")[0].toLowerCase()
+                      ? "text-primary"
+                      : ""
+                  }`}
+                >
+                  {optimalRateDisplay.toFixed(2)}%
+                  <span className="ml-1 inline-flex items-center">
+                    <Image
+                      src={getProtocolLogo(optimalProtocol)}
+                      alt={optimalProtocol}
+                      width={18}
+                      height={18}
+                      className="inline-block rounded-full min-w-[1.125em] min-h-[1.125em]"
+                    />
+                  </span>
+                </div>
               </div>
             </div>
-
-            {/* Current Rate Section */}
-            <div className="text-center">
-              <div className="text-sm text-base-content/70">Current Rate</div>
-              <div className="font-medium">{currentRate.toFixed(2)}%</div>
-            </div>
-
-            {/* Optimal Rate Section */}
-            <div className="text-center">
-              <div className="text-sm text-base-content/70">Optimal Rate</div>
-              <div className={`font-medium ${
-                optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase()
-                  ? "text-primary"
-                  : ""
-              }`}>
-                {optimalRateDisplay.toFixed(2)}%
-                <span className="ml-1 inline-flex items-center">
-                  <Image
-                    src={getProtocolLogo(optimalProtocol)}
-                    alt={optimalProtocol}
-                    width={18}
-                    height={18}
-                    className="inline-block rounded-full min-w-[1.125em] min-h-[1.125em]"
-                  />
-                </span>
-              </div>
-            </div>
           </div>
-        </div>
 
-        {/* Action Buttons - Always at bottom on mobile */}
-        <div className={`flex justify-end gap-2 md:col-span-2`}>
-          {type === "supply" ? (
-            <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>
-              Deposit
-            </button>
-          ) : (
-            <button 
-              className="btn btn-sm btn-primary" 
-              onClick={() => setIsRepayModalOpen(true)}
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2 md:col-span-2">
+            {type === "supply" ? (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => setIsDepositModalOpen(true)}
+              >
+                Deposit
+              </button>
+            ) : (
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => setIsRepayModalOpen(true)}
+                disabled={!hasBalance}
+              >
+                Repay
+              </button>
+            )}
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => setIsMoveModalOpen(true)}
               disabled={!hasBalance}
             >
-              Repay
+              Move
             </button>
-          )}
-          <button 
-            className="btn btn-sm btn-outline" 
-            onClick={() => setIsMoveModalOpen(true)}
-            disabled={!hasBalance}
-          >
-            Move
-          </button>
+            {collateralView && (
+              <label
+                htmlFor={`collateral-${name}`}
+                className="swap swap-rotate btn btn-sm btn-circle btn-ghost"
+              >
+                <svg
+                  className="swap-off w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+                <svg
+                  className="swap-on w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 15l7-7-7-7"
+                  />
+                </svg>
+              </label>
+            )}
+          </div>
         </div>
+
+        {/* Collateral Content */}
+        {collateralView && (
+          <div className="collapse-content">
+            <div className="grid grid-cols-1 md:grid-cols-7 w-full">
+              <div className="md:col-span-5 md:col-start-1">{collateralView}</div>
+            </div>
+          </div>
+        )}
       </div>
 
       <MovePositionModal
@@ -217,17 +273,21 @@ export const Position: FC<PositionProps> = ({
   );
 };
 
-// Example usage:
 export const ExamplePosition: FC = () => {
   return (
     <Position
-      icon="/logos/usdc-coin-usdc-logo.svg" // Replace with actual token icons.
+      icon="/logos/usdc-coin-usdc-logo.svg"
       name="USDC"
       balance={1000.5}
       currentRate={3.5}
       type="supply"
       protocolName="Aave V3"
       tokenAddress="0x0000000000000000000000000000000000000000"
+      collateralView={
+        <div className="p-4 bg-gray-100">
+          This is the collateral view content.
+        </div>
+      }
     />
   );
 };

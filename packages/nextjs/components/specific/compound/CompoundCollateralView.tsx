@@ -36,30 +36,31 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
   const [collateralAddresses, collateralBalances, collateralDisplayNames] = collateralData;
 
   return (
-    <div className="bg-base-200 rounded-lg p-4 mt-4">
-      <h3 className="text-lg font-semibold mb-3">Collateral Positions</h3>
-      <div className="space-y-2">
-        {collateralAddresses.map((address: string, index: number) => {
-          const balance = Number(formatUnits(collateralBalances[index], 18)); // Assuming 18 decimals
-          if (balance <= 0) return null;
+    <div className="bg-base-200 rounded-lg p-2 mt-2">
+      <div className="flex flex-col gap-2">
+        <span className="text-sm text-base-content/70">Collateral</span>
+        <div className="flex flex-wrap gap-4">
+          {collateralAddresses.map((address: string, index: number) => {
+            const balance = Number(formatUnits(collateralBalances[index], 18));
+            if (balance <= 0) return null;
 
-          // Extract token name from address (you might want to improve this)
-          const name = collateralDisplayNames[index];
+            const name = collateralDisplayNames[index];
 
-          return (
-            <div key={address} className="flex items-center justify-between p-2 bg-base-100 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 relative">
-                  <Image src={tokenNameToLogo(name)} alt={`${name} icon`} layout="fill" className="rounded-full" />
+            return (
+              <div key={address} className="flex-none bg-base-100 rounded-lg p-2 min-w-[150px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 relative">
+                    <Image src={tokenNameToLogo(name)} alt={`${name} icon`} layout="fill" className="rounded-full" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{name}</span>
+                    <span className="text-sm text-base-content/70">{formatNumber(balance)}</span>
+                  </div>
                 </div>
-                <span className="font-medium">{name}</span>
               </div>
-              <div className="text-right">
-                <div className="font-medium">{formatNumber(balance)}</div>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

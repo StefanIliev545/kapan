@@ -8,6 +8,7 @@ export interface ProtocolPosition {
   balance: number;
   currentRate: number;
   tokenAddress: string;
+  collateralView?: React.ReactNode;
 }
 
 interface ProtocolViewProps {
