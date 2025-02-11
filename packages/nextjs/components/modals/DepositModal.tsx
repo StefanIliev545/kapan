@@ -1,7 +1,12 @@
 import { FC, useState } from "react";
 import Image from "next/image";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useWalletClient, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
+import {
+  useWalletClient,
+  useWriteContract,
+  useReadContract,
+  usePublicClient,
+} from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 
@@ -24,19 +29,19 @@ export const DepositModal: FC<DepositModalProps> = ({
   protocolName,
 }) => {
   const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Get the RouterGateway contract deployment from Scaffold‑Eth
+  // Get the RouterGateway contract from Scaffold‑Eth
   const { data: routerGateway } = useScaffoldContract({
     contractName: "RouterGateway",
   });
 
-  // Use Scaffold‑Eth's write hook for sending transactions to RouterGateway
+  // Write hooks
   const { writeContractAsync: writeContractAsync } = useScaffoldWriteContract({
     contractName: "RouterGateway",
   });
-
   const { writeContractAsync: writeErc20Async } = useWriteContract();
 
   // Read token balance
@@ -53,46 +58,59 @@ export const DepositModal: FC<DepositModalProps> = ({
     abi: ERC20ABI,
     functionName: "decimals",
   });
-  // Format balance for display
-  const formattedBalance = balance && decimals 
-    ? formatUnits(balance as bigint, decimals as number) 
-    : "0";
+
+  const formattedBalance =
+    balance && decimals
+      ? formatUnits(balance as bigint, decimals as number)
+      : "0";
 
   const handleDeposit = async () => {
-    if (!walletClient || !routerGateway) return;
+    if (!walletClient || !routerGateway || !publicClient) return;
     try {
       setLoading(true);
-      // Parse the deposit amount – adjust decimals if necessary (here we assume 18)
+      // Parse the deposit amount using the token's decimals
       const depositAmount = parseUnits(amount, decimals as number);
 
       const spenderAddress = routerGateway.address as `0x${string}`;
       const contractAddress = token.address as `0x${string}`;
-      const ownerAddress = walletClient?.account.address as `0x${string}`;
+      const ownerAddress = walletClient.account.address as `0x${string}`;
 
       console.log(`Protocol name: ${protocolName}`);
       console.log(`Spender address: ${spenderAddress}`);
       console.log(`Contract address: ${contractAddress}`);
       console.log(`Owner address: ${ownerAddress}`);
 
+      // Approve the RouterGateway to spend tokens
       const approveTx = await writeErc20Async({
         address: contractAddress,
         abi: ERC20ABI,
         functionName: "approve",
         args: [spenderAddress, depositAmount],
       });
+      console.log("Approve transaction sent:", approveTx);
 
-      // Call supplyWithPermit on RouterGateway:
-      // The expected arguments: protocolName, token address, user, amount, deadline, v, r, s
-      const tx = await writeContractAsync({
+      // Wait for the approve transaction receipt
+      await publicClient.waitForTransactionReceipt({ hash: approveTx as `0x${string}` });
+      console.log("Approve transaction confirmed");
+
+      // Call the supply function on RouterGateway
+      const supplyTx = await writeContractAsync({
         functionName: "supply",
         args: [
-          protocolName.toLowerCase(), // ensure protocol name matches your mapping (e.g. "aave")
+          protocolName.toLowerCase(),
           token.address,
-          walletClient?.account.address,
+          ownerAddress,
           depositAmount,
         ],
       });
-      console.log("Deposit transaction sent:", tx);
+      console.log("Supply transaction sent:", supplyTx);
+
+      // Wait for the supply transaction receipt
+      await publicClient.waitForTransactionReceipt({ hash: supplyTx as `0x${string}` });
+      console.log("Supply transaction confirmed");
+
+      // Once everything is confirmed, close the modal.
+      onClose();
     } catch (error) {
       console.error("Deposit failed:", error);
     } finally {
@@ -122,7 +140,7 @@ export const DepositModal: FC<DepositModalProps> = ({
 
           <div>
             <label className="text-sm text-base-content/70">
-              Amount 
+              Amount{" "}
               <span className="float-right">
                 Balance: {Number(formattedBalance).toFixed(4)} {token.name}
               </span>
@@ -136,7 +154,7 @@ export const DepositModal: FC<DepositModalProps> = ({
               max={formattedBalance}
             />
             <div className="text-right mt-1">
-              <button 
+              <button
                 className="btn btn-xs"
                 onClick={() => setAmount(formattedBalance)}
               >
