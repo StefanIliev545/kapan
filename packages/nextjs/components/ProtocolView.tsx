@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useState, useMemo } from "react";
 import Image from "next/image";
 import { Position } from "./Position";
 
@@ -29,6 +29,24 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 }) => {
   const [showAll, setShowAll] = useState(false);
 
+  // Calculate net balance
+  const netBalance = useMemo(() => {
+    const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
+    const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
+    return totalSupplied - totalBorrowed;
+  }, [suppliedPositions, borrowedPositions]);
+
+  // Format currency with sign
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Math.abs(amount));
+    return amount >= 0 ? formatted : `-${formatted}`;
+  };
+
   // Filter positions based on showAll toggle
   const filteredSuppliedPositions = showAll 
     ? suppliedPositions 
@@ -48,7 +66,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               <div className="w-10 h-10 relative">
                 <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
               </div>
-              <div className="text-2xl font-bold">{protocolName}</div>
+              <div className="flex flex-col">
+                <div className="text-2xl font-bold">{protocolName}</div>
+                <div className="text-base-content/70">
+                  Balance: {formatCurrency(netBalance)}
+                </div>
+              </div>
             </div>
 
             {/* Show All Toggle */}
