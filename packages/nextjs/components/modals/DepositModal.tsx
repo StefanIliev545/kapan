@@ -1,8 +1,8 @@
 import { FC, useState } from "react";
 import Image from "next/image";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { useWalletClient, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits } from "viem";
+import { useWalletClient, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
+import { parseUnits, formatUnits } from "viem";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 
 interface DepositModalProps {
@@ -32,26 +32,44 @@ export const DepositModal: FC<DepositModalProps> = ({
     contractName: "RouterGateway",
   });
 
-  // Use Scaffold‑Eth’s write hook for sending transactions to RouterGateway
+  // Use Scaffold‑Eth's write hook for sending transactions to RouterGateway
   const { writeContractAsync: writeContractAsync } = useScaffoldWriteContract({
     contractName: "RouterGateway",
   });
 
   const { writeContractAsync: writeErc20Async } = useWriteContract();
 
+  // Read token balance
+  const { data: balance } = useReadContract({
+    address: token.address as `0x${string}`,
+    abi: ERC20ABI,
+    functionName: "balanceOf",
+    args: [walletClient?.account.address as `0x${string}`],
+  });
+
+  // Read token decimals
+  const { data: decimals } = useReadContract({
+    address: token.address as `0x${string}`,
+    abi: ERC20ABI,
+    functionName: "decimals",
+  });
+  // Format balance for display
+  const formattedBalance = balance && decimals 
+    ? formatUnits(BigInt(balance), decimals) 
+    : "0";
+
   const handleDeposit = async () => {
     if (!walletClient || !routerGateway) return;
     try {
       setLoading(true);
       // Parse the deposit amount – adjust decimals if necessary (here we assume 18)
-      const depositAmount = parseUnits(amount, 18);
-      // Set a deadline 1 hour from now
-      const deadline = Math.floor(Date.now() / 1000) + 3600;
+      const depositAmount = parseUnits(amount, decimals);
 
       const spenderAddress = routerGateway.address as `0x${string}`;
       const contractAddress = token.address as `0x${string}`;
       const ownerAddress = walletClient?.account.address as `0x${string}`;
 
+      console.log(`Protocol name: ${protocolName}`);
       console.log(`Spender address: ${spenderAddress}`);
       console.log(`Contract address: ${contractAddress}`);
       console.log(`Owner address: ${ownerAddress}`);
@@ -106,14 +124,28 @@ export const DepositModal: FC<DepositModalProps> = ({
           </div>
 
           <div>
-            <label className="text-sm text-base-content/70">Amount</label>
+            <label className="text-sm text-base-content/70">
+              Amount 
+              <span className="float-right">
+                Balance: {Number(formattedBalance).toFixed(4)} {token.name}
+              </span>
+            </label>
             <input
               type="number"
               className="input input-bordered w-full"
               placeholder="0.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              max={formattedBalance}
             />
+            <div className="text-right mt-1">
+              <button 
+                className="btn btn-xs"
+                onClick={() => setAmount(formattedBalance)}
+              >
+                Max
+              </button>
+            </div>
           </div>
 
           <div className="text-sm">

@@ -357,7 +357,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x5DaAced60F47CF16d01761b3f5B04C9676c33DE1",
+      address: "0x940Dc92F951B109520237686e4C4021C011024f6",
       abi: [
         {
           inputs: [
@@ -863,7 +863,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x8c33b08E2c25c4e6439B5525b3f4F2BCc3332Fb7",
+      address: "0x341804B0b998C95974A6966068324E75B833d7Fd",
       abi: [
         {
           inputs: [
@@ -1021,7 +1021,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x0defc29DA52800F541Bb07ad264D7eD5735e4CfA",
+      address: "0xBE1f196001D58586Aa78eFdeC47a44f107b70AbC",
       abi: [
         {
           inputs: [

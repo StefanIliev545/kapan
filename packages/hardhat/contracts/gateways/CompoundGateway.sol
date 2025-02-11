@@ -67,8 +67,10 @@ contract CompoundGateway is IGateway {
 
     function deposit(address token, address user, uint256 amount) external cometMustExist(token) {
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(address(this), amount);
-        tokenToComet[token].supplyTo(user, token, amount);
+        
+        ICompoundComet comet = tokenToComet[token];
+        IERC20(token).approve(address(comet), amount);
+        comet.supplyTo(user, token, amount);
     }
 
     function withdraw(address token, address user, uint256 amount) external {

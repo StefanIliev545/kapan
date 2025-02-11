@@ -43,8 +43,6 @@ export const Position: FC<PositionProps> = ({
     args: [tokenAddress],
   });
 
-  console.log(`Optimal rate data for ${name}: `, optimalRateData);
-
   let optimalProtocol = "";
   let optimalRateDisplay = 0;
   if (optimalRateData) {
@@ -52,10 +50,6 @@ export const Position: FC<PositionProps> = ({
     optimalProtocol = proto;
     optimalRateDisplay = Number(rate) / 1e8;
   }
-
-  console.log(
-    `Protocol comparison: ${optimalProtocol.toLowerCase()} vs ${protocolName.split(" ")[0].toLowerCase()}`
-  );
 
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {

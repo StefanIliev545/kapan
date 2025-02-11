@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "hardhat/console.sol";
+
 contract RouterGateway {
     using SafeERC20 for IERC20;
 
@@ -63,12 +65,15 @@ contract RouterGateway {
         require(address(gateway) != address(0), "Protocol not supported");
 
         // Transfer tokens from user to this contract
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        console.log("Transferring tokens from user to this contract", amount);
+        IERC20(token).safeTransferFrom(user, address(this), amount);
 
         // Approve gateway to spend tokens
+        console.log("Approving gateway to spend tokens");
         IERC20(token).approve(address(gateway), amount);
 
         // Forward deposit call to the appropriate gateway
+        console.log("Forwarding deposit call to the appropriate gateway");
         gateway.deposit(token, user, amount);
     }
 } 
