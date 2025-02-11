@@ -77,91 +77,95 @@ export const Position: FC<PositionProps> = ({
   return (
     <>
       <div
-        className={`grid ${
-          type === "supply" ? "grid-cols-7" : "grid-cols-6"
-        } items-center w-full p-4 rounded-lg gap-4 ${
+        className={`grid grid-cols-1 md:grid-cols-7 items-center w-full p-4 rounded-lg gap-4 ${
           type === "supply" ? "bg-base-200" : "bg-base-200/50"
         }`}
       >
-        {/* Icon, Name, and Info Section */}
-        <div className="flex items-center space-x-3 col-span-1">
-          <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
-            <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-lg">{name}</span>
-            <div className="dropdown dropdown-end dropdown-bottom">
-              <label tabIndex={0} className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                <Image 
-                  src="/logos/info-button.svg" 
-                  alt="info" 
-                  width={18}
-                  height={18}
-                  className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
-                />
-              </label>
-              <div 
-                tabIndex={0} 
-                className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-                style={{ 
-                  right: 'auto',
-                  transform: 'translateX(-50%)',
-                  left: '50%',
-                }}
-              >
-                <div className="card-body">
-                  <h3 className="card-title text-sm">{name} Details</h3>
-                  <div className="text-xs space-y-1">
-                    <p className="text-base-content/70">Contract Address:</p>
-                    <p className="font-mono break-all">{tokenAddress}</p>
-                    <p className="text-base-content/70">Protocol:</p>
-                    <p>{protocolName}</p>
-                    <p className="text-base-content/70">Type:</p>
-                    <p className="capitalize">{type} Position</p>
+        {/* Main Content - Stacks on mobile */}
+        <div className="flex flex-col md:flex-row md:col-span-5 gap-4">
+          {/* Icon, Name, and Info Section */}
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
+              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-lg">{name}</span>
+              <div className="dropdown dropdown-end dropdown-bottom">
+                <label tabIndex={0} className="cursor-pointer flex items-center justify-center h-[1.125em]">
+                  <Image 
+                    src="/logos/info-button.svg" 
+                    alt="info" 
+                    width={18}
+                    height={18}
+                    className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
+                  />
+                </label>
+                <div 
+                  tabIndex={0} 
+                  className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
+                  style={{ 
+                    right: 'auto',
+                    transform: 'translateX(-50%)',
+                    left: '50%',
+                  }}
+                >
+                  <div className="card-body">
+                    <h3 className="card-title text-sm">{name} Details</h3>
+                    <div className="text-xs space-y-1">
+                      <p className="text-base-content/70">Contract Address:</p>
+                      <p className="font-mono break-all">{tokenAddress}</p>
+                      <p className="text-base-content/70">Protocol:</p>
+                      <p>{protocolName}</p>
+                      <p className="text-base-content/70">Type:</p>
+                      <p className="capitalize">{type} Position</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Balance Section */}
-        <div className="text-center col-span-1">
-          <div className="text-sm text-base-content/70">Balance</div>
-          <div className={`font-medium ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
-            {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
+          {/* Stats Section - Flex row on mobile, grid on desktop */}
+          <div className="flex md:grid md:grid-cols-3 justify-between items-center gap-4">
+            {/* Balance Section */}
+            <div className="text-center">
+              <div className="text-sm text-base-content/70">Balance</div>
+              <div className={`font-medium ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
+                {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
+              </div>
+            </div>
+
+            {/* Current Rate Section */}
+            <div className="text-center">
+              <div className="text-sm text-base-content/70">Current Rate</div>
+              <div className="font-medium">{currentRate.toFixed(2)}%</div>
+            </div>
+
+            {/* Optimal Rate Section */}
+            <div className="text-center">
+              <div className="text-sm text-base-content/70">Optimal Rate</div>
+              <div className={`font-medium ${
+                optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase()
+                  ? "text-primary"
+                  : ""
+              }`}>
+                {optimalRateDisplay.toFixed(2)}%
+                <span className="ml-1 inline-flex items-center">
+                  <Image
+                    src={getProtocolLogo(optimalProtocol)}
+                    alt={optimalProtocol}
+                    width={18}
+                    height={18}
+                    className="inline-block rounded-full min-w-[1.125em] min-h-[1.125em]"
+                  />
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Current Rate Section */}
-        <div className="text-center col-span-1">
-          <div className="text-sm text-base-content/70">Current Rate</div>
-          <div className="font-medium">{currentRate.toFixed(2)}%</div>
-        </div>
-
-        {/* Optimal Rate Section */}
-        <div className="text-center col-span-1">
-          <div className="text-sm text-base-content/70">Optimal Rate</div>
-          <div className={`font-medium ${
-            optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase()
-              ? "text-primary"
-              : ""
-          }`}>
-            {optimalRateDisplay.toFixed(2)}%
-            <span className="ml-1 inline-flex items-center">
-              <Image
-                src={getProtocolLogo(optimalProtocol)}
-                alt={optimalProtocol}
-                width={18}
-                height={18}
-                className="inline-block rounded-full min-w-[1.125em] min-h-[1.125em]"
-              />
-            </span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className={`text-center ${type === "supply" ? "col-span-2" : "col-span-1"} flex justify-end gap-2`}>
+        {/* Action Buttons - Always at bottom on mobile */}
+        <div className={`flex justify-end gap-2 md:col-span-2`}>
           {type === "supply" ? (
             <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>
               Deposit

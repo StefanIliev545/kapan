@@ -39,80 +39,88 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     : borrowedPositions.filter(p => p.balance < 0);
 
   return (
-    <div className="w-full p-6 space-y-8">
-      {/* Protocol Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 relative">
-            <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
-          </div>
-          <div className="text-2xl font-bold">{protocolName}</div>
-        </div>
+    <div className="w-full h-full flex flex-col hide-scrollbar">
+      {/* Sticky Header - Using navbar height variable */}
+      <div className="sticky sticky-below-nav bg-base-100 shadow-sm z-10">
+        <div className="p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 relative">
+                <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
+              </div>
+              <div className="text-2xl font-bold">{protocolName}</div>
+            </div>
 
-        {/* Show All Toggle */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-base-content/70">Show all</span>
-          <input
-            type="checkbox"
-            className="toggle toggle-primary toggle-sm"
-            checked={showAll}
-            onChange={(e) => setShowAll(e.target.checked)}
-          />
-        </div>
+            {/* Show All Toggle */}
+            <div className="flex items-center gap-2 order-last md:order-none">
+              <span className="text-sm text-base-content/70">Show all</span>
+              <input
+                type="checkbox"
+                className="toggle toggle-primary toggle-sm"
+                checked={showAll}
+                onChange={(e) => setShowAll(e.target.checked)}
+              />
+            </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="text-lg text-base-content/70">Current LTV</span>
-            <span className="text-xl font-medium">{ltv}%</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg text-base-content/70">Max LTV</span>
-            <span className="text-xl font-medium">{maxLtv}%</span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-base-content/70">Current LTV</span>
+                <span className="text-xl font-medium">{ltv}%</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-base-content/70">Max LTV</span>
+                <span className="text-xl font-medium">{maxLtv}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
-        {/* Supplied Assets */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-4 text-center">Supplied Assets</h2>
-          {filteredSuppliedPositions.length > 0 ? (
-            <div className="space-y-2">
-              {filteredSuppliedPositions.map((position, index) => (
-                <Position 
-                  key={`supplied-${position.name}-${index}`} 
-                  {...position} 
-                  type="supply" 
-                  protocolName={protocolName}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
-              {showAll ? "No available assets" : "No supplied assets"}
-            </div>
-          )}
-        </div>
+      {/* Content Area - Fill remaining space */}
+      <div className="flex-grow p-6 pt-4 space-y-8">
+        {/* Positions Grid - Changes to stack on smaller screens */}
+        <div className="grid lg:grid-cols-2 grid-cols-1 gap-8">
+          {/* Supplied Assets */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold mb-4 text-center">Supplied Assets</h2>
+            {filteredSuppliedPositions.length > 0 ? (
+              <div className="space-y-2">
+                {filteredSuppliedPositions.map((position, index) => (
+                  <Position 
+                    key={`supplied-${position.name}-${index}`} 
+                    {...position} 
+                    type="supply" 
+                    protocolName={protocolName}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                {showAll ? "No available assets" : "No supplied assets"}
+              </div>
+            )}
+          </div>
 
-        {/* Borrowed Assets */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-4 text-center">Borrowed Assets</h2>
-          {filteredBorrowedPositions.length > 0 ? (
-            <div className="space-y-2">
-              {filteredBorrowedPositions.map((position, index) => (
-                <Position 
-                  key={`borrowed-${position.name}-${index}`} 
-                  {...position} 
-                  type="borrow" 
-                  protocolName={protocolName}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
-              {showAll ? "No available assets" : "No borrowed assets"}
-            </div>
-          )}
+          {/* Borrowed Assets */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold mb-4 text-center">Borrowed Assets</h2>
+            {filteredBorrowedPositions.length > 0 ? (
+              <div className="space-y-2">
+                {filteredBorrowedPositions.map((position, index) => (
+                  <Position 
+                    key={`borrowed-${position.name}-${index}`} 
+                    {...position} 
+                    type="borrow" 
+                    protocolName={protocolName}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                {showAll ? "No available assets" : "No borrowed assets"}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

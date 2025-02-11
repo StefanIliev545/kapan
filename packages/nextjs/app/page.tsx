@@ -7,10 +7,8 @@ import { CompoundProtocolView } from "~~/components/specific/compound/CompoundPr
 const Home: NextPage = () => {
   return (
     <>
-      <div className="flex items-center flex-col flex-grow pt-10">
-        <AaveProtocolView />
-        <CompoundProtocolView />
-      </div>
+      <AaveProtocolView />
+      <CompoundProtocolView />
     </>
   );
 };
