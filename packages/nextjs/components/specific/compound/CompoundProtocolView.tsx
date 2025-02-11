@@ -4,6 +4,7 @@ import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { CompoundCollateralView } from "./CompoundCollateralView";
 
 export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
@@ -135,14 +136,23 @@ export const CompoundProtocolView: FC = () => {
   const currentLtv = 75;
 
   return (
-    <ProtocolView
-      protocolName="Compound V3"
-      protocolIcon="/logos/compound.svg"
-      ltv={currentLtv}
-      maxLtv={90}
-      suppliedPositions={suppliedPositions}
-      borrowedPositions={borrowedPositions}
-    />
+    <div>
+      <ProtocolView
+        protocolName="Compound V3"
+        protocolIcon="/logos/compound.svg"
+        ltv={currentLtv}
+        maxLtv={90}
+        suppliedPositions={suppliedPositions}
+        borrowedPositions={borrowedPositions}
+      />
+      {/* Add CompoundCollateralView for each market */}
+      <div className="container mx-auto px-6">
+        {wethAddress && <CompoundCollateralView baseToken={wethAddress} />}
+        {usdcAddress && <CompoundCollateralView baseToken={usdcAddress} />}
+        {usdtAddress && <CompoundCollateralView baseToken={usdtAddress} />}
+        {usdcEAddress && <CompoundCollateralView baseToken={usdcEAddress} />}
+      </div>
+    </div>
   );
 };
 

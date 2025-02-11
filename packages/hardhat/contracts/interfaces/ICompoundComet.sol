@@ -23,8 +23,7 @@ interface ICompoundComet {
     function getPrice(address priceFeed) external view returns (uint128);
 
     // Returns the collateral balance of a given account for a given asset.
-    function collateralBalanceOf(address account, address asset) external view returns (uint128);
-
+    function userCollateral(address account, address asset) external view returns (uint128, uint128);
 
     function balanceOf(address owner) external view returns (uint256);
     function borrowBalanceOf(address account) external view returns (uint256);

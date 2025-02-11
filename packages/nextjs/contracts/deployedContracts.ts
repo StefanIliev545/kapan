@@ -357,7 +357,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xFe6543D91309b23f73EdB59f0dc98BF6f012D03F",
+      address: "0x62C24f09074AaFb80cd0B58563f0E779E8A0de00",
       abi: [
         {
           inputs: [
@@ -579,8 +579,8 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "contract ICompoundComet",
-              name: "comet",
+              internalType: "address",
+              name: "token",
               type: "address",
             },
             {
@@ -600,6 +600,11 @@ const deployedContracts = {
               internalType: "uint128[]",
               name: "balances",
               type: "uint128[]",
+            },
+            {
+              internalType: "string[]",
+              name: "displayNames",
+              type: "string[]",
             },
           ],
           stateMutability: "view",
@@ -820,7 +825,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0xbC373a3a2A2cb66772b6d3e1E8714a631a1F6670",
+      address: "0xF4F2485A50e62C706deBec4E94b298Ee959CEAED",
       abi: [
         {
           inputs: [

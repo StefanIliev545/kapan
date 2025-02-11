@@ -6,6 +6,7 @@ import "../interfaces/ICompoundComet.sol";
 import {FeedRegistryInterface} from "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import {Denominations} from "@chainlink/contracts/src/v0.8/Denominations.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract CompoundGateway is IGateway {
 
@@ -88,37 +89,28 @@ contract CompoundGateway is IGateway {
         // TODO: Implement
     }
 
-    function getDepositedCollaterals(ICompoundComet comet, address account)
+    function getDepositedCollaterals(address token, address account)
         external
         view
-        returns (address[] memory collaterals, uint128[] memory balances)
+        returns (address[] memory collaterals, uint128[] memory balances, string[] memory displayNames)
     {
-        uint8 n = comet.numAssets();
-        uint256 count = 0;
-        
-        // First, determine how many assets have a nonzero collateral balance.
-        for (uint8 i = 0; i < n; i++) {
-            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
-            uint128 bal = comet.collateralBalanceOf(account, info.asset);
-            if (bal > 0) {
-                count++;
-            }
-        }
-        
+        ICompoundComet comet = tokenToComet[token];
+        require(address(comet) != address(0), "Comet is not set");
+        uint8 n = comet.numAssets();        
         // Allocate arrays of the correct size.
-        collaterals = new address[](count);
-        balances = new uint128[](count);
+        collaterals = new address[](n);
+        displayNames = new string[](n);
+        balances = new uint128[](n);
         
         uint256 index = 0;
         // Populate the arrays with assets that have a nonzero balance.
         for (uint8 i = 0; i < n; i++) {
             ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
-            uint128 bal = comet.collateralBalanceOf(account, info.asset);
-            if (bal > 0) {
-                collaterals[index] = info.asset;
-                balances[index] = bal;
-                index++;
-            }
+            (uint128 bal, ) = comet.userCollateral(account, info.asset);
+            collaterals[index] = info.asset;
+            displayNames[index] = ERC20(info.asset).symbol();
+            balances[index] = bal;
+            index++;
         }
     }
 
