@@ -100,4 +100,17 @@ contract RouterGateway {
         console.log("Forwarding repay call to the appropriate gateway");
         gateway.repay(token, user, amount);
     }
+
+    function getBalance(
+        string calldata protocolName,
+        address token,
+        address user
+    ) external view returns (uint256) {
+        // Get the gateway for the specified protocol
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+
+        // Forward balance call to the appropriate gateway
+        return gateway.getBalance(token, user);
+    }
 } 

@@ -1021,7 +1021,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xFaCBAd7F68D51631614E2C5516a88c767D68683e",
+      address: "0x446FDffDB90C8fF2d3571361007892F583c1A842",
       abi: [
         {
           inputs: [
@@ -1091,6 +1091,35 @@ const deployedContracts = {
               internalType: "contract IGateway",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",

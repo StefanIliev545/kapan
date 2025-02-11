@@ -5,6 +5,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { DepositModal } from "./modals/DepositModal";
 import { RepayModal } from "./modals/RepayModal";
+import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 
 interface PositionProps {
   icon: string;
@@ -227,12 +228,28 @@ export const Position: FC<PositionProps> = ({
         )}
       </div>
 
-      <MovePositionModal
-        isOpen={isMoveModalOpen}
-        onClose={() => setIsMoveModalOpen(false)}
-        fromProtocol={protocolName}
-        position={{ name, balance, type }}
-      />
+      {/* Use different move modals based on position type */}
+      {type === "supply" ? (
+        <MoveSupplyModal
+          isOpen={isMoveModalOpen}
+          onClose={() => setIsMoveModalOpen(false)}
+          token={{
+            name,
+            icon,
+            currentRate,
+            address: tokenAddress,
+          }}
+          fromProtocol={protocolName}
+          currentSupply={balance}
+        />
+      ) : (
+        <MovePositionModal
+          isOpen={isMoveModalOpen}
+          onClose={() => setIsMoveModalOpen(false)}
+          fromProtocol={protocolName}
+          position={{ name, balance, type }}
+        />
+      )}
 
       {type === "supply" && (
         <DepositModal
