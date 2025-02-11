@@ -36,10 +36,17 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
   const [collateralAddresses, collateralBalances, collateralDisplayNames] = collateralData;
 
   return (
-    <div className="bg-base-200 rounded-lg p-2 mt-2">
+    <div className="bg-base-200 rounded-lg p-2 mt-2 w-full">
       <div className="flex flex-col gap-2">
-        <span className="text-sm text-base-content/70">Collateral</span>
-        <div className="flex flex-wrap gap-4">
+        <div className="flex justify-center items-center relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-base-content/10"></div>
+          </div>
+          <span className="relative px-4 text-sm text-base-content/70 bg-base-200">
+            Collateral
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-4 w-full justify-center">
           {collateralAddresses.map((address: string, index: number) => {
             const balance = Number(formatUnits(collateralBalances[index], 18));
             if (balance <= 0) return null;

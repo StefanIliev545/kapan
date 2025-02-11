@@ -31,6 +31,7 @@ export const Position: FC<PositionProps> = ({
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Check if position has a balance
   const hasBalance = type === "supply" ? balance > 0 : balance < 0;
@@ -66,25 +67,14 @@ export const Position: FC<PositionProps> = ({
 
   return (
     <>
-      <div className="collapse">
-        {/* Place the toggle input as the first child when collateralView exists */}
-        {collateralView && (
-          <input
-            type="checkbox"
-            id={`collateral-${name}`}
-            className="collapse-toggle hidden"
-          />
-        )}
-
-        <div
-          className={`grid grid-cols-1 md:grid-cols-7 items-center w-full p-4 rounded-lg gap-4 ${
-            type === "supply" ? "bg-base-200" : "bg-base-200/50"
-          }`}
-        >
+      <div className="relative">
+        <div className={`grid grid-cols-1 md:grid-cols-7 items-center w-full p-4 rounded-lg gap-4 ${
+          type === "supply" ? "bg-base-200" : "bg-base-200/50"
+        }`}>
           {/* Main Content */}
           <div className="flex flex-col md:flex-row md:col-span-5 gap-4">
             {/* Icon, Name, and Info Section */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center w-[200px]">
               <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
                 <Image
                   src={icon}
@@ -93,11 +83,12 @@ export const Position: FC<PositionProps> = ({
                   className="rounded-full"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-lg">{name}</span>
-                <div className="dropdown dropdown-end dropdown-bottom">
-                  <label
+              <div className="flex items-center ml-3">
+                <span className="font-semibold text-lg truncate mr-2">{name}</span>
+                <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0">
+                  <div
                     tabIndex={0}
+                    role="button"
                     className="cursor-pointer flex items-center justify-center h-[1.125em]"
                   >
                     <Image
@@ -107,7 +98,7 @@ export const Position: FC<PositionProps> = ({
                       height={18}
                       className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
                     />
-                  </label>
+                  </div>
                   <div
                     tabIndex={0}
                     className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
@@ -134,31 +125,22 @@ export const Position: FC<PositionProps> = ({
             </div>
 
             {/* Stats Section */}
-            <div className="flex md:grid md:grid-cols-3 justify-between items-center gap-4">
-              <div className="text-center">
+            <div className="flex md:grid md:grid-cols-3 justify-between items-center gap-4 flex-grow">
+              <div className="text-center w-[120px]">
                 <div className="text-sm text-base-content/70">Balance</div>
-                <div
-                  className={`font-medium ${
-                    type === "supply" ? "text-green-500" : "text-red-500"
-                  }`}
-                >
+                <div className={`font-medium tabular-nums ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
                   {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
                 </div>
               </div>
-              <div className="text-center">
+              <div className="text-center w-[120px]">
                 <div className="text-sm text-base-content/70">Current Rate</div>
-                <div className="font-medium">{currentRate.toFixed(2)}%</div>
+                <div className="font-medium tabular-nums">{currentRate.toFixed(2)}%</div>
               </div>
-              <div className="text-center">
+              <div className="text-center w-[120px]">
                 <div className="text-sm text-base-content/70">Optimal Rate</div>
-                <div
-                  className={`font-medium ${
-                    optimalProtocol.toLowerCase() !==
-                    protocolName.split(" ")[0].toLowerCase()
-                      ? "text-primary"
-                      : ""
-                  }`}
-                >
+                <div className={`font-medium tabular-nums ${
+                  optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase() ? "text-primary" : ""
+                }`}>
                   {optimalRateDisplay.toFixed(2)}%
                   <span className="ml-1 inline-flex items-center">
                     <Image
@@ -235,11 +217,17 @@ export const Position: FC<PositionProps> = ({
           </div>
         </div>
 
-        {/* Collateral Content */}
         {collateralView && (
-          <div className="collapse-content">
-            <div className="grid grid-cols-1 md:grid-cols-7 w-full">
-              <div className="md:col-span-5 md:col-start-1">{collateralView}</div>
+          <div className="collapse">
+            <input
+              type="checkbox"
+              id={`collateral-${name}`}
+              className="collapse-toggle hidden"
+            />
+            <div className="collapse-content">
+              <div className="grid grid-cols-1 md:grid-cols-7 w-full">
+                <div className="md:col-span-7">{collateralView}</div>
+              </div>
             </div>
           </div>
         )}

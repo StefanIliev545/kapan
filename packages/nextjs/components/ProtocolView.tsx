@@ -58,10 +58,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     : borrowedPositions.filter(p => p.balance < 0);
 
   return (
-    <div className="w-full h-full flex flex-col hide-scrollbar">
-      {/* Sticky Header - Using navbar height variable */}
-      <div className="sticky sticky-below-nav bg-base-100 shadow-sm z-10">
-        <div className="p-6">
+    <div className="w-full h-full flex flex-col hide-scrollbar p-6 space-y-8">
+      {/* Protocol Header Card */}
+      <div className="card bg-base-100 shadow-xl">
+        <div className="card-body">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 relative">
@@ -100,54 +100,51 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
       </div>
 
-      {/* Content Area - Fill remaining space */}
-      <div className="flex-grow p-6 pt-4 space-y-8">
-        {/* Positions Grid - Changes to stack on smaller screens */}
-        <div className="grid lg:grid-cols-2 grid-cols-1 gap-8">
-          {/* Supplied Assets */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title justify-center">Supplied Assets</h2>
-              {filteredSuppliedPositions.length > 0 ? (
-                <div className="space-y-2">
-                  {filteredSuppliedPositions.map((position, index) => (
-                    <Position 
-                      key={`supplied-${position.name}-${index}`} 
-                      {...position} 
-                      type="supply" 
-                      protocolName={protocolName}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
-                  {showAll ? "No available assets" : "No supplied assets"}
-                </div>
-              )}
-            </div>
+      {/* Positions Grid */}
+      <div className="grid lg:grid-cols-2 grid-cols-1 gap-8">
+        {/* Supplied Assets */}
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body">
+            <h2 className="card-title justify-center">Supplied Assets</h2>
+            {filteredSuppliedPositions.length > 0 ? (
+              <div className="space-y-2">
+                {filteredSuppliedPositions.map((position, index) => (
+                  <Position 
+                    key={`supplied-${position.name}-${index}`} 
+                    {...position} 
+                    type="supply" 
+                    protocolName={protocolName}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                {showAll ? "No available assets" : "No supplied assets"}
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Borrowed Assets */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title justify-center">Borrowed Assets</h2>
-              {filteredBorrowedPositions.length > 0 ? (
-                <div className="space-y-2">
-                  {filteredBorrowedPositions.map((position, index) => (
-                    <Position 
-                      key={`borrowed-${position.name}-${index}`} 
-                      {...position} 
-                      type="borrow" 
-                      protocolName={protocolName}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
-                  {showAll ? "No available assets" : "No borrowed assets"}
-                </div>
-              )}
-            </div>
+        {/* Borrowed Assets */}
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body">
+            <h2 className="card-title justify-center">Borrowed Assets</h2>
+            {filteredBorrowedPositions.length > 0 ? (
+              <div className="space-y-2">
+                {filteredBorrowedPositions.map((position, index) => (
+                  <Position 
+                    key={`borrowed-${position.name}-${index}`} 
+                    {...position} 
+                    type="borrow" 
+                    protocolName={protocolName}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                {showAll ? "No available assets" : "No borrowed assets"}
+              </div>
+            )}
           </div>
         </div>
       </div>
