@@ -31,12 +31,14 @@ contract CompoundGateway is IGateway {
         tokenToComet[address(_ethComet.baseToken())] = _ethComet;
     }
 
-    function getSupplyRate(address token) external view whenCometExists(token) returns (uint256 supplyRate) {
+    function getSupplyRate(address token) external view whenCometExists(token) returns (uint256 supplyRate, bool success) {
         supplyRate = tokenToComet[token].getSupplyRate(tokenToComet[token].getUtilization());
+        success = true;
     }
 
-    function getBorrowRate(address token) external view whenCometExists(token) returns (uint256 borrowRate) {
+    function getBorrowRate(address token) external view whenCometExists(token) returns (uint256 borrowRate, bool success) {
         borrowRate = tokenToComet[token].getBorrowRate(tokenToComet[token].getUtilization());
+        success = true;
     }
 
     function getBaseToken(ICompoundComet comet) external view returns (address) {

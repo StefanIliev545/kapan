@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x968A51d4151bEA12b6784dD9FE29457a3C8e5BCd",
+      address: "0xc511a94eD6dA43ECcf89235A929D98DD782dC203",
       abi: [
         {
           inputs: [
@@ -214,6 +214,11 @@ const deployedContracts = {
               name: "",
               type: "uint256",
             },
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
           ],
           stateMutability: "view",
           type: "function",
@@ -256,6 +261,11 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
             },
           ],
           stateMutability: "view",
@@ -347,7 +357,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x37033090a87353d527C58d03CB489f7D641a6b53",
+      address: "0xfFD89CD4cA0e083f25E1bFFc2fb480e251Cc2208",
       abi: [
         {
           inputs: [
@@ -502,6 +512,11 @@ const deployedContracts = {
               internalType: "uint256",
               name: "borrowRate",
               type: "uint256",
+            },
+            {
+              internalType: "bool",
+              name: "success",
+              type: "bool",
             },
           ],
           stateMutability: "view",
@@ -662,6 +677,11 @@ const deployedContracts = {
               name: "supplyRate",
               type: "uint256",
             },
+            {
+              internalType: "bool",
+              name: "success",
+              type: "bool",
+            },
           ],
           stateMutability: "view",
           type: "function",
@@ -745,7 +765,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x5E9a2fDDF58500ca5304D1D2F05E439cB1472e15",
+      address: "0x6718b9232B15d61C602a7C60acfF41606c129Abb",
       abi: [
         {
           inputs: [

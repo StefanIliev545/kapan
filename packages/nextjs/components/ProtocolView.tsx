@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 import Image from "next/image";
 import { Position } from "./Position";
 
@@ -27,6 +27,17 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   suppliedPositions,
   borrowedPositions,
 }) => {
+  const [showAll, setShowAll] = useState(false);
+
+  // Filter positions based on showAll toggle
+  const filteredSuppliedPositions = showAll 
+    ? suppliedPositions 
+    : suppliedPositions.filter(p => p.balance > 0);
+  
+  const filteredBorrowedPositions = showAll 
+    ? borrowedPositions 
+    : borrowedPositions.filter(p => p.balance < 0);
+
   return (
     <div className="w-full p-6 space-y-8">
       {/* Protocol Header */}
@@ -37,6 +48,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           </div>
           <div className="text-2xl font-bold">{protocolName}</div>
         </div>
+
+        {/* Show All Toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-base-content/70">Show all</span>
+          <input
+            type="checkbox"
+            className="toggle toggle-primary toggle-sm"
+            checked={showAll}
+            onChange={(e) => setShowAll(e.target.checked)}
+          />
+        </div>
+
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <span className="text-lg text-base-content/70">Current LTV</span>
@@ -53,9 +76,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         {/* Supplied Assets */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold mb-4 text-center">Supplied Assets</h2>
-          {suppliedPositions.length > 0 ? (
+          {filteredSuppliedPositions.length > 0 ? (
             <div className="space-y-2">
-              {suppliedPositions.map((position, index) => (
+              {filteredSuppliedPositions.map((position, index) => (
                 <Position 
                   key={`supplied-${position.name}-${index}`} 
                   {...position} 
@@ -65,16 +88,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">No supplied assets</div>
+            <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+              {showAll ? "No available assets" : "No supplied assets"}
+            </div>
           )}
         </div>
 
         {/* Borrowed Assets */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold mb-4 text-center">Borrowed Assets</h2>
-          {borrowedPositions.length > 0 ? (
+          {filteredBorrowedPositions.length > 0 ? (
             <div className="space-y-2">
-              {borrowedPositions.map((position, index) => (
+              {filteredBorrowedPositions.map((position, index) => (
                 <Position 
                   key={`borrowed-${position.name}-${index}`} 
                   {...position} 
@@ -84,7 +109,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">No borrowed assets</div>
+            <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+              {showAll ? "No available assets" : "No borrowed assets"}
+            </div>
           )}
         </div>
       </div>

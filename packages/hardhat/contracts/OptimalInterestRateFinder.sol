@@ -40,9 +40,17 @@ contract OptimalInterestRateFinder {
     }
 
     function findOptimalSupplyRate(address _token) public view returns (string memory, uint256) {
-        uint256 aaveSupplyRate = convertAaveRateToAPY(aaveGateway.getSupplyRate(_token));
-        uint256 compoundSupplyRate = convertCompoundRateToAPR(compoundGateway.getSupplyRate(_token));
-        if (aaveSupplyRate > compoundSupplyRate) {
+        (uint256 aaveSupplyRateRaw, bool aaveSuccess) = aaveGateway.getSupplyRate(_token);
+        (uint256 compoundSupplyRateRaw, bool compoundSuccess) = compoundGateway.getSupplyRate(_token);
+        uint256 aaveSupplyRate = convertAaveRateToAPY(aaveSupplyRateRaw);
+        uint256 compoundSupplyRate = convertCompoundRateToAPR(compoundSupplyRateRaw);
+        if (aaveSuccess && compoundSuccess) {
+            if (aaveSupplyRate > compoundSupplyRate) {
+                return ("aave", aaveSupplyRate);
+            } else {
+                return ("compound", compoundSupplyRate);
+            }
+        } else if (aaveSuccess) {
             return ("aave", aaveSupplyRate);
         } else {
             return ("compound", compoundSupplyRate);
@@ -50,9 +58,17 @@ contract OptimalInterestRateFinder {
     }
 
     function findOptimalBorrowRate(address _token) public view returns (string memory, uint256) {
-        uint256 aaveBorrowRate = convertAaveRateToAPY(aaveGateway.getBorrowRate(_token));
-        uint256 compoundBorrowRate = convertCompoundRateToAPR(compoundGateway.getBorrowRate(_token));
-        if (aaveBorrowRate < compoundBorrowRate) {
+        (uint256 aaveBorrowRateRaw, bool aaveSuccess) = aaveGateway.getBorrowRate(_token);
+        (uint256 compoundBorrowRateRaw, bool compoundSuccess) = compoundGateway.getBorrowRate(_token);
+        uint256 aaveBorrowRate = convertAaveRateToAPY(aaveBorrowRateRaw);
+        uint256 compoundBorrowRate = convertCompoundRateToAPR(compoundBorrowRateRaw);
+        if (aaveSuccess && compoundSuccess) {
+            if (aaveBorrowRate < compoundBorrowRate) {
+                return ("aave", aaveBorrowRate);
+            } else {
+                return ("compound", compoundBorrowRate);
+            }
+        } else if (aaveSuccess) {
             return ("aave", aaveBorrowRate);
         } else {
             return ("compound", compoundBorrowRate);

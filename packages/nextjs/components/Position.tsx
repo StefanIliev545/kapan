@@ -30,6 +30,9 @@ export const Position: FC<PositionProps> = ({
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
 
+  // Check if position has a balance
+  const hasBalance = type === "supply" ? balance > 0 : balance < 0;
+
   // Fetch optimal rate from the OptimalInterestRateFinder contract.
   // The contract returns a tuple [optimalProtocol, optimalRate] where optimalRate is a fixed-point value.
   const { data: optimalRateData } = useScaffoldReadContract({
@@ -80,12 +83,46 @@ export const Position: FC<PositionProps> = ({
           type === "supply" ? "bg-base-200" : "bg-base-200/50"
         }`}
       >
-        {/* Icon and Name Section */}
+        {/* Icon, Name, and Info Section */}
         <div className="flex items-center space-x-3 col-span-1">
-          <div className="w-8 h-8 relative">
+          <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
             <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
           </div>
-          <span className="font-semibold text-lg">{name}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-lg">{name}</span>
+            <div className="dropdown dropdown-end dropdown-bottom">
+              <label tabIndex={0} className="cursor-pointer flex items-center justify-center h-[1.125em]">
+                <Image 
+                  src="/logos/info-button.svg" 
+                  alt="info" 
+                  width={18}
+                  height={18}
+                  className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
+                />
+              </label>
+              <div 
+                tabIndex={0} 
+                className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
+                style={{ 
+                  right: 'auto',
+                  transform: 'translateX(-50%)',
+                  left: '50%',
+                }}
+              >
+                <div className="card-body">
+                  <h3 className="card-title text-sm">{name} Details</h3>
+                  <div className="text-xs space-y-1">
+                    <p className="text-base-content/70">Contract Address:</p>
+                    <p className="font-mono break-all">{tokenAddress}</p>
+                    <p className="text-base-content/70">Protocol:</p>
+                    <p>{protocolName}</p>
+                    <p className="text-base-content/70">Type:</p>
+                    <p className="capitalize">{type} Position</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Balance Section */}
@@ -105,21 +142,19 @@ export const Position: FC<PositionProps> = ({
         {/* Optimal Rate Section */}
         <div className="text-center col-span-1">
           <div className="text-sm text-base-content/70">Optimal Rate</div>
-          <div
-            className={`font-medium ${
-              optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase()
-                ? "text-primary"
-                : ""
-            }`}
-          >
+          <div className={`font-medium ${
+            optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase()
+              ? "text-primary"
+              : ""
+          }`}>
             {optimalRateDisplay.toFixed(2)}%
-            <span className="ml-1">
+            <span className="ml-1 inline-flex items-center">
               <Image
                 src={getProtocolLogo(optimalProtocol)}
                 alt={optimalProtocol}
-                width={16}
-                height={16}
-                className="inline-block rounded-full"
+                width={18}
+                height={18}
+                className="inline-block rounded-full min-w-[1.125em] min-h-[1.125em]"
               />
             </span>
           </div>
@@ -132,11 +167,19 @@ export const Position: FC<PositionProps> = ({
               Deposit
             </button>
           ) : (
-            <button className="btn btn-sm btn-primary" onClick={() => setIsRepayModalOpen(true)}>
+            <button 
+              className="btn btn-sm btn-primary" 
+              onClick={() => setIsRepayModalOpen(true)}
+              disabled={!hasBalance}
+            >
               Repay
             </button>
           )}
-          <button className="btn btn-sm btn-outline" onClick={() => setIsMoveModalOpen(true)}>
+          <button 
+            className="btn btn-sm btn-outline" 
+            onClick={() => setIsMoveModalOpen(true)}
+            disabled={!hasBalance}
+          >
             Move
           </button>
         </div>

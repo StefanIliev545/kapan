@@ -25,9 +25,8 @@ export const AaveProtocolView: FC = () => {
 
     if (!allTokensInfo) return { suppliedPositions: supplied, borrowedPositions: borrowed };
 
+    // Create a position for each token, regardless of balance
     allTokensInfo.forEach((token: any) => {
-      // Determine decimals based on the token symbol.
-      // Adjust this logic as needed for your tokens.
       let decimals = 18;
       if (token.symbol === "USDC" || token.symbol === "USDT" || token.symbol === "USDC.e") {
         decimals = 6;
@@ -35,30 +34,29 @@ export const AaveProtocolView: FC = () => {
 
       const supplyAPY = convertRateToAPY(token.supplyRate);
       const borrowAPY = convertRateToAPY(token.borrowRate);
+      const tokenPrice = Number(formatUnits(token.price, 8));
 
-      // If the user has a supplied (deposited) balance, compute its USD value.
-      if (token.balance && BigInt(token.balance) > 0n) {
-        const usdBalance = Number(formatUnits(token.price, 8)) * Number(formatUnits(token.balance, decimals));
-        supplied.push({
-          icon: tokenNameToLogo(token.symbol),
-          name: token.symbol,
-          balance: usdBalance,
-          currentRate: supplyAPY,
-          tokenAddress: token.token,
-        });
-      }
+      // Add supply position (even if balance is 0)
+      const supplyBalance = token.balance ? Number(formatUnits(token.balance, decimals)) : 0;
+      const supplyUsdBalance = supplyBalance * tokenPrice;
+      supplied.push({
+        icon: tokenNameToLogo(token.symbol),
+        name: token.symbol,
+        balance: supplyUsdBalance,
+        currentRate: supplyAPY,
+        tokenAddress: token.token,
+      });
 
-      // If the user has a borrow balance, compute its USD value.
-      if (token.borrowBalance && BigInt(token.borrowBalance) > 0n) {
-        const usdBalance = Number(formatUnits(token.price, 8)) * Number(formatUnits(token.borrowBalance, decimals));
-        borrowed.push({
-          icon: tokenNameToLogo(token.symbol),
-          name: token.symbol,
-          balance: -usdBalance,
-          currentRate: borrowAPY,
-          tokenAddress: token.token,
-        });
-      }
+      // Add borrow position (even if balance is 0)
+      const borrowBalance = token.borrowBalance ? Number(formatUnits(token.borrowBalance, decimals)) : 0;
+      const borrowUsdBalance = borrowBalance * tokenPrice;
+      borrowed.push({
+        icon: tokenNameToLogo(token.symbol),
+        name: token.symbol,
+        balance: -borrowUsdBalance, // Negative for borrow positions
+        currentRate: borrowAPY,
+        tokenAddress: token.token,
+      });
     });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
@@ -68,8 +66,8 @@ export const AaveProtocolView: FC = () => {
     <ProtocolView
       protocolName="Aave V3"
       protocolIcon="/logos/aave.svg"
-      ltv={75} // Optionally, you could fetch this value from the contract.
-      maxLtv={90} // Optionally, you could fetch this value from the contract.
+      ltv={75}
+      maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
     />

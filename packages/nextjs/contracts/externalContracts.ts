@@ -102,6 +102,9 @@ export const contractNameToLogo = (contractName: keyof typeof contractLogos) => 
 };
 
 export const tokenNameToLogo = (tokenName: string) => {
+  if (tokenName == "USD₮0") { // stupid shit
+    return "/logos/usdt.svg";
+  }
   return `/logos/${tokenName.toLowerCase()}.svg`;
 };
 

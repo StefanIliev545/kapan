@@ -57,24 +57,24 @@ contract AaveGateway is IGateway {
         return tokens;
     }
 
-    function getBorrowRate(address token) external view override returns (uint256) {
+    function getBorrowRate(address token) external view override returns (uint256, bool) {
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
         for (uint256 i = 0; i < reserves.length; i++) {
             if (reserves[i].underlyingAsset == token) {
-                return reserves[i].variableBorrowRate;
+                return (reserves[i].variableBorrowRate, true);
             }
         }
-        return 0;
+        return (0, false);
     }
 
-    function getSupplyRate(address token) external view override returns (uint256) {
+    function getSupplyRate(address token) external view override returns (uint256, bool) {
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
         for (uint256 i = 0; i < reserves.length; i++) {
             if (reserves[i].underlyingAsset == token) {
-                return reserves[i].liquidityRate;
+                return (reserves[i].liquidityRate, true);
             }
         }
-        return 0;
+        return (0, false);
     }
 
 
