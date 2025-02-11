@@ -244,7 +244,12 @@ export const Position: FC<PositionProps> = ({
         <DepositModal
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}
-          token={{ name, icon, currentRate }}
+          token={{
+            name,
+            icon,
+            currentRate,
+            address: tokenAddress,
+          }}
           protocolName={protocolName}
         />
       )}
