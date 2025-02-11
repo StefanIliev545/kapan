@@ -1,33 +1,4 @@
-import { Abi } from "abitype";
 import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
-
-/**
- * @example
- * const externalContracts = {
- *   1: {
- *     DAI: {
- *       address: "0x...",
- *       abi: [...],
- *     },
- *   },
- * } as const;
- */
-const erc20Abi: Abi = [
-  {
-    constant: true,
-    inputs: [],
-    name: "decimals",
-    outputs: [
-      {
-        name: "",
-        type: "uint8",
-      },
-    ],
-    payable: false,
-    stateMutability: "view",
-    type: "function",
-  },
-];
 
 const externalContracts = {
   42161: {},
@@ -51,6 +22,7 @@ const externalContracts = {
         },
       ],
       logo: "/logos/usdc.svg",
+      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
     USDT: {
       address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
@@ -71,6 +43,7 @@ const externalContracts = {
         },
       ],
       logo: "/logos/usdt.svg",
+      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
     USDCe: {
       address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
@@ -91,6 +64,7 @@ const externalContracts = {
         },
       ],
       logo: "/logos/usdc.svg",
+      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
     eth: {
       address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -111,6 +85,7 @@ const externalContracts = {
         },
       ],
       logo: "/logos/ethereum.svg",
+      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
   },
 } as const;

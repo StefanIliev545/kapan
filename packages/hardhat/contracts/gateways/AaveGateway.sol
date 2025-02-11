@@ -61,7 +61,7 @@ contract AaveGateway is IGateway {
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
         for (uint256 i = 0; i < reserves.length; i++) {
             if (reserves[i].underlyingAsset == token) {
-                return reserves[i].baseVariableBorrowRate;
+                return reserves[i].variableBorrowRate;
             }
         }
         return 0;
@@ -71,7 +71,7 @@ contract AaveGateway is IGateway {
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
         for (uint256 i = 0; i < reserves.length; i++) {
             if (reserves[i].underlyingAsset == token) {
-                return reserves[i].baseVariableBorrowRate;
+                return reserves[i].liquidityRate;
             }
         }
         return 0;

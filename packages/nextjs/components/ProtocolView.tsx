@@ -7,7 +7,7 @@ export interface ProtocolPosition {
   name: string;
   balance: number;
   currentRate: number;
-  optimalRate: number;
+  tokenAddress: string;
 }
 
 interface ProtocolViewProps {
@@ -100,7 +100,7 @@ export const ExampleProtocolView: FC = () => {
       name: "ETH",
       balance: 5000.75,
       currentRate: 2.8,
-      optimalRate: 3.1,
+      tokenAddress: "",
     },
   ];
 
@@ -110,14 +110,14 @@ export const ExampleProtocolView: FC = () => {
       name: "DAI",
       balance: -2500.25,
       currentRate: 4.2,
-      optimalRate: 3.8,
+      tokenAddress: "",
     },
     {
       icon: "/logos/usd-coin-usdc-logo.svg",
       name: "USDC",
       balance: -1000.5,
       currentRate: 3.5,
-      optimalRate: 3.2,
+      tokenAddress: "",
     },
   ];
 

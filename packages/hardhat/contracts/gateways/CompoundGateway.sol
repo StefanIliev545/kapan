@@ -8,6 +8,12 @@ contract CompoundGateway is IGateway {
 
     mapping(address => ICompoundComet) public tokenToComet;
 
+    modifier whenCometExists(address token) {
+        if (address(tokenToComet[token]) != address(0)) {
+            _;
+        }
+    }
+
     constructor(
         ICompoundComet _USDCComet, 
         ICompoundComet _USDTComet, 
@@ -25,12 +31,12 @@ contract CompoundGateway is IGateway {
         tokenToComet[address(_ethComet.baseToken())] = _ethComet;
     }
 
-    function getSupplyRate(address token) external view returns (uint256) {
-        return tokenToComet[token].getSupplyRate(tokenToComet[token].getUtilization());
+    function getSupplyRate(address token) external view whenCometExists(token) returns (uint256 supplyRate) {
+        supplyRate = tokenToComet[token].getSupplyRate(tokenToComet[token].getUtilization());
     }
 
-    function getBorrowRate(address token) external view returns (uint256) {
-        return tokenToComet[token].getBorrowRate(tokenToComet[token].getUtilization());
+    function getBorrowRate(address token) external view whenCometExists(token) returns (uint256 borrowRate) {
+        borrowRate = tokenToComet[token].getBorrowRate(tokenToComet[token].getUtilization());
     }
 
     function getBaseToken(ICompoundComet comet) external view returns (address) {

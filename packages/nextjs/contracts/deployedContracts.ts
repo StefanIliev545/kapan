@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x3e6f8db28Fb514044D5EA527f48847B1A484373D",
+      address: "0x968A51d4151bEA12b6784dD9FE29457a3C8e5BCd",
       abi: [
         {
           inputs: [
@@ -347,7 +347,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xc4bf01bE4eF2398C7510cb40FbFfcDe42287F9C0",
+      address: "0x37033090a87353d527C58d03CB489f7D641a6b53",
       abi: [
         {
           inputs: [
@@ -500,7 +500,7 @@ const deployedContracts = {
           outputs: [
             {
               internalType: "uint256",
-              name: "",
+              name: "borrowRate",
               type: "uint256",
             },
           ],
@@ -659,7 +659,7 @@ const deployedContracts = {
           outputs: [
             {
               internalType: "uint256",
-              name: "",
+              name: "supplyRate",
               type: "uint256",
             },
           ],
@@ -729,6 +729,174 @@ const deployedContracts = {
           name: "withdraw",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        borrow: "contracts/interfaces/IGateway.sol",
+        deposit: "contracts/interfaces/IGateway.sol",
+        getBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowRate: "contracts/interfaces/IGateway.sol",
+        getLtv: "contracts/interfaces/IGateway.sol",
+        getSupplyRate: "contracts/interfaces/IGateway.sol",
+        repay: "contracts/interfaces/IGateway.sol",
+        withdraw: "contracts/interfaces/IGateway.sol",
+      },
+    },
+    OptimalInterestRateFinder: {
+      address: "0x5E9a2fDDF58500ca5304D1D2F05E439cB1472e15",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_aaveGateway",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_compoundGateway",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "aaveGateway",
+          outputs: [
+            {
+              internalType: "contract AaveGateway",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "compoundGateway",
+          outputs: [
+            {
+              internalType: "contract CompoundGateway",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          name: "convertAaveRateToAPY",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "ratePerSecond",
+              type: "uint256",
+            },
+          ],
+          name: "convertCompoundRateToAPR",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_token",
+              type: "address",
+            },
+          ],
+          name: "findOptimalBorrowRate",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_token",
+              type: "address",
+            },
+          ],
+          name: "findOptimalSupplyRate",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "_tokens",
+              type: "address[]",
+            },
+          ],
+          name: "multiFindOptimalInterestRate",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "",
+              type: "string[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
       ],

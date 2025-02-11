@@ -2,7 +2,7 @@ import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
-import { contractNameToLogo } from "~~/contracts/externalContracts";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 export const CompoundProtocolView: FC = () => {
@@ -20,14 +20,6 @@ export const CompoundProtocolView: FC = () => {
   const usdcAddress = usdc?.address;
   const usdtAddress = usdt?.address;
   const usdcEAddress = usdcE?.address;
-
-  // Build token logos mapping using the helper from externalContracts.
-  const tokenLogos: Record<string, string> = {
-    WETH: contractNameToLogo("eth"),
-    USDC: contractNameToLogo("USDC"),
-    USDT: contractNameToLogo("USDT"),
-    "USDC.e": contractNameToLogo("USDCe"),
-  };
 
   // For each token, call the aggregated getCompoundData function.
   // getCompoundData returns a tuple: [supplyRate, borrowRate, balance, borrowBalance]
@@ -98,22 +90,22 @@ export const CompoundProtocolView: FC = () => {
       const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
       const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
 
-      console.log(`${tokenName} price: ${price}`);
+      console.log(`${tokenName} address: ${tokenAddress}`);
 
       borrowed.push({
-        icon: tokenLogos[tokenName],
+        icon: tokenNameToLogo(tokenName),
         name: tokenName,
-        balance: -borrowBalance, // Negative indicates borrowing.
+        balance: -borrowBalance,
         currentRate: borrowAPR,
-        optimalRate: borrowAPR,
+        tokenAddress: tokenAddress,
       });
 
       supplied.push({
-        icon: tokenLogos[tokenName],
+        icon: tokenNameToLogo(tokenName),
         name: tokenName,
         balance: balance,
         currentRate: supplyAPR,
-        optimalRate: supplyAPR,
+        tokenAddress: tokenAddress,
       });
     };
 
@@ -137,7 +129,6 @@ export const CompoundProtocolView: FC = () => {
     usdcECompoundData,
     usdcEDecimals,
     connectedAddress,
-    tokenLogos,
   ]);
 
   // Hardcode current LTV (or fetch from contract if needed).

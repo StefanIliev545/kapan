@@ -44,7 +44,7 @@ export const AaveProtocolView: FC = () => {
           name: token.symbol,
           balance: usdBalance,
           currentRate: supplyAPY,
-          optimalRate: supplyAPY,
+          tokenAddress: token.token,
         });
       }
 
@@ -56,7 +56,7 @@ export const AaveProtocolView: FC = () => {
           name: token.symbol,
           balance: -usdBalance,
           currentRate: borrowAPY,
-          optimalRate: borrowAPY,
+          tokenAddress: token.token,
         });
       }
     });
