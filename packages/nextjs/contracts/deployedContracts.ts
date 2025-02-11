@@ -1021,7 +1021,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xBE1f196001D58586Aa78eFdeC47a44f107b70AbC",
+      address: "0x81026094AE0285642720d8d4aAc3Ee6BFa362D4f",
       abi: [
         {
           inputs: [

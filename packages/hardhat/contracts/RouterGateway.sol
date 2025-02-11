@@ -17,6 +17,7 @@ contract RouterGateway {
     constructor(address aaveGateway, address compoundGateway) {
         gateways["aave"] = IGateway(aaveGateway);
         gateways["compound"] = IGateway(compoundGateway);
+        gateways["compound v3"] = IGateway(compoundGateway);
     }
 
     function supplyWithPermit(

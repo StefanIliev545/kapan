@@ -55,7 +55,7 @@ export const DepositModal: FC<DepositModalProps> = ({
   });
   // Format balance for display
   const formattedBalance = balance && decimals 
-    ? formatUnits(BigInt(balance), decimals) 
+    ? formatUnits(balance as bigint, decimals as number) 
     : "0";
 
   const handleDeposit = async () => {
@@ -63,7 +63,7 @@ export const DepositModal: FC<DepositModalProps> = ({
     try {
       setLoading(true);
       // Parse the deposit amount – adjust decimals if necessary (here we assume 18)
-      const depositAmount = parseUnits(amount, decimals);
+      const depositAmount = parseUnits(amount, decimals as number);
 
       const spenderAddress = routerGateway.address as `0x${string}`;
       const contractAddress = token.address as `0x${string}`;
@@ -92,10 +92,7 @@ export const DepositModal: FC<DepositModalProps> = ({
           depositAmount,
         ],
       });
-      if (tx) {
-        await tx.wait();
-        onClose();
-      }
+      console.log("Deposit transaction sent:", tx);
     } catch (error) {
       console.error("Deposit failed:", error);
     } finally {

@@ -139,7 +139,7 @@ export const CompoundProtocolView: FC = () => {
   return (
     <div>
       <ProtocolView
-        protocolName="compound"
+        protocolName="Compound V3"
         protocolIcon="/logos/compound.svg"
         ltv={currentLtv}
         maxLtv={90}
