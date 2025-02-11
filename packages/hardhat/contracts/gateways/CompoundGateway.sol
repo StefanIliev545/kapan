@@ -7,8 +7,11 @@ import {FeedRegistryInterface} from "@chainlink/contracts/src/v0.8/interfaces/Fe
 import {Denominations} from "@chainlink/contracts/src/v0.8/Denominations.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract CompoundGateway is IGateway {
+    using SafeERC20 for IERC20;
 
     mapping(address => ICompoundComet) public tokenToComet;
     FeedRegistryInterface public priceFeed;
@@ -18,6 +21,11 @@ contract CompoundGateway is IGateway {
         if (address(tokenToComet[token]) != address(0)) {
             _;
         }
+    }
+
+    modifier cometMustExist(address token) {
+        require(address(tokenToComet[token]) != address(0), "Comet is not set");
+        _;
     }
 
     constructor(
@@ -57,8 +65,10 @@ contract CompoundGateway is IGateway {
         return comet.baseToken();
     }
 
-    function deposit(address token, address user, uint256 amount) external {
-        // TODO: Implement
+    function deposit(address token, address user, uint256 amount) external cometMustExist(token) {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(token).approve(address(this), amount);
+        tokenToComet[token].supplyTo(user, token, amount);
     }
 
     function withdraw(address token, address user, uint256 amount) external {

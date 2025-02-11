@@ -18,13 +18,21 @@ contract AaveGateway is IGateway {
         // TODO: Implement
     }
 
-    function deposit(address token, address user, uint256 amount) external override {}
+    function deposit(address token, address user, uint256 amount) external override {
+        revert("not implemented");
+    }
 
-    function withdraw(address token, address user, uint256 amount) external override {}
+    function withdraw(address token, address user, uint256 amount) external override {
+        revert("not implemented");
+    }
 
-    function borrow(address token, address user, uint256 amount) external override {}
+    function borrow(address token, address user, uint256 amount) external override {
+        revert("not implemented");
+    }
 
-    function repay(address token, address user, uint256 amount) external override {}
+    function repay(address token, address user, uint256 amount) external override {
+        revert("not implemented");
+    }
 
     struct TokenInfo {
         address token;

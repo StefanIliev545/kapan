@@ -33,4 +33,7 @@ interface ICompoundComet {
     function baseToken() external view returns (address);
     function baseTokenPriceFeed() external view returns (address);
     function priceScale() external pure returns (uint64);
+
+
+    function supplyTo(address dst, address asset, uint amount) external;
 }
