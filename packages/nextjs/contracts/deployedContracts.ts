@@ -357,7 +357,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x940Dc92F951B109520237686e4C4021C011024f6",
+      address: "0x5A160E15602ac655D4802CCd7a47944004A1bFAe",
       abi: [
         {
           inputs: [
@@ -863,7 +863,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x341804B0b998C95974A6966068324E75B833d7Fd",
+      address: "0x353bbe46d23fa5DcCdc6E95574375DdA23903a7a",
       abi: [
         {
           inputs: [
@@ -1021,7 +1021,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x81026094AE0285642720d8d4aAc3Ee6BFa362D4f",
+      address: "0xFaCBAd7F68D51631614E2C5516a88c767D68683e",
       abi: [
         {
           inputs: [
@@ -1094,6 +1094,34 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "repay",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {

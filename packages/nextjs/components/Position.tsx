@@ -252,7 +252,12 @@ export const Position: FC<PositionProps> = ({
         <RepayModal
           isOpen={isRepayModalOpen}
           onClose={() => setIsRepayModalOpen(false)}
-          token={{ name, icon, currentRate }}
+          token={{ 
+            name, 
+            icon, 
+            currentRate, 
+            address: tokenAddress 
+          }}
           protocolName={protocolName}
         />
       )}

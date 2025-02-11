@@ -32,19 +32,21 @@ export const DepositModal: FC<DepositModalProps> = ({
   const publicClient = usePublicClient();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  // Track if the approval step is confirmed.
+  const [isApproveConfirmed, setIsApproveConfirmed] = useState(false);
 
-  // Get the RouterGateway contract from Scaffold‑Eth
+  // Get the RouterGateway contract from Scaffold‑Eth.
   const { data: routerGateway } = useScaffoldContract({
     contractName: "RouterGateway",
   });
 
-  // Write hooks
+  // Write hooks.
   const { writeContractAsync: writeContractAsync } = useScaffoldWriteContract({
     contractName: "RouterGateway",
   });
   const { writeContractAsync: writeErc20Async } = useWriteContract();
 
-  // Read token balance
+  // Read token balance.
   const { data: balance } = useReadContract({
     address: token.address as `0x${string}`,
     abi: ERC20ABI,
@@ -52,7 +54,7 @@ export const DepositModal: FC<DepositModalProps> = ({
     args: [walletClient?.account.address as `0x${string}`],
   });
 
-  // Read token decimals
+  // Read token decimals.
   const { data: decimals } = useReadContract({
     address: token.address as `0x${string}`,
     abi: ERC20ABI,
@@ -68,32 +70,33 @@ export const DepositModal: FC<DepositModalProps> = ({
     if (!walletClient || !routerGateway || !publicClient) return;
     try {
       setLoading(true);
-      // Parse the deposit amount using the token's decimals
+      // Parse deposit amount.
       const depositAmount = parseUnits(amount, decimals as number);
 
       const spenderAddress = routerGateway.address as `0x${string}`;
       const contractAddress = token.address as `0x${string}`;
       const ownerAddress = walletClient.account.address as `0x${string}`;
 
-      console.log(`Protocol name: ${protocolName}`);
-      console.log(`Spender address: ${spenderAddress}`);
-      console.log(`Contract address: ${contractAddress}`);
-      console.log(`Owner address: ${ownerAddress}`);
+      console.log(`Protocol: ${protocolName}`);
+      console.log(`Spender: ${spenderAddress}`);
+      console.log(`Contract: ${contractAddress}`);
+      console.log(`Owner: ${ownerAddress}`);
 
-      // Approve the RouterGateway to spend tokens
+      // Approve RouterGateway to spend tokens.
       const approveTx = await writeErc20Async({
         address: contractAddress,
         abi: ERC20ABI,
         functionName: "approve",
         args: [spenderAddress, depositAmount],
       });
-      console.log("Approve transaction sent:", approveTx);
+      console.log("Approve tx sent:", approveTx);
 
-      // Wait for the approve transaction receipt
+      // Wait for approve receipt.
       await publicClient.waitForTransactionReceipt({ hash: approveTx as `0x${string}` });
-      console.log("Approve transaction confirmed");
+      console.log("Approve tx confirmed");
+      setIsApproveConfirmed(true);
 
-      // Call the supply function on RouterGateway
+      // Now supply.
       const supplyTx = await writeContractAsync({
         functionName: "supply",
         args: [
@@ -103,13 +106,13 @@ export const DepositModal: FC<DepositModalProps> = ({
           depositAmount,
         ],
       });
-      console.log("Supply transaction sent:", supplyTx);
+      console.log("Supply tx sent:", supplyTx);
 
-      // Wait for the supply transaction receipt
+      // Wait for supply receipt.
       await publicClient.waitForTransactionReceipt({ hash: supplyTx as `0x${string}` });
-      console.log("Supply transaction confirmed");
+      console.log("Supply tx confirmed");
 
-      // Once everything is confirmed, close the modal.
+      // Close modal when finished.
       onClose();
     } catch (error) {
       console.error("Deposit failed:", error);
@@ -168,6 +171,18 @@ export const DepositModal: FC<DepositModalProps> = ({
             <span className="ml-2 font-medium">
               {token.currentRate.toFixed(2)}%
             </span>
+          </div>
+
+          {/* DaisyUI steps – the list items remain contiguous, while inner spans get extra padding */}
+          <div className="flex justify-center mt-8">
+            <ul className="steps steps-horizontal w-full max-w-lg">
+              <li className="step step-primary">
+                <span className="block py-3">Approve {token.name}</span>
+              </li>
+              <li className={`step ${isApproveConfirmed ? "step-primary" : "opacity-50"}`}>
+                <span className="block py-3">Supply to {protocolName}</span>
+              </li>
+            </ul>
           </div>
         </div>
 

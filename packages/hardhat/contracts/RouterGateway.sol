@@ -77,4 +77,27 @@ contract RouterGateway {
         console.log("Forwarding deposit call to the appropriate gateway");
         gateway.deposit(token, user, amount);
     }
+
+    function repay(
+        string calldata protocolName,
+        address token,
+        address user,
+        uint256 amount
+    ) external {
+        // Get the gateway for the specified protocol
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+
+        // Transfer tokens from user to this contract
+        console.log("Transferring tokens from user to this contract for repayment", amount);
+        IERC20(token).safeTransferFrom(user, address(this), amount);
+
+        // Approve gateway to spend tokens
+        console.log("Approving gateway to spend tokens for repayment");
+        IERC20(token).approve(address(gateway), amount);
+
+        // Forward repay call to the appropriate gateway
+        console.log("Forwarding repay call to the appropriate gateway");
+        gateway.repay(token, user, amount);
+    }
 } 

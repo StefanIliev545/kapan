@@ -81,8 +81,14 @@ contract CompoundGateway is IGateway {
         // TODO: Implement
     }   
 
-    function repay(address token, address user, uint256 amount) external {
-        // TODO: Implement
+    function repay(address token, address user, uint256 amount) external override {
+        // For Compound, repaying is the same as supplying
+        // The negative balance will be used to repay the debt
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        
+        ICompoundComet comet = tokenToComet[token];
+        IERC20(token).approve(address(comet), amount);
+        comet.supplyTo(user, token, amount);
     }
 
     function getBalance(address token, address user) external view returns (uint256) {
