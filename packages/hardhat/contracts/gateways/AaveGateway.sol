@@ -52,7 +52,7 @@ contract AaveGateway is IGateway {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
     
-        IERC20(token).safeTransferFrom(user, address(this), amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).approve(poolAddress, amount);
         IPool(poolAddress).repay(token, amount, 2, user);
     }
