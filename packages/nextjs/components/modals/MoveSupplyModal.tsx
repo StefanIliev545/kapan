@@ -1,9 +1,9 @@
 import { FC, useState } from "react";
 import Image from "next/image";
 import { formatUnits } from "viem";
-import { useWalletClient, useReadContract } from "wagmi";
-import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useReadContract, useWalletClient } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
+import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 interface MoveSupplyModalProps {
   isOpen: boolean;
@@ -49,9 +49,8 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   });
 
   // Format balance for display using correct decimals
-  const formattedBalance = protocolBalance && decimals
-    ? formatUnits(protocolBalance as bigint, decimals as number)
-    : "0";
+  const formattedBalance =
+    protocolBalance && decimals ? formatUnits(protocolBalance as bigint, decimals as number) : "0";
 
   // Filter out the current protocol from options
   const availableProtocols = SUPPORTED_PROTOCOLS.filter(p => p.value.toLowerCase() !== fromProtocol.toLowerCase());
@@ -124,12 +123,12 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
                 onChange={e => setAmount(e.target.value)}
                 max={formattedBalance}
               />
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-xs"
+              <span 
+                className="absolute right-4 top-1/2 -translate-y-1/2 underline cursor-pointer hover:opacity-80 text-sm"
                 onClick={() => setAmount(formattedBalance)}
               >
                 Max
-              </button>
+              </span>
             </div>
           </div>
         </div>

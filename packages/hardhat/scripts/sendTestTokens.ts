@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 import { ERC20ABI } from "../../nextjs/contracts/externalContracts";
-import { formatUnits, parseUnits, parseEther } from "viem";
+import { formatUnits, parseUnits, parseEther, hexToRlp } from "viem";
 
 const RICH_ACCOUNT = "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D";
 
@@ -21,7 +21,9 @@ const AMOUNTS = {
 
 async function main() {
   // Get the addresses to fund from command line
-  const addresses = ["0x02aD0f9CaB40dEf1D6563bfC84F5AeA4282842aF"];
+  const signers = await ethers.getSigners();
+  const addresses = signers.map(signer => signer.address);
+  addresses.push("0x02aD0f9CaB40dEf1D6563bfC84F5AeA4282842aF");
   if (addresses.length === 0) {
     console.log("Please provide at least one address to fund");
     return;

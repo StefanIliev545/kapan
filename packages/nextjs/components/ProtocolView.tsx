@@ -30,14 +30,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 }) => {
   const [showAll, setShowAll] = useState(false);
 
-  // Calculate net balance
+  // Calculate net balance.
   const netBalance = useMemo(() => {
     const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
     const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
     return totalSupplied - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
 
-  // Format currency with sign
+  // Format currency with sign.
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -48,14 +48,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return amount >= 0 ? formatted : `-${formatted}`;
   };
 
-  // Filter positions based on showAll toggle
-  const filteredSuppliedPositions = showAll 
-    ? suppliedPositions 
-    : suppliedPositions.filter(p => p.balance > 0);
-  
-  const filteredBorrowedPositions = showAll 
-    ? borrowedPositions 
-    : borrowedPositions.filter(p => p.balance < 0);
+  // Filter positions based on showAll toggle.
+  const filteredSuppliedPositions = showAll
+    ? suppliedPositions
+    : suppliedPositions.filter((p) => p.balance > 0);
+  const filteredBorrowedPositions = showAll
+    ? borrowedPositions
+    : borrowedPositions.filter((p) => p.balance < 0);
+
+  // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
+  const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
 
   return (
     <div className="w-full h-full flex flex-col hide-scrollbar p-6 space-y-8">
@@ -65,7 +67,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 relative">
-                <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
+                <Image
+                  src={protocolIcon}
+                  alt={`${protocolName} icon`}
+                  layout="fill"
+                  className="rounded-full"
+                />
               </div>
               <div className="flex flex-col">
                 <div className="text-2xl font-bold">{protocolName}</div>
@@ -100,51 +107,59 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
       </div>
 
-      {/* Positions Grid */}
-      <div className="grid lg:grid-cols-2 grid-cols-1 gap-8">
+      {/* Positions Container: Flex that stacks vertically on small screens and side-by-side on xl */}
+      <div className="flex flex-col xl:flex-row gap-8">
         {/* Supplied Assets */}
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
-            <h2 className="card-title justify-center">Supplied Assets</h2>
-            {filteredSuppliedPositions.length > 0 ? (
-              <div className="space-y-2">
-                {filteredSuppliedPositions.map((position, index) => (
-                  <Position 
-                    key={`supplied-${position.name}-${index}`} 
-                    {...position} 
-                    type="supply" 
-                    protocolName={protocolName}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
-                {showAll ? "No available assets" : "No supplied assets"}
-              </div>
-            )}
+        <div className="flex-1">
+          <div className="card bg-base-100 shadow-xl h-full">
+            <div className="card-body">
+              <h2 className="card-title justify-center">Supplied Assets</h2>
+              {filteredSuppliedPositions.length > 0 ? (
+                <div className="space-y-2">
+                  {filteredSuppliedPositions.map((position, index) => (
+                    // Wrap each Position in a container with a fixed min-height.
+                    <div key={`supplied-${position.name}-${index}`} className="min-h-[80px]">
+                      <Position
+                        {...position}
+                        type="supply"
+                        protocolName={protocolName}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                  {showAll ? "No available assets" : "No supplied assets"}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Borrowed Assets */}
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
-            <h2 className="card-title justify-center">Borrowed Assets</h2>
-            {filteredBorrowedPositions.length > 0 ? (
-              <div className="space-y-2">
-                {filteredBorrowedPositions.map((position, index) => (
-                  <Position 
-                    key={`borrowed-${position.name}-${index}`} 
-                    {...position} 
-                    type="borrow" 
-                    protocolName={protocolName}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
-                {showAll ? "No available assets" : "No borrowed assets"}
-              </div>
-            )}
+        <div className="flex-1">
+          <div className="card bg-base-100 shadow-xl h-full">
+            <div className="card-body">
+              <h2 className="card-title justify-center">Borrowed Assets</h2>
+              {filteredBorrowedPositions.length > 0 ? (
+                <div className="space-y-2">
+                  {filteredBorrowedPositions.map((position, index) => (
+                    // Wrap each Position in a container with the same min-height.
+                    <div key={`borrowed-${position.name}-${index}`} className="min-h-[80px]">
+                      <Position
+                        {...position}
+                        type="borrow"
+                        protocolName={protocolName}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                  {showAll ? "No available assets" : "No borrowed assets"}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -152,7 +167,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   );
 };
 
-// Example usage:
 export const ExampleProtocolView: FC = () => {
   const exampleSuppliedPositions: ProtocolPosition[] = [
     {
