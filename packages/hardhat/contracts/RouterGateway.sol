@@ -114,4 +114,20 @@ contract RouterGateway {
         // Forward balance call to the appropriate gateway
         return gateway.getBalance(token, user);
     }
+
+    function moveDebt(address token, address user, uint256 amount, string calldata fromProtocol, string calldata toProtocol) external {
+        // Get the gateway for the specified protocol
+        IGateway fromGateway = gateways[fromProtocol];
+        IGateway toGateway = gateways[toProtocol];
+        require(address(fromGateway) != address(0), "From protocol not supported");
+        require(address(toGateway) != address(0), "To protocol not supported");
+
+        // Forward move debt call to the appropriate gateway
+        fromGateway.repay(token, user, amount);
+        fromGateway.withdraw(token, user, amount);
+        toGateway.deposit(token, user, amount);
+        toGateway.borrow(token, user, amount);
+
+        //repay flash loan
+    }
 } 

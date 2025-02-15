@@ -40,7 +40,11 @@ contract AaveGateway is IGateway {
     }
 
     function borrow(address token, address user, uint256 amount) external override {
-        revert("not implemented");
+        address poolAddress = poolAddressesProvider.getPool();
+        require(poolAddress != address(0), "Pool address not set");
+
+        IPool(poolAddress).borrow(token, amount, 2, REFERRAL_CODE, user);
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
 
     function repay(address token, address user, uint256 amount) external override {
