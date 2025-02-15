@@ -4,14 +4,23 @@ pragma solidity ^0.8.0;
 import { IGateway } from "../interfaces/IGateway.sol";
 import { IPoolAddressesProvider } from "../interfaces/aave/IPoolAddressesProvider.sol";
 import { IUiPoolDataProviderV3 } from "../interfaces/aave/IUiDataProvider.sol";
+import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 
 contract AaveGateway is IGateway {
+    using SafeERC20 for IERC20;
+
     IPoolAddressesProvider public immutable poolAddressesProvider;
     IUiPoolDataProviderV3 public immutable uiPoolDataProvider;
+    uint16 public immutable REFERRAL_CODE;
 
-    constructor(address _poolAddressesProvider, address _uiPoolDataProvider) {
+
+    constructor(address _poolAddressesProvider, address _uiPoolDataProvider, uint16 _referralCode) {
         poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
         uiPoolDataProvider = IUiPoolDataProviderV3(_uiPoolDataProvider);
+        REFERRAL_CODE = _referralCode;
     }
 
     function getLtv(address token, address user) external view returns (uint256) {
@@ -19,19 +28,33 @@ contract AaveGateway is IGateway {
     }
 
     function deposit(address token, address user, uint256 amount) external override {
-        revert("not implemented");
+        address poolAddress = poolAddressesProvider.getPool();
+        require(poolAddress != address(0), "Pool address not set");
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(token).approve(poolAddress, amount);
+        IPool(poolAddress).supply(token, amount, user, REFERRAL_CODE);
     }
 
+    // not sure when this will ever be used. 
     function withdraw(address token, address user, uint256 amount) external override {
         revert("not implemented");
     }
 
+    // the borrow function will work through the variable debt token's credit delegation mechanism. 
+    // This means this gateway will borrow on behalf of the user when a new position is established, unsecured
+    // for the protocol. 
     function borrow(address token, address user, uint256 amount) external override {
         revert("not implemented");
     }
 
     function repay(address token, address user, uint256 amount) external override {
-        revert("not implemented");
+        address poolAddress = poolAddressesProvider.getPool();
+        require(poolAddress != address(0), "Pool address not set");
+    
+        IERC20(token).safeTransferFrom(user, address(this), amount);
+        IERC20(token).approve(poolAddress, amount);
+        IPool(poolAddress).repay(token, amount, 2, user);
     }
 
     struct TokenInfo {

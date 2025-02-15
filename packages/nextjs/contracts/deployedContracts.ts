@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xeAC1E31B624F9Da2B1cE511d1C9984a5D462A846",
+      address: "0x6718b9232B15d61C602a7C60acfF41606c129Abb",
       abi: [
         {
           inputs: [
@@ -21,9 +21,65 @@ const deployedContracts = {
               name: "_uiPoolDataProvider",
               type: "address",
             },
+            {
+              internalType: "uint16",
+              name: "_referralCode",
+              type: "uint16",
+            },
           ],
           stateMutability: "nonpayable",
           type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "REFERRAL_CODE",
+          outputs: [
+            {
+              internalType: "uint16",
+              name: "",
+              type: "uint16",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -863,7 +919,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x477e39e34454122237Ef0388C24897344f10f7D3",
+      address: "0x3380B63bac55501492Aff80f2d7eF5c171909AE1",
       abi: [
         {
           inputs: [
@@ -1021,7 +1077,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x4e7B447cF5DA9521e9a2222Fb77BAdcb299708E4",
+      address: "0x79C29972195808E156674B1407D6D0d8516a72bD",
       abi: [
         {
           inputs: [

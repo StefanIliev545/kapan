@@ -30,6 +30,7 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
     args: [
         "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", //Pool Addresses Provider
         "0x5c5228aC8BC1528482514aF3e27E692495148717", //Ui Provider
+        0 // Referral Code
     ],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by

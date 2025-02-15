@@ -18,6 +18,7 @@ contract RouterGateway {
         gateways["aave"] = IGateway(aaveGateway);
         gateways["compound"] = IGateway(compoundGateway);
         gateways["compound v3"] = IGateway(compoundGateway);
+        gateways["aave v3"] = IGateway(aaveGateway);
     }
 
     function supplyWithPermit(

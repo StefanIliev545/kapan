@@ -5,6 +5,13 @@ __metadata:
   version: 6
   cacheKey: 8
 
+"@aave/core-v3@npm:^1.19.3":
+  version: 1.19.3
+  resolution: "@aave/core-v3@npm:1.19.3"
+  checksum: 64fe159280b9777a0913c0d8612c03c6e17bced1304975e72a9bb99a9af400159ae10f2038d4e182d6237e20cbe8d16aba5bb9dacbc9d93d38e032a5260e5dbb
+  languageName: node
+  linkType: hard
+
 "@adraffy/ens-normalize@npm:1.10.0":
   version: 1.10.0
   resolution: "@adraffy/ens-normalize@npm:1.10.0"
@@ -2486,6 +2493,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@se-2/hardhat@workspace:packages/hardhat"
   dependencies:
+    "@aave/core-v3": ^1.19.3
     "@chainlink/contracts": ^1.3.0
     "@ethersproject/abi": ~5.7.0
     "@ethersproject/providers": ~5.7.2
@@ -2564,7 +2572,6 @@ __metadata:
     vercel: ~39.1.3
     viem: 2.21.32
     wagmi: ^2.14.11
-    wagmi-permit: 1.0.19
     zustand: ~5.0.0
   languageName: unknown
   linkType: soft
@@ -14432,17 +14439,6 @@ __metadata:
     typescript:
       optional: true
   checksum: c15cc0eb5c44acdfe37c948126591aa4784c927960b020e7b0614211bdaf40aa54befac47a827f987bb61d918549ba04b8b5478e5c9a313e6424ea2d942d4728
-  languageName: node
-  linkType: hard
-
-"wagmi-permit@npm:1.0.19":
-  version: 1.0.19
-  resolution: "wagmi-permit@npm:1.0.19"
-  peerDependencies:
-    react: "*"
-    viem: 1.x
-    wagmi: 1.x
-  checksum: af2a9e78ed39b28f5132ea52a114b23a4734eef542ccfbae0082919a709780a8997c8b21b59885017be1d3a3c94a7ebd51d5f5c732d0f61176cd619c3a541d16
   languageName: node
   linkType: hard
 
