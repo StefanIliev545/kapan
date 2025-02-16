@@ -119,8 +119,9 @@ contract RouterGateway {
 
     function receiveFlashLoanToMoveDebt(
         address user,
-        address token,
-        uint256 amount,
+        address debtToken,
+        uint256 debtAmount,
+        Collateral[] memory collaterals,
         string calldata fromProtocol,
         string calldata toProtocol
     ) external {
@@ -129,10 +130,31 @@ contract RouterGateway {
         IGateway toGateway = gateways[toProtocol];
         require(address(fromGateway) != address(0), "From protocol not supported");
         require(address(toGateway) != address(0), "To protocol not supported");
+        
+        // Receive flash loan to repay the debt.
+        balancerVault.sendTo(debtToken, address(this), debtAmount);
+        IERC20(debtToken).approve(address(fromGateway), debtAmount);
+        // Repay the debt
+        fromGateway.repay(debtToken, user, debtAmount);
+
+        for (uint i = 0; i < collaterals.length; i++) {
+            fromGateway.withdrawCollateral(debtToken, collaterals[i].token, address(this), collaterals[i].amount);
+            IERC20(collaterals[i].token).approve(address(toGateway), collaterals[i].amount);
+            toGateway.deposit(collaterals[i].token, user, collaterals[i].amount);
+        }
+
+        toGateway.borrow(debtToken, user, debtAmount);
+        IERC20(debtToken).safeTransfer(address(balancerVault), debtAmount);
+        balancerVault.settle(debtToken, debtAmount);
     }
 
-    function moveDebt(address token, address user, uint256 amount, string calldata fromProtocol, string calldata toProtocol) external {
-        bytes memory data = abi.encodeWithSelector(this.receiveFlashLoanToMoveDebt.selector, user, token, amount, fromProtocol, toProtocol);
+    struct Collateral {
+        address token;
+        uint256 amount;
+    }    
+
+    function moveDebt(address user, address debtToken, uint256 debtAmount, Collateral[] memory collaterals, string calldata fromProtocol, string calldata toProtocol) external {
+        bytes memory data = abi.encodeWithSelector(this.receiveFlashLoanToMoveDebt.selector, user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
         balancerVault.unlock(data);
     }
 

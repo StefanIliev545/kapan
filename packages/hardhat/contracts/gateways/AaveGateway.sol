@@ -5,9 +5,10 @@ import { IGateway } from "../interfaces/IGateway.sol";
 import { IPoolAddressesProvider } from "../interfaces/aave/IPoolAddressesProvider.sol";
 import { IUiPoolDataProviderV3 } from "../interfaces/aave/IUiDataProvider.sol";
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
+import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract AaveGateway is IGateway {
     using SafeERC20 for IERC20;
 
@@ -35,8 +36,11 @@ contract AaveGateway is IGateway {
         IPool(poolAddress).supply(token, amount, user, REFERRAL_CODE);
     }
 
-    function withdraw(address token, address user, uint256 amount) external override {
-        revert("not implemented");
+    function withdrawCollateral(address, address aToken, address user, uint256 amount) external override {
+        IERC20(aToken).safeTransferFrom(user, address(this), amount);
+        IPool(poolAddressesProvider.getPool()).withdraw(aToken, amount, user);
+        address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
+        IERC20(underlying).safeTransfer(msg.sender, amount);
     }
 
     function borrow(address token, address user, uint256 amount) external override {
@@ -65,6 +69,7 @@ contract AaveGateway is IGateway {
         uint256 price;
         uint256 borrowBalance;
         uint256 balance;
+        address aToken;
     }
 
     /// @notice Returns all token info for a given user.
@@ -88,7 +93,8 @@ contract AaveGateway is IGateway {
                 reserves[i].symbol,
                 reserves[i].priceInMarketReferenceCurrency,
                 borrowBalance,
-                balance
+                balance,
+                reserves[i].aTokenAddress
             );
         }
         return tokens;
@@ -242,6 +248,34 @@ contract AaveGateway is IGateway {
         string[] memory symbols,
         uint8[] memory decimals
     ) {
-        return (new address[](0), new uint256[](0), new string[](0), new uint8[](0));
+        // Get all tokens info
+        TokenInfo[] memory allTokens = this.getAllTokensInfo(user);
+
+        // Count tokens with non-zero balance
+        uint256 tokenCount = 0;
+        for (uint256 i = 0; i < allTokens.length; i++) {
+            if (allTokens[i].balance > 0) {
+                tokenCount++;
+            }
+        }
+
+        // Initialize arrays with the correct size
+        collateralAddresses = new address[](tokenCount);
+        balances = new uint256[](tokenCount);
+        symbols = new string[](tokenCount);
+        decimals = new uint8[](tokenCount);
+
+        // Fill arrays with tokens that have balance
+        uint256 index = 0;
+        for (uint256 i = 0; i < allTokens.length; i++) {
+            if (allTokens[i].balance > 0) {
+                collateralAddresses[index] = allTokens[i].aToken;
+                balances[index] = allTokens[i].balance;
+                symbols[index] = allTokens[i].symbol;
+                decimals[index] = ERC20(allTokens[i].token).decimals();
+                index++;
+            }
+        }
+        return (collateralAddresses, balances, symbols, decimals);
     }
 }

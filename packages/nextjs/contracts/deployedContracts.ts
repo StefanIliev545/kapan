@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x1F43da05BbEC2D384EB6A541dcfA2BFfceD171AF",
+      address: "0x52705086Ae19feAef97aB0F3905A360857b82199",
       abi: [
         {
           inputs: [
@@ -197,6 +197,11 @@ const deployedContracts = {
                   internalType: "uint256",
                   name: "balance",
                   type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "aToken",
+                  type: "address",
                 },
               ],
               internalType: "struct AaveGateway.TokenInfo[]",
@@ -419,7 +424,12 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "token",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "aToken",
               type: "address",
             },
             {
@@ -433,7 +443,7 @@ const deployedContracts = {
               type: "uint256",
             },
           ],
-          name: "withdraw",
+          name: "withdrawCollateral",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -449,11 +459,11 @@ const deployedContracts = {
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
         repay: "contracts/interfaces/IGateway.sol",
-        withdraw: "contracts/interfaces/IGateway.sol",
+        withdrawCollateral: "contracts/interfaces/IGateway.sol",
       },
     },
     CompoundGateway: {
-      address: "0xF0B91CF28218fd5E5AC89eCc42E24476dba98e97",
+      address: "0xe6dDcC5353d6d67BDCef42430F1e3c11335823B8",
       abi: [
         {
           inputs: [
@@ -965,7 +975,12 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "token",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
               type: "address",
             },
             {
@@ -979,7 +994,7 @@ const deployedContracts = {
               type: "uint256",
             },
           ],
-          name: "withdraw",
+          name: "withdrawCollateral",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -995,11 +1010,11 @@ const deployedContracts = {
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
         repay: "contracts/interfaces/IGateway.sol",
-        withdraw: "contracts/interfaces/IGateway.sol",
+        withdrawCollateral: "contracts/interfaces/IGateway.sol",
       },
     },
     OptimalInterestRateFinder: {
-      address: "0xFCb9aB7bBf155F5d76de65a2ae429aB5CCEdeA69",
+      address: "0xf641e24cda0685Aabe2bb88eF14D085cc3d76134",
       abi: [
         {
           inputs: [
@@ -1157,7 +1172,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xDEAce0ac17741E57b6b96eb6Eaf28cA1E67805a0",
+      address: "0xbe9D4039FCcf1A1746f81F05Aae7527031C678EE",
       abi: [
         {
           inputs: [
@@ -1327,18 +1342,35 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
               name: "user",
               type: "address",
             },
             {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
               internalType: "uint256",
-              name: "amount",
+              name: "debtAmount",
               type: "uint256",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct RouterGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
             },
             {
               internalType: "string",
@@ -1365,13 +1397,30 @@ const deployedContracts = {
             },
             {
               internalType: "address",
-              name: "token",
+              name: "debtToken",
               type: "address",
             },
             {
               internalType: "uint256",
-              name: "amount",
+              name: "debtAmount",
               type: "uint256",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct RouterGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
             },
             {
               internalType: "string",

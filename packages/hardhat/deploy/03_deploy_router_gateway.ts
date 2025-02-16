@@ -12,7 +12,7 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
   // Deploy RouterGateway
   const routerGateway = await deploy("RouterGateway", {
     from: deployer,
-    args: [aaveGateway.address, compoundGateway.address, "0x0000000000000000000000000000000000000000"], //todo balancer vault address
+    args: [aaveGateway.address, compoundGateway.address, "0xBA12222222228d8Ba445958a75a0704d566BF2C8"],
     log: true,
     autoMine: true,
   });

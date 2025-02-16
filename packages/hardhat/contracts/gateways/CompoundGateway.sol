@@ -74,12 +74,15 @@ contract CompoundGateway is IGateway {
         comet.supplyTo(user, token, amount);
     }
 
-    function withdraw(address token, address user, uint256 amount) external {
-        // TODO: Implement
+    // TODO: Insecure as this allows anyone to withdraw from a user's account, given this gateway will be manager.
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public cometMustExist(market) {
+        ICompoundComet comet = tokenToComet[market];
+        comet.withdrawFrom(user, address(this), collateral, amount);
+        IERC20(collateral).safeTransfer(msg.sender, amount);
     }   
 
     function borrow(address token, address user, uint256 amount) external {
-        // TODO: Implement
+        withdrawCollateral(token, token, user, amount);
     }   
 
     function repay(address token, address user, uint256 amount) external override {

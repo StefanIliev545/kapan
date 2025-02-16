@@ -3,7 +3,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 interface IGateway {
     function deposit(address token, address user, uint256 amount) external;
-    function withdraw(address token, address user, uint256 amount) external;
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) external;
     function borrow(address token, address user, uint256 amount) external;
     function repay(address token, address user, uint256 amount) external;
 
