@@ -1,7 +1,7 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { useAccount } from "wagmi";
 import { SelectableCollateralView } from "../specific/collateral/SelectableCollateralView";
+import { useAccount } from "wagmi";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 
 interface MovePositionModalProps {
@@ -10,8 +10,8 @@ interface MovePositionModalProps {
   fromProtocol: string;
   position: {
     name: string;
-    balance: number;       // USD value
-    tokenBalance: number;  // Token amount
+    balance: number; // USD value
+    tokenBalance: number; // Token amount
     type: "supply" | "borrow";
     tokenAddress: string;
   };
@@ -21,12 +21,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const { address: userAddress } = useAccount();
   const protocols = [
     { name: "Aave V3", icon: "/logos/aave.svg" },
-    { name: "Compound V3", icon: "/logos/compound.svg" }
+    { name: "Compound V3", icon: "/logos/compound.svg" },
   ];
 
-  const [selectedProtocol, setSelectedProtocol] = useState(
-    protocols.find(p => p.name !== fromProtocol)?.name || ""
-  );
+  const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
   const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
 
@@ -38,9 +36,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   );
 
   // Map fetched collaterals to the format expected by SelectableCollateralView
-  const collaterals = fetchedCollaterals.map((collateral: { symbol: string; balance: number; address: string }) => ({
+  const collaterals = fetchedCollaterals.map((collateral: { symbol: string; balance: number; address: string; decimals: number }) => ({
     ...collateral,
-    selected: selectedCollaterals.has(collateral.symbol)
+    selected: selectedCollaterals.has(collateral.symbol),
   }));
 
   const handleCollateralToggle = (symbol: string) => {
@@ -69,10 +67,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <label className="text-sm text-base-content/70">From Protocol</label>
               <div className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4">
                 <div className="flex items-center gap-2 truncate">
-                  <Image 
-                    src={protocols.find(p => p.name === fromProtocol)?.icon || ""} 
-                    alt={fromProtocol} 
-                    width={20} 
+                  <Image
+                    src={protocols.find(p => p.name === fromProtocol)?.icon || ""}
+                    alt={fromProtocol}
+                    width={20}
                     height={20}
                     className="rounded-full min-w-[20px]"
                   />
@@ -85,12 +83,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             <div>
               <label className="text-sm text-base-content/70">To Protocol</label>
               <div className="dropdown w-full">
-                <label tabIndex={0} className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4">
+                <label
+                  tabIndex={0}
+                  className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4"
+                >
                   <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
                     {selectedProtocol && (
                       <>
-                        <Image 
-                          src={protocols.find(p => p.name === selectedProtocol)?.icon || ""} 
+                        <Image
+                          src={protocols.find(p => p.name === selectedProtocol)?.icon || ""}
                           alt={selectedProtocol}
                           width={20}
                           height={20}
@@ -109,12 +110,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     .filter(p => p.name !== fromProtocol)
                     .map(protocol => (
                       <li key={protocol.name}>
-                        <a 
-                          className="flex items-center gap-2"
-                          onClick={() => setSelectedProtocol(protocol.name)}
-                        >
-                          <Image 
-                            src={protocol.icon} 
+                        <a className="flex items-center gap-2" onClick={() => setSelectedProtocol(protocol.name)}>
+                          <Image
+                            src={protocol.icon}
                             alt={protocol.name}
                             width={20}
                             height={20}
@@ -132,13 +130,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             <div>
               <label className="text-sm text-base-content/70">Flash Loan Provider</label>
               <div className="dropdown w-full">
-                <label tabIndex={0} className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4">
+                <label
+                  tabIndex={0}
+                  className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4"
+                >
                   <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
-                    <Image 
-                      src="/logos/balancer.svg" 
-                      alt="Balancer" 
-                      width={20} 
-                      height={20} 
+                    <Image
+                      src="/logos/balancer.svg"
+                      alt="Balancer"
+                      width={20}
+                      height={20}
                       className="rounded-full min-w-[20px]"
                     />
                     <span className="truncate">Balancer</span>
@@ -150,10 +151,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
                   <li>
                     <a className="flex items-center gap-2">
-                      <Image 
-                        src="/logos/balancer.svg" 
-                        alt="Balancer" 
-                        width={20} 
+                      <Image
+                        src="/logos/balancer.svg"
+                        alt="Balancer"
+                        width={20}
                         height={20}
                         className="rounded-full min-w-[20px]"
                       />
@@ -182,7 +183,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 onChange={e => setAmount(e.target.value)}
                 max={Math.abs(position.tokenBalance)}
               />
-              <span 
+              <span
                 className="absolute right-4 top-1/2 -translate-y-1/2 underline cursor-pointer hover:opacity-80 text-sm"
                 onClick={() => setAmount(Math.abs(position.tokenBalance).toString())}
               >
@@ -194,18 +195,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           {/* Collateral Selection */}
           {position.type === "borrow" && (
             <div>
-              <label className="text-sm text-base-content/70 mb-2 block">
-                Select Collateral to Move
-              </label>
+              <label className="text-sm text-base-content/70 mb-2 block">Select Collateral to Move</label>
               {isLoadingCollaterals ? (
                 <div className="flex items-center justify-center py-4">
                   <span className="loading loading-spinner loading-md"></span>
                 </div>
               ) : collaterals.length > 0 ? (
-                <SelectableCollateralView
-                  collaterals={collaterals}
-                  onCollateralToggle={handleCollateralToggle}
-                />
+                <SelectableCollateralView collaterals={collaterals} onCollateralToggle={handleCollateralToggle} />
               ) : (
                 <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
                   No collateral available to move
@@ -219,12 +215,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button 
+          <button
             className="btn btn-primary"
             disabled={
-              !selectedProtocol || 
-              !amount || 
-              Number(amount) <= 0 || 
+              !selectedProtocol ||
+              !amount ||
+              Number(amount) <= 0 ||
               Number(amount) > Math.abs(position.tokenBalance) ||
               (position.type === "borrow" && selectedCollaterals.size === 0)
             }
