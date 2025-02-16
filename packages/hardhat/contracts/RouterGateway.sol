@@ -121,7 +121,7 @@ contract RouterGateway {
         address user,
         address debtToken,
         uint256 debtAmount,
-        Collateral[] memory collaterals,
+        IGateway.Collateral[] memory collaterals,
         string calldata fromProtocol,
         string calldata toProtocol
     ) external {
@@ -148,12 +148,7 @@ contract RouterGateway {
         balancerVault.settle(debtToken, debtAmount);
     }
 
-    struct Collateral {
-        address token;
-        uint256 amount;
-    }    
-
-    function moveDebt(address user, address debtToken, uint256 debtAmount, Collateral[] memory collaterals, string calldata fromProtocol, string calldata toProtocol) external {
+    function moveDebt(address user, address debtToken, uint256 debtAmount, IGateway.Collateral[] memory collaterals, string calldata fromProtocol, string calldata toProtocol) external {
         bytes memory data = abi.encodeWithSelector(this.receiveFlashLoanToMoveDebt.selector, user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
         balancerVault.unlock(data);
     }
@@ -171,5 +166,19 @@ contract RouterGateway {
         IGateway gateway = gateways[protocolName];
         require(address(gateway) != address(0), "Protocol not supported");
         return gateway.getPossibleCollaterals(token, user);
+    }
+
+    function getFromProtocolApprovalsForMove(address debtToken, IGateway.Collateral[] calldata collaterals, string calldata fromProtocol) external view returns (address[] memory, bytes[] memory) {
+        IGateway fromGateway = gateways[fromProtocol];
+        require(address(fromGateway) != address(0), "From protocol not supported");
+        (address[] memory fromTarget, bytes[] memory fromData) = fromGateway.getEncodedCollateralApprovals(debtToken, collaterals);
+        return (fromTarget, fromData);
+    }
+
+    function getToProtocolApprovalsForMove(address debtToken, uint256 debtAmount, string calldata toProtocol) external view returns (address[] memory, bytes[] memory) {
+        IGateway toGateway = gateways[toProtocol];
+        require(address(toGateway) != address(0), "To protocol not supported");
+        (address[] memory toTarget, bytes[] memory toData) = toGateway.getEncodedDebtApproval(debtToken, debtAmount);
+        return (toTarget, toData);
     }
 } 

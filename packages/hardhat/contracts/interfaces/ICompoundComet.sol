@@ -37,4 +37,6 @@ interface ICompoundComet {
 
     function supplyTo(address dst, address asset, uint amount) external;
     function withdrawFrom(address src, address to, address asset, uint amount) external;
+
+    function allow(address manager, bool isAllowed) external;
 }

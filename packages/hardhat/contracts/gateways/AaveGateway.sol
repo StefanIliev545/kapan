@@ -9,6 +9,7 @@ import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 contract AaveGateway is IGateway {
     using SafeERC20 for IERC20;
 
@@ -277,5 +278,23 @@ contract AaveGateway is IGateway {
             }
         }
         return (collateralAddresses, balances, symbols, decimals);
+    }
+
+    function getEncodedCollateralApprovals(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data) {
+        target = new address[](collaterals.length);
+        data = new bytes[](collaterals.length);
+        for (uint256 i = 0; i < collaterals.length; i++) {
+            target[i] = address(token);
+            data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), collaterals[i].amount);
+        }
+    }
+
+    function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data) {
+        (address variableDebtToken, , bool found) = _getReserveAddresses(token);
+        require(found && variableDebtToken != address(0), "Token is not a valid debt token");
+        target = new address[](1);
+        data = new bytes[](1);
+        target[0] = variableDebtToken;
+        data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), amount);
     }
 }

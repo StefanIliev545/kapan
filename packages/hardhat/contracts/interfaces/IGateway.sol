@@ -19,4 +19,11 @@ interface IGateway {
         string[] memory symbols,
         uint8[] memory decimals
     );
+
+    struct Collateral {
+        address token;
+        uint256 amount;
+    }    
+    function getEncodedCollateralApprovals(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
+    function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data);
 }

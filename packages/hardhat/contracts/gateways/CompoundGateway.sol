@@ -212,4 +212,20 @@ contract CompoundGateway is IGateway {
         price = getPrice(token);
         priceScale = comet.priceScale();
     }
+
+    function getEncodedCollateralApprovals(address token, Collateral[] calldata) external view returns (address[] memory target, bytes[] memory data) {
+        ICompoundComet comet = tokenToComet[token];
+        target = new address[](1);
+        data = new bytes[](1);
+        target[0] = address(comet);
+        data[0] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
+    }
+
+    function getEncodedDebtApproval(address token, uint256) external view returns (address[] memory target, bytes[] memory data) {
+        ICompoundComet comet = tokenToComet[token];
+        target = new address[](1);
+        data = new bytes[](1);
+        target[0] = address(comet);
+        data[0] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
+    }
 }
