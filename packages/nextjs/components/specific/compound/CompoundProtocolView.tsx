@@ -75,8 +75,6 @@ export const CompoundProtocolView: FC = () => {
     const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
 
-    // Utility to compute a position for a token.
-    // compoundData is expected to be a tuple: [supplyRate, borrowRate, balance, borrowBalance]
     const computePosition = (
       tokenName: string,
       tokenAddress: string | undefined,
@@ -88,15 +86,18 @@ export const CompoundProtocolView: FC = () => {
       const decimals = Number(decimalsRaw);
       const supplyAPR = supplyRate ? convertRateToAPR(BigInt(supplyRate)) : 0;
       const borrowAPR = borrowRate ? convertRateToAPR(BigInt(borrowRate)) : 0;
-      const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) * Number(formatUnits(price, 8)) : 0;
+      
+      const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
+      const usdBalance = balance * Number(formatUnits(price, 8));
+      
       const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
-
-      console.log(`${tokenName} address: ${tokenAddress}`);
+      const usdBorrowBalance = borrowBalance * Number(formatUnits(price, 8));
 
       borrowed.push({
         icon: tokenNameToLogo(tokenName),
         name: tokenName,
-        balance: -borrowBalance,
+        balance: -usdBorrowBalance,
+        tokenBalance: borrowBalance,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
         collateralView: <CompoundCollateralView baseToken={tokenAddress} />,
@@ -105,7 +106,8 @@ export const CompoundProtocolView: FC = () => {
       supplied.push({
         icon: tokenNameToLogo(tokenName),
         name: tokenName,
-        balance: balance,
+        balance: usdBalance,
+        tokenBalance: balance,
         currentRate: supplyAPR,
         tokenAddress: tokenAddress,
       });

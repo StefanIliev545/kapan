@@ -25,7 +25,6 @@ export const AaveProtocolView: FC = () => {
 
     if (!allTokensInfo) return { suppliedPositions: supplied, borrowedPositions: borrowed };
 
-    // Create a position for each token, regardless of balance
     allTokensInfo.forEach((token: any) => {
       let decimals = 18;
       if (token.symbol === "USDC" || token.symbol === "USDT" || token.symbol === "USDC.e") {
@@ -36,24 +35,26 @@ export const AaveProtocolView: FC = () => {
       const borrowAPY = convertRateToAPY(token.borrowRate);
       const tokenPrice = Number(formatUnits(token.price, 8));
 
-      // Add supply position (even if balance is 0)
+      // Add supply position
       const supplyBalance = token.balance ? Number(formatUnits(token.balance, decimals)) : 0;
       const supplyUsdBalance = supplyBalance * tokenPrice;
       supplied.push({
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
         balance: supplyUsdBalance,
+        tokenBalance: supplyBalance,
         currentRate: supplyAPY,
         tokenAddress: token.token,
       });
 
-      // Add borrow position (even if balance is 0)
+      // Add borrow position
       const borrowBalance = token.borrowBalance ? Number(formatUnits(token.borrowBalance, decimals)) : 0;
       const borrowUsdBalance = borrowBalance * tokenPrice;
       borrowed.push({
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
-        balance: -borrowUsdBalance, // Negative for borrow positions
+        balance: -borrowUsdBalance,
+        tokenBalance: borrowBalance,
         currentRate: borrowAPY,
         tokenAddress: token.token,
       });

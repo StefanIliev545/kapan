@@ -9,6 +9,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract CompoundGateway is IGateway {
     using SafeERC20 for IERC20;
@@ -107,8 +108,43 @@ contract CompoundGateway is IGateway {
         // TODO: Implement
     }
 
+    function getPossibleCollaterals(address token, address user) external view returns (
+        address[] memory collateralAddresses,
+        uint256[] memory balances,
+        string[] memory symbols,
+        uint8[] memory decimals
+    ) {
+        (address[] memory collaterals, uint128[] memory rawBalances, string[] memory displayNames) = getDepositedCollaterals(token, user);
+        
+        // Count non-zero balances
+        uint256 nonZeroCount = 0;
+        for (uint256 i = 0; i < rawBalances.length; i++) {
+            if (rawBalances[i] > 0) {
+                nonZeroCount++;
+            }
+        }
+
+        // Create new arrays with only non-zero balances
+        collateralAddresses = new address[](nonZeroCount);
+        balances = new uint256[](nonZeroCount);
+        symbols = new string[](nonZeroCount);
+        decimals = new uint8[](nonZeroCount);
+
+        // Fill arrays with non-zero balance entries
+        uint256 j = 0;
+        for (uint256 i = 0; i < rawBalances.length; i++) {
+            if (rawBalances[i] > 0) {
+                collateralAddresses[j] = collaterals[i];
+                balances[j] = uint256(rawBalances[i]);
+                symbols[j] = displayNames[i];
+                decimals[j] = IERC20Metadata(collaterals[i]).decimals();
+                j++;
+            }
+        }
+    }
+
     function getDepositedCollaterals(address token, address account)
-        external
+        public
         view
         returns (address[] memory collaterals, uint128[] memory balances, string[] memory displayNames)
     {

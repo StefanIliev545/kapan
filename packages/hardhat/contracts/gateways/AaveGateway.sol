@@ -235,4 +235,13 @@ contract AaveGateway is IGateway {
         }
         return 0;
     }
+
+    function getPossibleCollaterals(address token, address user) external view returns (
+        address[] memory collateralAddresses,
+        uint256[] memory balances,
+        string[] memory symbols,
+        uint8[] memory decimals
+    ) {
+        return (new address[](0), new uint256[](0), new string[](0), new uint8[](0));
+    }
 }

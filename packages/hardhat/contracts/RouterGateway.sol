@@ -5,6 +5,7 @@ import "./interfaces/IGateway.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./interfaces/balancer/IVault.sol";
 
 import "hardhat/console.sol";
 
@@ -13,12 +14,13 @@ contract RouterGateway {
 
     // Mapping from protocol name to gateway contract
     mapping(string => IGateway) public gateways;
-
-    constructor(address aaveGateway, address compoundGateway) {
+    IVault public balancerVault;
+    constructor(address aaveGateway, address compoundGateway, IVault vault) {
         gateways["aave"] = IGateway(aaveGateway);
         gateways["compound"] = IGateway(compoundGateway);
         gateways["compound v3"] = IGateway(compoundGateway);
         gateways["aave v3"] = IGateway(aaveGateway);
+        balancerVault = vault;
     }
 
     function supplyWithPermit(
@@ -115,19 +117,37 @@ contract RouterGateway {
         return gateway.getBalance(token, user);
     }
 
-    function moveDebt(address token, address user, uint256 amount, string calldata fromProtocol, string calldata toProtocol) external {
+    function receiveFlashLoanToMoveDebt(
+        address user,
+        address token,
+        uint256 amount,
+        string calldata fromProtocol,
+        string calldata toProtocol
+    ) external {
         // Get the gateway for the specified protocol
         IGateway fromGateway = gateways[fromProtocol];
         IGateway toGateway = gateways[toProtocol];
         require(address(fromGateway) != address(0), "From protocol not supported");
         require(address(toGateway) != address(0), "To protocol not supported");
+    }
 
-        // Forward move debt call to the appropriate gateway
-        fromGateway.repay(token, user, amount);
-        fromGateway.withdraw(token, user, amount);
-        toGateway.deposit(token, user, amount);
-        toGateway.borrow(token, user, amount);
+    function moveDebt(address token, address user, uint256 amount, string calldata fromProtocol, string calldata toProtocol) external {
+        bytes memory data = abi.encodeWithSelector(this.receiveFlashLoanToMoveDebt.selector, user, token, amount, fromProtocol, toProtocol);
+        balancerVault.unlock(data);
+    }
 
-        //repay flash loan
+    function getPossibleCollaterals(
+        address token, 
+        string calldata protocolName, 
+        address user
+    ) external view returns (
+        address[] memory collateralAddresses,
+        uint256[] memory balances,
+        string[] memory symbols,
+        uint8[] memory decimals
+    ) {
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        return gateway.getPossibleCollaterals(token, user);
     }
 } 

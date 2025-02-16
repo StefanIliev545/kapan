@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xBAe46fB553bD8577737882aF030073CE89be51CB",
+      address: "0x1F43da05BbEC2D384EB6A541dcfA2BFfceD171AF",
       abi: [
         {
           inputs: [
@@ -310,6 +310,45 @@ const deployedContracts = {
               name: "token",
               type: "address",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPossibleCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collateralAddresses",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "balances",
+              type: "uint256[]",
+            },
+            {
+              internalType: "string[]",
+              name: "symbols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint8[]",
+              name: "decimals",
+              type: "uint8[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
           ],
           name: "getSupplyRate",
           outputs: [
@@ -407,13 +446,14 @@ const deployedContracts = {
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
+        getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
         repay: "contracts/interfaces/IGateway.sol",
         withdraw: "contracts/interfaces/IGateway.sol",
       },
     },
     CompoundGateway: {
-      address: "0x37033090a87353d527C58d03CB489f7D641a6b53",
+      address: "0xF0B91CF28218fd5E5AC89eCc42E24476dba98e97",
       abi: [
         {
           inputs: [
@@ -754,6 +794,45 @@ const deployedContracts = {
               name: "token",
               type: "address",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPossibleCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collateralAddresses",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "balances",
+              type: "uint256[]",
+            },
+            {
+              internalType: "string[]",
+              name: "symbols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint8[]",
+              name: "decimals",
+              type: "uint8[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
           ],
           name: "getPrice",
           outputs: [
@@ -913,13 +992,14 @@ const deployedContracts = {
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
+        getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
         repay: "contracts/interfaces/IGateway.sol",
         withdraw: "contracts/interfaces/IGateway.sol",
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x6863fc291F586531E9F4002998c18300776f0D7d",
+      address: "0xFCb9aB7bBf155F5d76de65a2ae429aB5CCEdeA69",
       abi: [
         {
           inputs: [
@@ -1077,7 +1157,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x281613035506Da4D158574580c12ED65cD3b62ba",
+      address: "0xDEAce0ac17741E57b6b96eb6Eaf28cA1E67805a0",
       abi: [
         {
           inputs: [
@@ -1089,6 +1169,11 @@ const deployedContracts = {
             {
               internalType: "address",
               name: "compoundGateway",
+              type: "address",
+            },
+            {
+              internalType: "contract IVault",
+              name: "vault",
               type: "address",
             },
           ],
@@ -1132,6 +1217,19 @@ const deployedContracts = {
           ],
           name: "SafeERC20FailedOperation",
           type: "error",
+        },
+        {
+          inputs: [],
+          name: "balancerVault",
+          outputs: [
+            {
+              internalType: "contract IVault",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -1179,6 +1277,116 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPossibleCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collateralAddresses",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "balances",
+              type: "uint256[]",
+            },
+            {
+              internalType: "string[]",
+              name: "symbols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint8[]",
+              name: "decimals",
+              type: "uint8[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+          ],
+          name: "moveDebt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+          ],
+          name: "receiveFlashLoanToMoveDebt",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {

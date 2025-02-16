@@ -1,5 +1,8 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 import Image from "next/image";
+import { useAccount } from "wagmi";
+import { SelectableCollateralView } from "../specific/collateral/SelectableCollateralView";
+import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 
 interface MovePositionModalProps {
   isOpen: boolean;
@@ -7,70 +10,227 @@ interface MovePositionModalProps {
   fromProtocol: string;
   position: {
     name: string;
-    balance: number;
+    balance: number;       // USD value
+    tokenBalance: number;  // Token amount
     type: "supply" | "borrow";
+    tokenAddress: string;
   };
 }
 
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
-  const protocols = ["Aave V3", "Compound V3"];
+  const { address: userAddress } = useAccount();
+  const protocols = [
+    { name: "Aave V3", icon: "/logos/aave.svg" },
+    { name: "Compound V3", icon: "/logos/compound.svg" }
+  ];
+
+  const [selectedProtocol, setSelectedProtocol] = useState(
+    protocols.find(p => p.name !== fromProtocol)?.name || ""
+  );
+  const [amount, setAmount] = useState("");
+  const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
+
+  // Fetch collaterals from the contract
+  const { collaterals: fetchedCollaterals, isLoading: isLoadingCollaterals } = useCollaterals(
+    position.tokenAddress,
+    fromProtocol,
+    userAddress || "0x0000000000000000000000000000000000000000", // Fallback address if not connected
+  );
+
+  // Map fetched collaterals to the format expected by SelectableCollateralView
+  const collaterals = fetchedCollaterals.map((collateral: { symbol: string; balance: number; address: string }) => ({
+    ...collateral,
+    selected: selectedCollaterals.has(collateral.symbol)
+  }));
+
+  const handleCollateralToggle = (symbol: string) => {
+    setSelectedCollaterals(prev => {
+      const next = new Set(prev);
+      if (next.has(symbol)) {
+        next.delete(symbol);
+      } else {
+        next.add(symbol);
+      }
+      return next;
+    });
+  };
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box">
+      <div className="modal-box max-w-2xl">
         <h3 className="font-bold text-lg">
           Move {position.type === "supply" ? "Supply" : "Debt"}: {position.name}
         </h3>
 
-        <div className="py-4 space-y-4">
-          <div>
-            <label className="text-sm text-base-content/70">From Protocol</label>
-            <div className="font-medium">{fromProtocol}</div>
-          </div>
-
-          <div>
-            <label className="text-sm text-base-content/70">To Protocol</label>
-            <select className="select select-bordered w-full">
-              {protocols
-                .filter(p => p !== fromProtocol)
-                .map(protocol => (
-                  <option key={protocol} value={protocol}>
-                    {protocol}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          {/* Flash Loan Provider Dropdown */}
-          <div>
-            <label className="text-sm text-base-content/70">Flash Loan Provider</label>
-            <div className="dropdown w-full">
-              <label tabIndex={0} className="btn btn-outline w-full flex justify-between">
-                <div className="flex items-center gap-2">
-                  <Image src="/logos/balancer.svg" alt="Balancer" width={20} height={20} />
-                  Balancer
+        <div className="py-4 space-y-6">
+          <div className="grid grid-cols-3 gap-4">
+            {/* From Protocol */}
+            <div>
+              <label className="text-sm text-base-content/70">From Protocol</label>
+              <div className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4">
+                <div className="flex items-center gap-2 truncate">
+                  <Image 
+                    src={protocols.find(p => p.name === fromProtocol)?.icon || ""} 
+                    alt={fromProtocol} 
+                    width={20} 
+                    height={20}
+                    className="rounded-full min-w-[20px]"
+                  />
+                  <span className="truncate">{fromProtocol}</span>
                 </div>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </label>
-              <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
-                <li>
-                  <a className="flex items-center gap-2">
-                    <Image src="/logos/balancer.svg" alt="Balancer" width={20} height={20} />
-                    Balancer
-                  </a>
-                </li>
-              </ul>
+              </div>
+            </div>
+
+            {/* To Protocol */}
+            <div>
+              <label className="text-sm text-base-content/70">To Protocol</label>
+              <div className="dropdown w-full">
+                <label tabIndex={0} className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4">
+                  <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
+                    {selectedProtocol && (
+                      <>
+                        <Image 
+                          src={protocols.find(p => p.name === selectedProtocol)?.icon || ""} 
+                          alt={selectedProtocol}
+                          width={20}
+                          height={20}
+                          className="rounded-full min-w-[20px]"
+                        />
+                        <span className="truncate">{selectedProtocol}</span>
+                      </>
+                    )}
+                  </div>
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </label>
+                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
+                  {protocols
+                    .filter(p => p.name !== fromProtocol)
+                    .map(protocol => (
+                      <li key={protocol.name}>
+                        <a 
+                          className="flex items-center gap-2"
+                          onClick={() => setSelectedProtocol(protocol.name)}
+                        >
+                          <Image 
+                            src={protocol.icon} 
+                            alt={protocol.name}
+                            width={20}
+                            height={20}
+                            className="rounded-full min-w-[20px]"
+                          />
+                          <span className="truncate">{protocol.name}</span>
+                        </a>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Flash Loan Provider */}
+            <div>
+              <label className="text-sm text-base-content/70">Flash Loan Provider</label>
+              <div className="dropdown w-full">
+                <label tabIndex={0} className="btn btn-outline w-full flex items-center justify-between mt-3 !h-12 px-4">
+                  <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
+                    <Image 
+                      src="/logos/balancer.svg" 
+                      alt="Balancer" 
+                      width={20} 
+                      height={20} 
+                      className="rounded-full min-w-[20px]"
+                    />
+                    <span className="truncate">Balancer</span>
+                  </div>
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </label>
+                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
+                  <li>
+                    <a className="flex items-center gap-2">
+                      <Image 
+                        src="/logos/balancer.svg" 
+                        alt="Balancer" 
+                        width={20} 
+                        height={20}
+                        className="rounded-full min-w-[20px]"
+                      />
+                      <span className="truncate">Balancer</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
+
+          {/* Amount Input */}
+          <div className="max-w-l">
+            <label className="text-sm text-base-content/70">
+              Amount{" "}
+              <span className="float-right">
+                Available: {Math.abs(position.tokenBalance).toFixed(4)} {position.name}
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                className="input input-bordered w-full pr-16"
+                placeholder="0.00"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                max={Math.abs(position.tokenBalance)}
+              />
+              <span 
+                className="absolute right-4 top-1/2 -translate-y-1/2 underline cursor-pointer hover:opacity-80 text-sm"
+                onClick={() => setAmount(Math.abs(position.tokenBalance).toString())}
+              >
+                Max
+              </span>
+            </div>
+          </div>
+
+          {/* Collateral Selection */}
+          {position.type === "borrow" && (
+            <div>
+              <label className="text-sm text-base-content/70 mb-2 block">
+                Select Collateral to Move
+              </label>
+              {isLoadingCollaterals ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="loading loading-spinner loading-md"></span>
+                </div>
+              ) : collaterals.length > 0 ? (
+                <SelectableCollateralView
+                  collaterals={collaterals}
+                  onCollateralToggle={handleCollateralToggle}
+                />
+              ) : (
+                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                  No collateral available to move
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="modal-action">
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary">Move Position</button>
+          <button 
+            className="btn btn-primary"
+            disabled={
+              !selectedProtocol || 
+              !amount || 
+              Number(amount) <= 0 || 
+              Number(amount) > Math.abs(position.tokenBalance) ||
+              (position.type === "borrow" && selectedCollaterals.size === 0)
+            }
+          >
+            Move Position
+          </button>
         </div>
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>

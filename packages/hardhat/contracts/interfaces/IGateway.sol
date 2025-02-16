@@ -13,4 +13,10 @@ interface IGateway {
     function getBorrowRate(address token) external view returns (uint256, bool);
     function getSupplyRate(address token) external view returns (uint256, bool);
     function getLtv(address token, address user) external view returns (uint256);
+    function getPossibleCollaterals(address token, address user) external view returns (
+        address[] memory collateralAddresses,
+        uint256[] memory balances,
+        string[] memory symbols,
+        uint8[] memory decimals
+    );
 }

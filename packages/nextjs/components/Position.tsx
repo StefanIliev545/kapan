@@ -10,7 +10,8 @@ import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 interface PositionProps {
   icon: string;
   name: string;
-  balance: number;
+  balance: number;      // USD value
+  tokenBalance: number; // Raw token amount
   currentRate: number;
   optimalRate?: number;
   type: "supply" | "borrow";
@@ -23,7 +24,9 @@ export const Position: FC<PositionProps> = ({
   icon,
   name,
   balance,
+  tokenBalance,
   currentRate,
+  optimalRate,
   type,
   protocolName,
   tokenAddress,
@@ -34,8 +37,10 @@ export const Position: FC<PositionProps> = ({
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Check if position has a balance
-  const hasBalance = type === "supply" ? balance > 0 : balance < 0;
+  // Check if position has a balance - for borrow positions, we want to check if there is debt
+  const hasBalance = type === "supply" 
+    ? tokenBalance > 0 
+    : tokenBalance > 0; // Changed from tokenBalance < 0 since borrow balance is positive
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract.
   const { data: optimalRateData } = useScaffoldReadContract({
@@ -217,16 +222,27 @@ export const Position: FC<PositionProps> = ({
         <MoveSupplyModal
           isOpen={isMoveModalOpen}
           onClose={() => setIsMoveModalOpen(false)}
-          token={{ name, icon, currentRate, address: tokenAddress }}
+          token={{ 
+            name, 
+            icon, 
+            currentRate, 
+            address: tokenAddress 
+          }}
           fromProtocol={protocolName}
-          currentSupply={balance}
+          currentSupply={tokenBalance}
         />
       ) : (
         <MovePositionModal
           isOpen={isMoveModalOpen}
           onClose={() => setIsMoveModalOpen(false)}
           fromProtocol={protocolName}
-          position={{ name, balance, type }}
+          position={{
+            name,
+            balance,
+            tokenBalance,
+            type,
+            tokenAddress,
+          }}
         />
       )}
 
@@ -257,6 +273,7 @@ export const ExamplePosition: FC = () => {
       icon="/logos/usdc-coin-usdc-logo.svg"
       name="USDC"
       balance={1000.5}
+      tokenBalance={1000.5}
       currentRate={3.5}
       type="supply"
       protocolName="Aave V3"
