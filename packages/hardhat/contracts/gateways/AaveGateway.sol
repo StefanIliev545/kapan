@@ -43,15 +43,18 @@ contract AaveGateway is IGateway {
     function withdrawCollateral(address, address aToken, address user, uint256 amount) external override {
         IERC20 atoken = IERC20(aToken);
         IAToken aTokenContract = IAToken(aToken);
+        
         console.log("AToken balance of user", atoken.balanceOf(user), aToken, user);
         require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
-        console.log("Transferring collateral to this contract", amount, aToken);
-        atoken.transferFrom(user, address(this), aTokenContract.scaledBalanceOf(user));
+        uint256 allowance = atoken.allowance(user, address(this));
+        console.log("AToken allowance", allowance, amount);
+        require(allowance >= amount, "Insufficient allowance");
+        atoken.transferFrom(user, address(this), amount);
 
         console.log("Withdrawing collateral from Aave");
-        IPool(poolAddressesProvider.getPool()).withdraw(aToken, amount, user);
-
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
+        IPool(poolAddressesProvider.getPool()).withdraw(underlying, amount, address(this));
+
         console.log("Transferring collateral to msg.sender", amount, underlying);
         IERC20(underlying).safeTransfer(msg.sender, amount);
     }
@@ -307,7 +310,7 @@ contract AaveGateway is IGateway {
         target = new address[](collaterals.length);
         data = new bytes[](collaterals.length);
         for (uint256 i = 0; i < collaterals.length; i++) {
-            target[i] = address(token);
+            target[i] = collaterals[i].token;
             data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), collaterals[i].amount);
         }
     }
