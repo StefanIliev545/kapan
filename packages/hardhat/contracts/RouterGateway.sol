@@ -163,30 +163,20 @@ contract RouterGateway {
         require(address(fromGateway) != address(0), "From protocol not supported");
         require(address(toGateway) != address(0), "To protocol not supported");
 
-        // Debug logs for debt amounts
-        uint256 actualBorrowBalance = fromGateway.getBorrowBalance(debtToken, user);
-        console.log("Actual borrow balance:", actualBorrowBalance);
-        console.log("Requested debt amount to move:", debtAmount);
-        require(debtAmount <= actualBorrowBalance, "Debt amount exceeds borrow balance");
-
         // Repay the debt on the "from" protocol
-        IERC20(debtToken).approve(address(fromGateway), debtAmount);
-        console.log("Repaying debt on the from protocol");
-        uint256 borrowBalanceBefore = fromGateway.getBorrowBalance(debtToken, user);
-        console.log("Borrow balance before repayment:", borrowBalanceBefore);
-        fromGateway.repay(debtToken, user, debtAmount);
-        uint256 borrowBalanceAfter = fromGateway.getBorrowBalance(debtToken, user);
-        console.log("Borrow balance after repayment:", borrowBalanceAfter);
-        require(borrowBalanceAfter < borrowBalanceBefore, "Repayment did not reduce borrow balance");
-
+        {
+            IERC20(debtToken).approve(address(fromGateway), debtAmount);
+            uint256 borrowBalanceBefore = fromGateway.getBorrowBalance(debtToken, user);
+            fromGateway.repay(debtToken, user, debtAmount);
+            uint256 borrowBalanceAfter = fromGateway.getBorrowBalance(debtToken, user);
+            require(borrowBalanceAfter < borrowBalanceBefore, "Repayment did not reduce borrow balance");
+        }
         // For each collateral asset, withdraw then deposit into the target protocol.
         for (uint i = 0; i < collaterals.length; i++) {
-            console.log("Withdrawing collateral from the from protocol");
-            fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
-            console.log("Approving collateral to the to protocol");
-            IERC20(collaterals[i].token).approve(address(toGateway), collaterals[i].amount);
+            address underlyingReceived = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
+            IERC20(underlyingReceived).approve(address(toGateway), collaterals[i].amount);
             console.log("Depositing collateral into the to protocol");
-            toGateway.deposit(collaterals[i].token, user, collaterals[i].amount);
+            toGateway.depositCollateral(debtToken, underlyingReceived, collaterals[i].amount, user);
         }
 
         // Borrow the debt on the "to" protocol.

@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xF4F2485A50e62C706deBec4E94b298Ee959CEAED",
+      address: "0x178fc2B403Bb6F88dBa7A40003838C24e5dEeFC6",
       abi: [
         {
           inputs: [
@@ -142,6 +142,34 @@ const deployedContracts = {
             },
           ],
           name: "deposit",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "receiver",
+              type: "address",
+            },
+          ],
+          name: "depositCollateral",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -514,7 +542,13 @@ const deployedContracts = {
             },
           ],
           name: "withdrawCollateral",
-          outputs: [],
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
           stateMutability: "nonpayable",
           type: "function",
         },
@@ -522,6 +556,7 @@ const deployedContracts = {
       inheritedFunctions: {
         borrow: "contracts/interfaces/IGateway.sol",
         deposit: "contracts/interfaces/IGateway.sol",
+        depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
@@ -535,7 +570,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x37033090a87353d527C58d03CB489f7D641a6b53",
+      address: "0x6d246480181D9894a328135113A1FFa3D1465c4F",
       abi: [
         {
           inputs: [
@@ -648,6 +683,34 @@ const deployedContracts = {
             },
           ],
           name: "deposit",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "receiver",
+              type: "address",
+            },
+          ],
+          name: "depositCollateral",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -1137,7 +1200,13 @@ const deployedContracts = {
             },
           ],
           name: "withdrawCollateral",
-          outputs: [],
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
           stateMutability: "nonpayable",
           type: "function",
         },
@@ -1145,6 +1214,7 @@ const deployedContracts = {
       inheritedFunctions: {
         borrow: "contracts/interfaces/IGateway.sol",
         deposit: "contracts/interfaces/IGateway.sol",
+        depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
@@ -1158,7 +1228,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x5DaAced60F47CF16d01761b3f5B04C9676c33DE1",
+      address: "0x86D76fA82b9e739745fc7e4866181E56E8d1dF07",
       abi: [
         {
           inputs: [
@@ -1316,7 +1386,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x9BBeED34EcF593C261a4f4A0963787630A6b9EeE",
+      address: "0xb156644716c8d99d9e22FaBcb2AF09E306688fA1",
       abi: [
         {
           inputs: [

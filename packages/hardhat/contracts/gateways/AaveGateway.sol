@@ -29,7 +29,7 @@ contract AaveGateway is IGateway {
         // TODO: Implement LTV logic
     }
 
-    function deposit(address token, address user, uint256 amount) external override {
+    function deposit(address token, address user, uint256 amount) public override {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
 
@@ -38,16 +38,17 @@ contract AaveGateway is IGateway {
         IPool(poolAddress).supply(token, amount, user, REFERRAL_CODE);
     }
 
+    function depositCollateral(address market, address collateral, uint256 amount, address receiver) external override {
+        deposit(collateral, receiver, amount);
+    }
+
     // 1909960826083442181  - balance of user 
     // 1909960825889295500 - transferFrom
-    function withdrawCollateral(address, address aToken, address user, uint256 amount) external override {
+    function withdrawCollateral(address, address aToken, address user, uint256 amount) external override returns (address) {
         IERC20 atoken = IERC20(aToken);
-        IAToken aTokenContract = IAToken(aToken);
         
-        console.log("AToken balance of user", atoken.balanceOf(user), aToken, user);
         require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
         uint256 allowance = atoken.allowance(user, address(this));
-        console.log("AToken allowance", allowance, amount);
         require(allowance >= amount, "Insufficient allowance");
         atoken.transferFrom(user, address(this), amount);
 
@@ -55,15 +56,17 @@ contract AaveGateway is IGateway {
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
         IPool(poolAddressesProvider.getPool()).withdraw(underlying, amount, address(this));
 
-        console.log("Transferring collateral to msg.sender", amount, underlying);
         IERC20(underlying).safeTransfer(msg.sender, amount);
+        return underlying;
     }
 
     function borrow(address token, address user, uint256 amount) external override {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
 
+        console.log("Borrowing", token, amount, user);
         IPool(poolAddress).borrow(token, amount, 2, REFERRAL_CODE, user);
+        console.log("Borrowed on behalf of", user, amount);
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
