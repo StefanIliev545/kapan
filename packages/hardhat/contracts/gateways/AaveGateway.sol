@@ -38,7 +38,9 @@ contract AaveGateway is IGateway {
     }
 
     function withdrawCollateral(address, address aToken, address user, uint256 amount) external override {
-        IERC20(aToken).safeTransferFrom(user, address(this), amount);
+        IERC20 atoken = IERC20(aToken);
+        require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
+        atoken.safeTransferFrom(user, address(this), amount);
         IPool(poolAddressesProvider.getPool()).withdraw(aToken, amount, user);
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
         IERC20(underlying).safeTransfer(msg.sender, amount);
@@ -242,6 +244,17 @@ contract AaveGateway is IGateway {
         }
         return 0;
     }
+    
+    function getScaledBalance(address token, address user) private view returns (uint256) {
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+        for (uint256 i = 0; i < userReserves.length; i++) {
+            if (userReserves[i].underlyingAsset == token) {
+                return userReserves[i].scaledATokenBalance;
+            }
+        }
+        return 0;
+    }
 
     function getPossibleCollaterals(address token, address user) external view returns (
         address[] memory collateralAddresses,
@@ -271,7 +284,7 @@ contract AaveGateway is IGateway {
         for (uint256 i = 0; i < allTokens.length; i++) {
             if (allTokens[i].balance > 0) {
                 collateralAddresses[index] = allTokens[i].aToken;
-                balances[index] = allTokens[i].balance;
+                balances[index] = getScaledBalance(allTokens[i].token, user);
                 symbols[index] = allTokens[i].symbol;
                 decimals[index] = ERC20(allTokens[i].token).decimals();
                 index++;
@@ -290,7 +303,7 @@ contract AaveGateway is IGateway {
     }
 
     function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data) {
-        (address variableDebtToken, , bool found) = _getReserveAddresses(token);
+        (,address variableDebtToken , bool found) = _getReserveAddresses(token);
         require(found && variableDebtToken != address(0), "Token is not a valid debt token");
         target = new address[](1);
         data = new bytes[](1);

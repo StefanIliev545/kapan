@@ -1,8 +1,10 @@
 import { FC, useState } from "react";
 import Image from "next/image";
 import { SelectableCollateralView } from "../specific/collateral/SelectableCollateralView";
+import { parseUnits } from "viem";
 import { useAccount } from "wagmi";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
 
 interface MovePositionModalProps {
   isOpen: boolean;
@@ -11,7 +13,7 @@ interface MovePositionModalProps {
   position: {
     name: string;
     balance: number; // USD value
-    tokenBalance: number; // Token amount
+    tokenBalance: number; // Token amount in human-readable units
     type: "supply" | "borrow";
     tokenAddress: string;
   };
@@ -27,6 +29,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
   const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
 
   // Fetch collaterals from the contract
   const { collaterals: fetchedCollaterals, isLoading: isLoadingCollaterals } = useCollaterals(
@@ -36,10 +39,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   );
 
   // Map fetched collaterals to the format expected by SelectableCollateralView
-  const collaterals = fetchedCollaterals.map((collateral: { symbol: string; balance: number; address: string; decimals: number }) => ({
-    ...collateral,
-    selected: selectedCollaterals.has(collateral.symbol),
-  }));
+  const collaterals = fetchedCollaterals.map(
+    (collateral: { symbol: string; balance: number; address: string; decimals: number }) => ({
+      ...collateral,
+      selected: selectedCollaterals.has(collateral.symbol),
+    }),
+  );
 
   const handleCollateralToggle = (symbol: string) => {
     setSelectedCollaterals(prev => {
@@ -51,6 +56,51 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       }
       return next;
     });
+  };
+
+  // Import the moveDebt hook that handles approvals and the moveDebt transaction.
+  const { moveDebt, error } = useMoveDebtScaffold();
+
+  const handleMoveDebt = async () => {
+    try {
+      if (!userAddress) throw new Error("Wallet not connected");
+
+      setLoading(true);
+
+      // Assume token has 18 decimals; adjust if needed.
+      const tokenDecimals = 18;
+      const debtAmount = parseUnits(amount, tokenDecimals);
+
+      // Build collateral array from selected collaterals.
+      // We assume each collateral's entire balance will be moved.
+      const selectedCollateralArray = collaterals
+        .filter(c => selectedCollaterals.has(c.symbol))
+        .map(c => ({
+          token: c.address,
+          // Convert the collateral balance (assumed to be in human-readable format) to base units.
+          amount: parseUnits(c.balance.toString(), c.decimals.toString()),
+        }));
+
+      // Only handle debt moves; if it's a supply, you might want a different flow.
+      if (position.type === "borrow") {
+        await moveDebt({
+          user: userAddress,
+          debtToken: position.tokenAddress,
+          debtAmount,
+          collaterals: selectedCollateralArray,
+          fromProtocol: fromProtocol.toLowerCase(),
+          toProtocol: selectedProtocol.toLowerCase(),
+        });
+      } else {
+        console.log("Supply move not implemented in this hook");
+      }
+
+      onClose();
+    } catch (err) {
+      console.error("Move debt failed:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -217,7 +267,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </button>
           <button
             className="btn btn-primary"
+            onClick={handleMoveDebt}
             disabled={
+              loading ||
               !selectedProtocol ||
               !amount ||
               Number(amount) <= 0 ||
@@ -225,7 +277,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               (position.type === "borrow" && selectedCollaterals.size === 0)
             }
           >
-            Move Position
+            {loading ? "Moving..." : "Move Position"}
           </button>
         </div>
       </div>

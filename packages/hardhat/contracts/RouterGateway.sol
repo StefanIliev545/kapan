@@ -125,6 +125,7 @@ contract RouterGateway {
         string calldata fromProtocol,
         string calldata toProtocol
     ) external {
+        console.log("Received flash loan to move debt");
         // Get the gateway for the specified protocol
         IGateway fromGateway = gateways[fromProtocol];
         IGateway toGateway = gateways[toProtocol];
@@ -132,25 +133,35 @@ contract RouterGateway {
         require(address(toGateway) != address(0), "To protocol not supported");
         
         // Receive flash loan to repay the debt.
+        console.log("Receiving flash loan to repay the debt");
         balancerVault.sendTo(debtToken, address(this), debtAmount);
+        console.log("Flash loan received");
         IERC20(debtToken).approve(address(fromGateway), debtAmount);
         // Repay the debt
+        console.log("Repaying the debt");
         fromGateway.repay(debtToken, user, debtAmount);
 
         for (uint i = 0; i < collaterals.length; i++) {
+            console.log("Withdrawing collateral");
             fromGateway.withdrawCollateral(debtToken, collaterals[i].token, address(this), collaterals[i].amount);
+            console.log("Approving collateral");
             IERC20(collaterals[i].token).approve(address(toGateway), collaterals[i].amount);
+            console.log("Depositing collateral");
             toGateway.deposit(collaterals[i].token, user, collaterals[i].amount);
         }
-
+        console.log("Borrowing the debt");
         toGateway.borrow(debtToken, user, debtAmount);
+        console.log("Transferring the debt to the balancer vault");
         IERC20(debtToken).safeTransfer(address(balancerVault), debtAmount);
+        console.log("Settingtling the debt");
         balancerVault.settle(debtToken, debtAmount);
     }
 
     function moveDebt(address user, address debtToken, uint256 debtAmount, IGateway.Collateral[] memory collaterals, string calldata fromProtocol, string calldata toProtocol) external {
         bytes memory data = abi.encodeWithSelector(this.receiveFlashLoanToMoveDebt.selector, user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
+        console.log("Requesting flash loan");
         balancerVault.unlock(data);
+        console.log("Flash loan requested");
     }
 
     function getPossibleCollaterals(

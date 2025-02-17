@@ -1,0 +1,88 @@
+import { useState } from "react";
+import { usePublicClient, useWalletClient } from "wagmi";
+import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+
+export const useMoveDebtScaffold = () => {
+  const [error, setError] = useState(null);
+  const publicClient = usePublicClient();
+  const { data: signer } = useWalletClient();
+  const { data: routerContract } = useScaffoldContract({ contractName: "RouterGateway" });
+
+  // Prepare the moveDebt write hook
+  const { writeContractAsync: moveDebtWrite } = useScaffoldWriteContract({
+    contractName: "RouterGateway",
+  });
+
+  /**
+   * moveDebt executes the following steps:
+   * 1. Dynamically reads the encoded approval payloads using the passed parameters.
+   * 2. Sends each approval transaction via the signer and waits for each receipt.
+   * 3. Calls the moveDebt function on the RouterGateway and waits for its receipt.
+   *
+   * @param {Object} params
+   * @param {string} params.user - The user's address.
+   * @param {string} params.debtToken - The debt token address.
+   * @param {string|number} params.debtAmount - The amount of debt.
+   * @param {Array} params.collaterals - Array of collateral objects (must match the contract’s struct).
+   * @param {string} params.fromProtocol - The source protocol.
+   * @param {string} params.toProtocol - The destination protocol.
+   */
+  const moveDebt = async ({ user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol }) => {
+    try {
+      if (!routerContract || !signer || !publicClient) {
+        throw new Error("RouterGateway contract, signer, or publicClient is not available");
+      }
+
+      // Dynamically fetch approval payloads using callStatic so that no state changes occur.
+      const fromApprovals = await routerContract.read.getFromProtocolApprovalsForMove([
+        debtToken,
+        collaterals,
+        fromProtocol,
+      ]);
+      const toApprovals = await routerContract.read.getToProtocolApprovalsForMove([debtToken, debtAmount, toProtocol]);
+
+      // Each approval call returns a tuple: [address[] targets, bytes[] encodedData]
+      const [fromTargets, fromData] = fromApprovals;
+      const [toTargets, toData] = toApprovals;
+
+      // Execute "from" protocol approval transactions and wait for each receipt.
+      for (let i = 0; i < fromTargets.length; i++) {
+        const txHash = await signer.sendTransaction({
+          to: fromTargets[i],
+          data: fromData[i],
+        });
+        console.log(`Sent from approval ${i}: ${txHash}`);
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        console.log(`From approval ${i} confirmed`);
+      }
+
+      // Execute "to" protocol approval transactions and wait for each receipt.
+      for (let i = 0; i < toTargets.length; i++) {
+        const txHash = await signer.sendTransaction({
+          to: toTargets[i],
+          data: toData[i],
+        });
+        console.log(`Sent to approval ${i}: ${txHash}`);
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        console.log(`To approval ${i} confirmed`);
+      }
+
+      // Once all approvals are confirmed, call moveDebt on the RouterGateway.
+      const moveDebtTxHash = await moveDebtWrite({
+        functionName: "moveDebt",
+        args: [user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol],
+      });
+      console.log(`Sent moveDebt tx: ${moveDebtTxHash}`);
+      await publicClient.waitForTransactionReceipt({ hash: moveDebtTxHash as `0x${string}` });
+      console.log("moveDebt transaction confirmed");
+
+      return moveDebtTxHash;
+    } catch (err) {
+      console.error("moveDebt error:", err);
+      setError(err);
+      throw err;
+    }
+  };
+
+  return { moveDebt, error };
+};
