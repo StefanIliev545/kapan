@@ -15,7 +15,6 @@ interface MoveSupplyModalProps {
     address: string;
   };
   fromProtocol: string;
-  currentSupply: number;
 }
 
 const SUPPORTED_PROTOCOLS = [
@@ -23,7 +22,7 @@ const SUPPORTED_PROTOCOLS = [
   { name: "Aave V3", value: "aave", icon: "/logos/aave.svg" },
 ];
 
-export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol, currentSupply }) => {
+export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol }) => {
   const { data: walletClient } = useWalletClient();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);

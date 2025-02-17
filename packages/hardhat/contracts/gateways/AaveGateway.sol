@@ -38,16 +38,19 @@ contract AaveGateway is IGateway {
         IPool(poolAddress).supply(token, amount, user, REFERRAL_CODE);
     }
 
-    // 1909960767124144500  - sent
-    // 1909960764171070584 - balanceOf
+    // 1909960826083442181  - balance of user 
+    // 1909960825889295500 - transferFrom
     function withdrawCollateral(address, address aToken, address user, uint256 amount) external override {
-        amount = amount/2;
         IERC20 atoken = IERC20(aToken);
+        IAToken aTokenContract = IAToken(aToken);
         console.log("AToken balance of user", atoken.balanceOf(user), aToken, user);
         require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
-        atoken.safeTransferFrom(user, address(this), amount);
+        console.log("Transferring collateral to this contract", amount, aToken);
+        atoken.transferFrom(user, address(this), aTokenContract.scaledBalanceOf(user));
+
         console.log("Withdrawing collateral from Aave");
         IPool(poolAddressesProvider.getPool()).withdraw(aToken, amount, user);
+
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
         console.log("Transferring collateral to msg.sender", amount, underlying);
         IERC20(underlying).safeTransfer(msg.sender, amount);

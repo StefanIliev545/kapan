@@ -1,6 +1,21 @@
 import { useState } from "react";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldContract, useScaffoldWriteContract, useScaffoldContractWrite } from "~~/hooks/scaffold-eth";
+import { parseUnits } from "viem";
+
+interface MoveDebtParams {
+  user: string;
+  debtToken: string;
+  debtAmount: bigint;
+  collaterals: {
+    token: string;
+    amount: bigint;
+  }[];
+  fromProtocol: string;
+  toProtocol: string;
+  flashLoanVersion: string;
+  repayAll: boolean;
+}
 
 export const useMoveDebtScaffold = () => {
   const [error, setError] = useState(null);
@@ -9,7 +24,7 @@ export const useMoveDebtScaffold = () => {
   const { data: routerContract } = useScaffoldContract({ contractName: "RouterGateway" });
 
   // Prepare the moveDebt write hook
-  const { writeContractAsync: moveDebtWrite } = useScaffoldWriteContract({
+  const { writeContractAsync: moveDebtAsync } = useScaffoldWriteContract({
     contractName: "RouterGateway",
   });
 
@@ -23,11 +38,11 @@ export const useMoveDebtScaffold = () => {
    * @param {string} params.user - The user's address.
    * @param {string} params.debtToken - The debt token address.
    * @param {string|number} params.debtAmount - The amount of debt.
-   * @param {Array} params.collaterals - Array of collateral objects (must match the contract’s struct).
+   * @param {Array} params.collaterals - Array of collateral objects (must match the contract's struct).
    * @param {string} params.fromProtocol - The source protocol.
    * @param {string} params.toProtocol - The destination protocol.
    */
-  const moveDebt = async ({ user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol }) => {
+  const moveDebt = async (params: MoveDebtParams) => {
     try {
       if (!routerContract || !signer || !publicClient) {
         throw new Error("RouterGateway contract, signer, or publicClient is not available");
@@ -35,11 +50,11 @@ export const useMoveDebtScaffold = () => {
 
       // Dynamically fetch approval payloads using callStatic so that no state changes occur.
       const fromApprovals = await routerContract.read.getFromProtocolApprovalsForMove([
-        debtToken,
-        collaterals,
-        fromProtocol,
+        params.debtToken,
+        params.collaterals,
+        params.fromProtocol,
       ]);
-      const toApprovals = await routerContract.read.getToProtocolApprovalsForMove([debtToken, debtAmount, toProtocol]);
+      const toApprovals = await routerContract.read.getToProtocolApprovalsForMove([params.debtToken, params.debtAmount, params.toProtocol]);
 
       // Each approval call returns a tuple: [address[] targets, bytes[] encodedData]
       const [fromTargets, fromData] = fromApprovals;
@@ -68,9 +83,18 @@ export const useMoveDebtScaffold = () => {
       }
 
       // Once all approvals are confirmed, call moveDebt on the RouterGateway.
-      const moveDebtTxHash = await moveDebtWrite({
+      const moveDebtTxHash = await moveDebtAsync({
         functionName: "moveDebt",
-        args: [user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol],
+        args: [
+          params.user,
+          params.debtToken,
+          params.debtAmount,
+          params.repayAll,
+          params.collaterals,
+          params.fromProtocol,
+          params.toProtocol,
+          params.flashLoanVersion,
+        ],
       });
       console.log(`Sent moveDebt tx: ${moveDebtTxHash}`);
       await publicClient.waitForTransactionReceipt({ hash: moveDebtTxHash as `0x${string}` });

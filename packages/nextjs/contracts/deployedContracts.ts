@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xD2B1361422753a73dEC461efeBf8D3E46eeA0f56",
+      address: "0x1672a7eA4f72D1535B2F6bbC446Ac83B1A31ee2c",
       abi: [
         {
           inputs: [
@@ -535,7 +535,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x67FF55E8ebF23262981567675bF6C232c1bA580C",
+      address: "0x37033090a87353d527C58d03CB489f7D641a6b53",
       abi: [
         {
           inputs: [
@@ -1158,7 +1158,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x974E142FB685D64FF3cAdeb982522bF01fd06D01",
+      address: "0x6718b9232B15d61C602a7C60acfF41606c129Abb",
       abi: [
         {
           inputs: [
@@ -1316,7 +1316,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x8a9208B2Ce9E0046f130bcC84720FF568D6E2D01",
+      address: "0x3380B63bac55501492Aff80f2d7eF5c171909AE1",
       abi: [
         {
           inputs: [
@@ -1332,7 +1332,12 @@ const deployedContracts = {
             },
             {
               internalType: "contract IVault",
-              name: "vault",
+              name: "v3vault",
+              type: "address",
+            },
+            {
+              internalType: "contract IFlashLoanProvider",
+              name: "v2Vault",
               type: "address",
             },
           ],
@@ -1379,7 +1384,20 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "balancerVault",
+          name: "balancerV2Vault",
+          outputs: [
+            {
+              internalType: "contract IFlashLoanProvider",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "balancerV3Vault",
           outputs: [
             {
               internalType: "contract IVault",
@@ -1428,6 +1446,35 @@ const deployedContracts = {
             },
           ],
           name: "getBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getBorrowBalance",
           outputs: [
             {
               internalType: "uint256",
@@ -1580,6 +1627,11 @@ const deployedContracts = {
               type: "uint256",
             },
             {
+              internalType: "bool",
+              name: "repayAll",
+              type: "bool",
+            },
+            {
               components: [
                 {
                   internalType: "address",
@@ -1606,8 +1658,41 @@ const deployedContracts = {
               name: "toProtocol",
               type: "string",
             },
+            {
+              internalType: "string",
+              name: "flashLoanVersion",
+              type: "string",
+            },
           ],
           name: "moveDebt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "contract IERC20[]",
+              name: "tokens",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "amounts",
+              type: "uint256[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "feeAmounts",
+              type: "uint256[]",
+            },
+            {
+              internalType: "bytes",
+              name: "userData",
+              type: "bytes",
+            },
+          ],
+          name: "receiveFlashLoan",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -1657,7 +1742,7 @@ const deployedContracts = {
               type: "string",
             },
           ],
-          name: "receiveFlashLoanToMoveDebt",
+          name: "receiveFlashLoanV3",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",

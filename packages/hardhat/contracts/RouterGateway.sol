@@ -276,11 +276,18 @@ contract RouterGateway {
         address user,
         address debtToken,
         uint256 debtAmount,
+        bool repayAll,
         IGateway.Collateral[] memory collaterals,
         string calldata fromProtocol,
         string calldata toProtocol,
         string calldata flashLoanVersion
     ) external {
+        if (repayAll) {
+            IGateway fromGateway = gateways[fromProtocol];
+            require(address(fromGateway) != address(0), "From protocol not supported");
+            debtAmount = fromGateway.getBorrowBalance(debtToken, user);
+        }
+
         if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v2"))) {
             // For Balancer v2, encode parameters without function selector.
             bytes memory data = abi.encode(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);

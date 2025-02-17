@@ -1,17 +1,17 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { MovePositionModal } from "./modals/MovePositionModal";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { DepositModal } from "./modals/DepositModal";
-import { RepayModal } from "./modals/RepayModal";
+import { MovePositionModal } from "./modals/MovePositionModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
+import { RepayModal } from "./modals/RepayModal";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 interface PositionProps {
   icon: string;
   name: string;
-  balance: number;      // USD value
-  tokenBalance: number; // Raw token amount
+  balance: number; // USD value
+  tokenBalance: bigint; // Raw token amount
   currentRate: number;
   optimalRate?: number;
   type: "supply" | "borrow";
@@ -38,9 +38,7 @@ export const Position: FC<PositionProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Check if position has a balance - for borrow positions, we want to check if there is debt
-  const hasBalance = type === "supply" 
-    ? tokenBalance > 0 
-    : tokenBalance > 0; // Changed from tokenBalance < 0 since borrow balance is positive
+  const hasBalance = type === "supply" ? tokenBalance > 0 : tokenBalance > 0; // Changed from tokenBalance < 0 since borrow balance is positive
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract.
   const { data: optimalRateData } = useScaffoldReadContract({
@@ -68,26 +66,15 @@ export const Position: FC<PositionProps> = ({
   return (
     <>
       {/* Outer container uses grid that becomes a single column on mobile */}
-      <div
-        className={`w-full p-4 rounded-lg gap-4 bg-base-200 grid grid-cols-1 lg:grid-cols-7`}
-      >
+      <div className={`w-full p-4 rounded-lg gap-4 bg-base-200 grid grid-cols-1 lg:grid-cols-7`}>
         {/* Header: Icon and Title */}
         <div className="order-1 lg:order-none lg:col-span-2 flex items-center">
           <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
-            <Image
-              src={icon}
-              alt={`${name} icon`}
-              layout="fill"
-              className="rounded-full"
-            />
+            <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
           </div>
           <span className="ml-3 font-semibold text-lg truncate">{name}</span>
           <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-2">
-            <div
-              tabIndex={0}
-              role="button"
-              className="cursor-pointer flex items-center justify-center h-[1.125em]"
-            >
+            <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
               <Image
                 src="/logos/info-button.svg"
                 alt="info"
@@ -136,9 +123,7 @@ export const Position: FC<PositionProps> = ({
             <div className="text-sm text-base-content/70">Optimal Rate</div>
             <div
               className={`font-medium tabular-nums ${
-                optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase()
-                  ? "text-primary"
-                  : ""
+                optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase() ? "text-primary" : ""
               }`}
             >
               {optimalRateDisplay.toFixed(2)}%
@@ -158,47 +143,23 @@ export const Position: FC<PositionProps> = ({
         {/* Buttons */}
         <div className="order-3 lg:order-none lg:col-span-2 flex justify-end gap-2">
           {type === "supply" ? (
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => setIsDepositModalOpen(true)}
-            >
+            <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>
               Deposit
             </button>
           ) : (
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => setIsRepayModalOpen(true)}
-              disabled={!hasBalance}
-            >
+            <button className="btn btn-sm btn-primary" onClick={() => setIsRepayModalOpen(true)} disabled={!hasBalance}>
               Repay
             </button>
           )}
-          <button
-            className="btn btn-sm btn-outline"
-            onClick={() => setIsMoveModalOpen(true)}
-            disabled={!hasBalance}
-          >
+          <button className="btn btn-sm btn-outline" onClick={() => setIsMoveModalOpen(true)} disabled={!hasBalance}>
             Move
           </button>
           {collateralView && (
-            <label
-              htmlFor={`collateral-${name}`}
-              className="swap swap-rotate btn btn-sm btn-circle btn-ghost"
-            >
-              <svg
-                className="swap-off w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+            <label htmlFor={`collateral-${name}`} className="swap swap-rotate btn btn-sm btn-circle btn-ghost">
+              <svg className="swap-off w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
-              <svg
-                className="swap-on w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="swap-on w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15l7-7-7-7" />
               </svg>
             </label>
@@ -222,14 +183,13 @@ export const Position: FC<PositionProps> = ({
         <MoveSupplyModal
           isOpen={isMoveModalOpen}
           onClose={() => setIsMoveModalOpen(false)}
-          token={{ 
-            name, 
-            icon, 
-            currentRate, 
-            address: tokenAddress 
+          token={{
+            name,
+            icon,
+            currentRate,
+            address: tokenAddress,
           }}
           fromProtocol={protocolName}
-          currentSupply={tokenBalance}
         />
       ) : (
         <MovePositionModal
@@ -239,7 +199,6 @@ export const Position: FC<PositionProps> = ({
           position={{
             name,
             balance,
-            tokenBalance,
             type,
             tokenAddress,
           }}
@@ -278,11 +237,7 @@ export const ExamplePosition: FC = () => {
       type="supply"
       protocolName="Aave V3"
       tokenAddress="0x0000000000000000000000000000000000000000"
-      collateralView={
-        <div className="p-4 bg-gray-100">
-          This is the collateral view content.
-        </div>
-      }
+      collateralView={<div className="p-4 bg-gray-100">This is the collateral view content.</div>}
     />
   );
 };

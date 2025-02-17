@@ -1,10 +1,12 @@
-import { FC, useState } from "react";
+import { FC, useState, useMemo } from "react";
 import Image from "next/image";
 import { SelectableCollateralView } from "../specific/collateral/SelectableCollateralView";
-import { parseUnits } from "viem";
-import { useAccount } from "wagmi";
-import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { formatUnits, parseUnits } from "viem";
+import { useAccount, useReadContract } from "wagmi";
+import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 
 interface MovePositionModalProps {
   isOpen: boolean;
@@ -12,38 +14,61 @@ interface MovePositionModalProps {
   fromProtocol: string;
   position: {
     name: string;
-    balance: number; // USD value
-    tokenBalance: number; // Token amount in human-readable units
+    balance: number; // USD value (display only)
     type: "supply" | "borrow";
     tokenAddress: string;
   };
 }
 
-export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
+// Define the type for our flash loan providers.
+type FlashLoanProvider = {
+  name: "Balancer V2" | "Balancer V3";
+  icon: string;
+  version: "v2" | "v3";
+};
+
+const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
+  { name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2" },
+  { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3" },
+] as const;
+
+export const MovePositionModal: FC<MovePositionModalProps> = ({
+  isOpen,
+  onClose,
+  fromProtocol,
+  position,
+}) => {
   const { address: userAddress } = useAccount();
   const protocols = [
     { name: "Aave V3", icon: "/logos/aave.svg" },
     { name: "Compound V3", icon: "/logos/compound.svg" },
   ];
 
-  const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
+  const [selectedProtocol, setSelectedProtocol] = useState(
+    protocols.find(p => p.name !== fromProtocol)?.name || ""
+  );
+  // Use text input for full precision.
   const [amount, setAmount] = useState("");
   const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider>(
+    FLASH_LOAN_PROVIDERS[0]
+  );
+  const [isRepayingAll, setIsRepayingAll] = useState(false);
 
-  // Fetch collaterals from the contract
+  // Fetch collaterals from the contract.
   const { collaterals: fetchedCollaterals, isLoading: isLoadingCollaterals } = useCollaterals(
     position.tokenAddress,
     fromProtocol,
-    userAddress || "0x0000000000000000000000000000000000000000", // Fallback address if not connected
+    userAddress || "0x0000000000000000000000000000000000000000"
   );
 
-  // Map fetched collaterals to the format expected by SelectableCollateralView
+  // Map fetched collaterals to the format expected by SelectableCollateralView.
   const collaterals = fetchedCollaterals.map(
     (collateral: { symbol: string; balance: number; address: string; decimals: number }) => ({
       ...collateral,
       selected: selectedCollaterals.has(collateral.symbol),
-    }),
+    })
   );
 
   const handleCollateralToggle = (symbol: string) => {
@@ -61,35 +86,92 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   // Import the moveDebt hook that handles approvals and the moveDebt transaction.
   const { moveDebt, error } = useMoveDebtScaffold();
 
+  // Read on-chain borrow balance (raw BigInt).
+  const { data: tokenBalance } = useScaffoldReadContract({
+    contractName: "RouterGateway",
+    functionName: "getBorrowBalance",
+    args: [
+      fromProtocol.toLowerCase(),
+      position.tokenAddress,
+      userAddress || "0x0000000000000000000000000000000000000000",
+    ],
+  });
+
+  // Read token decimals.
+  const { data: decimals } = useReadContract({
+    address: position.tokenAddress as `0x${string}`,
+    abi: ERC20ABI,
+    functionName: "decimals",
+  });
+
+  // Use useMemo so that formattedTokenBalance is only recalculated when tokenBalance or decimals changes.
+  const formattedTokenBalance = useMemo(() => {
+    if (!tokenBalance || !decimals) return "0";
+    return formatUnits(tokenBalance, decimals as number);
+  }, [tokenBalance, decimals]);
+
+  // When the user clicks "Max", set the input value to the full formatted balance
+  // and mark that we're repaying all
+  const handleSetMaxAmount = () => {
+    console.log("Setting max amount:", {
+      rawTokenBalance: tokenBalance?.toString(),
+      formatted: formattedTokenBalance,
+    });
+    setAmount(formattedTokenBalance);
+    setIsRepayingAll(true);
+  };
+
+  // When the user manually changes the amount, they're no longer repaying all
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("Amount input changed:", {
+      newValue: e.target.value,
+      maxAllowed: formattedTokenBalance,
+    });
+    setAmount(e.target.value);
+    setIsRepayingAll(false);
+  };
+
   const handleMoveDebt = async () => {
     try {
       if (!userAddress) throw new Error("Wallet not connected");
-
+      if (!decimals) throw new Error("Token decimals not loaded");
       setLoading(true);
 
-      // Assume token has 18 decimals; adjust if needed.
-      const tokenDecimals = 18;
-      const debtAmount = parseUnits(amount, tokenDecimals);
+      // Determine the debt amount:
+      // If the user has selected "max", we'll let the contract fetch the current amount
+      let computedDebtAmount: bigint;
+      if (isRepayingAll) {
+        computedDebtAmount = tokenBalance as bigint;
+      } else {
+        computedDebtAmount = parseUnits(amount, decimals as number);
+      }
 
-      // Build collateral array from selected collaterals.
-      // We assume each collateral's entire balance will be moved.
+      // Build collateral array from selected collaterals
       const selectedCollateralArray = collaterals
         .filter(c => selectedCollaterals.has(c.symbol))
-        .map(c => ({
-          token: c.address,
-          // Convert the collateral balance (assumed to be in human-readable format) to base units.
-          amount: parseUnits(c.balance.toString(), c.decimals.toString()),
-        }));
+        .map(c => {
+          const collateralAmount = parseUnits(c.balance.toString(), c.decimals);
+          console.log(`Collateral ${c.symbol}:`, {
+            balance: c.balance,
+            decimals: c.decimals,
+            parsedAmount: collateralAmount.toString(),
+          });
+          return {
+            token: c.address,
+            amount: collateralAmount,
+          };
+        });
 
-      // Only handle debt moves; if it's a supply, you might want a different flow.
       if (position.type === "borrow") {
         await moveDebt({
           user: userAddress,
           debtToken: position.tokenAddress,
-          debtAmount,
+          debtAmount: computedDebtAmount,
           collaterals: selectedCollateralArray,
           fromProtocol: fromProtocol.toLowerCase(),
           toProtocol: selectedProtocol.toLowerCase(),
+          flashLoanVersion: selectedFlashLoanProvider.version,
+          repayAll: isRepayingAll, // Pass the repayAll flag
         });
       } else {
         console.log("Supply move not implemented in this hook");
@@ -186,31 +268,33 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 >
                   <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
                     <Image
-                      src="/logos/balancer.svg"
-                      alt="Balancer"
+                      src={selectedFlashLoanProvider.icon}
+                      alt={selectedFlashLoanProvider.name}
                       width={20}
                       height={20}
                       className="rounded-full min-w-[20px]"
                     />
-                    <span className="truncate">Balancer</span>
+                    <span className="truncate">{selectedFlashLoanProvider.name}</span>
                   </div>
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </label>
                 <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
-                  <li>
-                    <a className="flex items-center gap-2">
-                      <Image
-                        src="/logos/balancer.svg"
-                        alt="Balancer"
-                        width={20}
-                        height={20}
-                        className="rounded-full min-w-[20px]"
-                      />
-                      <span className="truncate">Balancer</span>
-                    </a>
-                  </li>
+                  {FLASH_LOAN_PROVIDERS.map(provider => (
+                    <li key={provider.name}>
+                      <a className="flex items-center gap-2" onClick={() => setSelectedFlashLoanProvider(provider)}>
+                        <Image
+                          src={provider.icon}
+                          alt={provider.name}
+                          width={20}
+                          height={20}
+                          className="rounded-full min-w-[20px]"
+                        />
+                        <span className="truncate">{provider.name}</span>
+                      </a>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -221,21 +305,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             <label className="text-sm text-base-content/70">
               Amount{" "}
               <span className="float-right">
-                Available: {Math.abs(position.tokenBalance).toFixed(4)} {position.name}
+                Available: {formattedTokenBalance} {position.name}
               </span>
             </label>
             <div className="relative">
               <input
-                type="number"
+                type="text"
                 className="input input-bordered w-full pr-16"
                 placeholder="0.00"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
-                max={Math.abs(position.tokenBalance)}
+                onChange={handleAmountChange}
               />
               <span
                 className="absolute right-4 top-1/2 -translate-y-1/2 underline cursor-pointer hover:opacity-80 text-sm"
-                onClick={() => setAmount(Math.abs(position.tokenBalance).toString())}
+                onClick={handleSetMaxAmount}
               >
                 Max
               </span>
@@ -272,8 +355,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               loading ||
               !selectedProtocol ||
               !amount ||
-              Number(amount) <= 0 ||
-              Number(amount) > Math.abs(position.tokenBalance) ||
+              // Compare using BigInt conversion to avoid precision issues.
+              (parseUnits(amount, decimals as number) > (tokenBalance as bigint)) ||
               (position.type === "borrow" && selectedCollaterals.size === 0)
             }
           >
