@@ -9,6 +9,7 @@ import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "hardhat/console.sol";
 
 contract AaveGateway is IGateway {
     using SafeERC20 for IERC20;
@@ -37,12 +38,18 @@ contract AaveGateway is IGateway {
         IPool(poolAddress).supply(token, amount, user, REFERRAL_CODE);
     }
 
+    // 1909960767124144500  - sent
+    // 1909960764171070584 - balanceOf
     function withdrawCollateral(address, address aToken, address user, uint256 amount) external override {
+        amount = amount/2;
         IERC20 atoken = IERC20(aToken);
+        console.log("AToken balance of user", atoken.balanceOf(user), aToken, user);
         require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
         atoken.safeTransferFrom(user, address(this), amount);
+        console.log("Withdrawing collateral from Aave");
         IPool(poolAddressesProvider.getPool()).withdraw(aToken, amount, user);
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
+        console.log("Transferring collateral to msg.sender", amount, underlying);
         IERC20(underlying).safeTransfer(msg.sender, amount);
     }
 
@@ -284,7 +291,7 @@ contract AaveGateway is IGateway {
         for (uint256 i = 0; i < allTokens.length; i++) {
             if (allTokens[i].balance > 0) {
                 collateralAddresses[index] = allTokens[i].aToken;
-                balances[index] = getScaledBalance(allTokens[i].token, user);
+                balances[index] = allTokens[i].balance;
                 symbols[index] = allTokens[i].symbol;
                 decimals[index] = ERC20(allTokens[i].token).decimals();
                 index++;

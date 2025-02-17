@@ -9,18 +9,30 @@ import "./interfaces/balancer/IVault.sol";
 
 import "hardhat/console.sol";
 
+// Interface for a v2–style flash loan provider (e.g. Balancer v2)
+interface IFlashLoanProvider {
+    function flashLoan(
+        address receiver,
+        IERC20[] calldata tokens,
+        uint256[] calldata amounts,
+        bytes calldata userData
+    ) external;
+}
+
 contract RouterGateway {
     using SafeERC20 for IERC20;
 
     // Mapping from protocol name to gateway contract
     mapping(string => IGateway) public gateways;
-    IVault public balancerVault;
-    constructor(address aaveGateway, address compoundGateway, IVault vault) {
+    IVault public balancerV3Vault;
+    IFlashLoanProvider public balancerV2Vault;
+    constructor(address aaveGateway, address compoundGateway, IVault v3vault, IFlashLoanProvider v2Vault) {
         gateways["aave"] = IGateway(aaveGateway);
         gateways["compound"] = IGateway(compoundGateway);
         gateways["compound v3"] = IGateway(compoundGateway);
         gateways["aave v3"] = IGateway(aaveGateway);
-        balancerVault = vault;
+        balancerV3Vault = v3vault;
+        balancerV2Vault = v2Vault;
     }
 
     function supplyWithPermit(
@@ -117,7 +129,119 @@ contract RouterGateway {
         return gateway.getBalance(token, user);
     }
 
-    function receiveFlashLoanToMoveDebt(
+    function getBorrowBalance(
+        string calldata protocolName,
+        address token,
+        address user
+    ) external view returns (uint256) {
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        return gateway.getBorrowBalance(token, user);
+    }
+    
+    // -------------------------------------------------------------------------
+    // Common Debt Moving Logic (Flash Loan–agnostic)
+    // -------------------------------------------------------------------------
+    //
+    // This internal function is completely unaware of any flash loan details.
+    // It simply moves debt from one protocol to another:
+    // 1. Repays the debt on the "from" protocol.
+    // 2. Withdraws collateral from the "from" protocol.
+    // 3. Deposits collateral into the "to" protocol.
+    // 4. Borrows the same amount on the "to" protocol.
+    //
+    function _moveDebtCommon(
+        address user,
+        address debtToken,
+        uint256 debtAmount,
+        IGateway.Collateral[] memory collaterals,
+        string memory fromProtocol,
+        string memory toProtocol
+    ) internal {
+        IGateway fromGateway = gateways[fromProtocol];
+        IGateway toGateway = gateways[toProtocol];
+        require(address(fromGateway) != address(0), "From protocol not supported");
+        require(address(toGateway) != address(0), "To protocol not supported");
+
+        // Debug logs for debt amounts
+        uint256 actualBorrowBalance = fromGateway.getBorrowBalance(debtToken, user);
+        console.log("Actual borrow balance:", actualBorrowBalance);
+        console.log("Requested debt amount to move:", debtAmount);
+        require(debtAmount <= actualBorrowBalance, "Debt amount exceeds borrow balance");
+
+        // Repay the debt on the "from" protocol
+        IERC20(debtToken).approve(address(fromGateway), debtAmount);
+        console.log("Repaying debt on the from protocol");
+        uint256 borrowBalanceBefore = fromGateway.getBorrowBalance(debtToken, user);
+        console.log("Borrow balance before repayment:", borrowBalanceBefore);
+        fromGateway.repay(debtToken, user, debtAmount);
+        uint256 borrowBalanceAfter = fromGateway.getBorrowBalance(debtToken, user);
+        console.log("Borrow balance after repayment:", borrowBalanceAfter);
+        require(borrowBalanceAfter < borrowBalanceBefore, "Repayment did not reduce borrow balance");
+
+        // For each collateral asset, withdraw then deposit into the target protocol.
+        for (uint i = 0; i < collaterals.length; i++) {
+            console.log("Withdrawing collateral from the from protocol");
+            fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
+            console.log("Approving collateral to the to protocol");
+            IERC20(collaterals[i].token).approve(address(toGateway), collaterals[i].amount);
+            console.log("Depositing collateral into the to protocol");
+            toGateway.deposit(collaterals[i].token, user, collaterals[i].amount);
+        }
+
+        // Borrow the debt on the "to" protocol.
+        console.log("Borrowing debt on the to protocol");
+        toGateway.borrow(debtToken, user, debtAmount);
+    }
+
+    // -------------------------------------------------------------------------
+    // Flash Loan Wrapper for Balancer V2
+    // -------------------------------------------------------------------------
+    //
+    // In a Balancer v2 flash loan the tokens are transferred (or "pulled") into this
+    // contract as soon as they are approved. This function decodes the userData,
+    // calls the common debt move function, then repays the principal plus fee.
+    //
+    function receiveFlashLoan(
+        IERC20[] calldata tokens,
+        uint256[] calldata amounts,
+        uint256[] calldata feeAmounts,
+        bytes calldata userData
+    ) external {
+        require(msg.sender == address(balancerV2Vault), "Unauthorized flash loan provider");
+
+        // Decode userData to extract move debt parameters.
+        (
+            address user,
+            address debtToken,
+            uint256 debtAmount,
+            IGateway.Collateral[] memory collaterals,
+            string memory fromProtocol,
+            string memory toProtocol
+        ) = abi.decode(userData, (address, address, uint256, IGateway.Collateral[], string, string));
+
+        console.log("Balancer V2 flash loan callback received");
+        require(feeAmounts.length == 1, "Balancer V2 flash loan fee amount length mismatch");
+        require(feeAmounts[0] == 0, "Flash loans are free");
+
+        // Execute the common debt move logic.
+        _moveDebtCommon(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
+
+        // Repay the flash loan provider (principal + fee).
+        uint256 totalRepayment = debtAmount + feeAmounts[0];
+        IERC20(debtToken).safeTransfer(address(balancerV2Vault), totalRepayment);
+    }
+
+    // -------------------------------------------------------------------------
+    // Flash Loan Wrapper for Balancer V3
+    // -------------------------------------------------------------------------
+    //
+    // For Balancer v3, tokens are delivered via a call to sendTo.
+    // This wrapper assumes that the tokens have been sent before the call.
+    // After calling the common move debt function, it repays the flash loan,
+    // then calls settle if required.
+    //
+    function receiveFlashLoanV3(
         address user,
         address debtToken,
         uint256 debtAmount,
@@ -125,43 +249,63 @@ contract RouterGateway {
         string calldata fromProtocol,
         string calldata toProtocol
     ) external {
-        console.log("Received flash loan to move debt");
-        // Get the gateway for the specified protocol
-        IGateway fromGateway = gateways[fromProtocol];
-        IGateway toGateway = gateways[toProtocol];
-        require(address(fromGateway) != address(0), "From protocol not supported");
-        require(address(toGateway) != address(0), "To protocol not supported");
-        
-        // Receive flash loan to repay the debt.
-        console.log("Receiving flash loan to repay the debt");
-        balancerVault.sendTo(debtToken, address(this), debtAmount);
-        console.log("Flash loan received");
-        IERC20(debtToken).approve(address(fromGateway), debtAmount);
-        // Repay the debt
-        console.log("Repaying the debt");
-        fromGateway.repay(debtToken, user, debtAmount);
+        require(msg.sender == address(balancerV3Vault), "Unauthorized flash loan provider");
 
-        for (uint i = 0; i < collaterals.length; i++) {
-            console.log("Withdrawing collateral");
-            fromGateway.withdrawCollateral(debtToken, collaterals[i].token, address(this), collaterals[i].amount);
-            console.log("Approving collateral");
-            IERC20(collaterals[i].token).approve(address(toGateway), collaterals[i].amount);
-            console.log("Depositing collateral");
-            toGateway.deposit(collaterals[i].token, user, collaterals[i].amount);
-        }
-        console.log("Borrowing the debt");
-        toGateway.borrow(debtToken, user, debtAmount);
-        console.log("Transferring the debt to the balancer vault");
-        IERC20(debtToken).safeTransfer(address(balancerVault), debtAmount);
-        console.log("Settingtling the debt");
-        balancerVault.settle(debtToken, debtAmount);
+        console.log("Balancer V3 flash loan callback received");
+
+        // Execute the common debt move logic.
+        _moveDebtCommon(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
+
+        // Repay the flash loan provider (principal only, assuming no fee).
+        IERC20(debtToken).safeTransfer(address(balancerV3Vault), debtAmount);
+
+        // Optionally settle the flash loan if required by the provider.
+        balancerV3Vault.settle(debtToken, debtAmount);
     }
 
-    function moveDebt(address user, address debtToken, uint256 debtAmount, IGateway.Collateral[] memory collaterals, string calldata fromProtocol, string calldata toProtocol) external {
-        bytes memory data = abi.encodeWithSelector(this.receiveFlashLoanToMoveDebt.selector, user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
-        console.log("Requesting flash loan");
-        balancerVault.unlock(data);
-        console.log("Flash loan requested");
+
+   // -------------------------------------------------------------------------
+    // moveDebt: Supports both flash loan providers
+    // -------------------------------------------------------------------------
+    //
+    // The caller provides the flashLoanVersion ("v2" or "v3").
+    // Based on this parameter, the function encodes the debt move parameters
+    // appropriately and calls either the v2 flashLoan function or the v3 unlock function.
+    //
+    function moveDebt(
+        address user,
+        address debtToken,
+        uint256 debtAmount,
+        IGateway.Collateral[] memory collaterals,
+        string calldata fromProtocol,
+        string calldata toProtocol,
+        string calldata flashLoanVersion
+    ) external {
+        if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v2"))) {
+            // For Balancer v2, encode parameters without function selector.
+            bytes memory data = abi.encode(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
+            IERC20[] memory tokens = new IERC20[](1);
+            tokens[0] = IERC20(debtToken);
+            uint256[] memory amounts = new uint256[](1);
+            amounts[0] = debtAmount;
+            console.log("Requesting Balancer V2 flash loan");
+            balancerV2Vault.flashLoan(address(this), tokens, amounts, data);
+        } else if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v3"))) {
+            // For Balancer v3, encode parameters with the function selector.
+            bytes memory data = abi.encodeWithSelector(
+                this.receiveFlashLoanV3.selector,
+                user,
+                debtToken,
+                debtAmount,
+                collaterals,
+                fromProtocol,
+                toProtocol
+            );
+            console.log("Requesting Balancer V3 flash loan");
+            IVault(address(balancerV3Vault)).unlock(data);
+        } else {
+            revert("Unsupported flash loan version");
+        }
     }
 
     function getPossibleCollaterals(
