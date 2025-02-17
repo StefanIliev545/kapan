@@ -11,6 +11,10 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 
+interface DebtToken {
+    function borrowAllowance(address user, address spender) external view returns (uint256);
+}
+
 contract AaveGateway is IGateway {
     using SafeERC20 for IERC20;
 
@@ -63,6 +67,12 @@ contract AaveGateway is IGateway {
     function borrow(address token, address user, uint256 amount) external override {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
+
+        (, address variableDebtToken, bool found) = _getReserveAddresses(token);
+        require(found && variableDebtToken != address(0), "Token is not a valid debt token");
+        uint256 allowance = DebtToken(variableDebtToken).borrowAllowance(user, address(this));
+        console.log("Borrow allowance", allowance, "amount asked", amount);
+        require(allowance >= amount, "Insufficient borrow allowance");
 
         console.log("Borrowing", token, amount, user);
         IPool(poolAddress).borrow(token, amount, 2, REFERRAL_CODE, user);
@@ -324,6 +334,7 @@ contract AaveGateway is IGateway {
         target = new address[](1);
         data = new bytes[](1);
         target[0] = variableDebtToken;
-        data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), amount);
+        // todo - determine if max is ok, its hard to get the exact amount right if we wanna transfer all.. 
+        data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), type(uint256).max);
     }
 }
