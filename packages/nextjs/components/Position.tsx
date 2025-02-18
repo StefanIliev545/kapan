@@ -121,11 +121,7 @@ export const Position: FC<PositionProps> = ({
           </div>
           <div>
             <div className="text-sm text-base-content/70">Optimal Rate</div>
-            <div
-              className={`font-medium tabular-nums ${
-                optimalProtocol.toLowerCase() !== protocolName.split(" ")[0].toLowerCase() ? "text-primary" : ""
-              }`}
-            >
+            <div className={`font-medium tabular-nums`}>
               {optimalRateDisplay.toFixed(2)}%
               <span className="ml-1 inline-flex items-center">
                 <Image

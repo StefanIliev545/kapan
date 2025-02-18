@@ -6,10 +6,10 @@ import { CompoundProtocolView } from "~~/components/specific/compound/CompoundPr
 
 const Home: NextPage = () => {
   return (
-    <>
+    <div className="container mx-auto px-5">
       <AaveProtocolView />
       <CompoundProtocolView />
-    </>
+    </div>
   );
 };
 
