@@ -570,29 +570,14 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x6d246480181D9894a328135113A1FFa3D1465c4F",
+      address: "0xf3C8D98a2f001fF9E04c8023995033b02EC3A161",
       abi: [
         {
           inputs: [
             {
-              internalType: "contract ICompoundComet",
-              name: "_USDCComet",
-              type: "address",
-            },
-            {
-              internalType: "contract ICompoundComet",
-              name: "_USDTComet",
-              type: "address",
-            },
-            {
-              internalType: "contract ICompoundComet",
-              name: "_USDCeComet",
-              type: "address",
-            },
-            {
-              internalType: "contract ICompoundComet",
-              name: "_ethComet",
-              type: "address",
+              internalType: "contract ICompoundComet[]",
+              name: "_comets",
+              type: "address[]",
             },
             {
               internalType: "contract FeedRegistryInterface",
@@ -1228,7 +1213,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x7791b489fb72B15DdFf4946dc05093a01b8B3638",
+      address: "0x34AAAeA646c8B95D86FdbD5F04023f9304BA78F4",
       abi: [
         {
           inputs: [
@@ -1361,6 +1346,35 @@ const deployedContracts = {
         {
           inputs: [
             {
+              internalType: "address",
+              name: "_token",
+              type: "address",
+            },
+          ],
+          name: "getAllProtocolRates",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "protocols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "rates",
+              type: "uint256[]",
+            },
+            {
+              internalType: "bool[]",
+              name: "success",
+              type: "bool[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address[]",
               name: "_tokens",
               type: "address[]",
@@ -1386,7 +1400,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x0BfF995DcBF8132DB58015C583d93730E544ECbA",
+      address: "0x3a31D91045b06c8E52f37dd615842ECC890954c3",
       abi: [
         {
           inputs: [

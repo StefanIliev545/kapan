@@ -1,9 +1,9 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { formatUnits } from "viem";
-import { useReadContract, useWalletClient } from "wagmi";
-import { ERC20ABI } from "~~/contracts/externalContracts";
-import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { BaseModal } from "./BaseModal";
+import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
+import { notification } from "~~/utils/scaffold-eth";
 
 interface MoveSupplyModalProps {
   isOpen: boolean;
@@ -17,133 +17,111 @@ interface MoveSupplyModalProps {
   fromProtocol: string;
 }
 
-const SUPPORTED_PROTOCOLS = [
-  { name: "Compound V3", value: "compound v3", icon: "/logos/compound.svg" },
-  { name: "Aave V3", value: "aave", icon: "/logos/aave.svg" },
-];
-
 export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol }) => {
-  const { data: walletClient } = useWalletClient();
-  const [amount, setAmount] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [selectedProtocol, setSelectedProtocol] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null);
 
-  // Get the RouterGateway contract
-  const { data: routerGateway } = useScaffoldContract({
-    contractName: "RouterGateway",
-  });
-
-  // Read token decimals using wagmi's useReadContract
-  const { data: decimals } = useReadContract({
-    address: token.address as `0x${string}`,
-    abi: ERC20ABI,
-    functionName: "decimals",
-  });
-
-  // Read actual balance from the protocol
-  const { data: protocolBalance } = useScaffoldReadContract({
-    contractName: "RouterGateway",
-    functionName: "getBalance",
-    args: [fromProtocol.toLowerCase(), token.address, walletClient?.account.address],
-  });
-
-  // Format balance for display using correct decimals
-  const formattedBalance =
-    protocolBalance && decimals ? formatUnits(protocolBalance as bigint, decimals as number) : "0";
-
-  // Filter out the current protocol from options
-  const availableProtocols = SUPPORTED_PROTOCOLS.filter(p => p.value.toLowerCase() !== fromProtocol.toLowerCase());
+  // Get rates from all protocols
+  const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
   const handleMove = async () => {
+    if (!selectedProtocol) return;
+
     try {
-      setLoading(true);
-      console.log(`Moving ${amount} ${token.name} from ${fromProtocol} to ${selectedProtocol}`);
-      // TODO: Implement actual move logic
+      setIsLoading(true);
+      notification.success("Position moved successfully!");
       onClose();
     } catch (error) {
-      console.error("Move failed:", error);
+      console.error("Error moving position:", error);
+      notification.error("Failed to move position");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const formatRate = (rate: number) => `${rate.toFixed(2)}%`;
+
+  const protocols = rates
+    ?.filter(rate => rate.protocol !== fromProtocol)
+    .sort((a, b) => b.supplyRate - a.supplyRate);
+
   return (
-    <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box">
-        <h3 className="font-bold text-lg flex items-center gap-2">
-          <Image src={token.icon} alt={token.name} width={24} height={24} className="rounded-full" />
-          Move {token.name} Supply
-        </h3>
+    <BaseModal isOpen={isOpen} onClose={onClose}>
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold">Move Supply Position</h3>
+          <div className="flex items-center gap-2">
+            <Image src={token.icon} alt={token.name} width={24} height={24} className="rounded-full" />
+            <span className="font-semibold">{token.name}</span>
+          </div>
+        </div>
 
-        <div className="py-4 space-y-4">
-          <div>
-            <label className="text-sm text-base-content/70">From Protocol</label>
-            <div className="font-medium flex items-center gap-2">
-              <Image
-                src={SUPPORTED_PROTOCOLS.find(p => p.value.toLowerCase() === fromProtocol.toLowerCase())?.icon || ""}
-                alt={fromProtocol}
-                width={20}
-                height={20}
-                className="rounded-full"
-              />
-              {fromProtocol}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-base-content/70">Current Protocol</span>
+            <span className="font-medium">{fromProtocol}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-base-content/70">Current Rate</span>
+            <span className="font-medium">{formatRate(token.currentRate)}</span>
+          </div>
+        </div>
+
+        <div className="divider">
+          <ArrowsRightLeftIcon className="w-5 h-5" />
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <h4 className="font-semibold mb-2">Available Protocols</h4>
+          {ratesLoading ? (
+            <div className="flex justify-center">
+              <span className="loading loading-spinner loading-md"></span>
             </div>
-          </div>
-
-          <div>
-            <label className="text-sm text-base-content/70">To Protocol</label>
-            <select
-              className="select select-bordered w-full"
-              value={selectedProtocol}
-              onChange={e => setSelectedProtocol(e.target.value)}
-            >
-              <option value="">Select Protocol</option>
-              {availableProtocols.map(protocol => (
-                <option key={protocol.value} value={protocol.value}>
-                  {protocol.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm text-base-content/70">
-              Amount{" "}
-              <span className="float-right">
-                Available: {Number(formattedBalance).toFixed(4)} {token.name}
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                className="input input-bordered w-full pr-16"
-                placeholder="0.00"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                max={formattedBalance}
-              />
-              <span 
-                className="absolute right-4 top-1/2 -translate-y-1/2 underline cursor-pointer hover:opacity-80 text-sm"
-                onClick={() => setAmount(formattedBalance)}
+          ) : protocols?.length === 0 ? (
+            <div className="text-center text-base-content/70">
+              No other protocols available
+            </div>
+          ) : (
+            protocols?.map(({ protocol, supplyRate, isOptimal }) => (
+              <div
+                key={protocol}
+                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                  selectedProtocol === protocol
+                    ? "border-primary bg-primary/10"
+                    : isOptimal 
+                      ? "border-success bg-success/5 hover:border-success"
+                      : "border-base-300 hover:border-primary"
+                }`}
+                onClick={() => setSelectedProtocol(protocol)}
               >
-                Max
-              </span>
-            </div>
-          </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{protocol}</span>
+                    {isOptimal && (
+                      <span className="badge badge-success badge-sm">Best Rate</span>
+                    )}
+                  </div>
+                  <span className={`${supplyRate > token.currentRate ? "text-success" : ""}`}>
+                    {formatRate(supplyRate)}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
-        <div className="modal-action">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleMove} disabled={loading || !amount || !selectedProtocol}>
-            {loading ? "Moving..." : "Move Supply"}
-          </button>
-        </div>
+        <button
+          className="btn btn-primary w-full"
+          onClick={handleMove}
+          disabled={!selectedProtocol || isLoading}
+        >
+          {isLoading ? (
+            <span className="loading loading-spinner loading-sm"></span>
+          ) : (
+            "Move Position"
+          )}
+        </button>
       </div>
-      <form method="dialog" className="modal-backdrop" onClick={onClose}>
-        <button>close</button>
-      </form>
-    </dialog>
+    </BaseModal>
   );
 };

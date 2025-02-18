@@ -9,28 +9,23 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
   const aaveGateway = await hre.deployments.get("AaveGateway");
   const compoundGateway = await hre.deployments.get("CompoundGateway");
 
+  const BALANCER_VAULT3 = process.env.BALANCER_VAULT3!;
+  const BALANCER_VAULT2 = process.env.BALANCER_VAULT2!;
+
   // Deploy RouterGateway
   const routerGateway = await deploy("RouterGateway", {
     from: deployer,
-    args: [aaveGateway.address, compoundGateway.address, "0xbA1333333333a1BA1108E8412f11850A5C319bA9", "0xBA12222222228d8Ba445958a75a0704d566BF2C8"],// V2 - "0xBA12222222228d8Ba445958a75a0704d566BF2C8"],
+    args: [
+      aaveGateway.address,
+      compoundGateway.address,
+      BALANCER_VAULT3,
+      BALANCER_VAULT2,
+    ],
     log: true,
     autoMine: true,
   });
 
   console.log(`RouterGateway deployed to: ${routerGateway.address}`);
-
-  // Verify on etherscan if not on a local chain
-  /*if (hre.network.name !== "localhost" && hre.network.name !== "hardhat") {
-    try {
-      await hre.run("verify:verify", {
-        address: routerGateway.address,
-        constructorArguments: [aaveGateway.address, compoundGateway.address],
-      });
-      console.log("RouterGateway verified on Etherscan");
-    } catch (error) {
-      console.log("Error verifying contract:", error);
-    }
-  }*/
 };
 
 export default deployRouterGateway;
