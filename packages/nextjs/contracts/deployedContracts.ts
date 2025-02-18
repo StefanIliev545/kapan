@@ -1927,7 +1927,7 @@ const deployedContracts = {
   },
   11155111: {
     AaveGateway: {
-      address: "0xBe9e1BE5448d4A4e4f93f43b6D4bdbb5BD417c3E",
+      address: "0x6433987E9f8f3416fe61D1FaEABCcEE957156929",
       abi: [
         {
           inputs: [
@@ -3133,7 +3133,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x46f7700a3c547ffc0d1951c445dc897cb85e02b1",
+      address: "0x2EA750471f6B4fF1a66Dcb31272dB8a30bbccEef",
       abi: [
         {
           inputs: [
@@ -3291,7 +3291,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xc3FEDD5F3CFa9386380C7590a6d0C35b55a42395",
+      address: "0x2564276cfA766787557f5bb7Cd2ba92037441c29",
       abi: [
         {
           inputs: [
