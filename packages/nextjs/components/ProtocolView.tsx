@@ -1,12 +1,12 @@
-import { FC, useState, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { Position } from "./Position";
 
 export interface ProtocolPosition {
   icon: string;
   name: string;
-  balance: number;       // USD value
-  tokenBalance: number;  // Raw token amount
+  balance: number; // USD value
+  tokenBalance: bigint; // Raw token amount
   currentRate: number;
   tokenAddress: string;
   collateralView?: React.ReactNode;
@@ -50,12 +50,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   };
 
   // Filter positions based on showAll toggle.
-  const filteredSuppliedPositions = showAll
-    ? suppliedPositions
-    : suppliedPositions.filter((p) => p.balance > 0);
-  const filteredBorrowedPositions = showAll
-    ? borrowedPositions
-    : borrowedPositions.filter((p) => p.balance < 0);
+  const filteredSuppliedPositions = showAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0);
+  const filteredBorrowedPositions = showAll ? borrowedPositions : borrowedPositions.filter(p => p.balance < 0);
 
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
   const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
@@ -68,18 +64,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 relative">
-                <Image
-                  src={protocolIcon}
-                  alt={`${protocolName} icon`}
-                  layout="fill"
-                  className="rounded-full"
-                />
+                <Image src={protocolIcon} alt={`${protocolName} icon`} layout="fill" className="rounded-full" />
               </div>
               <div className="flex flex-col">
                 <div className="text-2xl font-bold">{protocolName}</div>
-                <div className="text-base-content/70">
-                  Balance: {formatCurrency(netBalance)}
-                </div>
+                <div className="text-base-content/70">Balance: {formatCurrency(netBalance)}</div>
               </div>
             </div>
 
@@ -90,7 +79,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 type="checkbox"
                 className="toggle toggle-primary toggle-sm"
                 checked={showAll}
-                onChange={(e) => setShowAll(e.target.checked)}
+                onChange={e => setShowAll(e.target.checked)}
               />
             </div>
 
@@ -120,11 +109,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   {filteredSuppliedPositions.map((position, index) => (
                     // Wrap each Position in a container with a fixed min-height.
                     <div key={`supplied-${position.name}-${index}`} className="min-h-[80px]">
-                      <Position
-                        {...position}
-                        type="supply"
-                        protocolName={protocolName}
-                      />
+                      <Position {...position} type="supply" protocolName={protocolName} />
                     </div>
                   ))}
                 </div>
@@ -147,11 +132,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   {filteredBorrowedPositions.map((position, index) => (
                     // Wrap each Position in a container with the same min-height.
                     <div key={`borrowed-${position.name}-${index}`} className="min-h-[80px]">
-                      <Position
-                        {...position}
-                        type="borrow"
-                        protocolName={protocolName}
-                      />
+                      <Position {...position} type="borrow" protocolName={protocolName} />
                     </div>
                   ))}
                 </div>
@@ -174,7 +155,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/ethereum-logo.svg",
       name: "ETH",
       balance: 5000.75,
-      tokenBalance: 2.5,
+      tokenBalance: BigInt(2.5),
       currentRate: 2.8,
       tokenAddress: "0x0000000000000000000000000000000000000000",
     },
@@ -185,7 +166,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/dai-logo.svg",
       name: "DAI",
       balance: -2500.25,
-      tokenBalance: 2500.25,
+      tokenBalance: BigInt(2500.25),
       currentRate: 4.2,
       tokenAddress: "0x0000000000000000000000000000000000000000",
     },
@@ -193,7 +174,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/usd-coin-usdc-logo.svg",
       name: "USDC",
       balance: -1000.5,
-      tokenBalance: 1000.5, // Example USDC amount
+      tokenBalance: BigInt(1000.5), // Example USDC amount
       currentRate: 3.5,
       tokenAddress: "",
     },

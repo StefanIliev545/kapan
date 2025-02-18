@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { useScaffoldContract, useScaffoldWriteContract, useScaffoldContractWrite } from "~~/hooks/scaffold-eth";
-import { parseUnits } from "viem";
+import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 interface MoveDebtParams {
   user: string;
@@ -54,7 +53,11 @@ export const useMoveDebtScaffold = () => {
         params.collaterals,
         params.fromProtocol,
       ]);
-      const toApprovals = await routerContract.read.getToProtocolApprovalsForMove([params.debtToken, params.debtAmount, params.toProtocol]);
+      const toApprovals = await routerContract.read.getToProtocolApprovalsForMove([
+        params.debtToken,
+        params.debtAmount,
+        params.toProtocol,
+      ]);
 
       // Each approval call returns a tuple: [address[] targets, bytes[] encodedData]
       const [fromTargets, fromData] = fromApprovals;
@@ -101,7 +104,7 @@ export const useMoveDebtScaffold = () => {
       console.log("moveDebt transaction confirmed");
 
       return moveDebtTxHash;
-    } catch (err) {
+    } catch (err: any) {
       console.error("moveDebt error:", err);
       setError(err);
       throw err;

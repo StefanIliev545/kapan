@@ -232,7 +232,7 @@ export const ExamplePosition: FC = () => {
       icon="/logos/usdc-coin-usdc-logo.svg"
       name="USDC"
       balance={1000.5}
-      tokenBalance={1000.5}
+      tokenBalance={BigInt(1000.5)}
       currentRate={3.5}
       type="supply"
       protocolName="Aave V3"

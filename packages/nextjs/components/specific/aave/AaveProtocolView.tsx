@@ -42,7 +42,7 @@ export const AaveProtocolView: FC = () => {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
         balance: supplyUsdBalance,
-        tokenBalance: supplyBalance,
+        tokenBalance: token.balance,
         currentRate: supplyAPY,
         tokenAddress: token.token,
       });
@@ -54,7 +54,7 @@ export const AaveProtocolView: FC = () => {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
         balance: -borrowUsdBalance,
-        tokenBalance: borrowBalance,
+        tokenBalance: token.borrowBalance,
         currentRate: borrowAPY,
         tokenAddress: token.token,
       });

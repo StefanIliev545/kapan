@@ -97,7 +97,7 @@ export const CompoundProtocolView: FC = () => {
         icon: tokenNameToLogo(tokenName),
         name: tokenName,
         balance: -usdBorrowBalance,
-        tokenBalance: borrowBalance,
+        tokenBalance: borrowBalanceRaw,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
         collateralView: <CompoundCollateralView baseToken={tokenAddress} />,
@@ -107,7 +107,7 @@ export const CompoundProtocolView: FC = () => {
         icon: tokenNameToLogo(tokenName),
         name: tokenName,
         balance: usdBalance,
-        tokenBalance: balance,
+        tokenBalance: balanceRaw,
         currentRate: supplyAPR,
         tokenAddress: tokenAddress,
       });
