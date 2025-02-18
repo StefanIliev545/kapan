@@ -24,38 +24,41 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  // mainnet registry - 0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+  const USDC_COMET = process.env.COMPOUND_USDC_COMET || "0x0000000000000000000000000000000000000000";
+  const USDT_COMET = process.env.COMPOUND_USDT_COMET || "0x0000000000000000000000000000000000000000";
+  const USDC_E_COMET = process.env.COMPOUND_USDC_E_COMET || "0x0000000000000000000000000000000000000000";
+  const WETH_COMET = process.env.COMPOUND_WETH_COMET || "0x0000000000000000000000000000000000000000";
+  const CHAINLINK_FEED = process.env.CHAINLINK_FEED_REGISTRY || "0x0000000000000000000000000000000000000000";
+  const WETH_ADDRESS = process.env.WETH_ADDRESS || "0x0000000000000000000000000000000000000000";
+  const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED || "0x0000000000000000000000000000000000000000";
 
   await deploy("CompoundGateway", {
     from: deployer,
-    // Contract constructor arguments
     args: [
-        "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // ARBI USDC
-        "0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07", //USDT
-        "0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA", //USDC.e
-        "0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486", //WETH
-        "0x0000000000000000000000000000000000000000", //priceFeed
+      USDC_COMET,
+      USDT_COMET,
+      USDC_E_COMET,
+      WETH_COMET,
+      CHAINLINK_FEED,
     ],
     log: true,
-    // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
-    // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
 
   await hre.deployments.execute("CompoundGateway", { from: deployer }, "overrideFeed",
-    "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", // WETH
-    "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612", // Chainlink Registry
+    WETH_ADDRESS,
+    WETH_PRICE_FEED,
   );
 
   // Get the deployed contract to interact with it after deploying.
   const CompoundGateway = await hre.ethers.getContract<Contract>("CompoundGateway", deployer);
-  const usdcToken = await CompoundGateway.getBaseToken("0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf");
+  const usdcToken = await CompoundGateway.getBaseToken(USDC_COMET);
   console.log("👋 Base Token USDC:", usdcToken);
-  const usdtToken = await CompoundGateway.getBaseToken("0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07");
+  const usdtToken = await CompoundGateway.getBaseToken(USDT_COMET);
   console.log("👋 Base Token USDT:", usdtToken);
-  const usdcEToken = await CompoundGateway.getBaseToken("0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA");
+  const usdcEToken = await CompoundGateway.getBaseToken(USDC_E_COMET);
   console.log("👋 Base Token USDC.e:", usdcEToken);
-  const wethToken = await CompoundGateway.getBaseToken("0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486");
+  const wethToken = await CompoundGateway.getBaseToken(WETH_COMET);
   console.log("👋 Base Token WETH:", wethToken);
 };
 

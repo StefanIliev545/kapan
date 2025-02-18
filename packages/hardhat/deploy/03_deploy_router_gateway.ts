@@ -20,7 +20,7 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
   console.log(`RouterGateway deployed to: ${routerGateway.address}`);
 
   // Verify on etherscan if not on a local chain
-  if (hre.network.name !== "localhost" && hre.network.name !== "hardhat") {
+  /*if (hre.network.name !== "localhost" && hre.network.name !== "hardhat") {
     try {
       await hre.run("verify:verify", {
         address: routerGateway.address,
@@ -30,7 +30,7 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
     } catch (error) {
       console.log("Error verifying contract:", error);
     }
-  }
+  }*/
 };
 
 export default deployRouterGateway;

@@ -36,15 +36,18 @@ contract CompoundGateway is IGateway {
         ICompoundComet _ethComet,
         FeedRegistryInterface _priceFeed
     ) {
-        require(address(_USDCComet.baseToken()) != address(0), "USDCComet is not set");
-        require(address(_USDTComet.baseToken()) != address(0), "USDTComet is not set");
-        require(address(_USDCeComet.baseToken()) != address(0), "USDCeComet is not set");
-        require(address(_ethComet.baseToken()) != address(0), "ethComet is not set");
-
-        tokenToComet[address(_USDCComet.baseToken())] = _USDCComet;
-        tokenToComet[address(_USDTComet.baseToken())] = _USDTComet;
-        tokenToComet[address(_USDCeComet.baseToken())] = _USDCeComet;
-        tokenToComet[address(_ethComet.baseToken())] = _ethComet;
+        if (address(_USDCComet.baseToken()) != address(0)) {
+            tokenToComet[address(_USDCComet.baseToken())] = _USDCComet;
+        }
+        if (address(_USDTComet.baseToken()) != address(0)) {
+            tokenToComet[address(_USDTComet.baseToken())] = _USDTComet;
+        }
+        if (address(_USDCeComet.baseToken()) != address(0)) {
+            tokenToComet[address(_USDCeComet.baseToken())] = _USDCeComet;
+        }
+        if (address(_ethComet.baseToken()) != address(0)) {
+            tokenToComet[address(_ethComet.baseToken())] = _ethComet;
+        }
         priceFeed = _priceFeed;
     }
 

@@ -24,17 +24,18 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
+  const POOL_ADDRESSES_PROVIDER = process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
+  const UI_POOL_DATA_PROVIDER = process.env.AAVE_UI_POOL_DATA_PROVIDER || "0x5c5228aC8BC1528482514aF3e27E692495148717";
+  const REFERRAL_CODE = process.env.AAVE_REFERRAL_CODE || "0";
+
   await deploy("AaveGateway", {
     from: deployer,
-    // Contract constructor arguments
     args: [
-        "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", //Pool Addresses Provider
-        "0x5c5228aC8BC1528482514aF3e27E692495148717", //Ui Provider
-        0 // Referral Code
+      POOL_ADDRESSES_PROVIDER,
+      UI_POOL_DATA_PROVIDER,
+      REFERRAL_CODE
     ],
     log: true,
-    // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
-    // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
 };
