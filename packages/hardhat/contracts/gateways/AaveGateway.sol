@@ -46,8 +46,6 @@ contract AaveGateway is IGateway {
         deposit(collateral, receiver, amount);
     }
 
-    // 1909960826083442181  - balance of user 
-    // 1909960825889295500 - transferFrom
     function withdrawCollateral(address, address aToken, address user, uint256 amount) external override returns (address) {
         IERC20 atoken = IERC20(aToken);
         

@@ -108,7 +108,7 @@ export const Position: FC<PositionProps> = ({
         </div>
 
         {/* Stats: Rates */}
-        <div className="order-2 lg:order-none lg:col-span-3 grid grid-cols-3 gap-4 text-center">
+        <div className="order-2 lg:order-none lg:col-span-3 grid grid-cols-3 gap-4 items-center">
           <div>
             <div className="text-sm text-base-content/70">Balance</div>
             <div className={`font-medium ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
@@ -140,8 +140,8 @@ export const Position: FC<PositionProps> = ({
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="order-3 lg:order-none lg:col-span-2 flex justify-end gap-2">
+        {/* Action Buttons */}
+        <div className="order-3 lg:order-none lg:col-span-2 flex items-center justify-end gap-2">
           {type === "supply" ? (
             <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>
               Deposit
