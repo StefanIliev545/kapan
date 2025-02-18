@@ -32,13 +32,26 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const WETH_ADDRESS = process.env.WETH_ADDRESS || "0x0000000000000000000000000000000000000000";
   const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED || "0x0000000000000000000000000000000000000000";
 
+  const comets = [];
+  if (USDC_COMET !== "0x0000000000000000000000000000000000000000") {
+    comets.push(USDC_COMET);
+  }
+  if (USDT_COMET !== "0x0000000000000000000000000000000000000000") {
+    comets.push(USDT_COMET); 
+  }
+  if (USDC_E_COMET !== "0x0000000000000000000000000000000000000000") {
+    comets.push(USDC_E_COMET);
+  }
+  if (WETH_COMET !== "0x0000000000000000000000000000000000000000") {
+    comets.push(WETH_COMET);
+  }
+
+  console.log("👋 Comets:", comets);
+
   await deploy("CompoundGateway", {
     from: deployer,
     args: [
-      USDC_COMET,
-      USDT_COMET,
-      USDC_E_COMET,
-      WETH_COMET,
+      comets,
       CHAINLINK_FEED,
     ],
     log: true,
@@ -49,17 +62,6 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
     WETH_ADDRESS,
     WETH_PRICE_FEED,
   );
-
-  // Get the deployed contract to interact with it after deploying.
-  const CompoundGateway = await hre.ethers.getContract<Contract>("CompoundGateway", deployer);
-  const usdcToken = await CompoundGateway.getBaseToken(USDC_COMET);
-  console.log("👋 Base Token USDC:", usdcToken);
-  const usdtToken = await CompoundGateway.getBaseToken(USDT_COMET);
-  console.log("👋 Base Token USDT:", usdtToken);
-  const usdcEToken = await CompoundGateway.getBaseToken(USDC_E_COMET);
-  console.log("👋 Base Token USDC.e:", usdcEToken);
-  const wethToken = await CompoundGateway.getBaseToken(WETH_COMET);
-  console.log("👋 Base Token WETH:", wethToken);
 };
 
 export default deployYourContract;

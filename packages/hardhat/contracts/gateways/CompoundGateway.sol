@@ -30,23 +30,13 @@ contract CompoundGateway is IGateway {
     }
 
     constructor(
-        ICompoundComet _USDCComet, 
-        ICompoundComet _USDTComet, 
-        ICompoundComet _USDCeComet, 
-        ICompoundComet _ethComet,
+        ICompoundComet[] memory _comets,
         FeedRegistryInterface _priceFeed
     ) {
-        if (address(_USDCComet.baseToken()) != address(0)) {
-            tokenToComet[address(_USDCComet.baseToken())] = _USDCComet;
-        }
-        if (address(_USDTComet.baseToken()) != address(0)) {
-            tokenToComet[address(_USDTComet.baseToken())] = _USDTComet;
-        }
-        if (address(_USDCeComet.baseToken()) != address(0)) {
-            tokenToComet[address(_USDCeComet.baseToken())] = _USDCeComet;
-        }
-        if (address(_ethComet.baseToken()) != address(0)) {
-            tokenToComet[address(_ethComet.baseToken())] = _ethComet;
+        for (uint256 i = 0; i < _comets.length; i++) {
+            if (address(_comets[i]) != address(0)) {
+                tokenToComet[address(_comets[i].baseToken())] = _comets[i];
+            }
         }
         priceFeed = _priceFeed;
     }
