@@ -5,10 +5,6 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  // Get the deployed gateway contracts
-  const aaveGateway = await hre.deployments.get("AaveGateway");
-  const compoundGateway = await hre.deployments.get("CompoundGateway");
-
   const BALANCER_VAULT3 = process.env.BALANCER_VAULT3!;
   const BALANCER_VAULT2 = process.env.BALANCER_VAULT2!;
 
@@ -16,13 +12,13 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
   const routerGateway = await deploy("RouterGateway", {
     from: deployer,
     args: [
-      aaveGateway.address,
-      compoundGateway.address,
       BALANCER_VAULT3,
       BALANCER_VAULT2,
+      deployer,
     ],
     log: true,
     autoMine: true,
+    deterministicDeployment: "0x4242424242424242424242424242424242424242",
   });
 
   console.log(`RouterGateway deployed to: ${routerGateway.address}`);
@@ -31,4 +27,3 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
 export default deployRouterGateway;
 
 deployRouterGateway.tags = ["RouterGateway"];
-deployRouterGateway.dependencies = ["AaveGateway", "CompoundGateway"];

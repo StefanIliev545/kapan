@@ -6,7 +6,7 @@ export interface ProtocolPosition {
   icon: string;
   name: string;
   balance: number;       // USD value
-  tokenBalance: number;  // Raw token amount
+  tokenBalance: bigint;  // Raw token amount
   currentRate: number;
   tokenAddress: string;
   collateralView?: React.ReactNode;
@@ -174,7 +174,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/ethereum-logo.svg",
       name: "ETH",
       balance: 5000.75,
-      tokenBalance: 2.5,
+      tokenBalance: BigInt(2.5),
       currentRate: 2.8,
       tokenAddress: "0x0000000000000000000000000000000000000000",
     },
@@ -185,7 +185,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/dai-logo.svg",
       name: "DAI",
       balance: -2500.25,
-      tokenBalance: 2500.25,
+      tokenBalance: BigInt(2500.25),
       currentRate: 4.2,
       tokenAddress: "0x0000000000000000000000000000000000000000",
     },
@@ -193,7 +193,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/usd-coin-usdc-logo.svg",
       name: "USDC",
       balance: -1000.5,
-      tokenBalance: 1000.5, // Example USDC amount
+      tokenBalance: BigInt(1000.5), // Example USDC amount
       currentRate: 3.5,
       tokenAddress: "",
     },

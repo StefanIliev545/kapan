@@ -22,22 +22,29 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
     You can run the `yarn account` command to check your balance in every network.
   */
   const { deployer } = await hre.getNamedAccounts();
-  const { deploy } = hre.deployments;
+  const { deploy, execute, get } = hre.deployments;
 
   const POOL_ADDRESSES_PROVIDER = process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
   const UI_POOL_DATA_PROVIDER = process.env.AAVE_UI_POOL_DATA_PROVIDER || "0x5c5228aC8BC1528482514aF3e27E692495148717";
   const REFERRAL_CODE = process.env.AAVE_REFERRAL_CODE || "0";
 
-  await deploy("AaveGateway", {
+  const routerGateway = await get("RouterGateway");
+
+  const aaveGateway = await deploy("AaveGateway", {
     from: deployer,
     args: [
+      routerGateway.address,
       POOL_ADDRESSES_PROVIDER,
       UI_POOL_DATA_PROVIDER,
       REFERRAL_CODE
     ],
     log: true,
     autoMine: true,
+    deterministicDeployment: "0x4242424242424242424242424242424242424242",
   });
+
+  await execute("RouterGateway", { from: deployer }, "addGateway", "aave", aaveGateway.address);
+  await execute("RouterGateway", { from: deployer }, "addGateway", "aave v3", aaveGateway.address);
 };
 
 export default deployYourContract;
@@ -45,3 +52,4 @@ export default deployYourContract;
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags YourContract
 deployYourContract.tags = ["AAVEGateway"];
+deployYourContract.dependencies = ["RouterGateway"];

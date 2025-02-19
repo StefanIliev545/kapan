@@ -10,8 +10,9 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { ProtocolGateway } from "./ProtocolGateway.sol";
 
-contract CompoundGateway is IGateway {
+contract CompoundGateway is IGateway, ProtocolGateway {
     using SafeERC20 for IERC20;
 
     mapping(address => ICompoundComet) public tokenToComet;
@@ -30,9 +31,10 @@ contract CompoundGateway is IGateway {
     }
 
     constructor(
+        address router,
         ICompoundComet[] memory _comets,
         FeedRegistryInterface _priceFeed
-    ) {
+    ) ProtocolGateway(router) {
         for (uint256 i = 0; i < _comets.length; i++) {
             if (address(_comets[i]) != address(0)) {
                 tokenToComet[address(_comets[i].baseToken())] = _comets[i];

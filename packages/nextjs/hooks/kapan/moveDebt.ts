@@ -101,7 +101,7 @@ export const useMoveDebtScaffold = () => {
       console.log("moveDebt transaction confirmed");
 
       return moveDebtTxHash;
-    } catch (err) {
+    } catch (err: any) {
       console.error("moveDebt error:", err);
       setError(err);
       throw err;

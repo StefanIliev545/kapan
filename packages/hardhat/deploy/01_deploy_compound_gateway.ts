@@ -22,7 +22,7 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
     You can run the `yarn account` command to check your balance in every network.
   */
   const { deployer } = await hre.getNamedAccounts();
-  const { deploy } = hre.deployments;
+  const { deploy, execute, get } = hre.deployments;
 
   const USDC_COMET = process.env.COMPOUND_USDC_COMET || "0x0000000000000000000000000000000000000000";
   const USDT_COMET = process.env.COMPOUND_USDT_COMET || "0x0000000000000000000000000000000000000000";
@@ -34,20 +34,27 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
 
   const COMET_ADDRESSES = [USDC_COMET, USDT_COMET, USDC_E_COMET, WETH_COMET].filter((address) => address !== "0x0000000000000000000000000000000000000000");
 
-  await deploy("CompoundGateway", {
+  const routerGateway = await get("RouterGateway");
+
+  const compoundGateway = await deploy("CompoundGateway", {
     from: deployer,
     args: [
+      routerGateway.address,
       COMET_ADDRESSES,
       CHAINLINK_FEED,
     ],
     log: true,
     autoMine: true,
+    deterministicDeployment: "0x4242424242424242424242424242424242424242",
   });
 
   await hre.deployments.execute("CompoundGateway", { from: deployer }, "overrideFeed",
     WETH_ADDRESS,
     WETH_PRICE_FEED,
   );
+
+  await execute("RouterGateway", { from: deployer }, "addGateway", "compound", compoundGateway.address);
+  await execute("RouterGateway", { from: deployer }, "addGateway", "compound v3", compoundGateway.address);
 };
 
 export default deployYourContract;
@@ -55,3 +62,4 @@ export default deployYourContract;
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags YourContract
 deployYourContract.tags = ["CompoundGateway"];
+deployYourContract.dependencies = ["RouterGateway"];

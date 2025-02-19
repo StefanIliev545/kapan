@@ -5,6 +5,7 @@ import "./interfaces/IGateway.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/balancer/IVault.sol";
 
 import "hardhat/console.sol";
@@ -19,20 +20,22 @@ interface IFlashLoanProvider {
     ) external;
 }
 
-contract RouterGateway {
+contract RouterGateway is Ownable {
     using SafeERC20 for IERC20;
 
     // Mapping from protocol name to gateway contract
     mapping(string => IGateway) public gateways;
+
     IVault public balancerV3Vault;
     IFlashLoanProvider public balancerV2Vault;
-    constructor(address aaveGateway, address compoundGateway, IVault v3vault, IFlashLoanProvider v2Vault) {
-        gateways["aave"] = IGateway(aaveGateway);
-        gateways["compound"] = IGateway(compoundGateway);
-        gateways["compound v3"] = IGateway(compoundGateway);
-        gateways["aave v3"] = IGateway(aaveGateway);
+
+    constructor(IVault v3vault, IFlashLoanProvider v2Vault, address owner) Ownable(owner) {
         balancerV3Vault = v3vault;
         balancerV2Vault = v2Vault;
+    }
+
+    function addGateway(string calldata protocolName, address gateway) external onlyOwner {
+        gateways[protocolName] = IGateway(gateway);
     }
 
     function supplyWithPermit(

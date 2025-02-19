@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { IGateway } from "../interfaces/IGateway.sol";
 import { IPoolAddressesProvider } from "../interfaces/aave/IPoolAddressesProvider.sol";
 import { IUiPoolDataProviderV3 } from "../interfaces/aave/IUiDataProvider.sol";
@@ -15,14 +16,14 @@ interface DebtToken {
     function borrowAllowance(address user, address spender) external view returns (uint256);
 }
 
-contract AaveGateway is IGateway {
+contract AaveGateway is IGateway, ProtocolGateway {
     using SafeERC20 for IERC20;
 
     IPoolAddressesProvider public immutable poolAddressesProvider;
     IUiPoolDataProviderV3 public immutable uiPoolDataProvider;
     uint16 public immutable REFERRAL_CODE;
 
-    constructor(address _poolAddressesProvider, address _uiPoolDataProvider, uint16 _referralCode) {
+    constructor(address router, address _poolAddressesProvider, address _uiPoolDataProvider, uint16 _referralCode) ProtocolGateway(router) {
         poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
         uiPoolDataProvider = IUiPoolDataProviderV3(_uiPoolDataProvider);
         REFERRAL_CODE = _referralCode;
