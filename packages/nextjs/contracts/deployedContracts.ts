@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x8115D53243634C9E22717913FadDF94D8d0DC490",
+      address: "0xeAC1E31B624F9Da2B1cE511d1C9984a5D462A846",
       abi: [
         {
           inputs: [
@@ -570,7 +570,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xf3C8D98a2f001fF9E04c8023995033b02EC3A161",
+      address: "0x37033090a87353d527C58d03CB489f7D641a6b53",
       abi: [
         {
           inputs: [
@@ -1213,7 +1213,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x34AAAeA646c8B95D86FdbD5F04023f9304BA78F4",
+      address: "0x477e39e34454122237Ef0388C24897344f10f7D3",
       abi: [
         {
           inputs: [
@@ -1400,7 +1400,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x3a31D91045b06c8E52f37dd615842ECC890954c3",
+      address: "0x4e7B447cF5DA9521e9a2222Fb77BAdcb299708E4",
       abi: [
         {
           inputs: [

@@ -82,9 +82,9 @@ module.exports = {
       center: true,
       padding: "1rem",
       screens: {
-        lg: "1024px",
-        xl: "1280px",
-        "2xl": "1440px", // your maximum width for ultra-wide screens
+        lg: "1680px",
+        xl: "1680px",
+        "2xl": "2300px", // 2/3 of 3440px for ultra-wide screens
       },
     },
     extend: {
