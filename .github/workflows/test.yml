@@ -17,9 +17,35 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
-        cache: 'yarn'
+
+    - name: Get yarn cache directory path
+      id: yarn-cache-dir-path
+      run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache yarn dependencies
+      uses: actions/cache@v3
+      id: yarn-cache
+      with:
+        path: |
+          ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          **/node_modules
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-yarn-
+
+    - name: Cache Hardhat compilation
+      uses: actions/cache@v3
+      with:
+        path: |
+          packages/hardhat/cache
+          packages/hardhat/artifacts
+          packages/hardhat/typechain-types
+        key: ${{ runner.os }}-hardhat-${{ hashFiles('packages/hardhat/contracts/**/*.sol') }}
+        restore-keys: |
+          ${{ runner.os }}-hardhat-
 
     - name: Install dependencies
+      if: steps.yarn-cache.outputs.cache-hit != 'true'
       run: yarn install
       working-directory: packages/hardhat
 
