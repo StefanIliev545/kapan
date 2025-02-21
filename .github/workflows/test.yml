@@ -17,21 +17,8 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
-
-    - name: Get yarn cache directory path
-      id: yarn-cache-dir-path
-      run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-
-    - name: Cache yarn dependencies
-      uses: actions/cache@v3
-      id: yarn-cache
-      with:
-        path: |
-          ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          **/node_modules
-        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-yarn-
+        cache: 'npm'
+        cache-dependency-path: packages/hardhat/package.json
 
     - name: Cache Hardhat compilation
       uses: actions/cache@v3
@@ -45,19 +32,18 @@ jobs:
           ${{ runner.os }}-hardhat-
 
     - name: Install dependencies
-      if: steps.yarn-cache.outputs.cache-hit != 'true'
-      run: yarn install
+      run: npm ci
       working-directory: packages/hardhat
 
     - name: Run unit tests
-      run: yarn test
+      run: npm run test
       working-directory: packages/hardhat
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
 
     - name: Run fork tests
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: yarn test:fork
+      run: npm run test:fork
       working-directory: packages/hardhat
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
