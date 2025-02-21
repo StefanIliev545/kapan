@@ -16,8 +16,8 @@
     "hardhat-verify": "hardhat verify",
     "lint": "eslint --config ./.eslintrc.json --ignore-path ./.eslintignore ./*.ts ./deploy/**/*.ts ./scripts/**/*.ts ./test/**/*.ts",
     "lint-staged": "eslint --config ./.eslintrc.json --ignore-path ./.eslintignore",
-    "test": "REPORT_GAS=true hardhat test \"test/*.test.ts\"",
-    "test:fork": "REPORT_GAS=true hardhat test --network hardhat \"test/*.fork.test.ts\"",
+    "test": "REPORT_GAS=true hardhat test --grep '^((?!:fork).)*$'",
+    "test:fork": "REPORT_GAS=true hardhat test --network hardhat test/*.fork.test.ts",
     "verify": "hardhat etherscan-verify"
   },
   "dependencies": {

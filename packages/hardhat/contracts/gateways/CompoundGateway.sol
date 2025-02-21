@@ -13,7 +13,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "hardhat/console.sol";
 
 contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -88,17 +87,14 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
     // TODO: Insecure as this allows anyone to withdraw from a user's account, given this gateway will be manager.
     function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouterOrSelf(user) cometMustExist(market) nonReentrant returns (address) {
         ICompoundComet comet = tokenToComet[market];
-        console.log("withdrawing collateral", market, amount);
         comet.withdrawFrom(user, address(this), collateral, amount);
         emit CollateralWithdrawn(market, collateral, user, amount);
-        console.log("transferring collateral", collateral, amount);
         IERC20(collateral).safeTransfer(msg.sender, amount);
         return collateral;
     }   
 
     function borrow(address token, address user, uint256 amount) external onlyRouterOrSelf(user) {
         withdrawCollateral(token, token, user, amount);
-        console.log("borrowed", token, amount);
     }   
 
     function repay(address token, address user, uint256 amount) external override nonReentrant {

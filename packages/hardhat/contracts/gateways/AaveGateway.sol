@@ -11,7 +11,6 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "hardhat/console.sol";
 
 interface DebtToken {
     function borrowAllowance(address user, address spender) external view returns (uint256);
@@ -56,7 +55,6 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         require(allowance >= amount, "Insufficient allowance");
         atoken.transferFrom(user, address(this), amount);
 
-        console.log("Withdrawing collateral from Aave");
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
         IPool(poolAddressesProvider.getPool()).withdraw(underlying, amount, address(this));
 
@@ -71,12 +69,9 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         (, address variableDebtToken, bool found) = _getReserveAddresses(token);
         require(found && variableDebtToken != address(0), "Token is not a valid debt token");
         uint256 allowance = DebtToken(variableDebtToken).borrowAllowance(user, address(this));
-        console.log("Borrow allowance", allowance, "amount asked", amount);
         require(allowance >= amount, "Insufficient borrow allowance");
 
-        console.log("Borrowing", token, amount, user);
         IPool(poolAddress).borrow(token, amount, 2, REFERRAL_CODE, user);
-        console.log("Borrowed on behalf of", user, amount);
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 

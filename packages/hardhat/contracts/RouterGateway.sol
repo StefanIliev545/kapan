@@ -88,15 +88,12 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         require(address(gateway) != address(0), "Protocol not supported");
 
         // Transfer tokens from user to this contract
-        console.log("Transferring tokens from user to this contract", amount);
         IERC20(token).safeTransferFrom(user, address(this), amount);
 
         // Approve gateway to spend tokens
-        console.log("Approving gateway to spend tokens");
         IERC20(token).approve(address(gateway), amount);
 
         // Forward deposit call to the appropriate gateway
-        console.log("Forwarding deposit call to the appropriate gateway");
         gateway.deposit(token, user, amount);
     }
 
@@ -111,15 +108,12 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         require(address(gateway) != address(0), "Protocol not supported");
 
         // Transfer tokens from user to this contract
-        console.log("Transferring tokens from user to this contract for repayment", amount);
         IERC20(token).safeTransferFrom(user, address(this), amount);
 
         // Approve gateway to spend tokens
-        console.log("Approving gateway to spend tokens for repayment");
         IERC20(token).approve(address(gateway), amount);
 
         // Forward repay call to the appropriate gateway
-        console.log("Forwarding repay call to the appropriate gateway");
         gateway.repay(token, user, amount);
     }
 
@@ -182,12 +176,10 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         for (uint i = 0; i < collaterals.length; i++) {
             address underlyingReceived = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
             IERC20(underlyingReceived).approve(address(toGateway), collaterals[i].amount);
-            console.log("Depositing collateral into the to protocol");
             toGateway.depositCollateral(debtToken, underlyingReceived, collaterals[i].amount, user);
         }
 
         // Borrow the debt on the "to" protocol.
-        console.log("Borrowing debt on the to protocol");
         toGateway.borrow(debtToken, user, debtAmount);
     }
 
@@ -234,7 +226,6 @@ contract RouterGateway is Ownable, ReentrancyGuard {
             string memory toProtocol
         ) = abi.decode(userData, (address, address, uint256, IGateway.Collateral[], string, string));
 
-        console.log("Balancer V2 flash loan callback received");
         require(feeAmounts.length == 1, "Balancer V2 flash loan fee amount length mismatch");
         require(feeAmounts[0] == 0, "Flash loans are free");
 
@@ -264,8 +255,6 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         string calldata toProtocol
     ) external flashLoanOnly {
         require(msg.sender == address(balancerV3Vault), "Unauthorized flash loan provider");
-
-        console.log("Balancer V3 flash loan callback received");
 
         // Execute the common debt move logic.
         _moveDebtCommon(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
