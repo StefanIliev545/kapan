@@ -1,0 +1,44 @@
+name: Test Contracts
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install
+      working-directory: packages/hardhat
+
+    - name: Run unit tests
+      run: yarn test
+      working-directory: packages/hardhat
+      env:
+        ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+
+    - name: Run fork tests
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: yarn test:fork
+      working-directory: packages/hardhat
+      env:
+        ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        MAINNET_FORKING_ENABLED: "true"
+        COMPOUND_USDC_COMET: "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf"
+        COMPOUND_WETH_COMET: "0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486"
+        AAVE_POOL_ADDRESSES_PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"
+        AAVE_UI_POOL_DATA_PROVIDER: "0x5c5228aC8BC1528482514aF3e27E692495148717"
+        BALANCER_VAULT3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9"
+        BALANCER_VAULT2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8" 
