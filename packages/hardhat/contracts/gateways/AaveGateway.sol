@@ -47,7 +47,7 @@ contract AaveGateway is IGateway, ProtocolGateway {
         deposit(collateral, receiver, amount);
     }
 
-    function withdrawCollateral(address, address aToken, address user, uint256 amount) external override returns (address) {
+    function withdrawCollateral(address, address aToken, address user, uint256 amount) external override onlyRouter returns (address) {
         IERC20 atoken = IERC20(aToken);
         
         require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
@@ -63,7 +63,7 @@ contract AaveGateway is IGateway, ProtocolGateway {
         return underlying;
     }
 
-    function borrow(address token, address user, uint256 amount) external override {
+    function borrow(address token, address user, uint256 amount) external override onlyRouter {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
 

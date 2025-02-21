@@ -11,8 +11,9 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ProtocolGateway } from "./ProtocolGateway.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CompoundGateway is IGateway, ProtocolGateway {
+contract CompoundGateway is IGateway, ProtocolGateway, Ownable {
     using SafeERC20 for IERC20;
 
     mapping(address => ICompoundComet) public tokenToComet;
@@ -33,8 +34,9 @@ contract CompoundGateway is IGateway, ProtocolGateway {
     constructor(
         address router,
         ICompoundComet[] memory _comets,
-        FeedRegistryInterface _priceFeed
-    ) ProtocolGateway(router) {
+        FeedRegistryInterface _priceFeed,
+        address _owner
+    ) ProtocolGateway(router) Ownable(_owner) {
         for (uint256 i = 0; i < _comets.length; i++) {
             if (address(_comets[i]) != address(0)) {
                 tokenToComet[address(_comets[i].baseToken())] = _comets[i];
@@ -79,14 +81,14 @@ contract CompoundGateway is IGateway, ProtocolGateway {
     
 
     // TODO: Insecure as this allows anyone to withdraw from a user's account, given this gateway will be manager.
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public cometMustExist(market) returns (address) {
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouter cometMustExist(market) returns (address) {
         ICompoundComet comet = tokenToComet[market];
         comet.withdrawFrom(user, address(this), collateral, amount);
         IERC20(collateral).safeTransfer(msg.sender, amount);
         return collateral;
     }   
 
-    function borrow(address token, address user, uint256 amount) external {
+    function borrow(address token, address user, uint256 amount) external onlyRouter {
         withdrawCollateral(token, token, user, amount);
     }   
 

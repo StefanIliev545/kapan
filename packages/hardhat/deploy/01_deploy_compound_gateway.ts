@@ -42,6 +42,7 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
       routerGateway.address,
       COMET_ADDRESSES,
       CHAINLINK_FEED,
+      deployer, // owner
     ],
     log: true,
     autoMine: true,
