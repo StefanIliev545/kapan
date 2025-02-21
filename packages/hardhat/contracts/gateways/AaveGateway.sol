@@ -10,13 +10,14 @@ import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
 interface DebtToken {
     function borrowAllowance(address user, address spender) external view returns (uint256);
 }
 
-contract AaveGateway is IGateway, ProtocolGateway {
+contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IPoolAddressesProvider public immutable poolAddressesProvider;
@@ -34,7 +35,7 @@ contract AaveGateway is IGateway, ProtocolGateway {
         // TODO: Implement LTV logic
     }
 
-    function deposit(address token, address user, uint256 amount) public override {
+    function deposit(address token, address user, uint256 amount) public override nonReentrant {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
 
@@ -63,7 +64,7 @@ contract AaveGateway is IGateway, ProtocolGateway {
         return underlying;
     }
 
-    function borrow(address token, address user, uint256 amount) external override onlyRouter {
+    function borrow(address token, address user, uint256 amount) external override onlyRouter nonReentrant {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
 
@@ -79,7 +80,7 @@ contract AaveGateway is IGateway, ProtocolGateway {
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function repay(address token, address user, uint256 amount) external override {
+    function repay(address token, address user, uint256 amount) external override nonReentrant {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
     

@@ -12,9 +12,14 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract CompoundGateway is IGateway, ProtocolGateway, Ownable {
+
+contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    event CollateralWithdrawn(address indexed market, address indexed collateral, address indexed user, uint256 amount);
+
 
     mapping(address => ICompoundComet) public tokenToComet;
     FeedRegistryInterface public priceFeed;
@@ -45,7 +50,7 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable {
         priceFeed = _priceFeed;
     }
 
-    function overrideFeed(address token, AggregatorV3Interface feed) external {
+    function overrideFeed(address token, AggregatorV3Interface feed) external onlyOwner {
         overrideFeeds[token] = feed;
     }
 
@@ -69,30 +74,31 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable {
         comet.supplyTo(user, token, amount);
     }
 
-    function deposit(address token, address user, uint256 amount) external cometMustExist(token) {
+    function deposit(address token, address user, uint256 amount) external cometMustExist(token) nonReentrant {
         ICompoundComet comet = tokenToComet[token];
         depositToComet(comet, token, user, amount);
     }
 
-    function depositCollateral(address market, address collateral, uint256 amount, address receiver) external cometMustExist(market) {
+    function depositCollateral(address market, address collateral, uint256 amount, address receiver) external cometMustExist(market) nonReentrant {
         ICompoundComet comet = tokenToComet[market];
         depositToComet(comet, collateral, receiver, amount);
     }
     
 
     // TODO: Insecure as this allows anyone to withdraw from a user's account, given this gateway will be manager.
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouter cometMustExist(market) returns (address) {
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouter cometMustExist(market) nonReentrant returns (address) {
         ICompoundComet comet = tokenToComet[market];
         comet.withdrawFrom(user, address(this), collateral, amount);
+        emit CollateralWithdrawn(market, collateral, user, amount);
         IERC20(collateral).safeTransfer(msg.sender, amount);
         return collateral;
     }   
 
-    function borrow(address token, address user, uint256 amount) external onlyRouter {
+    function borrow(address token, address user, uint256 amount) external onlyRouter nonReentrant {
         withdrawCollateral(token, token, user, amount);
     }   
 
-    function repay(address token, address user, uint256 amount) external override {
+    function repay(address token, address user, uint256 amount) external override nonReentrant {
         // For Compound, repaying is the same as supplying
         // The negative balance will be used to repay the debt
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);

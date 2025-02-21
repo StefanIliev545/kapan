@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/balancer/IVault.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "hardhat/console.sol";
 
@@ -20,7 +21,7 @@ interface IFlashLoanProvider {
     ) external;
 }
 
-contract RouterGateway is Ownable {
+contract RouterGateway is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // Mapping from protocol name to gateway contract
@@ -28,6 +29,9 @@ contract RouterGateway is Ownable {
 
     IVault public balancerV3Vault;
     IFlashLoanProvider public balancerV2Vault;
+
+    // State variable to track if flash loan is enabled
+    bool private flashLoanEnabled;
 
     constructor(IVault v3vault, IFlashLoanProvider v2Vault, address owner) Ownable(owner) {
         balancerV3Vault = v3vault;
@@ -47,7 +51,7 @@ contract RouterGateway is Ownable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
+    ) external nonReentrant {
         // Get the gateway for the specified protocol
         IGateway gateway = gateways[protocolName];
         require(address(gateway) != address(0), "Protocol not supported");
@@ -78,7 +82,7 @@ contract RouterGateway is Ownable {
         address token,
         address user,
         uint256 amount
-    ) external {
+    ) external nonReentrant {
         // Get the gateway for the specified protocol
         IGateway gateway = gateways[protocolName];
         require(address(gateway) != address(0), "Protocol not supported");
@@ -101,7 +105,7 @@ contract RouterGateway is Ownable {
         address token,
         address user,
         uint256 amount
-    ) external {
+    ) external nonReentrant {
         // Get the gateway for the specified protocol
         IGateway gateway = gateways[protocolName];
         require(address(gateway) != address(0), "Protocol not supported");
@@ -187,6 +191,23 @@ contract RouterGateway is Ownable {
         toGateway.borrow(debtToken, user, debtAmount);
     }
 
+    /**
+     * @notice Modifier to ensure flash loan callbacks can only be triggered internally
+     */
+    modifier enableFlashLoan() {
+        flashLoanEnabled = true;
+        _;
+        flashLoanEnabled = false;
+    }
+
+    /**
+     * @notice Modifier to verify flash loan was triggered internally
+     */
+    modifier flashLoanOnly() {
+        require(flashLoanEnabled, "Flash loan not enabled");
+        _;
+    }
+
     // -------------------------------------------------------------------------
     // Flash Loan Wrapper for Balancer V2
     // -------------------------------------------------------------------------
@@ -200,7 +221,7 @@ contract RouterGateway is Ownable {
         uint256[] calldata amounts,
         uint256[] calldata feeAmounts,
         bytes calldata userData
-    ) external {
+    ) external flashLoanOnly {
         require(msg.sender == address(balancerV2Vault), "Unauthorized flash loan provider");
 
         // Decode userData to extract move debt parameters.
@@ -241,7 +262,7 @@ contract RouterGateway is Ownable {
         IGateway.Collateral[] memory collaterals,
         string calldata fromProtocol,
         string calldata toProtocol
-    ) external {
+    ) external flashLoanOnly {
         require(msg.sender == address(balancerV3Vault), "Unauthorized flash loan provider");
 
         console.log("Balancer V3 flash loan callback received");
@@ -274,7 +295,10 @@ contract RouterGateway is Ownable {
         string calldata fromProtocol,
         string calldata toProtocol,
         string calldata flashLoanVersion
-    ) external {
+    ) external nonReentrant enableFlashLoan {
+        require(debtAmount > 0, "Debt amount must be greater than zero");
+        require(user == msg.sender, "User must be the caller");
+
         if (repayAll) {
             IGateway fromGateway = gateways[fromProtocol];
             require(address(fromGateway) != address(0), "From protocol not supported");
@@ -282,16 +306,13 @@ contract RouterGateway is Ownable {
         }
 
         if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v2"))) {
-            // For Balancer v2, encode parameters without function selector.
             bytes memory data = abi.encode(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
             IERC20[] memory tokens = new IERC20[](1);
             tokens[0] = IERC20(debtToken);
             uint256[] memory amounts = new uint256[](1);
             amounts[0] = debtAmount;
-            console.log("Requesting Balancer V2 flash loan");
             balancerV2Vault.flashLoan(address(this), tokens, amounts, data);
         } else if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v3"))) {
-            // For Balancer v3, encode parameters with the function selector.
             bytes memory data = abi.encodeWithSelector(
                 this.receiveFlashLoanV3.selector,
                 user,
@@ -301,7 +322,6 @@ contract RouterGateway is Ownable {
                 fromProtocol,
                 toProtocol
             );
-            console.log("Requesting Balancer V3 flash loan");
             IVault(address(balancerV3Vault)).unlock(data);
         } else {
             revert("Unsupported flash loan version");

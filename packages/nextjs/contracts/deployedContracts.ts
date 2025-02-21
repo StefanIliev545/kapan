@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x9B0F07f3bc7B3D1A533314c4A8DcE9f42F3ff127",
+      address: "0x442A6CDC895A4d7d5edc17E873d690893456460e",
       abi: [
         {
           inputs: [
@@ -60,6 +60,11 @@ const deployedContracts = {
         {
           inputs: [],
           name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
           type: "error",
         },
         {
@@ -589,7 +594,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x28779C180155E14647f8192951ae2A76B81bf7e8",
+      address: "0xcbEFcF21fDD3C11E20082a2C1252ecda5f073593",
       abi: [
         {
           inputs: [
@@ -606,6 +611,11 @@ const deployedContracts = {
             {
               internalType: "contract FeedRegistryInterface",
               name: "_priceFeed",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_owner",
               type: "address",
             },
           ],
@@ -643,12 +653,89 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
           ],
           name: "SafeERC20FailedOperation",
           type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "CollateralWithdrawn",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
         },
         {
           inputs: [],
@@ -1145,6 +1232,19 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "priceFeed",
           outputs: [
             {
@@ -1154,6 +1254,13 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -1196,6 +1303,19 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -1248,10 +1368,13 @@ const deployedContracts = {
         repay: "contracts/interfaces/IGateway.sol",
         withdrawCollateral: "contracts/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x1c4FAb98628EddcFB5733083D2445CDFec45A749",
+      address: "0xF4F2485A50e62C706deBec4E94b298Ee959CEAED",
       abi: [
         {
           inputs: [
@@ -1438,7 +1561,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x2C0a2F958EC0048D590C33ACEAE2d45b150772BC",
+      address: "0xB7Cea5083AEDCf4cfB5fa37385d9c6678fC644B1",
       abi: [
         {
           inputs: [
@@ -1508,6 +1631,11 @@ const deployedContracts = {
             },
           ],
           name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
           type: "error",
         },
         {
