@@ -379,6 +379,6 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         gateway.borrow(token, user, amount);
 
         // Transfer borrowed tokens to the user
-        IERC20(token).safeTransferFrom(address(gateway), user, amount);
+        IERC20(token).safeTransfer(user, amount);
     }
 } 
