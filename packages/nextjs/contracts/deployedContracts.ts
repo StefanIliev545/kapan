@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x442A6CDC895A4d7d5edc17E873d690893456460e",
+      address: "0x473E0D5843C3485B595D6581840fDcC28BfaFBdc",
       abi: [
         {
           inputs: [
@@ -594,7 +594,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xcbEFcF21fDD3C11E20082a2C1252ecda5f073593",
+      address: "0xDD3518D0e0a4CE389004890319d197e81e7ccfd7",
       abi: [
         {
           inputs: [
@@ -1374,7 +1374,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0xF4F2485A50e62C706deBec4E94b298Ee959CEAED",
+      address: "0x5A160E15602ac655D4802CCd7a47944004A1bFAe",
       abi: [
         {
           inputs: [
@@ -1561,7 +1561,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xB7Cea5083AEDCf4cfB5fa37385d9c6678fC644B1",
+      address: "0x0D8714220380f193778feC6a8F8258C3438C3b8B",
       abi: [
         {
           inputs: [
@@ -1710,6 +1710,34 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "borrow",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {

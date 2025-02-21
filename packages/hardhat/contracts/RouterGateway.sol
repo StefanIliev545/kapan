@@ -356,4 +356,29 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         (address[] memory toTarget, bytes[] memory toData) = toGateway.getEncodedDebtApproval(debtToken, debtAmount);
         return (toTarget, toData);
     }
+
+    /**
+     * @notice Borrow tokens from a protocol
+     * @param protocolName The name of the protocol to borrow from
+     * @param token The token to borrow
+     * @param user The user to borrow for
+     * @param amount The amount to borrow
+     */
+    function borrow(
+        string calldata protocolName,
+        address token,
+        address user,
+        uint256 amount
+    ) external nonReentrant {
+        // Get the gateway for the specified protocol
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        require(user == msg.sender, "Can only borrow for yourself");
+
+        // Forward borrow call to the appropriate gateway
+        gateway.borrow(token, user, amount);
+
+        // Transfer borrowed tokens to the user
+        IERC20(token).safeTransferFrom(address(gateway), user, amount);
+    }
 } 

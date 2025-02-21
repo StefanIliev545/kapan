@@ -14,6 +14,15 @@ abstract contract ProtocolGateway {
     }
 
     /**
+     * @notice Modifier to restrict function access to router or user themselves
+     * @param user The user the function is being called for
+     */
+    modifier onlyRouterOrSelf(address user) {
+        require(msg.sender == ROUTER || msg.sender == user, "Only router or self can call");
+        _;
+    }
+
+    /**
      * @notice Constructor to set the router address
      * @param router The address of the router contract that can call protected functions
      */

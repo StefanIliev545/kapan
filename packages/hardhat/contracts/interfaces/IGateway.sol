@@ -4,6 +4,13 @@ pragma solidity >=0.8.0 <0.9.0;
 interface IGateway {
     function deposit(address token, address user, uint256 amount) external;
     
+    /**
+     * @notice Borrow tokens from the protocol
+     * @dev Can be called by Router or directly by the user
+     * @param token The token to borrow
+     * @param user The user to borrow for
+     * @param amount The amount to borrow
+     */
     function borrow(address token, address user, uint256 amount) external;
     function repay(address token, address user, uint256 amount) external;
 

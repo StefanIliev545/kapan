@@ -64,7 +64,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         return underlying;
     }
 
-    function borrow(address token, address user, uint256 amount) external override onlyRouter nonReentrant {
+    function borrow(address token, address user, uint256 amount) external override onlyRouterOrSelf(user) nonReentrant {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
 

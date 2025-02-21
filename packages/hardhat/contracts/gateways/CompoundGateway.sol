@@ -86,7 +86,7 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
     
 
     // TODO: Insecure as this allows anyone to withdraw from a user's account, given this gateway will be manager.
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouter cometMustExist(market) nonReentrant returns (address) {
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouterOrSelf(user) cometMustExist(market) nonReentrant returns (address) {
         ICompoundComet comet = tokenToComet[market];
         comet.withdrawFrom(user, address(this), collateral, amount);
         emit CollateralWithdrawn(market, collateral, user, amount);
@@ -94,7 +94,7 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         return collateral;
     }   
 
-    function borrow(address token, address user, uint256 amount) external onlyRouter nonReentrant {
+    function borrow(address token, address user, uint256 amount) external onlyRouterOrSelf(user) {
         withdrawCollateral(token, token, user, amount);
     }   
 
