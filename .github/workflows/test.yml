@@ -17,8 +17,18 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
-        cache: 'npm'
-        cache-dependency-path: packages/hardhat/package.json
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          **/node_modules
+          packages/hardhat/.yarn/cache
+          packages/hardhat/.yarn/unplugged
+          packages/hardhat/.yarn/install-state.gz
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-modules-
 
     - name: Cache Hardhat compilation
       uses: actions/cache@v3
@@ -32,18 +42,18 @@ jobs:
           ${{ runner.os }}-hardhat-
 
     - name: Install dependencies
-      run: npm ci
+      run: yarn install --frozen-lockfile
       working-directory: packages/hardhat
 
     - name: Run unit tests
-      run: npm run test
+      run: yarn test
       working-directory: packages/hardhat
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
 
     - name: Run fork tests
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: npm run test:fork
+      run: yarn test:fork
       working-directory: packages/hardhat
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
