@@ -3,12 +3,17 @@ import { ethers, network } from "hardhat";
 import { Contract, BigNumberish, HDNodeWallet } from "ethers";
 import { RouterGateway, AaveGateway, IERC20 } from "../typechain-types";
 
+// Skip the entire test suite if not running on forked network
+const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" 
+  ? describe 
+  : describe.skip;
+
 // Real addresses on Arbitrum
 const RICH_ACCOUNT = ethers.getAddress("0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D"); // Rich USDC holder
 const USDC_ADDRESS = ethers.getAddress("0xaf88d065e77c8cC2239327C5EDb3A432268e5831");
 const WETH_ADDRESS = ethers.getAddress("0x82aF49447D8a07e3bd95BD0d56f35241523fBab1");
 
-describe("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed)", function () {
+runOnlyOnFork("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed)", function () {
   let router: RouterGateway;
   let aaveGateway: AaveGateway;
   let usdc: IERC20;
@@ -127,6 +132,28 @@ describe("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed)", function
     const finalWethBalance = await weth.balanceOf(userAddress);
     expect(finalWethBalance).to.be.closeTo(
       initialWethBalance + borrowAmount,
+      ethers.parseUnits("0.0001", 18) // Allow for small rounding differences
+    );
+  });
+
+  it("should repay part of the WETH debt", async function () {
+    const repayAmount = ethers.parseUnits("0.005", 18); // Repay 0.005 WETH
+    const userAddress = await user.getAddress();
+
+    // Get initial borrow balance
+    const initialBorrowBalance = await aaveGateway.getBorrowBalance(WETH_ADDRESS, userAddress);
+    expect(initialBorrowBalance).to.be.gt(0, "Should have existing debt");
+
+    // Approve the RouterGateway to spend WETH
+    await weth.connect(user).approve(await router.getAddress(), repayAmount);
+
+    // Repay WETH
+    await router.connect(user).repay("aave", WETH_ADDRESS, userAddress, repayAmount);
+
+    // Verify the repayment
+    const finalBorrowBalance = await aaveGateway.getBorrowBalance(WETH_ADDRESS, userAddress);
+    expect(finalBorrowBalance).to.be.closeTo(
+      initialBorrowBalance - repayAmount,
       ethers.parseUnits("0.0001", 18) // Allow for small rounding differences
     );
   });
