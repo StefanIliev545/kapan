@@ -11,6 +11,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IPoolDataProvider } from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 
 interface DebtToken {
     function borrowAllowance(address user, address spender) external view returns (uint256);
@@ -331,5 +332,11 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         target[0] = variableDebtToken;
         // todo - determine if max is ok, its hard to get the exact amount right if we wanna transfer all.. 
         data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), type(uint256).max);
+    }
+
+    function getAToken(address underlyingToken) external view returns (address) {
+        IPoolDataProvider dataProvider = IPoolDataProvider(IPoolAddressesProvider(poolAddressesProvider).getPoolDataProvider());
+        (address aTokenAddress, , ) = dataProvider.getReserveTokensAddresses(underlyingToken);
+        return aTokenAddress;
     }
 }

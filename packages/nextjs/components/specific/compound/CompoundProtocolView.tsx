@@ -1,10 +1,10 @@
 import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
+import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { CompoundCollateralView } from "./CompoundCollateralView";
 
 export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
@@ -69,7 +69,7 @@ export const CompoundProtocolView: FC = () => {
     const SCALE = 1e18; // as a number
     return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
   };
-  
+
   // Aggregate positions using useMemo.
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
@@ -86,10 +86,10 @@ export const CompoundProtocolView: FC = () => {
       const decimals = Number(decimalsRaw);
       const supplyAPR = supplyRate ? convertRateToAPR(BigInt(supplyRate)) : 0;
       const borrowAPR = borrowRate ? convertRateToAPR(BigInt(borrowRate)) : 0;
-      
+
       const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
       const usdBalance = balance * Number(formatUnits(price, 8));
-      
+
       const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
       const usdBorrowBalance = borrowBalance * Number(formatUnits(price, 8));
 
@@ -132,7 +132,6 @@ export const CompoundProtocolView: FC = () => {
     usdcEAddress,
     usdcECompoundData,
     usdcEDecimals,
-    connectedAddress,
   ]);
 
   // Hardcode current LTV (or fetch from contract if needed).

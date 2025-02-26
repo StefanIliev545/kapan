@@ -166,6 +166,7 @@ contract RouterGateway is Ownable, ReentrancyGuard {
 
         // Repay the debt on the "from" protocol
         {
+            console.log("Repaying debt on from protocol");
             IERC20(debtToken).approve(address(fromGateway), debtAmount);
             uint256 borrowBalanceBefore = fromGateway.getBorrowBalance(debtToken, user);
             fromGateway.repay(debtToken, user, debtAmount);
@@ -174,12 +175,15 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         }
         // For each collateral asset, withdraw then deposit into the target protocol.
         for (uint i = 0; i < collaterals.length; i++) {
+            console.log("Withdrawing collateral from from protocol");
             address underlyingReceived = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
+            console.log("Depositing collateral into to protocol");
             IERC20(underlyingReceived).approve(address(toGateway), collaterals[i].amount);
             toGateway.depositCollateral(debtToken, underlyingReceived, collaterals[i].amount, user);
         }
 
         // Borrow the debt on the "to" protocol.
+        console.log("Borrowing debt on to protocol");
         toGateway.borrow(debtToken, user, debtAmount);
     }
 
@@ -255,6 +259,9 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         string calldata toProtocol
     ) external flashLoanOnly {
         require(msg.sender == address(balancerV3Vault), "Unauthorized flash loan provider");
+
+        // Send the debt token to this contract.
+        balancerV3Vault.sendTo(debtToken, address(this), debtAmount);
 
         // Execute the common debt move logic.
         _moveDebtCommon(user, debtToken, debtAmount, collaterals, fromProtocol, toProtocol);
