@@ -1,4 +1,4 @@
-import { FC, useState, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { SelectableCollateralView } from "../specific/collateral/SelectableCollateralView";
 import { formatUnits, parseUnits } from "viem";
@@ -32,27 +32,20 @@ const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
   { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3" },
 ] as const;
 
-export const MovePositionModal: FC<MovePositionModalProps> = ({
-  isOpen,
-  onClose,
-  fromProtocol,
-  position,
-}) => {
+export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
   const { address: userAddress } = useAccount();
   const protocols = [
     { name: "Aave V3", icon: "/logos/aave.svg" },
     { name: "Compound V3", icon: "/logos/compound.svg" },
   ];
 
-  const [selectedProtocol, setSelectedProtocol] = useState(
-    protocols.find(p => p.name !== fromProtocol)?.name || ""
-  );
+  const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   // Use text input for full precision.
   const [amount, setAmount] = useState("");
   const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider>(
-    FLASH_LOAN_PROVIDERS[0]
+    FLASH_LOAN_PROVIDERS[0],
   );
   const [isRepayingAll, setIsRepayingAll] = useState(false);
 
@@ -60,7 +53,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const { collaterals: fetchedCollaterals, isLoading: isLoadingCollaterals } = useCollaterals(
     position.tokenAddress,
     fromProtocol,
-    userAddress || "0x0000000000000000000000000000000000000000"
+    userAddress || "0x0000000000000000000000000000000000000000",
   );
 
   // Map fetched collaterals to the format expected by SelectableCollateralView.
@@ -68,7 +61,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     (collateral: { symbol: string; balance: number; address: string; decimals: number }) => ({
       ...collateral,
       selected: selectedCollaterals.has(collateral.symbol),
-    })
+    }),
   );
 
   const handleCollateralToggle = (symbol: string) => {
@@ -84,7 +77,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   };
 
   // Import the moveDebt hook that handles approvals and the moveDebt transaction.
-  const { moveDebt, error } = useMoveDebtScaffold();
+  const { moveDebt } = useMoveDebtScaffold();
 
   // Read on-chain borrow balance (raw BigInt).
   const { data: tokenBalance } = useScaffoldReadContract({
@@ -280,7 +273,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </label>
-                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full z-50 dropdown-bottom"
+                >
                   {FLASH_LOAN_PROVIDERS.map(provider => (
                     <li key={provider.name}>
                       <a className="flex items-center gap-2" onClick={() => setSelectedFlashLoanProvider(provider)}>
@@ -356,7 +352,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               !selectedProtocol ||
               !amount ||
               // Compare using BigInt conversion to avoid precision issues.
-              (parseUnits(amount, decimals as number) > (tokenBalance as bigint)) ||
+              parseUnits(amount, decimals as number) > (tokenBalance as bigint) ||
               (position.type === "borrow" && selectedCollaterals.size === 0)
             }
           >

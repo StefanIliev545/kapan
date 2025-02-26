@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x3A9fCf470bdC530C7EeC9aF3f48e0969766EcB05",
+      address: "0xa52dA48a18Dc3af4D8C472748De6479a8Ee2b3C0",
       abi: [
         {
           inputs: [
@@ -195,6 +195,25 @@ const deployedContracts = {
           name: "depositCollateral",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAToken",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -594,7 +613,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xaE5005eC8672FEb60F7400b486773e5306321501",
+      address: "0x74e51064B6a9d441465d3cc7Fe415782D448d669",
       abi: [
         {
           inputs: [
@@ -1374,7 +1393,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x2F7e3763CAb88d161eA199d591db36aBA7536474",
+      address: "0xdD0AEF74980C0d8Ac8b547c80E93895E11fE9Cbe",
       abi: [
         {
           inputs: [
@@ -1561,7 +1580,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xC7EA65a27691fF1d1262349f58541B7031Fd3D37",
+      address: "0x7bB12C5D14bE3458c5fEE2DaC9C8819A80360094",
       abi: [
         {
           inputs: [
