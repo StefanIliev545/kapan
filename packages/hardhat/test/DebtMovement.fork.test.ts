@@ -176,7 +176,7 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     // Update our collaterals array to use the aToken
     const aaveCollaterals = [
       {
-        token: aTokenAddress, // Use aToken address instead of underlying
+        token: USDC_ADDRESS, // Use aToken address instead of underlying
         amount: depositAmount
       }
     ];
