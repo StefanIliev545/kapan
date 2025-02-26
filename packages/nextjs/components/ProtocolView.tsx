@@ -61,13 +61,13 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
 
   return (
-    <div className="w-full h-full flex flex-col hide-scrollbar p-6 space-y-8">
+    <div className="w-full h-full flex flex-col hide-scrollbar p-4 space-y-4">
       {/* Protocol Header Card */}
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="card bg-base-100 shadow-xl rounded-md">
+        <div className="card-body p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 relative">
+              <div className="w-9 h-9 relative">
                 <Image
                   src={protocolIcon}
                   alt={`${protocolName} icon`}
@@ -76,7 +76,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 />
               </div>
               <div className="flex flex-col">
-                <div className="text-2xl font-bold">{protocolName}</div>
+                <div className="text-xl font-bold">{protocolName}</div>
                 <div className="text-base-content/70">
                   Balance: {formatCurrency(netBalance)}
                 </div>
@@ -94,14 +94,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <span className="text-lg text-base-content/70">Current LTV</span>
-                <span className="text-xl font-medium">{ltv}%</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <span className="text-base text-base-content/70">Current LTV</span>
+                <span className="text-lg font-medium">{ltv}%</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg text-base-content/70">Max LTV</span>
-                <span className="text-xl font-medium">{maxLtv}%</span>
+              <div className="flex items-center gap-1">
+                <span className="text-base text-base-content/70">Max LTV</span>
+                <span className="text-lg font-medium">{maxLtv}%</span>
               </div>
             </div>
           </div>
@@ -109,17 +109,17 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       </div>
 
       {/* Positions Container: Flex that stacks vertically on small screens and side-by-side on xl */}
-      <div className="flex flex-col xl:flex-row gap-8">
+      <div className="flex flex-col xl:flex-row gap-4">
         {/* Supplied Assets */}
         <div className="flex-1">
-          <div className="card bg-base-100 shadow-xl h-full">
-            <div className="card-body">
-              <h2 className="card-title justify-center">Supplied Assets</h2>
+          <div className="card bg-base-100 shadow-xl h-full rounded-md">
+            <div className="card-body p-3">
+              <h2 className="card-title justify-center text-lg">Supplied Assets</h2>
               {filteredSuppliedPositions.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {filteredSuppliedPositions.map((position, index) => (
                     // Wrap each Position in a container with a fixed min-height.
-                    <div key={`supplied-${position.name}-${index}`} className="min-h-[80px]">
+                    <div key={`supplied-${position.name}-${index}`} className="min-h-[70px]">
                       <Position
                         {...position}
                         type="supply"
@@ -129,7 +129,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                <div className="text-base-content/70 text-center p-3 bg-base-200 rounded-md">
                   {showAll ? "No available assets" : "No supplied assets"}
                 </div>
               )}
@@ -139,14 +139,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
         {/* Borrowed Assets */}
         <div className="flex-1">
-          <div className="card bg-base-100 shadow-xl h-full">
-            <div className="card-body">
-              <h2 className="card-title justify-center">Borrowed Assets</h2>
+          <div className="card bg-base-100 shadow-xl h-full rounded-md">
+            <div className="card-body p-3">
+              <h2 className="card-title justify-center text-lg">Borrowed Assets</h2>
               {filteredBorrowedPositions.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {filteredBorrowedPositions.map((position, index) => (
                     // Wrap each Position in a container with the same min-height.
-                    <div key={`borrowed-${position.name}-${index}`} className="min-h-[80px]">
+                    <div key={`borrowed-${position.name}-${index}`} className="min-h-[70px]">
                       <Position
                         {...position}
                         type="borrow"
@@ -156,7 +156,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
+                <div className="text-base-content/70 text-center p-3 bg-base-200 rounded-md">
                   {showAll ? "No available assets" : "No borrowed assets"}
                 </div>
               )}

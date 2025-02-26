@@ -66,21 +66,21 @@ export const Position: FC<PositionProps> = ({
   return (
     <>
       {/* Outer container uses grid that becomes a single column on mobile */}
-      <div className={`w-full p-4 rounded-lg gap-4 bg-base-200 grid grid-cols-1 lg:grid-cols-7`}>
+      <div className={`w-full p-3 rounded-md bg-base-200 grid grid-cols-1 lg:grid-cols-7`}>
         {/* Header: Icon and Title */}
         <div className="order-1 lg:order-none lg:col-span-2 flex items-center">
-          <div className="w-8 h-8 relative min-w-[32px] min-h-[32px]">
+          <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
             <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
           </div>
-          <span className="ml-3 font-semibold text-lg truncate">{name}</span>
-          <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-2">
+          <span className="ml-2 font-semibold text-lg truncate">{name}</span>
+          <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1">
             <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
               <Image
                 src="/logos/info-button.svg"
                 alt="info"
-                width={18}
-                height={18}
-                className="opacity-50 hover:opacity-80 transition-opacity min-w-[1.125em] min-h-[1.125em]"
+                width={16}
+                height={16}
+                className="opacity-50 hover:opacity-80 transition-opacity min-w-[1em] min-h-[1em]"
               />
             </div>
             <div
@@ -90,9 +90,10 @@ export const Position: FC<PositionProps> = ({
                 right: "auto",
                 transform: "translateX(-50%)",
                 left: "50%",
+                borderRadius: "4px",
               }}
             >
-              <div className="card-body">
+              <div className="card-body p-3">
                 <h3 className="card-title text-sm">{name} Details</h3>
                 <div className="text-xs space-y-1">
                   <p className="text-base-content/70">Contract Address:</p>
@@ -108,36 +109,38 @@ export const Position: FC<PositionProps> = ({
         </div>
 
         {/* Stats: Rates */}
-        <div className="order-2 lg:order-none lg:col-span-3 grid grid-cols-3 gap-4 items-center">
-          <div>
-            <div className="text-sm text-base-content/70">Balance</div>
-            <div className={`font-medium ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
+        <div className="order-2 lg:order-none lg:col-span-3 grid grid-cols-3 gap-0 items-center">
+          <div className="px-2 border-r border-base-300">
+            <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
+            <div className={`font-medium h-6 line-clamp-1 ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
               {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
             </div>
           </div>
-          <div>
-            <div className="text-sm text-base-content/70">Current Rate</div>
-            <div className="font-medium tabular-nums">{currentRate.toFixed(2)}%</div>
+          <div className="px-2 border-r border-base-300">
+            <div className="text-sm text-base-content/70 overflow-hidden h-6">Current Rate</div>
+            <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
+              {currentRate.toFixed(2)}%
+            </div>
           </div>
-          <div>
-            <div className="text-sm text-base-content/70">Optimal Rate</div>
-            <div className={`font-medium tabular-nums`}>
-              {optimalRateDisplay.toFixed(2)}%
-              <span className="ml-1 inline-flex items-center">
-                <Image
-                  src={getProtocolLogo(optimalProtocol)}
-                  alt={optimalProtocol}
-                  width={18}
-                  height={18}
-                  className="inline-block rounded-full min-w-[1.125em] min-h-[1.125em]"
-                />
+          <div className="px-2">
+            <div className="text-sm text-base-content/70 overflow-hidden h-6">Optimal Rate</div>
+            <div className="font-medium flex items-center h-6">
+              <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
+                {optimalRateDisplay.toFixed(2)}%
               </span>
+              <Image
+                src={getProtocolLogo(optimalProtocol)}
+                alt={optimalProtocol}
+                width={16}
+                height={16}
+                className="flex-shrink-0 rounded-full ml-1"
+              />
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="order-3 lg:order-none lg:col-span-2 flex items-center justify-end gap-2">
+        <div className="order-3 lg:order-none lg:col-span-2 flex items-center justify-end gap-1">
           {type === "supply" ? (
             <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>
               Deposit
