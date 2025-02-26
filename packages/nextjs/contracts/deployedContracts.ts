@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xa52dA48a18Dc3af4D8C472748De6479a8Ee2b3C0",
+      address: "0xB4f5A8E70837195DA5BB9A0417E595a63B5aF68b",
       abi: [
         {
           inputs: [
@@ -512,6 +512,68 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+          ],
+          name: "getSupportedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collateralAddresses",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "aToken",
+              type: "address",
+            },
+          ],
+          name: "getUnderlyingToken",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+          ],
+          name: "isCollateralSupported",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "isSupported",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "poolAddressesProvider",
           outputs: [
@@ -569,7 +631,7 @@ const deployedContracts = {
             },
             {
               internalType: "address",
-              name: "aToken",
+              name: "token",
               type: "address",
             },
             {
@@ -607,13 +669,15 @@ const deployedContracts = {
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
+        getSupportedCollaterals: "contracts/interfaces/IGateway.sol",
+        isCollateralSupported: "contracts/interfaces/IGateway.sol",
         repay: "contracts/interfaces/IGateway.sol",
         withdrawCollateral: "contracts/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
     CompoundGateway: {
-      address: "0x74e51064B6a9d441465d3cc7Fe415782D448d669",
+      address: "0xa1356fF21c799f6A00a7C27C6Ad11F16524a9BbE",
       abi: [
         {
           inputs: [
@@ -1216,6 +1280,49 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
+              name: "market",
+              type: "address",
+            },
+          ],
+          name: "getSupportedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collateralAddresses",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+          ],
+          name: "isCollateralSupported",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "isSupported",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -1384,6 +1491,8 @@ const deployedContracts = {
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
+        getSupportedCollaterals: "contracts/interfaces/IGateway.sol",
+        isCollateralSupported: "contracts/interfaces/IGateway.sol",
         repay: "contracts/interfaces/IGateway.sol",
         withdrawCollateral: "contracts/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
@@ -1393,7 +1502,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0xdD0AEF74980C0d8Ac8b547c80E93895E11fE9Cbe",
+      address: "0xb5Da641FAAFEfEE40F83262029B61190A6eda18F",
       abi: [
         {
           inputs: [
@@ -1580,7 +1689,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x7bB12C5D14bE3458c5fEE2DaC9C8819A80360094",
+      address: "0x3222b25f31B5a04396AAaE6877A635F9c8113352",
       abi: [
         {
           inputs: [
@@ -1763,6 +1872,40 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+          ],
+          name: "canMoveCollateral",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "canMove",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
               name: "",
               type: "string",
             },
@@ -1826,6 +1969,30 @@ const deployedContracts = {
             },
           ],
           name: "getBorrowBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "string",
+              name: "flashLoanVersion",
+              type: "string",
+            },
+          ],
+          name: "getFlashLoanProviderBalance",
           outputs: [
             {
               internalType: "uint256",
@@ -1929,6 +2096,30 @@ const deployedContracts = {
         {
           inputs: [
             {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+          ],
+          name: "getSupportedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "collateralAddresses",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address",
               name: "debtToken",
               type: "address",
@@ -1955,6 +2146,35 @@ const deployedContracts = {
               internalType: "bytes[]",
               name: "",
               type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateral",
+              type: "address",
+            },
+          ],
+          name: "isCollateralSupported",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "isSupported",
+              type: "bool",
             },
           ],
           stateMutability: "view",

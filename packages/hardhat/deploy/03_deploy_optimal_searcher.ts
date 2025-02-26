@@ -2,14 +2,14 @@
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
+import { verifyContract } from "../utils/verification";
 
 /**
- * Deploys a contract named "YourContract" using the deployer account and
- * constructor arguments set to the deployer address
+ * Deploys the OptimalInterestRateFinder contract
  *
  * @param hre HardhatRuntimeEnvironment object.
  */
-const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+const deployOptimalInterestRateFinder: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 
@@ -26,7 +26,7 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const aaveGateway = await hre.deployments.get("AaveGateway");
   const compoundGateway = await hre.deployments.get("CompoundGateway");
 
-  await deploy("OptimalInterestRateFinder", {
+  const optimalFinder = await deploy("OptimalInterestRateFinder", {
     from: deployer,
     // Contract constructor arguments
     args: [
@@ -38,10 +38,24 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
     // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
+  
+  // Skip verification on local networks
+  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+    // Verify the contract on Etherscan
+    await verifyContract(
+      hre,
+      optimalFinder.address,
+      [
+        aaveGateway.address,
+        compoundGateway.address,
+      ]
+    );
+  }
 };
 
-export default deployYourContract;
+export default deployOptimalInterestRateFinder;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
-// e.g. yarn deploy --tags YourContract
-deployYourContract.tags = ["AAVEGateway"];
+// e.g. yarn deploy --tags OptimalInterestRateFinder
+deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder"];
+deployOptimalInterestRateFinder.dependencies = ["AAVEGateway", "CompoundGateway"];

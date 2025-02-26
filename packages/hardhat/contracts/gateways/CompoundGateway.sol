@@ -240,4 +240,50 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         target[0] = address(comet);
         data[0] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
     }
+    
+    /**
+     * @notice Check if a collateral token is supported for a specific market in Compound
+     * @param market The address of the market token
+     * @param collateral The address of the collateral token to check
+     * @return isSupported Whether the collateral is supported in the market
+     */
+    function isCollateralSupported(address market, address collateral) external view override returns (bool isSupported) {
+        ICompoundComet comet = tokenToComet[market];
+        if (address(comet) == address(0)) {
+            return false;
+        }
+        
+        // Iterate through all assets to find if the collateral is supported
+        uint8 numAssets = comet.numAssets();
+        for (uint8 i = 0; i < numAssets; i++) {
+            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
+            if (info.asset == collateral) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @notice Get all supported collaterals for a specific market in Compound
+     * @param market The address of the market token
+     * @return collateralAddresses Array of supported collateral token addresses
+     */
+    function getSupportedCollaterals(address market) external view override returns (address[] memory collateralAddresses) {
+        ICompoundComet comet = tokenToComet[market];
+        if (address(comet) == address(0)) {
+            return new address[](0);
+        }
+        
+        uint8 numAssets = comet.numAssets();
+        collateralAddresses = new address[](numAssets);
+        
+        for (uint8 i = 0; i < numAssets; i++) {
+            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
+            collateralAddresses[i] = info.asset;
+        }
+        
+        return collateralAddresses;
+    }
 }

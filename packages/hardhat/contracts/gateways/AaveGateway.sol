@@ -48,7 +48,8 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         deposit(collateral, receiver, amount);
     }
 
-    function withdrawCollateral(address, address aToken, address user, uint256 amount) external override onlyRouter returns (address) {
+    function withdrawCollateral(address, address token, address user, uint256 amount) external override onlyRouter returns (address) {
+        address aToken = getAToken(token);
         IERC20 atoken = IERC20(aToken);
         
         require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
@@ -305,7 +306,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         uint256 index = 0;
         for (uint256 i = 0; i < allTokens.length; i++) {
             if (allTokens[i].balance > 0) {
-                collateralAddresses[index] = allTokens[i].aToken;
+                collateralAddresses[index] = allTokens[i].token;
                 balances[index] = allTokens[i].balance;
                 symbols[index] = allTokens[i].symbol;
                 decimals[index] = ERC20(allTokens[i].token).decimals();
@@ -319,7 +320,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         target = new address[](collaterals.length);
         data = new bytes[](collaterals.length);
         for (uint256 i = 0; i < collaterals.length; i++) {
-            target[i] = collaterals[i].token;
+            target[i] = getAToken(collaterals[i].token);
             data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), collaterals[i].amount);
         }
     }
@@ -334,9 +335,65 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), type(uint256).max);
     }
 
-    function getAToken(address underlyingToken) external view returns (address) {
+    function getAToken(address underlyingToken) public view returns (address) {
         IPoolDataProvider dataProvider = IPoolDataProvider(IPoolAddressesProvider(poolAddressesProvider).getPoolDataProvider());
         (address aTokenAddress, , ) = dataProvider.getReserveTokensAddresses(underlyingToken);
         return aTokenAddress;
+    }
+
+    function getUnderlyingToken(address aToken) external view returns (address) {
+        IPoolDataProvider dataProvider = IPoolDataProvider(IPoolAddressesProvider(poolAddressesProvider).getPoolDataProvider());
+        (address underlyingToken, , ) = dataProvider.getReserveTokensAddresses(aToken);
+        return underlyingToken;
+    }
+
+    /**
+     * @notice Check if a collateral token is supported for a specific market in Aave
+     * @param market The address of the market token (not used in Aave as all collaterals are cross-market)
+     * @param collateral The address of the collateral token to check
+     * @return isSupported Whether the collateral is supported in Aave
+     */
+    function isCollateralSupported(address market, address collateral) external view override returns (bool isSupported) {
+        // In Aave, we need to check if the token is a supported reserve and if it can be used as collateral
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+        
+        for (uint256 i = 0; i < reserves.length; i++) {
+            if (reserves[i].underlyingAsset == collateral) {
+                // Check if the token can be used as collateral in Aave
+                return reserves[i].usageAsCollateralEnabled;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @notice Get all supported collaterals for a specific market in Aave
+     * @param market The address of the market token (not used in Aave as all collaterals are cross-market)
+     * @return collateralAddresses Array of supported collateral token addresses
+     */
+    function getSupportedCollaterals(address market) external view override returns (address[] memory collateralAddresses) {
+        // Get all Aave reserves
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+        
+        // Count eligible collaterals
+        uint256 collateralCount = 0;
+        for (uint256 i = 0; i < reserves.length; i++) {
+            if (reserves[i].usageAsCollateralEnabled) {
+                collateralCount++;
+            }
+        }
+        
+        // Create and populate array with eligible collaterals
+        collateralAddresses = new address[](collateralCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < reserves.length; i++) {
+            if (reserves[i].usageAsCollateralEnabled) {
+                collateralAddresses[index] = reserves[i].underlyingAsset;
+                index++;
+            }
+        }
+        
+        return collateralAddresses;
     }
 }

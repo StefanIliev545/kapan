@@ -1,11 +1,11 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { SelectableCollateralView } from "../specific/collateral/SelectableCollateralView";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
-import { ERC20ABI } from "~~/contracts/externalContracts";
+import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 
 interface MovePositionModalProps {
@@ -20,7 +20,6 @@ interface MovePositionModalProps {
   };
 }
 
-// Define the type for our flash loan providers.
 type FlashLoanProvider = {
   name: "Balancer V2" | "Balancer V3";
   icon: string;
@@ -40,7 +39,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   ];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
-  // Use text input for full precision.
   const [amount, setAmount] = useState("");
   const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -48,6 +46,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     FLASH_LOAN_PROVIDERS[0],
   );
   const [isRepayingAll, setIsRepayingAll] = useState(false);
+  const [hasProviderSufficientBalance, setHasProviderSufficientBalance] = useState<boolean | null>(null);
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
 
   // Fetch collaterals from the contract.
   const { collaterals: fetchedCollaterals, isLoading: isLoadingCollaterals } = useCollaterals(
@@ -56,30 +56,48 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     userAddress || "0x0000000000000000000000000000000000000000",
   );
 
-  // Map fetched collaterals to the format expected by SelectableCollateralView.
-  const collaterals = fetchedCollaterals.map(
-    (collateral: { symbol: string; balance: number; address: string; decimals: number }) => ({
-      ...collateral,
-      selected: selectedCollaterals.has(collateral.symbol),
-    }),
+  // Memoize the collateral addresses to prevent recreation on every render.
+  const collateralAddresses = useMemo(
+    () => fetchedCollaterals.map((collateral: any) => collateral.address),
+    // Stable dependency - stringify the addresses to avoid reference comparisons
+    [JSON.stringify(fetchedCollaterals.map((c: any) => c.address))],
   );
 
+  // Use the hook to check collateral support.
+  const { isLoading: isLoadingCollateralSupport, supportedCollaterals } = useCollateralSupport(
+    selectedProtocol,
+    position.tokenAddress,
+    collateralAddresses,
+  );
+
+  // Combine fetched collaterals with selected state and support status.
+  const collaterals = useMemo(() => {
+    return fetchedCollaterals.map(
+      (collateral: { symbol: string; balance: number; address: string; decimals: number }) => {
+        // Directly use the supported status from the hook
+        return {
+          ...collateral,
+          selected: selectedCollaterals.has(collateral.symbol),
+          supported: supportedCollaterals[collateral.address] === true,
+        };
+      },
+    );
+  }, [fetchedCollaterals, selectedCollaterals, supportedCollaterals]);
+
   const handleCollateralToggle = (symbol: string) => {
+    const collateral = collaterals.find(c => c.symbol === symbol);
+    if (collateral && !collateral.supported) return;
     setSelectedCollaterals(prev => {
       const next = new Set(prev);
-      if (next.has(symbol)) {
-        next.delete(symbol);
-      } else {
-        next.add(symbol);
-      }
+      next.has(symbol) ? next.delete(symbol) : next.add(symbol);
       return next;
     });
   };
 
-  // Import the moveDebt hook that handles approvals and the moveDebt transaction.
+  // Move debt hook.
   const { moveDebt } = useMoveDebtScaffold();
 
-  // Read on-chain borrow balance (raw BigInt).
+  // Read on-chain borrow balance.
   const { data: tokenBalance } = useScaffoldReadContract({
     contractName: "RouterGateway",
     functionName: "getBorrowBalance",
@@ -97,29 +115,61 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     functionName: "decimals",
   });
 
-  // Use useMemo so that formattedTokenBalance is only recalculated when tokenBalance or decimals changes.
+  // Check flash loan provider balance.
+  const { data: flashLoanProviderBalance } = useScaffoldReadContract({
+    contractName: "RouterGateway",
+    functionName: "getFlashLoanProviderBalance",
+    args: [position.tokenAddress, selectedFlashLoanProvider.version],
+  });
+
+  // Effect for checking provider balance.
+  useEffect(() => {
+    // Early return if dependencies are missing
+    if (!flashLoanProviderBalance || !decimals || !amount || !tokenBalance) {
+      setHasProviderSufficientBalance(null);
+      return;
+    }
+
+    // Using state updater function to avoid closure over stale state
+    setIsCheckingBalance(true);
+
+    // Create a stable reference to the current values
+    const currentFlashLoanProviderBalance = flashLoanProviderBalance;
+    const currentAmount = amount;
+    const currentDecimals = decimals;
+    const currentTokenBalance = tokenBalance;
+    const currentIsRepayingAll = isRepayingAll;
+
+    const checkBalanceTimeout = setTimeout(() => {
+      try {
+        const requestedAmount = currentIsRepayingAll
+          ? (currentTokenBalance as bigint)
+          : parseUnits(currentAmount, currentDecimals as number);
+        setHasProviderSufficientBalance(currentFlashLoanProviderBalance >= requestedAmount);
+      } catch (error) {
+        console.error("Error checking provider balance:", error);
+        setHasProviderSufficientBalance(null);
+      } finally {
+        setIsCheckingBalance(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(checkBalanceTimeout);
+    // Explicit dependencies, without isCheckingBalance which would cause a loop
+  }, [flashLoanProviderBalance, amount, decimals, isRepayingAll, tokenBalance]);
+
+  // Memoize formatted token balance.
   const formattedTokenBalance = useMemo(() => {
     if (!tokenBalance || !decimals) return "0";
     return formatUnits(tokenBalance, decimals as number);
   }, [tokenBalance, decimals]);
 
-  // When the user clicks "Max", set the input value to the full formatted balance
-  // and mark that we're repaying all
   const handleSetMaxAmount = () => {
-    console.log("Setting max amount:", {
-      rawTokenBalance: tokenBalance?.toString(),
-      formatted: formattedTokenBalance,
-    });
     setAmount(formattedTokenBalance);
     setIsRepayingAll(true);
   };
 
-  // When the user manually changes the amount, they're no longer repaying all
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("Amount input changed:", {
-      newValue: e.target.value,
-      maxAllowed: formattedTokenBalance,
-    });
     setAmount(e.target.value);
     setIsRepayingAll(false);
   };
@@ -130,8 +180,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       if (!decimals) throw new Error("Token decimals not loaded");
       setLoading(true);
 
-      // Determine the debt amount:
-      // If the user has selected "max", we'll let the contract fetch the current amount
       let computedDebtAmount: bigint;
       if (isRepayingAll) {
         computedDebtAmount = tokenBalance as bigint;
@@ -139,20 +187,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         computedDebtAmount = parseUnits(amount, decimals as number);
       }
 
-      // Build collateral array from selected collaterals
       const selectedCollateralArray = collaterals
         .filter(c => selectedCollaterals.has(c.symbol))
         .map(c => {
           const collateralAmount = parseUnits(c.balance.toString(), c.decimals);
-          console.log(`Collateral ${c.symbol}:`, {
-            balance: c.balance,
-            decimals: c.decimals,
-            parsedAmount: collateralAmount.toString(),
-          });
-          return {
-            token: c.address,
-            amount: collateralAmount,
-          };
+          return { token: c.address, amount: collateralAmount };
         });
 
       if (position.type === "borrow") {
@@ -164,12 +203,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           fromProtocol: fromProtocol.toLowerCase(),
           toProtocol: selectedProtocol.toLowerCase(),
           flashLoanVersion: selectedFlashLoanProvider.version,
-          repayAll: isRepayingAll, // Pass the repayAll flag
+          repayAll: isRepayingAll,
         });
       } else {
         console.log("Supply move not implemented in this hook");
       }
-
       onClose();
     } catch (err) {
       console.error("Move debt failed:", err);
@@ -268,6 +306,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                       className="rounded-full min-w-[20px]"
                     />
                     <span className="truncate">{selectedFlashLoanProvider.name}</span>
+                    {hasProviderSufficientBalance !== null && amount && (
+                      <span
+                        className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                          hasProviderSufficientBalance ? "bg-success/20 text-success" : "bg-error/20 text-error"
+                        }`}
+                      >
+                        {hasProviderSufficientBalance ? "Sufficient" : "Insufficient"}
+                      </span>
+                    )}
+                    {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
                   </div>
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -293,6 +341,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                   ))}
                 </ul>
               </div>
+              {hasProviderSufficientBalance === false && amount && (
+                <p className="text-xs text-error mt-1">
+                  This provider does not have enough {position.name} for your flash loan.
+                </p>
+              )}
             </div>
           </div>
 
@@ -324,13 +377,48 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           {/* Collateral Selection */}
           {position.type === "borrow" && (
             <div>
-              <label className="text-sm text-base-content/70 mb-2 block">Select Collateral to Move</label>
-              {isLoadingCollaterals ? (
+              <label className="text-sm text-base-content/70 mb-2 block">
+                Select Collateral to Move{" "}
+                {selectedProtocol && (
+                  <span className="text-xs ml-2 text-base-content/50">
+                    (Grayed out collaterals are not supported in {selectedProtocol})
+                  </span>
+                )}
+              </label>
+              {isLoadingCollaterals || isLoadingCollateralSupport ? (
                 <div className="flex items-center justify-center py-4">
                   <span className="loading loading-spinner loading-md"></span>
+                  <span className="ml-2">Checking collateral support...</span>
                 </div>
               ) : collaterals.length > 0 ? (
-                <SelectableCollateralView collaterals={collaterals} onCollateralToggle={handleCollateralToggle} />
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {collaterals.map(collateral => (
+                    <button
+                      key={collateral.symbol}
+                      onClick={() => handleCollateralToggle(collateral.symbol)}
+                      className={`
+                        btn btn-sm normal-case flex items-center gap-2 h-auto py-2
+                        ${collateral.selected ? "btn-primary" : "btn-outline"}
+                        ${!collateral.supported ? "opacity-50 cursor-not-allowed" : ""}
+                      `}
+                      disabled={!collateral.supported}
+                    >
+                      <div className="w-5 h-5 relative flex-shrink-0">
+                        <Image
+                          src={tokenNameToLogo(collateral.symbol)}
+                          alt={collateral.symbol}
+                          fill
+                          className="rounded-full object-contain"
+                        />
+                      </div>
+                      <span className="truncate">{collateral.symbol}</span>
+                      <span className="opacity-70 tabular-nums">
+                        {collateral.balance.toFixed(collateral.decimals > 6 ? 4 : collateral.decimals)}
+                      </span>
+                      {!collateral.supported && <span className="text-xs px-1 bg-base-300 rounded-full ml-1">!</span>}
+                    </button>
+                  ))}
+                </div>
               ) : (
                 <div className="text-base-content/70 text-center p-4 bg-base-200 rounded-lg">
                   No collateral available to move
@@ -351,9 +439,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               loading ||
               !selectedProtocol ||
               !amount ||
-              // Compare using BigInt conversion to avoid precision issues.
               parseUnits(amount, decimals as number) > (tokenBalance as bigint) ||
-              (position.type === "borrow" && selectedCollaterals.size === 0)
+              (position.type === "borrow" && selectedCollaterals.size === 0) ||
+              hasProviderSufficientBalance === false
             }
           >
             {loading ? "Moving..." : "Move Position"}

@@ -204,6 +204,65 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         _;
     }
 
+    /**
+     * @notice Check if a collateral token is supported in the target protocol
+     * @param protocolName The name of the protocol to check
+     * @param market The address of the market token
+     * @param collateral The address of the collateral token to check
+     * @return isSupported Whether the collateral is supported in the protocol
+     */
+    function isCollateralSupported(
+        string calldata protocolName,
+        address market,
+        address collateral
+    ) external view returns (bool isSupported) {
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        
+        return gateway.isCollateralSupported(market, collateral);
+    }
+    
+    /**
+     * @notice Get all supported collaterals for a specific market in a protocol
+     * @param protocolName The name of the protocol to check
+     * @param market The address of the market token
+     * @return collateralAddresses Array of supported collateral token addresses
+     */
+    function getSupportedCollaterals(
+        string calldata protocolName,
+        address market
+    ) external view returns (address[] memory collateralAddresses) {
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        
+        return gateway.getSupportedCollaterals(market);
+    }
+    
+    /**
+     * @notice Check if a collateral can be moved from one protocol to another
+     * @param fromProtocol The name of the source protocol
+     * @param toProtocol The name of the target protocol
+     * @param market The address of the market token
+     * @param collateral The address of the collateral token to check
+     * @return canMove Whether the collateral can be moved between protocols
+     */
+    function canMoveCollateral(
+        string calldata fromProtocol,
+        string calldata toProtocol,
+        address market,
+        address collateral
+    ) external view returns (bool canMove) {
+        IGateway fromGateway = gateways[fromProtocol];
+        IGateway toGateway = gateways[toProtocol];
+        
+        require(address(fromGateway) != address(0), "From protocol not supported");
+        require(address(toGateway) != address(0), "To protocol not supported");
+        
+        // Collateral must be supported in both protocols
+        return fromGateway.isCollateralSupported(market, collateral) && 
+               toGateway.isCollateralSupported(market, collateral);
+    }
+
     // -------------------------------------------------------------------------
     // Flash Loan Wrapper for Balancer V2
     // -------------------------------------------------------------------------
@@ -351,6 +410,22 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         require(address(toGateway) != address(0), "To protocol not supported");
         (address[] memory toTarget, bytes[] memory toData) = toGateway.getEncodedDebtApproval(debtToken, debtAmount);
         return (toTarget, toData);
+    }
+
+    /**
+     * @notice Get the balance of a token in a flash loan provider
+     * @param token The token address to check balance for
+     * @param flashLoanVersion The flash loan provider version ("v2" or "v3")
+     * @return The token balance in the flash loan provider
+     */
+    function getFlashLoanProviderBalance(address token, string calldata flashLoanVersion) external view returns (uint256) {
+        if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v2"))) {
+            return IERC20(token).balanceOf(address(balancerV2Vault));
+        } else if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v3"))) {
+            return IERC20(token).balanceOf(address(balancerV3Vault));
+        } else {
+            revert("Unsupported flash loan version");
+        }
     }
 
     /**

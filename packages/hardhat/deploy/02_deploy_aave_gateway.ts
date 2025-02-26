@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { Contract } from "ethers";
+import { verifyContract } from "../utils/verification";
 
 /**
  * Deploys a contract named "YourContract" using the deployer account and
@@ -10,7 +11,7 @@ import { Contract } from "ethers";
  *
  * @param hre HardhatRuntimeEnvironment object.
  */
-const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 
@@ -45,11 +46,26 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
 
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave", aaveGateway.address);
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave v3", aaveGateway.address);
+  
+  // Skip verification on local networks
+  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+    // Verify the contract on Etherscan
+    await verifyContract(
+      hre,
+      aaveGateway.address,
+      [
+        routerGateway.address,
+        POOL_ADDRESSES_PROVIDER,
+        UI_POOL_DATA_PROVIDER,
+        REFERRAL_CODE
+      ]
+    );
+  }
 };
 
-export default deployYourContract;
+export default deployAaveGateway;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags YourContract
-deployYourContract.tags = ["AAVEGateway"];
-deployYourContract.dependencies = ["RouterGateway"];
+deployAaveGateway.tags = ["AAVEGateway"];
+deployAaveGateway.dependencies = ["RouterGateway"];

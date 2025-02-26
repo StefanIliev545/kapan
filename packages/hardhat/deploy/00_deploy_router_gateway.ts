@@ -1,5 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
+import { verifyContract } from "../utils/verification";
 
 const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
@@ -22,6 +23,16 @@ const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeE
   });
 
   console.log(`RouterGateway deployed to: ${routerGateway.address}`);
+  
+  // Skip verification on local networks
+  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+    // Verify the contract on Etherscan
+    await verifyContract(
+      hre,
+      routerGateway.address,
+      [BALANCER_VAULT3, BALANCER_VAULT2, deployer]
+    );
+  }
 };
 
 export default deployRouterGateway;

@@ -30,6 +30,21 @@ interface IGateway {
         uint8[] memory decimals
     );
 
+    /**
+     * @notice Check if a collateral token is supported for a specific market in this protocol
+     * @param market The address of the market token
+     * @param collateral The address of the collateral token to check
+     * @return isSupported Whether the collateral is supported in the market
+     */
+    function isCollateralSupported(address market, address collateral) external view returns (bool isSupported);
+
+    /**
+     * @notice Get all supported collaterals for a specific market in this protocol
+     * @param market The address of the market token
+     * @return collateralAddresses Array of supported collateral token addresses
+     */
+    function getSupportedCollaterals(address market) external view returns (address[] memory collateralAddresses);
+
     struct Collateral {
         address token;
         uint256 amount;
