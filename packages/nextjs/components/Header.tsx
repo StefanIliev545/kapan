@@ -72,7 +72,7 @@ export const Header = () => {
 
   return (
     <div className="sticky lg:static top-0 navbar bg-base-100 min-h-0 flex-shrink-0 justify-between z-30 shadow-md shadow-secondary px-0 sm:px-2">
-      <div className="navbar-start w-auto lg:w-1/2">
+      <div className="navbar-start w-auto lg:w-1/3">
         <div className="lg:hidden dropdown" ref={burgerMenuRef}>
           <label
             tabIndex={0}
@@ -108,7 +108,15 @@ export const Header = () => {
           <HeaderMenuLinks />
         </ul>
       </div>
-      <div className="navbar-end flex-grow mr-4">
+      
+      {/* Alpha version indicator */}
+      <div className="flex-none lg:flex-1 flex justify-center items-center">
+        <div className="bg-warning text-warning-content px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+          ALPHA VERSION
+        </div>
+      </div>
+      
+      <div className="navbar-end flex-grow mr-4 lg:w-1/3 justify-end">
         <RainbowKitCustomConnectButton />
         <FaucetButton />
       </div>
