@@ -147,7 +147,12 @@ export const Position: FC<PositionProps> = ({
               Repay
             </button>
           )}
-          <button className="btn btn-sm btn-outline" onClick={() => setIsMoveModalOpen(true)} disabled={!hasBalance}>
+          <button 
+            className="btn btn-sm btn-outline" 
+            onClick={() => setIsMoveModalOpen(true)} 
+            disabled={!hasBalance || type === "supply"}
+            title={type === "supply" ? "Moving supply positions is not yet implemented" : ""}
+          >
             Move
           </button>
           {collateralView && (
