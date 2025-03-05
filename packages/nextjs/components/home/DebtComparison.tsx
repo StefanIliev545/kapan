@@ -1,121 +1,201 @@
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { FiTrendingDown, FiArrowRight } from "react-icons/fi";
-import { MockData } from "../../types/mockData";
+import { motion, AnimatePresence } from "framer-motion";
+import { FiTrendingDown, FiArrowRight, FiDollarSign, FiPercent } from "react-icons/fi";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useTokenData } from "~~/hooks/useTokenData";
+import { formatNumber } from "~~/utils/formatNumber";
 
-interface DebtComparisonProps {
-  mockData: MockData;
-  savingsPercentage: string;
-}
+const AnimatedValue = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+  <div className="relative overflow-hidden">
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={children?.toString()}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -20, opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className={className}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  </div>
+);
 
-const formatCurrency = (value: number): string => {
-  if (value >= 1e9) {
-    return `$${(value / 1e9).toFixed(2)}B`;
-  }
-  if (value >= 1e6) {
-    return `$${(value / 1e6).toFixed(2)}M`;
-  }
-  if (value >= 1e3) {
-    return `$${(value / 1e3).toFixed(1)}K`;
-  }
-  return `$${value.toFixed(2)}`;
-};
+const DebtComparison = () => {
+  const tokenData = useTokenData();
 
-const DebtComparison = ({ mockData, savingsPercentage }: DebtComparisonProps) => {
-  // Calculate annual interest for both protocols
-  const aaveAnnualInterest = Math.round(mockData.aaveDebt * (mockData.aaveRate / 100));
-  const compoundAnnualInterest = Math.round(mockData.aaveDebt * (mockData.compoundRate / 100));
-  const totalSavings = aaveAnnualInterest - compoundAnnualInterest;
+  // Find Aave and Compound rates
+  const aaveProtocol = tokenData.protocols.find(p => p.name === "Aave V3");
+  const compoundProtocol = tokenData.protocols.find(p => p.name === "Compound V3");
+  const aaveRate = aaveProtocol?.rate || 0;
+  const compoundRate = compoundProtocol?.rate || 0;
+
+  // Calculate savings
+  const annualInterestAave = tokenData.totalDebt * (aaveRate / 100);
+  const annualInterestCompound = tokenData.totalDebt * (compoundRate / 100);
+  const totalSavings = annualInterestAave - annualInterestCompound;
+  const savingsPercentage = aaveRate > 0 ? (((aaveRate - compoundRate) / aaveRate) * 100).toFixed(1) : "0.0";
 
   return (
-    <div className="w-full">
-      <h2 className="text-2xl font-bold mb-6 text-center">Protocol Interest Rate Comparison</h2>
-      
-      <div className="card bg-base-200 shadow-lg mb-6">
-        <div className="card-body p-4">
-          <div className="flex items-center gap-6">
-            <div className="avatar">
-              <div className="w-16 rounded-full bg-base-100 p-2">
-                <Image src="/logos/usdc.svg" alt="USDC Logo" width={64} height={64} />
-              </div>
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <FiDollarSign className="w-6 h-6" />
+          Protocol Interest Rate Comparison
+        </h2>
+      </div>
+
+      {/* Total Debt Position with Token Icon */}
+      <div className="flex items-center gap-6 mb-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-xl">
+            <span>Total</span>
+            <div className="w-5 h-5 relative">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tokenData.symbol}
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full h-full"
+                >
+                  <Image src={tokenNameToLogo(tokenData.symbol)} alt={tokenData.symbol} fill className="object-contain" />
+                </motion.div>
+              </AnimatePresence>
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <h3 className="text-lg font-semibold">Active USDC Debt Position</h3>
-                <div className="badge badge-secondary">Aave V3</div>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <div className="text-3xl font-bold text-primary">{formatCurrency(mockData.aaveDebt)}</div>
-                <div className="text-sm font-medium">outstanding debt</div>
-              </div>
+            <AnimatedValue>{tokenData.symbol}</AnimatedValue>
+            <span>debt on</span>
+            <div className="w-5 h-5 relative">
+              <Image src="/logos/aave.svg" alt="Aave" fill className="object-contain" />
             </div>
+            <span>Aave on</span>
+            <div className="w-4 h-4 relative">
+              <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />
+            </div>
+            <span>Arbitrum:</span>
+            <AnimatedValue className="text-xl font-bold">
+              ${formatNumber(tokenData.totalDebt)}
+            </AnimatedValue>
           </div>
         </div>
       </div>
-      
-      <div className="flex flex-col gap-4">
-        <div className="card bg-base-200 shadow-lg">
-          <div className="card-body p-4">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              {/* Current Protocol */}
-              <div className="flex-1 w-full">
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="w-16 h-16 rounded-full bg-base-100 p-3 flex items-center justify-center flex-shrink-0">
-                    <Image src="/logos/aave.svg" alt="Aave Logo" width={40} height={40} />
-                  </div>
-                  <div className="flex flex-col items-start gap-2">
-                    <span className="text-xl font-bold">Aave</span>
-                    <div className="badge badge-lg badge-secondary px-3">{mockData.aaveRate}% APR</div>
-                  </div>
-                </div>
-                <div className="text-sm font-medium mb-2">Current Annual Interest</div>
-                <div className="text-3xl font-bold text-neutral">{formatCurrency(aaveAnnualInterest)}</div>
-              </div>
 
-              {/* Arrow */}
-              <div className="hidden md:flex items-center text-base-content/60">
-                <FiArrowRight size={32} />
-              </div>
-
-              {/* Target Protocol */}
-              <div className="flex-1 w-full">
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="w-16 h-16 rounded-full bg-base-100 p-3 flex items-center justify-center flex-shrink-0">
-                    <Image src="/logos/compound.svg" alt="Compound Logo" width={40} height={40} />
-                  </div>
-                  <div className="flex flex-col items-start gap-2">
-                    <span className="text-xl font-bold">Compound</span>
-                    <div className="badge badge-lg badge-primary px-3">{mockData.compoundRate}% APR</div>
-                  </div>
-                </div>
-                <div className="text-sm font-medium mb-2">Potential Annual Interest</div>
-                <div className="text-3xl font-bold text-primary">{formatCurrency(compoundAnnualInterest)}</div>
+      {/* Protocol Comparison */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Higher Rate Protocol */}
+        <div className="card bg-base-200 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="avatar">
+              <div className="w-8 h-8 rounded-full bg-base-100 p-1 shadow-sm border border-base-300">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={aaveRate > compoundRate ? "aave" : "compound"}
+                    initial={{ rotate: -180, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 180, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full h-full"
+                  >
+                    <Image 
+                      src={aaveRate > compoundRate ? "/logos/aave.svg" : "/logos/compound.svg"} 
+                      alt={aaveRate > compoundRate ? "Aave" : "Compound"} 
+                      width={24} 
+                      height={24} 
+                    />
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
+            <div>
+              <AnimatedValue className="font-semibold">
+                Currently on {aaveRate > compoundRate ? "Aave" : "Compound"}
+              </AnimatedValue>
+              <div className="text-sm text-base-content/70">Variable Rate</div>
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-base-content/70 flex items-center gap-1">
+              <FiPercent className="w-4 h-4" />
+              Annual Interest
+            </div>
+            <AnimatedValue className="text-2xl font-bold">
+              {Math.max(aaveRate, compoundRate).toFixed(2)}%
+            </AnimatedValue>
+            <AnimatedValue className="text-base-content/70 mt-1">
+              ${formatNumber(Math.max(annualInterestAave, annualInterestCompound))} per year
+            </AnimatedValue>
           </div>
         </div>
 
-        <div className="card bg-base-200 shadow-lg">
-          <div className="card-body p-4">
-            <div className="flex items-center gap-4">
-              <FiTrendingDown className="w-8 h-8 text-primary flex-shrink-0" />
-              <div>
-                <h3 className="text-xl font-bold mb-1">Protocol-Wide Annual Savings</h3>
-                <div className="text-sm space-y-1 opacity-80">
-                  <p>Moving this position to Compound would reduce interest costs by {savingsPercentage}%</p>
-                  <p className="text-primary text-lg font-semibold">Total Savings: {formatCurrency(totalSavings)} per year</p>
-                </div>
+        {/* Lower Rate Protocol */}
+        <div className="card bg-base-200 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="avatar">
+              <div className="w-8 h-8 rounded-full bg-base-100 p-1 shadow-sm border border-base-300">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={aaveRate > compoundRate ? "compound" : "aave"}
+                    initial={{ rotate: -180, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 180, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full h-full"
+                  >
+                    <Image 
+                      src={aaveRate > compoundRate ? "/logos/compound.svg" : "/logos/aave.svg"} 
+                      alt={aaveRate > compoundRate ? "Compound" : "Aave"} 
+                      width={24} 
+                      height={24} 
+                    />
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
+            <div>
+              <AnimatedValue className="font-semibold">
+                Available on {aaveRate > compoundRate ? "Compound" : "Aave"}
+              </AnimatedValue>
+              <div className="text-sm text-base-content/70">Variable Rate</div>
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-base-content/70">Annual Interest</div>
+            <AnimatedValue className="text-2xl font-bold text-primary">
+              {Math.min(aaveRate, compoundRate).toFixed(2)}%
+            </AnimatedValue>
+            <AnimatedValue className="text-base-content/70 mt-1">
+              ${formatNumber(Math.min(annualInterestAave, annualInterestCompound))} per year
+            </AnimatedValue>
           </div>
         </div>
-        
-        <Link href="/app" className="w-full">
-          <button className="btn btn-primary w-full btn-lg">View Debt Positions</button>
+      </div>
+
+      {/* Savings Card */}
+      <div className="card bg-base-200 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+            <FiTrendingDown className="w-5 h-5 text-success" />
+          </div>
+          <div className="font-semibold">Your Potential Savings</div>
+        </div>
+        <div className="mt-2">
+          <AnimatedValue className="text-3xl font-bold text-success">
+            Save ${formatNumber(totalSavings)} per year
+          </AnimatedValue>
+          <AnimatedValue className="text-base-content/70 mt-1">
+            {savingsPercentage}% reduction in borrowing costs
+          </AnimatedValue>
+        </div>
+        <Link href="/app" className="mt-4" passHref>
+          <button className="btn btn-primary w-full">Start Saving Now</button>
         </Link>
       </div>
     </div>
   );
 };
 
-export default DebtComparison; 
+export default DebtComparison;

@@ -2559,6 +2559,7 @@ __metadata:
     eslint-config-next: ~14.2.15
     eslint-config-prettier: ~8.10.0
     eslint-plugin-prettier: ~5.2.1
+    framer-motion: ^12.4.10
     heatmap.js: ^2.0.5
     next: ~14.2.11
     next-nprogress-bar: ~2.3.13
@@ -8013,6 +8014,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"framer-motion@npm:^12.4.10":
+  version: 12.4.10
+  resolution: "framer-motion@npm:12.4.10"
+  dependencies:
+    motion-dom: ^12.4.10
+    motion-utils: ^12.4.10
+    tslib: ^2.4.0
+  peerDependencies:
+    "@emotion/is-prop-valid": "*"
+    react: ^18.0.0 || ^19.0.0
+    react-dom: ^18.0.0 || ^19.0.0
+  peerDependenciesMeta:
+    "@emotion/is-prop-valid":
+      optional: true
+    react:
+      optional: true
+    react-dom:
+      optional: true
+  checksum: c5e2e3658627e37b91c0a09d0ef908dddc67028240d7b747845ecfe84bb9cadefcaab715f05e587d1baf029a3766356825aac91f0f062e92f29a0f551e59770f
+  languageName: node
+  linkType: hard
+
 "fs-extra@npm:11.1.0":
   version: 11.1.0
   resolution: "fs-extra@npm:11.1.0"
@@ -10433,6 +10456,22 @@ __metadata:
   version: 1.1.0
   resolution: "modern-ahocorasick@npm:1.1.0"
   checksum: 78b99840c9af086c1e36a594ee85bebd8c19d48e2ef31a67d1bad0e673ac12fc931e5961abb5b16daaf820af4923e700f76b1793b7413e18782230162866a0af
+  languageName: node
+  linkType: hard
+
+"motion-dom@npm:^12.4.10":
+  version: 12.4.10
+  resolution: "motion-dom@npm:12.4.10"
+  dependencies:
+    motion-utils: ^12.4.10
+  checksum: 6ecf64e5a41db29b228940a9d832f67f69ce4c4b23bb501ed93bb98acaa30deb6bf486cfb319bdf4f63bef5f45448605cb212ab74a819f93dcfaae9e3aeb6053
+  languageName: node
+  linkType: hard
+
+"motion-utils@npm:^12.4.10":
+  version: 12.4.10
+  resolution: "motion-utils@npm:12.4.10"
+  checksum: 86335d4c2332ee4215a5a78371b0b8da6d472834802ac6516a43bc237efa5659dbdebc47b64aefaaeacb779d4e8e5639c79a05099a482fc235ed0c4337c89abc
   languageName: node
   linkType: hard
 

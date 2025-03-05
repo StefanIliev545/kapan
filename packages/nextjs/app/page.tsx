@@ -42,7 +42,7 @@ const Home: NextPage = () => {
       {/* Main content */}
       <main className="relative z-10">
         {/* Hero section */}
-        <HeroSection mockData={mockData} savingsPercentage={savingsPercentage} />
+        <HeroSection />
         
         {/* Alpha warning */}
         <AlphaWarning />

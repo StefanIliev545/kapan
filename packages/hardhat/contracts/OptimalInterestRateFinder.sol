@@ -114,4 +114,28 @@ contract OptimalInterestRateFinder {
         rates[1] = convertCompoundRateToAPR(compoundRateRaw);
         success[1] = compoundSuccess;
     }
+
+
+    function getAllProtocolBorrowRates(address _token) public view returns (
+        string[] memory protocols,
+        uint256[] memory rates,
+        bool[] memory success
+    ) {
+        // Initialize arrays with size 2 (Aave and Compound)
+        protocols = new string[](2);
+        rates = new uint256[](2);
+        success = new bool[](2);
+
+        // Get Aave rates
+        protocols[0] = "Aave V3";
+        (uint256 aaveRateRaw, bool aaveSuccess) = aaveGateway.getBorrowRate(_token);
+        rates[0] = convertAaveRateToAPY(aaveRateRaw);
+        success[0] = aaveSuccess;
+
+        // Get Compound rates
+        protocols[1] = "Compound V3";
+        (uint256 compoundRateRaw, bool compoundSuccess) = compoundGateway.getBorrowRate(_token);
+        rates[1] = convertCompoundRateToAPR(compoundRateRaw);
+        success[1] = compoundSuccess;
+    }
 }

@@ -1,27 +1,12 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { MockData } from "../../types/mockData";
 import DebtComparison from "./DebtComparison";
 
-interface HeroSectionProps {
-  mockData: MockData;
-  savingsPercentage: string;
-}
-
-const HeroSection = ({ mockData, savingsPercentage }: HeroSectionProps) => {
+const HeroSection = () => {
   return (
     <div className="hero min-h-screen relative">
-      <div className="hero-content flex-col lg:flex-row-reverse gap-8 py-16 z-10">
-        <div className="lg:w-1/2">
-          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
-            <div className="card-body p-6">
-              {/* Debt comparison component */}
-              <DebtComparison mockData={mockData} savingsPercentage={savingsPercentage} />
-            </div>
-          </div>
-        </div>
-        
+      <div className="hero-content flex-col lg:flex-row gap-8 py-16 z-10">
         <div className="lg:w-1/2">
           <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
             <div className="card-body p-6">
@@ -61,6 +46,15 @@ const HeroSection = ({ mockData, savingsPercentage }: HeroSectionProps) => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="lg:w-1/2">
+          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
+            <div className="card-body p-6">
+              {/* Debt comparison component */}
+              <DebtComparison />
             </div>
           </div>
         </div>

@@ -1502,7 +1502,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x2F7e3763CAb88d161eA199d591db36aBA7536474",
+      address: "0x3380B63bac55501492Aff80f2d7eF5c171909AE1",
       abi: [
         {
           inputs: [
@@ -1627,6 +1627,35 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_token",
+              type: "address",
+            },
+          ],
+          name: "getAllProtocolBorrowRates",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "protocols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "rates",
+              type: "uint256[]",
+            },
+            {
+              internalType: "bool[]",
+              name: "success",
+              type: "bool[]",
             },
           ],
           stateMutability: "view",

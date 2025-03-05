@@ -26,6 +26,7 @@
     "burner-connector": "0.0.9",
     "daisyui": "4.12.10",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.4.10",
     "heatmap.js": "^2.0.5",
     "next": "~14.2.11",
     "next-nprogress-bar": "~2.3.13",
