@@ -3,7 +3,7 @@ import { FiInfo, FiShield, FiZap } from "react-icons/fi";
 const AlphaWarning = () => {
   return (
     <div className="container mx-auto px-5 my-8 z-10">
-      <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-warning">
+      <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-warning rounded-lg">
         <div className="card-body p-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
             {/* Main message */}

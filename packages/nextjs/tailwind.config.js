@@ -89,7 +89,16 @@ module.exports = {
     },
     extend: {
       boxShadow: { center: "0 0 12px -2px rgb(0 0 0 / 0.05)" },
-      animation: { "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite" },
+      animation: { 
+        "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "gradient-x": "gradient-x 8s ease infinite"
+      },
+      keyframes: {
+        "gradient-x": {
+          "0%, 100%": { "background-position": "left center" },
+          "50%": { "background-position": "right center" }
+        }
+      }
     },
   },
 };

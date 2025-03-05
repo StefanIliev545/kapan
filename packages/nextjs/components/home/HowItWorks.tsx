@@ -3,7 +3,7 @@ import { FiCreditCard, FiSearch, FiArrowRight } from "react-icons/fi";
 const HowItWorks = () => {
   return (
     <div className="container mx-auto px-5 py-16 z-10">
-      <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
+      <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
         <div className="card-body p-6">
           <h2 className="text-3xl font-bold text-center mb-8">
             <div className="flex items-center justify-center gap-2">
@@ -21,10 +21,10 @@ const HowItWorks = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-lg">
               <div className="card-body items-center text-center gap-4">
                 <div className="badge badge-primary badge-lg">1</div>
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                   <FiCreditCard className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold">Connect Wallet</h3>
@@ -38,10 +38,10 @@ const HowItWorks = () => {
               </div>
             </div>
 
-            <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-lg">
               <div className="card-body items-center text-center gap-4">
                 <div className="badge badge-primary badge-lg">2</div>
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                   <FiSearch className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold">Choose Position</h3>
@@ -55,10 +55,10 @@ const HowItWorks = () => {
               </div>
             </div>
 
-            <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+            <div className="card bg-base-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-lg">
               <div className="card-body items-center text-center gap-4">
                 <div className="badge badge-primary badge-lg">3</div>
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                   <FiArrowRight className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold">Move Debt</h3>

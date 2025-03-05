@@ -3,12 +3,12 @@ import { FiLink, FiDatabase } from "react-icons/fi";
 const ComingSoon = () => {
   return (
     <div className="container mx-auto px-5 py-16 z-10">
-      <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
+      <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
         <div className="card-body p-6">
           <h2 className="text-3xl font-bold text-center mb-8">Coming Soon</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card bg-base-200 shadow-lg border-2 border-accent">
+            <div className="card bg-base-200 shadow-lg border-2 border-accent rounded-lg">
               <div className="card-body">
                 <h3 className="card-title text-accent">
                   <FiLink className="w-6 h-6 mr-2" />
@@ -24,7 +24,7 @@ const ComingSoon = () => {
               </div>
             </div>
             
-            <div className="card bg-base-200 shadow-lg border-2 border-primary">
+            <div className="card bg-base-200 shadow-lg border-2 border-primary rounded-lg">
               <div className="card-body">
                 <h3 className="card-title text-primary">
                   <FiDatabase className="w-6 h-6 mr-2" />
