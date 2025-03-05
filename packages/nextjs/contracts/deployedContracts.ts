@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xB4f5A8E70837195DA5BB9A0417E595a63B5aF68b",
+      address: "0x6B136ADA56D96A871b7C3079982912E521d731bb",
       abi: [
         {
           inputs: [
@@ -677,7 +677,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xa1356fF21c799f6A00a7C27C6Ad11F16524a9BbE",
+      address: "0x606b5E4609441F7E5be9C21cB5acEc1a84744d5C",
       abi: [
         {
           inputs: [
@@ -1502,7 +1502,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x2F7e3763CAb88d161eA199d591db36aBA7536474",
+      address: "0x3380B63bac55501492Aff80f2d7eF5c171909AE1",
       abi: [
         {
           inputs: [
@@ -1640,6 +1640,35 @@ const deployedContracts = {
               type: "address",
             },
           ],
+          name: "getAllProtocolBorrowRates",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "protocols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "rates",
+              type: "uint256[]",
+            },
+            {
+              internalType: "bool[]",
+              name: "success",
+              type: "bool[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_token",
+              type: "address",
+            },
+          ],
           name: "getAllProtocolRates",
           outputs: [
             {
@@ -1689,7 +1718,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x3222b25f31B5a04396AAaE6877A635F9c8113352",
+      address: "0xe432a8671E44311D29a2f84d7192229a1ec8FC0a",
       abi: [
         {
           inputs: [
@@ -2465,7 +2494,7 @@ const deployedContracts = {
   },
   42161: {
     AaveGateway: {
-      address: "0xAb8992CB4E655ABE7224229df67C445AeE1c7B45",
+      address: "0xac96b18a656e54662Cd2ff5Eb1Df9C36d9FE7a77",
       abi: [
         {
           inputs: [
@@ -3135,7 +3164,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x2C896Fe12069918752531F62dfCcAf47FF0B1F8d",
+      address: "0x96E1D36ed8d76AB172DF0A00895D32Bd2A14cF0d",
       abi: [
         {
           inputs: [
@@ -3960,7 +3989,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x6433987E9f8f3416fe61D1FaEABCcEE957156929",
+      address: "0x04A922BB66B7A1380b2089385490a44FC73F8086",
       abi: [
         {
           inputs: [
@@ -4098,6 +4127,35 @@ const deployedContracts = {
               type: "address",
             },
           ],
+          name: "getAllProtocolBorrowRates",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "protocols",
+              type: "string[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "rates",
+              type: "uint256[]",
+            },
+            {
+              internalType: "bool[]",
+              name: "success",
+              type: "bool[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_token",
+              type: "address",
+            },
+          ],
           name: "getAllProtocolRates",
           outputs: [
             {
@@ -4147,7 +4205,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x379b1e0a42Dd2533f09f3B44c8D40E83204EF81A",
+      address: "0x712ad471D73031AB13f94E40acDac5f21E9e78d9",
       abi: [
         {
           inputs: [

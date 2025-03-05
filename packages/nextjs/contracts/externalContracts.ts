@@ -86,6 +86,27 @@ const externalContracts = {
       logo: "/logos/ethereum.svg",
       richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
+    ETH: {
+      address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+      abi: [
+        {
+          constant: true,
+          inputs: [],
+          name: "decimals",
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+            },
+          ],
+          payable: false,
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      logo: "/logos/ethereum.svg",
+      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+    },
   },
   31337: {
     USDC: {
@@ -152,6 +173,27 @@ const externalContracts = {
       richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
     eth: {
+      address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+      abi: [
+        {
+          constant: true,
+          inputs: [],
+          name: "decimals",
+          outputs: [
+            {
+              name: "",
+              type: "uint8",
+            },
+          ],
+          payable: false,
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      logo: "/logos/ethereum.svg",
+      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+    },
+    ETH: {
       address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
       abi: [
         {

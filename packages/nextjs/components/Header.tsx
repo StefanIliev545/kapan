@@ -17,7 +17,7 @@ type HeaderMenuLink = {
 export const menuLinks: HeaderMenuLink[] = [
   {
     label: "Manage",
-    href: "/",
+    href: "/app",
     icon: <ArrowsRightLeftIcon className="h-5 w-5" />,
   },
 
