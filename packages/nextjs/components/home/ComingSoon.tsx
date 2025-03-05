@@ -19,7 +19,7 @@ const ComingSoon = () => {
                   best rates regardless of network.
                 </p>
                 <div className="card-actions justify-end mt-4">
-                  <div className="badge badge-accent badge-outline">Coming Q2 2023</div>
+                  <div className="badge badge-accent badge-outline">Coming Q2 2026</div>
                 </div>
               </div>
             </div>
@@ -35,7 +35,7 @@ const ComingSoon = () => {
                   even more options for optimizing your DeFi debt.
                 </p>
                 <div className="card-actions justify-end mt-4">
-                  <div className="badge badge-primary badge-outline">Coming Q3 2023</div>
+                  <div className="badge badge-primary badge-outline">Coming Q3 2025</div>
                 </div>
               </div>
             </div>

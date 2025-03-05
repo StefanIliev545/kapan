@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useScaffoldReadContract } from "./scaffold-eth";
 import { useInterval } from "usehooks-ts";
-import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import externalContracts from "~~/contracts/externalContracts";
+import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
 interface TokenData {
@@ -17,9 +17,11 @@ interface TokenData {
 
 export const useTokenData = () => {
   const { targetNetwork } = useTargetNetwork();
-  
+
   // Get tokens from external contracts for current network
-  const TOKENS = Object.entries(externalContracts[targetNetwork.id as keyof typeof externalContracts] as GenericContractsDeclaration[number])
+  const TOKENS = Object.entries(
+    externalContracts[targetNetwork.id as keyof typeof externalContracts] as GenericContractsDeclaration[number],
+  )
     .filter(([name]) => ["USDC", "USDT", "USDCe", "ETH"].includes(name))
     .map(([name, data]) => ({
       symbol: name == "USDCe" ? "USDC.e" : name,
