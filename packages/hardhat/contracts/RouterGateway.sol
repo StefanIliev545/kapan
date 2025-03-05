@@ -88,7 +88,7 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         require(address(gateway) != address(0), "Protocol not supported");
 
         // Transfer tokens from user to this contract
-        IERC20(token).safeTransferFrom(user, address(this), amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         // Approve gateway to spend tokens
         IERC20(token).approve(address(gateway), amount);
@@ -108,7 +108,7 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         require(address(gateway) != address(0), "Protocol not supported");
 
         // Transfer tokens from user to this contract
-        IERC20(token).safeTransferFrom(user, address(this), amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         // Approve gateway to spend tokens
         IERC20(token).approve(address(gateway), amount);

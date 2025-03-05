@@ -66,3 +66,19 @@ p {
 .sticky-below-nav {
   top: var(--navbar-height) !important;
 }
+
+/* Animations for transaction feed */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}

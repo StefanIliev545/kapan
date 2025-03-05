@@ -1,24 +1,61 @@
 "use client";
 
 import type { NextPage } from "next";
-import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
-import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
+import { useMemo } from "react";
+import Image from "next/image";
+import { useMockData } from "../services/mockData";
+import TransactionFeed from "../components/TransactionFeed";
+import HeroSection from "../components/home/HeroSection";
+import AlphaWarning from "../components/home/AlphaWarning";
+import HowItWorks from "../components/home/HowItWorks";
+import ProtocolStats from "../components/home/ProtocolStats";
+import ComingSoon from "../components/home/ComingSoon";
 
+/**
+ * Home Page Component
+ */
 const Home: NextPage = () => {
-  return (
-    <div className="container mx-auto px-5">
-      {/* Alpha Version Disclaimer */}
-      <div className="my-8 p-4 border-2 border-warning bg-warning bg-opacity-10 rounded-lg">
-        <h2 className="text-xl font-bold text-warning mb-2">Alpha Version</h2>
-        <p className="text-warning">
-          This application is in <span className="font-bold">ALPHA</span> version. Features may be unstable, and 
-          using the app involves risks. Use at your own risk. You can view the current light tests and smart contracts
-          on github for more information.
-        </p>
+  // Use react-query hook to get mock data
+  const { data: mockData, isLoading } = useMockData();
+  
+  // Calculate savings percentage with useMemo for efficiency
+  const savingsPercentage = useMemo(() => {
+    if (!mockData) return "0.0";
+    return ((mockData.aaveRate - mockData.compoundRate) / mockData.aaveRate * 100).toFixed(1);
+  }, [mockData]);
+
+  // Display loading state
+  if (isLoading || !mockData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="loading loading-spinner loading-lg text-primary"></div>
       </div>
+    );
+  }
+
+  // Main content with background and UI
+  return (
+    <div className="flex-grow">
+      {/* Background transaction feed */}
+      <TransactionFeed />
       
-      <AaveProtocolView />
-      <CompoundProtocolView />
+      {/* Main content */}
+      <main className="relative z-10">
+        {/* Hero section */}
+        <HeroSection mockData={mockData} savingsPercentage={savingsPercentage} />
+        
+        {/* Alpha warning */}
+        <AlphaWarning />
+        
+        {/* How it works */}
+        <HowItWorks />
+        
+        {/* Protocol stats */}
+        <ProtocolStats />
+        
+        {/* Coming soon */}
+        <ComingSoon />
+      </main>
     </div>
   );
 };
