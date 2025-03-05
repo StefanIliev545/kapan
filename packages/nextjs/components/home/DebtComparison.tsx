@@ -121,10 +121,10 @@ const DebtComparison = () => {
       {/* Protocol Comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Higher Rate Protocol */}
-        <div className="card bg-base-200 p-4">
+        <div className="card bg-base-200 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="avatar">
-              <div className="w-8 h-8 rounded-full bg-base-100 p-1 shadow-sm border border-base-300">
+              <div className="w-8 h-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={aaveRate > compoundRate ? "aave" : "compound"}
@@ -164,10 +164,10 @@ const DebtComparison = () => {
         </div>
 
         {/* Lower Rate Protocol */}
-        <div className="card bg-base-200 p-4">
+        <div className="card bg-base-200 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="avatar">
-              <div className="w-8 h-8 rounded-full bg-base-100 p-1 shadow-sm border border-base-300">
+              <div className="w-8 h-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={aaveRate > compoundRate ? "compound" : "aave"}
@@ -207,9 +207,9 @@ const DebtComparison = () => {
       </div>
 
       {/* Savings Card */}
-      <div className="card bg-base-200 p-4">
+      <div className="card bg-base-200 p-4 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
             <FiTrendingDown className="w-5 h-5 text-success" />
           </div>
           <div className="font-semibold">Your Potential Savings</div>
@@ -218,8 +218,10 @@ const DebtComparison = () => {
           <AnimatedValue className="text-3xl font-bold text-success">
             Save ${formatNumber(totalSavings)} per year
           </AnimatedValue>
-          <AnimatedValue className="text-base-content/70 mt-1">
-            {savingsPercentage}% reduction in borrowing costs
+          <AnimatedValue className="mt-1">
+            <div className="text-xl font-bold bg-gradient-to-r from-primary via-success to-primary bg-[length:200%_100%] animate-gradient-x bg-clip-text text-transparent">
+              {savingsPercentage}% reduction in borrowing costs
+            </div>
           </AnimatedValue>
         </div>
         <Link href="/app" className="mt-4" passHref>

@@ -8,7 +8,7 @@ const HeroSection = () => {
     <div className="hero min-h-screen relative">
       <div className="hero-content flex-col lg:flex-row gap-8 py-16 z-10">
         <div className="lg:w-1/2">
-          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
+          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
             <div className="card-body p-6">
               <h1 className="text-4xl font-bold mb-2">Optimize Your DeFi Debt</h1>
               <h2 className="text-2xl mb-4">Move debts between lending protocols seamlessly</h2>
@@ -34,12 +34,12 @@ const HeroSection = () => {
                   <div className="badge badge-outline">Alpha</div>
                   <div className="flex gap-2">
                     <div className="avatar">
-                      <div className="w-8 rounded-full bg-base-100 p-1 shadow-sm border border-base-300">
+                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
                         <Image src="/logos/aave.svg" alt="Aave" width={24} height={24} />
                       </div>
                     </div>
                     <div className="avatar">
-                      <div className="w-8 rounded-full bg-base-100 p-1 shadow-sm border border-base-300">
+                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
                         <Image src="/logos/compound.svg" alt="Compound" width={24} height={24} />
                       </div>
                     </div>
@@ -51,7 +51,7 @@ const HeroSection = () => {
         </div>
         
         <div className="lg:w-1/2">
-          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300">
+          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
             <div className="card-body p-6">
               {/* Debt comparison component */}
               <DebtComparison />
