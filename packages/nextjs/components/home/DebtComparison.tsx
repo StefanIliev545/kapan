@@ -1,8 +1,8 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { FiTrendingDown, FiArrowRight, FiDollarSign, FiPercent } from "react-icons/fi";
+import { AnimatePresence, motion } from "framer-motion";
+import { FiArrowRight, FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useTokenData } from "~~/hooks/useTokenData";
 import { formatNumber } from "~~/utils/formatNumber";
@@ -33,11 +33,15 @@ const DebtComparison = () => {
   const aaveRate = aaveProtocol?.rate || 0;
   const compoundRate = compoundProtocol?.rate || 0;
 
-  // Calculate savings
-  const annualInterestAave = tokenData.totalDebt * (aaveRate / 100);
-  const annualInterestCompound = tokenData.totalDebt * (compoundRate / 100);
-  const totalSavings = annualInterestAave - annualInterestCompound;
-  const savingsPercentage = aaveRate > 0 ? (((aaveRate - compoundRate) / aaveRate) * 100).toFixed(1) : "0.0";
+  // Calculate savings based on which protocol has higher rate
+  const isAaveHigher = aaveRate > compoundRate;
+  const higherRate = Math.max(aaveRate, compoundRate);
+  const lowerRate = Math.min(aaveRate, compoundRate);
+  const currentDebt = isAaveHigher ? tokenData.totalDebt : tokenData.totalDebt;
+  const annualInterestHigher = currentDebt * (higherRate / 100);
+  const annualInterestLower = currentDebt * (lowerRate / 100);
+  const totalSavings = Math.abs(annualInterestHigher - annualInterestLower);
+  const savingsPercentage = higherRate > 0 ? (((higherRate - lowerRate) / higherRate) * 100).toFixed(1) : "0.0";
 
   return (
     <div>
@@ -50,36 +54,66 @@ const DebtComparison = () => {
 
       {/* Total Debt Position with Token Icon */}
       <div className="flex items-center gap-6 mb-6">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-xl">
-            <span>Total</span>
-            <div className="w-5 h-5 relative">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={tokenData.symbol}
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="w-full h-full"
-                >
-                  <Image src={tokenNameToLogo(tokenData.symbol)} alt={tokenData.symbol} fill className="object-contain" />
-                </motion.div>
-              </AnimatePresence>
+        <div className="flex flex-col gap-2 w-full">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xl min-h-[4rem]">
+            <div className="inline-flex items-center gap-2 whitespace-nowrap">
+              <span>Total</span>
+              <div className="w-5 h-5 relative">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={tokenData.symbol}
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.5, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full h-full"
+                  >
+                    <Image
+                      src={tokenNameToLogo(tokenData.symbol)}
+                      alt={tokenData.symbol}
+                      fill
+                      className="object-contain"
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              <AnimatedValue>{tokenData.symbol}</AnimatedValue>
+              <span>debt on</span>
             </div>
-            <AnimatedValue>{tokenData.symbol}</AnimatedValue>
-            <span>debt on</span>
-            <div className="w-5 h-5 relative">
-              <Image src="/logos/aave.svg" alt="Aave" fill className="object-contain" />
+            <div className="inline-flex items-center gap-2 whitespace-nowrap">
+              <div className="w-5 h-5 relative">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={isAaveHigher ? "aave" : "compound"}
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.5, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full h-full"
+                  >
+                    <Image 
+                      src={isAaveHigher ? "/logos/aave.svg" : "/logos/compound.svg"} 
+                      alt={isAaveHigher ? "Aave" : "Compound"} 
+                      fill 
+                      className="object-contain" 
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              <AnimatedValue>
+                {isAaveHigher ? "Aave" : "Compound"}
+              </AnimatedValue>
+              <span>on</span>
+              <div className="w-4 h-4 relative">
+                <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />
+              </div>
+              <span>Arbitrum:</span>
             </div>
-            <span>Aave on</span>
-            <div className="w-4 h-4 relative">
-              <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />
+            <div className="inline-flex items-center">
+              <AnimatedValue className="text-xl font-bold whitespace-nowrap">
+                ${formatNumber(tokenData.totalDebt)}
+              </AnimatedValue>
             </div>
-            <span>Arbitrum:</span>
-            <AnimatedValue className="text-xl font-bold">
-              ${formatNumber(tokenData.totalDebt)}
-            </AnimatedValue>
           </div>
         </div>
       </div>
@@ -100,11 +134,11 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image 
-                      src={aaveRate > compoundRate ? "/logos/aave.svg" : "/logos/compound.svg"} 
-                      alt={aaveRate > compoundRate ? "Aave" : "Compound"} 
-                      width={24} 
-                      height={24} 
+                    <Image
+                      src={aaveRate > compoundRate ? "/logos/aave.svg" : "/logos/compound.svg"}
+                      alt={aaveRate > compoundRate ? "Aave" : "Compound"}
+                      width={24}
+                      height={24}
                     />
                   </motion.div>
                 </AnimatePresence>
@@ -122,11 +156,9 @@ const DebtComparison = () => {
               <FiPercent className="w-4 h-4" />
               Annual Interest
             </div>
-            <AnimatedValue className="text-2xl font-bold">
-              {Math.max(aaveRate, compoundRate).toFixed(2)}%
-            </AnimatedValue>
+            <AnimatedValue className="text-2xl font-bold">{Math.max(aaveRate, compoundRate).toFixed(2)}%</AnimatedValue>
             <AnimatedValue className="text-base-content/70 mt-1">
-              ${formatNumber(Math.max(annualInterestAave, annualInterestCompound))} per year
+              ${formatNumber(Math.max(annualInterestHigher, annualInterestLower))} per year
             </AnimatedValue>
           </div>
         </div>
@@ -145,11 +177,11 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image 
-                      src={aaveRate > compoundRate ? "/logos/compound.svg" : "/logos/aave.svg"} 
-                      alt={aaveRate > compoundRate ? "Compound" : "Aave"} 
-                      width={24} 
-                      height={24} 
+                    <Image
+                      src={aaveRate > compoundRate ? "/logos/compound.svg" : "/logos/aave.svg"}
+                      alt={aaveRate > compoundRate ? "Compound" : "Aave"}
+                      width={24}
+                      height={24}
                     />
                   </motion.div>
                 </AnimatePresence>
@@ -168,7 +200,7 @@ const DebtComparison = () => {
               {Math.min(aaveRate, compoundRate).toFixed(2)}%
             </AnimatedValue>
             <AnimatedValue className="text-base-content/70 mt-1">
-              ${formatNumber(Math.min(annualInterestAave, annualInterestCompound))} per year
+              ${formatNumber(Math.min(annualInterestHigher, annualInterestLower))} per year
             </AnimatedValue>
           </div>
         </div>
