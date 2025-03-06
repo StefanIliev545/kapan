@@ -93,7 +93,7 @@ const BenefitsSection = () => {
             
             <div className="mt-6 pt-4 border-t border-base-300">
               <div className="bg-primary/5 p-3 rounded-lg text-sm text-base-content/80">
-                <strong className="text-primary">Pro tip:</strong> Use our rate comparison tool to identify the best protocol for your specific asset pair before migrating your debt position.
+                <strong className="text-accent">Pro tip:</strong> Use our rate comparison tool to identify the best protocol for your specific asset pair before migrating your debt position.
               </div>
             </div>
           </div>
@@ -122,7 +122,7 @@ const BenefitsSection = () => {
             
             <div className="mt-6 pt-4 border-t border-base-300">
               <div className="bg-primary/5 p-3 rounded-lg text-sm text-base-content/80">
-                <strong className="text-primary">Security:</strong> Our smart contracts are thoroughly tested and utilize battle-tested flash loan providers.
+                <strong className="text-accent">Security:</strong> Our smart contracts are thoroughly tested and utilize battle-tested flash loan providers.
               </div>
             </div>
           </div>

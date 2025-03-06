@@ -202,7 +202,12 @@ export const Header = () => {
                     <div className="mb-6 pb-3 border-b border-base-300/50 dark:border-base-content/10">
                       <div className="flex items-center gap-4">
                         <div className="relative w-12 h-12">
-                          <Image alt="Kapan logo" className="object-contain" fill src="/seal-logo.svg" />
+                          <Image 
+                            alt="Kapan logo" 
+                            className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
+                            fill 
+                            src="/seal-logo.svg" 
+                          />
                         </div>
                         <div>
                           <div className="font-bold text-xl text-primary dark:text-accent">Kapan</div>
@@ -238,7 +243,13 @@ export const Header = () => {
               <div className="relative flex items-center">
                 <div className="relative">
                   <div className={`relative w-8 h-8 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
-                    <Image alt="Kapan logo" className="object-contain" fill src="/seal-logo.svg" priority />
+                    <Image 
+                      alt="Kapan logo" 
+                      className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
+                      fill 
+                      src="/seal-logo.svg" 
+                      priority 
+                    />
                   </div>
                 </div>
                 <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>

@@ -20,7 +20,7 @@ const FeatureCard = ({ icon, title, description, delay = 0 }: FeatureCardProps) 
     <div className="bg-gradient-to-r from-primary/20 to-accent/20 p-3 rounded-full text-accent mb-4">
       {icon}
     </div>
-    <h3 className="text-lg font-medium mb-2 text-center">{title}</h3>
+    <h3 className="text-lg font-medium mb-2 text-center text-base-content">{title}</h3>
     <p className="text-center text-sm text-base-content/80">{description}</p>
   </motion.div>
 );
@@ -66,15 +66,15 @@ const RevolutionSection = () => {
         className="text-center max-w-3xl mx-auto mb-12"
       >
         <span className="text-accent text-sm font-medium uppercase tracking-wider">The Future is Here</span>
-        <h2 className="text-3xl font-bold mb-6 mt-2">The Web3 Lending Revolution</h2>
+        <h2 className="text-3xl font-bold mb-6 mt-2 text-base-content">The Web3 Lending Revolution</h2>
         
-        <p className="text-xl mb-6">
+        <p className="text-xl mb-6 text-base-content">
           Kapan Finance is at the forefront of the <span className="text-accent font-medium">DeFi lending revolution</span>, 
           making it easier than ever to manage borrowing positions across multiple protocols.
         </p>
         
         <p className="text-base-content/80">
-          Our <span className="text-primary font-medium">atomic debt migration</span> technology eliminates the traditional barriers to refinancing in Web3, 
+          Our <span className="text-primary font-medium dark:text-accent">atomic debt migration</span> technology eliminates the traditional barriers to refinancing in Web3, 
           allowing you to seamlessly move between lending platforms for optimal rates and terms.
         </p>
       </motion.div>
@@ -98,8 +98,8 @@ const RevolutionSection = () => {
         transition={{ duration: 0.5, delay: 0.5 }}
         className="mt-12 text-center max-w-3xl mx-auto bg-base-100 p-6 rounded-lg shadow-sm border border-base-300/50"
       >
-        <p className="text-lg">
-          Whether you&apos;re looking to move your <span className="text-primary font-medium">Aave debt position</span> to <span className="text-primary font-medium">Compound</span> for 
+        <p className="text-lg text-base-content">
+          Whether you&apos;re looking to move your <span className="text-accent font-medium">Aave debt position</span> to <span className="text-accent font-medium">Compound</span> for 
           better rates, or optimize your borrowing strategy across multiple protocols, Kapan&apos;s atomic debt migration 
           provides a seamless, secure solution for Web3 lending optimization.
         </p>
