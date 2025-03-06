@@ -159,7 +159,7 @@ const TransactionFeed = () => {
                     <div className="flex items-center gap-1">
                       <Image 
                         src={getTokenIcon(tx.token)} 
-                        alt={tx.token} 
+                        alt={tx.token}
                         width={16} 
                         height={16} 
                         onError={(e) => {
@@ -181,7 +181,7 @@ const TransactionFeed = () => {
                     <div className="flex items-center gap-1">
                       <Image 
                         src="/logos/arb.svg" 
-                        alt="Arbitrum" 
+                        alt={tx.network} 
                         width={16} 
                         height={16} 
                         onError={(e) => {
