@@ -10,7 +10,6 @@ import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 const baseMetadata = getMetadata({
   title: "Kapan Finance",
   description: "Optimize DeFi borrowing by moving debt between protocols",
-  imageRelativePath: "/og-image.png",
 });
 
 export const metadata: Metadata = {
