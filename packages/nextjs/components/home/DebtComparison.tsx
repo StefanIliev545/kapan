@@ -2,7 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { FiArrowRight, FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
+import { FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useTokenData } from "~~/hooks/useTokenData";
 import { formatNumber } from "~~/utils/formatNumber";
@@ -91,18 +91,16 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image 
-                      src={isAaveHigher ? "/logos/aave.svg" : "/logos/compound.svg"} 
-                      alt={isAaveHigher ? "Aave" : "Compound"} 
-                      fill 
-                      className="object-contain" 
+                    <Image
+                      src={isAaveHigher ? "/logos/aave.svg" : "/logos/compound.svg"}
+                      alt={isAaveHigher ? "Aave" : "Compound"}
+                      fill
+                      className="object-contain"
                     />
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <AnimatedValue>
-                {isAaveHigher ? "Aave" : "Compound"}
-              </AnimatedValue>
+              <AnimatedValue>{isAaveHigher ? "Aave" : "Compound"}</AnimatedValue>
               <span>on</span>
               <div className="w-4 h-4 relative">
                 <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />

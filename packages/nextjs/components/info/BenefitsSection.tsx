@@ -122,7 +122,7 @@ const BenefitsSection = () => {
             
             <div className="mt-6 pt-4 border-t border-base-300">
               <div className="bg-primary/5 p-3 rounded-lg text-sm text-base-content/80">
-                <strong className="text-primary">Security:</strong> All our smart contracts are audited by leading security firms and utilize battle-tested flash loan providers.
+                <strong className="text-primary">Security:</strong> Our smart contracts are thoroughly tested and utilize battle-tested flash loan providers.
               </div>
             </div>
           </div>

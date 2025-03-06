@@ -58,7 +58,7 @@ const ContractsSection = () => {
         className="mt-8 text-center"
       >
         <p className="text-sm text-base-content/70 max-w-2xl mx-auto">
-          All contracts have been audited and verified on Etherscan. View contract source code and interactions
+          All contracts are verified on Etherscan. View contract source code and interactions
           by clicking on the contract addresses above.
         </p>
       </motion.div>

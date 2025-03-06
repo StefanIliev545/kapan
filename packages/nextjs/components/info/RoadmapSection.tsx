@@ -50,13 +50,13 @@ const enhanceWithProtocolLogos = (text: string) => {
     "Compound V3": "compound.svg",
     "Compound": "compound.svg",
     "Euler Finance": "balancer.svg", // Using balancer for now
-    "Morpho Labs": "eth.svg", // Using ETH for now
-    "Spark Protocol": "dai.svg", // Using DAI for now
-    "Venus Protocol": "usdc.svg", // Using USDC for now
+    "Morpho Labs": "morpho.svg", // Using ETH for now
+    "Spark Protocol": "spark.svg", // Using DAI for now
+    "Venus Protocol": "venus.svg", // Using USDC for now
     "Arbitrum": "arb.svg",
-    "Optimism": "eth.svg", // Using ETH for now as placeholder
+    "Optimism": "optimism.svg", // Using ETH for now as placeholder
     "Polygon": "eth.svg", // Using ETH for now as placeholder
-    "Base": "eth.svg" // Using ETH for now as placeholder
+    "Base": "base.svg" // Using ETH for now as placeholder
   };
 
   // Split the text by protocol mentions and create an array of React components
@@ -264,7 +264,7 @@ const RoadmapSection = () => {
       phase: 3,
       title: "Web3 Lending Protocol Expansion",
       description: "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
-      features: ["Euler Finance", "Morpho Labs", "Spark Protocol", "Venus Protocol"],
+      features: ["Euler Finance", "Morpho Labs", "Venus Protocol"],
       icon: <BuildingLibraryIcon className="w-5 h-5" />
     },
     {
@@ -278,7 +278,7 @@ const RoadmapSection = () => {
       phase: 5,
       title: "Cross-chain Web3 Debt Migration & Advanced Features",
       description: "Expanding atomic debt migration to multiple blockchain networks and implementing advanced DeFi portfolio management features.",
-      features: ["Arbitrum", "Optimism", "Polygon", "Base", "Loan Health Notifications", "DeFi Risk Analytics", "Rate Change Alerts"],
+      features: ["Arbitrum", "Optimism", "Base", "Loan Health Notifications", "DeFi Risk Analytics", "Rate Change Alerts"],
       icon: <GlobeAltIcon className="w-5 h-5" />
     }
   ];

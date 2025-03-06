@@ -149,25 +149,25 @@ export const Header = () => {
   return (
     <div className={`sticky top-0 z-30 transition-all duration-300 ${
       scrolled 
-        ? "py-2" 
-        : "py-4"
+        ? "py-1" 
+        : "py-2"
     }`}>
       {/* Background with gradient border */}
       <div className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
-        scrolled ? "shadow-lg" : ""
+        scrolled ? "shadow-md" : ""
       }`} style={{ zIndex: -1 }}>
-        {/* Animated accent line */}
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 dark:via-accent/50 to-transparent"></div>
+        {/* Accent line */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 dark:via-accent/30 to-transparent"></div>
       </div>
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="navbar justify-between">
+        <div className="navbar justify-between min-h-0 h-auto py-0">
           {/* Left section - Logo and nav */}
           <div className="flex items-center">
-            <div className="lg:hidden dropdown z-50 mr-3" ref={burgerMenuRef}>
+            <div className="lg:hidden dropdown z-50 mr-2" ref={burgerMenuRef}>
               <button
                 aria-label="Menu"
-                className={`btn btn-circle btn-ghost transition-all duration-200`}
+                className="btn btn-circle btn-ghost btn-sm"
                 onClick={() => {
                   setIsDrawerOpen(prevIsOpenState => !prevIsOpenState);
                 }}
@@ -235,66 +235,17 @@ export const Header = () => {
             
             {/* Logo */}
             <Link href="/" className="flex items-center">
-              <motion.div 
-                className="relative flex items-center"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, type: "spring" }}
-              >
+              <div className="relative flex items-center">
                 <div className="relative">
-                  {/* Background glow effect */}
-                  <motion.div 
-                    className="absolute inset-0 rounded-full bg-primary/20"
-                    animate={{ 
-                      scale: [1, 1.05, 1],
-                      opacity: [0.5, 0.8, 0.5]
-                    }}
-                    transition={{ 
-                      duration: 3,
-                      repeat: Infinity,
-                      repeatType: "reverse"
-                    }}
-                    style={{ filter: "blur(10px)" }}
-                  />
-                  
-                  {/* Logo image with hover effect */}
-                  <motion.div 
-                    className="relative w-14 h-14 sm:w-16 sm:h-16"
-                    whileHover={{ 
-                      rotate: [0, -5, 5, -3, 3, 0],
-                      transition: { duration: 0.5 }
-                    }}
-                  >
-                    <Image 
-                      alt="Kapan logo" 
-                      className="object-contain" 
-                      fill 
-                      src="/seal-logo.svg" 
-                      priority
-                    />
-                  </motion.div>
+                  <div className={`relative w-8 h-8 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                    <Image alt="Kapan logo" className="object-contain" fill src="/seal-logo.svg" priority />
+                  </div>
                 </div>
-                
-                {/* Brand text */}
-                <div className="ml-3">
-                  <motion.div 
-                    className="font-bold text-xl sm:text-2xl bg-gradient-to-r from-primary to-secondary dark:from-accent dark:to-accent/80 bg-clip-text text-transparent"
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
-                  >
-                    Kapan
-                  </motion.div>
-                  <motion.div 
-                    className="text-xs sm:text-sm text-base-content/70"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                  >
-                    Lending Made Easy
-                  </motion.div>
+                <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
+                  <div className="font-bold text-lg text-primary dark:text-accent">Kapan</div>
+                  <div className="text-[10px] text-base-content/60 -mt-1">Lending Made Easy</div>
                 </div>
-              </motion.div>
+              </div>
             </Link>
             
             {/* Desktop Navigation */}
