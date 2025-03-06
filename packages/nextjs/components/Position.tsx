@@ -4,6 +4,7 @@ import { DepositModal } from "./modals/DepositModal";
 import { MovePositionModal } from "./modals/MovePositionModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { RepayModal } from "./modals/RepayModal";
+import { FiPercent } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -66,7 +67,7 @@ export const Position: FC<PositionProps> = ({
   return (
     <>
       {/* Outer container uses grid that becomes a single column on mobile */}
-      <div className={`w-full p-3 rounded-md bg-base-200 grid grid-cols-1 lg:grid-cols-7`}>
+      <div className={`w-full p-1 pl-2 pr-2 rounded-md bg-base-200 grid grid-cols-1 lg:grid-cols-7`}>
         {/* Header: Icon and Title */}
         <div className="order-1 lg:order-none lg:col-span-2 flex items-center">
           <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
@@ -112,18 +113,20 @@ export const Position: FC<PositionProps> = ({
         <div className="order-2 lg:order-none lg:col-span-3 grid grid-cols-3 gap-0 items-center">
           <div className="px-2 border-r border-base-300">
             <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-            <div className={`font-medium h-6 line-clamp-1 ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
+            <div className={`text-sm font-medium h-6 line-clamp-1 ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
               {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
             </div>
           </div>
           <div className="px-2 border-r border-base-300">
-            <div className="text-sm text-base-content/70 overflow-hidden h-6">Current Rate</div>
+            <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">
+              APY
+            </div>
             <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
               {currentRate.toFixed(2)}%
             </div>
           </div>
           <div className="px-2">
-            <div className="text-sm text-base-content/70 overflow-hidden h-6">Optimal Rate</div>
+            <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
             <div className="font-medium flex items-center h-6">
               <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
                 {optimalRateDisplay.toFixed(2)}%
@@ -150,9 +153,9 @@ export const Position: FC<PositionProps> = ({
               Repay
             </button>
           )}
-          <button 
-            className="btn btn-sm btn-outline" 
-            onClick={() => setIsMoveModalOpen(true)} 
+          <button
+            className="btn btn-sm btn-outline"
+            onClick={() => setIsMoveModalOpen(true)}
             disabled={!hasBalance || type === "supply"}
             title={type === "supply" ? "Moving supply positions is not yet implemented" : ""}
           >

@@ -2,7 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { FiArrowRight, FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
+import { FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useTokenData } from "~~/hooks/useTokenData";
 import { formatNumber } from "~~/utils/formatNumber";
@@ -91,18 +91,16 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image 
-                      src={isAaveHigher ? "/logos/aave.svg" : "/logos/compound.svg"} 
-                      alt={isAaveHigher ? "Aave" : "Compound"} 
-                      fill 
-                      className="object-contain" 
+                    <Image
+                      src={isAaveHigher ? "/logos/aave.svg" : "/logos/compound.svg"}
+                      alt={isAaveHigher ? "Aave" : "Compound"}
+                      fill
+                      className="object-contain"
                     />
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <AnimatedValue>
-                {isAaveHigher ? "Aave" : "Compound"}
-              </AnimatedValue>
+              <AnimatedValue>{isAaveHigher ? "Aave" : "Compound"}</AnimatedValue>
               <span>on</span>
               <div className="w-4 h-4 relative">
                 <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />
@@ -121,10 +119,10 @@ const DebtComparison = () => {
       {/* Protocol Comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Higher Rate Protocol */}
-        <div className="card bg-base-200 p-4 rounded-lg">
+        <div className="card bg-base-200 dark:bg-base-300/30 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="avatar">
-              <div className="w-8 h-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+              <div className="w-8 h-8 rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={aaveRate > compoundRate ? "aave" : "compound"}
@@ -145,7 +143,7 @@ const DebtComparison = () => {
               </div>
             </div>
             <div>
-              <AnimatedValue className="font-semibold">
+              <AnimatedValue className="font-semibold text-base-content">
                 Currently on {aaveRate > compoundRate ? "Aave" : "Compound"}
               </AnimatedValue>
               <div className="text-sm text-base-content/70">Variable Rate</div>
@@ -156,7 +154,7 @@ const DebtComparison = () => {
               <FiPercent className="w-4 h-4" />
               Annual Interest
             </div>
-            <AnimatedValue className="text-2xl font-bold">{Math.max(aaveRate, compoundRate).toFixed(2)}%</AnimatedValue>
+            <AnimatedValue className="text-2xl font-bold text-base-content">{Math.max(aaveRate, compoundRate).toFixed(2)}%</AnimatedValue>
             <AnimatedValue className="text-base-content/70 mt-1">
               ${formatNumber(Math.max(annualInterestHigher, annualInterestLower))} per year
             </AnimatedValue>
@@ -164,10 +162,10 @@ const DebtComparison = () => {
         </div>
 
         {/* Lower Rate Protocol */}
-        <div className="card bg-base-200 p-4 rounded-lg">
+        <div className="card bg-base-200 dark:bg-base-300/30 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="avatar">
-              <div className="w-8 h-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+              <div className="w-8 h-8 rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={aaveRate > compoundRate ? "compound" : "aave"}
@@ -188,7 +186,7 @@ const DebtComparison = () => {
               </div>
             </div>
             <div>
-              <AnimatedValue className="font-semibold">
+              <AnimatedValue className="font-semibold text-base-content">
                 Available on {aaveRate > compoundRate ? "Compound" : "Aave"}
               </AnimatedValue>
               <div className="text-sm text-base-content/70">Variable Rate</div>
@@ -196,7 +194,7 @@ const DebtComparison = () => {
           </div>
           <div className="mt-2">
             <div className="text-base-content/70">Annual Interest</div>
-            <AnimatedValue className="text-2xl font-bold text-primary">
+            <AnimatedValue className="text-2xl font-bold text-primary dark:text-accent">
               {Math.min(aaveRate, compoundRate).toFixed(2)}%
             </AnimatedValue>
             <AnimatedValue className="text-base-content/70 mt-1">
@@ -207,25 +205,25 @@ const DebtComparison = () => {
       </div>
 
       {/* Savings Card */}
-      <div className="card bg-base-200 p-4 rounded-lg">
+      <div className="card bg-base-200 dark:bg-base-300/30 p-4 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-success/10 dark:bg-success/20 flex items-center justify-center">
             <FiTrendingDown className="w-5 h-5 text-success" />
           </div>
-          <div className="font-semibold">Your Potential Savings</div>
+          <div className="font-semibold text-base-content">Your Potential Savings</div>
         </div>
         <div className="mt-2">
           <AnimatedValue className="text-3xl font-bold text-success">
             Save ${formatNumber(totalSavings)} per year
           </AnimatedValue>
           <AnimatedValue className="mt-1">
-            <div className="text-xl font-bold bg-gradient-to-r from-primary via-success to-primary bg-[length:200%_100%] animate-gradient-x bg-clip-text text-transparent">
+            <div className="text-xl font-bold bg-gradient-to-r from-primary via-success to-primary dark:from-accent dark:via-success dark:to-accent bg-[length:200%_100%] animate-gradient-x bg-clip-text text-transparent">
               {savingsPercentage}% reduction in borrowing costs
             </div>
           </AnimatedValue>
         </div>
         <Link href="/app" className="mt-4" passHref>
-          <button className="btn btn-primary w-full">Start Saving Now</button>
+          <button className="btn btn-primary dark:bg-accent dark:border-accent/70 dark:text-accent-content dark:hover:bg-accent/80 w-full">Start Saving Now</button>
         </Link>
       </div>
     </div>

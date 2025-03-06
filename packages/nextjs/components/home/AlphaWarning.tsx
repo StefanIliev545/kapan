@@ -37,7 +37,7 @@ const AlphaWarning = () => {
                 <h3 className="text-lg font-bold">Active Development</h3>
               </div>
               <p className="text-base-content/80">
-                Smart contracts are in active development and pre-audit. While thoroughly tested, 
+                Smart contracts are in active development and have not been audited yet. While thoroughly tested, 
                 use at your own risk and start with small amounts.
               </p>
             </div>

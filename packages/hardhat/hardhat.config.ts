@@ -54,7 +54,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        blockNumber: 307066496,
+        blockNumber: 312628268,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
     },
