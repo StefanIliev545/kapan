@@ -164,13 +164,14 @@ export const Header = () => {
         <div className="navbar justify-between min-h-0 h-auto py-0">
           {/* Left section - Logo and nav */}
           <div className="flex items-center">
-            <div className="lg:hidden dropdown z-50 mr-2" ref={burgerMenuRef}>
+            <div className="lg:hidden dropdown z-50 mr-2" ref={burgerMenuRef} data-state={isDrawerOpen ? "open" : "closed"}>
               <button
                 aria-label="Menu"
-                className="btn btn-circle btn-ghost btn-sm"
+                className="btn btn-circle btn-ghost btn-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:focus:ring-accent/50"
                 onClick={() => {
                   setIsDrawerOpen(prevIsOpenState => !prevIsOpenState);
                 }}
+                style={{ touchAction: "manipulation" }}
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
@@ -189,50 +190,63 @@ export const Header = () => {
                 </AnimatePresence>
               </button>
               
+              {/* Mobile Navigation Menu */}
               <AnimatePresence>
                 {isDrawerOpen && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="dropdown-content menu bg-base-200/95 dark:bg-base-300/95 backdrop-blur-md rounded-box shadow-2xl mt-3 p-6 w-72 overflow-hidden absolute left-0 z-50"
-                    style={{ backdropFilter: "blur(12px)" }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+                    onClick={() => setIsDrawerOpen(false)}
                   >
-                    <div className="mb-6 pb-3 border-b border-base-300/50 dark:border-base-content/10">
-                      <div className="flex items-center gap-4">
-                        <div className="relative w-12 h-12">
-                          <Image 
-                            alt="Kapan logo" 
-                            className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
-                            fill 
-                            src="/seal-logo.svg" 
-                          />
+                    <motion.div 
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.2 }}
+                      className="fixed top-16 left-4 z-50 w-72 rounded-lg shadow-2xl"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <div
+                        className="bg-base-200/95 dark:bg-base-300/95 backdrop-blur-md p-6 rounded-box border border-base-300/50 dark:border-base-content/10 shadow-lg"
+                      >
+                        <div className="mb-6 pb-3 border-b border-base-300/50 dark:border-base-content/10">
+                          <div className="flex items-center gap-4">
+                            <div className="relative w-12 h-12">
+                              <Image 
+                                alt="Kapan logo" 
+                                className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
+                                fill 
+                                src="/seal-logo.svg" 
+                              />
+                            </div>
+                            <div>
+                              <div className="font-bold text-xl text-primary dark:text-accent">Kapan</div>
+                              <div className="text-xs text-base-content/60">Lending Made Easy</div>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-xl text-primary dark:text-accent">Kapan</div>
-                          <div className="text-xs text-base-content/60">Lending Made Easy</div>
+                        <ul className="space-y-2">
+                          <HeaderMenuLinks />
+                        </ul>
+                        <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
+                          <div className="flex justify-center mb-3">
+                            <div className="bg-warning/90 text-warning-content px-4 py-1 rounded-full text-xs font-bold">
+                              ALPHA VERSION
+                            </div>
+                          </div>
+                          <div className="flex flex-col space-y-3 items-stretch relative z-50">
+                            <div className="relative">
+                              <RainbowKitCustomConnectButton />
+                            </div>
+                            <div className="relative">
+                              <FaucetButton />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <ul className="space-y-2">
-                      <HeaderMenuLinks />
-                    </ul>
-                    <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
-                      <div className="flex justify-center mb-3">
-                        <div className="bg-warning/90 text-warning-content px-4 py-1 rounded-full text-xs font-bold">
-                          ALPHA VERSION
-                        </div>
-                      </div>
-                      <div className="flex flex-col space-y-3 items-stretch relative z-50">
-                        <div className="relative">
-                          <RainbowKitCustomConnectButton />
-                        </div>
-                        <div className="relative">
-                          <FaucetButton />
-                        </div>
-                      </div>
-                    </div>
+                    </motion.div>
                   </motion.div>
                 )}
               </AnimatePresence>
