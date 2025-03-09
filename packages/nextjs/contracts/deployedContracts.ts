@@ -677,7 +677,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x606b5E4609441F7E5be9C21cB5acEc1a84744d5C",
+      address: "0xc70cb7182b907feA9e536fC641BE7a571a2729D0",
       abi: [
         {
           inputs: [
@@ -1002,6 +1002,30 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -1247,6 +1271,30 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -1502,7 +1550,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x1672a7eA4f72D1535B2F6bbC446Ac83B1A31ee2c",
+      address: "0x2298d5c26daBB9C7Bb634d5BDe9Aaef5b6436b03",
       abi: [
         {
           inputs: [

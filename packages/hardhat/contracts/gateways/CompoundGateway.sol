@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
+import "hardhat/console.sol";
 contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -200,6 +200,28 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         }
 
         return 0;
+    }
+
+    function getCollateralPrice(address market,address asset) public view returns (uint256) {
+        ICompoundComet comet = tokenToComet[market];
+        ICompoundComet.AssetInfo memory info = comet.getAssetInfoByAddress(asset);
+        return comet.getPrice(info.priceFeed);
+    }
+
+    /**
+     * @notice Get prices for multiple tokens at once
+     * @param tokens Array of token addresses
+     * @return prices Array of token prices in USD (same decimals as individual getPrice calls)
+     */
+    function getPrices(address market,address[] calldata tokens) public view returns (uint256[] memory) {
+        uint256[] memory prices = new uint256[](tokens.length);
+        
+        for (uint i = 0; i < tokens.length; i++) {
+            console.log("Token:", tokens[i]);
+            prices[i] = getCollateralPrice(market,tokens[i]);
+        }
+        
+        return prices;
     }
 
     // New function: Aggregates all compound data needed for the readHook.

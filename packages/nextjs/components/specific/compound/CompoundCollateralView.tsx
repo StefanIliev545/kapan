@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useState, useMemo } from "react";
 import Image from "next/image";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
@@ -9,7 +9,8 @@ import { DepositCollateralModal } from "./DepositCollateralModal";
 interface CollateralPosition {
   icon: string;
   name: string;
-  balance: number;
+  balance: number; // Token amount
+  usdValue: number; // USD value
   address: string;
 }
 
@@ -25,6 +26,21 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
     args: [baseToken, connectedAddress],
   });
 
+  // Extract collateral addresses for price lookup
+  const collateralAddresses = useMemo(() => {
+    if (!collateralData?.[0] || !collateralData[0].length) return [];
+    // Return the array of addresses (first element in the collateralData tuple)
+    return collateralData[0];
+  }, [collateralData]);
+
+  // Fetch prices for all collaterals at once
+  // First argument is the market (baseToken), second is the array of collateral addresses
+  const { data: collateralPrices } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrices",
+    args: [baseToken, collateralAddresses], // Market first, then token addresses
+  });
+
   // Format currency with 2 decimal places
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -33,29 +49,51 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
     }).format(num);
   };
 
-  if (!collateralData || !collateralData[0]?.length) {
-    return null;
-  }
+  // Format currency in USD
+  const formatUSD = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
 
-  const [collateralAddresses, collateralBalances, collateralDisplayNames] = collateralData;
+  // Process collateral data with prices
+  const collateralPositions = useMemo(() => {
+    if (!collateralData || !collateralData[0]?.length) {
+      return [];
+    }
 
-  // Create position objects for all collateral
-  const allCollateralPositions: CollateralPosition[] = 
-    collateralAddresses.map((address: string, index: number) => {
-      const balance = Number(formatUnits(collateralBalances[index], 18));
-      const name = collateralDisplayNames[index];
-      return { 
-        name, 
-        balance, 
+    const [addresses, balances, displayNames] = collateralData;
+    
+    // Create positions with price data
+    const positions = addresses.map((address: string, index: number) => {
+      const balance = Number(formatUnits(balances[index], 18));
+      const name = displayNames[index];
+      
+      // Calculate USD value 
+      let usdValue = 0;
+      if (collateralPrices && index < collateralPrices.length) {
+        // Price is returned in 8 decimals format
+        const price = Number(formatUnits(collateralPrices[index], 8));
+        usdValue = balance * price;
+      }
+      
+      return {
+        name,
+        balance,
+        usdValue,
         icon: tokenNameToLogo(name),
         address
       };
     });
     
-  // Filter based on toggle state
-  const collateralPositions = showAll 
-    ? allCollateralPositions 
-    : allCollateralPositions.filter(pos => pos.balance > 0);
+    // Filter based on toggle state
+    return showAll 
+      ? positions 
+      : positions.filter(pos => pos.balance > 0);
+  }, [collateralData, collateralPrices, showAll]);
 
   if (collateralPositions.length === 0 && !showAll) {
     return null;
@@ -70,6 +108,10 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
   const handleCloseModal = () => {
     setSelectedCollateral(null);
   };
+
+  // Get all collateral positions (for counting)
+  const allPositionsCount = collateralData ? collateralData[0].length : 0;
+  const positionsWithBalanceCount = collateralPositions.filter(pos => pos.balance > 0).length;
 
   return (
     <>
@@ -86,7 +128,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
                 Collateral Assets
               </span>
               <span className="badge badge-primary badge-xs">
-                {collateralPositions.filter(pos => pos.balance > 0).length}/{allCollateralPositions.length}
+                {positionsWithBalanceCount}/{allPositionsCount}
               </span>
             </div>
             
@@ -118,16 +160,23 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
                         src={position.icon} 
                         alt={`${position.name} icon`} 
                         width={20} 
-                        height={20} 
+                        height={20}
                         className="object-contain max-w-full max-h-full"
                       />
                     </div>
                   </div>
                   <div className="flex flex-col">
                     <span className="font-medium text-sm">{position.name}</span>
-                    <span className={`text-xs font-mono ${position.balance > 0 ? 'text-base-content/70' : 'text-base-content/40'}`}>
-                      {position.balance > 0 ? formatNumber(position.balance) : 'No balance'}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className={`text-xs font-mono ${position.balance > 0 ? 'text-base-content/70' : 'text-base-content/40'}`}>
+                        {position.balance > 0 ? formatNumber(position.balance) : 'No balance'}
+                      </span>
+                      {position.balance > 0 && position.usdValue > 0 && (
+                        <span className="text-xs text-primary font-medium">
+                          {formatUSD(position.usdValue)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
