@@ -8,8 +8,8 @@ import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 const baseMetadata = getMetadata({
-  title: "Kapan Finance",
-  description: "Optimize DeFi borrowing by moving debt between protocols",
+  title: "Kapan Finance | DeFi Lending Aggregator",
+  description: "Optimize your DeFi APY rates by transferring your debt between protocols",
 });
 
 export const metadata: Metadata = {

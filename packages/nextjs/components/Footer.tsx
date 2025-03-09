@@ -28,6 +28,15 @@ export const Footer = () => {
               <span className="text-base-content">Join our Discord</span>
             </Link>
             <Link
+              href="/blog"
+              className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 shadow-md hover:shadow-lg transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
+              </svg>
+              <span className="text-base-content">Blog</span>
+            </Link>
+            <Link
               href="https://x.com/KapanFinance"
               target="_blank"
               rel="noopener noreferrer"
