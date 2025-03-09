@@ -1,0 +1,82 @@
+---
+title: "Understanding Interest Rate Differences Between Lending Protocols"
+excerpt: "Why do Aave and Compound have different interest rates for the same assets? We break down the factors that affect borrowing costs."
+coverImage: 
+  src: "/blog/rich-pepe-poor-pepe.webp"
+  alt: "Interest Rate Comparison Chart"
+  width: 1200
+  height: 630
+date: "February 28, 2025"
+readTime: "6 min read"
+category: "Market Analysis"
+---
+
+# Introduction
+
+One of the most confusing aspects of DeFi lending for newcomers is understanding why the same asset can have dramatically different interest rates across protocols. In this article, we'll demystify the factors that cause these variations and how you can use them to your advantage.
+
+# Supply and Demand Fundamentals
+
+At its core, interest rate differences come down to the basic economic principle of supply and demand. When an asset has:
+
+* High supply + low demand = Low interest rates
+* Low supply + high demand = High interest rates
+
+Each protocol has its own liquidity pools, which means the supply and demand dynamics can vary significantly between them.
+
+# Interest Rate Models
+
+While all major lending protocols follow supply and demand principles, they implement different mathematical models to calculate interest rates:
+
+## Aave's Interest Rate Model
+
+Aave uses a multi-slope interest rate model where:
+* Rates start at a minimum "base rate"
+* Rates increase gradually until a "optimal utilization point" (typically 80%)
+* Beyond the optimal point, rates increase rapidly to discourage 100% utilization
+
+## Compound's Interest Rate Model
+
+Compound employs a similar but differently parameterized model:
+* Rates are calculated based on a "utilization rate"
+* The slope of the interest rate curve is determined by protocol parameters
+* There's typically a smoother transition as utilization increases
+
+These different models mean that even with identical supply and demand conditions, rates would differ between protocols.
+
+# Protocol-Specific Factors
+
+Several protocol-specific factors can influence interest rates:
+
+## Risk Parameters
+* Each protocol assigns different risk parameters to assets
+* Higher perceived risk typically results in higher base rates
+
+## Governance Decisions
+* DAOs governing these protocols can vote to adjust rate parameters
+* Strategic decisions may temporarily adjust rates to attract liquidity
+
+## Market Incentives
+* Token incentives (like COMP or AAVE rewards) effectively reduce borrowing costs
+* Special promotions or liquidity mining programs can impact effective rates
+
+# Market Segmentation
+
+Different protocols may attract different types of users:
+* Some platforms attract more long-term borrowers
+* Others may be favored by short-term traders or arbitrageurs
+* This user segmentation affects borrowing demand and thus rates
+
+# Practical Implications for Borrowers
+
+Understanding these differences creates opportunities:
+
+1. **Rate arbitrage** - Borrowing from the protocol with the lowest rates
+2. **Strategic timing** - Moving debt when rate differentials are highest
+3. **Incentive optimization** - Factoring in token rewards when calculating effective rates
+
+# Conclusion
+
+Interest rate differences between protocols aren't random—they result from different models, parameters, governance decisions, and market dynamics. By understanding these factors, you can make more informed borrowing decisions and potentially save significantly on your borrowing costs.
+
+Platforms like Kapan Finance leverage these differences to help users automatically optimize their borrowing strategies, making DeFi lending more efficient and cost-effective. 
