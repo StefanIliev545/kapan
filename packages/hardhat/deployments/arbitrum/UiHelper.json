@@ -1,0 +1,60 @@
+{
+  "address": "0x86045DF29c3534e2cb730167e4B7Bf76be8C5c6b",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "tokens",
+          "type": "address[]"
+        }
+      ],
+      "name": "getDecimals",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x43858d89e4e52ecb2dc03567eac8df1daa6ece4fae029b28341950517599165c",
+  "receipt": {
+    "to": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "from": "0x58d21499B5A3374a486B3F412Cca43b76692eF15",
+    "contractAddress": null,
+    "transactionIndex": 1,
+    "gasUsed": "369105",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xdb55caeb43ea02466c9ea58d7fb4d7e3848fbc19e40ee96331e697ce2cf67213",
+    "transactionHash": "0x43858d89e4e52ecb2dc03567eac8df1daa6ece4fae029b28341950517599165c",
+    "logs": [],
+    "blockNumber": 313946866,
+    "cumulativeGasUsed": "369105",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [],
+  "numDeployments": 1,
+  "solcInputHash": "9ae058df07235a472c7f2bdbe92a4459",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.20+commit.a1b79de6\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"tokens\",\"type\":\"address[]\"}],\"name\":\"getDecimals\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/UiHelper.sol\":\"UiHelper\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0xc6a8ff0ea489379b61faa647490411b80102578440ab9d84e9a957cc12164e70\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Metadata.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC20} from \\\"../IERC20.sol\\\";\\n\\n/**\\n * @dev Interface for the optional metadata functions from the ERC20 standard.\\n */\\ninterface IERC20Metadata is IERC20 {\\n    /**\\n     * @dev Returns the name of the token.\\n     */\\n    function name() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the symbol of the token.\\n     */\\n    function symbol() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the decimals places of the token.\\n     */\\n    function decimals() external view returns (uint8);\\n}\\n\",\"keccak256\":\"0xaa761817f6cd7892fcf158b3c776b34551cde36f48ff9703d53898bc45a94ea2\",\"license\":\"MIT\"},\"contracts/UiHelper.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity >=0.8.0 <0.9.0;\\n\\nimport \\\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\\\";\\n\\ncontract UiHelper {\\n    function getDecimals(address[] calldata tokens) public view returns (uint256[] memory) {\\n        uint256[] memory decimals = new uint256[](tokens.length);\\n        for (uint256 i = 0; i < tokens.length; i++) {\\n            decimals[i] = IERC20Metadata(tokens[i]).decimals();\\n        }\\n        return decimals;\\n    }\\n}\\n\",\"keccak256\":\"0x05748316b7d6ce565f21522871836ea3a0b01f1956e31cd969b715b445d67344\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x608060405234801561001057600080fd5b50610304806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c8063a826c11414610030575b600080fd5b61004361003e36600461016f565b610059565b60405161005091906101e4565b60405180910390f35b606060008267ffffffffffffffff81111561007657610076610228565b60405190808252806020026020018201604052801561009f578160200160208202803683370190505b50905060005b83811015610167578484828181106100bf576100bf61023e565b90506020020160208101906100d49190610254565b6001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa158015610111573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906101359190610284565b60ff1682828151811061014a5761014a61023e565b60209081029190910101528061015f816102a7565b9150506100a5565b509392505050565b6000806020838503121561018257600080fd5b823567ffffffffffffffff8082111561019a57600080fd5b818501915085601f8301126101ae57600080fd5b8135818111156101bd57600080fd5b8660208260051b85010111156101d257600080fd5b60209290920196919550909350505050565b6020808252825182820181905260009190848201906040850190845b8181101561021c57835183529284019291840191600101610200565b50909695505050505050565b634e487b7160e01b600052604160045260246000fd5b634e487b7160e01b600052603260045260246000fd5b60006020828403121561026657600080fd5b81356001600160a01b038116811461027d57600080fd5b9392505050565b60006020828403121561029657600080fd5b815160ff8116811461027d57600080fd5b6000600182016102c757634e487b7160e01b600052601160045260246000fd5b506001019056fea26469706673582212201a1df631fda4444d1b84deae9fb740fea6848ca50be79a75819f2e2c85a880b864736f6c63430008140033",
+  "deployedBytecode": "0x608060405234801561001057600080fd5b506004361061002b5760003560e01c8063a826c11414610030575b600080fd5b61004361003e36600461016f565b610059565b60405161005091906101e4565b60405180910390f35b606060008267ffffffffffffffff81111561007657610076610228565b60405190808252806020026020018201604052801561009f578160200160208202803683370190505b50905060005b83811015610167578484828181106100bf576100bf61023e565b90506020020160208101906100d49190610254565b6001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa158015610111573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906101359190610284565b60ff1682828151811061014a5761014a61023e565b60209081029190910101528061015f816102a7565b9150506100a5565b509392505050565b6000806020838503121561018257600080fd5b823567ffffffffffffffff8082111561019a57600080fd5b818501915085601f8301126101ae57600080fd5b8135818111156101bd57600080fd5b8660208260051b85010111156101d257600080fd5b60209290920196919550909350505050565b6020808252825182820181905260009190848201906040850190845b8181101561021c57835183529284019291840191600101610200565b50909695505050505050565b634e487b7160e01b600052604160045260246000fd5b634e487b7160e01b600052603260045260246000fd5b60006020828403121561026657600080fd5b81356001600160a01b038116811461027d57600080fd5b9392505050565b60006020828403121561029657600080fd5b815160ff8116811461027d57600080fd5b6000600182016102c757634e487b7160e01b600052601160045260246000fd5b506001019056fea26469706673582212201a1df631fda4444d1b84deae9fb740fea6848ca50be79a75819f2e2c85a880b864736f6c63430008140033",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}
