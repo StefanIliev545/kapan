@@ -677,7 +677,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x606b5E4609441F7E5be9C21cB5acEc1a84744d5C",
+      address: "0xc6b621aa716A935025de9ec595875cE46B03D051",
       abi: [
         {
           inputs: [
@@ -1002,6 +1002,30 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -1247,6 +1271,30 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -2491,6 +2539,31 @@ const deployedContracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    UiHelper: {
+      address: "0x86045DF29c3534e2cb730167e4B7Bf76be8C5c6b",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getDecimals",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
   },
   42161: {
     AaveGateway: {
@@ -3164,7 +3237,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x96E1D36ed8d76AB172DF0A00895D32Bd2A14cF0d",
+      address: "0x06281379100b9D7c7b60ec137b116B151E217e06",
       abi: [
         {
           inputs: [
@@ -3489,6 +3562,30 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -3734,6 +3831,30 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -3989,7 +4110,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x04A922BB66B7A1380b2089385490a44FC73F8086",
+      address: "0x21f94585dA25e8dA5F5ea399F80c50E6467861c6",
       abi: [
         {
           inputs: [
@@ -4977,6 +5098,31 @@ const deployedContracts = {
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
+    },
+    UiHelper: {
+      address: "0x86045DF29c3534e2cb730167e4B7Bf76be8C5c6b",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getDecimals",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
     },
   },
 } as const;
