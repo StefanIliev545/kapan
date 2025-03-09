@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "hardhat/console.sol";
+
 contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -217,7 +217,6 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         uint256[] memory prices = new uint256[](tokens.length);
         
         for (uint i = 0; i < tokens.length; i++) {
-            console.log("Token:", tokens[i]);
             prices[i] = getCollateralPrice(market,tokens[i]);
         }
         

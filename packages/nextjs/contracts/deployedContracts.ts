@@ -677,7 +677,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xc70cb7182b907feA9e536fC641BE7a571a2729D0",
+      address: "0xc6b621aa716A935025de9ec595875cE46B03D051",
       abi: [
         {
           inputs: [
@@ -1550,7 +1550,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x2298d5c26daBB9C7Bb634d5BDe9Aaef5b6436b03",
+      address: "0x1672a7eA4f72D1535B2F6bbC446Ac83B1A31ee2c",
       abi: [
         {
           inputs: [
@@ -2538,6 +2538,31 @@ const deployedContracts = {
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
+    },
+    UiHelper: {
+      address: "0x86045DF29c3534e2cb730167e4B7Bf76be8C5c6b",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getDecimals",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
     },
   },
   42161: {
