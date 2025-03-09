@@ -1,6 +1,7 @@
 import { FC, useState, useMemo } from "react";
 import Image from "next/image";
 import { Position } from "./Position";
+import { TokenSelectModal } from "./modals/TokenSelectModal";
 
 export interface ProtocolPosition {
   icon: string;
@@ -21,6 +22,23 @@ interface ProtocolViewProps {
   borrowedPositions: ProtocolPosition[];
 }
 
+// Health status indicator component that shows utilization percentage
+const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-32 h-1.5 bg-base-300 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-primary"
+          style={{ width: `${utilizationPercentage}%` }}
+        />
+      </div>
+      <span className="text-xs font-medium">
+        {utilizationPercentage.toFixed(0)}%
+      </span>
+    </div>
+  );
+};
+
 export const ProtocolView: FC<ProtocolViewProps> = ({
   protocolName,
   protocolIcon,
@@ -30,12 +48,21 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   borrowedPositions,
 }) => {
   const [showAll, setShowAll] = useState(false);
+  const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
+  // const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
 
   // Calculate net balance.
   const netBalance = useMemo(() => {
     const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
     const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
     return totalSupplied - totalBorrowed;
+  }, [suppliedPositions, borrowedPositions]);
+
+  // Calculate utilization percentage
+  const utilizationPercentage = useMemo(() => {
+    const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
+    const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
+    return totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
   }, [suppliedPositions, borrowedPositions]);
 
   // Format currency with sign.
@@ -60,32 +87,82 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
   const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
 
+  // Handle opening the token select modal
+  const handleAddSupply = () => {
+    setIsTokenSelectModalOpen(true);
+  };
+
+  // Handle closing the token select modal
+  const handleCloseTokenSelectModal = () => {
+    setIsTokenSelectModalOpen(false);
+  };
+
+  // Borrow functionality disabled for now
+  /*
+  const handleAddBorrow = () => {
+    setIsTokenBorrowModalOpen(true);
+  };
+
+  const handleCloseTokenBorrowModal = () => {
+    setIsTokenBorrowModalOpen(false);
+  };
+  */
+
+  // Get all possible supply positions by using showAll setting
+  // This ensures we include all tokens, even those with zero balance
+  const allSupplyPositions = useMemo(() => {
+    // If we're showing all anyway, use that
+    if (showAll) return suppliedPositions;
+    
+    // Otherwise, temporarily get all positions for the token modal
+    return suppliedPositions;
+  }, [suppliedPositions, showAll]);
+
+  // Get all possible borrow positions by using showAll setting
+  const allBorrowPositions = useMemo(() => {
+    // If we're showing all anyway, use that
+    if (showAll) return borrowedPositions;
+    
+    // Otherwise, temporarily get all positions for the token modal
+    return borrowedPositions;
+  }, [borrowedPositions, showAll]);
+
   return (
     <div className="w-full h-full flex flex-col hide-scrollbar p-4 space-y-4">
-      {/* Protocol Header Card */}
-      <div className="card bg-base-100 shadow-xl rounded-md">
+      {/* Protocol Header Card - Enhanced with subtle effects */}
+      <div className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
         <div className="card-body p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 relative">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 relative rounded-lg bg-base-200 p-1 flex items-center justify-center">
                 <Image
                   src={protocolIcon}
                   alt={`${protocolName} icon`}
-                  layout="fill"
-                  className="rounded-full"
+                  width={36}
+                  height={36}
+                  className="object-contain"
                 />
               </div>
               <div className="flex flex-col">
-                <div className="text-xl font-bold">{protocolName}</div>
-                <div className="text-base-content/70">
-                  Balance: {formatCurrency(netBalance)}
+                <div className="text-xl font-bold tracking-tight">{protocolName}</div>
+                <div className="text-base-content/70 flex items-center gap-1">
+                  <span className="text-sm">Balance:</span>
+                  <span className={`text-sm font-medium ${netBalance >= 0 ? 'text-success' : 'text-error'}`}>
+                    {formatCurrency(netBalance)}
+                  </span>
                 </div>
               </div>
             </div>
 
+            {/* Utilization Section - Simplified */}
+            <div className="flex flex-col items-start gap-1 order-3 md:order-2">
+              <span className="text-sm text-base-content/70">Protocol Utilization</span>
+              <HealthStatus utilizationPercentage={utilizationPercentage} />
+            </div>
+
             {/* Show All Toggle */}
-            <div className="flex items-center gap-2 order-last md:order-none">
-              <span className="text-sm text-base-content/70">Show all</span>
+            <div className="flex items-center justify-end gap-2 order-2 md:order-3">
+              <span className="text-sm text-base-content/70">Show all assets</span>
               <input
                 type="checkbox"
                 className="toggle toggle-primary toggle-sm"
@@ -93,33 +170,26 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 onChange={(e) => setShowAll(e.target.checked)}
               />
             </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <span className="text-base text-base-content/70">Current LTV</span>
-                <span className="text-lg font-medium">{ltv}%</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-base text-base-content/70">Max LTV</span>
-                <span className="text-lg font-medium">{maxLtv}%</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Positions Container: Flex that stacks vertically on small screens and side-by-side on xl */}
-      <div className="flex flex-col xl:flex-row gap-4">
+      {/* Positions Container: Improved shadows and rounded corners */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Supplied Assets */}
-        <div className="flex-1">
-          <div className="card bg-base-100 shadow-xl h-full rounded-md">
-            <div className="card-body p-3">
-              <h2 className="card-title justify-center text-lg">Supplied Assets</h2>
+        <div className="h-full">
+          <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 h-full rounded-lg">
+            <div className="card-body p-4">
+              <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
+                <span>Supplied Assets</span>
+                <span className="badge badge-primary badge-outline">
+                  {filteredSuppliedPositions.length}
+                </span>
+              </h2>
               {filteredSuppliedPositions.length > 0 ? (
-                <div className="space-y-1">
+                <div className=" pt-2">
                   {filteredSuppliedPositions.map((position, index) => (
-                    // Wrap each Position in a container with a fixed min-height.
-                    <div key={`supplied-${position.name}-${index}`} className="min-h-[70px]">
+                    <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
                       <Position
                         {...position}
                         type="supply"
@@ -127,10 +197,27 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       />
                     </div>
                   ))}
+                  
+                  {/* "Add Supply" button */}
+                  <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 mr-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Supply
+                  </button>
                 </div>
               ) : (
-                <div className="text-base-content/70 text-center p-3 bg-base-200 rounded-md">
-                  {showAll ? "No available assets" : "No supplied assets"}
+                <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-10 h-10 mb-2 opacity-50">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                  <p>{showAll ? "No available assets" : "No supplied assets"}</p>
+                  <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 mr-1">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Supply Assets
+                  </button>
                 </div>
               )}
             </div>
@@ -138,15 +225,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
 
         {/* Borrowed Assets */}
-        <div className="flex-1">
-          <div className="card bg-base-100 shadow-xl h-full rounded-md">
-            <div className="card-body p-3">
-              <h2 className="card-title justify-center text-lg">Borrowed Assets</h2>
+        <div className="h-full">
+          <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 h-full rounded-lg">
+            <div className="card-body p-4">
+              <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
+                <span>Borrowed Assets</span>
+                <span className="badge badge-secondary badge-outline">
+                  {filteredBorrowedPositions.length}
+                </span>
+              </h2>
               {filteredBorrowedPositions.length > 0 ? (
-                <div className="space-y-1">
+                <div className="pt-2">
                   {filteredBorrowedPositions.map((position, index) => (
-                    // Wrap each Position in a container with the same min-height.
-                    <div key={`borrowed-${position.name}-${index}`} className="min-h-[70px]">
+                    <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
                       <Position
                         {...position}
                         type="borrow"
@@ -156,17 +247,32 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-base-content/70 text-center p-3 bg-base-200 rounded-md">
-                  {showAll ? "No available assets" : "No borrowed assets"}
+                <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-10 h-10 mb-2 opacity-50">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                  <p>{showAll ? "No available assets" : "No borrowed assets"}</p>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Token Select Modal */}
+      <TokenSelectModal
+        isOpen={isTokenSelectModalOpen}
+        onClose={handleCloseTokenSelectModal}
+        tokens={allSupplyPositions}
+        protocolName={protocolName}
+      />
     </div>
   );
 };
+
+// Added display name to fix linting issue
+HealthStatus.displayName = "HealthStatus";
+ProtocolView.displayName = "ProtocolView";
 
 export const ExampleProtocolView: FC = () => {
   const exampleSuppliedPositions: ProtocolPosition[] = [
@@ -174,7 +280,7 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/ethereum-logo.svg",
       name: "ETH",
       balance: 5000.75,
-      tokenBalance: BigInt(2.5),
+      tokenBalance: BigInt(2.5 * 10 ** 18),
       currentRate: 2.8,
       tokenAddress: "0x0000000000000000000000000000000000000000",
     },
@@ -185,17 +291,17 @@ export const ExampleProtocolView: FC = () => {
       icon: "/logos/dai-logo.svg",
       name: "DAI",
       balance: -2500.25,
-      tokenBalance: BigInt(2500.25),
+      tokenBalance: BigInt(2500.25 * 10 ** 18),
       currentRate: 4.2,
       tokenAddress: "0x0000000000000000000000000000000000000000",
     },
     {
-      icon: "/logos/usd-coin-usdc-logo.svg",
+      icon: "/logos/usdc-logo.svg",
       name: "USDC",
       balance: -1000.5,
-      tokenBalance: BigInt(1000.5), // Example USDC amount
+      tokenBalance: BigInt(1000.5 * 10 ** 6), // USDC has 6 decimals
       currentRate: 3.5,
-      tokenAddress: "",
+      tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     },
   ];
 
@@ -210,3 +316,5 @@ export const ExampleProtocolView: FC = () => {
     />
   );
 };
+
+ExampleProtocolView.displayName = "ExampleProtocolView";
