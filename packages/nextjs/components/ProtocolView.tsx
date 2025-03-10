@@ -11,6 +11,7 @@ export interface ProtocolPosition {
   currentRate: number;
   tokenAddress: string;
   collateralView?: React.ReactNode;
+  collateralValue?: number; // Add optional collateral value for borrowed positions
 }
 
 interface ProtocolViewProps {
@@ -56,8 +57,23 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // Calculate net balance.
   const netBalance = useMemo(() => {
     const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
-    const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
-    return totalSupplied - totalBorrowed;
+    
+    // Include collateral values in total balance calculation
+    let totalBorrowed = 0;
+    let totalCollateral = 0;
+    
+    borrowedPositions.forEach((pos) => {
+      // Add up the absolute borrowed value
+      totalBorrowed += Math.abs(pos.balance);
+      
+      // Add up the collateral value if available
+      if (pos.collateralValue) {
+        totalCollateral += pos.collateralValue;
+      }
+    });
+    
+    // Net balance = supplied + collateral - borrowed
+    return totalSupplied + totalCollateral - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
 
   // Calculate utilization percentage
@@ -82,9 +98,13 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const filteredSuppliedPositions = showAll
     ? suppliedPositions
     : suppliedPositions.filter((p) => p.balance > 0);
+  
+  // For borrowed positions:
+  // - If not showing all, only show positions with actual debt (negative balance)
+  // - If showing all, show everything in the borrowedPositions array
   const filteredBorrowedPositions = showAll
-    ? borrowedPositions
-    : borrowedPositions.filter((p) => p.balance < 0);
+    ? borrowedPositions  // Show all potential borrowable tokens
+    : borrowedPositions.filter((p) => p.balance < 0);  // Only show positions with debt
 
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
   const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;

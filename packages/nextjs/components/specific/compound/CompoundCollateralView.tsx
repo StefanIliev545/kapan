@@ -3,7 +3,6 @@ import Image from "next/image";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { DepositCollateralModal } from "./DepositCollateralModal";
 
 interface CollateralPosition {
@@ -39,54 +38,38 @@ const UserUtilization: FC<{ utilizationPercentage: number }> = ({ utilizationPer
   );
 };
 
-export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken }) => {
+interface CompoundCollateralViewProps {
+  baseToken: string;
+  collateralData: any;
+  collateralPrices: any;
+  collateralDecimals: any;
+  baseTokenDecimals: number | bigint;
+  compoundData: any;
+}
+
+export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({ 
+  baseToken,
+  collateralData,
+  collateralPrices,
+  collateralDecimals,
+  baseTokenDecimals,
+  compoundData
+}) => {
   const [showAll, setShowAll] = useState(false);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
   const { address: connectedAddress } = useAccount();
 
-  // Get the user's comprehensive data for this baseToken
-  const { data: compoundData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getCompoundData",
-    args: [baseToken, connectedAddress],
-  });
+  // Ensure baseTokenDecimals is in the expected array format
+  const baseTokenDecimalsArray = typeof baseTokenDecimals === 'number' 
+    ? [BigInt(baseTokenDecimals)] 
+    : [baseTokenDecimals];
 
-  // Get baseToken decimals - fetch from the token itself
-  // We need this to properly format the borrow balance
-  const { data: baseTokenDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper", 
-    functionName: "getDecimals",
-    args: [[baseToken]],  // Expects an array of addresses
-  });
-
-  // Fetch collateral positions
-  const { data: collateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getDepositedCollaterals",
-    args: [baseToken, connectedAddress],
-  });
-
-  // Extract collateral addresses for price lookup
+  // Extract collateral addresses from passed data
   const collateralAddresses = useMemo(() => {
     if (!collateralData?.[0] || !collateralData[0].length) return [];
     // Return the array of addresses (first element in the collateralData tuple)
     return collateralData[0];
   }, [collateralData]);
-
-  // Get decimals for all collateral tokens using UiHelper
-  const { data: tokenDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper",
-    functionName: "getDecimals",
-    args: [collateralAddresses],
-  });
-
-  // Fetch prices directly from the contract
-  // Important: baseToken needs to be passed for each token even with no debt
-  const { data: collateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getPrices",
-    args: [baseToken, collateralAddresses], // Market first, then token addresses
-  });
 
   // Format currency with 2 decimal places
   const formatNumber = (num: number) => {
@@ -108,7 +91,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
 
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
-    if (!compoundData || !baseTokenDecimals || baseTokenDecimals.length === 0) {
+    if (!compoundData) {
       return { borrowBalance: 0, borrowValue: 0 };
     }
 
@@ -116,7 +99,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
     const [_, __, ___, borrowBalanceRaw, price] = compoundData;
     
     // Get the correct decimals for this token
-    const decimals = Number(baseTokenDecimals[0]);
+    const decimals = Number(baseTokenDecimalsArray[0]);
     
     // Format the borrow balance using the correct decimals
     const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
@@ -133,7 +116,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
     });
     
     return { borrowBalance, borrowValue: borrowUsdValue };
-  }, [compoundData, baseTokenDecimals]);
+  }, [compoundData, baseTokenDecimalsArray]);
 
   // Process collateral data with prices
   const allCollateralPositions = useMemo(() => {
@@ -147,15 +130,15 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
     const positions = addresses.map((address: string, index: number) => {
       const name = displayNames[index];
       
-      // Use decimals from UiHelper, fallback to 18 if not available
-      const decimals = tokenDecimals && index < tokenDecimals.length
-        ? Number(tokenDecimals[index])
+      // Use decimals from passed data, fallback to 18 if not available
+      const decimals = collateralDecimals && index < collateralDecimals.length
+        ? Number(collateralDecimals[index])
         : 18;
       
       // Format balance with correct decimals
       const balance = Number(formatUnits(balances[index], decimals));
       
-      // Get raw price value
+      // Get raw price value 
       const rawPrice = collateralPrices && index < collateralPrices.length 
         ? collateralPrices[index] 
         : 0n;
@@ -179,11 +162,11 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
     });
     
     return positions;
-  }, [collateralData, collateralPrices, tokenDecimals]);
+  }, [collateralData, collateralPrices, collateralDecimals]);
 
   // Calculate total collateral value in USD
   const totalCollateralValue = useMemo(() => {
-    return allCollateralPositions.reduce((total, position) => total + position.usdValue, 0);
+    return allCollateralPositions.reduce((total: number, position: CollateralPosition) => total + position.usdValue, 0);
   }, [allCollateralPositions]);
 
   // Calculate utilization percentage (borrowed USD / total collateral USD)
@@ -195,7 +178,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
   // Check if any position has a balance and auto-show all if none do
   useEffect(() => {
     if (allCollateralPositions && allCollateralPositions.length > 0) {
-      const anyHasBalance = allCollateralPositions.some(pos => pos.balance > 0);
+      const anyHasBalance = allCollateralPositions.some((pos: CollateralPosition) => pos.balance > 0);
       if (!anyHasBalance) {
         setShowAll(true);
       }
@@ -206,7 +189,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
   const collateralPositions = useMemo(() => {
     return showAll 
       ? allCollateralPositions 
-      : allCollateralPositions.filter(pos => pos.balance > 0);
+      : allCollateralPositions.filter((pos: CollateralPosition) => pos.balance > 0);
   }, [allCollateralPositions, showAll]);
 
   // Handle clicking on a collateral token
@@ -221,7 +204,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
 
   // Get all collateral positions (for counting)
   const allPositionsCount = allCollateralPositions.length;
-  const positionsWithBalanceCount = allCollateralPositions.filter(pos => pos.balance > 0).length;
+  const positionsWithBalanceCount = allCollateralPositions.filter((pos: CollateralPosition) => pos.balance > 0).length;
 
   return (
     <>
@@ -272,7 +255,7 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
           
           {collateralPositions.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {collateralPositions.map(position => (
+              {collateralPositions.map((position: CollateralPosition) => (
                 <div 
                   key={position.address} 
                   className={`bg-base-100 rounded-lg p-2 shadow-sm hover:shadow-md transition-all duration-200 border 
