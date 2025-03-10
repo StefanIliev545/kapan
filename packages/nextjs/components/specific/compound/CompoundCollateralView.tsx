@@ -228,9 +228,10 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
       <div className="bg-base-200/60 dark:bg-base-300/30 rounded-lg p-3 mt-2">
         <div className="flex flex-col">
           <div className="mb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 md:gap-4">
+                {/* Collateral Assets title and count - highest priority */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-sm font-semibold text-base-content/80 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
                       <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
@@ -244,21 +245,21 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
                   </span>
                 </div>
                 
-                {/* Utilization indicator - only show if user has collateral */}
+                {/* Utilization indicator - lowest priority, will disappear first */}
                 {totalCollateralValue > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-base-content/70">Utilization:</span>
+                  <div className="hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
+                    <span className="text-xs text-base-content/70 whitespace-nowrap">Utilization:</span>
                     <UserUtilization utilizationPercentage={utilizationPercentage} />
-                    <span className="text-xs text-base-content/70">
+                    <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline">
                       ({formatUSD(borrowDetails.borrowValue)} / {formatUSD(totalCollateralValue)})
                     </span>
                   </div>
                 )}
               </div>
               
-              {/* Toggle for showing all collateral */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-base-content/70">Show all</span>
+              {/* Toggle for showing all collateral - medium priority, always visible */}
+              <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+                <span className="text-xs text-base-content/70 whitespace-nowrap">Show all</span>
                 <input 
                   type="checkbox" 
                   className="toggle toggle-primary toggle-xs" 
@@ -279,8 +280,8 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
                     cursor-pointer hover:bg-base-200/50 active:scale-95`}
                   onClick={() => handleCollateralClick(position)}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="avatar">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="avatar flex-shrink-0">
                       <div className="w-7 h-7 rounded-full bg-base-200 p-1.5 flex items-center justify-center overflow-hidden">
                         <Image 
                           src={position.icon} 
@@ -291,15 +292,15 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
                         />
                       </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">{position.name}</span>
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="font-medium text-sm truncate">{position.name}</span>
                       <div className="flex flex-col">
-                        <span className={`text-xs font-mono ${position.balance > 0 ? 'text-base-content/70' : 'text-base-content/40'}`}>
+                        <span className={`text-xs font-mono truncate ${position.balance > 0 ? 'text-base-content/70' : 'text-base-content/40'}`}>
                           {position.balance > 0 ? formatNumber(position.balance) : 'No balance'}
                         </span>
                         {/* Only show price information for tokens with a balance */}
                         {position.balance > 0 && position.rawPrice > 0n && (
-                          <span className="text-xs font-medium text-success dark:text-success">
+                          <span className="text-xs font-medium text-success dark:text-success truncate">
                             {formatUSD(position.usdValue)}
                           </span>
                         )}
@@ -311,9 +312,8 @@ export const CompoundCollateralView: FC<{ baseToken: string }> = ({ baseToken })
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center text-center gap-2 bg-base-100/50 rounded-lg p-4">
-              <div>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" 
-                    className="w-6 h-6 text-gray-500 dark:text-gray-400 dark:filter dark:invert dark:brightness-75">
+              <div className="text-primary dark:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                 </svg>
               </div>
