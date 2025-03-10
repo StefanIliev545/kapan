@@ -146,6 +146,7 @@ export const CompoundProtocolView: FC = () => {
         maxLtv={90}
         suppliedPositions={suppliedPositions}
         borrowedPositions={borrowedPositions}
+        hideUtilization={true}
       />
     </div>
   );

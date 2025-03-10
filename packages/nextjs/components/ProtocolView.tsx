@@ -20,6 +20,7 @@ interface ProtocolViewProps {
   maxLtv: number;
   suppliedPositions: ProtocolPosition[];
   borrowedPositions: ProtocolPosition[];
+  hideUtilization?: boolean;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -46,6 +47,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   maxLtv,
   suppliedPositions,
   borrowedPositions,
+  hideUtilization = false,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -154,14 +156,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
             </div>
 
-            {/* Utilization Section - Simplified */}
-            <div className="flex flex-col items-start gap-1 order-3 md:order-2">
-              <span className="text-sm text-base-content/70">Protocol Utilization</span>
-              <HealthStatus utilizationPercentage={utilizationPercentage} />
-            </div>
+            {/* Utilization Section - Only show if not hidden */}
+            {!hideUtilization && (
+              <div className="flex flex-col items-start gap-1 order-3 md:order-2">
+                <span className="text-sm text-base-content/70">Protocol Utilization</span>
+                <HealthStatus utilizationPercentage={utilizationPercentage} />
+              </div>
+            )}
 
             {/* Show All Toggle */}
-            <div className="flex items-center justify-end gap-2 order-2 md:order-3">
+            <div className={`flex items-center justify-end gap-2 order-2 md:order-3 ${hideUtilization ? 'md:col-span-2' : ''}`}>
               <span className="text-sm text-base-content/70">Show all assets</span>
               <input
                 type="checkbox"

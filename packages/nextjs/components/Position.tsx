@@ -4,7 +4,7 @@ import { DepositModal } from "./modals/DepositModal";
 import { MovePositionModal } from "./modals/MovePositionModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { RepayModal } from "./modals/RepayModal";
-import { FiPercent } from "react-icons/fi";
+import { FiInfo, FiPercent, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -76,12 +76,9 @@ export const Position: FC<PositionProps> = ({
           <span className="ml-2 font-semibold text-lg truncate">{name}</span>
           <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1">
             <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-              <Image
-                src="/logos/info-button.svg"
-                alt="info"
-                width={16}
-                height={16}
-                className="opacity-50 hover:opacity-80 transition-opacity min-w-[1em] min-h-[1em]"
+              <FiInfo 
+                className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
+                aria-hidden="true"
               />
             </div>
             <div
@@ -163,12 +160,8 @@ export const Position: FC<PositionProps> = ({
           </button>
           {collateralView && (
             <label htmlFor={`collateral-${name}`} className="swap swap-rotate btn btn-sm btn-circle btn-ghost">
-              <svg className="swap-off w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-              <svg className="swap-on w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15l7-7-7-7" />
-              </svg>
+              <FiChevronDown className="swap-off w-4 h-4 text-base-content/70" />
+              <FiChevronUp className="swap-on w-4 h-4 text-base-content/70" />
             </label>
           )}
         </div>
