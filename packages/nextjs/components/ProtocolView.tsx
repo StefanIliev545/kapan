@@ -11,6 +11,7 @@ export interface ProtocolPosition {
   currentRate: number;
   tokenAddress: string;
   collateralView?: React.ReactNode;
+  collateralValue?: number; // Add optional collateral value for borrowed positions
 }
 
 interface ProtocolViewProps {
@@ -20,6 +21,7 @@ interface ProtocolViewProps {
   maxLtv: number;
   suppliedPositions: ProtocolPosition[];
   borrowedPositions: ProtocolPosition[];
+  hideUtilization?: boolean;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -46,6 +48,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   maxLtv,
   suppliedPositions,
   borrowedPositions,
+  hideUtilization = false,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -54,8 +57,23 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // Calculate net balance.
   const netBalance = useMemo(() => {
     const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
-    const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
-    return totalSupplied - totalBorrowed;
+    
+    // Include collateral values in total balance calculation
+    let totalBorrowed = 0;
+    let totalCollateral = 0;
+    
+    borrowedPositions.forEach((pos) => {
+      // Add up the absolute borrowed value
+      totalBorrowed += Math.abs(pos.balance);
+      
+      // Add up the collateral value if available
+      if (pos.collateralValue) {
+        totalCollateral += pos.collateralValue;
+      }
+    });
+    
+    // Net balance = supplied + collateral - borrowed
+    return totalSupplied + totalCollateral - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
 
   // Calculate utilization percentage
@@ -80,9 +98,13 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const filteredSuppliedPositions = showAll
     ? suppliedPositions
     : suppliedPositions.filter((p) => p.balance > 0);
+  
+  // For borrowed positions:
+  // - If not showing all, only show positions with actual debt (negative balance)
+  // - If showing all, show everything in the borrowedPositions array
   const filteredBorrowedPositions = showAll
-    ? borrowedPositions
-    : borrowedPositions.filter((p) => p.balance < 0);
+    ? borrowedPositions  // Show all potential borrowable tokens
+    : borrowedPositions.filter((p) => p.balance < 0);  // Only show positions with debt
 
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
   const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
@@ -154,14 +176,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
             </div>
 
-            {/* Utilization Section - Simplified */}
-            <div className="flex flex-col items-start gap-1 order-3 md:order-2">
-              <span className="text-sm text-base-content/70">Protocol Utilization</span>
-              <HealthStatus utilizationPercentage={utilizationPercentage} />
-            </div>
+            {/* Utilization Section - Only show if not hidden */}
+            {!hideUtilization && (
+              <div className="flex flex-col items-start gap-1 order-3 md:order-2">
+                <span className="text-sm text-base-content/70">Protocol Utilization</span>
+                <HealthStatus utilizationPercentage={utilizationPercentage} />
+              </div>
+            )}
 
             {/* Show All Toggle */}
-            <div className="flex items-center justify-end gap-2 order-2 md:order-3">
+            <div className={`flex items-center justify-end gap-2 order-2 md:order-3 ${hideUtilization ? 'md:col-span-2' : ''}`}>
               <span className="text-sm text-base-content/70">Show all assets</span>
               <input
                 type="checkbox"

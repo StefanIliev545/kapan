@@ -1,14 +1,9 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import {
-  useWalletClient,
-  useWriteContract,
-  useReadContract,
-  usePublicClient,
-} from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
+import { usePublicClient, useReadContract, useWalletClient, useWriteContract } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
+import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -22,12 +17,7 @@ interface RepayModalProps {
   protocolName: string;
 }
 
-export const RepayModal: FC<RepayModalProps> = ({
-  isOpen,
-  onClose,
-  token,
-  protocolName,
-}) => {
+export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName }) => {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const [amount, setAmount] = useState("");
@@ -58,10 +48,7 @@ export const RepayModal: FC<RepayModalProps> = ({
     functionName: "decimals",
   });
 
-  const formattedBalance =
-    balance && decimals
-      ? formatUnits(balance as bigint, decimals as number)
-      : "0";
+  const formattedBalance = balance && decimals ? formatUnits(balance as bigint, decimals as number) : "0";
 
   const handleRepay = async () => {
     if (!walletClient || !routerGateway || !publicClient) return;
@@ -94,12 +81,7 @@ export const RepayModal: FC<RepayModalProps> = ({
       // Now repay
       const repayTx = await writeContractAsync({
         functionName: "repay",
-        args: [
-          protocolName.toLowerCase(),
-          token.address,
-          ownerAddress,
-          repayAmount,
-        ],
+        args: [protocolName.toLowerCase(), token.address, ownerAddress, repayAmount],
       });
       console.log("Repay tx sent:", repayTx);
 
@@ -118,13 +100,7 @@ export const RepayModal: FC<RepayModalProps> = ({
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="modal-box">
         <h3 className="font-bold text-lg flex items-center gap-2">
-          <Image
-            src={token.icon}
-            alt={token.name}
-            width={24}
-            height={24}
-            className="rounded-full"
-          />
+          <Image src={token.icon} alt={token.name} width={24} height={24} className="rounded-full" />
           Repay {token.name}
         </h3>
 
@@ -146,14 +122,11 @@ export const RepayModal: FC<RepayModalProps> = ({
               className="input input-bordered w-full"
               placeholder="0.00"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={e => setAmount(e.target.value)}
               max={formattedBalance}
             />
             <div className="text-right mt-1">
-              <button
-                className="btn btn-xs"
-                onClick={() => setAmount(formattedBalance)}
-              >
+              <button className="btn btn-xs" onClick={() => setAmount(formattedBalance)}>
                 Max
               </button>
             </div>
@@ -161,9 +134,7 @@ export const RepayModal: FC<RepayModalProps> = ({
 
           <div className="text-sm">
             <span className="text-base-content/70">Borrow APY:</span>
-            <span className="ml-2 font-medium">
-              {token.currentRate.toFixed(2)}%
-            </span>
+            <span className="ml-2 font-medium">{token.currentRate.toFixed(2)}%</span>
           </div>
 
           <div className="flex justify-center mt-8">
@@ -182,11 +153,7 @@ export const RepayModal: FC<RepayModalProps> = ({
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleRepay}
-            disabled={loading || !amount}
-          >
+          <button className="btn btn-primary" onClick={handleRepay} disabled={loading || !amount}>
             {loading ? "Repaying..." : "Repay"}
           </button>
         </div>
@@ -196,4 +163,4 @@ export const RepayModal: FC<RepayModalProps> = ({
       </form>
     </dialog>
   );
-}; 
+};
