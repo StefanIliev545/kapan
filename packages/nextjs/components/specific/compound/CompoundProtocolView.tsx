@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, useMemo, useState, useEffect } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
@@ -6,9 +6,23 @@ import { useAccount, useWalletClient } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
+// Define a constant for zero address
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
+  
+  // State to track if we should force showing all assets (when wallet not connected)
+  const [forceShowAll, setForceShowAll] = useState(false);
+  
+  // Determine the address to use for queries
+  const queryAddress = connectedAddress || ZERO_ADDRESS;
+  
+  // Update forceShowAll when wallet connection status changes
+  useEffect(() => {
+    setForceShowAll(!connectedAddress);
+  }, [connectedAddress]);
 
   // Load token contracts via useScaffoldContract.
   const { data: usdc } = useScaffoldContract({ contractName: "USDC", walletClient });
@@ -27,44 +41,44 @@ export const CompoundProtocolView: FC = () => {
   const { data: wethCompoundData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
-    args: [wethAddress, connectedAddress],
+    args: [wethAddress, queryAddress],
   });
   const { data: usdcCompoundData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
-    args: [usdcAddress, connectedAddress],
+    args: [usdcAddress, queryAddress],
   });
   const { data: usdtCompoundData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
-    args: [usdtAddress, connectedAddress],
+    args: [usdtAddress, queryAddress],
   });
   const { data: usdcECompoundData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
-    args: [usdcEAddress, connectedAddress],
+    args: [usdcEAddress, queryAddress],
   });
 
   // Fetch collateral data for each token to include in balance calculation
   const { data: wethCollateralData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getDepositedCollaterals",
-    args: [wethAddress, connectedAddress],
+    args: [wethAddress, queryAddress],
   });
   const { data: usdcCollateralData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getDepositedCollaterals",
-    args: [usdcAddress, connectedAddress],
+    args: [usdcAddress, queryAddress],
   });
   const { data: usdtCollateralData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getDepositedCollaterals",
-    args: [usdtAddress, connectedAddress],
+    args: [usdtAddress, queryAddress],
   });
   const { data: usdcECollateralData } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getDepositedCollaterals",
-    args: [usdcEAddress, connectedAddress],
+    args: [usdcEAddress, queryAddress],
   });
 
   // Get collateral token addresses for price fetching
@@ -329,6 +343,7 @@ export const CompoundProtocolView: FC = () => {
         suppliedPositions={suppliedPositions}
         borrowedPositions={borrowedPositions}
         hideUtilization={true}
+        forceShowAll={forceShowAll}
       />
     </div>
   );

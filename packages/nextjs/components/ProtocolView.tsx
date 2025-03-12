@@ -1,4 +1,4 @@
-import { FC, useState, useMemo } from "react";
+import { FC, useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { Position } from "./Position";
 import { TokenSelectModal } from "./modals/TokenSelectModal";
@@ -22,15 +22,23 @@ interface ProtocolViewProps {
   suppliedPositions: ProtocolPosition[];
   borrowedPositions: ProtocolPosition[];
   hideUtilization?: boolean;
+  forceShowAll?: boolean; // If true, always show all assets regardless of showAll toggle
 }
 
 // Health status indicator component that shows utilization percentage
 const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
+  // Determine color based on utilization percentage
+  const getColor = () => {
+    if (utilizationPercentage < 50) return "bg-success";
+    if (utilizationPercentage < 70) return "bg-warning";
+    return "bg-error";
+  };
+  
   return (
     <div className="flex items-center gap-2">
       <div className="w-32 h-1.5 bg-base-300 rounded-full overflow-hidden">
         <div 
-          className="h-full bg-primary"
+          className={`h-full ${getColor()}`}
           style={{ width: `${utilizationPercentage}%` }}
         />
       </div>
@@ -49,10 +57,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   suppliedPositions,
   borrowedPositions,
   hideUtilization = false,
+  forceShowAll = false,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
   // const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
+
+  // Update showAll when forceShowAll prop changes
+  useEffect(() => {
+    if (forceShowAll) {
+      setShowAll(true);
+    }
+  }, [forceShowAll]);
 
   // Calculate net balance.
   const netBalance = useMemo(() => {
@@ -94,15 +110,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return amount >= 0 ? formatted : `-${formatted}`;
   };
 
+  // Use effective showAll state (component state OR forced from props)
+  const effectiveShowAll = showAll || forceShowAll;
+
   // Filter positions based on showAll toggle.
-  const filteredSuppliedPositions = showAll
+  const filteredSuppliedPositions = effectiveShowAll
     ? suppliedPositions
     : suppliedPositions.filter((p) => p.balance > 0);
   
   // For borrowed positions:
   // - If not showing all, only show positions with actual debt (negative balance)
   // - If showing all, show everything in the borrowedPositions array
-  const filteredBorrowedPositions = showAll
+  const filteredBorrowedPositions = effectiveShowAll
     ? borrowedPositions  // Show all potential borrowable tokens
     : borrowedPositions.filter((p) => p.balance < 0);  // Only show positions with debt
 
@@ -134,20 +153,20 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // This ensures we include all tokens, even those with zero balance
   const allSupplyPositions = useMemo(() => {
     // If we're showing all anyway, use that
-    if (showAll) return suppliedPositions;
+    if (effectiveShowAll) return suppliedPositions;
     
     // Otherwise, temporarily get all positions for the token modal
     return suppliedPositions;
-  }, [suppliedPositions, showAll]);
+  }, [suppliedPositions, effectiveShowAll]);
 
   // Get all possible borrow positions by using showAll setting
   const allBorrowPositions = useMemo(() => {
     // If we're showing all anyway, use that
-    if (showAll) return borrowedPositions;
+    if (effectiveShowAll) return borrowedPositions;
     
     // Otherwise, temporarily get all positions for the token modal
     return borrowedPositions;
-  }, [borrowedPositions, showAll]);
+  }, [borrowedPositions, effectiveShowAll]);
 
   return (
     <div className="w-full h-full flex flex-col hide-scrollbar p-4 space-y-4">
@@ -179,20 +198,27 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             {/* Utilization Section - Only show if not hidden */}
             {!hideUtilization && (
               <div className="flex flex-col items-start gap-1 order-3 md:order-2">
-                <span className="text-sm text-base-content/70">Protocol Utilization</span>
+                <span className="text-sm text-base-content">Protocol Utilization</span>
                 <HealthStatus utilizationPercentage={utilizationPercentage} />
               </div>
             )}
 
-            {/* Show All Toggle */}
+            {/* Show All Toggle - Hide if forceShowAll is true */}
             <div className={`flex items-center justify-end gap-2 order-2 md:order-3 ${hideUtilization ? 'md:col-span-2' : ''}`}>
-              <span className="text-sm text-base-content/70">Show all assets</span>
-              <input
-                type="checkbox"
-                className="toggle toggle-primary toggle-sm"
-                checked={showAll}
-                onChange={(e) => setShowAll(e.target.checked)}
-              />
+              {!forceShowAll && (
+                <>
+                  <span className="text-sm text-base-content/70">Show all assets</span>
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={showAll}
+                    onChange={(e) => setShowAll(e.target.checked)}
+                  />
+                </>
+              )}
+              {forceShowAll && (
+                <span className="text-sm text-primary">Connect wallet to view your positions</span>
+              )}
             </div>
           </div>
         </div>
@@ -235,7 +261,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-10 h-10 mb-2 opacity-50">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                   </svg>
-                  <p>{showAll ? "No available assets" : "No supplied assets"}</p>
+                  <p>{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                   <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 mr-1">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -275,7 +301,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-10 h-10 mb-2 opacity-50">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                   </svg>
-                  <p>{showAll ? "No available assets" : "No borrowed assets"}</p>
+                  <p>{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                 </div>
               )}
             </div>

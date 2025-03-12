@@ -1,21 +1,35 @@
-import { FC, useMemo } from "react";
+import { FC, useMemo, useState, useEffect } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 export const AaveProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
+  
+  // Get the AaveGateway contract info to use its address as a fallback
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGateway" });
+  
+  // State to track if we should force showing all assets when wallet is not connected
+  const [forceShowAll, setForceShowAll] = useState(false);
+  
+  // Determine the address to use for queries - use contract's own address as fallback
+  const queryAddress = connectedAddress || contractInfo?.address;
+  
+  // Update forceShowAll when wallet connection status changes
+  useEffect(() => {
+    setForceShowAll(!connectedAddress);
+  }, [connectedAddress]);
 
   // Helper: Convert Aave RAY (1e27) rates to APY percentage.
   const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 
-  // Get all token info, including supply and borrow balances, for the connected user.
+  // Get all token info, including supply and borrow balances, using query address
   const { data: allTokensInfo } = useScaffoldReadContract({
     contractName: "AaveGateway",
     functionName: "getAllTokensInfo",
-    args: [connectedAddress],
+    args: [queryAddress],
   });
 
   // Aggregate positions by iterating over the returned tokens.
@@ -71,6 +85,7 @@ export const AaveProtocolView: FC = () => {
       maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
+      forceShowAll={forceShowAll}
     />
   );
 };
