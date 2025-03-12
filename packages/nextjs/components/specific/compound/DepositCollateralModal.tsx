@@ -148,7 +148,6 @@ export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({
           <div className="text-sm bg-base-200/60 p-3 rounded-lg">
             <p className="text-base-content/70">
               This will deposit {token.name} as collateral for your Compound position.
-              Collateral can be used to borrow assets and will earn supply interest.
             </p>
           </div>
 
