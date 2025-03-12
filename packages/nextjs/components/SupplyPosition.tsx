@@ -1,50 +1,41 @@
 import { FC, useState } from "react";
 import Image from "next/image";
+import { useAccount } from "wagmi";
 import { DepositModal } from "./modals/DepositModal";
-import { MovePositionModal } from "./modals/MovePositionModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
-import { RepayModal } from "./modals/RepayModal";
-import { FiInfo, FiPercent, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiInfo } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { ProtocolPosition } from "./ProtocolView";
 
-interface PositionProps {
-  icon: string;
-  name: string;
-  balance: number; // USD value
-  tokenBalance: bigint; // Raw token amount
-  currentRate: number;
-  optimalRate?: number;
-  type: "supply" | "borrow";
+// SupplyPositionProps extends ProtocolPosition but can add supply-specific props
+export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
-  tokenAddress: string;
-  collateralView?: React.ReactNode;
-}
+};
 
-export const Position: FC<PositionProps> = ({
+export const SupplyPosition: FC<SupplyPositionProps> = ({
   icon,
   name,
   balance,
   tokenBalance,
   currentRate,
-  optimalRate,
-  type,
   protocolName,
   tokenAddress,
-  collateralView,
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // Get wallet connection status
+  const { address: userAddress } = useAccount();
+  const isWalletConnected = !!userAddress;
 
-  // Check if position has a balance - for borrow positions, we want to check if there is debt
-  const hasBalance = type === "supply" ? tokenBalance > 0 : tokenBalance > 0; // Changed from tokenBalance < 0 since borrow balance is positive
+  // Check if position has a balance
+  const hasBalance = tokenBalance > 0;
 
-  // Fetch optimal rate from the OptimalInterestRateFinder contract.
+  // Fetch optimal rate from the OptimalInterestRateFinder contract
   const { data: optimalRateData } = useScaffoldReadContract({
     contractName: "OptimalInterestRateFinder",
-    functionName: type === "supply" ? "findOptimalSupplyRate" : "findOptimalBorrowRate",
+    functionName: "findOptimalSupplyRate",
     args: [tokenAddress],
   });
 
@@ -67,7 +58,7 @@ export const Position: FC<PositionProps> = ({
   return (
     <>
       {/* Outer container uses grid that becomes a single column on mobile */}
-      <div className={`w-full p-1 pl-2 pr-2 rounded-md bg-base-200 grid grid-cols-1 lg:grid-cols-7`}>
+      <div className="w-full p-1 pl-2 pr-2 rounded-md bg-base-200 grid grid-cols-1 lg:grid-cols-7">
         {/* Header: Icon and Title */}
         <div className="order-1 lg:order-none lg:col-span-2 flex items-center">
           <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
@@ -99,7 +90,7 @@ export const Position: FC<PositionProps> = ({
                   <p className="text-base-content/70">Protocol:</p>
                   <p>{protocolName}</p>
                   <p className="text-base-content/70">Type:</p>
-                  <p className="capitalize">{type} Position</p>
+                  <p className="capitalize">Supply Position</p>
                 </div>
               </div>
             </div>
@@ -110,8 +101,8 @@ export const Position: FC<PositionProps> = ({
         <div className="order-2 lg:order-none lg:col-span-3 grid grid-cols-3 gap-0 items-center">
           <div className="px-2 border-r border-base-300">
             <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-            <div className={`text-sm font-medium h-6 line-clamp-1 ${type === "supply" ? "text-green-500" : "text-red-500"}`}>
-              {type === "supply" ? "" : "-"}${formatNumber(Math.abs(balance))}
+            <div className="text-sm font-medium h-6 line-clamp-1 text-green-500">
+              ${formatNumber(balance)}
             </div>
           </div>
           <div className="px-2 border-r border-base-300">
@@ -141,103 +132,44 @@ export const Position: FC<PositionProps> = ({
 
         {/* Action Buttons */}
         <div className="order-3 lg:order-none lg:col-span-2 flex items-center justify-end gap-1">
-          {type === "supply" ? (
-            <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>
-              Deposit
-            </button>
-          ) : (
-            <button className="btn btn-sm btn-primary" onClick={() => setIsRepayModalOpen(true)} disabled={!hasBalance}>
-              Repay
-            </button>
-          )}
+          <button 
+            className="btn btn-sm btn-primary" 
+            onClick={() => setIsDepositModalOpen(true)}
+            disabled={!isWalletConnected}
+            title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
+          >
+            Deposit
+          </button>
           <button
             className="btn btn-sm btn-outline"
             onClick={() => setIsMoveModalOpen(true)}
-            disabled={!hasBalance || type === "supply"}
-            title={type === "supply" ? "Moving supply positions is not yet implemented" : ""}
+            disabled={true || !isWalletConnected}
+            title={!isWalletConnected ? "Connect wallet to move supply" : "Moving supply positions is not yet implemented"}
           >
             Move
           </button>
-          {collateralView && (
-            <label htmlFor={`collateral-${name}`} className="swap swap-rotate btn btn-sm btn-circle btn-ghost">
-              <FiChevronDown className="swap-off w-4 h-4 text-base-content/70" />
-              <FiChevronUp className="swap-on w-4 h-4 text-base-content/70" />
-            </label>
-          )}
         </div>
       </div>
 
-      {collateralView && (
-        <div className="collapse">
-          <input type="checkbox" id={`collateral-${name}`} className="collapse-toggle hidden" />
-          <div className="collapse-content">
-            <div className="grid grid-cols-1 md:grid-cols-7 w-full">
-              <div className="md:col-span-7">{collateralView}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modals */}
-      {type === "supply" ? (
-        <MoveSupplyModal
-          isOpen={isMoveModalOpen}
-          onClose={() => setIsMoveModalOpen(false)}
-          token={{
-            name,
-            icon,
-            currentRate,
-            address: tokenAddress,
-          }}
-          fromProtocol={protocolName}
-        />
-      ) : (
-        <MovePositionModal
-          isOpen={isMoveModalOpen}
-          onClose={() => setIsMoveModalOpen(false)}
-          fromProtocol={protocolName}
-          position={{
-            name,
-            balance,
-            type,
-            tokenAddress,
-          }}
-        />
-      )}
+      <MoveSupplyModal
+        isOpen={isMoveModalOpen}
+        onClose={() => setIsMoveModalOpen(false)}
+        token={{
+          name,
+          icon,
+          currentRate,
+          address: tokenAddress,
+        }}
+        fromProtocol={protocolName}
+      />
 
-      {type === "supply" && (
-        <DepositModal
-          isOpen={isDepositModalOpen}
-          onClose={() => setIsDepositModalOpen(false)}
-          token={{ name, icon, currentRate, address: tokenAddress }}
-          protocolName={protocolName}
-        />
-      )}
-
-      {type === "borrow" && (
-        <RepayModal
-          isOpen={isRepayModalOpen}
-          onClose={() => setIsRepayModalOpen(false)}
-          token={{ name, icon, currentRate, address: tokenAddress }}
-          protocolName={protocolName}
-        />
-      )}
+      <DepositModal
+        isOpen={isDepositModalOpen}
+        onClose={() => setIsDepositModalOpen(false)}
+        token={{ name, icon, currentRate, address: tokenAddress }}
+        protocolName={protocolName}
+      />
     </>
   );
-};
-
-export const ExamplePosition: FC = () => {
-  return (
-    <Position
-      icon="/logos/usdc-coin-usdc-logo.svg"
-      name="USDC"
-      balance={1000.5}
-      tokenBalance={BigInt(1000.5)}
-      currentRate={3.5}
-      type="supply"
-      protocolName="Aave V3"
-      tokenAddress="0x0000000000000000000000000000000000000000"
-      collateralView={<div className="p-4 bg-gray-100">This is the collateral view content.</div>}
-    />
-  );
-};
+}; 

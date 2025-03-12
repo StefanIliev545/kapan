@@ -1,17 +1,20 @@
-import { FC, useState, useMemo, useEffect } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Position } from "./Position";
+import { BorrowPosition } from "./BorrowPosition";
+import { SupplyPosition } from "./SupplyPosition";
 import { TokenSelectModal } from "./modals/TokenSelectModal";
+import { BorrowModal } from "./modals/BorrowModal";
+import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 
 export interface ProtocolPosition {
   icon: string;
   name: string;
-  balance: number;       // USD value
-  tokenBalance: bigint;  // Raw token amount
+  balance: number; // USD value
+  tokenBalance: bigint; // Raw token amount
   currentRate: number;
   tokenAddress: string;
   collateralView?: React.ReactNode;
-  collateralValue?: number; // Add optional collateral value for borrowed positions
+  collateralValue?: number; // Optional collateral value (used by borrowed positions)
 }
 
 interface ProtocolViewProps {
@@ -33,18 +36,13 @@ const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercen
     if (utilizationPercentage < 70) return "bg-warning";
     return "bg-error";
   };
-  
+
   return (
     <div className="flex items-center gap-2">
       <div className="w-32 h-1.5 bg-base-300 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${getColor()}`}
-          style={{ width: `${utilizationPercentage}%` }}
-        />
+        <div className={`h-full ${getColor()}`} style={{ width: `${utilizationPercentage}%` }} />
       </div>
-      <span className="text-xs font-medium">
-        {utilizationPercentage.toFixed(0)}%
-      </span>
+      <span className="text-xs font-medium">{utilizationPercentage.toFixed(0)}%</span>
     </div>
   );
 };
@@ -61,7 +59,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
-  // const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
+  const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
+  const [isTokenBorrowSelectModalOpen, setIsTokenBorrowSelectModalOpen] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
 
   // Update showAll when forceShowAll prop changes
   useEffect(() => {
@@ -73,21 +73,21 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // Calculate net balance.
   const netBalance = useMemo(() => {
     const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
-    
+
     // Include collateral values in total balance calculation
     let totalBorrowed = 0;
     let totalCollateral = 0;
-    
-    borrowedPositions.forEach((pos) => {
+
+    borrowedPositions.forEach(pos => {
       // Add up the absolute borrowed value
       totalBorrowed += Math.abs(pos.balance);
-      
+
       // Add up the collateral value if available
       if (pos.collateralValue) {
         totalCollateral += pos.collateralValue;
       }
     });
-    
+
     // Net balance = supplied + collateral - borrowed
     return totalSupplied + totalCollateral - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
@@ -114,47 +114,55 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const effectiveShowAll = showAll || forceShowAll;
 
   // Filter positions based on showAll toggle.
-  const filteredSuppliedPositions = effectiveShowAll
-    ? suppliedPositions
-    : suppliedPositions.filter((p) => p.balance > 0);
-  
+  const filteredSuppliedPositions = effectiveShowAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0);
+
   // For borrowed positions:
   // - If not showing all, only show positions with actual debt (negative balance)
   // - If showing all, show everything in the borrowedPositions array
   const filteredBorrowedPositions = effectiveShowAll
-    ? borrowedPositions  // Show all potential borrowable tokens
-    : borrowedPositions.filter((p) => p.balance < 0);  // Only show positions with debt
+    ? borrowedPositions // Show all potential borrowable tokens
+    : borrowedPositions.filter(p => p.balance < 0); // Only show positions with debt
 
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
   const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
 
-  // Handle opening the token select modal
+  // Handle opening the token select modal for supply
   const handleAddSupply = () => {
     setIsTokenSelectModalOpen(true);
   };
 
-  // Handle closing the token select modal
+  // Handle closing the token select modal for supply
   const handleCloseTokenSelectModal = () => {
     setIsTokenSelectModalOpen(false);
   };
 
-  // Borrow functionality disabled for now
-  /*
+  // Handle opening the token select modal for borrowing
   const handleAddBorrow = () => {
+    setIsTokenBorrowSelectModalOpen(true);
+  };
+
+  // Handle closing the token select modal for borrowing
+  const handleCloseBorrowSelectModal = () => {
+    setIsTokenBorrowSelectModalOpen(false);
+  };
+
+  // Handle opening the borrow modal directly (obsolete, but keeping for reference)
+  const handleOpenBorrowModal = () => {
     setIsTokenBorrowModalOpen(true);
   };
 
-  const handleCloseTokenBorrowModal = () => {
+  // Handle closing the borrow modal
+  const handleCloseBorrowModal = () => {
     setIsTokenBorrowModalOpen(false);
+    setSelectedToken(null);
   };
-  */
 
   // Get all possible supply positions by using showAll setting
   // This ensures we include all tokens, even those with zero balance
   const allSupplyPositions = useMemo(() => {
     // If we're showing all anyway, use that
     if (effectiveShowAll) return suppliedPositions;
-    
+
     // Otherwise, temporarily get all positions for the token modal
     return suppliedPositions;
   }, [suppliedPositions, effectiveShowAll]);
@@ -163,7 +171,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const allBorrowPositions = useMemo(() => {
     // If we're showing all anyway, use that
     if (effectiveShowAll) return borrowedPositions;
-    
+
     // Otherwise, temporarily get all positions for the token modal
     return borrowedPositions;
   }, [borrowedPositions, effectiveShowAll]);
@@ -188,7 +196,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <div className="text-xl font-bold tracking-tight">{protocolName}</div>
                 <div className="text-base-content/70 flex items-center gap-1">
                   <span className="text-sm">Balance:</span>
-                  <span className={`text-sm font-medium ${netBalance >= 0 ? 'text-success' : 'text-error'}`}>
+                  <span className={`text-sm font-medium ${netBalance >= 0 ? "text-success" : "text-error"}`}>
                     {formatCurrency(netBalance)}
                   </span>
                 </div>
@@ -204,7 +212,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             )}
 
             {/* Show All Toggle - Hide if forceShowAll is true */}
-            <div className={`flex items-center justify-end gap-2 order-2 md:order-3 ${hideUtilization ? 'md:col-span-2' : ''}`}>
+            <div
+              className={`flex items-center justify-end gap-2 order-2 md:order-3 ${hideUtilization ? "md:col-span-2" : ""}`}
+            >
               {!forceShowAll && (
                 <>
                   <span className="text-sm text-base-content/70">Show all assets</span>
@@ -212,13 +222,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     type="checkbox"
                     className="toggle toggle-primary toggle-sm"
                     checked={showAll}
-                    onChange={(e) => setShowAll(e.target.checked)}
+                    onChange={e => setShowAll(e.target.checked)}
                   />
                 </>
               )}
-              {forceShowAll && (
-                <span className="text-sm text-primary">Connect wallet to view your positions</span>
-              )}
+              {forceShowAll && <span className="text-sm text-primary">Connect wallet to view your positions</span>}
             </div>
           </div>
         </div>
@@ -232,40 +240,28 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             <div className="card-body p-4">
               <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
                 <span>Supplied Assets</span>
-                <span className="badge badge-primary badge-outline">
-                  {filteredSuppliedPositions.length}
-                </span>
+                <span className="badge badge-primary badge-outline">{filteredSuppliedPositions.length}</span>
               </h2>
               {filteredSuppliedPositions.length > 0 ? (
                 <div className=" pt-2">
                   {filteredSuppliedPositions.map((position, index) => (
                     <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
-                      <Position
-                        {...position}
-                        type="supply"
-                        protocolName={protocolName}
-                      />
+                      <SupplyPosition {...position} protocolName={protocolName} />
                     </div>
                   ))}
-                  
+
                   {/* "Add Supply" button */}
                   <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 mr-1">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
+                    <FiPlus className="w-4 h-4 mr-1" />
                     Add Supply
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-10 h-10 mb-2 opacity-50">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                  </svg>
+                  <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                   <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 mr-1">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
+                    <FiPlus className="w-4 h-4 mr-1" />
                     Supply Assets
                   </button>
                 </div>
@@ -280,28 +276,30 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             <div className="card-body p-4">
               <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
                 <span>Borrowed Assets</span>
-                <span className="badge badge-secondary badge-outline">
-                  {filteredBorrowedPositions.length}
-                </span>
+                <span className="badge badge-secondary badge-outline">{filteredBorrowedPositions.length}</span>
               </h2>
               {filteredBorrowedPositions.length > 0 ? (
                 <div className="pt-2">
                   {filteredBorrowedPositions.map((position, index) => (
                     <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
-                      <Position
-                        {...position}
-                        type="borrow"
-                        protocolName={protocolName}
-                      />
+                      <BorrowPosition {...position} protocolName={protocolName} />
                     </div>
                   ))}
+                  
+                  {/* "Add Borrow" button */}
+                  <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
+                    <FiPlus className="w-4 h-4 mr-1" />
+                    Borrow
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-10 h-10 mb-2 opacity-50">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                  </svg>
+                  <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
+                  <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
+                    <FiPlus className="w-4 h-4 mr-1" />
+                    Borrow Assets
+                  </button>
                 </div>
               )}
             </div>
@@ -309,13 +307,47 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
       </div>
 
-      {/* Token Select Modal */}
+      {/* Token Select Modal for Supply */}
       <TokenSelectModal
         isOpen={isTokenSelectModalOpen}
         onClose={handleCloseTokenSelectModal}
         tokens={allSupplyPositions}
         protocolName={protocolName}
+        isBorrow={false}
       />
+
+      {/* Token Select Modal for Borrow */}
+      <TokenSelectModal
+        isOpen={isTokenBorrowSelectModalOpen}
+        onClose={handleCloseBorrowSelectModal}
+        tokens={allBorrowPositions}
+        protocolName={protocolName}
+        isBorrow={true}
+      />
+
+      {/* Borrow Modal - Kept for backward compatibility */}
+      {isTokenBorrowModalOpen && (
+        <BorrowModal
+          isOpen={isTokenBorrowModalOpen}
+          onClose={handleCloseBorrowModal}
+          token={
+            selectedToken
+              ? {
+                  name: selectedToken.name,
+                  icon: selectedToken.icon,
+                  address: selectedToken.tokenAddress,
+                  currentRate: selectedToken.currentRate,
+                }
+              : {
+                  name: borrowedPositions[0]?.name || "",
+                  icon: borrowedPositions[0]?.icon || "",
+                  address: borrowedPositions[0]?.tokenAddress || "",
+                  currentRate: borrowedPositions[0]?.currentRate || 0,
+                }
+          }
+          protocolName={protocolName}
+        />
+      )}
     </div>
   );
 };

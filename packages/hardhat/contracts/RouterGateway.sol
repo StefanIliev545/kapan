@@ -398,6 +398,12 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         return gateway.getPossibleCollaterals(token, user);
     }
 
+    function getEncodedDebtApproval(string calldata protocolName, address debtToken, uint256 debtAmount) external view returns (address[] memory, bytes[] memory) {
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        return gateway.getEncodedDebtApproval(debtToken, debtAmount);
+    }
+
     function getFromProtocolApprovalsForMove(address debtToken, IGateway.Collateral[] calldata collaterals, string calldata fromProtocol) external view returns (address[] memory, bytes[] memory) {
         IGateway fromGateway = gateways[fromProtocol];
         require(address(fromGateway) != address(0), "From protocol not supported");

@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x6B136ADA56D96A871b7C3079982912E521d731bb",
+      address: "0x80D0A27e6c520269FD4EDab3215BFD4389D9a0A5",
       abi: [
         {
           inputs: [
@@ -677,7 +677,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xc6b621aa716A935025de9ec595875cE46B03D051",
+      address: "0xEce446058DBa41ac494c3321682B836E8E2dF5F0",
       abi: [
         {
           inputs: [
@@ -1766,7 +1766,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0xe432a8671E44311D29a2f84d7192229a1ec8FC0a",
+      address: "0x8D75FD07f01e0C893CE0bA51cC0846c277644F99",
       abi: [
         {
           inputs: [
@@ -2051,6 +2051,40 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "debtAmount",
+              type: "uint256",
+            },
+          ],
+          name: "getEncodedDebtApproval",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "",
+              type: "bytes[]",
             },
           ],
           stateMutability: "view",
