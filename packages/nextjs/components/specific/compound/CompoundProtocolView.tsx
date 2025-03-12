@@ -13,15 +13,29 @@ export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
   
-  // State to track if we should force showing all assets (when wallet not connected)
+  // State to track if we should force showing all assets when wallet is not connected
   const [forceShowAll, setForceShowAll] = useState(false);
   
   // Determine the address to use for queries
   const queryAddress = connectedAddress || ZERO_ADDRESS;
   
-  // Update forceShowAll when wallet connection status changes
+  // Update forceShowAll when wallet connection status changes with a delay
   useEffect(() => {
-    setForceShowAll(!connectedAddress);
+    // If wallet is connected, immediately set forceShowAll to false
+    if (connectedAddress) {
+      setForceShowAll(false);
+      return;
+    }
+    
+    // If wallet is not connected, wait a bit before forcing show all
+    // This gives time for wallet to connect during initial page load
+    const timeout = setTimeout(() => {
+      if (!connectedAddress) {
+        setForceShowAll(true);
+      }
+    }, 2500); // Wait 1.5 seconds before deciding wallet is not connected
+    
+    return () => clearTimeout(timeout);
   }, [connectedAddress]);
 
   // Load token contracts via useScaffoldContract.
