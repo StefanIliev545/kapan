@@ -25,6 +25,7 @@ const etherscanOptimisticApiKey = process.env.ETHERSCAN_OPTIMISTIC_API_KEY || "R
 const basescanApiKey = process.env.BASESCAN_API_KEY || "ZZZEIPMT1MNJ8526VV2Y744CA7TNZR64G6";
 const arbiscanApiKey = process.env.ARBISCAN_API_KEY || "";
 const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY || "";
+const bscscanApiKey = process.env.BSCSCAN_API_KEY || "";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -186,6 +187,26 @@ const config: HardhatUserConfig = {
       url: "https://alfajores-forno.celo-testnet.org",
       accounts: [deployerPrivateKey],
     },
+    bnb: {
+      url: "https://bsc-dataseed.binance.org",
+      accounts: [deployerPrivateKey],
+      verify: {
+        etherscan: {
+          apiUrl: "https://api.bscscan.com",
+          apiKey: bscscanApiKey,
+        },
+      },
+    },
+    bnbTestnet: {
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+      accounts: [deployerPrivateKey],
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-testnet.bscscan.com",
+          apiKey: bscscanApiKey,
+        },
+      },
+    },
   },
   // configuration for harhdat-verify plugin
   etherscan: {
@@ -200,6 +221,8 @@ const config: HardhatUserConfig = {
       polygonMumbai: polygonscanApiKey,
       base: basescanApiKey,
       baseSepolia: basescanApiKey,
+      bnb: bscscanApiKey,
+      bnbTestnet: bscscanApiKey,
     },
     customChains: [
       {
@@ -232,6 +255,22 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api-sepolia-optimistic.etherscan.io/api",
           browserURL: "https://sepolia-optimistic.etherscan.io",
+        },
+      },
+      {
+        network: "bnb",
+        chainId: 56,
+        urls: {
+          apiURL: "https://api.bscscan.com/api",
+          browserURL: "https://bscscan.com",
+        },
+      },
+      {
+        network: "bnbTestnet",
+        chainId: 97,
+        urls: {
+          apiURL: "https://api-testnet.bscscan.com/api",
+          browserURL: "https://testnet.bscscan.com",
         },
       },
     ],

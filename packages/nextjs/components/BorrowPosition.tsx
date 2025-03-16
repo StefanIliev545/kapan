@@ -125,14 +125,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </div>
           <div className="px-2 border-r border-base-300">
             <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">
-              APY
+              APR
             </div>
             <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
               {currentRate.toFixed(2)}%
             </div>
           </div>
           <div className="px-2">
-            <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
+            <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APR</div>
             <div className="font-medium flex items-center h-6">
               <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
                 {optimalRateDisplay.toFixed(2)}%

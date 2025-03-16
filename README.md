@@ -6,21 +6,30 @@
   <a href="https://kapan.finance/info">Documentation</a>
 </h4>
 
-🔄 A DeFi protocol that optimizes borrowing costs by allowing users to seamlessly move debt positions between lending platforms like Aave and Compound on the Arbitrum network.
+🔄 A DeFi protocol that optimizes borrowing costs by allowing users to seamlessly move debt positions between lending platforms like Aave, Compound, and Venus across multiple chains including Arbitrum and BNB Chain.
 
 ⚙️ Built using NextJS, RainbowKit, Hardhat, Wagmi, Viem, and Typescript.
 
 - 💰 **Interest Rate Optimization**: Move your debt to platforms with lower interest rates.
-- 🔄 **One-Click Transfers**: Seamlessly transfer debt between Aave and Compound with a single transaction.
+- 🔄 **One-Click Transfers**: Seamlessly transfer debt between lending protocols with a single transaction.
 - 📊 **Real-time Comparisons**: Instantly see potential savings by comparing rates between protocols.
 - 🧮 **Automatic Calculations**: Built-in calculator shows exactly how much you can save yearly.
 - 🔐 **Secure & Non-custodial**: Your assets always remain in your control.
+- 🌉 **Cross-Chain Support**: Optimize debt across different blockchains.
 
 ![Kapan Finance Dashboard](https://kapan.finance/dashboard-preview.png)
 
 ## Overview
 
 Kapan Finance enables DeFi users to optimize their borrowing costs by easily moving debt positions between lending protocols. By comparing interest rates and facilitating seamless transfers, users can save significantly on their annual borrowing costs without complex manual processes.
+
+## Supported Protocols
+
+Kapan currently supports the following lending protocols:
+
+- **Aave V3** (Arbitrum)
+- **Compound V3** (Arbitrum)
+- **Venus** (Arbitrum)
 
 ## How It Works
 
@@ -30,11 +39,12 @@ Kapan Finance enables DeFi users to optimize their borrowing costs by easily mov
 
 ## Features
 
-- **Protocol Comparison**: Real-time comparison of interest rates between Aave and Compound.
+- **Protocol Comparison**: Real-time comparison of interest rates between Aave, Compound, and Venus.
 - **Savings Calculation**: Automatic calculation of potential annual savings based on your debt amount.
 - **One-Click Debt Transfers**: Seamlessly move your debt between protocols with a single transaction.
 - **User-Friendly Interface**: Clean, intuitive interface that makes DeFi optimization accessible to everyone.
 - **Multi-Asset Support**: Support for various assets like USDC, ETH, and more.
+- **Cross-Chain Integration**: Support for multiple blockchains (Arbitrum, BNB Chain).
 
 ## Requirements
 
