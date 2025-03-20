@@ -75,6 +75,7 @@ const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEn
       venusGateway.address,
       [
         VENUS_COMPTROLLER,
+        VENUS_ORACLE,
         routerGateway.address
       ]
     );
