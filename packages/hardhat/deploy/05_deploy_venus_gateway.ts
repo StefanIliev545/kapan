@@ -6,7 +6,7 @@ import { verifyContract } from "../utils/verification";
 
 /**
  * Deploys the Venus Gateway contract using the deployer account and
- * registers it with the Router Gateway
+ * registers it with the Router Gateway and OptimalInterestRateFinder
  *
  * @param hre HardhatRuntimeEnvironment object.
  */
@@ -48,6 +48,24 @@ const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEn
   // Register the gateway with the router
   await execute("RouterGateway", { from: deployer }, "addGateway", "venus", venusGateway.address);
   
+  // Also register the gateway with the OptimalInterestRateFinder
+  try {
+    const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
+    console.log(`Registering VenusGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
+    
+    await execute(
+      "OptimalInterestRateFinder", 
+      { from: deployer, log: true }, 
+      "registerGateway", 
+      "venus", 
+      venusGateway.address
+    );
+    
+    console.log("VenusGateway registered with OptimalInterestRateFinder");
+  } catch (error) {
+    console.warn("Failed to register with OptimalInterestRateFinder:", error);
+  }
+  
   // Skip verification on local networks
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     // Verify the contract on BscScan
@@ -67,4 +85,5 @@ export default deployVenusGateway;
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags VenusGateway
 deployVenusGateway.tags = ["VenusGateway"];
-deployVenusGateway.dependencies = ["RouterGateway"]; 
+// Now depends on OptimalInterestRateFinder as well
+deployVenusGateway.dependencies = ["RouterGateway", "OptimalInterestRateFinder"]; 

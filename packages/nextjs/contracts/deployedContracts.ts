@@ -1704,49 +1704,85 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x21ff94fB478420982CC91F6a7236864EE1939a51",
+      address: "0x9BBeED34EcF593C261a4f4A0963787630A6b9EeE",
       abi: [
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_aaveGateway",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "_compoundGateway",
-              type: "address",
-            },
-          ],
+          inputs: [],
           stateMutability: "nonpayable",
           type: "constructor",
         },
         {
-          inputs: [],
-          name: "aaveGateway",
-          outputs: [
+          inputs: [
             {
-              internalType: "contract AaveGateway",
-              name: "",
+              internalType: "address",
+              name: "owner",
               type: "address",
             },
           ],
-          stateMutability: "view",
-          type: "function",
+          name: "OwnableInvalidOwner",
+          type: "error",
         },
         {
-          inputs: [],
-          name: "compoundGateway",
-          outputs: [
+          inputs: [
             {
-              internalType: "contract CompoundGateway",
-              name: "",
+              internalType: "address",
+              name: "account",
               type: "address",
             },
           ],
-          stateMutability: "view",
-          type: "function",
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "string",
+              name: "name",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayRegistered",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "string",
+              name: "name",
+              type: "string",
+            },
+          ],
+          name: "GatewayRemoved",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
         },
         {
           inputs: [
@@ -1776,6 +1812,49 @@ const deployedContracts = {
             },
           ],
           name: "convertCompoundRateToAPR",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocol",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          name: "convertRateToStandardized",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          name: "convertVenusRateToAPY",
           outputs: [
             {
               internalType: "uint256",
@@ -1829,6 +1908,25 @@ const deployedContracts = {
               internalType: "uint256",
               name: "",
               type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "contract IGateway",
+              name: "",
+              type: "address",
             },
           ],
           stateMutability: "view",
@@ -1893,6 +1991,19 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [],
+          name: "getRegisteredGateways",
+          outputs: [
+            {
+              internalType: "string[]",
+              name: "",
+              type: "string[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "address[]",
@@ -1916,8 +2027,95 @@ const deployedContracts = {
           stateMutability: "view",
           type: "function",
         },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "name",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "registerGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "registeredGatewayNames",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "name",
+              type: "string",
+            },
+          ],
+          name: "removeGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
-      inheritedFunctions: {},
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
     },
     RouterGateway: {
       address: "0x89eE2ea76b325dCe230567dA14915269332E3223",

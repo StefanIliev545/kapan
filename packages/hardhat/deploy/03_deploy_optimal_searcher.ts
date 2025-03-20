@@ -23,21 +23,19 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  const aaveGateway = await hre.deployments.get("AaveGateway");
-  const compoundGateway = await hre.deployments.get("CompoundGateway");
-
+  // Deploy with empty constructor - gateways will register themselves
   const optimalFinder = await deploy("OptimalInterestRateFinder", {
     from: deployer,
-    // Contract constructor arguments
-    args: [
-        aaveGateway.address,
-        compoundGateway.address,
-    ],
+    // No constructor arguments needed
+    args: [],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
     autoMine: true,
   });
+
+  console.log("OptimalInterestRateFinder deployed at:", optimalFinder.address);
+  console.log("Gateways will self-register during their deployment");
   
   // Skip verification on local networks
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
@@ -45,10 +43,7 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
     await verifyContract(
       hre,
       optimalFinder.address,
-      [
-        aaveGateway.address,
-        compoundGateway.address,
-      ]
+      [] // No constructor arguments
     );
   }
 };
@@ -58,4 +53,5 @@ export default deployOptimalInterestRateFinder;
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags OptimalInterestRateFinder
 deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder"];
-deployOptimalInterestRateFinder.dependencies = ["AAVEGateway", "CompoundGateway"];
+// No dependencies - this should be deployed first
+deployOptimalInterestRateFinder.dependencies = [];
