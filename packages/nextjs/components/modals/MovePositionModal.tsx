@@ -36,6 +36,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const protocols = [
     { name: "Aave V3", icon: "/logos/aave.svg" },
     { name: "Compound V3", icon: "/logos/compound.svg" },
+    { name: "Venus", icon: "/logos/venus.svg" },
   ];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
@@ -74,22 +75,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const collaterals = useMemo(() => {
     return fetchedCollaterals.map(
       (collateral: { symbol: string; balance: number; address: string; decimals: number }) => {
-        // Directly use the supported status from the hook
+        // Use the address for selection status instead of symbol
         return {
           ...collateral,
-          selected: selectedCollaterals.has(collateral.symbol),
+          // Check if the address is in the selectedCollaterals set
+          selected: selectedCollaterals.has(collateral.address),
           supported: supportedCollaterals[collateral.address] === true,
         };
       },
     );
   }, [fetchedCollaterals, selectedCollaterals, supportedCollaterals]);
 
-  const handleCollateralToggle = (symbol: string) => {
-    const collateral = collaterals.find(c => c.symbol === symbol);
+  // Modified to use address instead of symbol
+  const handleCollateralToggle = (address: string) => {
+    const collateral = collaterals.find(c => c.address === address);
     if (collateral && !collateral.supported) return;
     setSelectedCollaterals(prev => {
       const next = new Set(prev);
-      next.has(symbol) ? next.delete(symbol) : next.add(symbol);
+      next.has(address) ? next.delete(address) : next.add(address);
       return next;
     });
   };
@@ -188,7 +191,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       }
 
       const selectedCollateralArray = collaterals
-        .filter(c => selectedCollaterals.has(c.symbol))
+        .filter(c => selectedCollaterals.has(c.address))
         .map(c => {
           const collateralAmount = parseUnits(c.balance.toString(), c.decimals);
           return { token: c.address, amount: collateralAmount };
@@ -268,7 +271,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </label>
-                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
+                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full z-50 dropdown-bottom">
                   {protocols
                     .filter(p => p.name !== fromProtocol)
                     .map(protocol => (
@@ -394,8 +397,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 <div className="flex flex-wrap gap-2 justify-center">
                   {collaterals.map(collateral => (
                     <button
-                      key={collateral.symbol}
-                      onClick={() => handleCollateralToggle(collateral.symbol)}
+                      key={collateral.address}
+                      onClick={() => handleCollateralToggle(collateral.address)}
                       className={`
                         btn btn-sm normal-case flex items-center gap-2 h-auto py-2
                         ${collateral.selected ? "btn-primary" : "btn-outline"}

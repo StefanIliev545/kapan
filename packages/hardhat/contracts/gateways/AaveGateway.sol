@@ -48,7 +48,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         deposit(collateral, receiver, amount);
     }
 
-    function withdrawCollateral(address, address token, address user, uint256 amount) external override onlyRouter returns (address) {
+    function withdrawCollateral(address, address token, address user, uint256 amount) external override onlyRouter returns (address, uint256) {
         address aToken = getAToken(token);
         IERC20 atoken = IERC20(aToken);
         
@@ -61,7 +61,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         IPool(poolAddressesProvider.getPool()).withdraw(underlying, amount, address(this));
 
         IERC20(underlying).safeTransfer(msg.sender, amount);
-        return underlying;
+        return (underlying, amount);
     }
 
     function borrow(address token, address user, uint256 amount) external override onlyRouterOrSelf(user) nonReentrant {
@@ -190,6 +190,10 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         return 0;
     }
 
+    function getBorrowBalanceCurrent(address token, address user) external override returns (uint256) {
+        return getBorrowBalance(token, user);
+    }
+
     /// @notice Returns the list of tokens that the user has borrowed.
     function borrowedTokens(address user) external view returns (address[] memory) {
         (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
@@ -285,7 +289,33 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         string[] memory symbols,
         uint8[] memory decimals
     ) {
-        // Get all tokens info
+        // If user is zero address, get all possible tokens but with zero balances
+        if (user == address(0)) {
+            (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+            
+            // Initialize arrays with all reserves
+            uint256 tokenCountX = reserves.length;
+            collateralAddresses = new address[](tokenCountX);
+            balances = new uint256[](tokenCountX); // All zeros by default
+            symbols = new string[](tokenCountX);
+            decimals = new uint8[](tokenCountX);
+            
+            // Fill arrays with token data (zero balances)
+            for (uint256 i = 0; i < tokenCountX; i++) {
+                collateralAddresses[i] = reserves[i].underlyingAsset;
+                symbols[i] = reserves[i].symbol;
+                // Get decimals directly from token
+                try ERC20(reserves[i].underlyingAsset).decimals() returns (uint8 dec) {
+                    decimals[i] = dec;
+                } catch {
+                    decimals[i] = 18; // Default to 18 if call fails
+                }
+            }
+            
+            return (collateralAddresses, balances, symbols, decimals);
+        }
+        
+        // For connected wallets, get all tokens with actual balances
         TokenInfo[] memory allTokens = this.getAllTokensInfo(user);
 
         // Count tokens with non-zero balance
@@ -309,7 +339,11 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
                 collateralAddresses[index] = allTokens[i].token;
                 balances[index] = allTokens[i].balance;
                 symbols[index] = allTokens[i].symbol;
-                decimals[index] = ERC20(allTokens[i].token).decimals();
+                try ERC20(allTokens[i].token).decimals() returns (uint8 dec) {
+                    decimals[index] = dec;
+                } catch {
+                    decimals[index] = 18; // Default to 18 if call fails
+                }
                 index++;
             }
         }
@@ -325,7 +359,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         }
     }
 
-    function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data) {
+    function getEncodedDebtApproval(address token, uint256 amount, address user) external view override returns (address[] memory target, bytes[] memory data) {
         (,address variableDebtToken , bool found) = _getReserveAddresses(token);
         require(found && variableDebtToken != address(0), "Token is not a valid debt token");
         target = new address[](1);
@@ -333,6 +367,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         target[0] = variableDebtToken;
         // todo - determine if max is ok, its hard to get the exact amount right if we wanna transfer all.. 
         data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), type(uint256).max);
+        return (target, data);
     }
 
     function getAToken(address underlyingToken) public view returns (address) {
@@ -395,5 +430,17 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         }
         
         return collateralAddresses;
+    }
+
+    /**
+     * @notice Get additional actions required for a token when providing collateral (not used in Aave)
+     * @param token The token to borrow
+     * @param collaterals The collaterals to use
+     * @return target Array of target contract addresses (empty for Aave)
+     * @return data Array of encoded function call data (empty for Aave)
+     */
+    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view override returns (address[] memory target, bytes[] memory data) {
+        // Aave doesn't require any additional actions
+        return (new address[](0), new bytes[](0));
     }
 }

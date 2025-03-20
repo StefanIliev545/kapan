@@ -6,8 +6,8 @@ import { Contract } from "ethers";
 import { verifyContract } from "../utils/verification";
 
 /**
- * Deploys a contract named "YourContract" using the deployer account and
- * constructor arguments set to the deployer address
+ * Deploys the Compound Gateway contract using the deployer account,
+ * registers it with the Router Gateway and OptimalInterestRateFinder
  *
  * @param hre HardhatRuntimeEnvironment object.
  */
@@ -50,13 +50,34 @@ const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntim
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
   });
 
+  console.log(`CompoundGateway deployed to: ${compoundGateway.address}`);
+
   await hre.deployments.execute("CompoundGateway", { from: deployer }, "overrideFeed",
     WETH_ADDRESS,
     WETH_PRICE_FEED,
   );
 
+  // Register the gateway with the router
   await execute("RouterGateway", { from: deployer }, "addGateway", "compound", compoundGateway.address);
   await execute("RouterGateway", { from: deployer }, "addGateway", "compound v3", compoundGateway.address);
+  
+  // Also register the gateway with the OptimalInterestRateFinder
+  try {
+    const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
+    console.log(`Registering CompoundGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
+    
+    await execute(
+      "OptimalInterestRateFinder", 
+      { from: deployer, log: true }, 
+      "registerGateway", 
+      "compound", 
+      compoundGateway.address
+    );
+    
+    console.log("CompoundGateway registered with OptimalInterestRateFinder");
+  } catch (error) {
+    console.warn("Failed to register with OptimalInterestRateFinder:", error);
+  }
   
   // Skip verification on local networks
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
@@ -77,6 +98,7 @@ const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntim
 export default deployCompoundGateway;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
-// e.g. yarn deploy --tags YourContract
+// e.g. yarn deploy --tags CompoundGateway
 deployCompoundGateway.tags = ["CompoundGateway"];
-deployCompoundGateway.dependencies = ["RouterGateway"];
+// Now depends on OptimalInterestRateFinder as well
+deployCompoundGateway.dependencies = ["RouterGateway", "OptimalInterestRateFinder"];

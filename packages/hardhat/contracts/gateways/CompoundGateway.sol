@@ -85,12 +85,12 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
     
 
     // TODO: Insecure as this allows anyone to withdraw from a user's account, given this gateway will be manager.
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouterOrSelf(user) cometMustExist(market) nonReentrant returns (address) {
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) public onlyRouterOrSelf(user) cometMustExist(market) nonReentrant returns (address, uint256) {
         ICompoundComet comet = tokenToComet[market];
         comet.withdrawFrom(user, address(this), collateral, amount);
         emit CollateralWithdrawn(market, collateral, user, amount);
         IERC20(collateral).safeTransfer(msg.sender, amount);
-        return collateral;
+        return (collateral, amount);
     }   
 
     function borrow(address token, address user, uint256 amount) external onlyRouterOrSelf(user) {
@@ -111,8 +111,12 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         return tokenToComet[token].balanceOf(user);
     }
 
-    function getBorrowBalance(address token, address user) external view returns (uint256) {
+    function getBorrowBalance(address token, address user) public view returns (uint256) {
         return tokenToComet[token].borrowBalanceOf(user);
+    }
+
+    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
+        return getBorrowBalance(token, user);
     }
 
     function getLtv(address token, address user) external view returns (uint256) {
@@ -254,12 +258,13 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         data[0] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
     }
 
-    function getEncodedDebtApproval(address token, uint256) external view returns (address[] memory target, bytes[] memory data) {
+    function getEncodedDebtApproval(address token, uint256 amount, address user) external view override returns (address[] memory target, bytes[] memory data) {
         ICompoundComet comet = tokenToComet[token];
         target = new address[](1);
         data = new bytes[](1);
         target[0] = address(comet);
         data[0] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
+        return (target, data);
     }
     
     /**
@@ -306,5 +311,17 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
         }
         
         return collateralAddresses;
+    }
+
+    /**
+     * @notice Get additional actions required for a token when providing collateral (not used in Compound)
+     * @param token The token to borrow
+     * @param collaterals The collaterals to use
+     * @return target Array of target contract addresses (empty for Compound)
+     * @return data Array of encoded function call data (empty for Compound)
+     */
+    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view override returns (address[] memory target, bytes[] memory data) {
+        // Compound doesn't require any additional actions
+        return (new address[](0), new bytes[](0));
     }
 }

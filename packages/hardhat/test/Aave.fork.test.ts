@@ -114,7 +114,7 @@ runOnlyOnFork("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :fork
     const userAddress = await user.getAddress();
 
     // Get and execute the required approvals for borrowing
-    const [approvals, data] = await aaveGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount);
+    const [approvals, data] = await aaveGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount, userAddress);
 
     // Execute the approval transaction
     await user.sendTransaction({

@@ -6,8 +6,8 @@ import { Contract } from "ethers";
 import { verifyContract } from "../utils/verification";
 
 /**
- * Deploys a contract named "YourContract" using the deployer account and
- * constructor arguments set to the deployer address
+ * Deploys the Aave Gateway contract using the deployer account and
+ * registers it with the Router Gateway and OptimalInterestRateFinder
  *
  * @param hre HardhatRuntimeEnvironment object.
  */
@@ -44,8 +44,29 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
   });
 
+  console.log(`AaveGateway deployed to: ${aaveGateway.address}`);
+
+  // Register with RouterGateway
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave", aaveGateway.address);
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave v3", aaveGateway.address);
+  
+  // Also register with OptimalInterestRateFinder
+  try {
+    const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
+    console.log(`Registering AaveGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
+    
+    await execute(
+      "OptimalInterestRateFinder", 
+      { from: deployer, log: true }, 
+      "registerGateway", 
+      "aave", 
+      aaveGateway.address
+    );
+    
+    console.log("AaveGateway registered with OptimalInterestRateFinder");
+  } catch (error) {
+    console.warn("Failed to register with OptimalInterestRateFinder:", error);
+  }
   
   // Skip verification on local networks
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
@@ -66,6 +87,7 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
 export default deployAaveGateway;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
-// e.g. yarn deploy --tags YourContract
+// e.g. yarn deploy --tags AaveGateway
 deployAaveGateway.tags = ["AAVEGateway"];
-deployAaveGateway.dependencies = ["RouterGateway"];
+// Now depends on OptimalInterestRateFinder as well
+deployAaveGateway.dependencies = ["RouterGateway", "OptimalInterestRateFinder"];

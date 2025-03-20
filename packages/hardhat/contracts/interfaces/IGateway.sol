@@ -15,11 +15,12 @@ interface IGateway {
     function repay(address token, address user, uint256 amount) external;
 
     function depositCollateral(address market, address collateral, uint256 amount, address receiver) external;
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) external returns (address);
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) external returns (address, uint256);
     
 
     function getBalance(address token, address user) external view returns (uint256);
     function getBorrowBalance(address token, address user) external view returns (uint256);
+    function getBorrowBalanceCurrent(address token, address user) external returns (uint256);
     function getBorrowRate(address token) external view returns (uint256, bool);
     function getSupplyRate(address token) external view returns (uint256, bool);
     function getLtv(address token, address user) external view returns (uint256);
@@ -50,5 +51,14 @@ interface IGateway {
         uint256 amount;
     }    
     function getEncodedCollateralApprovals(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
-    function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data);
+    function getEncodedDebtApproval(address token, uint256 amount, address user) external view returns (address[] memory target, bytes[] memory data);
+    
+    /**
+     * @notice Get additional actions required for a token when providing collateral
+     * @param token The token to borrow
+     * @param collaterals The collaterals to use
+     * @return target Array of target contract addresses
+     * @return data Array of encoded function call data
+     */
+    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
 }

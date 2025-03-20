@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/balancer/IVault.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "hardhat/console.sol";
 
 // Interface for a v2–style flash loan provider (e.g. Balancer v2)
 interface IFlashLoanProvider {
@@ -166,24 +165,20 @@ contract RouterGateway is Ownable, ReentrancyGuard {
 
         // Repay the debt on the "from" protocol
         {
-            console.log("Repaying debt on from protocol");
             IERC20(debtToken).approve(address(fromGateway), debtAmount);
-            uint256 borrowBalanceBefore = fromGateway.getBorrowBalance(debtToken, user);
+            uint256 borrowBalanceBefore = fromGateway.getBorrowBalanceCurrent(debtToken, user);
             fromGateway.repay(debtToken, user, debtAmount);
-            uint256 borrowBalanceAfter = fromGateway.getBorrowBalance(debtToken, user);
+            uint256 borrowBalanceAfter = fromGateway.getBorrowBalanceCurrent(debtToken, user);
             require(borrowBalanceAfter < borrowBalanceBefore, "Repayment did not reduce borrow balance");
         }
         // For each collateral asset, withdraw then deposit into the target protocol.
         for (uint i = 0; i < collaterals.length; i++) {
-            console.log("Withdrawing collateral from from protocol");
-            address underlyingReceived = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
-            console.log("Depositing collateral into to protocol");
-            IERC20(underlyingReceived).approve(address(toGateway), collaterals[i].amount);
-            toGateway.depositCollateral(debtToken, underlyingReceived, collaterals[i].amount, user);
+            (address underlyingReceived, uint256 amountReceived) = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
+            IERC20(underlyingReceived).approve(address(toGateway), amountReceived);
+            toGateway.depositCollateral(debtToken, underlyingReceived, amountReceived, user);
         }
 
         // Borrow the debt on the "to" protocol.
-        console.log("Borrowing debt on to protocol");
         toGateway.borrow(debtToken, user, debtAmount);
     }
 
@@ -357,7 +352,7 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         if (repayAll) {
             IGateway fromGateway = gateways[fromProtocol];
             require(address(fromGateway) != address(0), "From protocol not supported");
-            debtAmount = fromGateway.getBorrowBalance(debtToken, user);
+            debtAmount = fromGateway.getBorrowBalanceCurrent(debtToken, user);
         }
 
         if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v2"))) {
@@ -398,18 +393,57 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         return gateway.getPossibleCollaterals(token, user);
     }
 
-    function getFromProtocolApprovalsForMove(address debtToken, IGateway.Collateral[] calldata collaterals, string calldata fromProtocol) external view returns (address[] memory, bytes[] memory) {
-        IGateway fromGateway = gateways[fromProtocol];
-        require(address(fromGateway) != address(0), "From protocol not supported");
-        (address[] memory fromTarget, bytes[] memory fromData) = fromGateway.getEncodedCollateralApprovals(debtToken, collaterals);
-        return (fromTarget, fromData);
+    function getEncodedDebtApproval(string calldata protocolName, address debtToken, uint256 debtAmount, address user) external view returns (address[] memory, bytes[] memory) {
+        IGateway gateway = gateways[protocolName];
+        require(address(gateway) != address(0), "Protocol not supported");
+        return gateway.getEncodedDebtApproval(debtToken, debtAmount, user);
     }
 
-    function getToProtocolApprovalsForMove(address debtToken, uint256 debtAmount, string calldata toProtocol) external view returns (address[] memory, bytes[] memory) {
+    /**
+     * @notice Get approvals for collateral movement from source protocol
+     * @param debtToken The token being borrowed
+     * @param collaterals The collaterals being moved
+     * @param fromProtocol The protocol moving from 
+     * @return Array of target addresses and encoded function call data
+     */
+    function getFromProtocolApprovalsForMove(
+        address debtToken, 
+        IGateway.Collateral[] calldata collaterals, 
+        string calldata fromProtocol
+    ) external view returns (address[] memory, bytes[] memory) {
+        IGateway fromGateway = gateways[fromProtocol];
+        require(address(fromGateway) != address(0), "From protocol not supported");
+        return fromGateway.getEncodedCollateralApprovals(debtToken, collaterals);
+    }
+    
+    /**
+     * @notice Get inbound collateral actions from destination protocol
+     * @param debtToken The token being borrowed
+     * @param collaterals The collaterals being moved
+     * @param toProtocol The protocol moving to
+     * @return Array of target addresses and encoded function call data
+     */
+    function getToProtocolInboundActions(
+        address debtToken, 
+        IGateway.Collateral[] calldata collaterals, 
+        string calldata toProtocol
+    ) external view returns (address[] memory, bytes[] memory) {
         IGateway toGateway = gateways[toProtocol];
         require(address(toGateway) != address(0), "To protocol not supported");
-        (address[] memory toTarget, bytes[] memory toData) = toGateway.getEncodedDebtApproval(debtToken, debtAmount);
-        return (toTarget, toData);
+        return toGateway.getInboundCollateralActions(debtToken, collaterals);
+    }
+
+    function getToProtocolApprovalsForMove(
+        address debtToken,
+        uint256 debtAmount,
+        string calldata toProtocol,
+        address user
+    ) external view returns (address[] memory, bytes[] memory) {
+        // For the destination protocol, we need to get debt approval
+        IGateway toGateway = gateways[toProtocol];
+        require(address(toGateway) != address(0), "Protocol not supported");
+        
+        return toGateway.getEncodedDebtApproval(debtToken, debtAmount, user);
     }
 
     /**

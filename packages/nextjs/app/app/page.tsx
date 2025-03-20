@@ -3,6 +3,7 @@
 import type { NextPage } from "next";
 import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
+import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
 import AlphaWarning from "~~/components/home/AlphaWarning";
 
 const App: NextPage = () => {
@@ -12,6 +13,7 @@ const App: NextPage = () => {
       <AlphaWarning />
       <AaveProtocolView />
       <CompoundProtocolView />
+      <VenusProtocolView />
     </div>
   );
 };
