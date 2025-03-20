@@ -47,20 +47,32 @@ export const useMoveDebtScaffold = () => {
         throw new Error("RouterGateway contract, signer, or publicClient is not available");
       }
 
-      // Dynamically fetch approval payloads using callStatic so that no state changes occur.
+      // Dynamically fetch approval payloads using callStatic
+      // 1. Get collateral approvals from source protocol
       const fromApprovals = await routerContract.read.getFromProtocolApprovalsForMove([
         params.debtToken,
         params.collaterals,
         params.fromProtocol,
       ]);
+      
+      // 2. Get inbound collateral actions from destination protocol
+      const inboundActions = await routerContract.read.getToProtocolInboundActions([
+        params.debtToken,
+        params.collaterals,
+        params.toProtocol,
+      ]);
+      
+      // 3. Get debt approvals for destination protocol
       const toApprovals = await routerContract.read.getToProtocolApprovalsForMove([
         params.debtToken,
         params.debtAmount,
         params.toProtocol,
+        params.user,
       ]);
 
-      // Each approval call returns a tuple: [address[] targets, bytes[] encodedData]
+      // Extract all target addresses and encoded data
       const [fromTargets, fromData] = fromApprovals;
+      const [inboundTargets, inboundData] = inboundActions;
       const [toTargets, toData] = toApprovals;
 
       // Execute "from" protocol approval transactions and wait for each receipt.
@@ -72,6 +84,17 @@ export const useMoveDebtScaffold = () => {
         console.log(`Sent from approval ${i}: ${txHash}`);
         await publicClient.waitForTransactionReceipt({ hash: txHash });
         console.log(`From approval ${i} confirmed`);
+      }
+
+      // Execute inbound action transactions for the destination protocol
+      for (let i = 0; i < inboundTargets.length; i++) {
+        const txHash = await signer.sendTransaction({
+          to: inboundTargets[i],
+          data: inboundData[i],
+        });
+        console.log(`Sent inbound action ${i}: ${txHash}`);
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        console.log(`Inbound action ${i} confirmed`);
       }
 
       // Execute "to" protocol approval transactions and wait for each receipt.

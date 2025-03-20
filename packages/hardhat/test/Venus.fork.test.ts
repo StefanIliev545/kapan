@@ -155,17 +155,20 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
   it("should approve gateway as delegate for borrowing", async function () {
     const userAddress = await user.getAddress();
     
-    // Get encoded approval data
-    const [target, data] = await venusGateway.getEncodedDelegateApproval();
-    console.log("Delegate approval target:", target);
+    // Get encoded approval data for the delegate using the updated approach
+    const [targets, approvalData] = await venusGateway.getEncodedDebtApproval(WETH_ADDRESS, ethers.parseUnits("0.01", 18), userAddress);
+    
+    if (targets.length === 0) {
+      console.log("User is already approved as delegate, no approval needed");
+      return;
+    }
     
     // Execute the delegate approval
     await user.sendTransaction({
-      to: target,
-      data: data,
+      to: targets[0],
+      data: approvalData[0],
     });
     
-    // Unfortunately, there's no direct way to check delegate approval status in this test
     console.log("Delegate approval transaction executed");
   });
 
@@ -174,7 +177,7 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
     const userAddress = await user.getAddress();
 
     // Get the required encoded approvals for borrowing
-    const [targets, approvalData] = await venusGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount);
+    const [targets, approvalData] = await venusGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount, userAddress);
     
     console.log(`Debt approval requires ${targets.length} transactions:`);
     

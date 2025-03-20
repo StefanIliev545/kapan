@@ -51,5 +51,14 @@ interface IGateway {
         uint256 amount;
     }    
     function getEncodedCollateralApprovals(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
-    function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data);
+    function getEncodedDebtApproval(address token, uint256 amount, address user) external view returns (address[] memory target, bytes[] memory data);
+    
+    /**
+     * @notice Get additional actions required for a token when providing collateral
+     * @param token The token to borrow
+     * @param collaterals The collaterals to use
+     * @return target Array of target contract addresses
+     * @return data Array of encoded function call data
+     */
+    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
 }

@@ -51,6 +51,7 @@ export const useBorrow = () => {
         protocolName.toLowerCase(),
         tokenAddress,
         amount,
+        userAddress,
       ]);
 
       // Approvals will be a tuple: [address[] targets, bytes[] encodedData]

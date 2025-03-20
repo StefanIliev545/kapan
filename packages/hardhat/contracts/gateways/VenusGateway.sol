@@ -238,11 +238,16 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     
     /**
      * @notice Generate encoded call data for the user to approve this contract as a delegate for borrowing
+     * @return shouldApprove Whether the user should approve the delegate
      * @return target The comptroller address
      * @return data The encoded call data for updateDelegate function
      */
-    function getEncodedDelegateApproval() external view returns (address target, bytes memory data) {
+    function getEncodedDelegateApproval() external view returns (bool shouldApprove, address target, bytes memory data) {
         // Encode the updateDelegate function call to approve this contract
+       /* if (comptroller.approvedDelegates(address(this))) {
+            return (false, address(0x0), bytes(""));
+        }*/
+
         target = address(comptroller);
         data = abi.encodeWithSelector(
             comptroller.updateDelegate.selector,
@@ -250,7 +255,7 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             true            // allowBorrows = true
         );
         
-        return (target, data);
+        return (true, target, data);
     }
     
     /**
@@ -677,42 +682,102 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     
     /**
      * @notice Generate encoded call data for approving debt operations
-     * @dev For Venus, this involves entering the market for the token's vToken
+     * @dev For Venus, this involves checking if delegate approval is needed and entering the market
      * @param token The token to borrow
      * @param amount The amount to borrow (not used in this implementation)
+     * @param user The user address to check for delegate approval
      * @return target Array of target contract addresses
      * @return data Array of encoded function call data
      */
-    function getEncodedDebtApproval(address token, uint256 amount) external view override returns (address[] memory target, bytes[] memory data) {
-        // In Venus, to borrow a token, the user needs to:
-        // 1. Enter the market for the token's vToken
-        // 2. Approve this contract as a delegate borrower
-        
-        // Create arrays with two elements (enterMarket + delegate approval)
-        target = new address[](2);
-        data = new bytes[](2);
+    function getEncodedDebtApproval(address token, uint256 amount, address user) external view override returns (address[] memory target, bytes[] memory data) {
+        // In Venus, to borrow a token, the user needs to approve this contract as a delegate borrower
         
         // Get the vToken address for this token
-        address vTokenAddress;
         try this.getVTokenForUnderlying(token) returns (address vToken) {
-            vTokenAddress = vToken;
+            // First check if the user has already approved this gateway
+            bool isAlreadyApproved = false;
+            try comptroller.approvedDelegates(user, address(this)) returns (bool approved) {
+                isAlreadyApproved = approved;
+                console.log("getEncodedDebtApproval: delegate already approved", isAlreadyApproved);
+            } catch {
+                // If call fails, assume not approved (continue with normal flow)
+                console.log("getEncodedDebtApproval: failed to check delegate approval");
+            }
+            
+            // If already approved, return empty arrays
+            if (isAlreadyApproved) {
+                return (new address[](0), new bytes[](0));
+            }
+            
+            // Otherwise, get the encoded delegate approval data
+            console.log("getEncodedDebtApproval: delegate approval needed");
+            target = new address[](1);
+            data = new bytes[](1);
+            target[0] = address(comptroller);
+            data[0] = abi.encodeWithSelector(
+                comptroller.updateDelegate.selector,
+                address(this),  // delegate address (this gateway)
+                true            // allowBorrows = true
+            );
         } catch {
             // If token is not found in Venus, return empty approvals
             return (new address[](0), new bytes[](0));
         }
+
+        return (target, data);
+    }
+
+    /**
+     * @notice Get additional actions required for a token when providing collateral in Venus protocol
+     * @dev For Venus, users need to enter markets for each collateral they want to use
+     * @param token The token to borrow
+     * @param collaterals The collaterals to use
+     * @return target Array of target contract addresses
+     * @return data Array of encoded function call data
+     */
+    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view override returns (address[] memory target, bytes[] memory data) {
+        // In Venus, users need to enter markets for each collateral they want to use
+        // We'll create an enterMarkets call for the comptroller
         
-        // First call is to enterMarkets with a single market (the vToken)
-        address[] memory marketsToEnter = new address[](1);
-        marketsToEnter[0] = vTokenAddress;
+        // We need one target (the comptroller) and one data (enterMarkets call)
+        target = new address[](1);
+        data = new bytes[](1);
         
+        // The target is the comptroller
         target[0] = address(comptroller);
+        
+        // Get vToken addresses for each collateral
+        address[] memory vTokens = new address[](collaterals.length);
+        uint validCount = 0;
+        
+        for (uint i = 0; i < collaterals.length; i++) {
+            try this.getVTokenForUnderlying(collaterals[i].token) returns (address vToken) {
+                vTokens[validCount++] = vToken;
+            } catch {
+                // Skip if token is not found in Venus
+                continue;
+            }
+        }
+        
+        // If we couldn't find any valid vTokens, return empty arrays
+        if (validCount == 0) {
+            return (new address[](0), new bytes[](0));
+        }
+        
+        // If not all collaterals had valid vTokens, resize the array
+        if (validCount < collaterals.length) {
+            address[] memory validVTokens = new address[](validCount);
+            for (uint i = 0; i < validCount; i++) {
+                validVTokens[i] = vTokens[i];
+            }
+            vTokens = validVTokens;
+        }
+        
+        // Encode the enterMarkets function call
         data[0] = abi.encodeWithSelector(
             comptroller.enterMarkets.selector,
-            marketsToEnter
+            vTokens
         );
-        
-        // Second call is the delegate approval
-        (target[1], data[1]) = this.getEncodedDelegateApproval();
         
         return (target, data);
     }

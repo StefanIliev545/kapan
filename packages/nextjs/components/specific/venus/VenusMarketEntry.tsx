@@ -23,6 +23,25 @@ const COMPTROLLER_ABI = [
     ],
     stateMutability: "nonpayable",
     type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "vToken",
+        type: "address"
+      }
+    ],
+    name: "exitMarket",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256"
+      }
+    ],
+    stateMutability: "nonpayable",
+    type: "function"
   }
 ] as const;
 
@@ -40,6 +59,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
   const { address: userAddress } = useAccount();
   const [isMember, setIsMember] = useState<boolean | null>(null);
   const [isEntering, setIsEntering] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   // Check membership status using VenusGateway
   const { data: membershipStatus, isLoading: isCheckingMembership, refetch: refetchMembership } = useScaffoldReadContract({
@@ -48,7 +68,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
     args: [userAddress || "0x0000000000000000000000000000000000000000", vTokenAddress || "0x0000000000000000000000000000000000000000"],
   });
 
-  // Set up direct Comptroller contract call for enterMarkets using wagmi
+  // Set up direct Comptroller contract call for enterMarkets and exitMarket using wagmi
   const { writeContractAsync, isPending } = useWriteContract();
 
   // Update local state when membership data changes
@@ -78,6 +98,26 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
     }
   };
 
+  // Handle the market exit action
+  const handleMarketExit = async () => {
+    if (!userAddress || !isMember || isExiting || !comptrollerAddress) return;
+    
+    try {
+      setIsExiting(true);
+      await writeContractAsync({
+        address: comptrollerAddress as `0x${string}`,
+        abi: COMPTROLLER_ABI,
+        functionName: 'exitMarket',
+        args: [vTokenAddress]
+      });
+      await refetchMembership();
+    } catch (error) {
+      console.error("Failed to exit market:", error);
+    } finally {
+      setIsExiting(false);
+    }
+  };
+
   // If we're still loading or no wallet is connected, show a neutral state
   if (isCheckingMembership || !userAddress) {
     return (
@@ -89,12 +129,20 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
     );
   }
 
-  // If the user is a member, show a green checkmark
+  // If the user is a member, show a clickable green checkmark
   if (isMember) {
     return (
-      <div className="ml-2 flex items-center" title={`${tokenSymbol} market entered`}>
-        <div className="w-5 h-5 rounded-full bg-success/20 text-success flex items-center justify-center">
-          <FiCheck size={14} />
+      <div 
+        className="ml-2 flex items-center cursor-pointer" 
+        onClick={handleMarketExit}
+        title={`Exit ${tokenSymbol} market (remove as collateral)`}
+      >
+        <div className={`w-5 h-5 rounded-full ${isExiting || isPending ? 'bg-warning/20' : 'bg-success/20'} ${isExiting || isPending ? 'text-warning' : 'text-success'} flex items-center justify-center transition-colors hover:bg-base-300`}>
+          {isExiting || isPending ? (
+            <span className="loading loading-spinner loading-xs"></span>
+          ) : (
+            <FiCheck size={14} />
+          )}
         </div>
       </div>
     );

@@ -144,7 +144,7 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     console.log("\n--- Step 2: Borrowing WETH from Aave ---");
     
     // Get and execute approvals for Aave borrowing
-    const [aaveApprovals, aaveData] = await aaveGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount);
+    const [aaveApprovals, aaveData] = await aaveGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount, userAddress);
     console.log("Got debt approval data from Aave Gateway");
     
     for (let i = 0; i < aaveApprovals.length; i++) {
@@ -199,7 +199,7 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     console.log("Approved WETH for router (for flash loan repayment)");
     
     // Get and execute approvals for moving debt to Compound
-    const [toApprovals, toData] = await compoundGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount);
+    const [toApprovals, toData] = await compoundGateway.getEncodedDebtApproval(WETH_ADDRESS, borrowAmount, userAddress);
     console.log("Got debt approval data from Compound Gateway");
     
     for (let i = 0; i < toApprovals.length; i++) {
@@ -261,7 +261,7 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     console.log("Approved WETH for router (for flash loan repayment)");
     
     // Get and execute approvals for moving to Aave
-    const [toAaveApprovals, toAaveData] = await aaveGateway.getEncodedDebtApproval(WETH_ADDRESS, compoundBorrowBalance);
+    const [toAaveApprovals, toAaveData] = await aaveGateway.getEncodedDebtApproval(WETH_ADDRESS, compoundBorrowBalance, userAddress);
     console.log("Got debt approval data from Aave Gateway");
     
     for (let i = 0; i < toAaveApprovals.length; i++) {

@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xC6348eBA87be1A4B7fF7D2aec845c60D281e72AF",
+      address: "0xca337B639cEd4D9865A5b177Ec80A6Ce3553f963",
       abi: [
         {
           inputs: [
@@ -431,8 +431,54 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
           ],
           name: "getEncodedDebtApproval",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "target",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct IGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
+            },
+          ],
+          name: "getInboundCollateralActions",
           outputs: [
             {
               internalType: "address[]",
@@ -696,6 +742,7 @@ const deployedContracts = {
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
+        getInboundCollateralActions: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
@@ -707,7 +754,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x961583d54c8197DD50C29df9811713689F8BA75F",
+      address: "0x25D04Eed912d2fD4E72F5fB42cf31a145ef2Dd72",
       abi: [
         {
           inputs: [
@@ -1209,11 +1256,57 @@ const deployedContracts = {
             },
             {
               internalType: "uint256",
-              name: "",
+              name: "amount",
               type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
             },
           ],
           name: "getEncodedDebtApproval",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "target",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct IGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
+            },
+          ],
+          name: "getInboundCollateralActions",
           outputs: [
             {
               internalType: "address[]",
@@ -1596,6 +1689,7 @@ const deployedContracts = {
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
+        getInboundCollateralActions: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
@@ -1610,7 +1704,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x2eB3C1f7805DF01EF64Ce30a50e4aC127b79726B",
+      address: "0x21ff94fB478420982CC91F6a7236864EE1939a51",
       abi: [
         {
           inputs: [
@@ -1826,7 +1920,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x24f251584Be40faF497D1d7853ff47212155ad40",
+      address: "0x89eE2ea76b325dCe230567dA14915269332E3223",
       abi: [
         {
           inputs: [
@@ -2133,6 +2227,11 @@ const deployedContracts = {
               name: "debtAmount",
               type: "uint256",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
           ],
           name: "getEncodedDebtApproval",
           outputs: [
@@ -2305,8 +2404,59 @@ const deployedContracts = {
               name: "toProtocol",
               type: "string",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
           ],
           name: "getToProtocolApprovalsForMove",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct IGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+          ],
+          name: "getToProtocolInboundActions",
           outputs: [
             {
               internalType: "address[]",
@@ -2659,7 +2809,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0xA165c4d7F17e295F6b723804627Ba97A8EfB0a0b",
+      address: "0xD06E3b27A2ae2D78fad679AFF90FCdE9ed4c9bef",
       abi: [
         {
           inputs: [
@@ -3152,6 +3302,11 @@ const deployedContracts = {
               name: "amount",
               type: "uint256",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
           ],
           name: "getEncodedDebtApproval",
           outputs: [
@@ -3174,6 +3329,11 @@ const deployedContracts = {
           name: "getEncodedDelegateApproval",
           outputs: [
             {
+              internalType: "bool",
+              name: "shouldApprove",
+              type: "bool",
+            },
+            {
               internalType: "address",
               name: "target",
               type: "address",
@@ -3182,6 +3342,47 @@ const deployedContracts = {
               internalType: "bytes",
               name: "data",
               type: "bytes",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct IGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
+            },
+          ],
+          name: "getInboundCollateralActions",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "target",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
             },
           ],
           stateMutability: "view",
@@ -3513,6 +3714,7 @@ const deployedContracts = {
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
+        getInboundCollateralActions: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
@@ -4189,6 +4391,7 @@ const deployedContracts = {
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
+        getInboundCollateralActions: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",
@@ -5060,6 +5263,7 @@ const deployedContracts = {
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
+        getInboundCollateralActions: "contracts/interfaces/IGateway.sol",
         getLtv: "contracts/interfaces/IGateway.sol",
         getPossibleCollaterals: "contracts/interfaces/IGateway.sol",
         getSupplyRate: "contracts/interfaces/IGateway.sol",

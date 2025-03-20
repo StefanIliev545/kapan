@@ -126,6 +126,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             lowerProtocolName,
             token.address,
             parsedAmount,
+            userAddress,
           ]);
 
           // Approvals will be a tuple: [address[] targets, bytes[] encodedData]

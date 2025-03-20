@@ -359,7 +359,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         }
     }
 
-    function getEncodedDebtApproval(address token, uint256 amount) external view returns (address[] memory target, bytes[] memory data) {
+    function getEncodedDebtApproval(address token, uint256 amount, address user) external view override returns (address[] memory target, bytes[] memory data) {
         (,address variableDebtToken , bool found) = _getReserveAddresses(token);
         require(found && variableDebtToken != address(0), "Token is not a valid debt token");
         target = new address[](1);
@@ -367,6 +367,7 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         target[0] = variableDebtToken;
         // todo - determine if max is ok, its hard to get the exact amount right if we wanna transfer all.. 
         data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), type(uint256).max);
+        return (target, data);
     }
 
     function getAToken(address underlyingToken) public view returns (address) {
@@ -429,5 +430,17 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         }
         
         return collateralAddresses;
+    }
+
+    /**
+     * @notice Get additional actions required for a token when providing collateral (not used in Aave)
+     * @param token The token to borrow
+     * @param collaterals The collaterals to use
+     * @return target Array of target contract addresses (empty for Aave)
+     * @return data Array of encoded function call data (empty for Aave)
+     */
+    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view override returns (address[] memory target, bytes[] memory data) {
+        // Aave doesn't require any additional actions
+        return (new address[](0), new bytes[](0));
     }
 }

@@ -80,6 +80,8 @@ interface ComptrollerInterface {
      */
     function updateDelegate(address delegate, bool allowBorrows) external;
     
+    function approvedDelegates(address user, address delegate) external view returns (bool);
+    
     /**
      * @notice Return information about a specific market
      * @param vToken The vToken address to get market data for
