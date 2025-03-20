@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/balancer/IVault.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "hardhat/console.sol";
 
 // Interface for a v2–style flash loan provider (e.g. Balancer v2)
 interface IFlashLoanProvider {
@@ -166,7 +165,6 @@ contract RouterGateway is Ownable, ReentrancyGuard {
 
         // Repay the debt on the "from" protocol
         {
-            console.log("Repaying debt on from protocol");
             IERC20(debtToken).approve(address(fromGateway), debtAmount);
             uint256 borrowBalanceBefore = fromGateway.getBorrowBalanceCurrent(debtToken, user);
             fromGateway.repay(debtToken, user, debtAmount);
@@ -175,15 +173,12 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         }
         // For each collateral asset, withdraw then deposit into the target protocol.
         for (uint i = 0; i < collaterals.length; i++) {
-            console.log("Withdrawing collateral from from protocol");
             (address underlyingReceived, uint256 amountReceived) = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
-            console.log("Depositing collateral into to protocol");
             IERC20(underlyingReceived).approve(address(toGateway), amountReceived);
             toGateway.depositCollateral(debtToken, underlyingReceived, amountReceived, user);
         }
 
         // Borrow the debt on the "to" protocol.
-        console.log("Borrowing debt on to protocol");
         toGateway.borrow(debtToken, user, debtAmount);
     }
 
@@ -395,7 +390,6 @@ contract RouterGateway is Ownable, ReentrancyGuard {
     ) {
         IGateway gateway = gateways[protocolName];
         require(address(gateway) != address(0), "Protocol not supported");
-        console.log("getPossibleCollaterals", protocolName);
         return gateway.getPossibleCollaterals(token, user);
     }
 

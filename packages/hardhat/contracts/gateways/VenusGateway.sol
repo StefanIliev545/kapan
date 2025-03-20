@@ -13,7 +13,6 @@ import "./ProtocolGateway.sol";
 import "../interfaces/venus/ComptrollerInterface.sol";
 import "../interfaces/venus/VTokenInterface.sol";
 import "../interfaces/venus/ResilientOracleInterface.sol";
-import "hardhat/console.sol";
 
 contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -151,11 +150,9 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         
         // User must have entered the market already to borrow
         // The borrowed tokens will go directly to the user
-        console.log("borrowing", token, user, amount);
         uint result = VTokenInterface(vTokenAddress).borrowBehalf(user, amount);
         require(result == 0, "VenusGateway: borrow failed");
         
-        console.log("borrowed", token, user, amount);
         // Transfer borrowed tokens to the user
         IERC20(token).safeTransfer(msg.sender, amount);
     }
@@ -359,10 +356,7 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             // Get rates
             supplyRates[i] = vToken.supplyRatePerBlock();
             borrowRates[i] = vToken.borrowRatePerBlock();
-            
-            // Default price to 1 USD (8 decimals precision)
-            // This should be replaced with actual price oracle implementation
-            prices[i] = 1e8;
+            prices[i] = oracle.getUnderlyingPrice(vTokenAddress);
         }
         
         return (prices, supplyRates, borrowRates);
@@ -634,14 +628,9 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
 
 
         // Transfer the vTokens from the user to this contract.
-        uint256 userBalance = vToken.balanceOf(user);
-        console.log("withdrawing collateral: transfer", requiredVTokenAmount, "vTokens", userBalance);
         vToken.transferFrom(user, address(this), requiredVTokenAmount);
-        console.log("withdrawing collateral: redeem", underlyingAmount, "underlying");
         // Redeem the required vTokens to get the underlying tokens.
         vToken.redeem(requiredVTokenAmount);
-        uint256 contractBalance = IERC20(underlying).balanceOf(address(this));
-        console.log("withdrawing collateral: transfer out", contractBalance, "underlying", underlyingAmount);
         IERC20(underlying).safeTransfer(msg.sender, underlyingAmount);
         return (underlying, underlyingAmount);
     }
@@ -705,10 +694,8 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             bool isAlreadyApproved = false;
             try comptroller.approvedDelegates(user, address(this)) returns (bool approved) {
                 isAlreadyApproved = approved;
-                console.log("getEncodedDebtApproval: delegate already approved", isAlreadyApproved);
             } catch {
                 // If call fails, assume not approved (continue with normal flow)
-                console.log("getEncodedDebtApproval: failed to check delegate approval");
             }
             
             // If already approved, return empty arrays
@@ -717,7 +704,6 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             }
             
             // Otherwise, get the encoded delegate approval data
-            console.log("getEncodedDebtApproval: delegate approval needed");
             target = new address[](1);
             data = new bytes[](1);
             target[0] = address(comptroller);

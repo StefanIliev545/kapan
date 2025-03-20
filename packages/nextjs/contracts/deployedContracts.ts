@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0xca337B639cEd4D9865A5b177Ec80A6Ce3553f963",
+      address: "0x03c21b5E6989bAE06347A783F62E0F01b002D775",
       abi: [
         {
           inputs: [
@@ -754,7 +754,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x25D04Eed912d2fD4E72F5fB42cf31a145ef2Dd72",
+      address: "0x89268528fE4F07A8ca5d3902849dE74C9A5c7638",
       abi: [
         {
           inputs: [
@@ -1704,7 +1704,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x6d246480181D9894a328135113A1FFa3D1465c4F",
+      address: "0x178fc2B403Bb6F88dBa7A40003838C24e5dEeFC6",
       abi: [
         {
           inputs: [],
@@ -2118,7 +2118,7 @@ const deployedContracts = {
       },
     },
     RouterGateway: {
-      address: "0x89eE2ea76b325dCe230567dA14915269332E3223",
+      address: "0x552f66d45544Bd009c17EDf4e7a7C1c0fF505fa5",
       abi: [
         {
           inputs: [
@@ -3007,7 +3007,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0xF714Ec55Bb756a389A70c247DaF54f8e0C3bb4fa",
+      address: "0x6EA35ae614caf444fcAEd9a89B3D903af93C36b9",
       abi: [
         {
           inputs: [
