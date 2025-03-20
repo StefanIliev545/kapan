@@ -26,8 +26,8 @@ const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEn
 
   // Venus Unitroller (Comptroller Proxy) on BNB Chain
   // This is the main entry point to the Venus Protocol
-  const VENUS_COMPTROLLER = process.env.VENUS_COMPTROLLER || "0xfD36E2c2a6789Db23113685031d7F16329158384";
-
+  const VENUS_COMPTROLLER = process.env.VENUS_COMPTROLLER!;
+  const VENUS_ORACLE = process.env.VENUS_ORACLE!;
   // Get the router gateway address from previous deployment
   const routerGateway = await get("RouterGateway");
 
@@ -36,6 +36,7 @@ const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEn
     from: deployer,
     args: [
       VENUS_COMPTROLLER,  // Comptroller
+      VENUS_ORACLE,       // Oracle
       routerGateway.address  // Router
     ],
     log: true,

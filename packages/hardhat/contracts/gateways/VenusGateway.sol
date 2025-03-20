@@ -12,19 +12,21 @@ import "./ProtocolGateway.sol";
 // Import local interface definitions instead of Venus Protocol package
 import "../interfaces/venus/ComptrollerInterface.sol";
 import "../interfaces/venus/VTokenInterface.sol";
-
+import "../interfaces/venus/ResilientOracleInterface.sol";
 import "hardhat/console.sol";
 
 contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     ComptrollerInterface public comptroller;
-    
-    constructor(address _comptroller, address router) 
+    ResilientOracleInterface public oracle;
+
+    constructor(address _comptroller, address _oracle, address router) 
         ProtocolGateway(router)
         Ownable(msg.sender)
     {
         comptroller = ComptrollerInterface(_comptroller);
+        oracle = ResilientOracleInterface(_oracle);
     }
     
     /**
@@ -272,7 +274,8 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         address[] memory tokens,
         string[] memory symbols,
         string[] memory names,
-        uint8[] memory decimals
+        uint8[] memory decimals,
+        uint256[] memory prices
     ) {
         // Get all markets from the comptroller
         vTokens = this.getAllMarkets();
@@ -283,7 +286,7 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         symbols = new string[](marketsCount);
         names = new string[](marketsCount);
         decimals = new uint8[](marketsCount);
-        
+        prices = new uint256[](marketsCount);
         // Populate arrays with basic token information
         for (uint i = 0; i < marketsCount; i++) {
             address vTokenAddress = vTokens[i];
@@ -323,9 +326,10 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
                 names[i] = vToken.name();
                 decimals[i] = vToken.decimals();
             }
+            prices[i] = oracle.getUnderlyingPrice(vTokenAddress);
         }
         
-        return (vTokens, tokens, symbols, names, decimals);
+        return (vTokens, tokens, symbols, names, decimals, prices);
     }
     
     /**
@@ -462,7 +466,8 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             address[] memory tokens, 
             string[] memory tokenSymbols, 
             string[] memory names, 
-            uint8[] memory tokenDecimals
+            uint8[] memory tokenDecimals,
+            uint256[] memory prices
         ) = this.getAllVenusMarkets();
         
         // Create arrays for return values
@@ -500,9 +505,10 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         (
             ,  // vTokens (not needed)
             address[] memory tokens, 
-            ,  // symbols (not needed)
-            ,  // names (not needed)
-            // decimals (not needed)
+            , // symbols (not needed)
+            , // names (not needed)
+            , // decimals (not needed)
+              // prices (not needed)
         ) = this.getAllVenusMarkets();
         
         // First check that both market and collateral are valid tokens in Venus
@@ -540,7 +546,8 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             address[] memory tokens, 
             ,  // symbols (not needed)
             ,  // names (not needed)
-            // decimals (not needed)
+            ,// decimals (not needed)
+            // prices (not needed)
         ) = this.getAllVenusMarkets();
         
         // Check if market is a valid token in Venus

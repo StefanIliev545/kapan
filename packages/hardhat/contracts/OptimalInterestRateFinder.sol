@@ -15,6 +15,8 @@ contract OptimalInterestRateFinder is Ownable {
     // We'll use 1e8 as our fixed point precision.
     // When displaying the result, divide the returned number by 1e8.
     uint256 private constant PRECISION = 1e8;
+    // We'll use a higher internal scale to avoid rounding to zero.
+    uint256 private constant HIGH_SCALE = 1e27;
 
     // Events for gateway registration
     event GatewayRegistered(string name, address gateway);
@@ -95,10 +97,37 @@ contract OptimalInterestRateFinder is Ownable {
      * @dev Similar to the Compound conversion, but with different scaling.
      *      The returned value is in fixed‑point format (divide by PRECISION to get the percentage).
      */
-    function convertVenusRateToAPY(uint256 rate) public pure returns (uint256) {
-        uint256 SECONDS_PER_YEAR = 60 * 60 * 24 * 365; // 31536000 seconds
-        return (rate * SECONDS_PER_YEAR * 100 * PRECISION) / 1e18;
+    
+    function convertVenusRateToAPY(uint256 ratePerBlock) public pure returns (uint256) {
+        uint256 blocksPerDay = 60 * 60 * 24; // 86400 blocks per day
+        uint256 daysPerYear = 365;
+
+        // Calculate the daily increment in HIGH_SCALE precision.
+        // dailyIncrement = (ratePerBlock * blocksPerDay * HIGH_SCALE) / 1e18
+        uint256 dailyIncrement = (ratePerBlock * blocksPerDay * HIGH_SCALE) / 1e18;
+        // Daily growth factor (in HIGH_SCALE fixed-point): 1 + dailyIncrement
+        uint256 dailyFactor = HIGH_SCALE + dailyIncrement;
+        
+        // Compound the daily factor for (daysPerYear - 1) days.
+        uint256 compounded = rpow(dailyFactor, daysPerYear - 1, HIGH_SCALE);
+        
+        // The APY (in the same fixed-point scale) is the excess growth: compounded - HIGH_SCALE.
+        uint256 apyFixed = compounded > HIGH_SCALE ? compounded - HIGH_SCALE : 0;
+        
+        // Convert to a percentage and scale to PRECISION (1e8):
+        // That is, APY (%) = (apyFixed / HIGH_SCALE) * 100.
+        return (apyFixed * 100 * PRECISION) / HIGH_SCALE;
     }
+
+    function rpow(uint256 x, uint256 n, uint256 base) internal pure returns (uint256 result) {
+        result = base;
+        for (uint256 i = 0; i < n; i++) {
+            // Multiply, then round by adding half the base before dividing.
+            result = (result * x + base / 2) / base;
+        }
+    }
+
+
     
     /**
      * @notice Converts a protocol rate to a standardized APY percentage

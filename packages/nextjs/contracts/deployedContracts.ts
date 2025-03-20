@@ -1704,7 +1704,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x9BBeED34EcF593C261a4f4A0963787630A6b9EeE",
+      address: "0x6d246480181D9894a328135113A1FFa3D1465c4F",
       abi: [
         {
           inputs: [],
@@ -1850,7 +1850,7 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "uint256",
-              name: "rate",
+              name: "ratePerBlock",
               type: "uint256",
             },
           ],
@@ -3007,13 +3007,18 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0xD06E3b27A2ae2D78fad679AFF90FCdE9ed4c9bef",
+      address: "0xF714Ec55Bb756a389A70c247DaF54f8e0C3bb4fa",
       abi: [
         {
           inputs: [
             {
               internalType: "address",
               name: "_comptroller",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_oracle",
               type: "address",
             },
             {
@@ -3303,6 +3308,11 @@ const deployedContracts = {
               internalType: "uint8[]",
               name: "decimals",
               type: "uint8[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
             },
           ],
           stateMutability: "view",
@@ -3788,6 +3798,19 @@ const deployedContracts = {
               internalType: "bool",
               name: "isSupported",
               type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "oracle",
+          outputs: [
+            {
+              internalType: "contract ResilientOracleInterface",
+              name: "",
+              type: "address",
             },
           ],
           stateMutability: "view",

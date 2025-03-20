@@ -70,11 +70,40 @@ export const VenusProtocolView: FC = () => {
 
   // Helper: Convert Venus rates to APY percentage
   // Venus uses rates per block, so we need to convert to annual rates
-  // Assuming ~10,512,000 blocks per year (20 blocks per minute * 60 minutes * 24 hours * 365.25 days)
+  // Following the formula from Venus docs: https://docs-v4.venus.io/guides/protocol-math#calculating-the-apy-using-rate-per-block
   const convertRateToAPY = (ratePerBlock: bigint): number => {
-    const blocksPerYear = 10512000n;
-    const rate = Number(ratePerBlock) / 1e18;
-    return (Math.pow(1 + rate, Number(blocksPerYear)) - 1) * 100;
+    const ethMantissa = 1e18;
+    const blocksPerDay = 60 * 60 * 24;
+    const daysPerYear = 365;
+    
+    // Convert bigint to number for math operations
+    const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
+    
+    // Use compound interest formula: ((ratePerBlock * blocksPerDay) + 1) ^ (daysPerYear - 1) - 1
+    const apy = (Math.pow((ratePerBlockNum * blocksPerDay) + 1, daysPerYear - 1) - 1) * 100;
+    
+    return apy;
+  };
+
+  // Special token overrides for specific addresses
+  const tokenOverrides: Record<string, { name: string; logo: string }> = {
+    "0x70d95587d40A2caf56bd97485aB3Eec10Bee6336": { name: "gmWETH/USDC", logo: "/logos/gmweth.svg" },
+    "0x47c031236e19d024b42f8AE6780E44A573170703": { name: "gmWBTC/USDC", logo: "/logos/gmbtc.svg" },
+  };
+
+  // Helper to get token display name and logo
+  const getTokenDisplay = (tokenAddress: string, originalSymbol: string) => {
+    const override = tokenOverrides[tokenAddress];
+    if (override) {
+      return {
+        displayName: override.name,
+        logo: override.logo
+      };
+    }
+    return {
+      displayName: originalSymbol,
+      logo: tokenNameToLogo(originalSymbol)
+    };
   };
 
   // Step 1: Get basic token info from getAllVenusMarkets
@@ -83,7 +112,7 @@ export const VenusProtocolView: FC = () => {
     functionName: "getAllMarkets"
   });
 
-  // Step 2: Get detailed market information
+  // Step 2: Get detailed market information including prices from oracles
   const { data: marketDetails, isLoading: isLoadingMarketDetails } = useScaffoldReadContract({
     contractName: "VenusGateway",
     functionName: "getAllVenusMarkets"
@@ -126,8 +155,8 @@ export const VenusProtocolView: FC = () => {
     }
     
     // Destructure arrays from tuple responses
-    const [vTokens, tokens, symbols, names, decimals] = marketDetails;
-    const [prices, supplyRates, borrowRates] = ratesData;
+    const [vTokens, tokens, symbols, names, decimals, prices] = marketDetails;
+    const [, supplyRates, borrowRates] = ratesData;
     
     // Process data to create positions
     for (let i = 0; i < vTokens.length; i++) {
@@ -135,11 +164,15 @@ export const VenusProtocolView: FC = () => {
       const symbol = symbols[i];
       const decimal = decimals[i];
       const tokenAddress = tokens[i];
+      const name = names[i];
       
       // Skip tokens with no underlying (like vBNB potentially)
       if (tokenAddress === "0x0000000000000000000000000000000000000000") {
         continue;
       }
+      
+      // Apply token overrides if needed
+      const { displayName, logo } = getTokenDisplay(tokenAddress, symbol);
       
       // Get rates and prices
       const supplyRate = supplyRates[i];
@@ -150,8 +183,9 @@ export const VenusProtocolView: FC = () => {
       const supplyAPY = convertRateToAPY(supplyRate);
       const borrowAPY = convertRateToAPY(borrowRate);
       
-      // Convert price from 8 decimals precision
-      const tokenPrice = Number(formatUnits(price, 8));
+      // Convert price from Venus ResilientOracle format
+      // According to Venus docs, prices are returned in USD with a consistent scale factor of 1e18
+      const tokenPrice = Number(formatUnits(price, 18 + (18 - decimal)));
       
       // Create supply position
       let supplyBalance = 0n;
@@ -165,8 +199,8 @@ export const VenusProtocolView: FC = () => {
       }
       
       supplied.push({
-        icon: tokenNameToLogo(symbol),
-        name: symbol,
+        icon: logo,
+        name: displayName,
         balance: supplyUsdBalance,
         tokenBalance: supplyBalance,
         currentRate: supplyAPY,
@@ -193,8 +227,8 @@ export const VenusProtocolView: FC = () => {
       }
       
       borrowed.push({
-        icon: tokenNameToLogo(symbol),
-        name: symbol,
+        icon: logo,
+        name: displayName,
         balance: -borrowUsdBalance, // Negative for borrowed
         tokenBalance: borrowBalance,
         currentRate: borrowAPY,
@@ -207,7 +241,7 @@ export const VenusProtocolView: FC = () => {
       borrowedPositions: borrowed,
       isLoading: false
     };
-  }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY]);
+  }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress]);
 
   // Get LTV (Loan-to-Value) for Venus
   // In Venus Protocol, this is typically around 50-75% depending on the asset
