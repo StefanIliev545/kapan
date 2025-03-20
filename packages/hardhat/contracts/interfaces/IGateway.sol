@@ -15,11 +15,12 @@ interface IGateway {
     function repay(address token, address user, uint256 amount) external;
 
     function depositCollateral(address market, address collateral, uint256 amount, address receiver) external;
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) external returns (address);
+    function withdrawCollateral(address market, address collateral, address user, uint256 amount) external returns (address, uint256);
     
 
     function getBalance(address token, address user) external view returns (uint256);
     function getBorrowBalance(address token, address user) external view returns (uint256);
+    function getBorrowBalanceCurrent(address token, address user) external returns (uint256);
     function getBorrowRate(address token) external view returns (uint256, bool);
     function getSupplyRate(address token) external view returns (uint256, bool);
     function getLtv(address token, address user) external view returns (uint256);

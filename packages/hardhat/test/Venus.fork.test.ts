@@ -179,7 +179,7 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
     console.log(`Debt approval requires ${targets.length} transactions:`);
     
     // Execute all required approval transactions
-    for (let i = 1; i < targets.length; i++) {
+    for (let i = 0; i < targets.length - 1; i++) {
       console.log(`Executing approval ${i+1}/${targets.length} - Target: ${targets[i]}`);
       const tx =await user.sendTransaction({
         to: targets[i],

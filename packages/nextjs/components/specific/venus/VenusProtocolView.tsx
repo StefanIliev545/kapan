@@ -26,14 +26,25 @@
 
 import { FC, useMemo, useState, useEffect } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
+import { SupplyPositionProps } from "../../SupplyPosition";
+import { VenusMarketEntry } from "./VenusMarketEntry";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 
+// Create a Venus supply position type
+type VenusSupplyPosition = SupplyPositionProps;
+
 export const VenusProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   const { data: venusGatewayContract } = useScaffoldContract({ contractName: "VenusGateway" });
+  
+  // Get Comptroller address from VenusGateway
+  const { data: comptrollerAddress } = useScaffoldReadContract({
+    contractName: "VenusGateway",
+    functionName: "comptroller",
+  });
   
   // State to track if we should force showing all assets when wallet is not connected
   const [forceShowAll, setForceShowAll] = useState(false);
@@ -101,7 +112,7 @@ export const VenusProtocolView: FC = () => {
 
   // Combine all the data to create supply and borrow positions
   const { suppliedPositions, borrowedPositions, isLoading } = useMemo(() => {
-    const supplied: ProtocolPosition[] = [];
+    const supplied: VenusSupplyPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
     
     // Check if we have all the required data
@@ -160,6 +171,14 @@ export const VenusProtocolView: FC = () => {
         tokenBalance: supplyBalance,
         currentRate: supplyAPY,
         tokenAddress: tokenAddress,
+        protocolName: "Venus",
+        afterInfoContent: comptrollerAddress ? (
+          <VenusMarketEntry 
+            vTokenAddress={vTokens[i]} 
+            comptrollerAddress={comptrollerAddress}
+            tokenSymbol={symbol}
+          />
+        ) : null
       });
       
       // Create borrow position
@@ -202,7 +221,7 @@ export const VenusProtocolView: FC = () => {
       protocolIcon="/logos/venus.svg"
       ltv={ltv}
       maxLtv={maxLtv}
-      suppliedPositions={suppliedPositions}
+      suppliedPositions={suppliedPositions as SupplyPositionProps[]}
       borrowedPositions={borrowedPositions}
       forceShowAll={forceShowAll}
     />

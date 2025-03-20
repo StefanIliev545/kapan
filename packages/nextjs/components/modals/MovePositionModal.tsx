@@ -36,6 +36,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const protocols = [
     { name: "Aave V3", icon: "/logos/aave.svg" },
     { name: "Compound V3", icon: "/logos/compound.svg" },
+    { name: "Venus", icon: "/logos/venus.svg" },
   ];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
@@ -268,7 +269,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </label>
-                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full">
+                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-full z-50 dropdown-bottom">
                   {protocols
                     .filter(p => p.name !== fromProtocol)
                     .map(protocol => (

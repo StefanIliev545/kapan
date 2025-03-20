@@ -168,18 +168,18 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         {
             console.log("Repaying debt on from protocol");
             IERC20(debtToken).approve(address(fromGateway), debtAmount);
-            uint256 borrowBalanceBefore = fromGateway.getBorrowBalance(debtToken, user);
+            uint256 borrowBalanceBefore = fromGateway.getBorrowBalanceCurrent(debtToken, user);
             fromGateway.repay(debtToken, user, debtAmount);
-            uint256 borrowBalanceAfter = fromGateway.getBorrowBalance(debtToken, user);
+            uint256 borrowBalanceAfter = fromGateway.getBorrowBalanceCurrent(debtToken, user);
             require(borrowBalanceAfter < borrowBalanceBefore, "Repayment did not reduce borrow balance");
         }
         // For each collateral asset, withdraw then deposit into the target protocol.
         for (uint i = 0; i < collaterals.length; i++) {
             console.log("Withdrawing collateral from from protocol");
-            address underlyingReceived = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
+            (address underlyingReceived, uint256 amountReceived) = fromGateway.withdrawCollateral(debtToken, collaterals[i].token, user, collaterals[i].amount);
             console.log("Depositing collateral into to protocol");
-            IERC20(underlyingReceived).approve(address(toGateway), collaterals[i].amount);
-            toGateway.depositCollateral(debtToken, underlyingReceived, collaterals[i].amount, user);
+            IERC20(underlyingReceived).approve(address(toGateway), amountReceived);
+            toGateway.depositCollateral(debtToken, underlyingReceived, amountReceived, user);
         }
 
         // Borrow the debt on the "to" protocol.
@@ -357,7 +357,7 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         if (repayAll) {
             IGateway fromGateway = gateways[fromProtocol];
             require(address(fromGateway) != address(0), "From protocol not supported");
-            debtAmount = fromGateway.getBorrowBalance(debtToken, user);
+            debtAmount = fromGateway.getBorrowBalanceCurrent(debtToken, user);
         }
 
         if (keccak256(bytes(flashLoanVersion)) == keccak256(bytes("v2"))) {
@@ -395,6 +395,7 @@ contract RouterGateway is Ownable, ReentrancyGuard {
     ) {
         IGateway gateway = gateways[protocolName];
         require(address(gateway) != address(0), "Protocol not supported");
+        console.log("getPossibleCollaterals", protocolName);
         return gateway.getPossibleCollaterals(token, user);
     }
 

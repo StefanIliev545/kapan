@@ -118,7 +118,7 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
      * @param user The account to supply for
      * @param amount The amount to supply
      */
-    function deposit(address token, address user, uint256 amount) external override onlyRouter nonReentrant {
+    function deposit(address token, address user, uint256 amount) public override onlyRouter nonReentrant {
         address vTokenAddress = getVTokenForUnderlying(token);
         
         // Transfer tokens from the user to this contract
@@ -155,7 +155,7 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         
         console.log("borrowed", token, user, amount);
         // Transfer borrowed tokens to the user
-        IERC20(token).safeTransfer(user, amount);
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
     
     /**
@@ -207,6 +207,11 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     function getBorrowBalance(address token, address user) external view override returns (uint256) {
         address vTokenAddress = getVTokenForUnderlying(token);
         return VTokenInterface(vTokenAddress).borrowBalanceStored(user);
+    }
+
+    function getBorrowBalanceCurrent(address token, address user) external override returns (uint256) {
+        address vTokenAddress = getVTokenForUnderlying(token);
+        return VTokenInterface(vTokenAddress).borrowBalanceCurrent(user);
     }
     
     /**
@@ -459,15 +464,13 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         collateralAddresses = new address[](tokens.length);
         symbols = new string[](tokens.length);
         decimals = new uint8[](tokens.length);
+        balances = new uint256[](tokens.length); // Initialize with all zeros by default
         
-        // If user address is provided, get their balances
+        // If user address is provided and not zero, get their balances
         if (user != address(0)) {
             // Get user balances for all markets
             (uint256[] memory userBalances, ) = this.getUserBalances(vTokens, user);
             balances = userBalances;
-        } else {
-            // If no user is provided, return zero balances
-            balances = new uint256[](tokens.length);
         }
         
         // Copy token information to return arrays
@@ -598,13 +601,39 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     // and would leverage the Venus Protocol's functionality
 
     // Placeholder implementations for the remaining IGateway interface methods
-    function depositCollateral(address market, address collateral, uint256 amount, address receiver) external override onlyRouter nonReentrant {
-        revert("depositCollateral: not implemented");
+    function depositCollateral(address market, address collateral, uint256 amount, address receiver) external override onlyRouter {
+        deposit(collateral, receiver, amount);
     }
     
-    function withdrawCollateral(address market, address collateral, address user, uint256 amount) external override onlyRouterOrSelf(user) nonReentrant returns (address) {
-        revert("withdrawCollateral: not implemented");
+    function withdrawCollateral(
+        address market,
+        address collateral,
+        address user,
+        uint256 underlyingAmount // now amount is specified in underlying units
+    ) external override onlyRouterOrSelf(user) nonReentrant returns (address, uint256) {
+        address vTokenAddress = this.getVTokenForUnderlying(collateral);
+        VTokenInterface vToken = VTokenInterface(vTokenAddress);
+        address underlying = vToken.underlying();
+        uint256 exchangeRate = vToken.exchangeRateCurrent();
+
+        // Calculate the required amount of vTokens to redeem the desired underlying amount.
+        // rounds up.
+        uint256 requiredVTokenAmount = (underlyingAmount * 1e18 + exchangeRate - 1) / exchangeRate;
+
+
+        // Transfer the vTokens from the user to this contract.
+        uint256 userBalance = vToken.balanceOf(user);
+        console.log("withdrawing collateral: transfer", requiredVTokenAmount, "vTokens", userBalance);
+        vToken.transferFrom(user, address(this), requiredVTokenAmount);
+        console.log("withdrawing collateral: redeem", underlyingAmount, "underlying");
+        // Redeem the required vTokens to get the underlying tokens.
+        vToken.redeem(requiredVTokenAmount);
+        uint256 contractBalance = IERC20(underlying).balanceOf(address(this));
+        console.log("withdrawing collateral: transfer out", contractBalance, "underlying", underlyingAmount);
+        IERC20(underlying).safeTransfer(msg.sender, underlyingAmount);
+        return (underlying, underlyingAmount);
     }
+
     
     /**
      * @notice Generate encoded call data for approving collateral usage
@@ -632,13 +661,13 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             }
             
             // Target is the underlying token
-            target[i] = collaterals[i].token;
+            target[i] = vTokenAddress;
             
             // Encode the approve function call - approve the vToken contract to spend the tokens
             // Use type(uint256).max for unlimited approval
             data[i] = abi.encodeWithSelector(
                 IERC20.approve.selector,
-                vTokenAddress,
+                address(this),
                 type(uint256).max
             );
         }

@@ -11,6 +11,7 @@ import { ProtocolPosition } from "./ProtocolView";
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
+  afterInfoContent?: React.ReactNode;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -21,6 +22,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   currentRate,
   protocolName,
   tokenAddress,
+  afterInfoContent,
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -95,6 +97,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </div>
             </div>
           </div>
+          
+          {/* Render additional content after the info button if provided */}
+          {afterInfoContent}
         </div>
 
         {/* Stats: Rates */}

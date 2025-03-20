@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x80D0A27e6c520269FD4EDab3215BFD4389D9a0A5",
+      address: "0xC6348eBA87be1A4B7fF7D2aec845c60D281e72AF",
       abi: [
         {
           inputs: [
@@ -337,6 +337,30 @@ const deployedContracts = {
               name: "token",
               type: "address",
             },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getBorrowBalanceCurrent",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
           ],
           name: "getBorrowRate",
           outputs: [
@@ -652,6 +676,11 @@ const deployedContracts = {
               name: "",
               type: "address",
             },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
           ],
           stateMutability: "nonpayable",
           type: "function",
@@ -663,6 +692,7 @@ const deployedContracts = {
         depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowBalanceCurrent: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
@@ -677,7 +707,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xEce446058DBa41ac494c3321682B836E8E2dF5F0",
+      address: "0x961583d54c8197DD50C29df9811713689F8BA75F",
       abi: [
         {
           inputs: [
@@ -972,6 +1002,30 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getBorrowBalanceCurrent",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -1522,6 +1576,11 @@ const deployedContracts = {
               name: "",
               type: "address",
             },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
           ],
           stateMutability: "nonpayable",
           type: "function",
@@ -1533,6 +1592,7 @@ const deployedContracts = {
         depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowBalanceCurrent: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
@@ -1550,7 +1610,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x1672a7eA4f72D1535B2F6bbC446Ac83B1A31ee2c",
+      address: "0x2eB3C1f7805DF01EF64Ce30a50e4aC127b79726B",
       abi: [
         {
           inputs: [
@@ -1766,7 +1826,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     RouterGateway: {
-      address: "0x8D75FD07f01e0C893CE0bA51cC0846c277644F99",
+      address: "0x24f251584Be40faF497D1d7853ff47212155ad40",
       abi: [
         {
           inputs: [
@@ -2599,7 +2659,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0x00dD0063f51147470A588d8f9f399F8aa2445CB2",
+      address: "0xA165c4d7F17e295F6b723804627Ba97A8EfB0a0b",
       abi: [
         {
           inputs: [
@@ -2828,44 +2888,6 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "address[]",
-              name: "vTokens",
-              type: "address[]",
-            },
-          ],
-          name: "enterMarkets",
-          outputs: [
-            {
-              internalType: "uint256[]",
-              name: "",
-              type: "uint256[]",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "vToken",
-              type: "address",
-            },
-          ],
-          name: "exitMarket",
-          outputs: [
-            {
-              internalType: "uint256",
-              name: "",
-              type: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               internalType: "address",
               name: "account",
               type: "address",
@@ -3003,6 +3025,30 @@ const deployedContracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getBorrowBalanceCurrent",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -3436,7 +3482,7 @@ const deployedContracts = {
             },
             {
               internalType: "uint256",
-              name: "amount",
+              name: "underlyingAmount",
               type: "uint256",
             },
           ],
@@ -3446,6 +3492,11 @@ const deployedContracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "nonpayable",
@@ -3458,6 +3509,7 @@ const deployedContracts = {
         depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowBalanceCurrent: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
@@ -4133,6 +4185,7 @@ const deployedContracts = {
         depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowBalanceCurrent: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
@@ -5003,6 +5056,7 @@ const deployedContracts = {
         depositCollateral: "contracts/interfaces/IGateway.sol",
         getBalance: "contracts/interfaces/IGateway.sol",
         getBorrowBalance: "contracts/interfaces/IGateway.sol",
+        getBorrowBalanceCurrent: "contracts/interfaces/IGateway.sol",
         getBorrowRate: "contracts/interfaces/IGateway.sol",
         getEncodedCollateralApprovals: "contracts/interfaces/IGateway.sol",
         getEncodedDebtApproval: "contracts/interfaces/IGateway.sol",
