@@ -50,10 +50,21 @@ export const useTokenData = () => {
       const [protocols, rates, success] = protocolRates;
 
       // Create array of protocol data with names and rates
-      const protocolData = protocols.map((name, index) => ({
-        name: name as string,
-        rate: success[index] ? Number(rates[index]) / 1e8 : 0, // Convert from 8 decimals to percentage
-      }));
+      const protocolData = protocols.map((name, index) => {
+        // Clean up protocol names for display
+        let displayName = name as string;
+        if (displayName.toLowerCase() === "aave") displayName = "Aave V3";
+        if (displayName.toLowerCase() === "compound") displayName = "Compound V3";
+        if (displayName.toLowerCase() === "venus") displayName = "Venus";
+        
+        return {
+          name: displayName,
+          rate: success[index] ? Number(rates[index]) / 1e8 : 0, // Convert from 8 decimals to percentage
+        };
+      }).filter(p => p.rate > 0); // Filter out protocols with zero rates
+      
+      // Sort by rate (highest first) to ensure comparison component works correctly
+      protocolData.sort((a, b) => b.rate - a.rate);
 
       setTokenData((prev: TokenData) => ({
         ...prev,

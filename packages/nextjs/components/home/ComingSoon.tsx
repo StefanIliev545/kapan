@@ -32,7 +32,7 @@ const ComingSoon = () => {
                 </h3>
                 <p className="text-base-content/80">
                   We&apos;re working to integrate more lending protocols like Maker and Morpho to provide 
-                  even more options for optimizing your DeFi debt.
+                  even more options beyond our current Aave, Compound, and Venus integrations.
                 </p>
                 <div className="card-actions justify-end mt-4">
                   <div className="badge badge-primary dark:badge-accent badge-outline dark:border-accent/70">Coming Q3 2025</div>

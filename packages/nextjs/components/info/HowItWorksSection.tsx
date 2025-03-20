@@ -95,6 +95,21 @@ const HowItWorksSection = () => {
                     <p className="text-sm text-base-content/70">Efficient DeFi borrowing platform</p>
                   </div>
                 </div>
+                
+                <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
+                    <Image
+                      src="/logos/venus.svg"
+                      alt="Venus Protocol"
+                      fill
+                      className="object-contain p-1"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-base-content">Venus Protocol</h4>
+                    <p className="text-sm text-base-content/70">BNB Chain&apos;s leading lending platform</p>
+                  </div>
+                </div>
               </div>
               
               <div className="flex items-center gap-2 mt-6 text-sm text-base-content/70 border-t border-base-300 pt-4">

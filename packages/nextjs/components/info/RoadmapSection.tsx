@@ -248,7 +248,7 @@ const RoadmapSection = () => {
     {
       phase: 1,
       title: "Initial Web3 Lending Platform Launch",
-      description: "Core features supporting basic lending operations and atomic debt migration across Aave V3 and Compound V3.",
+      description: "Core features supporting basic lending operations and atomic debt migration across Aave V3, Compound V3, and Venus Protocol.",
       features: ["Supply Assets", "Repay Loans", "Atomic Debt Migration", "Cross-Protocol Rate Comparison"],
       isActive: true,
       icon: <RocketLaunchIcon className="w-5 h-5" />
@@ -264,7 +264,7 @@ const RoadmapSection = () => {
       phase: 3,
       title: "Web3 Lending Protocol Expansion",
       description: "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
-      features: ["Euler Finance", "Morpho Labs", "Venus Protocol"],
+      features: ["Euler Finance", "Morpho Labs"],
       icon: <BuildingLibraryIcon className="w-5 h-5" />
     },
     {

@@ -27,17 +27,33 @@ const AnimatedValue = ({ children, className }: { children: React.ReactNode; cla
 const DebtComparison = () => {
   const tokenData = useTokenData();
 
-  // Find Aave and Compound rates
+  // Find rates from all supported protocols
   const aaveProtocol = tokenData.protocols.find(p => p.name === "Aave V3");
   const compoundProtocol = tokenData.protocols.find(p => p.name === "Compound V3");
+  const venusProtocol = tokenData.protocols.find(p => p.name === "Venus");
+  
   const aaveRate = aaveProtocol?.rate || 0;
   const compoundRate = compoundProtocol?.rate || 0;
+  const venusRate = venusProtocol?.rate || 0;
 
-  // Calculate savings based on which protocol has higher rate
-  const isAaveHigher = aaveRate > compoundRate;
-  const higherRate = Math.max(aaveRate, compoundRate);
-  const lowerRate = Math.min(aaveRate, compoundRate);
-  const currentDebt = isAaveHigher ? tokenData.totalDebt : tokenData.totalDebt;
+  // Find the protocol with the highest rate
+  const ratesByProtocol = [
+    { name: "Aave", rate: aaveRate, logo: "/logos/aave.svg" },
+    { name: "Compound", rate: compoundRate, logo: "/logos/compound.svg" },
+    { name: "Venus", rate: venusRate, logo: "/logos/venus.svg" }
+  ];
+
+  // Sort protocols by rate (highest first)
+  const sortedProtocols = [...ratesByProtocol].sort((a, b) => b.rate - a.rate);
+  
+  // Get highest and lowest rate protocols
+  const highestRateProtocol = sortedProtocols[0];
+  const lowestRateProtocol = sortedProtocols[sortedProtocols.length - 1];
+  
+  // Calculate savings 
+  const higherRate = highestRateProtocol.rate;
+  const lowerRate = lowestRateProtocol.rate;
+  const currentDebt = tokenData.totalDebt;
   const annualInterestHigher = currentDebt * (higherRate / 100);
   const annualInterestLower = currentDebt * (lowerRate / 100);
   const totalSavings = Math.abs(annualInterestHigher - annualInterestLower);
@@ -84,7 +100,7 @@ const DebtComparison = () => {
               <div className="w-5 h-5 relative">
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={isAaveHigher ? "aave" : "compound"}
+                    key={highestRateProtocol.name.toLowerCase()}
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.5, opacity: 0 }}
@@ -92,15 +108,15 @@ const DebtComparison = () => {
                     className="w-full h-full"
                   >
                     <Image
-                      src={isAaveHigher ? "/logos/aave.svg" : "/logos/compound.svg"}
-                      alt={isAaveHigher ? "Aave" : "Compound"}
+                      src={highestRateProtocol.logo}
+                      alt={highestRateProtocol.name}
                       fill
                       className="object-contain"
                     />
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <AnimatedValue>{isAaveHigher ? "Aave" : "Compound"}</AnimatedValue>
+              <AnimatedValue>{highestRateProtocol.name}</AnimatedValue>
               <span>on</span>
               <div className="w-4 h-4 relative">
                 <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />
@@ -125,7 +141,7 @@ const DebtComparison = () => {
               <div className="w-8 h-8 rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={aaveRate > compoundRate ? "aave" : "compound"}
+                    key={highestRateProtocol.name.toLowerCase()}
                     initial={{ rotate: -180, opacity: 0 }}
                     animate={{ rotate: 0, opacity: 1 }}
                     exit={{ rotate: 180, opacity: 0 }}
@@ -133,8 +149,8 @@ const DebtComparison = () => {
                     className="w-full h-full"
                   >
                     <Image
-                      src={aaveRate > compoundRate ? "/logos/aave.svg" : "/logos/compound.svg"}
-                      alt={aaveRate > compoundRate ? "Aave" : "Compound"}
+                      src={highestRateProtocol.logo}
+                      alt={highestRateProtocol.name}
                       width={24}
                       height={24}
                     />
@@ -144,7 +160,7 @@ const DebtComparison = () => {
             </div>
             <div>
               <AnimatedValue className="font-semibold text-base-content">
-                Currently on {aaveRate > compoundRate ? "Aave" : "Compound"}
+                Currently on {highestRateProtocol.name}
               </AnimatedValue>
               <div className="text-sm text-base-content/70">Variable Rate</div>
             </div>
@@ -154,9 +170,9 @@ const DebtComparison = () => {
               <FiPercent className="w-4 h-4" />
               Annual Interest
             </div>
-            <AnimatedValue className="text-2xl font-bold text-base-content">{Math.max(aaveRate, compoundRate).toFixed(2)}%</AnimatedValue>
+            <AnimatedValue className="text-2xl font-bold text-base-content">{higherRate.toFixed(2)}%</AnimatedValue>
             <AnimatedValue className="text-base-content/70 mt-1">
-              ${formatNumber(Math.max(annualInterestHigher, annualInterestLower))} per year
+              ${formatNumber(annualInterestHigher)} per year
             </AnimatedValue>
           </div>
         </div>
@@ -168,7 +184,7 @@ const DebtComparison = () => {
               <div className="w-8 h-8 rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={aaveRate > compoundRate ? "compound" : "aave"}
+                    key={lowestRateProtocol.name.toLowerCase()}
                     initial={{ rotate: -180, opacity: 0 }}
                     animate={{ rotate: 0, opacity: 1 }}
                     exit={{ rotate: 180, opacity: 0 }}
@@ -176,8 +192,8 @@ const DebtComparison = () => {
                     className="w-full h-full"
                   >
                     <Image
-                      src={aaveRate > compoundRate ? "/logos/compound.svg" : "/logos/aave.svg"}
-                      alt={aaveRate > compoundRate ? "Compound" : "Aave"}
+                      src={lowestRateProtocol.logo}
+                      alt={lowestRateProtocol.name}
                       width={24}
                       height={24}
                     />
@@ -187,7 +203,7 @@ const DebtComparison = () => {
             </div>
             <div>
               <AnimatedValue className="font-semibold text-base-content">
-                Available on {aaveRate > compoundRate ? "Compound" : "Aave"}
+                Available on {lowestRateProtocol.name}
               </AnimatedValue>
               <div className="text-sm text-base-content/70">Variable Rate</div>
             </div>
@@ -195,10 +211,10 @@ const DebtComparison = () => {
           <div className="mt-2">
             <div className="text-base-content/70">Annual Interest</div>
             <AnimatedValue className="text-2xl font-bold text-primary dark:text-accent">
-              {Math.min(aaveRate, compoundRate).toFixed(2)}%
+              {lowerRate.toFixed(2)}%
             </AnimatedValue>
             <AnimatedValue className="text-base-content/70 mt-1">
-              ${formatNumber(Math.min(annualInterestHigher, annualInterestLower))} per year
+              ${formatNumber(annualInterestLower)} per year
             </AnimatedValue>
           </div>
         </div>
