@@ -1,5 +1,5 @@
 # 🏦 Kapan Finance
-
+![image](https://github.com/user-attachments/assets/ff0ac5a2-d9dc-47ff-b2a6-2892f9f1acd6)
 <h4 align="center">
   <a href="https://kapan.finance">Website</a> |
   <a href="https://kapan.finance/app">App</a> |
