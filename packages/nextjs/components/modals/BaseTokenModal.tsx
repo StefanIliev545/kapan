@@ -66,6 +66,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     args: [walletClient?.account?.address as `0x${string}`],
     query: {
       enabled: isOpen,
+      refetchInterval: 5000,
     },
   });
 

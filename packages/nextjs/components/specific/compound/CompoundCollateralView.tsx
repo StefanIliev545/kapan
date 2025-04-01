@@ -80,7 +80,9 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "CompoundGateway",
     functionName: "getDepositedCollaterals",
     args: [baseToken, queryAddress],
-    enabled: shouldFetch,
+    query: {
+      enabled: shouldFetch,
+    },
   });
 
   // Extract collateral addresses from fetched data
@@ -94,7 +96,9 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "CompoundGateway",
     functionName: "getPrices",
     args: [baseToken, collateralAddresses],
-    enabled: shouldFetch && collateralAddresses.length > 0,
+    query: {
+      enabled: shouldFetch && collateralAddresses.length > 0,
+    },
   });
 
   // Fetch decimals for collateral tokens
@@ -102,7 +106,9 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "UiHelper",
     functionName: "getDecimals",
     args: [collateralAddresses],
-    enabled: shouldFetch && collateralAddresses.length > 0,
+    query: {
+      enabled: shouldFetch && collateralAddresses.length > 0,
+    },
   });
 
   // Ensure baseTokenDecimals is in the expected array format

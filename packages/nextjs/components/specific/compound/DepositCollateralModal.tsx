@@ -46,6 +46,10 @@ export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({
     abi: ERC20ABI,
     functionName: "balanceOf",
     args: [walletClient?.account?.address as `0x${string}`],
+    query: {
+      enabled: isOpen,
+      refetchInterval: 5000,
+    },
   });
 
   // Read token decimals
@@ -53,6 +57,9 @@ export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({
     address: token.address as `0x${string}`,
     abi: ERC20ABI,
     functionName: "decimals",
+    query: {
+      enabled: isOpen,
+    },
   });
 
   const formattedBalance = balance && decimals ? formatUnits(balance as bigint, decimals as number) : "0";
