@@ -1,6 +1,16 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { FiAlertTriangle, FiArrowRight, FiArrowRightCircle, FiCheck, FiDollarSign } from "react-icons/fi";
+import {
+  FiAlertTriangle,
+  FiArrowRight,
+  FiArrowRightCircle,
+  FiCheck,
+  FiDollarSign,
+  FiLock,
+  FiMinusCircle,
+  FiPlusCircle,
+  FiTrendingUp,
+} from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -34,6 +44,17 @@ const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
   { name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2" },
   { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3" },
 ] as const;
+
+// Extend the collateral type with rawBalance
+type CollateralType = {
+  symbol: string;
+  balance: number;
+  address: string;
+  decimals: number;
+  rawBalance: bigint; // Not optional - rawBalance is always provided by useCollaterals
+  selected: boolean;
+  supported: boolean;
+};
 
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
   const { address: userAddress } = useAccount();
@@ -80,9 +101,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   );
 
   // Combine fetched collaterals with selected state and support status.
-  const collaterals = useMemo(() => {
+  const collaterals = useMemo<CollateralType[]>(() => {
     return fetchedCollaterals.map(
-      (collateral: { symbol: string; balance: number; address: string; decimals: number }) => {
+      (collateral: { symbol: string; balance: number; address: string; decimals: number; rawBalance: bigint }) => {
         // Use the address for selection status instead of symbol
         return {
           ...collateral,
@@ -233,8 +254,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       const selectedCollateralArray = collaterals
         .filter(c => selectedCollaterals.has(c.address))
         .map(c => {
-          const collateralAmount = parseUnits(c.balance.toString(), c.decimals);
-          return { token: c.address, amount: collateralAmount };
+          // Always use rawBalance directly - no need for fallbacks or undefined checks
+          const amount = c.rawBalance;
+          console.log(`Using exact raw balance for ${c.symbol}: ${amount.toString()}`);
+          return { token: c.address, amount };
         });
 
       if (position.type === "borrow") {
@@ -321,20 +344,38 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 </div>
               </div>
               <div className="absolute -right-2 -bottom-2 bg-base-100 rounded-full p-0.5 shadow-md">
-                <FiArrowRightCircle className="text-primary w-6 h-6" />
+                {position.type === "borrow" ? (
+                  <FiArrowRightCircle className="text-primary w-6 h-6" />
+                ) : (
+                  <FiTrendingUp className="text-emerald-500 w-6 h-6" />
+                )}
               </div>
             </div>
             <div>
               <h3 className="text-2xl font-bold flex items-center gap-2">
-                <span className="font-extrabold bg-gradient-to-r from-purple-500 via-primary to-blue-500 bg-clip-text text-transparent dark:from-purple-300 dark:via-primary-300 dark:to-blue-300">
+                <span
+                  className={`font-extrabold bg-gradient-to-r ${
+                    position.type === "borrow"
+                      ? "from-purple-500 via-primary to-blue-500 bg-clip-text text-transparent dark:from-purple-300 dark:via-primary-300 dark:to-blue-300"
+                      : "from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent dark:from-emerald-300 dark:via-teal-300 dark:to-cyan-300"
+                  }`}
+                >
                   Move {position.type === "supply" ? "Supply" : "Debt"}
                 </span>
                 <span className="text-base-content">{position.name}</span>
               </h3>
-              <div className="text-sm opacity-70">
-                {position.type === "borrow"
-                  ? `Moving debt from ${fromProtocol} to another protocol`
-                  : `Moving supply from ${fromProtocol} to another protocol`}
+              <div className="text-sm opacity-70 flex items-center gap-1">
+                {position.type === "borrow" ? (
+                  <>
+                    <FiMinusCircle className="w-4 h-4 text-primary" />
+                    <span>Moving debt from {fromProtocol} to another protocol</span>
+                  </>
+                ) : (
+                  <>
+                    <FiPlusCircle className="w-4 h-4 text-emerald-500" />
+                    <span>Moving supply from {fromProtocol} to another protocol</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -489,7 +530,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           {/* Amount Input */}
           <div className="space-y-2">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium text-base-content/80">Amount</label>
+              <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
+                Amount
+                {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
+              </label>
               <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                 <span className="text-base-content/70">Available:</span>
                 <span className="font-medium ml-1">
@@ -594,8 +638,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     loading ||
                     !selectedProtocol ||
                     !amount ||
-                    (tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
-                    (position.type === "borrow" && selectedCollaterals.size === 0) ||
+                    !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
+                    !!(position.type === "borrow" && selectedCollaterals.size === 0) ||
                     hasProviderSufficientBalance === false ||
                     step !== "idle";
 
@@ -603,11 +647,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     <button
                       className={`btn ${getActionButtonClass()} btn-lg w-full h-14 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
                       onClick={handleMoveDebt}
-                      disabled={isDisabled ? true : false}
+                      disabled={isDisabled}
                     >
                       {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
                       {getActionButtonText()}
-                      {!loading && step === "idle" && <FiArrowRight className="w-5 h-5 ml-1" />}
+                      {!loading &&
+                        step === "idle" &&
+                        (position.type === "supply" ? (
+                          <FiTrendingUp className="w-5 h-5 ml-1" />
+                        ) : (
+                          <FiArrowRight className="w-5 h-5 ml-1" />
+                        ))}
                     </button>
                   );
                 })()}
