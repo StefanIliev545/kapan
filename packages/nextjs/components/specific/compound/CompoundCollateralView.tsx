@@ -39,6 +39,7 @@ interface CompoundCollateralViewProps {
   baseTokenDecimals: number | bigint;
   compoundData: any;
   isVisible?: boolean; // New prop to indicate if the collateral view is visible
+  initialShowAll?: boolean; // Prop to control initial showAll state
 }
 
 export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
@@ -46,8 +47,9 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   baseTokenDecimals,
   compoundData,
   isVisible = false, // Default to false if not provided
+  initialShowAll = undefined, // Default to undefined (use component logic) if not provided
 }) => {
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(initialShowAll === undefined ? false : initialShowAll);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
   const { address: connectedAddress } = useAccount();
 
@@ -194,8 +196,11 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     }
   }, [isVisible, baseToken]);
 
-  // Auto-expand all tokens when the component becomes visible
+  // Auto-expand all tokens when the component becomes visible, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
+    // Skip this logic if initialShowAll was explicitly provided
+    if (initialShowAll !== undefined) return;
+    
     if (isVisible && !showAll) {
       // Check if we have any tokens with balance
       const hasTokensWithBalance = allCollateralPositions.some((pos: CollateralPosition) => pos.balance > 0);
@@ -205,7 +210,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
         setShowAll(true);
       }
     }
-  }, [isVisible, allCollateralPositions, showAll]);
+  }, [isVisible, allCollateralPositions, showAll, initialShowAll]);
 
   // Calculate total collateral value in USD
   const totalCollateralValue = useMemo(() => {
@@ -218,15 +223,18 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     return (borrowDetails.borrowValue / totalCollateralValue) * 100;
   }, [borrowDetails.borrowValue, totalCollateralValue]);
 
-  // Check if any position has a balance and auto-show all if none do
+  // Check if any position has a balance and auto-show all if none do, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
+    // Skip this logic if initialShowAll was explicitly provided
+    if (initialShowAll !== undefined) return;
+    
     if (allCollateralPositions && allCollateralPositions.length > 0) {
       const anyHasBalance = allCollateralPositions.some((pos: CollateralPosition) => pos.balance > 0);
       if (!anyHasBalance) {
         setShowAll(true);
       }
     }
-  }, [allCollateralPositions]);
+  }, [allCollateralPositions, initialShowAll]);
 
   // Filter based on toggle state
   const collateralPositions = useMemo(() => {
