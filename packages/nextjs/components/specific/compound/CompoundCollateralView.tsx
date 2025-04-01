@@ -1,9 +1,10 @@
-import { FC, useState, useMemo, useEffect } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { DepositCollateralModal } from "./DepositCollateralModal";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { DepositCollateralModal } from "./DepositCollateralModal";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
 interface CollateralPosition {
   icon: string;
@@ -26,50 +27,35 @@ const UserUtilization: FC<{ utilizationPercentage: number }> = ({ utilizationPer
   return (
     <div className="flex items-center gap-2">
       <div className="w-20 h-1.5 bg-base-300 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${getColor()}`}
-          style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
-        />
+        <div className={`h-full ${getColor()}`} style={{ width: `${Math.min(utilizationPercentage, 100)}%` }} />
       </div>
-      <span className="text-xs font-medium">
-        {utilizationPercentage.toFixed(0)}% borrowed
-      </span>
+      <span className="text-xs font-medium">{utilizationPercentage.toFixed(0)}% borrowed</span>
     </div>
   );
 };
 
 interface CompoundCollateralViewProps {
   baseToken: string;
-  collateralData: any;
-  collateralPrices: any;
-  collateralDecimals: any;
   baseTokenDecimals: number | bigint;
   compoundData: any;
+  isVisible?: boolean; // New prop to indicate if the collateral view is visible
 }
 
-export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({ 
+export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   baseToken,
-  collateralData,
-  collateralPrices,
-  collateralDecimals,
   baseTokenDecimals,
-  compoundData
+  compoundData,
+  isVisible = false, // Default to false if not provided
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
   const { address: connectedAddress } = useAccount();
 
-  // Ensure baseTokenDecimals is in the expected array format
-  const baseTokenDecimalsArray = typeof baseTokenDecimals === 'number' 
-    ? [BigInt(baseTokenDecimals)] 
-    : [baseTokenDecimals];
+  // Use ZERO_ADDRESS when wallet is not connected
+  const queryAddress = connectedAddress || "0x0000000000000000000000000000000000000000";
 
-  // Extract collateral addresses from passed data
-  const collateralAddresses = useMemo(() => {
-    if (!collateralData?.[0] || !collateralData[0].length) return [];
-    // Return the array of addresses (first element in the collateralData tuple)
-    return collateralData[0];
-  }, [collateralData]);
+  // Only fetch data when the component is visible or when first mounted
+  const shouldFetch = isVisible;
 
   // Format currency with 2 decimal places
   const formatNumber = (num: number) => {
@@ -89,6 +75,40 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     }).format(amount);
   };
 
+  // Fetch collateral data directly in this component
+  const { data: collateralData } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getDepositedCollaterals",
+    args: [baseToken, queryAddress],
+    enabled: shouldFetch,
+  });
+
+  // Extract collateral addresses from fetched data
+  const collateralAddresses = useMemo(() => {
+    if (!collateralData?.[0] || !collateralData[0].length) return [];
+    return collateralData[0];
+  }, [collateralData]);
+
+  // Fetch prices for collateral tokens
+  const { data: collateralPrices } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrices",
+    args: [baseToken, collateralAddresses],
+    enabled: shouldFetch && collateralAddresses.length > 0,
+  });
+
+  // Fetch decimals for collateral tokens
+  const { data: collateralDecimals } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "getDecimals",
+    args: [collateralAddresses],
+    enabled: shouldFetch && collateralAddresses.length > 0,
+  });
+
+  // Ensure baseTokenDecimals is in the expected array format
+  const baseTokenDecimalsArray =
+    typeof baseTokenDecimals === "number" ? [BigInt(baseTokenDecimals)] : [baseTokenDecimals];
+
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
     if (!compoundData) {
@@ -97,24 +117,24 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
     // CompoundData returns [supplyRate, borrowRate, balance, borrowBalance, price, priceScale]
     const [_, __, ___, borrowBalanceRaw, price] = compoundData;
-    
+
     // Get the correct decimals for this token
     const decimals = Number(baseTokenDecimalsArray[0]);
-    
+
     // Format the borrow balance using the correct decimals
     const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
-    
+
     // Calculate USD value of the borrowed amount (price is in 8 decimals)
     const borrowUsdValue = borrowBalance * Number(formatUnits(price, 8));
-    
-    console.log('Borrow details:', {
+
+    console.log("Borrow details:", {
       borrowBalanceRaw: borrowBalanceRaw?.toString(),
       decimals,
       borrowBalance,
       price: price?.toString(),
-      borrowUsdValue
+      borrowUsdValue,
     });
-    
+
     return { borrowBalance, borrowValue: borrowUsdValue };
   }, [compoundData, baseTokenDecimalsArray]);
 
@@ -125,32 +145,28 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     }
 
     const [addresses, balances, displayNames] = collateralData;
-    
+
     // Create positions with price data
     const positions = addresses.map((address: string, index: number) => {
       const name = displayNames[index];
-      
+
       // Use decimals from passed data, fallback to 18 if not available
-      const decimals = collateralDecimals && index < collateralDecimals.length
-        ? Number(collateralDecimals[index])
-        : 18;
-      
+      const decimals = collateralDecimals && index < collateralDecimals.length ? Number(collateralDecimals[index]) : 18;
+
       // Format balance with correct decimals
       const balance = Number(formatUnits(balances[index], decimals));
-      
-      // Get raw price value 
-      const rawPrice = collateralPrices && index < collateralPrices.length 
-        ? collateralPrices[index] 
-        : 0n;
-      
-      // Calculate USD value 
+
+      // Get raw price value
+      const rawPrice = collateralPrices && index < collateralPrices.length ? collateralPrices[index] : 0n;
+
+      // Calculate USD value
       let usdValue = 0;
       if (rawPrice > 0n) {
         // Price is returned in 8 decimals format
         const price = Number(formatUnits(rawPrice, 8));
         usdValue = balance * price;
       }
-      
+
       return {
         name,
         balance,
@@ -160,9 +176,30 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
         rawPrice,
       };
     });
-    
+
     return positions;
   }, [collateralData, collateralPrices, collateralDecimals]);
+
+  // Refresh data when visibility changes
+  useEffect(() => {
+    if (isVisible) {
+      // You could trigger a manual refetch here if needed
+      console.log("Collateral view is now visible", { baseToken });
+    }
+  }, [isVisible, baseToken]);
+
+  // Auto-expand all tokens when the component becomes visible
+  useEffect(() => {
+    if (isVisible && !showAll) {
+      // Check if we have any tokens with balance
+      const hasTokensWithBalance = allCollateralPositions.some((pos: CollateralPosition) => pos.balance > 0);
+
+      // If there are no tokens with balance, show all tokens
+      if (!hasTokensWithBalance) {
+        setShowAll(true);
+      }
+    }
+  }, [isVisible, allCollateralPositions, showAll]);
 
   // Calculate total collateral value in USD
   const totalCollateralValue = useMemo(() => {
@@ -205,6 +242,20 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   // Get all collateral positions (for counting)
   const allPositionsCount = allCollateralPositions.length;
   const positionsWithBalanceCount = allCollateralPositions.filter((pos: CollateralPosition) => pos.balance > 0).length;
+
+  // Don't render anything until data is loaded when visible
+  if (isVisible && (!collateralData || collateralData[0]?.length === 0) && !allCollateralPositions.length) {
+    return (
+      <div className="bg-base-200/60 dark:bg-base-300/30 rounded-lg p-3 mt-2">
+        <div className="flex items-center justify-center py-4">
+          <div className="animate-pulse flex items-center">
+            <div className="h-4 w-4 bg-primary/30 rounded-full mr-2"></div>
+            <span className="text-sm text-base-content/70">Loading collateral data...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

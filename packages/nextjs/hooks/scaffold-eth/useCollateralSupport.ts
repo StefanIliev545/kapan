@@ -17,6 +17,7 @@ export const useCollateralSupport = (
   protocolName: string,
   marketAddress: string,
   collateralAddresses: string[],
+  enabled: boolean,
 ): CollateralSupportResult => {
   const [supportedCollaterals, setSupportedCollaterals] = useState<Record<string, boolean>>({});
 
@@ -25,6 +26,9 @@ export const useCollateralSupport = (
     contractName: "RouterGateway",
     functionName: "getSupportedCollaterals",
     args: [protocolName.toLowerCase(), marketAddress],
+    query: {
+      enabled,
+    },
   });
 
   // Process the collateral support data

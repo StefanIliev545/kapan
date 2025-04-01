@@ -55,6 +55,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     position.tokenAddress,
     fromProtocol,
     userAddress || "0x0000000000000000000000000000000000000000",
+    isOpen,
   );
 
   // Memoize the collateral addresses to prevent recreation on every render.
@@ -69,6 +70,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     selectedProtocol,
     position.tokenAddress,
     collateralAddresses,
+    isOpen,
   );
 
   // Combine fetched collaterals with selected state and support status.
@@ -109,6 +111,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       position.tokenAddress,
       userAddress || "0x0000000000000000000000000000000000000000",
     ],
+    query: {
+      enabled: isOpen,
+    },
   });
 
   // Read token decimals.
@@ -116,6 +121,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     address: position.tokenAddress as `0x${string}`,
     abi: ERC20ABI,
     functionName: "decimals",
+    query: {
+      enabled: isOpen,
+    },
   });
 
   // Check flash loan provider balance.
@@ -123,6 +131,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     contractName: "RouterGateway",
     functionName: "getFlashLoanProviderBalance",
     args: [position.tokenAddress, selectedFlashLoanProvider.version],
+    query: {
+      enabled: isOpen,
+    },
   });
 
   // Effect for checking provider balance.

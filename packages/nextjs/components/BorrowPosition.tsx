@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import React, { FC, useState } from "react";
 import Image from "next/image";
 import { useAccount } from "wagmi";
 import { MovePositionModal } from "./modals/MovePositionModal";
@@ -28,6 +28,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
+  const [isCollateralVisible, setIsCollateralVisible] = useState(false);
 
   // Get wallet connection status
   const { address: userAddress } = useAccount();
@@ -66,6 +67,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const handleCloseBorrowModal = () => {
     setIsBorrowModalOpen(false);
   };
+
+  // Toggle collateral visibility
+  const toggleCollateralVisibility = () => {
+    setIsCollateralVisible(prev => !prev);
+  };
+
+  // Get the collateral view with isVisible prop
+  const collateralViewWithVisibility = collateralView 
+    ? React.cloneElement(collateralView as React.ReactElement, { isVisible: isCollateralVisible })
+    : null;
 
   return (
     <>
@@ -184,26 +195,26 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </button>
             
           {collateralView && (
-            <label 
-              htmlFor={`collateral-${name}`} 
-              className={`swap swap-rotate btn btn-sm btn-circle h-9 w-9 btn-ghost ${!isWalletConnected ? 'btn-disabled' : ''}`}
+            <button 
+              className={`btn btn-sm btn-circle h-9 w-9 btn-ghost ${!isWalletConnected ? 'btn-disabled' : ''}`}
+              onClick={toggleCollateralVisibility}
               title={!isWalletConnected ? "Connect wallet to view collateral" : "Toggle collateral view"}
             >
-              <FiChevronDown className="swap-off w-4 h-4 text-base-content/70" />
-              <FiChevronUp className="swap-on w-4 h-4 text-base-content/70" />
-            </label>
+              {isCollateralVisible ? (
+                <FiChevronUp className="w-4 h-4 text-base-content/70" />
+              ) : (
+                <FiChevronDown className="w-4 h-4 text-base-content/70" />
+              )}
+            </button>
           )}
         </div>
       </div>
 
       {/* Collateral View (if provided) */}
       {collateralView && (
-        <div className="collapse">
-          <input type="checkbox" id={`collateral-${name}`} className="collapse-toggle hidden" />
-          <div className="collapse-content">
-            <div className="py-2">
-              {collateralView}
-            </div>
+        <div className={`overflow-hidden transition-all duration-300 ${isCollateralVisible ? 'max-h-[500px]' : 'max-h-0'}`}>
+          <div className="py-2">
+            {collateralViewWithVisibility}
           </div>
         </div>
       )}
