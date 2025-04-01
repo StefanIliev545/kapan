@@ -9,11 +9,14 @@ interface CollateralToken {
   decimals: number;
 }
 
-export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string) => {
+export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean) => {
   const { data, isLoading } = useScaffoldReadContract({
     contractName: "RouterGateway",
     functionName: "getPossibleCollaterals",
     args: [tokenAddress, protocolName.toLowerCase(), userAddress],
+    query: {
+      enabled,
+    },
   });
 
   if (!data) return { collaterals: [], isLoading };

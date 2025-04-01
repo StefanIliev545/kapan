@@ -1704,7 +1704,7 @@ const deployedContracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x178fc2B403Bb6F88dBa7A40003838C24e5dEeFC6",
+      address: "0x7d299A65180413f1bE93fd810272c09a0F5DF6b4",
       abi: [
         {
           inputs: [],

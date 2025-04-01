@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useEffect } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
@@ -12,13 +12,13 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
-  
+
   // State to track if we should force showing all assets when wallet is not connected
   const [forceShowAll, setForceShowAll] = useState(false);
-  
+
   // Determine the address to use for queries
   const queryAddress = connectedAddress || ZERO_ADDRESS;
-  
+
   // Update forceShowAll when wallet connection status changes with a delay
   useEffect(() => {
     // If wallet is connected, immediately set forceShowAll to false
@@ -26,7 +26,7 @@ export const CompoundProtocolView: FC = () => {
       setForceShowAll(false);
       return;
     }
-    
+
     // If wallet is not connected, wait a bit before forcing show all
     // This gives time for wallet to connect during initial page load
     const timeout = setTimeout(() => {
@@ -34,7 +34,7 @@ export const CompoundProtocolView: FC = () => {
         setForceShowAll(true);
       }
     }, 2500); // Wait 1.5 seconds before deciding wallet is not connected
-    
+
     return () => clearTimeout(timeout);
   }, [connectedAddress]);
 
@@ -73,99 +73,6 @@ export const CompoundProtocolView: FC = () => {
     args: [usdcEAddress, queryAddress],
   });
 
-  // Fetch collateral data for each token to include in balance calculation
-  const { data: wethCollateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getDepositedCollaterals",
-    args: [wethAddress, queryAddress],
-  });
-  const { data: usdcCollateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getDepositedCollaterals",
-    args: [usdcAddress, queryAddress],
-  });
-  const { data: usdtCollateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getDepositedCollaterals",
-    args: [usdtAddress, queryAddress],
-  });
-  const { data: usdcECollateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getDepositedCollaterals",
-    args: [usdcEAddress, queryAddress],
-  });
-
-  // Get collateral token addresses for price fetching
-  const wethCollateralAddresses = useMemo(() => {
-    if (!wethCollateralData?.[0] || !wethCollateralData[0].length) return [];
-    return wethCollateralData[0];
-  }, [wethCollateralData]);
-
-  const usdcCollateralAddresses = useMemo(() => {
-    if (!usdcCollateralData?.[0] || !usdcCollateralData[0].length) return [];
-    return usdcCollateralData[0];
-  }, [usdcCollateralData]);
-
-  const usdtCollateralAddresses = useMemo(() => {
-    if (!usdtCollateralData?.[0] || !usdtCollateralData[0].length) return [];
-    return usdtCollateralData[0];
-  }, [usdtCollateralData]);
-
-  const usdcECollateralAddresses = useMemo(() => {
-    if (!usdcECollateralData?.[0] || !usdcECollateralData[0].length) return [];
-    return usdcECollateralData[0];
-  }, [usdcECollateralData]);
-
-  // Fetch prices for all collateral tokens
-  const { data: wethCollateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getPrices",
-    args: [wethAddress, wethCollateralAddresses],
-  });
-
-  const { data: usdcCollateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getPrices",
-    args: [usdcAddress, usdcCollateralAddresses],
-  });
-
-  const { data: usdtCollateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getPrices",
-    args: [usdtAddress, usdtCollateralAddresses],
-  });
-
-  const { data: usdcECollateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
-    functionName: "getPrices",
-    args: [usdcEAddress, usdcECollateralAddresses],
-  });
-
-  // Get decimals for collateral tokens
-  const { data: wethCollateralDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper",
-    functionName: "getDecimals",
-    args: [wethCollateralAddresses],
-  });
-
-  const { data: usdcCollateralDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper",
-    functionName: "getDecimals",
-    args: [usdcCollateralAddresses],
-  });
-
-  const { data: usdtCollateralDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper",
-    functionName: "getDecimals",
-    args: [usdtCollateralAddresses],
-  });
-
-  const { data: usdcECollateralDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper",
-    functionName: "getDecimals",
-    args: [usdcECollateralAddresses],
-  });
-
   // Fetch decimals for each token.
   const { data: wethDecimals } = useScaffoldReadContract({
     contractName: "eth",
@@ -191,44 +98,6 @@ export const CompoundProtocolView: FC = () => {
     return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
   };
 
-  // Calculate total collateral value in USD for a specific market
-  const calculateCollateralValue = (
-    collateralData: any,
-    collateralPrices: any,
-    collateralDecimals: any
-  ): number => {
-    if (!collateralData || !collateralData[0] || !collateralData[0].length || !collateralPrices) {
-      return 0;
-    }
-
-    const [addresses, balances, displayNames] = collateralData;
-    let totalValue = 0;
-
-    for (let i = 0; i < addresses.length; i++) {
-      // Skip tokens with zero balance
-      if (!balances[i] || balances[i] === 0n) continue;
-
-      // Use the token's actual decimals if available, fallback to 18
-      const decimals = collateralDecimals && i < collateralDecimals.length
-        ? Number(collateralDecimals[i])
-        : 18;
-
-      // Format balance with proper decimals
-      const balance = Number(formatUnits(balances[i], decimals));
-
-      // Get price and ensure it exists
-      if (!collateralPrices[i]) continue;
-      
-      // Price is in 8 decimals format
-      const price = Number(formatUnits(collateralPrices[i], 8));
-      
-      const tokenValue = balance * price;
-      totalValue += tokenValue;
-    }
-
-    return totalValue;
-  };
-
   // Aggregate positions using useMemo.
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
@@ -239,9 +108,6 @@ export const CompoundProtocolView: FC = () => {
       tokenAddress: string | undefined,
       compoundData: any,
       decimalsRaw: any,
-      marketCollateralData: any,
-      marketCollateralPrices: any,
-      marketCollateralDecimals: any
     ) => {
       if (!tokenAddress || !compoundData || !decimalsRaw) return;
       const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price, priceScale] = compoundData;
@@ -255,19 +121,6 @@ export const CompoundProtocolView: FC = () => {
       const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
       const usdBorrowBalance = borrowBalance * Number(formatUnits(price, 8));
 
-      // Calculate collateral value for this market
-      const collateralValue = calculateCollateralValue(
-        marketCollateralData,
-        marketCollateralPrices,
-        marketCollateralDecimals
-      );
-
-      console.log(`${tokenName} market:`, { 
-        usdBorrowBalance, 
-        collateralValue,
-        netBalance: collateralValue - usdBorrowBalance 
-      });
-
       // Always add to borrowed positions list, regardless of whether there's debt
       borrowed.push({
         icon: tokenNameToLogo(tokenName),
@@ -275,18 +128,17 @@ export const CompoundProtocolView: FC = () => {
         // Set negative balance if there's debt, otherwise zero balance
         balance: borrowBalanceRaw && borrowBalanceRaw > 0n ? -usdBorrowBalance : 0,
         // Store collateral value as a custom property
-        collateralValue: collateralValue,
+        collateralValue: 0, // This is now calculated inside the CollateralView
         tokenBalance: borrowBalanceRaw || 0n,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
-        collateralView: <CompoundCollateralView 
-          baseToken={tokenAddress} 
-          collateralData={marketCollateralData}
-          collateralPrices={marketCollateralPrices}
-          collateralDecimals={marketCollateralDecimals}
-          baseTokenDecimals={decimals}
-          compoundData={compoundData}
-        />,
+        collateralView: (
+          <CompoundCollateralView
+            baseToken={tokenAddress}
+            baseTokenDecimals={decimals}
+            compoundData={compoundData}
+          />
+        ),
       });
 
       supplied.push({
@@ -300,48 +152,44 @@ export const CompoundProtocolView: FC = () => {
     };
 
     computePosition(
-      "WETH", 
-      wethAddress, 
-      wethCompoundData, 
+      "WETH",
+      wethAddress,
+      wethCompoundData,
       wethDecimals,
-      wethCollateralData,
-      wethCollateralPrices,
-      wethCollateralDecimals
     );
     computePosition(
-      "USDC", 
-      usdcAddress, 
-      usdcCompoundData, 
+      "USDC",
+      usdcAddress,
+      usdcCompoundData,
       usdcDecimals,
-      usdcCollateralData,
-      usdcCollateralPrices,
-      usdcCollateralDecimals
     );
     computePosition(
-      "USDT", 
-      usdtAddress, 
-      usdtCompoundData, 
+      "USDT",
+      usdtAddress,
+      usdtCompoundData,
       usdtDecimals,
-      usdtCollateralData,
-      usdtCollateralPrices,
-      usdtCollateralDecimals
     );
     computePosition(
-      "USDC.e", 
-      usdcEAddress, 
-      usdcECompoundData, 
+      "USDC.e",
+      usdcEAddress,
+      usdcECompoundData,
       usdcEDecimals,
-      usdcECollateralData,
-      usdcECollateralPrices,
-      usdcECollateralDecimals
     );
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
   }, [
-    wethAddress, wethCompoundData, wethDecimals, wethCollateralData, wethCollateralPrices, wethCollateralDecimals,
-    usdcAddress, usdcCompoundData, usdcDecimals, usdcCollateralData, usdcCollateralPrices, usdcCollateralDecimals,
-    usdtAddress, usdtCompoundData, usdtDecimals, usdtCollateralData, usdtCollateralPrices, usdtCollateralDecimals,
-    usdcEAddress, usdcECompoundData, usdcEDecimals, usdcECollateralData, usdcECollateralPrices, usdcECollateralDecimals,
+    wethAddress,
+    wethCompoundData,
+    wethDecimals,
+    usdcAddress,
+    usdcCompoundData,
+    usdcDecimals,
+    usdtAddress,
+    usdtCompoundData,
+    usdtDecimals,
+    usdcEAddress,
+    usdcECompoundData,
+    usdcEDecimals,
   ]);
 
   // Hardcode current LTV (or fetch from contract if needed).

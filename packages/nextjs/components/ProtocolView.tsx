@@ -243,7 +243,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <span className="badge badge-primary badge-outline">{filteredSuppliedPositions.length}</span>
               </h2>
               {filteredSuppliedPositions.length > 0 ? (
-                <div className=" pt-2">
+                <div className=" pt-2 space-y-3">
                   {filteredSuppliedPositions.map((position, index) => (
                     <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
                       <SupplyPosition {...position} protocolName={protocolName} />
@@ -279,7 +279,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <span className="badge badge-secondary badge-outline">{filteredBorrowedPositions.length}</span>
               </h2>
               {filteredBorrowedPositions.length > 0 ? (
-                <div className="pt-2">
+                <div className="pt-2 space-y-3">
                   {filteredBorrowedPositions.map((position, index) => (
                     <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
                       <BorrowPosition {...position} protocolName={protocolName} />
