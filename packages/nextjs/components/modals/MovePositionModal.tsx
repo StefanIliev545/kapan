@@ -18,6 +18,7 @@ import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -66,7 +67,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
-  const [selectedCollaterals, setSelectedCollaterals] = useState<Set<string>>(new Set());
+  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider>(
     FLASH_LOAN_PROVIDERS[0],
@@ -100,31 +101,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     isOpen,
   );
 
-  // Combine fetched collaterals with selected state and support status.
-  const collaterals = useMemo<CollateralType[]>(() => {
+  // Combine fetched collaterals with support status.
+  const collateralsForSelector = useMemo(() => {
     return fetchedCollaterals.map(
       (collateral: { symbol: string; balance: number; address: string; decimals: number; rawBalance: bigint }) => {
-        // Use the address for selection status instead of symbol
         return {
           ...collateral,
-          // Check if the address is in the selectedCollaterals set
-          selected: selectedCollaterals.has(collateral.address),
           supported: supportedCollaterals[collateral.address] === true,
         };
       },
     );
-  }, [fetchedCollaterals, selectedCollaterals, supportedCollaterals]);
-
-  // Modified to use address instead of symbol
-  const handleCollateralToggle = (address: string) => {
-    const collateral = collaterals.find(c => c.address === address);
-    if (collateral && !collateral.supported) return;
-    setSelectedCollaterals(prev => {
-      const next = new Set(prev);
-      next.has(address) ? next.delete(address) : next.add(address);
-      return next;
-    });
-  };
+  }, [fetchedCollaterals, supportedCollaterals]);
 
   // Move debt hook.
   const { moveDebt } = useMoveDebtScaffold();
@@ -171,6 +158,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       setStep("idle");
       setLoading(false);
       setIsRepayingAll(false);
+      setSelectedCollateralsWithAmounts([]);
     }
   }, [isOpen]);
 
@@ -251,14 +239,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         computedDebtAmount = parseUnits(amount, decimals as number);
       }
 
-      const selectedCollateralArray = collaterals
-        .filter(c => selectedCollaterals.has(c.address))
-        .map(c => {
-          // Always use rawBalance directly - no need for fallbacks or undefined checks
-          const amount = c.rawBalance;
-          console.log(`Using exact raw balance for ${c.symbol}: ${amount.toString()}`);
-          return { token: c.address, amount };
-        });
+      const selectedCollateralArray = selectedCollateralsWithAmounts.map(c => {
+        return { token: c.token, amount: c.amount };
+      });
 
       if (position.type === "borrow") {
         await moveDebt({
@@ -317,6 +300,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   // Get the selected protocol icon
   const getSelectedProtocolIcon = () => {
     return protocols.find(p => p.name === selectedProtocol)?.icon || "";
+  };
+
+  // Handler for collateral selection and amount changes
+  const handleCollateralSelectionChange = (collaterals: CollateralWithAmount[]) => {
+    setSelectedCollateralsWithAmounts(collaterals);
   };
 
   return (
@@ -560,60 +548,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </div>
           </div>
 
-          {/* Collateral Selection */}
+          {/* Collateral Selection - Using the new component */}
           {position.type === "borrow" && (
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium text-base-content/80">Select Collateral to Move</label>
-                {selectedProtocol && (
-                  <span className="text-xs bg-base-200/60 py-1 px-2 rounded-md text-base-content/60">
-                    Grayed out = not supported in {selectedProtocol}
-                  </span>
-                )}
-              </div>
-
-              {isLoadingCollaterals || isLoadingCollateralSupport ? (
-                <div className="flex items-center justify-center py-6 bg-base-200/50 rounded-lg">
-                  <span className="loading loading-spinner loading-md"></span>
-                  <span className="ml-2 text-base-content/70">Checking collateral support...</span>
-                </div>
-              ) : collaterals.length > 0 ? (
-                <div className="bg-base-200/30 p-4 rounded-lg">
-                  <div className="flex flex-wrap gap-2">
-                    {collaterals.map(collateral => (
-                      <button
-                        key={collateral.address}
-                        onClick={() => handleCollateralToggle(collateral.address)}
-                        className={`
-                          btn h-auto py-2 px-3 normal-case flex items-center gap-2
-                          ${collateral.selected ? "btn-primary" : "btn-outline bg-base-100"}
-                          ${!collateral.supported ? "opacity-50 cursor-not-allowed" : ""}
-                        `}
-                        disabled={!collateral.supported}
-                      >
-                        <div className="w-6 h-6 relative flex-shrink-0">
-                          <Image
-                            src={tokenNameToLogo(collateral.symbol)}
-                            alt={collateral.symbol}
-                            fill
-                            className="rounded-full object-contain"
-                          />
-                        </div>
-                        <span className="truncate font-medium">{collateral.symbol}</span>
-                        <span className="opacity-70 tabular-nums">
-                          {collateral.balance.toFixed(collateral.decimals > 6 ? 4 : collateral.decimals)}
-                        </span>
-                        {!collateral.supported && <span className="text-xs px-1 bg-base-300 rounded-full ml-1">!</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg">
-                  No collateral available to move
-                </div>
-              )}
-            </div>
+            <CollateralSelector
+              collaterals={collateralsForSelector}
+              isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
+              selectedProtocol={selectedProtocol}
+              onCollateralSelectionChange={handleCollateralSelectionChange}
+            />
           )}
 
           {/* Error message */}
@@ -639,7 +581,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     !selectedProtocol ||
                     !amount ||
                     !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
-                    !!(position.type === "borrow" && selectedCollaterals.size === 0) ||
+                    !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
                     hasProviderSufficientBalance === false ||
                     step !== "idle";
 
