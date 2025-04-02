@@ -306,7 +306,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
         fromProtocol={protocolName}
         position={{
           name,
-          balance,
+          balance: balance? balance : 0,
           type: "borrow",
           tokenAddress,
         }}
