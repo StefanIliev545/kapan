@@ -218,11 +218,11 @@ export const Header = () => {
                                 alt="Kapan logo" 
                                 className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
                                 fill 
-                                src="/seal-logo.svg" 
+                                src="/seal-logo.png" 
                               />
                             </div>
                             <div>
-                              <div className="font-bold text-xl text-primary dark:text-accent">Kapan</div>
+                              <div className="font-bold text-xl text-primary dark:text-accent">Kapan Finance</div>
                               <div className="text-xs text-base-content/60">Lending Made Easy</div>
                             </div>
                           </div>
@@ -256,18 +256,18 @@ export const Header = () => {
             <Link href="/" className="flex items-center">
               <div className="relative flex items-center">
                 <div className="relative">
-                  <div className={`relative w-8 h-8 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                  <div className={`relative w-14 h-14 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
                     <Image 
                       alt="Kapan logo" 
                       className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
                       fill 
-                      src="/seal-logo.svg" 
+                      src="/seal-logo.png" 
                       priority 
                     />
                   </div>
                 </div>
                 <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                  <div className="font-bold text-lg text-primary dark:text-accent">Kapan</div>
+                  <div className="font-bold text-lg text-primary dark:text-accent">Kapan Finance</div>
                   <div className="text-[10px] text-base-content/60 -mt-1">Lending Made Easy</div>
                 </div>
               </div>
