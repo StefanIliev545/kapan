@@ -21,6 +21,8 @@ export interface CollateralWithAmount {
   symbol: string;
   decimals: number;
   maxAmount: bigint;
+  inputValue?: string; // For in-progress decimal inputs
+  supported: boolean;
 }
 
 // New interface for the token switcher dropdown
@@ -312,11 +314,31 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
             symbol: collateral.symbol,
             decimals: collateral.decimals,
             maxAmount: collateral.rawBalance,
+            // Track whether this collateral is supported in the current protocol
+            supported: collateral.supported
           },
         ];
       }
     });
   };
+
+  // Update selected collaterals when protocol changes
+  useEffect(() => {
+    if (!selectedProtocol) return;
+    
+    // Update selected collaterals when collateral support changes
+    setSelectedCollaterals(prev => {
+      return prev.map(c => {
+        // Find this collateral in the current list to check support status
+        const currentCollateral = collaterals.find(collateral => collateral.address === c.token);
+        return {
+          ...c,
+          // If found, use its current support status, otherwise mark as unsupported
+          supported: currentCollateral ? currentCollateral.supported : false
+        };
+      });
+    });
+  }, [collaterals, selectedProtocol]);
 
   // Handle amount change for a selected collateral
   const handleAmountChange = (token: string, amountStr: string, decimals: number) => {
@@ -324,11 +346,39 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       return prev.map(c => {
         if (c.token === token) {
           try {
-            // Parse amount to bigint if it's a valid number
-            const amount = amountStr === "" ? 0n : parseUnits(amountStr, decimals);
-            return { ...c, amount };
+            // Check if the input is empty or in the process of being entered (like "0." or "1.")
+            if (amountStr === "" || amountStr === "0" || amountStr === "." || amountStr === "0." || /^\d*\.?\d*$/.test(amountStr)) {
+              // For in-progress decimal inputs, keep the string value but set amount to 0 temporarily
+              if (amountStr === "." || amountStr === "0." || /^\d+\.$/.test(amountStr)) {
+                return { ...c, amount: 0n, inputValue: amountStr };
+              }
+              
+              // For valid numbers, convert to bigint
+              try {
+                // Check if the amount exceeds max before applying
+                let amount = parseUnits(amountStr, decimals);
+                
+                // If entered amount is greater than max, cap it at maximum
+                if (amount > c.maxAmount) {
+                  amount = c.maxAmount;
+                  // Format the max amount for display
+                  const maxAmountStr = formatUnits(c.maxAmount, decimals);
+                  // Update inputValue to show max value
+                  return { ...c, amount, inputValue: maxAmountStr };
+                }
+                
+                // Otherwise use the entered amount
+                return { ...c, amount, inputValue: undefined };
+              } catch {
+                // If parseUnits fails but the string looks like a number in progress, keep it
+                return { ...c, amount: 0n, inputValue: amountStr };
+              }
+            } else {
+              // Invalid input, keep current amount
+              return c;
+            }
           } catch (e) {
-            // If parsing fails, keep the current amount
+            // If anything goes wrong, keep the current amount
             return c;
           }
         }
@@ -433,18 +483,23 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
           <div className="bg-base-200/40 p-4 rounded-lg space-y-3">
             {selectedCollaterals.map((collateral) => {
               // Format human-readable amount for display
-              const displayAmount = collateral.amount === 0n 
-                ? "" 
-                : formatUnits(collateral.amount, collateral.decimals);
+              const displayAmount = collateral.inputValue 
+                ? collateral.inputValue
+                : collateral.amount === 0n 
+                  ? "" 
+                  : formatUnits(collateral.amount, collateral.decimals);
               
               // Format max amount for display
               const maxAmountStr = formatUnits(collateral.maxAmount, collateral.decimals);
               const maxAmount = formatMaxAmount(maxAmountStr);
               
+              // Check if this collateral is supported in the current protocol
+              const isSupported = collateral.supported;
+              
               return (
                 <div 
                   key={collateral.token} 
-                  className="flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm"
+                  className={`flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}
                 >
                   {/* Left side: Token icon and info - fixed width */}
                   <div className="flex items-center gap-2 w-[160px] flex-shrink-0">
@@ -453,7 +508,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                         src={tokenNameToLogo(collateral.symbol)}
                         alt={collateral.symbol}
                         fill
-                        className="rounded-full object-contain"
+                        className={`rounded-full object-contain ${!isSupported ? 'grayscale' : ''}`}
                       />
                     </div>
                     <div className="flex flex-col overflow-hidden">
@@ -461,6 +516,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                       <span className="text-xs text-base-content/60">
                         Available: {maxAmount}
                       </span>
+                      {!isSupported && (
+                        <span className="text-xs text-error/80">Not supported in {selectedProtocol}</span>
+                      )}
                     </div>
                   </div>
                   
@@ -482,19 +540,21 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   
                   {/* Input field - takes remaining space */}
                   <div className="flex-1">
-                    <div className="flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all">
+                    <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all ${!isSupported ? 'opacity-50' : ''}`}>
                       <input
                         type="text"
                         value={displayAmount}
                         onChange={(e) => handleAmountChange(collateral.token, e.target.value, collateral.decimals)}
                         className="flex-1 bg-transparent border-none focus:outline-none px-3 py-2 h-10 text-base-content"
                         placeholder="0.00"
+                        disabled={!isSupported}
                       />
                       <button
-                        className="mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200"
+                        className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={(e) => {
                           handleSetMax(collateral.token);
                         }}
+                        disabled={!isSupported}
                       >
                         MAX
                       </button>
@@ -504,7 +564,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   {/* Remove button - fixed width */}
                   <div className="flex-shrink-0">
                     <button
-                      className="btn btn-ghost btn-sm text-base-content/70 p-1 h-8 w-8 flex items-center justify-center"
+                      className="btn btn-ghost btn-sm text-base-content/70 p-1 h-8 w-8 flex items-center justify-center hover:bg-error/10 hover:text-error"
                       onClick={() => handleRemoveCollateral(collateral.token)}
                       title="Remove collateral"
                     >
