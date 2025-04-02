@@ -1,8 +1,9 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { DepositCollateralModal } from "./DepositCollateralModal";
-import { formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount } from "wagmi";
+import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -10,9 +11,11 @@ interface CollateralPosition {
   icon: string;
   name: string;
   balance: number; // Token amount
+  balanceRaw: bigint; // Raw token amount
   usdValue: number; // USD value
   address: string;
   rawPrice: bigint; // Store the raw price for debugging
+  decimals: number; // Store the decimals
 }
 
 // User position utilization indicator component
@@ -93,7 +96,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     return collateralData[0];
   }, [collateralData]);
 
-  // Fetch prices for collateral tokens
+  // Fetch prices for collateral tokens (in terms of baseToken)
   const { data: collateralPrices } = useScaffoldReadContract({
     contractName: "CompoundGateway",
     functionName: "getPrices",
@@ -113,9 +116,25 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     },
   });
 
+  // Fetch the baseToken price in USD
+  const { data: baseTokenPrice } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrice",
+    args: [baseToken],
+    query: {
+      enabled: shouldFetch,
+    },
+  });
+
   // Ensure baseTokenDecimals is in the expected array format
   const baseTokenDecimalsArray =
     typeof baseTokenDecimals === "number" ? [BigInt(baseTokenDecimals)] : [baseTokenDecimals];
+
+  // Extract baseToken price in USD
+  const baseTokenUsdPrice = useMemo(() => {
+    if (!baseTokenPrice) return 0n;
+    return baseTokenPrice;
+  }, [baseTokenPrice]);
 
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
@@ -134,15 +153,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
     // Calculate USD value of the borrowed amount (price is in 8 decimals)
     const borrowUsdValue = borrowBalance * Number(formatUnits(price, 8));
-
-    console.log("Borrow details:", {
-      borrowBalanceRaw: borrowBalanceRaw?.toString(),
-      decimals,
-      borrowBalance,
-      price: price?.toString(),
-      borrowUsdValue,
-    });
-
     return { borrowBalance, borrowValue: borrowUsdValue };
   }, [compoundData, baseTokenDecimalsArray]);
 
@@ -154,6 +164,9 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
     const [addresses, balances, displayNames] = collateralData;
 
+    // Base token price converted to a number with 8 decimals
+    const baseTokenUsdPriceNumber = baseTokenUsdPrice ? Number(formatUnits(baseTokenUsdPrice, 8)) : 0;
+
     // Create positions with price data
     const positions = addresses.map((address: string, index: number) => {
       const name = displayNames[index];
@@ -161,40 +174,56 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
       // Use decimals from passed data, fallback to 18 if not available
       const decimals = collateralDecimals && index < collateralDecimals.length ? Number(collateralDecimals[index]) : 18;
 
+      // Store the raw balance
+      const balanceRaw = balances[index];
+      
       // Format balance with correct decimals
-      const balance = Number(formatUnits(balances[index], decimals));
+      const balance = Number(formatUnits(balanceRaw, decimals));
 
-      // Get raw price value
-      const rawPrice = collateralPrices && index < collateralPrices.length ? collateralPrices[index] : 0n;
+      // Get collateral price in terms of baseToken
+      const collateralToBasePrice = collateralPrices && index < collateralPrices.length ? collateralPrices[index] : 0n;
 
-      // Calculate USD value
+      // Calculate USD value using both conversion rates:
+      // 1. Convert collateral to baseToken value 
+      // 2. Convert baseToken value to USD
       let usdValue = 0;
-      if (rawPrice > 0n) {
-        // Price is returned in 8 decimals format
-        const price = Number(formatUnits(rawPrice, 8));
-        usdValue = balance * price;
+      let effectiveUsdPrice = 0n;
+      
+      if (collateralToBasePrice > 0n && baseTokenUsdPrice > 0n) {
+        // Calculate the effective USD price by combining both rates
+        // Convert to BigInt calculation to avoid precision issues
+        const scaleFactor = 10n ** 8n; // Both prices have 8 decimals, result will have 8 decimals
+        effectiveUsdPrice = (collateralToBasePrice * baseTokenUsdPrice) / scaleFactor;
+        
+        // Calculate USD value
+        usdValue = balance * Number(formatUnits(effectiveUsdPrice, 8));
       }
 
       return {
         name,
         balance,
+        balanceRaw,
         usdValue,
         icon: tokenNameToLogo(name),
         address,
-        rawPrice,
+        rawPrice: effectiveUsdPrice, // Store the effective USD price for FiatBalance
+        decimals,
       };
     });
 
     return positions;
-  }, [collateralData, collateralPrices, collateralDecimals]);
+  }, [collateralData, collateralPrices, collateralDecimals, baseTokenUsdPrice]);
 
   // Refresh data when visibility changes
   useEffect(() => {
     if (isVisible) {
       // You could trigger a manual refetch here if needed
-      console.log("Collateral view is now visible", { baseToken });
+      console.log("Collateral view is now visible", { 
+        baseToken,
+        baseTokenUsdPrice: baseTokenUsdPrice ? baseTokenUsdPrice.toString() : "0",
+      });
     }
-  }, [isVisible, baseToken]);
+  }, [isVisible, baseToken, baseTokenUsdPrice]);
 
   // Auto-expand all tokens when the component becomes visible, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
@@ -217,6 +246,24 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     return allCollateralPositions.reduce((total: number, position: CollateralPosition) => total + position.usdValue, 0);
   }, [allCollateralPositions]);
 
+  // Log debug information about pricing
+  useEffect(() => {
+    if (isVisible && baseTokenUsdPrice && allCollateralPositions.length > 0) {
+      console.log("Collateral pricing debug:", {
+        baseToken,
+        baseTokenUsdPrice: baseTokenUsdPrice.toString(),
+        baseTokenUsdValue: Number(formatUnits(baseTokenUsdPrice, 8)),
+        totalCollateralValue,
+        positions: allCollateralPositions.map(pos => ({
+          name: pos.name,
+          balance: pos.balance,
+          usdValue: pos.usdValue,
+          rawPrice: pos.rawPrice.toString(),
+        }))
+      });
+    }
+  }, [isVisible, baseToken, baseTokenUsdPrice, allCollateralPositions, totalCollateralValue]);
+
   // Calculate utilization percentage (borrowed USD / total collateral USD)
   const utilizationPercentage = useMemo(() => {
     if (totalCollateralValue <= 0) return 0;
@@ -227,7 +274,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   useEffect(() => {
     // Skip this logic if initialShowAll was explicitly provided
     if (initialShowAll !== undefined) return;
-    
+
     if (allCollateralPositions && allCollateralPositions.length > 0) {
       const anyHasBalance = allCollateralPositions.some((pos: CollateralPosition) => pos.balance > 0);
       if (!anyHasBalance) {
@@ -238,8 +285,8 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   // Filter based on toggle state
   const collateralPositions = useMemo(() => {
-    return showAll 
-      ? allCollateralPositions 
+    return showAll
+      ? allCollateralPositions
       : allCollateralPositions.filter((pos: CollateralPosition) => pos.balance > 0);
   }, [allCollateralPositions, showAll]);
 
@@ -281,7 +328,18 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                 {/* Collateral Assets title and count - highest priority */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-sm font-semibold text-base-content/80 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-primary"
+                    >
                       <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
                       <path d="M2 17l10 5 10-5"></path>
                       <path d="M2 12l10 5 10-5"></path>
@@ -292,7 +350,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                     {positionsWithBalanceCount}/{allPositionsCount}
                   </span>
                 </div>
-                
+
                 {/* Utilization indicator - lowest priority, will disappear first */}
                 {totalCollateralValue > 0 && (
                   <div className="hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
@@ -304,37 +362,37 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                   </div>
                 )}
               </div>
-              
+
               {/* Toggle for showing all collateral - medium priority, always visible */}
               <div className="flex items-center gap-2 ml-auto flex-shrink-0">
                 <span className="text-xs text-base-content/70 whitespace-nowrap">Show all</span>
-                <input 
-                  type="checkbox" 
-                  className="toggle toggle-primary toggle-xs" 
-                  checked={showAll} 
+                <input
+                  type="checkbox"
+                  className="toggle toggle-primary toggle-xs"
+                  checked={showAll}
                   onChange={() => setShowAll(prev => !prev)}
                 />
               </div>
             </div>
           </div>
-          
+
           {collateralPositions.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {collateralPositions.map((position: CollateralPosition) => (
-                <div 
-                  key={position.address} 
+                <div
+                  key={position.address}
                   className={`bg-base-100 rounded-lg p-2 shadow-sm hover:shadow-md transition-all duration-200 border 
-                    ${position.balance > 0 ? 'border-base-300/50' : 'border-base-300/20'} 
+                    ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"} 
                     cursor-pointer hover:bg-base-200/50 active:scale-95`}
                   onClick={() => handleCollateralClick(position)}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
                     <div className="avatar flex-shrink-0">
                       <div className="w-7 h-7 rounded-full bg-base-200 p-1.5 flex items-center justify-center overflow-hidden">
-                        <Image 
-                          src={position.icon} 
-                          alt={`${position.name} icon`} 
-                          width={20} 
+                        <Image
+                          src={position.icon}
+                          alt={`${position.name} icon`}
+                          width={20}
                           height={20}
                           className="object-contain max-w-full max-h-full"
                         />
@@ -343,14 +401,24 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                     <div className="flex flex-col overflow-hidden">
                       <span className="font-medium text-sm truncate">{position.name}</span>
                       <div className="flex flex-col">
-                        <span className={`text-xs font-mono truncate ${position.balance > 0 ? 'text-base-content/70' : 'text-base-content/40'}`}>
-                          {position.balance > 0 ? formatNumber(position.balance) : 'No balance'}
-                        </span>
-                        {/* Only show price information for tokens with a balance */}
-                        {position.balance > 0 && position.rawPrice > 0n && (
-                          <span className="text-xs font-medium text-success dark:text-success truncate">
-                            {formatUSD(position.usdValue)}
-                          </span>
+                        {position.balance > 0 ? (
+                          <>
+                            {/* Single FiatBalance component showing USD value by default, raw amount on hover */}
+                            <span className="text-xs text-success truncate">
+                              <FiatBalance
+                                tokenAddress={position.address}
+                                rawValue={position.balanceRaw}
+                                price={position.rawPrice}
+                                decimals={position.decimals}
+                                tokenSymbol={position.name}
+                                className=""
+                                isNegative={false}
+                                maxRawDecimals={4}
+                              />
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-base-content/40 truncate">No balance</span>
                         )}
                       </div>
                     </div>
@@ -361,18 +429,26 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           ) : (
             <div className="flex flex-col items-center justify-center text-center gap-2 bg-base-100/50 rounded-lg p-4">
               <div className="text-primary dark:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                  />
                 </svg>
               </div>
               <p className="text-sm text-base-content/70">
                 {showAll ? "No collateral assets available" : "No collateral assets with balance"}
               </p>
               {!showAll && (
-                <button 
-                  className="btn btn-xs btn-outline mt-1"
-                  onClick={() => setShowAll(true)}
-                >
+                <button className="btn btn-xs btn-outline mt-1" onClick={() => setShowAll(true)}>
                   Show All Available Collateral
                 </button>
               )}
