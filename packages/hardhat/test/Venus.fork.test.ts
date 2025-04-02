@@ -16,6 +16,10 @@ const WETH_ADDRESS = ethers.getAddress("0x82aF49447D8a07e3bd95BD0d56f35241523fBa
 const COMPTROLLER_ADDRESS = process.env.VENUS_COMPTROLLER 
   ? ethers.getAddress(process.env.VENUS_COMPTROLLER)
   : ethers.getAddress("0x317c1A5739F39046E20b08ac9BeEa3f10fD43326"); // Venus Comptroller
+// Use environment variable for Venus Oracle with fallback to ZeroAddress (will need to be updated)
+const VENUS_ORACLE_ADDRESS = process.env.VENUS_ORACLE
+  ? ethers.getAddress(process.env.VENUS_ORACLE)
+  : ethers.ZeroAddress; // Default fallback, should be updated with actual address
 
 runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :fork", function () {
   let router: RouterGateway;
@@ -49,17 +53,20 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
       WETH_ADDRESS
     )) as unknown as IERC20;
 
+    console.log("Prefunding user with USDC...");
     // Transfer some USDC from rich account to our test user
     const transferAmount = ethers.parseUnits("2000", 6); // 2000 USDC (6 decimals)
     await usdc.connect(richSigner).transfer(await user.getAddress(), transferAmount);
 
     // Send some ETH for gas
+    console.log("Prefunding user with ETH...");
     await richSigner.sendTransaction({
       to: await user.getAddress(),
       value: ethers.parseEther("1"),
     });
 
     // Deploy RouterGateway
+    console.log("Deploying RouterGateway...");
     const balancerV3Vault = process.env.BALANCER_VAULT3 || ethers.ZeroAddress;
     const balancerV2Vault = process.env.BALANCER_VAULT2 || ethers.ZeroAddress;
     router = await ethers.deployContract("RouterGateway", [
@@ -70,13 +77,16 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
     await router.waitForDeployment();
 
     // Deploy VenusGateway
+    console.log("Deploying VenusGateway...");
     venusGateway = await ethers.deployContract("VenusGateway", [
       COMPTROLLER_ADDRESS,
+      VENUS_ORACLE_ADDRESS,
       await router.getAddress()
     ], richSigner) as VenusGateway;
     await venusGateway.waitForDeployment();
 
     // Register the VenusGateway
+    console.log("Registering VenusGateway...");
     await router.connect(user).addGateway("venus", await venusGateway.getAddress());
 
     console.log("Setup complete. Router:", await router.getAddress());
@@ -86,12 +96,7 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
   it("should get all Venus markets", async function() {
     const markets = await venusGateway.getAllVenusMarkets();
     console.log("Venus Markets Count:", markets.vTokens.length);
-    expect(markets.vTokens.length).to.be.gt(0, "Should have Venus markets");
-    
-    // Print out first few markets for debugging
-    for (let i = 0; i < Math.min(5, markets.vTokens.length); i++) {
-      console.log(`Market ${i}: vToken=${markets.vTokens[i]}, underlying=${markets.tokens[i]}, symbol=${markets.symbols[i]}`);
-    }
+    expect(markets.vTokens.length).to.be.gt(0, "Should have Venus markets");    
   });
 
   it("should deposit USDC via RouterGateway", async function () {
