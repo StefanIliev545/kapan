@@ -193,8 +193,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
                 onClick={() => setIsMoveModalOpen(true)}
-                disabled={true || !isWalletConnected}
-                title={!isWalletConnected ? "Connect wallet to move supply" : "Moving supply positions is not yet implemented"}
+                disabled={!isWalletConnected || !hasBalance}
+                title={!isWalletConnected ? "Connect wallet to move supply" : !hasBalance ? "No balance to move" : "Move supply to another protocol"}
               >
                 <div className="flex items-center justify-center">
                   <span>Move</span>
@@ -217,8 +217,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <button
                 className="btn btn-sm btn-outline flex justify-center items-center"
                 onClick={() => setIsMoveModalOpen(true)}
-                disabled={true || !isWalletConnected}
-                title={!isWalletConnected ? "Connect wallet to move supply" : "Moving supply positions is not yet implemented"}
+                disabled={!isWalletConnected || !hasBalance}
+                title={!isWalletConnected ? "Connect wallet to move supply" : !hasBalance ? "No balance to move" : "Move supply to another protocol"}
               >
                 <div className="flex items-center justify-center">
                   <span>Move</span>
@@ -236,6 +236,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         token={{
           name,
           icon,
+          rawBalance: tokenBalance,
           currentRate,
           address: tokenAddress,
         }}

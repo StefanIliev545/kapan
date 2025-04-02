@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x03c21b5E6989bAE06347A783F62E0F01b002D775",
+      address: "0x5bee4959942262539c7403C6757dD703be9Dff7e",
       abi: [
         {
           inputs: [
@@ -754,7 +754,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0x89268528fE4F07A8ca5d3902849dE74C9A5c7638",
+      address: "0xcCe61b5E480c25c5A8b1be68dA6212BCB896359D",
       abi: [
         {
           inputs: [
@@ -2118,7 +2118,7 @@ const deployedContracts = {
       },
     },
     RouterGateway: {
-      address: "0x552f66d45544Bd009c17EDf4e7a7C1c0fF505fa5",
+      address: "0x9FCcf9861B607c8F914B93AC190ACe97C85E4003",
       abi: [
         {
           inputs: [
@@ -2335,6 +2335,45 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "canMoveSupply",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "canMove",
+              type: "bool",
+            },
+            {
+              internalType: "uint256",
+              name: "fromBalance",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
               name: "",
               type: "string",
             },
@@ -2502,6 +2541,35 @@ const deployedContracts = {
             },
           ],
           name: "getFromProtocolApprovalsForMove",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+          ],
+          name: "getFromProtocolApprovalsForSupplyMove",
           outputs: [
             {
               internalType: "address[]",
@@ -2760,6 +2828,46 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct IGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
+            },
+            {
+              internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+          ],
+          name: "moveSupply",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "owner",
           outputs: [
@@ -3007,7 +3115,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0x6EA35ae614caf444fcAEd9a89B3D903af93C36b9",
+      address: "0xEA0079Dfa73724f9839f5472Aa4422fbd9a6308A",
       abi: [
         {
           inputs: [

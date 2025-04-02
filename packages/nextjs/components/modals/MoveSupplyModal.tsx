@@ -1,8 +1,10 @@
 import { FC, useState } from "react";
 import Image from "next/image";
+import { useAccount } from "wagmi";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { BaseModal } from "./BaseModal";
 import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
+import { useMoveSupply } from "~~/hooks/kapan/moveSupply";
 import { notification } from "~~/utils/scaffold-eth";
 
 interface MoveSupplyModalProps {
@@ -11,6 +13,7 @@ interface MoveSupplyModalProps {
   token: {
     name: string;
     icon: string;
+    rawBalance: bigint;
     currentRate: number;
     address: string;
   };
@@ -20,20 +23,40 @@ interface MoveSupplyModalProps {
 export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null);
+  const { address } = useAccount();
+  
+  // Get the moveSupply hook
+  const { moveSupply, error } = useMoveSupply();
 
   // Get rates from all protocols
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
   const handleMove = async () => {
-    if (!selectedProtocol) return;
+    if (!selectedProtocol || !address) return;
 
     try {
       setIsLoading(true);
-      notification.success("Position moved successfully!");
+      
+      // Create the collaterals array with a single token
+      const collaterals = [{
+        token: token.address,
+          amount: token.rawBalance, // 0 means move all available balance
+      }];
+      
+      // Execute the moveSupply function
+      const txHash = await moveSupply({
+        user: address,
+        debtToken: token.address, // This is needed for the interface but may not be used
+        collaterals,
+        fromProtocol: fromProtocol.toLowerCase(),
+        toProtocol: selectedProtocol.toLowerCase(),
+      });
+      
+      notification.success(`Position moved successfully! Transaction: ${txHash}`);
       onClose();
     } catch (error) {
       console.error("Error moving position:", error);
-      notification.error("Failed to move position");
+      notification.error(`Failed to move position: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -53,15 +76,6 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
           <div className="flex items-center gap-2">
             <Image src={token.icon} alt={token.name} width={24} height={24} className="rounded-full" />
             <span className="font-semibold">{token.name}</span>
-          </div>
-        </div>
-
-        {/* Not implemented message */}
-        <div className="alert alert-warning mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-          <div>
-            <h3 className="font-bold">Feature Not Available</h3>
-            <div className="text-sm">Moving supply positions is not yet implemented in this alpha version.</div>
           </div>
         </div>
 
@@ -122,10 +136,15 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
         <button
           className="btn btn-primary w-full"
           onClick={handleMove}
-          disabled={true} 
-          title="This feature is not yet implemented"
+          disabled={!selectedProtocol || isLoading || !address}
+          title={!address ? "Connect wallet to move supply" : 
+                 !selectedProtocol ? "Select a protocol to move to" : ""}
         >
-          Move Position
+          {isLoading ? (
+            <span className="loading loading-spinner loading-sm"></span>
+          ) : (
+            "Move Position"
+          )}
         </button>
       </div>
     </BaseModal>

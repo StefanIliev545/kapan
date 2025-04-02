@@ -32,7 +32,10 @@ contract OptimalInterestRateFinder is Ownable {
      * @param gateway The address of the gateway
      */
     function registerGateway(string calldata name, address gateway) external onlyOwner {
-        require(address(gateways[name]) == address(0), "Gateway already registered");
+        if (address(gateways[name]) != address(0)) {
+            removeGateway(name);
+        }
+
         gateways[name] = IGateway(gateway);
         registeredGatewayNames.push(name);
         emit GatewayRegistered(name, gateway);
@@ -42,7 +45,7 @@ contract OptimalInterestRateFinder is Ownable {
      * @notice Remove a gateway from the interest rate finder
      * @param name The name of the gateway to remove
      */
-    function removeGateway(string calldata name) external onlyOwner {
+    function removeGateway(string calldata name) public onlyOwner {
         require(address(gateways[name]) != address(0), "Gateway not registered");
         
         delete gateways[name];
