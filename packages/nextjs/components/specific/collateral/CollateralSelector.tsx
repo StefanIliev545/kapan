@@ -477,7 +477,6 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                         // In a real implementation, this would switch the collateral
                         console.log(`Switch from ${collateral.symbol} to ${newSymbol}`);
                       }}
-                      disabled={!selectedProtocol}
                     />
                   </div>
                   
