@@ -9,7 +9,7 @@ import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 export interface ProtocolPosition {
   icon: string;
   name: string;
-  balance?: number; // USD value
+  balance: number; // USD value
   tokenBalance: bigint; // Raw token amount
   currentRate: number;
   tokenAddress: string;
