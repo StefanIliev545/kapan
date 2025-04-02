@@ -9,10 +9,13 @@ import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 export interface ProtocolPosition {
   icon: string;
   name: string;
-  balance: number; // USD value
+  balance?: number; // USD value
   tokenBalance: bigint; // Raw token amount
   currentRate: number;
   tokenAddress: string;
+  tokenPrice?: bigint; // Token price with 8 decimals of precision
+  tokenDecimals?: number; // Token decimals
+  tokenSymbol?: string; // Token symbol for price feed selection
   collateralView?: React.ReactNode;
   collateralValue?: number; // Optional collateral value (used by borrowed positions)
 }

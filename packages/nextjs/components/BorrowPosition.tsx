@@ -8,6 +8,7 @@ import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "r
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { FiatBalance } from "./FiatBalance";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -22,6 +23,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   currentRate,
   protocolName,
   tokenAddress,
+  tokenPrice,
+  tokenDecimals,
   collateralView,
   collateralValue,
 }) => {
@@ -128,7 +131,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                     {collateralValue && (
                       <>
                         <p className="text-base-content/70">Collateral Value:</p>
-                        <p>${formatNumber(collateralValue)}</p>
+                        <p>
+                          <FiatBalance 
+                            tokenAddress={tokenAddress}
+                            rawValue={BigInt(Math.round(collateralValue * 10**8))}
+                            price={BigInt(10**8)}
+                            decimals={8}
+                            tokenSymbol={name}
+                            isNegative={false}
+                          />
+                        </p>
                       </>
                     )}
                   </div>
@@ -141,8 +153,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <div className="order-2 lg:order-none lg:col-span-6 grid grid-cols-3 gap-0 items-center min-w-[200px]">
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-              <div className="text-sm font-medium h-6 line-clamp-1 text-red-500">
-                -${formatNumber(Math.abs(balance))}
+              <div className="text-sm font-medium h-6 line-clamp-1">
+                <FiatBalance 
+                  tokenAddress={tokenAddress}
+                  rawValue={typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0)} 
+                  price={tokenPrice}
+                  decimals={tokenDecimals}
+                  tokenSymbol={name}
+                  isNegative={true} 
+                  className="text-red-500"
+                />
               </div>
             </div>
             <div className="px-2 border-r border-base-300">

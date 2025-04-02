@@ -7,6 +7,7 @@ import { FiInfo, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { ProtocolPosition } from "./ProtocolView";
+import { FiatBalance } from "./FiatBalance";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
@@ -22,6 +23,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   currentRate,
   protocolName,
   tokenAddress,
+  tokenPrice,
+  tokenDecimals,
   afterInfoContent,
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
@@ -124,8 +127,15 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <div className="order-2 lg:order-none lg:col-span-6 grid grid-cols-3 gap-0 items-center min-w-[200px]">
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-              <div className="text-sm font-medium h-6 line-clamp-1 text-green-500">
-                ${formatNumber(balance)}
+              <div className="text-sm font-medium h-6 line-clamp-1">
+                <FiatBalance 
+                  tokenAddress={tokenAddress}
+                  rawValue={typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0)}
+                  price={tokenPrice}
+                  decimals={tokenDecimals}
+                  tokenSymbol={name}
+                  className="text-green-500"
+                />
               </div>
             </div>
             <div className="px-2 border-r border-base-300">

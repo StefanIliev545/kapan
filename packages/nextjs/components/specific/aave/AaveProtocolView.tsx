@@ -55,7 +55,7 @@ export const AaveProtocolView: FC = () => {
 
     allTokensInfo.forEach((token: any) => {
       let decimals = 18;
-      if (token.symbol === "USDC" || token.symbol === "USDT" || token.symbol === "USDC.e") {
+      if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
         decimals = 6;
       }
 
@@ -73,6 +73,8 @@ export const AaveProtocolView: FC = () => {
         tokenBalance: token.balance,
         currentRate: supplyAPY,
         tokenAddress: token.token,
+        tokenPrice: token.price,
+        tokenSymbol: token.symbol,
       });
 
       // Add borrow position
@@ -85,6 +87,8 @@ export const AaveProtocolView: FC = () => {
         tokenBalance: token.borrowBalance,
         currentRate: borrowAPY,
         tokenAddress: token.token,
+        tokenPrice: token.price,
+        tokenSymbol: token.symbol,
       });
     });
 

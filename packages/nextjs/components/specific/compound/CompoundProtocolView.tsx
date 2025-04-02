@@ -132,6 +132,9 @@ export const CompoundProtocolView: FC = () => {
         tokenBalance: borrowBalanceRaw || 0n,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
+        tokenPrice: price,
+        tokenDecimals: decimals,
+        tokenSymbol: tokenName,
         collateralView: (
           <CompoundCollateralView
             baseToken={tokenAddress}
@@ -148,6 +151,9 @@ export const CompoundProtocolView: FC = () => {
         tokenBalance: balanceRaw,
         currentRate: supplyAPR,
         tokenAddress: tokenAddress,
+        tokenPrice: price,
+        tokenDecimals: decimals,
+        tokenSymbol: tokenName,
       });
     };
 

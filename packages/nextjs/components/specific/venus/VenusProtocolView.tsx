@@ -198,6 +198,9 @@ export const VenusProtocolView: FC = () => {
         supplyUsdBalance = supplyFormatted * tokenPrice;
       }
       
+      // Convert price to bigint with 8 decimals precision for FiatBalance compatibility
+      const priceWith8Decimals = BigInt(Math.round(tokenPrice * 1e8));
+      
       supplied.push({
         icon: logo,
         name: displayName,
@@ -205,6 +208,9 @@ export const VenusProtocolView: FC = () => {
         tokenBalance: supplyBalance,
         currentRate: supplyAPY,
         tokenAddress: tokenAddress,
+        tokenPrice: priceWith8Decimals, // Add the token price with 8 decimals
+        tokenDecimals: Number(decimal), // Add the token decimals
+        tokenSymbol: symbol, // Use the original symbol for price overrides
         protocolName: "Venus",
         afterInfoContent: comptrollerAddress ? (
           <VenusMarketEntry 
@@ -233,6 +239,9 @@ export const VenusProtocolView: FC = () => {
         tokenBalance: borrowBalance,
         currentRate: borrowAPY,
         tokenAddress: tokenAddress,
+        tokenPrice: priceWith8Decimals, // Add the token price with 8 decimals
+        tokenDecimals: Number(decimal), // Add the token decimals
+        tokenSymbol: symbol, // Use the original symbol for price overrides
       });
     }
     
