@@ -555,6 +555,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
               selectedProtocol={selectedProtocol}
               onCollateralSelectionChange={handleCollateralSelectionChange}
+              marketToken={position.tokenAddress}
             />
           )}
 
