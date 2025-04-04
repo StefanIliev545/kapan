@@ -13,7 +13,7 @@ export const Footer = () => {
         <div className="fixed flex justify-between items-center w-full z-10 p-4 bottom-0 left-0 pointer-events-none">
           <div className="flex flex-col md:flex-row gap-2 pointer-events-auto">
             <Link
-              href="https://discord.com/invite/D4TkKCFA"
+              href="https://discord.gg/Vjk6NhkxGv"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 shadow-md hover:shadow-lg transition-all"
