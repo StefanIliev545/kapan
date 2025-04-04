@@ -15,6 +15,7 @@ export interface CallToActionProps {
   gradientFrom?: string;
   gradientVia?: string;
   gradientTo?: string;
+  buttonTextColor?: string;
 }
 
 const TwitterIcon = () => (
@@ -41,6 +42,44 @@ const getGridColumnsClass = (sectionCount: number) => {
   return "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 };
 
+// Define a mapping of gradient classes to ensure they're included in the production build
+const gradientClasses = {
+  // Primary options for the "from" position
+  from: {
+    "purple-700": "from-purple-700",
+    "indigo-700": "from-indigo-700",
+    "blue-700": "from-blue-700",
+    "violet-700": "from-violet-700",
+    "fuchsia-700": "from-fuchsia-700",
+    "pink-700": "from-pink-700",
+  },
+  // Primary options for the "via" position
+  via: {
+    "purple-600": "via-purple-600",
+    "indigo-600": "via-indigo-600", 
+    "blue-600": "via-blue-600",
+    "violet-600": "via-violet-600",
+    "fuchsia-600": "via-fuchsia-600",
+    "pink-600": "via-pink-600",
+  },
+  // Primary options for the "to" position
+  to: {
+    "purple-600": "to-purple-600",
+    "indigo-600": "to-indigo-600",
+    "blue-600": "to-blue-600",
+    "violet-600": "to-violet-600", 
+    "fuchsia-600": "to-fuchsia-600",
+    "pink-600": "to-pink-600",
+  },
+  // Button text colors
+  buttonText: {
+    "fuchsia-600": "text-fuchsia-600",
+    "purple-600": "text-purple-600",
+    "indigo-600": "text-indigo-600",
+    "violet-600": "text-violet-600",
+  }
+};
+
 const CallToAction = ({
   sections = [
     {
@@ -60,9 +99,16 @@ const CallToAction = ({
   ],
   gradientFrom = "purple-700",
   gradientVia = "fuchsia-600",
-  gradientTo = "pink-600"
+  gradientTo = "pink-600",
+  buttonTextColor = "fuchsia-600"
 }: CallToActionProps) => {
   const gridColumnsClass = getGridColumnsClass(sections.length);
+  
+  // Get the appropriate classes from our mapping or use fallbacks
+  const fromClass = gradientClasses.from[gradientFrom as keyof typeof gradientClasses.from] || "from-purple-700";
+  const viaClass = gradientClasses.via[gradientVia as keyof typeof gradientClasses.via] || "via-fuchsia-600";
+  const toClass = gradientClasses.to[gradientTo as keyof typeof gradientClasses.to] || "to-pink-600";
+  const buttonColorClass = gradientClasses.buttonText[buttonTextColor as keyof typeof gradientClasses.buttonText] || "text-fuchsia-600";
 
   return (
     <>
@@ -77,7 +123,7 @@ const CallToAction = ({
           animation: gradientAnimation 6s ease infinite;
         }
       `}</style>
-      <div className={`animate-gradient bg-gradient-to-r from-${gradientFrom} via-${gradientVia} to-${gradientTo} text-white rounded-lg shadow-md overflow-hidden my-4 w-full`}>
+      <div className={`animate-gradient bg-gradient-to-r ${fromClass} ${viaClass} ${toClass} text-white rounded-lg shadow-md overflow-hidden my-4 w-full`}>
         <div className={`grid grid-cols-1 ${gridColumnsClass} divide-y md:divide-y-0 md:divide-x divide-white/20`}>
           {sections.map((section, index) => (
             <div key={index} className="flex flex-col items-center p-4 text-center">
@@ -90,7 +136,7 @@ const CallToAction = ({
                 href={section.buttonLink} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="bg-white text-fuchsia-600 hover:bg-gray-100 whitespace-nowrap text-sm px-4 py-1.5 rounded-full font-medium flex items-center shadow-sm hover:shadow transform hover:-translate-y-0.5 transition-all duration-200"
+                className={`bg-white ${buttonColorClass} hover:bg-gray-100 whitespace-nowrap text-sm px-4 py-1.5 rounded-full font-medium flex items-center shadow-sm hover:shadow transform hover:-translate-y-0.5 transition-all duration-200`}
               >
                 {section.icon}
                 {section.buttonText}
