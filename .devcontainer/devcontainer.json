@@ -21,10 +21,10 @@
 				"NomicFoundation.hardhat-solidity"
 			]
 		}
-	}
+	},
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "uname -a",
+	"postCreateCommand": "echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc",
 
 	// Configure tool-specific properties.
 	// "customizations": {},

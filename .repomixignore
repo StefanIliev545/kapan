@@ -1,0 +1,7 @@
+.env/
+.yarn/
+.github/
+node_modules/
+packages/hardhat/deployments/
+packages/hardhat/artifacts/
+packages/hardhat/cache/

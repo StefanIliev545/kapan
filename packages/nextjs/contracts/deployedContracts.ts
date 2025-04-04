@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     AaveGateway: {
-      address: "0x5bee4959942262539c7403C6757dD703be9Dff7e",
+      address: "0x636437Ee40ceC57572d10beA6307E89909f908e9",
       abi: [
         {
           inputs: [
@@ -754,7 +754,7 @@ const deployedContracts = {
       },
     },
     CompoundGateway: {
-      address: "0xcCe61b5E480c25c5A8b1be68dA6212BCB896359D",
+      address: "0x51B008bEe3E972BEaebE2F7414BDDbaB924e3C55",
       abi: [
         {
           inputs: [
@@ -2118,7 +2118,7 @@ const deployedContracts = {
       },
     },
     RouterGateway: {
-      address: "0x9FCcf9861B607c8F914B93AC190ACe97C85E4003",
+      address: "0x611aE7d1E3700a3677DD948F0052DfD1a69D0200",
       abi: [
         {
           inputs: [
@@ -2541,35 +2541,6 @@ const deployedContracts = {
             },
           ],
           name: "getFromProtocolApprovalsForMove",
-          outputs: [
-            {
-              internalType: "address[]",
-              name: "",
-              type: "address[]",
-            },
-            {
-              internalType: "bytes[]",
-              name: "",
-              type: "bytes[]",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "string",
-              name: "fromProtocol",
-              type: "string",
-            },
-          ],
-          name: "getFromProtocolApprovalsForSupplyMove",
           outputs: [
             {
               internalType: "address[]",
@@ -3115,7 +3086,7 @@ const deployedContracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0xEA0079Dfa73724f9839f5472Aa4422fbd9a6308A",
+      address: "0xa1a2E038a5F1e067Ea21D218DB6B60a262A42879",
       abi: [
         {
           inputs: [

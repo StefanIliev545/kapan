@@ -236,9 +236,11 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         token={{
           name,
           icon,
-          rawBalance: tokenBalance,
+          rawBalance: typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0),
           currentRate,
           address: tokenAddress,
+          decimals: tokenDecimals,
+          price: tokenPrice,
         }}
         fromProtocol={protocolName}
       />

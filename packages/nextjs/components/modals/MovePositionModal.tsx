@@ -18,6 +18,7 @@ import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { getProtocolLogo } from "~~/utils/protocol";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 
 // Define the step type for tracking the move flow
@@ -60,9 +61,9 @@ type CollateralType = {
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
   const { address: userAddress } = useAccount();
   const protocols = [
-    { name: "Aave V3", icon: "/logos/aave.svg" },
-    { name: "Compound V3", icon: "/logos/compound.svg" },
-    { name: "Venus", icon: "/logos/venus.svg" },
+    { name: "Aave V3" },
+    { name: "Compound V3" },
+    { name: "Venus" },
   ];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
@@ -299,7 +300,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   // Get the selected protocol icon
   const getSelectedProtocolIcon = () => {
-    return protocols.find(p => p.name === selectedProtocol)?.icon || "";
+    return protocols.find(p => p.name === selectedProtocol)?.name || "";
   };
 
   // Handler for collateral selection and amount changes
@@ -379,7 +380,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <div className="bg-base-200/60 py-3 px-4 rounded-lg flex items-center justify-between h-[52px]">
                 <div className="flex items-center gap-3 truncate">
                   <Image
-                    src={protocols.find(p => p.name === fromProtocol)?.icon || ""}
+                    src={getProtocolLogo(fromProtocol)}
                     alt={fromProtocol}
                     width={24}
                     height={24}
@@ -402,7 +403,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     {selectedProtocol ? (
                       <>
                         <Image
-                          src={getSelectedProtocolIcon()}
+                          src={getProtocolLogo(selectedProtocol)}
                           alt={selectedProtocol}
                           width={24}
                           height={24}
@@ -431,7 +432,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                           onClick={() => setSelectedProtocol(protocol.name)}
                         >
                           <Image
-                            src={protocol.icon}
+                            src={getProtocolLogo(protocol.name)}
                             alt={protocol.name}
                             width={24}
                             height={24}
