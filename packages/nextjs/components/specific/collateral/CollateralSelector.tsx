@@ -220,6 +220,14 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   const [activeTokenForSwitch, setActiveTokenForSwitch] = useState<string | null>(null);
   const switchButtonRefs = new Map<string, RefObject<HTMLButtonElement>>();
   
+  // Create a memoized version of the collateral support mapping
+  const collateralSupportMap = useMemo(() => {
+    return collaterals.reduce((acc, collateral) => {
+      acc[collateral.address] = collateral.supported;
+      return acc;
+    }, {} as Record<string, boolean>);
+  }, [collaterals]);
+  
   // Prepare refs for all selected collaterals
   selectedCollaterals.forEach(collateral => {
     if (!switchButtonRefs.has(collateral.token)) {
@@ -325,21 +333,24 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   // Update selected collaterals when protocol changes
   useEffect(() => {
     if (!selectedProtocol) return;
-    
+  
     // Update selected collaterals when collateral support changes
     setSelectedCollaterals(prev => {
-      return prev.map(c => {
-        // Find this collateral in the current list to check support status
-        const currentCollateral = collaterals.find(collateral => collateral.address === c.token);
-        return {
-          ...c,
-          // If found, use its current support status, otherwise mark as unsupported
-          supported: currentCollateral ? currentCollateral.supported : false
-        };
+      const updated = prev.map(c => ({
+        ...c,
+        supported: collateralSupportMap[c.token] ?? false,
+      }));
+  
+      // Check if any 'supported' value has changed
+      const hasChanged = updated.some((collateral, index) => {
+        return collateral.supported !== prev[index].supported;
       });
+  
+      // Only update state if there's a difference
+      return hasChanged ? updated : prev;
     });
-  }, [collaterals, selectedProtocol]);
-
+  }, [collateralSupportMap, selectedProtocol]);
+  
   // Handle amount change for a selected collateral
   const handleAmountChange = (token: string, amountStr: string, decimals: number) => {
     setSelectedCollaterals(prev => {
