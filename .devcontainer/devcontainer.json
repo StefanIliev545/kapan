@@ -3,7 +3,7 @@
 {
 	"name": "Kapan Starknet",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "starknetfoundation/starknet-dev:2.9.2",
+	"image": "starknetfoundation/starknet-dev:2.9.4",
 	"features": {
 		"ghcr.io/devcontainers/features/node:1": {},
 	

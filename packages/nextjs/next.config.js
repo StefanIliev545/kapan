@@ -14,6 +14,22 @@ const nextConfig = {
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },
+  images: {
+    remotePatterns: [
+      // External image source for StarkNet ID identicons
+      {
+        protocol: "https",
+        hostname: "identicon.starknet.id",
+        pathname: "/**", // Allows all paths under this domain
+      },
+      // External image source for images hosted on Starkurabu
+      {
+        protocol: "https",
+        hostname: "img.starkurabu.com",
+        pathname: "/**",
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

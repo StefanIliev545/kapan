@@ -100,7 +100,7 @@ function getContractDataFromDeployments() {
  * This script should be run last.
  */
 const generateTsAbis: DeployFunction = async function () {
-  const TARGET_DIR = "../nextjs/contracts/";
+  const TARGET_DIR = "../nextjs/contracts/hardhat/";
   const allContractsData = getContractDataFromDeployments();
 
   const fileContent = Object.entries(allContractsData).reduce((content, [chainId, chainConfig]) => {
@@ -108,13 +108,18 @@ const generateTsAbis: DeployFunction = async function () {
   }, "");
 
   if (!fs.existsSync(TARGET_DIR)) {
-    fs.mkdirSync(TARGET_DIR);
+    fs.mkdirSync(TARGET_DIR, { recursive: true });
   }
+
   fs.writeFileSync(
     `${TARGET_DIR}deployedContracts.ts`,
     await prettier.format(
-      `${generatedContractComment} import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract"; \n\n
- const deployedContracts = {${fileContent}} as const; \n\n export default deployedContracts satisfies GenericContractsDeclaration`,
+      `${generatedContractComment}
+      import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
+
+      const contracts = {${fileContent}} as const;
+      
+      export default contracts satisfies GenericContractsDeclaration;`,
       {
         parser: "typescript",
       },
