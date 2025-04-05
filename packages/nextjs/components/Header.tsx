@@ -238,11 +238,31 @@ export const Header = () => {
                             </div>
                           </div>
                           <div className="flex flex-col space-y-4 items-stretch relative z-50">
-                            <div className="relative">
-                              <RainbowKitCustomConnectButton />
-                            </div>
-                            <div className="relative">
-                              <CustomConnectButton />
+                            <div className="flex items-center bg-base-200 rounded-[18px] p-1 shadow-md relative">
+                              <div className="relative flex-1">
+                                <RainbowKitCustomConnectButton />
+                              </div>
+                              <div className="h-8 w-[1px] bg-base-300"></div>
+                              <div className="relative">
+                                <CustomConnectButton />
+                              </div>
+                              <div className="h-8 w-[1px] bg-base-300"></div>
+                              <div className="px-3 py-2 opacity-70">
+                                <Image
+                                  width={20}
+                                  height={20}
+                                  alt="Starknet Logo"
+                                  className="dark:hidden"
+                                  src="/logos/starknet.svg"
+                                />
+                                <Image
+                                  width={20}
+                                  height={20}
+                                  alt="Starknet Logo"
+                                  className="hidden dark:block"
+                                  src="/logos/starknet-dark.svg"
+                                />
+                              </div>
                             </div>
                             <div className="relative">
                               <Faucet />
@@ -323,11 +343,31 @@ export const Header = () => {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.5 }}
             >
-              <div className="relative">
-                <RainbowKitCustomConnectButton />
-              </div>
-              <div className="relative">
-                <CustomConnectButton />
+              <div className="flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-[18px] shadow-md relative">
+                <div className="relative flex-1 px-3 py-2 cursor-pointer">
+                  <RainbowKitCustomConnectButton />
+                </div>
+                <div className="h-8 w-[1px] bg-base-300"></div>
+                <div className="relative px-3 py-2 cursor-pointer">
+                  <CustomConnectButton />
+                </div>
+                <div className="h-8 w-[1px] bg-base-300"></div>
+                <div className="px-3 py-2 opacity-70">
+                  <Image
+                    width={20}
+                    height={20}
+                    alt="Starknet Logo"
+                    className="dark:hidden"
+                    src="/logos/starknet.svg"
+                  />
+                  <Image
+                    width={20}
+                    height={20}
+                    alt="Starknet Logo"
+                    className="hidden dark:block"
+                    src="/logos/starknet-dark.svg"
+                  />
+                </div>
               </div>
               <div className="relative">
                 <Faucet />

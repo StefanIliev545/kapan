@@ -62,13 +62,15 @@ export const CustomConnectButton = () => {
 
   return (
     <>
-      <AddressInfoDropdown
-        address={accountAddress as Address}
-        displayName={""}
-        ensAvatar={""}
-        blockExplorerAddressLink={blockExplorerAddressLink}
-      />
-      <AddressQRCodeModal address={accountAddress as Address} modalId="qrcode-modal" />
+      <div className="flex items-center">
+        <AddressInfoDropdown
+          address={accountAddress as Address}
+          displayName={""}
+          ensAvatar={""}
+          blockExplorerAddressLink={blockExplorerAddressLink}
+        />
+        <AddressQRCodeModal address={accountAddress as Address} modalId="qrcode-modal" />
+      </div>
     </>
   );
 };

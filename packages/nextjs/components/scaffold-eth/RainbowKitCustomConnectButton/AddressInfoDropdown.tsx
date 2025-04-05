@@ -47,15 +47,13 @@ export const AddressInfoDropdown = ({
 
   return (
     <>
-      <details ref={dropdownRef} className="dropdown dropdown-end leading-3">
-        <summary tabIndex={0} className="btn btn-secondary btn-sm pl-0 pr-2 shadow-md dropdown-toggle gap-0 !h-auto">
-          <BlockieAvatar address={checkSumAddress} size={30} ensImage={ensAvatar} />
-          <div className="flex items-center ml-2">
-            <span>
-              {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
-            </span>
-            <ChevronDownIcon className="h-6 w-4 ml-2 sm:ml-0" />
-          </div>
+      <details ref={dropdownRef} className="dropdown dropdown-end leading-3 flex-1">
+        <summary tabIndex={0} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200 py-1">
+          <BlockieAvatar address={checkSumAddress} size={24} ensImage={ensAvatar} />
+          <span className="text-sm font-medium">
+            {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
+          </span>
+          <ChevronDownIcon className="h-4 w-4 text-base-content/70" />
         </summary>
         <ul
           tabIndex={0}

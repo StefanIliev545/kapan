@@ -17,13 +17,11 @@ const ConnectModal = () => {
   }
 
   return (
-    <div>
-      <button 
-        onClick={connectWallet}
-        className="rounded-[18px] btn-sm font-bold px-8 bg-btn-wallet py-3 cursor-pointer"
-      >
-        Connect
-      </button>
+    <div 
+      onClick={connectWallet}
+      className="text-sm font-semibold text-primary hover:opacity-80 transition-opacity duration-200 cursor-pointer whitespace-nowrap"
+    >
+      Connect Starknet
     </div>
   );
 };

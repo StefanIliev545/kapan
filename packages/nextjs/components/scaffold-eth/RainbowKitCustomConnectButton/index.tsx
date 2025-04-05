@@ -29,9 +29,12 @@ export const RainbowKitCustomConnectButton = () => {
             {(() => {
               if (!connected) {
                 return (
-                  <button className="btn btn-primary btn-sm" onClick={openConnectModal} type="button">
+                  <div 
+                    className="text-sm font-semibold text-primary hover:opacity-80 transition-opacity duration-200 w-full" 
+                    onClick={openConnectModal}
+                  >
                     Connect Wallet
-                  </button>
+                  </div>
                 );
               }
 
@@ -40,8 +43,9 @@ export const RainbowKitCustomConnectButton = () => {
               }
 
               return (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 w-full">
                   <NetworkSwitcher />
+                  <div className="h-8 w-[1px] bg-base-300"></div>
                   <AddressInfoDropdown
                     address={account.address as Address}
                     displayName={account.displayName}
