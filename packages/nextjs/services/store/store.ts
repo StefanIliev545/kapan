@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import scaffoldConfig from "~~/scaffold.config";
 import { ChainWithAttributes } from "~~/utils/scaffold-eth";
+import { ChainWithAttributes as SNChainWithAttributes } from "~~/utils/scaffold-stark";
 
 /**
  * Zustand Store
@@ -16,10 +17,15 @@ type GlobalState = {
     price: number;
     isFetching: boolean;
   };
+  strkCurrencyPrice: number;
+  setStrkCurrencyPrice: (newNativeCurrencyPriceState: number) => void;
+
   setNativeCurrencyPrice: (newNativeCurrencyPriceState: number) => void;
   setIsNativeCurrencyFetching: (newIsNativeCurrencyFetching: boolean) => void;
-  targetNetwork: ChainWithAttributes;
-  setTargetNetwork: (newTargetNetwork: ChainWithAttributes) => void;
+  targetEVMNetwork: ChainWithAttributes;
+  setTargetEVMNetwork: (newTargetEVMNetwork: ChainWithAttributes) => void;
+  targetSNNetwork: SNChainWithAttributes;
+  setTargetSNNetwork: (newTargetSNNetwork: SNChainWithAttributes) => void;
 };
 
 export const useGlobalState = create<GlobalState>(set => ({
@@ -27,10 +33,16 @@ export const useGlobalState = create<GlobalState>(set => ({
     price: 0,
     isFetching: true,
   },
+  strkCurrencyPrice: 0,
+  setStrkCurrencyPrice: (newValue: number): void => set(() => ({ strkCurrencyPrice: newValue })),
   setNativeCurrencyPrice: (newValue: number): void =>
     set(state => ({ nativeCurrency: { ...state.nativeCurrency, price: newValue } })),
   setIsNativeCurrencyFetching: (newValue: boolean): void =>
     set(state => ({ nativeCurrency: { ...state.nativeCurrency, isFetching: newValue } })),
-  targetNetwork: scaffoldConfig.targetEVMNetworks[0],
-  setTargetNetwork: (newTargetNetwork: ChainWithAttributes) => set(() => ({ targetNetwork: newTargetNetwork })),
+  targetEVMNetwork: scaffoldConfig.targetEVMNetworks[0],
+  setTargetEVMNetwork: (newTargetEVMNetwork: ChainWithAttributes) =>
+    set(() => ({ targetEVMNetwork: newTargetEVMNetwork })),
+  targetSNNetwork: scaffoldConfig.targetSNNetworks[0],
+  setTargetSNNetwork: (newTargetSNNetwork: SNChainWithAttributes) =>
+    set(() => ({ targetSNNetwork: newTargetSNNetwork })),
 }));

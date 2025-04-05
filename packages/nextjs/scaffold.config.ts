@@ -4,11 +4,13 @@ import * as chains from "viem/chains";
 
 export type ScaffoldConfig = {
   targetEVMNetworks: readonly chains.Chain[];
-  targetNetworks: readonly SNChain[];
+  targetSNNetworks: readonly SNChain[];
   pollingInterval: number;
   alchemyApiKey: string;
   walletConnectProjectId: string;
   onlyLocalBurnerWallet: boolean;
+  autoConnectTTL: number;
+  walletAutoConnect: boolean;
 };
 
 export const DEFAULT_ALCHEMY_API_KEY = "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
@@ -16,7 +18,7 @@ export const DEFAULT_ALCHEMY_API_KEY = "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 const scaffoldConfig = {
   // The networks on which your DApp is live
   targetEVMNetworks: [chains.hardhat],
-  targetNetworks: [snchains.devnet],
+  targetSNNetworks: [snchains.devnet],
   // The interval at which your front-end polls the RPC servers for new data
   // it has no effect if you only target the local network (default is 4000)
   pollingInterval: 30000,
@@ -35,6 +37,8 @@ const scaffoldConfig = {
 
   // Only show the Burner Wallet when running on hardhat network
   onlyLocalBurnerWallet: true,
+  autoConnectTTL: 60000,
+  walletAutoConnect: true,
 } as const satisfies ScaffoldConfig;
 
 export default scaffoldConfig;
