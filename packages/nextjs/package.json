@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@heroicons/react": "~2.1.5",
-    "@keplr-wallet/types": "^0.12.211",
     "@rainbow-me/rainbowkit": "2.1.6",
     "@scaffold-stark/stark-burner": "^0.1.9",
     "@starknet-react/chains": "^3.1.2",

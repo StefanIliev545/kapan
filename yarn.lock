@@ -2039,17 +2039,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@keplr-wallet/types@npm:^0.12.211":
-  version: 0.12.211
-  resolution: "@keplr-wallet/types@npm:0.12.211"
-  dependencies:
-    long: ^4.0.0
-  peerDependencies:
-    starknet: ^6
-  checksum: 210d4f9697d0ffbc5e2612b7ea8ee20b03ef72623dd13af565d3157b9f5029c2736876891ebb3ff74846d010760233a7711532e5debd6863a92165952ebd8a9c
-  languageName: node
-  linkType: hard
-
 "@layerzerolabs/lz-evm-sdk-v1-0.7@npm:^1.5.14":
   version: 1.5.16
   resolution: "@layerzerolabs/lz-evm-sdk-v1-0.7@npm:1.5.16"
@@ -3989,7 +3978,6 @@ __metadata:
   resolution: "@se-2/nextjs@workspace:packages/nextjs"
   dependencies:
     "@heroicons/react": ~2.1.5
-    "@keplr-wallet/types": ^0.12.211
     "@rainbow-me/rainbowkit": 2.1.6
     "@scaffold-stark/stark-burner": ^0.1.9
     "@starknet-react/chains": ^3.1.2
@@ -14162,13 +14150,6 @@ __metadata:
     strip-ansi: ^7.1.0
     wrap-ansi: ^9.0.0
   checksum: 817a9ba6c5cbc19e94d6359418df8cfe8b3244a2903f6d53354e175e243a85b782dc6a98db8b5e457ee2f09542ca8916c39641b9cd3b0e6ef45e9481d50c918a
-  languageName: node
-  linkType: hard
-
-"long@npm:^4.0.0":
-  version: 4.0.0
-  resolution: "long@npm:4.0.0"
-  checksum: 16afbe8f749c7c849db1f4de4e2e6a31ac6e617cead3bdc4f9605cb703cd20e1e9fc1a7baba674ffcca57d660a6e5b53a9e236d7b25a295d3855cca79cc06744
   languageName: node
   linkType: hard
 
