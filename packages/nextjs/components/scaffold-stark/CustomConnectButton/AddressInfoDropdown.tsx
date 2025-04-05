@@ -79,7 +79,7 @@ export const AddressInfoDropdown = ({
       <details ref={dropdownRef} className="dropdown dropdown-end inline-block">
         <summary tabIndex={0} className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity duration-200 py-1">
           <div className="flex-shrink-0">
-            <BlockieAvatar address={address} size={24} ensImage={ensAvatar} />
+            <BlockieAvatar address={address} size={24} ensImage={profile?.profilePicture || ensAvatar} />
           </div>
           <span className="text-sm font-medium truncate min-w-0">
             {isENS(displayName) ? displayName : profile?.name || address?.slice(0, 6) + "..." + address?.slice(-4)}

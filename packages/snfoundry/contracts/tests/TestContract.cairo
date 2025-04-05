@@ -36,7 +36,6 @@ fn test_set_greetings() {
 }
 
 #[test]
-#[fork("SEPOLIA_LATEST")]
 fn test_transfer() {
     let user = OWNER();
     let eth_contract_address = contract_address_const::<ETH_CONTRACT_ADDRESS>();

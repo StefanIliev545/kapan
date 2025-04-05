@@ -1,30 +1,20 @@
-import * as chains from "@starknet-react/chains";
-import scaffoldConfig from "~~/scaffold.config";
 import { useEffect, useState } from "react";
+import * as chains from "@starknet-react/chains";
 import { StarkProfile } from "starknet";
+import scaffoldConfig from "~~/scaffold.config";
 
 type network = "mainnet" | "sepolia" | "devnet";
 
 const shouldUseProfile = () => {
-  const set = new Set(["mainnet", "sepolia"]);
-  return (
-    set.has(scaffoldConfig.targetSNNetworks[0].network) &&
-    (scaffoldConfig.targetSNNetworks[0].network as network) !==
-      chains.devnet.network
-  );
+  const set = new Set(["mainnet", "sepolia", "devnet"]);
+  return set.has(scaffoldConfig.targetSNNetworks[0].network);
 };
 
-const starknetIdApiBaseUrl =
-  (scaffoldConfig.targetSNNetworks[0].network as network) ===
-  chains.mainnet.network
-    ? "https://api.starknet.id"
-    : "https://sepolia.api.starknet.id";
+const starknetIdApiBaseUrl = "https://api.starknet.id";
 
 export const fetchProfileFromApi = async (address: string) => {
   try {
-    const addrToDomainRes = await fetch(
-      `${starknetIdApiBaseUrl}/addr_to_domain?addr=${address}`,
-    );
+    const addrToDomainRes = await fetch(`${starknetIdApiBaseUrl}/addr_to_domain?addr=${address}`);
 
     if (!addrToDomainRes.ok) {
       throw new Error(await addrToDomainRes.text());
@@ -34,9 +24,7 @@ export const fetchProfileFromApi = async (address: string) => {
 
     const domain = addrToDomainJson.domain;
 
-    const profileRes = await fetch(
-      `${starknetIdApiBaseUrl}/domain_to_data?domain=${domain}`,
-    );
+    const profileRes = await fetch(`${starknetIdApiBaseUrl}/domain_to_data?domain=${domain}`);
 
     if (!profileRes.ok) throw new Error(await profileRes.text());
 
@@ -67,9 +55,7 @@ export const fetchProfileFromApi = async (address: string) => {
 };
 
 // this hook is a workaround, basically a re-implement of the starknet react hook with conditional rendering.
-export const useScaffoldStarkProfile = (
-  address: chains.Address | undefined,
-) => {
+export const useScaffoldStarkProfile = (address: chains.Address | undefined) => {
   const [isLoading, setIsLoading] = useState(false);
   const [profile, setProfile] = useState<StarkProfile | undefined>();
   const isEnabled = shouldUseProfile();
@@ -77,16 +63,17 @@ export const useScaffoldStarkProfile = (
   useEffect(() => {
     if (!isEnabled || !address) {
       setProfile({ name: "", profilePicture: "" });
+      console.log("no profile");
       return;
     }
 
     setIsLoading(true);
 
     fetchProfileFromApi(address)
-      .then((data) => {
+      .then(data => {
         setProfile(data);
       })
-      .catch((e) => {
+      .catch(e => {
         console.error(`[useScaffoldStarkProfile] ` + e.message);
         setProfile(undefined);
       })

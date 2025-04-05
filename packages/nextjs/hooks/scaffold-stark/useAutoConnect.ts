@@ -9,7 +9,7 @@ import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
  * Automatically connect to a wallet/connector based on config and prior wallet
  */
 export const useAutoConnect = (): void => {
-  const savedConnector = useReadLocalStorage<{ id: string; ix?: number }>(
+  const savedConnector = useReadLocalStorage<{ id: string; ix?: number } | string>(
     "lastUsedConnector",
   );
 
@@ -25,13 +25,15 @@ export const useAutoConnect = (): void => {
       const ttlExpired =
         currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
       if (!ttlExpired) {
+        const connectorId = typeof savedConnector === 'string' ? savedConnector : savedConnector?.id;
         const connector = connectors.find(
-          (conn) => conn.id == savedConnector?.id,
+          (conn) => conn.id === connectorId,
         );
 
         if (connector) {
           if (
-            connector.id == "burner-wallet" &&
+            connector.id === "burner-wallet" &&
+            typeof savedConnector === 'object' &&
             savedConnector?.ix !== undefined &&
             connector instanceof BurnerConnector
           ) {

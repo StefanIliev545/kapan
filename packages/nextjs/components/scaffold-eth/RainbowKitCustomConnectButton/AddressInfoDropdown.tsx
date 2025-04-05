@@ -47,13 +47,15 @@ export const AddressInfoDropdown = ({
 
   return (
     <>
-      <details ref={dropdownRef} className="dropdown dropdown-end leading-3 flex-1">
+      <details ref={dropdownRef} className="dropdown dropdown-end leading-3 flex-none">
         <summary tabIndex={0} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200 py-1">
-          <BlockieAvatar address={checkSumAddress} size={24} ensImage={ensAvatar} />
-          <span className="text-sm font-medium">
+          <div className="flex-shrink-0">
+            <BlockieAvatar address={checkSumAddress} size={24} ensImage={ensAvatar} />
+          </div>
+          <span className="text-sm font-medium whitespace-nowrap">
             {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
           </span>
-          <ChevronDownIcon className="h-4 w-4 text-base-content/70" />
+          <ChevronDownIcon className="h-4 w-4 text-base-content/70 flex-shrink-0" />
         </summary>
         <ul
           tabIndex={0}
@@ -67,7 +69,7 @@ export const AddressInfoDropdown = ({
                   className="text-xl font-normal h-6 w-4 cursor-pointer ml-2 sm:ml-0"
                   aria-hidden="true"
                 />
-                <span className=" whitespace-nowrap">Copy address</span>
+                <span className="whitespace-nowrap">Copy address</span>
               </div>
             ) : (
               <CopyToClipboard
@@ -84,7 +86,7 @@ export const AddressInfoDropdown = ({
                     className="text-xl font-normal h-6 w-4 cursor-pointer ml-2 sm:ml-0"
                     aria-hidden="true"
                   />
-                  <span className=" whitespace-nowrap">Copy address</span>
+                  <span className="whitespace-nowrap">Copy address</span>
                 </div>
               </CopyToClipboard>
             )}
