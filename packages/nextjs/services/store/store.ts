@@ -17,6 +17,8 @@ type GlobalState = {
     price: number;
     isFetching: boolean;
   };
+  nativeCurrencyPrice: number;
+
   strkCurrencyPrice: number;
   setStrkCurrencyPrice: (newNativeCurrencyPriceState: number) => void;
 
@@ -34,9 +36,10 @@ export const useGlobalState = create<GlobalState>(set => ({
     isFetching: true,
   },
   strkCurrencyPrice: 0,
+  nativeCurrencyPrice: 0,
   setStrkCurrencyPrice: (newValue: number): void => set(() => ({ strkCurrencyPrice: newValue })),
   setNativeCurrencyPrice: (newValue: number): void =>
-    set(state => ({ nativeCurrency: { ...state.nativeCurrency, price: newValue } })),
+    set(state => ({ nativeCurrency: { ...state.nativeCurrency, price: newValue }, nativeCurrencyPrice: newValue })),
   setIsNativeCurrencyFetching: (newValue: boolean): void =>
     set(state => ({ nativeCurrency: { ...state.nativeCurrency, isFetching: newValue } })),
   targetEVMNetwork: scaffoldConfig.targetEVMNetworks[0],
