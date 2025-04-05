@@ -1,42 +1,18 @@
 import { KeplrConnector } from "./keplr";
 import { BurnerConnector } from "@scaffold-stark/stark-burner";
-import { InjectedConnector, argent, braavos } from "@starknet-react/core";
-import scaffoldConfig from "~~/scaffold.config";
-import { supportedChains } from "~~/supportedChains";
-import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
+import { Connector } from "@starknet-react/core";
+import { ArgentMobileConnector } from "starknetkit/argentMobile";
+import { InjectedConnector } from "starknetkit/injected";
+import { WebWalletConnector } from "starknetkit/webwallet";
 import { getTargetNetworks } from "~~/utils/scaffold-stark";
 
 const targetNetworks = getTargetNetworks();
 
-export const connectors = getConnectors();
-
-// workaround helper function to properly disconnect with removing local storage (prevent autoconnect infinite loop)
-function withDisconnectWrapper(connector: InjectedConnector) {
-  const connectorDisconnect = connector.disconnect;
-  const _disconnect = (): Promise<void> => {
-    localStorage.removeItem("lastUsedConnector");
-    localStorage.removeItem(LAST_CONNECTED_TIME_LOCALSTORAGE_KEY);
-    return connectorDisconnect();
-  };
-  connector.disconnect = _disconnect.bind(connector);
-  return connector;
-}
-
-function getConnectors() {
-  const { targetSNNetworks } = scaffoldConfig;
-
-  const connectors: InjectedConnector[] = [argent(), braavos()];
-  const isDevnet = targetSNNetworks.some(network => (network.network as string) === "devnet");
-
-  if (!isDevnet) {
-    connectors.push(new KeplrConnector());
-  } else {
-    const burnerConnector = new BurnerConnector();
-    burnerConnector.chain = supportedChains.devnet;
-    connectors.push(burnerConnector as unknown as InjectedConnector);
-  }
-
-  return connectors.sort(() => Math.random() - 0.5).map(withDisconnectWrapper);
-}
+export const connectors = [
+  new InjectedConnector({ options: { id: "argentX", name: "Argent X" } }) as Connector,
+  new InjectedConnector({ options: { id: "braavos", name: "Braavos" } }) as Connector,
+  new ArgentMobileConnector() as Connector,
+  new WebWalletConnector({ url: "https://web.argent.xyz" }) as Connector,
+];
 
 export const appChains = targetNetworks;

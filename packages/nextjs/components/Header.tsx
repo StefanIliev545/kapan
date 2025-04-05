@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Bars3Icon, 
-  XMarkIcon,
-  WalletIcon,
+import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Bars3Icon,
   BoltIcon,
-  DocumentChartBarIcon,
   CurrencyDollarIcon,
-  SparklesIcon
+  DocumentChartBarIcon,
+  SparklesIcon,
+  WalletIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { motion, AnimatePresence } from "framer-motion";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { Faucet } from "./scaffold-stark";
 
 type HeaderMenuLink = {
   label: string;
@@ -49,13 +51,13 @@ export const HeaderMenuLinks = () => {
       {menuLinks.map(({ label, href, icon }, index) => {
         const isActive = pathname === href;
         return (
-          <motion.li 
+          <motion.li
             key={href}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ 
-              duration: 0.4, 
-              delay: index * 0.1
+            transition={{
+              duration: 0.4,
+              delay: index * 0.1,
             }}
             className="relative"
           >
@@ -71,29 +73,29 @@ export const HeaderMenuLinks = () => {
             >
               {/* Background glow effect */}
               {isActive && (
-                <motion.div 
+                <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 dark:from-accent/10 dark:via-accent/5 dark:to-accent/10 rounded-xl -z-10"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   style={{ filter: "blur(8px)" }}
                 />
               )}
-              
+
               {/* Icon with animation */}
-              <motion.div 
+              <motion.div
                 whileHover={{ rotate: [0, -10, 10, -5, 5, 0], scale: 1.2 }}
                 transition={{ duration: 0.5 }}
                 className={`${isActive ? "text-primary dark:text-accent" : "text-base-content/70"} transition-colors duration-300`}
               >
                 {icon}
               </motion.div>
-              
+
               {/* Label */}
               <span className="relative">
                 {label}
-                
+
                 {/* Underline effect */}
                 {isActive && (
-                  <motion.div 
+                  <motion.div
                     initial={{ scaleX: 0, opacity: 0 }}
                     animate={{ scaleX: 1, opacity: 1 }}
                     exit={{ scaleX: 0, opacity: 0 }}
@@ -101,12 +103,10 @@ export const HeaderMenuLinks = () => {
                     transition={{ duration: 0.3 }}
                   />
                 )}
-                
+
                 {/* Hover underline effect for inactive items */}
                 {!isActive && (
-                  <motion.div 
-                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-accent scale-x-0 opacity-0 origin-left transition-transform group-hover:scale-x-100 group-hover:opacity-100 duration-300"
-                  />
+                  <motion.div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-accent scale-x-0 opacity-0 origin-left transition-transform group-hover:scale-x-100 group-hover:opacity-100 duration-300" />
                 )}
               </span>
             </Link>
@@ -125,37 +125,36 @@ export const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  
+
   useOutsideClick(
     burgerMenuRef,
     useCallback(() => setIsDrawerOpen(false), []),
   );
-  
+
   // Add scroll effect
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
-    
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  
+
   // Close drawer when route changes
   useEffect(() => {
     setIsDrawerOpen(false);
   }, [pathname]);
 
   return (
-    <div className={`sticky top-0 z-30 transition-all duration-300 ${
-      scrolled 
-        ? "py-1" 
-        : "py-2"
-    }`}>
+    <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
       {/* Background with gradient border */}
-      <div className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
-        scrolled ? "shadow-md" : ""
-      }`} style={{ zIndex: -1 }}>
+      <div
+        className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
+          scrolled ? "shadow-md" : ""
+        }`}
+        style={{ zIndex: -1 }}
+      >
         {/* Accent line */}
         <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 dark:via-accent/30 to-transparent"></div>
       </div>
@@ -164,7 +163,11 @@ export const Header = () => {
         <div className="navbar justify-between min-h-0 h-auto py-0">
           {/* Left section - Logo and nav */}
           <div className="flex items-center">
-            <div className="lg:hidden dropdown z-50 mr-2" ref={burgerMenuRef} data-state={isDrawerOpen ? "open" : "closed"}>
+            <div
+              className="lg:hidden dropdown z-50 mr-2"
+              ref={burgerMenuRef}
+              data-state={isDrawerOpen ? "open" : "closed"}
+            >
               <button
                 aria-label="Menu"
                 className="btn btn-circle btn-ghost btn-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:focus:ring-accent/50"
@@ -189,7 +192,7 @@ export const Header = () => {
                   </motion.div>
                 </AnimatePresence>
               </button>
-              
+
               {/* Mobile Navigation Menu */}
               <AnimatePresence>
                 {isDrawerOpen && (
@@ -200,7 +203,7 @@ export const Header = () => {
                     className="fixed inset-0 z-40 bg-black/30 lg:hidden"
                     onClick={() => setIsDrawerOpen(false)}
                   >
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
@@ -208,17 +211,15 @@ export const Header = () => {
                       className="fixed top-16 left-4 z-50 w-72 rounded-lg shadow-2xl"
                       onClick={e => e.stopPropagation()}
                     >
-                      <div
-                        className="bg-base-200/95 dark:bg-base-300/95 backdrop-blur-md p-6 rounded-box border border-base-300/50 dark:border-base-content/10 shadow-lg"
-                      >
+                      <div className="bg-base-200/95 dark:bg-base-300/95 backdrop-blur-md p-6 rounded-box border border-base-300/50 dark:border-base-content/10 shadow-lg">
                         <div className="mb-6 pb-3 border-b border-base-300/50 dark:border-base-content/10">
                           <div className="flex items-center gap-4">
                             <div className="relative w-12 h-12">
-                              <Image 
-                                alt="Kapan logo" 
-                                className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
-                                fill 
-                                src="/seal-logo.png" 
+                              <Image
+                                alt="Kapan logo"
+                                className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
+                                fill
+                                src="/seal-logo.png"
                               />
                             </div>
                             <div>
@@ -236,10 +237,16 @@ export const Header = () => {
                               ALPHA VERSION
                             </div>
                           </div>
-                          <div className="flex flex-col space-y-3 items-stretch relative z-50">
+                          <div className="flex flex-col space-y-4 items-stretch relative z-50">
                             <div className="relative">
                               <RainbowKitCustomConnectButton />
                             </div>
+                            <div className="relative">
+                              <CustomConnectButton />
+                            </div>
+                            <div className="relative">
+                              <Faucet />
+                            </div>  
                             <div className="relative">
                               <FaucetButton />
                             </div>
@@ -251,18 +258,18 @@ export const Header = () => {
                 )}
               </AnimatePresence>
             </div>
-            
+
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <div className="relative flex items-center">
                 <div className="relative">
                   <div className={`relative w-14 h-14 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
-                    <Image 
-                      alt="Kapan logo" 
-                      className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]" 
-                      fill 
-                      src="/seal-logo.png" 
-                      priority 
+                    <Image
+                      alt="Kapan logo"
+                      className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
+                      fill
+                      src="/seal-logo.png"
+                      priority
                     />
                   </div>
                 </div>
@@ -272,7 +279,7 @@ export const Header = () => {
                 </div>
               </div>
             </Link>
-            
+
             {/* Desktop Navigation */}
             <div className="hidden lg:flex ml-10">
               <ul className="flex space-x-2">
@@ -280,26 +287,26 @@ export const Header = () => {
               </ul>
             </div>
           </div>
-          
+
           {/* Right section - Alpha badge and buttons */}
           <div className="flex items-center gap-4">
             {/* Alpha badge */}
             <div className="hidden sm:block">
-              <motion.div 
+              <motion.div
                 className="relative"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3, duration: 0.5 }}
               >
-                <motion.div 
+                <motion.div
                   className="absolute inset-0 bg-warning/40 dark:bg-warning/20 rounded-full"
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.2, 1],
                   }}
-                  transition={{ 
+                  transition={{
                     duration: 2,
                     repeat: Infinity,
-                    repeatType: "reverse"
+                    repeatType: "reverse",
                   }}
                   style={{ filter: "blur(8px)" }}
                 />
@@ -308,7 +315,7 @@ export const Header = () => {
                 </div>
               </motion.div>
             </div>
-            
+
             {/* Connect button and faucet */}
             <motion.div
               className="flex gap-2 items-center relative z-20"
@@ -318,6 +325,12 @@ export const Header = () => {
             >
               <div className="relative">
                 <RainbowKitCustomConnectButton />
+              </div>
+              <div className="relative">
+                <CustomConnectButton />
+              </div>
+              <div className="relative">
+                <Faucet />
               </div>
               <div className="relative">
                 <FaucetButton />

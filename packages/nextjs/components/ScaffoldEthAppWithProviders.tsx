@@ -50,7 +50,13 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   }, []);
 
   return (
-    <StarknetConfig chains={appChains} provider={provider} connectors={connectors} explorer={starkscan}>
+    <StarknetConfig
+      chains={appChains}
+      provider={provider}
+      connectors={connectors}
+      explorer={starkscan}
+      autoConnect={true}
+    >
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <ProgressBar height="3px" color="#2299dd" />

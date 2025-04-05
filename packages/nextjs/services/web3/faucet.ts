@@ -2,7 +2,7 @@ import { Address } from "@starknet-react/chains";
 
 export async function mintEth(inputAddress: Address, eth: string) {
   try {
-    const response = await fetch("http://0.0.0.0:5050/mint", {
+    const response = await fetch("http://localhost:5050/mint", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
