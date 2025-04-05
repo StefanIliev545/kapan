@@ -1,13 +1,12 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/alpine
 {
-	"name": "Alpine",
+	"name": "Kapan Starknet",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:debian-12",
+	"image": "starknetfoundation/starknet-dev:2.9.2",
 	"features": {
 		"ghcr.io/devcontainers/features/node:1": {},
-		"ghcr.io/devcontainers/features/rust:1": {},
-		"ghcr.io/devcontainers-extra/features/asdf-package:1": {}
+	
 	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
@@ -20,7 +19,8 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"NomicFoundation.hardhat-solidity"
+				"NomicFoundation.hardhat-solidity",
+				"StarkWare.cairo1"
 			]
 		}
 	},

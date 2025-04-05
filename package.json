@@ -8,6 +8,12 @@
     ]
   },
   "scripts": {
+    "snchain": "yarn workspace @ss-2/snfoundry chain",
+    "sndeploy": "yarn workspace @ss-2/snfoundry deploy",
+    "sndeploy:clear": "yarn workspace @ss-2/snfoundry deploy:clear",
+    "sndeploy:no-reset": "yarn workspace @ss-2/snfoundry deploy --no-reset",
+    "sntest": "yarn workspace @ss-2/snfoundry test",
+    "sncompile": "yarn workspace @ss-2/snfoundry compile",
     "account": "yarn hardhat:account",
     "account:generate": "yarn workspace @se-2/hardhat account:generate",
     "account:import": "yarn workspace @se-2/hardhat account:import",
