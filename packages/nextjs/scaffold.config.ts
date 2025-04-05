@@ -3,8 +3,8 @@ import { Chain as SNChain } from "@starknet-react/chains";
 import * as chains from "viem/chains";
 
 export type ScaffoldConfig = {
-  targetNetworks: readonly chains.Chain[];
-  targetSNNetworks: readonly SNChain[];
+  targetEVMNetworks: readonly chains.Chain[];
+  targetNetworks: readonly SNChain[];
   pollingInterval: number;
   alchemyApiKey: string;
   walletConnectProjectId: string;
@@ -15,8 +15,8 @@ export const DEFAULT_ALCHEMY_API_KEY = "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 
 const scaffoldConfig = {
   // The networks on which your DApp is live
-  targetNetworks: [chains.hardhat],
-  targetSNNetworks: [snchains.devnet],
+  targetEVMNetworks: [chains.hardhat],
+  targetNetworks: [snchains.devnet],
   // The interval at which your front-end polls the RPC servers for new data
   // it has no effect if you only target the local network (default is 4000)
   pollingInterval: 30000,

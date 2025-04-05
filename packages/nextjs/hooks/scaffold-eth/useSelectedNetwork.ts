@@ -4,5 +4,5 @@ import { AllowedChainIds } from "~~/utils/scaffold-eth";
 
 export function useSelectedNetwork(chainId?: AllowedChainIds) {
   const targetNetwork = useGlobalState(({ targetNetwork }) => targetNetwork);
-  return scaffoldConfig.targetNetworks.find(targetNetwork => targetNetwork.id === chainId) ?? targetNetwork;
+  return scaffoldConfig.targetEVMNetworks.find(targetNetwork => targetNetwork.id === chainId) ?? targetNetwork;
 }
