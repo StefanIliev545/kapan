@@ -6,7 +6,10 @@
 	"image": "starknetfoundation/starknet-dev:2.9.4",
 	"features": {
 		"ghcr.io/devcontainers/features/node:1": {},
-	
+		"ghcr.io/devcontainers-extra/features/asdf-package:1": {
+			"plugin" : "scarb",
+			"version": "latest"
+		}
 	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.

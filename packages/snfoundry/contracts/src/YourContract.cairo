@@ -8,8 +8,8 @@ pub trait IYourContract<TContractState> {
 
 #[starknet::contract]
 mod YourContract {
-    use openzeppelin_access::ownable::OwnableComponent;
-    use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::access::ownable::OwnableComponent;
+    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use starknet::{ContractAddress, contract_address_const};
