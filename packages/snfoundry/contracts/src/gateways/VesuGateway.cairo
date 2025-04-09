@@ -125,7 +125,21 @@ mod VesuGateway {
             erc4626.deposit(basic.amount, basic.user);
         }
 
+        // TODO: Access control.
         fn withdraw(ref self: ContractState, instruction: @Withdraw) {
+            let basic = *instruction.basic;
+            if instruction.context.is_some() {
+                // todo - trigger modify as we are removing paired collateral
+                return;
+            }
+
+            let vToken = self.get_vtoken_for_collateral(basic.token);
+            let erc4626 = IERC4626Dispatcher {
+                contract_address: vToken,
+            };
+            // best to go through shares as there is some rounding.
+            let shares = erc4626.convert_to_shares(basic.amount);
+            erc4626.redeem(shares, basic.user, basic.user);
         }
 
         fn borrow(ref self: ContractState, instruction: @Borrow) {
@@ -147,7 +161,7 @@ mod VesuGateway {
             let mut addresses = array![];
             for i in 0..self.supported_assets.len() {
                 addresses.append(self.supported_assets.at(i).read());
-            }
+            };
             addresses
         }
     }
@@ -165,8 +179,8 @@ mod VesuGateway {
                     LendingInstruction::Deposit(deposit_params) => {
                         self.deposit(deposit_params);
                     },
-                    LendingInstruction::Withdraw(_withdraw_params) => {
-                        // TODO: Implement withdraw instruction handling  
+                    LendingInstruction::Withdraw(withdraw_params) => {
+                        self.withdraw(withdraw_params);
                     },
                     LendingInstruction::Borrow(_borrow_params) => {
                         // TODO: Implement borrow instruction handling

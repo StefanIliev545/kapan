@@ -6,7 +6,7 @@ edition = "2024_07"
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-starknet = "2.5.4"
+starknet = "2.9.4"
 # Change to just "openzeppelin" to use full features
 openzeppelin = "1.0.0"
 alexandria_math = "0.4.0"
@@ -25,3 +25,6 @@ sort-module-level-items = true
 name = "MAINNET_LATEST"
 url = "https://starknet-mainnet.public.blastapi.io/rpc/v0_7"
 block_id.tag = "latest"
+
+[scripts]
+test = "snforge test"
