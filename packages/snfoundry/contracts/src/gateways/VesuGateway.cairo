@@ -2,7 +2,6 @@ use starknet::ContractAddress;
 use core::array::Array;
 use core::array::Span;
 use core::bool;
-use crate::interfaces::IGateway::{IGateway, Collateral};
 
 pub mod Errors {
     pub const APPROVE_FAILED: felt252 = 'Approve failed';
@@ -43,6 +42,8 @@ mod VesuGateway {
         ISingletonDispatcher,
         ISingletonDispatcherTrait,
     };
+    use crate::interfaces::IGateway::{ILendingInstructionProcessor, LendingInstruction, Deposit, Withdraw, Borrow, Repay};
+
     
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
 
@@ -74,8 +75,19 @@ mod VesuGateway {
         self.ownable.initializer(get_caller_address());
     }
 
+    #[derive(Drop, Serde)]
+    struct VesuContext {
+        // Vesu has pools and positions. Debt is isolated in pairs to a collateral. 
+        pub pool_id: felt252, // This allows targeting a specific pool besides genesis.
+        pub positionCounterpartToken: ContractAddress, // This is either the collateral or the debt token depending on the instruction.
+    }
+
     trait IVesuGatewayInternal {
         fn get_vtoken_for_collateral(self: @ContractState, collateral: ContractAddress) -> ContractAddress;
+        fn deposit(ref self: ContractState, instruction: @Deposit);
+        fn withdraw(ref self: ContractState, instruction: @Withdraw);
+        fn borrow(ref self: ContractState, instruction: @Borrow);
+        fn repay(ref self: ContractState, instruction: @Repay);
     }
 
     impl VesuGatewayInternal of IVesuGatewayInternal {
@@ -89,6 +101,37 @@ mod VesuGateway {
                 contract_address: extensionForPool,
             };
             extension.v_token_for_collateral_asset(poolId, collateral)
+        }
+
+        fn deposit(ref self: ContractState, instruction: @Deposit) {
+            let basic = *instruction.basic;
+            if instruction.context.is_some() {
+                // todo - trigger modify as we are adding collateral
+                return;
+            }
+
+            let erc20 = IERC20Dispatcher {
+                contract_address: basic.token,
+            };
+            let result = erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount);
+            assert(result, Errors::TRANSFER_FAILED);
+
+            let vToken = self.get_vtoken_for_collateral(basic.token);
+            let erc4626 = IERC4626Dispatcher {
+                contract_address: vToken,
+            };
+            
+            assert(erc20.approve(vToken, basic.amount), Errors::APPROVE_FAILED);
+            erc4626.deposit(basic.amount, basic.user);
+        }
+
+        fn withdraw(ref self: ContractState, instruction: @Withdraw) {
+        }
+
+        fn borrow(ref self: ContractState, instruction: @Borrow) {
+        }
+
+        fn repay(ref self: ContractState, instruction: @Repay) {
         }
     }
 
@@ -110,134 +153,30 @@ mod VesuGateway {
     }
 
     #[abi(embed_v0)]
-    impl IGatewayImpl of IGateway<ContractState> {
-        fn deposit(ref self: ContractState, token: ContractAddress, user: ContractAddress, amount: u256) {
-            let erc20 = IERC20Dispatcher {
-                contract_address: token,
-            };
-            let result = erc20.transfer_from(get_caller_address(), get_contract_address(), amount);
-            assert(result, Errors::TRANSFER_FAILED);
-
-            let vToken = IVesuGatewayInternal::get_vtoken_for_collateral(@self, token);
-            let erc4626 = IERC4626Dispatcher {
-                contract_address: vToken,
-            };
-            
-            assert(erc20.approve(vToken, amount), Errors::APPROVE_FAILED);
-            erc4626.deposit(amount, user);
-        }
-
-        fn borrow(ref self: ContractState, token: ContractAddress, user: ContractAddress, amount: u256) {
+    impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
+        fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
             // Implementation
-        }
-
-        fn repay(ref self: ContractState, token: ContractAddress, user: ContractAddress, amount: u256) {
-            // Implementation
-        }
-
-        fn deposit_collateral(
-            ref self: ContractState,
-            market: ContractAddress,
-            collateral: ContractAddress,
-            amount: u256,
-            receiver: ContractAddress
-        ) {
-            self.deposit(collateral, receiver, amount);
-        }
-
-        fn withdraw_collateral(
-            ref self: ContractState,
-            market: ContractAddress,
-            collateral: ContractAddress,
-            user: ContractAddress,
-            amount: u256
-        ) -> (ContractAddress, u256) {
-            // Implementation
-            (collateral, amount)
-        }
-
-        fn get_balance(self: @ContractState, token: ContractAddress, user: ContractAddress) -> u256 {
-            // Implementation
-            0_u256
-        }
-
-        fn get_borrow_balance(self: @ContractState, token: ContractAddress, user: ContractAddress) -> u256 {
-            // Implementation
-            0_u256
-        }
-
-        fn get_borrow_balance_current(ref self: ContractState, token: ContractAddress, user: ContractAddress) -> u256 {
-            // Implementation
-            0_u256
-        }
-
-        fn get_borrow_rate(self: @ContractState, token: ContractAddress) -> (u256, bool) {
-            // Implementation
-            (0_u256, false)
-        }
-
-        fn get_supply_rate(self: @ContractState, token: ContractAddress) -> (u256, bool) {
-            // Implementation
-            (0_u256, false)
-        }
-
-        fn get_ltv(self: @ContractState, token: ContractAddress, user: ContractAddress) -> u256 {
-            // Implementation
-            0_u256
-        }
-
-        fn get_possible_collaterals(
-            self: @ContractState,
-            token: ContractAddress,
-            user: ContractAddress
-        ) -> (Array<ContractAddress>, Array<u256>, Array<felt252>, Array<u8>) {
-            // Implementation
-            (ArrayTrait::new(), ArrayTrait::new(), ArrayTrait::new(), ArrayTrait::new())
-        }
-
-        fn is_collateral_supported(
-            self: @ContractState,
-            market: ContractAddress,
-            collateral: ContractAddress
-        ) -> bool {
-            // Implementation
-            false
-        }
-
-        fn get_supported_collaterals(
-            self: @ContractState,
-            market: ContractAddress
-        ) -> Array<ContractAddress> {
-            // Implementation
-            ArrayTrait::new()
-        }
-
-        fn get_encoded_collateral_approvals(
-            self: @ContractState,
-            token: ContractAddress,
-            collaterals: Array<Collateral>
-        ) -> (Array<ContractAddress>, Array<Span<felt252>>) {
-            // Implementation
-            (ArrayTrait::new(), ArrayTrait::new())
-        }
-
-        fn get_encoded_debt_approval(
-            self: @ContractState,
-            token: ContractAddress,
-            amount: u256,
-            user: ContractAddress
-        ) -> (Array<ContractAddress>, Array<Span<felt252>>) {
-            // Implementation
-            (ArrayTrait::new(), ArrayTrait::new())
-        }
-
-        fn get_inbound_collateral_actions(
-            self: @ContractState,
-            token: ContractAddress,
-            collaterals: Array<Collateral>
-        ) -> (Array<ContractAddress>, Array<Span<felt252>>) {
-            // Implementation
-            (ArrayTrait::new(), ArrayTrait::new())
+            let mut i: usize = 0;
+            loop {
+                if i >= instructions.len() {
+                    break;
+                }
+                match instructions.at(i) {
+                    LendingInstruction::Deposit(deposit_params) => {
+                        self.deposit(deposit_params);
+                    },
+                    LendingInstruction::Withdraw(_withdraw_params) => {
+                        // TODO: Implement withdraw instruction handling  
+                    },
+                    LendingInstruction::Borrow(_borrow_params) => {
+                        // TODO: Implement borrow instruction handling
+                    },
+                    LendingInstruction::Repay(_repay_params) => {
+                        // TODO: Implement repay instruction handling
+                    },
+                }
+                i += 1;
+            }
         }
     }
 } 

@@ -22,6 +22,6 @@ casm = true
 sort-module-level-items = true
 
 [[tool.snforge.fork]]
-name = "SEPOLIA_LATEST"
-url = "https://starknet-sepolia.public.blastapi.io/rpc/v0_7"
+name = "MAINNET_LATEST"
+url = "https://starknet-mainnet.public.blastapi.io/rpc/v0_7"
 block_id.tag = "latest"
