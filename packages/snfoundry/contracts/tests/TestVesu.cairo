@@ -166,7 +166,6 @@ fn perform_withdrawal(ref context: TestContext, amount: u256) -> u256 {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_deposit() {
     let mut context = setup_test_context();
@@ -179,7 +178,6 @@ fn test_deposit() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_basic_withdraw() {
     let mut context = setup_test_context();
@@ -230,4 +228,63 @@ fn test_borrow() {
     let current_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
     println!("usdc balance: {}", current_usdc_balance);
     assert(current_usdc_balance > initial_usdc_balance, 'usdc balance not increased');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_repay() {
+    let mut context = setup_test_context();
+    let amount = 5000000000000000000;
+    
+    // First perform a deposit
+    perform_deposit(ref context, amount);
+
+    println!("deposited!");
+    let mut context_array = array![];
+    VesuContext {
+        pool_id: POOL_ID,
+        position_counterpart_token: context.token_address,
+    }.serialize(ref context_array);
+
+    let usdcERC20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
+    
+    // First borrow some USDC
+    let borrow_amount = 220000000;
+    let borrow = Borrow {
+        basic: create_basic_instruction(USDC_ERC20_ADDRESS(), borrow_amount, USER_ADDRESS()),
+        context: Option::Some(context_array.span()),
+    };
+    
+    println!("delegating!");
+    modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
+    println!("borrowing!");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Borrow(borrow)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+
+    let initial_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
+    println!("usdc balance after borrow: {}", initial_usdc_balance);
+
+    // Now repay half of the borrowed amount
+    let repay_amount = borrow_amount / 2;
+    
+    // Approve gateway to spend USDC
+    cheat_caller_address(USDC_ERC20_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    usdcERC20.approve(context.gateway_address, repay_amount);
+
+    // Create and process repay instruction
+    let repay = Repay {
+        basic: create_basic_instruction(USDC_ERC20_ADDRESS(), repay_amount, USER_ADDRESS()),
+        context: Option::Some(context_array.span()),
+    };
+    
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Repay(repay)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+
+    let final_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
+    println!("usdc balance after repay: {}", final_usdc_balance);
+    
+    // Verify that the balance decreased by the repay amount
+    assert(final_usdc_balance == initial_usdc_balance - repay_amount, 'no-decrease');
 }

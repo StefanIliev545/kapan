@@ -325,6 +325,7 @@ mod VesuGateway {
                 };
                 let result = erc20.approve(self.vesu_singleton.read(), debt_amount.abs());
                 assert(result, Errors::APPROVE_FAILED);
+                println!("approved debt {}", debt_amount.abs());
             }
 
             let modify_params = ModifyPositionParams {
@@ -334,7 +335,7 @@ mod VesuGateway {
                 user,
                 collateral: Default::default(),
                 debt: Amount {
-                    amount_type: AmountType::Target,
+                    amount_type: AmountType::Delta,
                     denomination: AmountDenomination::Assets,
                     value: debt_amount,
                 },
@@ -374,6 +375,33 @@ mod VesuGateway {
         
 
         fn repay(ref self: ContractState, instruction: @Repay) {
+            let basic = *instruction.basic;
+            let context = *instruction.context;
+            assert(context.is_some(), 'Context is required for repay');
+            let mut context_bytes = context.unwrap();
+            let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
+        
+            let pool_id = self.pool_id.read();
+            let user = basic.user;
+            let collateral_asset = vesu_context.position_counterpart_token;
+            let debt_asset = basic.token;
+        
+            // Validate context
+            assert(vesu_context.pool_id == pool_id, 'Invalid pool id');
+            assert(vesu_context.position_counterpart_token == contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>(), 'Invalid context'); //eth
+            assert(user == contract_address_const::<0x0113c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>(), 'Invalid user');
+        
+            // Transfer debt tokens from user to gateway
+            let erc20 = IERC20Dispatcher {
+                contract_address: debt_asset,
+            };
+            let result = erc20.transfer_from(user, get_contract_address(), basic.amount);
+            assert(result, Errors::TRANSFER_FAILED);
+
+            // Create negative i257 for repay (reducing debt)
+            let debt_amount = I257Impl::new(basic.amount, true);
+            println!("debt_amount: {}", debt_amount);
+            self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
         }
     }
 
