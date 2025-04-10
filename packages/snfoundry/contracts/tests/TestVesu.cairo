@@ -8,6 +8,7 @@ use kapan::interfaces::IGateway::{
     Borrow,
     Repay,
 };
+use kapan::gateways::VesuGateway::{IVesuViewerDispatcher, IVesuViewerDispatcherTrait};
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use openzeppelin::utils::serde::SerializedAppend;
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
@@ -16,6 +17,8 @@ use core::option::Option;
 use core::traits::{Drop};
 use kapan::interfaces::vesu::{ISingletonDispatcher, ISingletonDispatcherTrait, IERC4626Dispatcher, IERC4626DispatcherTrait};
 use kapan::gateways::VesuGateway::VesuContext;
+use core::num::traits::Zero;
+
 // Real contract address deployed on Sepolia
 fn SINGLETON_ADDRESS() -> ContractAddress {
     contract_address_const::<0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef>()
@@ -287,4 +290,82 @@ fn test_repay() {
     
     // Verify that the balance decreased by the repay amount
     assert(final_usdc_balance == initial_usdc_balance - repay_amount, 'no-decrease');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_get_all_positions() {
+    let mut context = setup_test_context();
+    
+    // Create ETH deposit position (collateral: ETH, debt: Zero)
+    let eth_amount = 5000000000000000000; // 5 ETH
+    perform_deposit(ref context, eth_amount);
+    
+    // Create ETH-USDC borrow position
+    let mut context_array = array![];
+    VesuContext {
+        pool_id: POOL_ID,
+        position_counterpart_token: context.token_address,
+    }.serialize(ref context_array);
+    
+    let borrow_amount = 110000000; // 110 USDC
+    let borrow = Borrow {
+        basic: create_basic_instruction(USDC_ERC20_ADDRESS(), borrow_amount, USER_ADDRESS()),
+        context: Option::Some(context_array.span()),
+    };
+    
+    modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Borrow(borrow)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    
+    // Create USDC deposit position
+    let usdc_amount = 100000000; // 100 USDC
+    let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
+    
+    // Approve and deposit USDC
+    cheat_caller_address(USDC_ERC20_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    usdc_erc20.approve(context.gateway_address, usdc_amount);
+    
+    let usdc_deposit = Deposit {
+        basic: create_basic_instruction(USDC_ERC20_ADDRESS(), usdc_amount, USER_ADDRESS()),
+        context: Option::None,
+    };
+    
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Deposit(usdc_deposit)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    
+    // Get all positions
+    let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };
+    let positions = vesuViewerDispatcher.get_all_positions(USER_ADDRESS());
+    
+    // Verify positions
+    let mut found_eth_deposit = false;
+    let mut found_eth_usdc_borrow = false;
+    let mut found_usdc_deposit = false;
+    
+    for i in 0..positions.len() {
+        let (collateral, debt, position) = *positions.at(i);
+        
+        if collateral == context.token_address && debt == Zero::zero() {
+            assert(position.collateral_shares > 0, 'ETH deposit position not found');
+            found_eth_deposit = true;
+        }
+        
+        if collateral == context.token_address && debt == USDC_ERC20_ADDRESS() {
+            assert(position.collateral_shares > 0, 'ETH-USDCc nf');
+            assert(position.nominal_debt > 0, 'ETH-USDCb nf');
+            found_eth_usdc_borrow = true;
+        }
+        
+        if collateral == USDC_ERC20_ADDRESS() && debt == Zero::zero() {
+            assert(position.collateral_shares > 0, 'USDC deposit position not found');
+            found_usdc_deposit = true;
+        }
+    };
+    
+    assert(found_eth_deposit, 'ETH deposit position missing');
+    assert(found_eth_usdc_borrow, 'ETH-USDCb position missing');
+    assert(found_usdc_deposit, 'USDC deposit position missing');
 }

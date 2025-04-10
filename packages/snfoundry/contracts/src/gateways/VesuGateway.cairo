@@ -1,6 +1,7 @@
 use starknet::ContractAddress;
 use core::array::Array;
 use core::array::Span;
+use crate::interfaces::vesu_data::Position;
 
 pub mod Errors {
     pub const APPROVE_FAILED: felt252 = 'Approve failed';
@@ -10,7 +11,12 @@ pub mod Errors {
 #[starknet::interface]
 trait IVesuGatewayAdmin<TContractState> {
     fn add_asset(ref self: TContractState, asset: ContractAddress);
-    fn get_supported_assets(self: @TContractState) -> Array<ContractAddress>;
+}
+
+#[starknet::interface]
+pub trait IVesuViewer<TContractState> {
+    fn get_all_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, Position)>;
+    fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
 }
 
 #[derive(Drop, Serde)]
@@ -412,14 +418,6 @@ mod VesuGateway {
             self.ownable.assert_only_owner();
             self.supported_assets.append().write(asset);
         }
-
-        fn get_supported_assets(self: @ContractState) -> Array<ContractAddress> {
-            let mut addresses = array![];
-            for i in 0..self.supported_assets.len() {
-                addresses.append(self.supported_assets.at(i).read());
-            };
-            addresses
-        }
     }
 
     #[abi(embed_v0)]
@@ -447,6 +445,52 @@ mod VesuGateway {
                 }
                 i += 1;
             }
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl IVesuViewerImpl of IVesuViewer<ContractState> {
+        fn get_supported_assets_array(self: @ContractState) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let supported_assets = self.supported_assets;
+            let len = supported_assets.len();
+            for i in 0..len {
+                assets.append(self.supported_assets.at(i).read());
+            };
+            assets
+        }
+
+        fn get_all_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, Position)> {
+            let mut positions = array![];
+            let supported_assets = self.get_supported_assets_array();
+            let pool_id = self.pool_id.read();
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+
+            // Iterate through all possible pairs of supported assets
+            let len = supported_assets.len();
+            for i in 0..len {
+                let collateral_asset = *supported_assets.at(i);
+                // Check position with zero debt first (earning positions)
+                let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, Zero::zero(), user);
+                if position.collateral_shares > 0 {
+                    positions.append((collateral_asset, Zero::zero(), position));
+                }
+
+                // Then check all other possible debt assets
+                for j in 0..len {
+                    if i == j {
+                        continue; // Skip same asset pairs
+                    }
+                    let debt_asset = *supported_assets.at(j);
+                    let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
+                    if position.collateral_shares > 0 || position.nominal_debt > 0 {
+                        positions.append((collateral_asset, debt_asset, position));
+                    }
+                }
+            };
+            positions
         }
     }
 } 
