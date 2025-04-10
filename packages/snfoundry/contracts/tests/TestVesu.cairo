@@ -188,16 +188,6 @@ fn test_basic_withdraw() {
     // First perform a deposit
     perform_deposit(ref context, amount);
     
-    // Verify vToken balance increased
-    assert(context.vtoken_erc20.balance_of(USER_ADDRESS()) > 0, 'vToken balance not increased');
-    println!("vToken balance: {}", context.vtoken_erc20.balance_of(USER_ADDRESS()));
-    
-    // Show share/asset conversion for debugging
-    let shares = context.vtoken_erc4626.convert_to_shares(amount);
-    let assets = context.vtoken_erc4626.convert_to_assets(shares);
-    println!("shares: {}", shares);
-    println!("assets: {}", assets);
-    
     // Now perform a withdrawal
     let initial_balance = perform_withdrawal(ref context, amount);
     

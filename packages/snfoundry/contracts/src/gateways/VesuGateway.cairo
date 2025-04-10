@@ -62,6 +62,7 @@ mod VesuGateway {
         AmountType,
         AmountDenomination,
         UnsignedAmount,
+        UpdatePositionResponse,
     };
     use crate::interfaces::IGateway::{ILendingInstructionProcessor, LendingInstruction, Deposit, Withdraw, Borrow, Repay};
 
@@ -103,6 +104,30 @@ mod VesuGateway {
         fn withdraw(ref self: ContractState, instruction: @Withdraw);
         fn borrow(ref self: ContractState, instruction: @Borrow);
         fn repay(ref self: ContractState, instruction: @Repay);
+        fn transfer_position_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            collateral_amount: u256
+        );
+        fn modify_collateral_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            collateral_amount: i257
+        ) -> UpdatePositionResponse;
+        fn modify_debt_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            debt_amount: i257
+        );
     }
 
     impl VesuGatewayInternal of IVesuGatewayInternal {
@@ -131,16 +156,22 @@ mod VesuGateway {
             let result = erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount);
             assert(result, Errors::TRANSFER_FAILED);
 
-            let vToken = self.get_vtoken_for_collateral(basic.token);
-            let erc4626 = IERC4626Dispatcher {
-                contract_address: vToken,
-            };
-            
-            assert(erc20.approve(vToken, basic.amount), Errors::APPROVE_FAILED);
-            erc4626.deposit(basic.amount, basic.user);
+            // Approve singleton to spend tokens
+            let singleton_address = self.vesu_singleton.read();
+            let approve_result = erc20.approve(singleton_address, basic.amount);
+            assert(approve_result, Errors::APPROVE_FAILED);
+
+            // Use modify position to add collateral
+            let pool_id = self.pool_id.read();
+            let collateral_asset = basic.token;
+            let debt_asset = Zero::zero();  // Zero debt token for deposit
+            let user = basic.user;
+
+            // Create positive i257 for deposit
+            let collateral_amount = I257Impl::new(basic.amount, false);
+            let response = self.modify_collateral_for(pool_id, collateral_asset, debt_asset, user, collateral_amount);
         }
 
-        // TODO: Access control.
         fn withdraw(ref self: ContractState, instruction: @Withdraw) {
             let basic = *instruction.basic;
             if instruction.context.is_some() {
@@ -148,13 +179,168 @@ mod VesuGateway {
                 return;
             }
 
-            let vToken = self.get_vtoken_for_collateral(basic.token);
-            let erc4626 = IERC4626Dispatcher {
-                contract_address: vToken,
+            let pool_id = self.pool_id.read();
+            let collateral_asset = basic.token;
+            let debt_asset = Zero::zero();  // Zero debt token for withdraw
+            let user = basic.user;
+
+            // Create negative i257 for withdraw
+            let collateral_amount = I257Impl::new(basic.amount, true);
+            let response = self.modify_collateral_for(pool_id, collateral_asset, debt_asset, user, collateral_amount);
+
+            println!("withdrawing collateral");
+            // Transfer tokens back to user using the actual amount withdrawn
+            let erc20 = IERC20Dispatcher {
+                contract_address: basic.token,
             };
-            // best to go through shares as there is some rounding.
-            let shares = erc4626.convert_to_shares(basic.amount);
-            erc4626.redeem(shares, basic.user, basic.user);
+            let result = erc20.transfer(user, response.collateral_delta.abs());
+            assert(result, Errors::TRANSFER_FAILED);
+        }
+
+        fn transfer_position_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            collateral_amount: u256
+        ) {
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+
+            // Check if position already exists
+            let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
+            if position.collateral_shares == 0 && position.nominal_debt == 0 {
+                // Transfer position from zero debt to target debt
+                println!("transferring position {} collateral", collateral_amount);
+                let transfer_params = TransferPositionParams {
+                    pool_id,
+                    from_collateral_asset: collateral_asset,
+                    to_collateral_asset: collateral_asset,
+                    from_debt_asset: Zero::zero(),
+                    to_debt_asset: debt_asset,
+                    from_user: user,
+                    to_user: user,
+                    collateral: UnsignedAmount {
+                        amount_type: AmountType::Target,
+                        denomination: AmountDenomination::Native,
+                        value: collateral_amount,
+                    },
+                    debt: Default::default(),
+                    from_data: ArrayTrait::new().span(),
+                    to_data: ArrayTrait::new().span(),
+                };
+                singleton_dispatcher.transfer_position(transfer_params);
+                println!("transferred position");
+            }
+        }
+
+        fn modify_collateral_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            collateral_amount: i257
+        ) -> UpdatePositionResponse {
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+
+            // Get context which contains all position info
+            let context = singleton_dispatcher.context(pool_id, collateral_asset, debt_asset, user);
+            let vesu_context: Context = context;
+
+            // If withdrawing, ensure we don't withdraw more than available
+            let mut final_amount = collateral_amount;
+            let mut amount_type = AmountType::Delta;
+            if collateral_amount.is_negative() {
+                println!("is negative");
+               
+                let vtoken = self.get_vtoken_for_collateral(collateral_asset);
+                let erc4626 = IERC4626Dispatcher {
+                    contract_address: vtoken,
+                };
+                let requested_shares = erc4626.convert_to_shares(collateral_amount.abs());
+                let available_shares = vesu_context.position.collateral_shares;
+                assert(available_shares > 0, 'No-collateral');
+                
+                println!("requested_shares: {}", requested_shares);
+                println!("available_shares: {}", available_shares);
+                if requested_shares >= available_shares {
+                    // For exact or over withdrawals, use Target with 0
+                    amount_type = AmountType::Target;
+                    final_amount = I257Impl::new(0, false);
+                    println!("using target amount type");
+                } else {
+                    // For partial withdrawals, use Delta with the negative amount
+                    let max_assets = erc4626.convert_to_assets(available_shares);
+                    final_amount = I257Impl::new(max_assets, true);
+                    println!("using delta amount type");
+                }
+                println!("final_amount: {}", final_amount);
+            }
+            println!("final_amount_premodify: {}", final_amount);
+
+            let modify_params = ModifyPositionParams {
+                pool_id,
+                collateral_asset,
+                debt_asset,
+                user,
+                collateral: Amount {
+                    amount_type,
+                    denomination: AmountDenomination::Assets,
+                    value: final_amount,
+                },
+                debt: Default::default(),
+                data: ArrayTrait::new().span(),
+            };
+            singleton_dispatcher.modify_position(modify_params)
+        }
+
+        fn modify_debt_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            debt_amount: i257
+        ) {
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+
+            // Check if position exists
+            let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
+            if position.collateral_shares == 0 && position.nominal_debt == 0 {
+                // Transfer position from zero debt to target debt
+                self.transfer_position_for(pool_id, collateral_asset, debt_asset, user, 0);
+            }
+
+            // Approve singleton to spend tokens if needed
+            if !debt_amount.is_negative() {
+                let erc20 = IERC20Dispatcher {
+                    contract_address: debt_asset,
+                };
+                let result = erc20.approve(self.vesu_singleton.read(), debt_amount.abs());
+                assert(result, Errors::APPROVE_FAILED);
+            }
+
+            let modify_params = ModifyPositionParams {
+                pool_id,
+                collateral_asset,
+                debt_asset,
+                user,
+                collateral: Default::default(),
+                debt: Amount {
+                    amount_type: AmountType::Target,
+                    denomination: AmountDenomination::Assets,
+                    value: debt_amount,
+                },
+                data: ArrayTrait::new().span(),
+            };
+            singleton_dispatcher.modify_position(modify_params);
         }
 
         fn borrow(ref self: ContractState, instruction: @Borrow) {
@@ -164,52 +350,21 @@ mod VesuGateway {
             let mut context_bytes = context.unwrap();
             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
         
-            let singleton_dispatcher = ISingletonDispatcher {
-                contract_address: self.vesu_singleton.read(),
-            };
             let pool_id = self.pool_id.read();
             let user = basic.user;
-        
-            // Extract collateral and debt assets from context (adjust based on your VesuContext struct)
-            assert(vesu_context.pool_id == pool_id, 'Invalid pool id');
-            assert(vesu_context.position_counterpart_token == contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>(), 'Invalid context'); //eth
-            assert(user == contract_address_const::<0x0113c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>(), 'Invalid user');
             let collateral_asset = vesu_context.position_counterpart_token;
             let debt_asset = basic.token;
         
-            // Check if the target position exists
-            let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
+            // Validate context
+            assert(vesu_context.pool_id == pool_id, 'Invalid pool id');
+            assert(vesu_context.position_counterpart_token == contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>(), 'Invalid context'); //eth
+            assert(user == contract_address_const::<0x0113c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>(), 'Invalid user');
+        
+            // Create positive i257 for borrow
+            let debt_amount = I257Impl::new(basic.amount, false);
+            self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
             
-            if position.collateral_shares == 0 && position.nominal_debt == 0 {
-                let transfer_params = TransferPositionParams {
-                    pool_id,
-                    from_collateral_asset: collateral_asset,
-                    to_collateral_asset: collateral_asset,
-                    from_debt_asset: Zero::zero(),
-                    to_debt_asset: debt_asset,
-                    from_user: user,
-                    to_user: user,
-                    collateral: Default::default(), // Specify collateral to transfer
-                    debt: Default::default(), // Specify debt to transfer
-                    from_data: ArrayTrait::new().span(),
-                    to_data: ArrayTrait::new().span(),
-                };
-                singleton_dispatcher.transfer_position(transfer_params);
-            }
-            let modify_params = ModifyPositionParams {
-                pool_id: pool_id,
-                collateral_asset: collateral_asset,
-                debt_asset: debt_asset,
-                user: user,
-                collateral: Default::default(),
-                debt: Amount {
-                    amount_type: AmountType::Target,
-                    denomination: AmountDenomination::Assets,
-                    value: I257Impl::new(basic.amount, false),
-                },
-                data: ArrayTrait::new().span(), // Add data if needed
-            };
-            singleton_dispatcher.modify_position(modify_params);
+            // Transfer debt tokens to user
             let erc20 = IERC20Dispatcher {
                 contract_address: debt_asset,
             };

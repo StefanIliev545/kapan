@@ -125,26 +125,26 @@ pub struct LiquidatePositionParams {
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct UpdatePositionResponse {
-    collateral_delta: i257, // [asset scale]
-    collateral_shares_delta: i257, // [SCALE]
-    debt_delta: i257, // [asset scale]
-    nominal_debt_delta: i257, // [SCALE]
-    bad_debt: u256, // [asset scale]
+    pub collateral_delta: i257, // [asset scale]
+    pub collateral_shares_delta: i257, // [SCALE]
+    pub debt_delta: i257, // [asset scale]
+    pub nominal_debt_delta: i257, // [SCALE]
+    pub bad_debt: u256, // [asset scale]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct Context {
-    pool_id: felt252,
-    extension: ContractAddress,
-    collateral_asset: ContractAddress,
-    debt_asset: ContractAddress,
-    collateral_asset_config: AssetConfig,
-    debt_asset_config: AssetConfig,
-    collateral_asset_price: AssetPrice,
-    debt_asset_price: AssetPrice,
-    collateral_asset_fee_shares: u256,
-    debt_asset_fee_shares: u256,
-    max_ltv: u64,
-    user: ContractAddress,
-    position: Position
+    pub pool_id: felt252,
+    pub extension: ContractAddress,
+    pub collateral_asset: ContractAddress,
+    pub debt_asset: ContractAddress,
+    pub collateral_asset_config: AssetConfig,
+    pub debt_asset_config: AssetConfig,
+    pub collateral_asset_price: AssetPrice,
+    pub debt_asset_price: AssetPrice,
+    pub collateral_asset_fee_shares: u256,
+    pub debt_asset_fee_shares: u256,
+    pub max_ltv: u64,
+    pub user: ContractAddress,
+    pub position: Position
 }
