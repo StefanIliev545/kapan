@@ -23,7 +23,7 @@ sort-module-level-items = true
 
 [[tool.snforge.fork]]
 name = "MAINNET_LATEST"
-url = "https://starknet-mainnet.public.blastapi.io/rpc/v0_7"
+url = "https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_7/UzZLO1ZxAF42Y2E4704aEr1GS0zETCnJ"
 block_id.tag = "latest"
 
 [scripts]

@@ -3,8 +3,8 @@ use starknet::ContractAddress;
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct Position {
-    collateral_shares: u256, // packed as u128 [SCALE] 
-    nominal_debt: u256, // packed as u123 [SCALE]
+    pub collateral_shares: u256, // packed as u128 [SCALE] 
+    pub nominal_debt: u256, // packed as u123 [SCALE]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
@@ -44,16 +44,16 @@ pub enum AmountDenomination {
 
 #[derive(PartialEq, Copy, Drop, Serde, Default)]
 pub struct Amount {
-    amount_type: AmountType,
-    denomination: AmountDenomination,
-    value: i257,
+    pub amount_type: AmountType,
+    pub denomination: AmountDenomination,
+    pub value: i257,
 }
 
 #[derive(PartialEq, Copy, Drop, Serde, Default)]
 pub struct UnsignedAmount {
-    amount_type: AmountType,
-    denomination: AmountDenomination,
-    value: u256,
+    pub amount_type: AmountType,
+    pub denomination: AmountDenomination,
+    pub value: u256,
 }
 
 #[derive(PartialEq, Copy, Drop, Serde, Default)]
@@ -89,28 +89,28 @@ pub struct DebtCapParams {
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct ModifyPositionParams {
-    pool_id: felt252,
-    collateral_asset: ContractAddress,
-    debt_asset: ContractAddress,
-    user: ContractAddress,
-    collateral: Amount,
-    debt: Amount,
-    data: Span<felt252>
+    pub pool_id: felt252,
+    pub collateral_asset: ContractAddress,
+    pub debt_asset: ContractAddress,
+    pub user: ContractAddress,
+    pub collateral: Amount,
+    pub debt: Amount,
+    pub data: Span<felt252>
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct TransferPositionParams {
-    pool_id: felt252,
-    from_collateral_asset: ContractAddress,
-    from_debt_asset: ContractAddress,
-    to_collateral_asset: ContractAddress,
-    to_debt_asset: ContractAddress,
-    from_user: ContractAddress,
-    to_user: ContractAddress,
-    collateral: UnsignedAmount,
-    debt: UnsignedAmount,
-    from_data: Span<felt252>,
-    to_data: Span<felt252>
+    pub pool_id: felt252,
+    pub from_collateral_asset: ContractAddress,
+    pub from_debt_asset: ContractAddress,
+    pub to_collateral_asset: ContractAddress,
+    pub to_debt_asset: ContractAddress,
+    pub from_user: ContractAddress,
+    pub to_user: ContractAddress,
+    pub collateral: UnsignedAmount,
+    pub debt: UnsignedAmount,
+    pub from_data: Span<felt252>,
+    pub to_data: Span<felt252>
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]

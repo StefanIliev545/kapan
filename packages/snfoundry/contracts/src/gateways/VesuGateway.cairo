@@ -1,7 +1,6 @@
 use starknet::ContractAddress;
 use core::array::Array;
 use core::array::Span;
-use core::bool;
 
 pub mod Errors {
     pub const APPROVE_FAILED: felt252 = 'Approve failed';
@@ -14,11 +13,22 @@ trait IVesuGatewayAdmin<TContractState> {
     fn get_supported_assets(self: @TContractState) -> Array<ContractAddress>;
 }
 
+#[derive(Drop, Serde)]
+pub struct VesuContext {
+    // Vesu has pools and positions. Debt is isolated in pairs to a collateral. 
+    pub pool_id: felt252, // This allows targeting a specific pool besides genesis.
+    pub position_counterpart_token: ContractAddress, // This is either the collateral or the debt token depending on the instruction.
+}
+
 #[starknet::contract]
 mod VesuGateway {
     use super::*;
+    use core::num::traits::Zero;
+    use core::option::OptionTrait;
+    use core::array::ArrayTrait;
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::token::erc20::interface::{IERC20DispatcherTrait, IERC20Dispatcher};
+    use alexandria_math::i257::{i257, I257Impl};
     use starknet::storage::{
         Map,
         StoragePointerWriteAccess,
@@ -32,6 +42,7 @@ mod VesuGateway {
     use starknet::{
         get_caller_address,
         get_contract_address,
+        contract_address_const,
     };
 
     use crate::interfaces::vesu::{
@@ -41,6 +52,16 @@ mod VesuGateway {
         IERC4626DispatcherTrait,
         ISingletonDispatcher,
         ISingletonDispatcherTrait,
+    };
+    use crate::interfaces::vesu_data::{
+        ModifyPositionParams,
+        TransferPositionParams,
+        Context,
+        Position,
+        Amount,
+        AmountType,
+        AmountDenomination,
+        UnsignedAmount,
     };
     use crate::interfaces::IGateway::{ILendingInstructionProcessor, LendingInstruction, Deposit, Withdraw, Borrow, Repay};
 
@@ -75,12 +96,6 @@ mod VesuGateway {
         self.ownable.initializer(get_caller_address());
     }
 
-    #[derive(Drop, Serde)]
-    struct VesuContext {
-        // Vesu has pools and positions. Debt is isolated in pairs to a collateral. 
-        pub pool_id: felt252, // This allows targeting a specific pool besides genesis.
-        pub positionCounterpartToken: ContractAddress, // This is either the collateral or the debt token depending on the instruction.
-    }
 
     trait IVesuGatewayInternal {
         fn get_vtoken_for_collateral(self: @ContractState, collateral: ContractAddress) -> ContractAddress;
@@ -143,7 +158,65 @@ mod VesuGateway {
         }
 
         fn borrow(ref self: ContractState, instruction: @Borrow) {
+            let basic = *instruction.basic;
+            let context = *instruction.context;
+            assert(context.is_some(), 'Context is required for borrow');
+            let mut context_bytes = context.unwrap();
+            let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
+        
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+            let pool_id = self.pool_id.read();
+            let user = basic.user;
+        
+            // Extract collateral and debt assets from context (adjust based on your VesuContext struct)
+            assert(vesu_context.pool_id == pool_id, 'Invalid pool id');
+            assert(vesu_context.position_counterpart_token == contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>(), 'Invalid context'); //eth
+            assert(user == contract_address_const::<0x0113c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>(), 'Invalid user');
+            let collateral_asset = vesu_context.position_counterpart_token;
+            let debt_asset = basic.token;
+        
+            // Check if the target position exists
+            let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
+            
+            if position.collateral_shares == 0 && position.nominal_debt == 0 {
+                let transfer_params = TransferPositionParams {
+                    pool_id,
+                    from_collateral_asset: collateral_asset,
+                    to_collateral_asset: collateral_asset,
+                    from_debt_asset: Zero::zero(),
+                    to_debt_asset: debt_asset,
+                    from_user: user,
+                    to_user: user,
+                    collateral: Default::default(), // Specify collateral to transfer
+                    debt: Default::default(), // Specify debt to transfer
+                    from_data: ArrayTrait::new().span(),
+                    to_data: ArrayTrait::new().span(),
+                };
+                singleton_dispatcher.transfer_position(transfer_params);
+            }
+            let modify_params = ModifyPositionParams {
+                pool_id: pool_id,
+                collateral_asset: collateral_asset,
+                debt_asset: debt_asset,
+                user: user,
+                collateral: Default::default(),
+                debt: Amount {
+                    amount_type: AmountType::Target,
+                    denomination: AmountDenomination::Assets,
+                    value: I257Impl::new(basic.amount, false),
+                },
+                data: ArrayTrait::new().span(), // Add data if needed
+            };
+            singleton_dispatcher.modify_position(modify_params);
+            let erc20 = IERC20Dispatcher {
+                contract_address: debt_asset,
+            };
+            let result = erc20.transfer(user, erc20.balance_of(get_contract_address()));
+            assert(result, Errors::TRANSFER_FAILED);
         }
+        
 
         fn repay(ref self: ContractState, instruction: @Repay) {
         }
@@ -182,11 +255,11 @@ mod VesuGateway {
                     LendingInstruction::Withdraw(withdraw_params) => {
                         self.withdraw(withdraw_params);
                     },
-                    LendingInstruction::Borrow(_borrow_params) => {
-                        // TODO: Implement borrow instruction handling
+                    LendingInstruction::Borrow(borrow_params) => {
+                        self.borrow(borrow_params);
                     },
-                    LendingInstruction::Repay(_repay_params) => {
-                        // TODO: Implement repay instruction handling
+                    LendingInstruction::Repay(repay_params) => {
+                        self.repay(repay_params);
                     },
                 }
                 i += 1;

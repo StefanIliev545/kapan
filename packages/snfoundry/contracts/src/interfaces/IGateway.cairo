@@ -10,26 +10,26 @@ pub struct BasicInstruction {
 #[derive(Drop, Serde)]
 pub struct Deposit {
     pub basic: BasicInstruction,
-    pub context: Option<ByteArray>
+    pub context: Option<Span<felt252>>
 }
 
 
 #[derive(Drop, Serde)]
 pub struct Borrow {
     pub basic: BasicInstruction,
-    pub context: Option<ByteArray>
+    pub context: Option<Span<felt252>>
 }
 
 #[derive(Drop, Serde)]
 pub struct Repay {
     pub basic: BasicInstruction,
-    pub context: Option<ByteArray>
+    pub context: Option<Span<felt252>>
 }
 
 #[derive(Drop, Serde)]
 pub struct Withdraw {
     pub basic: BasicInstruction,
-    pub context: Option<ByteArray>
+    pub context: Option<Span<felt252>>
 }
 
 

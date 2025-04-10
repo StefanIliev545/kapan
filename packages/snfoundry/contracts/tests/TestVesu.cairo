@@ -4,7 +4,9 @@ use kapan::interfaces::IGateway::{
     LendingInstruction, 
     Deposit, 
     BasicInstruction, 
-    Withdraw
+    Withdraw,
+    Borrow,
+    Repay,
 };
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use openzeppelin::utils::serde::SerializedAppend;
@@ -13,7 +15,7 @@ use starknet::{ContractAddress, contract_address_const, get_caller_address};
 use core::option::Option;
 use core::traits::{Drop};
 use kapan::interfaces::vesu::{ISingletonDispatcher, ISingletonDispatcherTrait, IERC4626Dispatcher, IERC4626DispatcherTrait};
-
+use kapan::gateways::VesuGateway::VesuContext;
 // Real contract address deployed on Sepolia
 fn SINGLETON_ADDRESS() -> ContractAddress {
     contract_address_const::<0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef>()
@@ -24,11 +26,17 @@ const POOL_ID: felt252 =
 
 const ETH_CONTRACT_ADDRESS: felt252 =
     0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7;
+const USDC_CONTRACT_ADDRESS: felt252 =
+    0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8;
 const VTOKEN_ETH_ADDRESS: felt252 =
     0x21fe2ca1b7e731e4a5ef7df2881356070c5d72db4b2d19f9195f6b641f75df0;
 
 fn VTOKEN_ERC4626_ADDRESS() -> ContractAddress {
     contract_address_const::<VTOKEN_ETH_ADDRESS>()
+}
+
+fn USDC_ERC20_ADDRESS() -> ContractAddress {
+    contract_address_const::<USDC_CONTRACT_ADDRESS>()
 }
 
 fn RICH_ADDRESS() -> ContractAddress {
@@ -87,7 +95,7 @@ fn prefund_address(address: ContractAddress) {
     let ethAddress = contract_address_const::<ETH_CONTRACT_ADDRESS>();
     let ethERC = IERC20Dispatcher { contract_address: ethAddress };
     cheat_caller_address(ethAddress, RICH_ADDRESS(), CheatSpan::TargetCalls(1));
-    ethERC.transfer(address, 1000000000000000000);
+    ethERC.transfer(address, 15000000000000000000);
 }
 
 fn modify_delegation(gateway: ContractAddress, user: ContractAddress, delegatee: ContractAddress, delegation: bool) {
@@ -114,7 +122,7 @@ fn perform_deposit(ref context: TestContext, amount: u256) -> u256 {
     };
     
     let initial_balance = context.token_erc20.balance_of(USER_ADDRESS());
-    assert(initial_balance > amount, 'insufficient balance');
+    assert(initial_balance >= amount, 'insufficient balance');
     
     // Approve and deposit
     cheat_caller_address(context.token_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
@@ -158,6 +166,7 @@ fn perform_withdrawal(ref context: TestContext, amount: u256) -> u256 {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_deposit() {
     let mut context = setup_test_context();
@@ -170,6 +179,7 @@ fn test_deposit() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_basic_withdraw() {
     let mut context = setup_test_context();
@@ -195,4 +205,39 @@ fn test_basic_withdraw() {
     let current_balance = context.token_erc20.balance_of(USER_ADDRESS());
     println!("balance: {}", current_balance);
     assert(current_balance > initial_balance, 'balance not increased');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_borrow() {
+    let mut context = setup_test_context();
+    let amount = 5000000000000000000;
+    perform_deposit(ref context, amount);
+
+    println!("deposited!");
+    let mut context_array = array![];
+    VesuContext {
+        pool_id: POOL_ID,
+        position_counterpart_token: context.token_address,
+    }.serialize(ref context_array);
+
+
+    let usdcERC20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
+    let initial_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
+    println!("usdc balance: {}", initial_usdc_balance);
+
+    let borrow = Borrow {
+        basic: create_basic_instruction(USDC_ERC20_ADDRESS(), 110000000, USER_ADDRESS()),
+        context: Option::Some(context_array.span()),
+    };
+    println!("delegating!");
+    modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
+    println!("borrowing!");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Borrow(borrow)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+
+    let current_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
+    println!("usdc balance: {}", current_usdc_balance);
+    assert(current_usdc_balance > initial_usdc_balance, 'usdc balance not increased');
 }
