@@ -1,6 +1,4 @@
-export async function GET(_: Request, props: { params: Promise<{ symbol: string }> }) {
-  const params = await props.params;
-
+export async function GET(_: Request, { params }: { params: { symbol: string } }) {
   const { symbol } = params;
 
   let apiUrl = "";
