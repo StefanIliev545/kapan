@@ -9,7 +9,7 @@ pub mod Errors {
 }
 
 #[starknet::interface]
-trait IVesuGatewayAdmin<TContractState> {
+pub trait IVesuGatewayAdmin<TContractState> {
     fn add_asset(ref self: TContractState, asset: ContractAddress);
 }
 
@@ -469,12 +469,14 @@ mod VesuGateway {
             };
 
             // Iterate through all possible pairs of supported assets
+            println!("supported_assets: {}", supported_assets.len());
             let len = supported_assets.len();
             for i in 0..len {
                 let collateral_asset = *supported_assets.at(i);
                 // Check position with zero debt first (earning positions)
                 let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, Zero::zero(), user);
                 if position.collateral_shares > 0 {
+                    println!("found earning position");
                     positions.append((collateral_asset, Zero::zero(), position));
                 }
 
@@ -486,6 +488,7 @@ mod VesuGateway {
                     let debt_asset = *supported_assets.at(j);
                     let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
                     if position.collateral_shares > 0 || position.nominal_debt > 0 {
+                        println!("found position");
                         positions.append((collateral_asset, debt_asset, position));
                     }
                 }
