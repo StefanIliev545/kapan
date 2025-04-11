@@ -7,18 +7,18 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 // devnet
 const PRIVATE_KEY_DEVNET =
-  process.env.PRIVATE_KEY_DEVNET || "0x71d7bb07b9a64f6f78ac4c816aff4da9";
+  process.env.PRIVATE_KEY_DEVNET || "0x57b2f8431c772e647712ae93cc616638";
 const RPC_URL_DEVNET = process.env.RPC_URL_DEVNET || "http://127.0.0.1:5050";
 const ACCOUNT_ADDRESS_DEVNET =
   process.env.ACCOUNT_ADDRESS_DEVNET ||
-  "0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691";
+  "0x04b3f4ba8c00a02b66142a4b1dd41a4dfab4f92650922a3280977b0f03c75ee1";
 
 const providerDevnet =
   RPC_URL_DEVNET && new RpcProvider({ nodeUrl: RPC_URL_DEVNET });
 const deployerDevnet =
   ACCOUNT_ADDRESS_DEVNET &&
   PRIVATE_KEY_DEVNET &&
-  new Account(providerDevnet, ACCOUNT_ADDRESS_DEVNET, PRIVATE_KEY_DEVNET, "1");
+  new Account(providerDevnet, ACCOUNT_ADDRESS_DEVNET, PRIVATE_KEY_DEVNET, "1", "0x3");
 
 const ETH_TOKEN_ADDRESS_DEVNET =
   "0x49D36570D4E46F48E99674BD3FCC84644DDD6B96F7C741B1562B82F9E004DC7";
@@ -36,7 +36,8 @@ const deployerSepolia =
     providerSepolia,
     process.env.ACCOUNT_ADDRESS_SEPOLIA,
     process.env.PRIVATE_KEY_SEPOLIA,
-    "1"
+    "1",
+    "0x3"
   );
 
 const ETH_TOKEN_ADDRESS =
@@ -55,7 +56,8 @@ const deployerMainnet =
     providerMainnet,
     process.env.ACCOUNT_ADDRESS_MAINNET,
     process.env.PRIVATE_KEY_MAINNET,
-    "1"
+    "1",
+    "0x3"
   );
 
 const feeTokenOptions = {
