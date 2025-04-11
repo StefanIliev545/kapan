@@ -3,7 +3,7 @@
 {
 	"name": "Kapan Starknet",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "starknetfoundation/starknet-dev:2.9.4",
+	"image": "starknetfoundation/starknet-dev:2.11.4",
 	"features": {
 		"ghcr.io/devcontainers/features/node:1": {}
 	},
@@ -24,6 +24,7 @@
 			]
 		}
 	},
+	"containerUser": "root",
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc",
