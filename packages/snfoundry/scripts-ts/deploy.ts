@@ -42,8 +42,17 @@ import { CallData, stark } from "starknet";
  *
  * @returns {Promise<void>}
  */
-const deployScript = async (): Promise<string> => {
+const deployScript = async (): Promise<void> => {
   // Deploy VesuGateway
+  const { address: gatewayAddress } = await deployContract({
+    contract: "VesuGateway",
+    constructorArgs: {
+      vesu_singleton: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+      pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
+    },
+  });
+
+  // Add supported assets
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
     "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac", // WBTC
@@ -54,25 +63,25 @@ const deployScript = async (): Promise<string> => {
     "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // UNI
   ];
 
-  const { address: gatewayAddress } = await deployContract({
-    contract: "VesuGateway",
-    constructorArgs: {
-      vesu_singleton: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
-      pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
-      supported_assets: supportedAssets,
-    },
-  });
-  return gatewayAddress;
-};
-
-const initializeContracts = async (gatewayAddress: string): Promise<void> => {
+  // Add each asset as a supported asset
+  for (const asset of supportedAssets) {
+    const { transaction_hash } = await deployer.execute([
+      {
+        contractAddress: gatewayAddress,
+        entrypoint: "add_asset",
+        calldata: CallData.compile({
+          asset,
+        }),
+      },
+    ]);
+    console.log(green(`Added asset ${asset} with tx hash ${transaction_hash}`));
+  }
 };
 
 const main = async (): Promise<void> => {
   try {
-    const gatewayAddress = await deployScript();
+    await deployScript();
     await executeDeployCalls();
-    await initializeContracts(gatewayAddress);
     exportDeployments();
 
     console.log(green("All Setup Done!"));

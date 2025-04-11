@@ -97,13 +97,10 @@ mod VesuGateway {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, vesu_singleton: ContractAddress, pool_id: felt252, supported_assets: Array<ContractAddress>) {
+    fn constructor(ref self: ContractState, vesu_singleton: ContractAddress, pool_id: felt252) {
         self.vesu_singleton.write(vesu_singleton);
         self.pool_id.write(pool_id);
         self.ownable.initializer(get_caller_address());
-        for asset in supported_assets {
-            self.supported_assets.push(asset);
-        }
     }
 
 
