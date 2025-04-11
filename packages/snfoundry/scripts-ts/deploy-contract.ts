@@ -10,8 +10,6 @@ import {
   extractContractHashes,
   DeclareContractPayload,
   UniversalDetails,
-  isSierra,
-  TransactionReceipt,
   constants,
 } from "starknet";
 import { DeployContractParams, Network } from "./types";
@@ -32,14 +30,16 @@ const argv = yargs(process.argv.slice(2))
     demandOption: true,
   })
   .option("reset", {
+    alias: "nr",
     type: "boolean",
-    description: "Reset deployments (remove existing deployments)",
+    description:
+      "(--no-reset) Do not reset deployments (keep existing deployments)",
     default: true,
   })
   .parseSync() as Arguments;
 
 const networkName: string = argv.network;
-const resetDeployments: boolean = argv.reset;
+const resetDeployments: boolean = argv.reset ?? true;
 
 let deployments = {};
 let deployCalls = [];
@@ -60,7 +60,27 @@ const declareIfNot_NotWait = async (
         version: constants.TRANSACTION_VERSION.V3,
       });
       if (networkName === "sepolia" || networkName === "mainnet") {
-        await provider.waitForTransaction(transaction_hash);
+        console.log(
+          yellow("Waiting for declaration transaction to be accepted...")
+        );
+        const receipt = await provider.waitForTransaction(transaction_hash);
+        console.log(
+          yellow("Declaration transaction receipt:"),
+          JSON.stringify(
+            receipt,
+            (_, v) => (typeof v === "bigint" ? v.toString() : v),
+            2
+          )
+        );
+
+        const receiptAny = receipt as any;
+        if (receiptAny.execution_status !== "SUCCEEDED") {
+          const revertReason = receiptAny.revert_reason || "Unknown reason";
+          throw new Error(
+            red(`Declaration failed or reverted. Reason: ${revertReason}`)
+          );
+        }
+        console.log(green("Declaration successful"));
       }
     } catch (e) {
       console.error(red("Error declaring contract:"), e);
@@ -99,6 +119,7 @@ const findContractFile = (
   const targetDir = path.resolve(__dirname, "../contracts/target/dev");
   const files = fs.readdirSync(targetDir);
 
+  // Look for files that end with the contract name and file type
   const pattern = new RegExp(`.*${contract}\\.${fileType}\\.json$`);
   const matchingFile = files.find((file) => pattern.test(file));
 
@@ -132,7 +153,6 @@ const findContractFile = (
  *   options: { maxFee: BigInt(1000000000000) }
  * });
  */
-
 const deployContract = async (
   params: DeployContractParams
 ): Promise<{
@@ -245,11 +265,10 @@ const executeDeployCalls = async (options?: UniversalDetails) => {
       version: constants.TRANSACTION_VERSION.V3,
     });
     if (networkName === "sepolia" || networkName === "mainnet") {
-      const receipt = (await provider.waitForTransaction(
-        transaction_hash
-      )) as TransactionReceipt;
-      if (receipt.execution_status !== "SUCCEEDED") {
-        const revertReason = receipt.revert_reason;
+      const receipt = await provider.waitForTransaction(transaction_hash);
+      const receiptAny = receipt as any;
+      if (receiptAny.execution_status !== "SUCCEEDED") {
+        const revertReason = receiptAny.revert_reason;
         throw new Error(red(`Deploy Calls Failed: ${revertReason}`));
       }
     }
@@ -286,6 +305,8 @@ const exportDeployments = () => {
     __dirname,
     `../deployments/${networkName}_latest.json`
   );
+
+  const resetDeployments: boolean = argv.reset ?? true;
 
   if (!resetDeployments && fs.existsSync(networkPath)) {
     const currentTimestamp = new Date().getTime();
