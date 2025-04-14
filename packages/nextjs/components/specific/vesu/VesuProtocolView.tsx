@@ -2,6 +2,8 @@ import { FC, useMemo, useEffect, useState } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { MarketRow } from "./MarketRow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useAccount } from "@starknet-react/core";
+import { VesuPosition } from "./VesuPosition";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -42,6 +44,26 @@ const formatRate = (rate: number): string => {
   return `${(rate * 100).toFixed(2)}%`;
 };
 
+// Helper function to format price
+const formatPrice = (price: bigint): string => {
+  // Convert price to number and format with 2 decimal places
+  const priceNum = Number(price) / 1e18; // Assuming price is in wei
+  return priceNum.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+// Helper function to format utilization
+const formatUtilization = (utilization: bigint): string => {
+  // Convert utilization to percentage with 2 decimal places
+  const utilizationNum = Number(utilization) / 1e18 * 100; // Assuming utilization is in wei
+  return utilizationNum.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 type ContractResponse = {
   readonly type: "core::array::Array::<kapan::gateways::VesuGateway::TokenMetadata>";
   readonly address: bigint;
@@ -60,22 +82,56 @@ type ContractResponse = {
   readonly scale: bigint;
 }[];
 
+// Add type for position data
+type PositionData = {
+  collateral_shares: bigint;
+  collateral_amount: bigint;
+  nominal_debt: bigint;
+};
+
+type PositionTuple = {
+  0: bigint; // collateral_asset
+  1: bigint; // debt_asset
+  2: PositionData;
+};
+
+// Add TokenMetadata type
+type TokenMetadata = {
+  address: bigint;
+  symbol: bigint;
+  decimals: number;
+  rate_accumulator: bigint;
+  utilization: bigint;
+  fee_rate: bigint;
+  price: {
+    value: bigint;
+    is_valid: boolean;
+  };
+  total_nominal_debt: bigint;
+  last_rate_accumulator: bigint;
+  reserve: bigint;
+  scale: bigint;
+};
+
 export const VesuProtocolView: FC = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { address: userAddress } = useAccount();
+  
+  // Fetch supported assets
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
     args: [],
+    refetchInterval: 0,
   });
 
-  // Set up refresh interval
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRefreshKey(prev => prev + 1);
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  console.log("Supported Assets:", userAddress);
+  // Fetch user positions if connected
+  const { data: userPositions, error: positionsError } = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_all_positions",
+    args: [userAddress || "0x0"], // Use zero address if not connected
+    refetchInterval: 0,
+  });
 
   // Memoize the market rows to prevent unnecessary re-renders
   const marketRows = useMemo(() => {
@@ -85,18 +141,6 @@ export const VesuProtocolView: FC = () => {
       const address = `0x${BigInt(asset.address).toString(16).padStart(64, '0')}`;
       const symbol = feltToString(asset.symbol);
       
-      // Log all asset data
-      console.log(`\nAsset: ${symbol} (${address})`);
-      console.log('Raw data:', {
-        fee_rate: asset.fee_rate.toString(),
-        total_nominal_debt: asset.total_nominal_debt.toString(),
-        last_rate_accumulator: asset.last_rate_accumulator.toString(),
-        reserve: asset.reserve.toString(),
-        scale: asset.scale.toString(),
-        rate_accumulator: asset.rate_accumulator.toString(),
-        utilization: asset.utilization.toString()
-      });
-
       // The fee_rate from the contract is already the onchain interest rate from the extension
       // It's calculated using extension.interest_rate() in the VesuGateway contract
       const interestPerSecond = asset.fee_rate;
@@ -109,13 +153,6 @@ export const VesuProtocolView: FC = () => {
         asset.reserve,
         asset.scale
       );
-
-      // Log calculated rates
-      console.log('Calculated rates:', {
-        interestPerSecond: interestPerSecond.toString(),
-        borrowAPR: formatRate(borrowAPR),
-        supplyAPY: formatRate(supplyAPY)
-      });
       
       return (
         <MarketRow
@@ -124,10 +161,36 @@ export const VesuProtocolView: FC = () => {
           name={symbol}
           supplyRate={formatRate(supplyAPY)}
           borrowRate={formatRate(borrowAPR)}
+          price={formatPrice(asset.price.value)}
+          utilization={formatUtilization(asset.utilization)}
         />
       );
     });
-  }, [supportedAssets, refreshKey]);
+  }, [supportedAssets]);
+
+  // Memoize the position rows to prevent unnecessary re-renders
+  const positionRows = useMemo(() => {
+    if (!userPositions || !supportedAssets) return null;
+
+    const positions = userPositions as unknown as PositionTuple[];
+    return positions?.map((position, index) => {
+      const collateralAsset = `0x${position[0].toString(16).padStart(64, '0')}`;
+      const debtAsset = `0x${position[1].toString(16).padStart(64, '0')}`;
+      const positionData = position[2];
+      console.log("Position data:", positionData);
+      return (
+        <VesuPosition
+          key={`${collateralAsset}-${debtAsset}-${index}`}
+          collateralAsset={collateralAsset}
+          debtAsset={debtAsset}
+          collateralShares={positionData.collateral_shares.toString()}
+          collateralAmount={positionData.collateral_amount.toString()}
+          nominalDebt={positionData.nominal_debt.toString()}
+          supportedAssets={supportedAssets as unknown as TokenMetadata[]}
+        />
+      );
+    });
+  }, [userPositions, supportedAssets]);
 
   if (assetsError) {
     console.error("Error fetching supported assets:", assetsError);
@@ -135,13 +198,32 @@ export const VesuProtocolView: FC = () => {
   }
   
   return (
-    <div className="card bg-base-100 shadow-md">
-      <div className="card-body p-4">
-        <h2 className="card-title text-lg border-b border-base-200 pb-2">Vesu Markets</h2>
-        <div className="space-y-2">
-          {marketRows}
+    <div className="space-y-4">
+      <div className="card bg-base-100 shadow-md">
+        <div className="card-body p-4">
+          <h2 className="card-title text-lg border-b border-base-200 pb-2">Vesu Markets</h2>
+          <div className="space-y-2">
+            {marketRows}
+          </div>
         </div>
       </div>
+
+      {userAddress && (
+        <div className="card bg-base-100 shadow-md">
+          <div className="card-body p-4">
+            <h2 className="card-title text-lg border-b border-base-200 pb-2">Your Positions</h2>
+            <div className="space-y-4">
+              {positionRows?.length ? (
+                positionRows
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No positions found
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }; 

@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x2e19c2abd2bccfc269a0239a5c1a61249c303b61448d4a81eeb031ae3637285",
+        "0x7659ce06f93e9c65119e7d37f18dfd4624ce4c2cae6ccf78c84fde36484c8b9",
       abi: [
         {
           type: "impl",
@@ -220,10 +220,14 @@ const contracts = {
         },
         {
           type: "struct",
-          name: "kapan::interfaces::vesu_data::Position",
+          name: "kapan::gateways::VesuGateway::PositionWithAmounts",
           members: [
             {
               name: "collateral_shares",
+              type: "core::integer::u256",
+            },
+            {
+              name: "collateral_amount",
               type: "core::integer::u256",
             },
             {
@@ -325,7 +329,7 @@ const contracts = {
               ],
               outputs: [
                 {
-                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::starknet::contract_address::ContractAddress, kapan::interfaces::vesu_data::Position)>",
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::starknet::contract_address::ContractAddress, kapan::gateways::VesuGateway::PositionWithAmounts)>",
                 },
               ],
               state_mutability: "view",
@@ -497,7 +501,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x538b9304e67735b11bb75b3250930a402681100c6093b01310c2f86274549e1",
+        "0x1e4bc9eada99f6abd59e72f7e53ea2873d7273f7c1d8e16118829973208afc1",
     },
   },
 } as const satisfies SNContractsType;

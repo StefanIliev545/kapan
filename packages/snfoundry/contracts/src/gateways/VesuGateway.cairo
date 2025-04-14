@@ -33,9 +33,16 @@ pub struct TokenMetadata {
     pub scale: u256,
 } 
 
+#[derive(Drop, Serde)]
+pub struct PositionWithAmounts {
+    pub collateral_shares: u256,
+    pub collateral_amount: u256,
+    pub nominal_debt: u256,
+}
+
 #[starknet::interface]
 pub trait IVesuViewer<TContractState> {
-    fn get_all_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, Position)>;
+    fn get_all_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
     fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
     fn get_supported_assets_ui(self: @TContractState) -> Array<TokenMetadata>;
 }
@@ -485,12 +492,15 @@ mod VesuGateway {
             assets
         }
 
-        fn get_all_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, Position)> {
+        fn get_all_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
             let mut positions = array![];
             let supported_assets = self.get_supported_assets_array();
             let pool_id = self.pool_id.read();
             let singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
+            };
+            let extension = IDefaultExtensionCLDispatcher {
+                contract_address: singleton_dispatcher.extension(pool_id),
             };
 
             // Iterate through all possible pairs of supported assets
@@ -502,7 +512,20 @@ mod VesuGateway {
                 let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, Zero::zero(), user);
                 if position.collateral_shares > 0 {
                     println!("found earning position");
-                    positions.append((collateral_asset, Zero::zero(), position));
+                    let vtoken = extension.v_token_for_collateral_asset(pool_id, collateral_asset);
+                    let erc4626 = IERC4626Dispatcher {
+                        contract_address: vtoken,
+                    };
+                    let collateral_amount = erc4626.convert_to_assets(position.collateral_shares);
+                    positions.append((
+                        collateral_asset,
+                        Zero::zero(),
+                        PositionWithAmounts {
+                            collateral_shares: position.collateral_shares,
+                            collateral_amount,
+                            nominal_debt: position.nominal_debt,
+                        }
+                    ));
                 }
 
                 // Then check all other possible debt assets
@@ -514,7 +537,20 @@ mod VesuGateway {
                     let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
                     if position.collateral_shares > 0 || position.nominal_debt > 0 {
                         println!("found position");
-                        positions.append((collateral_asset, debt_asset, position));
+                        let vtoken = extension.v_token_for_collateral_asset(pool_id, collateral_asset);
+                        let erc4626 = IERC4626Dispatcher {
+                            contract_address: vtoken,
+                        };
+                        let collateral_amount = erc4626.convert_to_assets(position.collateral_shares);
+                        positions.append((
+                            collateral_asset,
+                            debt_asset,
+                            PositionWithAmounts {
+                                collateral_shares: position.collateral_shares,
+                                collateral_amount,
+                                nominal_debt: position.nominal_debt,
+                            }
+                        ));
                     }
                 }
             };

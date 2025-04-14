@@ -37,7 +37,7 @@ const DiscordIcon = () => (
 );
 
 const App: NextPage = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("arbitrum");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
 
   // Example of customizing the CallToAction component
   const customSections: CallToActionSectionProps[] = [
@@ -74,7 +74,7 @@ const App: NextPage = () => {
       <AlphaWarning />
 
       {/* Network Filter */}
-      <NetworkFilter networks={networkOptions} defaultNetwork="arbitrum" onNetworkChange={setSelectedNetwork} />
+      <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 
       {/* Protocol Views */}
       {selectedNetwork === "arbitrum" && (
