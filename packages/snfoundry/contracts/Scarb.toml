@@ -25,7 +25,6 @@ sort-module-level-items = true
 [tool.scarb]  
 allow-prebuilt-plugins = ["snforge_std"]
 
-
 [[tool.snforge.fork]]
 name = "MAINNET_LATEST"
 url = "https://starknet-mainnet.public.blastapi.io/rpc/v0_8"

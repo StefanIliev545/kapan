@@ -2,6 +2,11 @@ use starknet::ContractAddress;
 use core::array::Array;
 use core::array::Span;
 use crate::interfaces::vesu_data::Position;
+use openzeppelin::token::erc20::interface::{IERC20DispatcherTrait, IERC20Dispatcher, IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
+use core::byte_array::ByteArrayTrait;
+use crate::interfaces::vesu_data::{
+    AssetPrice,
+};
 
 pub mod Errors {
     pub const APPROVE_FAILED: felt252 = 'Approve failed';
@@ -13,10 +18,26 @@ pub trait IVesuGatewayAdmin<TContractState> {
     fn add_asset(ref self: TContractState, asset: ContractAddress);
 }
 
+#[derive(Drop, Serde)]
+pub struct TokenMetadata {
+    pub address: ContractAddress,
+    pub symbol: felt252,
+    pub decimals: u8,
+    pub rate_accumulator: u256,
+    pub utilization: u256,
+    pub fee_rate: u256,
+    pub price: AssetPrice,
+    pub total_nominal_debt: u256,
+    pub last_rate_accumulator: u256,
+    pub reserve: u256,
+    pub scale: u256,
+} 
+
 #[starknet::interface]
 pub trait IVesuViewer<TContractState> {
     fn get_all_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, ContractAddress, Position)>;
     fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
+    fn get_supported_assets_ui(self: @TContractState) -> Array<TokenMetadata>;
 }
 
 #[derive(Drop, Serde)]
@@ -26,6 +47,11 @@ pub struct VesuContext {
     pub position_counterpart_token: ContractAddress, // This is either the collateral or the debt token depending on the instruction.
 }
 
+#[starknet::interface]
+trait IERC20Symbol<TContractState> {
+    fn symbol(self: @TContractState) -> felt252;
+}
+
 #[starknet::contract]
 mod VesuGateway {
     use super::*;
@@ -33,7 +59,7 @@ mod VesuGateway {
     use core::option::OptionTrait;
     use core::array::ArrayTrait;
     use openzeppelin::access::ownable::OwnableComponent;
-    use openzeppelin::token::erc20::interface::{IERC20DispatcherTrait, IERC20Dispatcher};
+    use openzeppelin::token::erc20::interface::{IERC20DispatcherTrait, IERC20Dispatcher, IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
     use alexandria_math::i257::{i257, I257Impl};
     use starknet::storage::{
         Map,
@@ -426,12 +452,8 @@ mod VesuGateway {
     #[abi(embed_v0)]
     impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
         fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
-            // Implementation
             let mut i: usize = 0;
-            loop {
-                if i >= instructions.len() {
-                    break;
-                }
+            while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit_params) => {
                         self.deposit(deposit_params);
@@ -497,6 +519,61 @@ mod VesuGateway {
                 }
             };
             positions
+        }
+
+        fn get_supported_assets_ui(self: @ContractState) -> Array<TokenMetadata> {
+            let mut assets = array![];
+            let len = self.supported_assets.len();
+            let pool_id = self.pool_id.read();
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+
+            let extension = IDefaultExtensionCLDispatcher {
+                contract_address: singleton_dispatcher.extension(pool_id),
+            };
+
+            for i in 0..len {
+                println!("i: {}", i);
+                let asset = self.supported_assets.at(i).read();
+                let asset_felt: felt252 = asset.into();
+                println!("asset: {}", asset_felt);
+                
+                let dispatcher = IERC20SymbolDispatcher { contract_address: asset };
+                let symbol_felt = dispatcher.symbol();
+                
+                let decimals = IERC20MetadataDispatcher { contract_address: asset }.decimals();
+                println!("symbol: {}", symbol_felt);
+                println!("decimals: {}", decimals);
+
+                // Get rate information from the singleton
+                println!("getting rate accumulator");
+                let rate_accumulator = singleton_dispatcher.rate_accumulator(pool_id, asset);
+                println!("getting utilization");
+                let utilization = singleton_dispatcher.utilization(pool_id, asset);
+                println!("getting asset config");
+                let (asset_config, _) = singleton_dispatcher.asset_config(pool_id, asset);
+                println!("getting fee rate");
+                let fee_rate = extension.interest_rate(pool_id, asset, utilization, asset_config.last_updated, asset_config.last_full_utilization_rate);
+                println!("getting price");
+                let price = extension.price(pool_id, asset);
+
+                let metadata = TokenMetadata { 
+                    address: asset, 
+                    symbol: symbol_felt, 
+                    decimals,
+                    rate_accumulator,
+                    utilization,
+                    fee_rate,
+                    price,
+                    total_nominal_debt: asset_config.total_nominal_debt,
+                    last_rate_accumulator: asset_config.last_rate_accumulator,
+                    reserve: asset_config.reserve,
+                    scale: asset_config.scale,
+                };
+                assets.append(metadata.into());
+            };
+            assets
         }
     }
 } 

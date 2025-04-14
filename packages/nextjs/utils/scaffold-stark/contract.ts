@@ -14,7 +14,7 @@ import {
 import { byteArray } from "starknet";
 import type { MergeDeepRecord } from "type-fest/source/merge-deep";
 import configExternalContracts from "~~/contracts/configExternalContracts";
-import deployedContractsData from "~~/contracts/hardhat/deployedContracts";
+import deployedContractsData from "~~/contracts/snfoundry/deployedContracts";
 import predeployedContracts from "~~/contracts/predeployedContracts";
 import scaffoldConfig from "~~/scaffold.config";
 import { feltToHex, isJsonString } from "~~/utils/scaffold-stark/common";

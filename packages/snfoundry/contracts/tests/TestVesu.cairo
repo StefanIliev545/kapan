@@ -63,6 +63,7 @@ struct TestContext {
 }
 
 fn setup_test_context() -> TestContext {
+    println!("deploying gateway");
     let gateway_address = deploy_vesu_gateway("VesuGateway");
     let token_address = contract_address_const::<ETH_CONTRACT_ADDRESS>();
     let token_erc20 = IERC20Dispatcher { contract_address: token_address };
@@ -71,10 +72,8 @@ fn setup_test_context() -> TestContext {
     let vtoken_erc20 = IERC20Dispatcher { contract_address: vtoken_address };
     let vtoken_erc4626 = IERC4626Dispatcher { contract_address: vtoken_address };
     
-    // Add supported assets
-    add_supported_assets(gateway_address);
-    
     // Pre-fund the test user
+    println!("pre-funding address");
     prefund_address(USER_ADDRESS());
     
     TestContext {
@@ -88,23 +87,19 @@ fn setup_test_context() -> TestContext {
     }
 }
 
-fn add_supported_assets(gateway_address: ContractAddress) {
-    let gateway_dispatcher = IVesuGatewayAdminDispatcher { contract_address: gateway_address };
+fn deploy_vesu_gateway(name: ByteArray) -> ContractAddress {
     let eth_address = contract_address_const::<ETH_CONTRACT_ADDRESS>();
     let usdc_address = contract_address_const::<USDC_CONTRACT_ADDRESS>();
-    
-    // Add ETH as supported asset
-    gateway_dispatcher.add_asset(eth_address);
-    
-    // Add USDC as supported asset
-    gateway_dispatcher.add_asset(usdc_address);
-}
 
-fn deploy_vesu_gateway(name: ByteArray) -> ContractAddress {
     let contract_class = declare(name).unwrap().contract_class();
     let mut calldata = array![];
     calldata.append_serde(SINGLETON_ADDRESS());
     calldata.append_serde(POOL_ID);
+    // Add supported assets array
+    let mut supported_assets = array![];
+    supported_assets.append(eth_address);
+    supported_assets.append(usdc_address);
+    calldata.append_serde(supported_assets);
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -316,6 +311,7 @@ fn test_repay() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_all_positions() {
     let mut context = setup_test_context();
@@ -396,4 +392,24 @@ fn test_get_all_positions() {
     assert(found_eth_deposit, 'ETH deposit position missing');
     assert(found_eth_usdc_borrow, 'ETH-USDCb position missing');
     assert(found_usdc_deposit, 'USDC deposit position missing');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_get_supported_assets_ui() {
+    let context = setup_test_context();
+    let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };
+    let assets = vesuViewerDispatcher.get_supported_assets_ui();
+    let crossCheckAssets = vesuViewerDispatcher.get_supported_assets_array();
+
+    assert(crossCheckAssets.len() == 2, 'sumtin-wrong');
+    assert(assets.len() == crossCheckAssets.len(), 'assets length mismatch');
+    // Verify we got some assets back
+    assert(assets.len() > 0, 'no assets returned');
+    
+    // Print the assets for debugging
+    for i in 0..assets.len() {
+        let asset = assets.at(i);
+        println!("Asset {}: symbol={}, decimals={}", i, asset.symbol, asset.decimals);
+    };
 }

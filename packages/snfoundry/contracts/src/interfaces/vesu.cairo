@@ -12,6 +12,7 @@ use crate::interfaces::vesu_data::{
     Context,
     AssetParams,
     LTVParams,
+    AssetPrice,
 };
 use alexandria_math::i257::i257;
 
@@ -162,6 +163,16 @@ pub trait IERC4626<TContractState> {
 
 #[starknet::interface]
 pub trait IDefaultExtensionCL<TContractState> {
+    fn price(self: @TContractState, pool_id: felt252, asset: ContractAddress) -> AssetPrice;
+    fn interest_rate(
+        self: @TContractState,
+        pool_id: felt252,
+        asset: ContractAddress,
+        utilization: u256,
+        last_updated: u64,
+        last_full_utilization_rate: u256,
+    ) -> u256;
+
     fn pool_name(self: @TContractState, pool_id: felt252) -> felt252;
     fn pool_owner(self: @TContractState, pool_id: felt252) -> ContractAddress;
     fn debt_caps(

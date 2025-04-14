@@ -10,17 +10,17 @@ pub struct Position {
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct AssetConfig { //                                     | slot | packed | notes
     //                                                      | ---- | ------ | ----- 
-    total_collateral_shares: u256, //       [SCALE]         | 1    | u128   |
-    total_nominal_debt: u256, //            [SCALE]         | 1    | u123   |
-    reserve: u256, //                       [asset scale]   | 2    | u128   |
-    max_utilization: u256, //               [SCALE]         | 2    | u8     | constant percentage
-    floor: u256, //                         [SCALE]         | 2    | u8     | constant decimals
-    scale: u256, //                         [SCALE]         | 2    | u8     | constant decimals 
-    is_legacy: bool, //                                     | 2    | u8     | constant
-    last_updated: u64, //                   [seconds]       | 3    | u32    |
-    last_rate_accumulator: u256, //         [SCALE]         | 3    | u64    |
-    last_full_utilization_rate: u256, //    [SCALE]         | 3    | u64    |
-    fee_rate: u256, //                      [SCALE]         | 3    | u8     | percentage
+    pub total_collateral_shares: u256, //       [SCALE]         | 1    | u128   |
+    pub total_nominal_debt: u256, //            [SCALE]         | 1    | u123   |
+    pub reserve: u256, //                       [asset scale]   | 2    | u128   |
+    pub max_utilization: u256, //               [SCALE]         | 2    | u8     | constant percentage
+    pub floor: u256, //                         [SCALE]         | 2    | u8     | constant decimals
+    pub scale: u256, //                         [SCALE]         | 2    | u8     | constant decimals 
+    pub is_legacy: bool, //                                     | 2    | u8     | constant
+    pub last_updated: u64, //                   [seconds]       | 3    | u32    |
+    pub last_rate_accumulator: u256, //         [SCALE]         | 3    | u64    |
+    pub last_full_utilization_rate: u256, //    [SCALE]         | 3    | u64    |
+    pub fee_rate: u256, //                      [SCALE]         | 3    | u8     | percentage
 }
 
 #[derive(PartialEq, Copy, Drop, Serde, starknet::Store)]

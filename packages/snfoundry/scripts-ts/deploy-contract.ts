@@ -211,6 +211,7 @@ const deployContract = async (
     };
   }
 
+  console.log(compiledContractSierra.abi);
   const contractCalldata = new CallData(compiledContractSierra.abi);
   const constructorCalldata = constructorArgs
     ? contractCalldata.compile("constructor", constructorArgs)
@@ -320,6 +321,7 @@ const exportDeployments = () => {
     fs.unlinkSync(networkPath);
   }
 
+  console.log(`Exporting deployments ${JSON.stringify(deployments, null, 2)}`);
   fs.writeFileSync(networkPath, JSON.stringify(deployments, null, 2));
 };
 

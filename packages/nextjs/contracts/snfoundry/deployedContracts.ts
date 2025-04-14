@@ -20,12 +20,36 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x3e7906fd7568ce5d203491e579e8764430a6cc632566db38d6802c40657ec32",
+        "0x2e19c2abd2bccfc269a0239a5c1a61249c303b61448d4a81eeb031ae3637285",
       abi: [
         {
           type: "impl",
-          name: "IGatewayImpl",
-          interface_name: "contracts::interfaces::IGateway::IGateway",
+          name: "IVesuGatewayAdminImpl",
+          interface_name: "kapan::gateways::VesuGateway::IVesuGatewayAdmin",
+        },
+        {
+          type: "interface",
+          name: "kapan::gateways::VesuGateway::IVesuGatewayAdmin",
+          items: [
+            {
+              type: "function",
+              name: "add_asset",
+              inputs: [
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "ILendingInstructionProcessorImpl",
+          interface_name:
+            "kapan::interfaces::IGateway::ILendingInstructionProcessor",
         },
         {
           type: "struct",
@@ -38,6 +62,173 @@ const contracts = {
             {
               name: "high",
               type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::BasicInstruction",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<core::felt252>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::felt252>",
+            },
+          ],
+        },
+        {
+          type: "enum",
+          name: "core::option::Option::<core::array::Span::<core::felt252>>",
+          variants: [
+            {
+              name: "Some",
+              type: "core::array::Span::<core::felt252>",
+            },
+            {
+              name: "None",
+              type: "()",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Deposit",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Borrow",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Repay",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Withdraw",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "enum",
+          name: "kapan::interfaces::IGateway::LendingInstruction",
+          variants: [
+            {
+              name: "Deposit",
+              type: "kapan::interfaces::IGateway::Deposit",
+            },
+            {
+              name: "Borrow",
+              type: "kapan::interfaces::IGateway::Borrow",
+            },
+            {
+              name: "Repay",
+              type: "kapan::interfaces::IGateway::Repay",
+            },
+            {
+              name: "Withdraw",
+              type: "kapan::interfaces::IGateway::Withdraw",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<kapan::interfaces::IGateway::LendingInstruction>",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "kapan::interfaces::IGateway::ILendingInstructionProcessor",
+          items: [
+            {
+              type: "function",
+              name: "process_instructions",
+              inputs: [
+                {
+                  name: "instructions",
+                  type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "IVesuViewerImpl",
+          interface_name: "kapan::gateways::VesuGateway::IVesuViewer",
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::vesu_data::Position",
+          members: [
+            {
+              name: "collateral_shares",
+              type: "core::integer::u256",
+            },
+            {
+              name: "nominal_debt",
+              type: "core::integer::u256",
             },
           ],
         },
@@ -57,152 +248,76 @@ const contracts = {
         },
         {
           type: "struct",
-          name: "contracts::interfaces::IGateway::Collateral",
+          name: "kapan::interfaces::vesu_data::AssetPrice",
           members: [
             {
-              name: "token",
-              type: "core::starknet::contract_address::ContractAddress",
+              name: "value",
+              type: "core::integer::u256",
             },
             {
-              name: "amount",
-              type: "core::integer::u256",
+              name: "is_valid",
+              type: "core::bool",
             },
           ],
         },
         {
           type: "struct",
-          name: "core::array::Span::<core::felt252>",
+          name: "kapan::gateways::VesuGateway::TokenMetadata",
           members: [
             {
-              name: "snapshot",
-              type: "@core::array::Array::<core::felt252>",
+              name: "address",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "symbol",
+              type: "core::felt252",
+            },
+            {
+              name: "decimals",
+              type: "core::integer::u8",
+            },
+            {
+              name: "rate_accumulator",
+              type: "core::integer::u256",
+            },
+            {
+              name: "utilization",
+              type: "core::integer::u256",
+            },
+            {
+              name: "fee_rate",
+              type: "core::integer::u256",
+            },
+            {
+              name: "price",
+              type: "kapan::interfaces::vesu_data::AssetPrice",
+            },
+            {
+              name: "total_nominal_debt",
+              type: "core::integer::u256",
+            },
+            {
+              name: "last_rate_accumulator",
+              type: "core::integer::u256",
+            },
+            {
+              name: "reserve",
+              type: "core::integer::u256",
+            },
+            {
+              name: "scale",
+              type: "core::integer::u256",
             },
           ],
         },
         {
           type: "interface",
-          name: "contracts::interfaces::IGateway::IGateway",
+          name: "kapan::gateways::VesuGateway::IVesuViewer",
           items: [
             {
               type: "function",
-              name: "deposit",
+              name: "get_all_positions",
               inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "borrow",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "repay",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "deposit_collateral",
-              inputs: [
-                {
-                  name: "market",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "collateral",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "receiver",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "withdraw_collateral",
-              inputs: [
-                {
-                  name: "market",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "collateral",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-              ],
-              outputs: [
-                {
-                  type: "(core::starknet::contract_address::ContractAddress, core::integer::u256)",
-                },
-              ],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "get_balance",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
                 {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
@@ -210,152 +325,15 @@ const contracts = {
               ],
               outputs: [
                 {
-                  type: "core::integer::u256",
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::starknet::contract_address::ContractAddress, kapan::interfaces::vesu_data::Position)>",
                 },
               ],
               state_mutability: "view",
             },
             {
               type: "function",
-              name: "get_borrow_balance",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::integer::u256",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
-              name: "get_borrow_balance_current",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::integer::u256",
-                },
-              ],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "get_borrow_rate",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "(core::integer::u256, core::bool)",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
-              name: "get_supply_rate",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "(core::integer::u256, core::bool)",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
-              name: "get_ltv",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::integer::u256",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
-              name: "get_possible_collaterals",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "user",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "(core::array::Array::<core::starknet::contract_address::ContractAddress>, core::array::Array::<core::integer::u256>, core::array::Array::<core::felt252>, core::array::Array::<core::integer::u8>)",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
-              name: "is_collateral_supported",
-              inputs: [
-                {
-                  name: "market",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "collateral",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::bool",
-                },
-              ],
-              state_mutability: "view",
-            },
-            {
-              type: "function",
-              name: "get_supported_collaterals",
-              inputs: [
-                {
-                  name: "market",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
+              name: "get_supported_assets_array",
+              inputs: [],
               outputs: [
                 {
                   type: "core::array::Array::<core::starknet::contract_address::ContractAddress>",
@@ -365,67 +343,74 @@ const contracts = {
             },
             {
               type: "function",
-              name: "get_encoded_collateral_approvals",
-              inputs: [
-                {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "collaterals",
-                  type: "core::array::Array::<contracts::interfaces::IGateway::Collateral>",
-                },
-              ],
+              name: "get_supported_assets_ui",
+              inputs: [],
               outputs: [
                 {
-                  type: "(core::array::Array::<core::starknet::contract_address::ContractAddress>, core::array::Array::<core::array::Span::<core::felt252>>)",
+                  type: "core::array::Array::<kapan::gateways::VesuGateway::TokenMetadata>",
+                },
+              ],
+              state_mutability: "view",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "OwnableMixinImpl",
+          interface_name: "openzeppelin_access::ownable::interface::OwnableABI",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_access::ownable::interface::OwnableABI",
+          items: [
+            {
+              type: "function",
+              name: "owner",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
               state_mutability: "view",
             },
             {
               type: "function",
-              name: "get_encoded_debt_approval",
+              name: "transfer_ownership",
               inputs: [
                 {
-                  name: "token",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "user",
+                  name: "new_owner",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
-              outputs: [
-                {
-                  type: "(core::array::Array::<core::starknet::contract_address::ContractAddress>, core::array::Array::<core::array::Span::<core::felt252>>)",
-                },
-              ],
-              state_mutability: "view",
+              outputs: [],
+              state_mutability: "external",
             },
             {
               type: "function",
-              name: "get_inbound_collateral_actions",
+              name: "renounce_ownership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "transferOwnership",
               inputs: [
                 {
-                  name: "token",
+                  name: "newOwner",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
-                {
-                  name: "collaterals",
-                  type: "core::array::Array::<contracts::interfaces::IGateway::Collateral>",
-                },
               ],
-              outputs: [
-                {
-                  type: "(core::array::Array::<core::starknet::contract_address::ContractAddress>, core::array::Array::<core::array::Span::<core::felt252>>)",
-                },
-              ],
-              state_mutability: "view",
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounceOwnership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
             },
           ],
         },
@@ -437,17 +422,82 @@ const contracts = {
               name: "vesu_singleton",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "pool_id",
+              type: "core::felt252",
+            },
+            {
+              name: "supported_assets",
+              type: "core::array::Array::<core::starknet::contract_address::ContractAddress>",
+            },
           ],
         },
         {
           type: "event",
-          name: "contracts::gateways::VesuGateway::VesuGateway::Event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
           kind: "enum",
-          variants: [],
+          variants: [
+            {
+              name: "OwnershipTransferred",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+              kind: "nested",
+            },
+            {
+              name: "OwnershipTransferStarted",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+              kind: "nested",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "kapan::gateways::VesuGateway::VesuGateway::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "OwnableEvent",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+              kind: "flat",
+            },
+          ],
         },
       ],
       classHash:
-        "0x2d99756f777e97cacdebde9e94480f9b6b935ddd9f7308c5fffce75b21c2800",
+        "0x538b9304e67735b11bb75b3250930a402681100c6093b01310c2f86274549e1",
     },
   },
 } as const satisfies SNContractsType;
