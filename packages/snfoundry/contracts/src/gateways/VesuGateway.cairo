@@ -38,6 +38,7 @@ pub struct PositionWithAmounts {
     pub collateral_shares: u256,
     pub collateral_amount: u256,
     pub nominal_debt: u256,
+    pub is_vtoken: bool,
 }
 
 #[starknet::interface]
@@ -508,7 +509,31 @@ mod VesuGateway {
             let len = supported_assets.len();
             for i in 0..len {
                 let collateral_asset = *supported_assets.at(i);
-                // Check position with zero debt first (earning positions)
+                
+                // Check vtoken balance first
+                let vtoken = extension.v_token_for_collateral_asset(pool_id, collateral_asset);
+                let erc20 = IERC20Dispatcher {
+                    contract_address: vtoken,
+                };
+                let vtoken_balance = erc20.balance_of(user);
+                if vtoken_balance > 0 {
+                    let erc4626 = IERC4626Dispatcher {
+                        contract_address: vtoken,
+                    };
+                    let collateral_amount = erc4626.convert_to_assets(vtoken_balance);
+                    positions.append((
+                        collateral_asset,
+                        Zero::zero(),
+                        PositionWithAmounts {
+                            collateral_shares: vtoken_balance,
+                            collateral_amount,
+                            nominal_debt: 0,
+                            is_vtoken: true,
+                        }
+                    ));
+                }
+
+                // Check position with zero debt (earning positions)
                 let (position, _, _) = singleton_dispatcher.position(pool_id, collateral_asset, Zero::zero(), user);
                 if position.collateral_shares > 0 {
                     println!("found earning position");
@@ -524,6 +549,7 @@ mod VesuGateway {
                             collateral_shares: position.collateral_shares,
                             collateral_amount,
                             nominal_debt: position.nominal_debt,
+                            is_vtoken: false,
                         }
                     ));
                 }
@@ -549,6 +575,7 @@ mod VesuGateway {
                                 collateral_shares: position.collateral_shares,
                                 collateral_amount,
                                 nominal_debt: position.nominal_debt,
+                                is_vtoken: false,
                             }
                         ));
                     }

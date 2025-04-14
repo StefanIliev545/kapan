@@ -1,9 +1,9 @@
-import { FC, useMemo, useEffect, useState } from "react";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+import { FC, useEffect, useMemo, useState } from "react";
 import { MarketRow } from "./MarketRow";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useAccount } from "@starknet-react/core";
 import { VesuPosition } from "./VesuPosition";
+import { useAccount } from "@starknet-react/core";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -12,9 +12,9 @@ const SCALE = 10n ** 18n;
 // Helper function to convert felt252 to string
 const feltToString = (felt: bigint): string => {
   // Convert felt to hex string and remove leading zeros
-  const hex = felt.toString(16).replace(/^0+/, '');
+  const hex = felt.toString(16).replace(/^0+/, "");
   // Convert hex to ASCII
-  return Buffer.from(hex, 'hex').toString('ascii');
+  return Buffer.from(hex, "hex").toString("ascii");
 };
 
 // Rate calculation functions
@@ -41,7 +41,25 @@ const toAnnualRates = (
 };
 
 const formatRate = (rate: number): string => {
+  if (rate < 0.01) {
+    return `${(rate * 100).toFixed(3)}%`;
+  }
   return `${(rate * 100).toFixed(2)}%`;
+};
+
+// Helper function to format token amounts with correct decimals
+const formatTokenAmount = (amount: string, decimals: number): string => {
+  try {
+    const bigIntAmount = BigInt(amount);
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const whole = bigIntAmount / divisor;
+    const fraction = bigIntAmount % divisor;
+    const fractionStr = fraction.toString().padStart(Number(decimals), '0');
+    return `${whole}.${fractionStr}`;
+  } catch (error) {
+    console.error('Error formatting token amount:', error);
+    return '0';
+  }
 };
 
 // Helper function to format price
@@ -57,7 +75,7 @@ const formatPrice = (price: bigint): string => {
 // Helper function to format utilization
 const formatUtilization = (utilization: bigint): string => {
   // Convert utilization to percentage with 2 decimal places
-  const utilizationNum = Number(utilization) / 1e18 * 100; // Assuming utilization is in wei
+  const utilizationNum = (Number(utilization) / 1e18) * 100; // Assuming utilization is in wei
   return utilizationNum.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -92,7 +110,12 @@ type PositionData = {
 type PositionTuple = {
   0: bigint; // collateral_asset
   1: bigint; // debt_asset
-  2: PositionData;
+  2: {
+    collateral_shares: bigint;
+    collateral_amount: bigint;
+    nominal_debt: bigint;
+    is_vtoken: boolean;
+  };
 };
 
 // Add TokenMetadata type
@@ -115,7 +138,7 @@ type TokenMetadata = {
 
 export const VesuProtocolView: FC = () => {
   const { address: userAddress } = useAccount();
-  
+
   // Fetch supported assets
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -138,22 +161,22 @@ export const VesuProtocolView: FC = () => {
     if (!supportedAssets) return null;
 
     return (supportedAssets as unknown as ContractResponse)?.map((asset: ContractResponse[number]) => {
-      const address = `0x${BigInt(asset.address).toString(16).padStart(64, '0')}`;
+      const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
       const symbol = feltToString(asset.symbol);
-      
+
       // The fee_rate from the contract is already the onchain interest rate from the extension
       // It's calculated using extension.interest_rate() in the VesuGateway contract
       const interestPerSecond = asset.fee_rate;
-      
+
       // Calculate rates using the Vesu protocol's rate calculation logic with asset config data
       const { borrowAPR, supplyAPY } = toAnnualRates(
         interestPerSecond,
         asset.total_nominal_debt,
         asset.last_rate_accumulator,
         asset.reserve,
-        asset.scale
+        asset.scale,
       );
-      
+
       return (
         <MarketRow
           key={address}
@@ -173,11 +196,24 @@ export const VesuProtocolView: FC = () => {
     if (!userPositions || !supportedAssets) return null;
 
     const positions = userPositions as unknown as PositionTuple[];
+    console.log("Raw positions data:", positions); // Debug log
+
     return positions?.map((position, index) => {
-      const collateralAsset = `0x${position[0].toString(16).padStart(64, '0')}`;
-      const debtAsset = `0x${position[1].toString(16).padStart(64, '0')}`;
+      const collateralAsset = `0x${position[0].toString(16).padStart(64, "0")}`;
+      const debtAsset = `0x${position[1].toString(16).padStart(64, "0")}`;
       const positionData = position[2];
-      console.log("Position data:", positionData);
+
+      // Debug log for each position
+      console.log("Processing position:", {
+        index,
+        collateralAsset,
+        debtAsset,
+        collateralShares: positionData.collateral_shares.toString(),
+        collateralAmount: positionData.collateral_amount.toString(),
+        nominalDebt: positionData.nominal_debt.toString(),
+        isVtoken: positionData.is_vtoken,
+      });
+
       return (
         <VesuPosition
           key={`${collateralAsset}-${debtAsset}-${index}`}
@@ -186,6 +222,7 @@ export const VesuProtocolView: FC = () => {
           collateralShares={positionData.collateral_shares.toString()}
           collateralAmount={positionData.collateral_amount.toString()}
           nominalDebt={positionData.nominal_debt.toString()}
+          isVtoken={positionData.is_vtoken}
           supportedAssets={supportedAssets as unknown as TokenMetadata[]}
         />
       );
@@ -196,29 +233,74 @@ export const VesuProtocolView: FC = () => {
     console.error("Error fetching supported assets:", assetsError);
     return <div>Error loading markets</div>;
   }
-  
+
   return (
     <div className="space-y-4">
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
           <h2 className="card-title text-lg border-b border-base-200 pb-2">Vesu Markets</h2>
-          <div className="space-y-2">
-            {marketRows}
-          </div>
+          <div className="space-y-2">{marketRows}</div>
         </div>
       </div>
 
       {userAddress && (
         <div className="card bg-base-100 shadow-md">
           <div className="card-body p-4">
-            <h2 className="card-title text-lg border-b border-base-200 pb-2">Your Positions</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="card-title text-lg">Your Positions</h2>
+              {positionRows?.length ? (
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Total Net Balance</div>
+                  <div className="text-xl font-bold">
+                    $
+                    {positionRows
+                      .reduce((total, position) => {
+                        const collateralMetadata = position.props.supportedAssets.find(
+                          (asset: TokenMetadata) =>
+                            `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` ===
+                            position.props.collateralAsset,
+                        );
+                        const debtMetadata = position.props.supportedAssets.find(
+                          (asset: TokenMetadata) =>
+                            `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === position.props.debtAsset,
+                        );
+
+                        if (!collateralMetadata) return total;
+
+                        // Calculate collateral value
+                        const collateralAmtNum = parseFloat(
+                          formatTokenAmount(position.props.collateralAmount, collateralMetadata.decimals),
+                        );
+                        const collateralPriceNum = parseFloat(
+                          formatTokenAmount(collateralMetadata.price.value.toString(), 18),
+                        );
+                        const collateralValue = collateralAmtNum * collateralPriceNum;
+
+                        // Calculate debt value
+                        let debtValue = 0;
+                        if (position.props.nominalDebt !== "0" && debtMetadata) {
+                          const debtAmtNum = parseFloat(
+                            formatTokenAmount(position.props.nominalDebt, debtMetadata.decimals),
+                          );
+                          const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata.price.value.toString(), 18));
+                          debtValue = debtAmtNum * debtPriceNum;
+                        }
+
+                        return total + (collateralValue - debtValue);
+                      }, 0)
+                      .toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <div className="space-y-4">
               {positionRows?.length ? (
                 positionRows
               ) : (
-                <div className="text-center py-4 text-gray-500">
-                  No positions found
-                </div>
+                <div className="text-center py-4 text-gray-500">No positions found</div>
               )}
             </div>
           </div>
@@ -226,4 +308,4 @@ export const VesuProtocolView: FC = () => {
       )}
     </div>
   );
-}; 
+};

@@ -33,6 +33,7 @@ export type VesuPositionProps = {
   collateralShares: string;
   collateralAmount: string;
   nominalDebt: string;
+  isVtoken: boolean;
   supportedAssets: TokenMetadata[];
 };
 
@@ -63,13 +64,8 @@ const feltToString = (felt: bigint): string => {
 };
 
 // Helper: Find token metadata by matching full address string
-const getTokenMetadata = (
-  address: string,
-  assets: TokenMetadata[]
-): TokenMetadata | undefined => {
-  return assets.find(
-    asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === address
-  );
+const getTokenMetadata = (address: string, assets: TokenMetadata[]): TokenMetadata | undefined => {
+  return assets.find(asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === address);
 };
 
 // Helper: Format token amount from its raw string using token decimals.
@@ -99,12 +95,15 @@ const calculateRates = (
   total_nominal_debt: bigint,
   last_rate_accumulator: bigint,
   reserve: bigint,
-  scale: bigint
+  scale: bigint,
 ) => {
   const borrowAPR = (Number(interestPerSecond) * YEAR_IN_SECONDS) / Number(SCALE);
   const totalBorrowed = Number((total_nominal_debt * last_rate_accumulator) / SCALE);
-  const reserveScale = Number((reserve * SCALE) / scale);
-  const supplyAPY = (borrowAPR * totalBorrowed) / (reserveScale + totalBorrowed);
+  
+  // Handle zero scale to avoid division by zero
+  const reserveScale = scale === 0n ? 0 : Number((reserve * SCALE) / scale);
+  const supplyAPY = (reserveScale + totalBorrowed) === 0 ? 0 : (borrowAPR * totalBorrowed) / (reserveScale + totalBorrowed);
+  
   return { borrowAPR, supplyAPY };
 };
 
@@ -114,40 +113,31 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   collateralShares,
   collateralAmount,
   nominalDebt,
+  isVtoken,
   supportedAssets,
 }) => {
   const collateralMetadata = getTokenMetadata(collateralAsset, supportedAssets);
   const debtMetadata = getTokenMetadata(debtAsset, supportedAssets);
 
-  if (!collateralMetadata || !debtMetadata) {
+  if (!collateralMetadata) {
+    console.error("Missing collateral metadata for asset:", collateralAsset);
     return null;
   }
 
-  // Format token amounts for display (preserving fractional parts)
-  const formattedCollateral = formatTokenAmount(collateralAmount.toString(), collateralMetadata.decimals);
-  const formattedDebt = formatTokenAmount(nominalDebt.toString(), debtMetadata.decimals);
-
-  console.log("Position data:", {
-    collateralShares,
-    nominalDebt,
-    collateralDecimals: collateralMetadata.decimals,
-    debtDecimals: debtMetadata.decimals,
-  });
+  // Format token amounts for display
+  const formattedCollateral = formatTokenAmount(collateralAmount, collateralMetadata.decimals);
+  const formattedDebt = nominalDebt === "0" ? "0" : formatTokenAmount(nominalDebt, debtMetadata?.decimals || 0);
 
   const collateralSymbol = feltToString(collateralMetadata.symbol);
-  const debtSymbol = feltToString(debtMetadata.symbol);
+  const debtSymbol = debtMetadata ? feltToString(debtMetadata.symbol) : "";
 
-  // === USD Value Calculations (Using Floating Point) ===
-  // Convert raw amounts (BigInt) into string form and then to a float using the helper.
-  // This avoids a direct Number() conversion on a BigInt.
-  const collateralAmtNum = parseFloat(formatTokenAmount(collateralAmount.toString(), collateralMetadata.decimals));
-  const debtAmtNum = parseFloat(formatTokenAmount(nominalDebt.toString(), debtMetadata.decimals));
+  // === USD Value Calculations ===
+  const collateralAmtNum = parseFloat(formatTokenAmount(collateralAmount, collateralMetadata.decimals));
+  const debtAmtNum = parseFloat(formatTokenAmount(nominalDebt, debtMetadata?.decimals || 0));
 
-  // Convert prices (stored as BigInt with 18 decimals) similarly.
   const collateralPriceNum = parseFloat(formatTokenAmount(collateralMetadata.price.value.toString(), 18));
-  const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata.price.value.toString(), 18));
+  const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata?.price.value.toString() || "0", 18));
 
-  // USD value = token amount * token price (both in floating point)
   const collateralValueNum = collateralAmtNum * collateralPriceNum;
   const debtValueNum = debtAmtNum * debtPriceNum;
 
@@ -166,18 +156,17 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     collateralMetadata.total_nominal_debt,
     collateralMetadata.last_rate_accumulator,
     collateralMetadata.reserve,
-    collateralMetadata.scale
+    collateralMetadata.scale,
   );
   const debtRates = calculateRates(
-    debtMetadata.fee_rate,
-    debtMetadata.total_nominal_debt,
-    debtMetadata.last_rate_accumulator,
-    debtMetadata.reserve,
-    debtMetadata.scale
+    debtMetadata?.fee_rate || 0n,
+    debtMetadata?.total_nominal_debt || 0n,
+    debtMetadata?.last_rate_accumulator || 0n,
+    debtMetadata?.reserve || 0n,
+    debtMetadata?.scale || 0n,
   );
 
-  // === Monthly Yield/Cost Calculations (Floating Point) ===
-  // Monthly yield/cost = (annual rate × USD value) / 12
+  // === Monthly Yield/Cost Calculations ===
   const monthlyYieldNum = (collateralRates.supplyAPY * collateralValueNum) / 12;
   const monthlyCostNum = (debtRates.borrowAPR * debtValueNum) / 12;
 
@@ -190,40 +179,37 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     maximumFractionDigits: 2,
   });
 
-  // === LTV Calculation === (as a percentage)
+  // === LTV Calculation ===
   const ltv = collateralValueNum > 0 ? (debtValueNum / collateralValueNum) * 100 : 0;
   const formattedLtv = ltv.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
-  // Debug logging of internal calculations
-  console.log("Position calculations:", {
-    collateralAmount,
-    collateralDecimals: collateralMetadata.decimals,
-    collateralPrice: collateralMetadata.price.value.toString(),
-    collateralValue: collateralValueNum,
-    nominalDebt,
-    debtDecimals: debtMetadata.decimals,
-    debtPrice: debtMetadata.price.value.toString(),
-    debtValue: debtValueNum,
-  });
-
   return (
     <div className="card bg-base-100 shadow-md">
       <div className="card-body p-4">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-2">
+            <img src={tokenNameToLogo(collateralSymbol.toLowerCase())} alt={collateralSymbol} className="w-6 h-6" />
+            <span className="font-medium">{collateralSymbol}</span>
+            {isVtoken && (
+              <span className="badge badge-sm badge-primary">vToken</span>
+            )}
+          </div>
+          {nominalDebt !== "0" && (
+            <div className="flex items-center gap-2">
+              <img src={tokenNameToLogo(debtSymbol.toLowerCase())} alt={debtSymbol} className="w-6 h-6" />
+              <span className="font-medium">{debtSymbol}</span>
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-4">
           {/* Collateral Section */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <img
-                src={tokenNameToLogo(collateralSymbol.toLowerCase())}
-                alt={collateralSymbol}
-                className="w-6 h-6"
-              />
-              <span className="font-bold">{collateralSymbol}</span>
+            <div className="text-2xl font-bold">
+              {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(4) : formattedCollateral}
             </div>
-            <div className="text-2xl font-bold">{formattedCollateral}</div>
             <div className="text-lg text-gray-500">${formattedCollateralValue}</div>
 
             <div className="divider my-1"></div>
@@ -237,49 +223,47 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Monthly yield</span>
-                <span className="text-sm font-medium">
-                  ${formattedMonthlyYield}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Liquidation price</span>
-                <span className="text-sm font-medium">1 / 0.53</span>
+                <span className="text-sm font-medium">${formattedMonthlyYield}</span>
               </div>
             </div>
           </div>
 
           {/* Debt Section */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <img
-                src={tokenNameToLogo(debtSymbol.toLowerCase())}
-                alt={debtSymbol}
-                className="w-6 h-6"
-              />
-              <span className="font-bold">{debtSymbol}</span>
-            </div>
-            <div className="text-2xl font-bold">{formattedDebt}</div>
-            <div className="text-lg text-gray-500">${formattedDebtValue}</div>
+            {nominalDebt === "0" ? (
+              <>
+                <div className="text-2xl font-bold text-gray-400">No debt</div>
+                <div className="text-lg text-gray-400">$0.00</div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {debtSymbol === "ETH" ? parseFloat(formattedDebt).toFixed(4) : formattedDebt}
+                </div>
+                <div className="text-lg text-gray-500">${formattedDebtValue}</div>
+              </>
+            )}
 
             <div className="divider my-1"></div>
 
             <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Borrow APR</span>
-                <span className="text-sm font-medium text-error">
-                  {(debtRates.borrowAPR * 100).toFixed(3)}%
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Monthly cost</span>
-                <span className="text-sm font-medium">
-                  ${formattedMonthlyCost}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Liquidation price</span>
-                <span className="text-sm font-medium">1.66K / 3.1K</span>
-              </div>
+              {nominalDebt === "0" ? (
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-400">No debt</span>
+                  <span className="text-sm font-medium text-gray-400">-</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Borrow APR</span>
+                    <span className="text-sm font-medium text-error">{(debtRates.borrowAPR * 100).toFixed(3)}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Monthly cost</span>
+                    <span className="text-sm font-medium">${formattedMonthlyCost}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

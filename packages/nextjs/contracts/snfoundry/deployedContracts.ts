@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x7659ce06f93e9c65119e7d37f18dfd4624ce4c2cae6ccf78c84fde36484c8b9",
+        "0x4aafa2b594e4a69556ee865972ddae4680b8aa059860e876da4cf9483bf7a0a",
       abi: [
         {
           type: "impl",
@@ -219,6 +219,20 @@ const contracts = {
           interface_name: "kapan::gateways::VesuGateway::IVesuViewer",
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::gateways::VesuGateway::PositionWithAmounts",
           members: [
@@ -234,19 +248,9 @@ const contracts = {
               name: "nominal_debt",
               type: "core::integer::u256",
             },
-          ],
-        },
-        {
-          type: "enum",
-          name: "core::bool",
-          variants: [
             {
-              name: "False",
-              type: "()",
-            },
-            {
-              name: "True",
-              type: "()",
+              name: "is_vtoken",
+              type: "core::bool",
             },
           ],
         },
@@ -501,7 +505,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x1e4bc9eada99f6abd59e72f7e53ea2873d7273f7c1d8e16118829973208afc1",
+        "0x590c763d6b9fb7d9e192b8ff8a96b838bc4b50cfd22424851e1758e1e60abce",
     },
   },
 } as const satisfies SNContractsType;
