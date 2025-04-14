@@ -4,83 +4,20 @@ import { VesuPosition } from "./VesuPosition";
 import { useAccount } from "@starknet-react/core";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
-
-// Constants
-const YEAR_IN_SECONDS = 31536000; // 365 days
-const SCALE = 10n ** 18n;
-
-// Helper function to convert felt252 to string
-const feltToString = (felt: bigint): string => {
-  // Convert felt to hex string and remove leading zeros
-  const hex = felt.toString(16).replace(/^0+/, "");
-  // Convert hex to ASCII
-  return Buffer.from(hex, "hex").toString("ascii");
-};
-
-// Rate calculation functions
-const toAPR = (interestPerSecond: bigint): number => {
-  return (Number(interestPerSecond) * YEAR_IN_SECONDS) / Number(SCALE);
-};
-
-const toAPY = (interestPerSecond: bigint): number => {
-  return (1 + Number(interestPerSecond) / Number(SCALE)) ** YEAR_IN_SECONDS - 1;
-};
-
-const toAnnualRates = (
-  interestPerSecond: bigint,
-  total_nominal_debt: bigint,
-  last_rate_accumulator: bigint,
-  reserve: bigint,
-  scale: bigint,
-) => {
-  const borrowAPR = toAPR(interestPerSecond);
-  const totalBorrowed = Number((total_nominal_debt * last_rate_accumulator) / SCALE);
-  const reserveScale = Number((reserve * SCALE) / scale);
-  const supplyAPY = (toAPY(interestPerSecond) * totalBorrowed) / (reserveScale + totalBorrowed);
-  return { borrowAPR, supplyAPY };
-};
-
-const formatRate = (rate: number): string => {
-  if (rate < 0.01) {
-    return `${(rate * 100).toFixed(3)}%`;
-  }
-  return `${(rate * 100).toFixed(2)}%`;
-};
-
-// Helper function to format token amounts with correct decimals
-const formatTokenAmount = (amount: string, decimals: number): string => {
-  try {
-    const bigIntAmount = BigInt(amount);
-    const divisor = BigInt(10) ** BigInt(decimals);
-    const whole = bigIntAmount / divisor;
-    const fraction = bigIntAmount % divisor;
-    const fractionStr = fraction.toString().padStart(Number(decimals), '0');
-    return `${whole}.${fractionStr}`;
-  } catch (error) {
-    console.error('Error formatting token amount:', error);
-    return '0';
-  }
-};
-
-// Helper function to format price
-const formatPrice = (price: bigint): string => {
-  // Convert price to number and format with 2 decimal places
-  const priceNum = Number(price) / 1e18; // Assuming price is in wei
-  return priceNum.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
-
-// Helper function to format utilization
-const formatUtilization = (utilization: bigint): string => {
-  // Convert utilization to percentage with 2 decimal places
-  const utilizationNum = (Number(utilization) / 1e18) * 100; // Assuming utilization is in wei
-  return utilizationNum.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
+import {
+  YEAR_IN_SECONDS,
+  SCALE,
+  feltToString,
+  toAPR,
+  toAPY,
+  toAnnualRates,
+  formatRate,
+  formatTokenAmount,
+  formatPrice,
+  formatUtilization,
+  TokenMetadata,
+  PositionData,
+} from "~~/utils/protocols";
 
 type ContractResponse = {
   readonly type: "core::array::Array::<kapan::gateways::VesuGateway::TokenMetadata>";
@@ -100,40 +37,10 @@ type ContractResponse = {
   readonly scale: bigint;
 }[];
 
-// Add type for position data
-type PositionData = {
-  collateral_shares: bigint;
-  collateral_amount: bigint;
-  nominal_debt: bigint;
-};
-
 type PositionTuple = {
   0: bigint; // collateral_asset
   1: bigint; // debt_asset
-  2: {
-    collateral_shares: bigint;
-    collateral_amount: bigint;
-    nominal_debt: bigint;
-    is_vtoken: boolean;
-  };
-};
-
-// Add TokenMetadata type
-type TokenMetadata = {
-  address: bigint;
-  symbol: bigint;
-  decimals: number;
-  rate_accumulator: bigint;
-  utilization: bigint;
-  fee_rate: bigint;
-  price: {
-    value: bigint;
-    is_valid: boolean;
-  };
-  total_nominal_debt: bigint;
-  last_rate_accumulator: bigint;
-  reserve: bigint;
-  scale: bigint;
+  2: PositionData;
 };
 
 export const VesuProtocolView: FC = () => {
@@ -296,11 +203,11 @@ export const VesuProtocolView: FC = () => {
                 </div>
               ) : null}
             </div>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {positionRows?.length ? (
                 positionRows
               ) : (
-                <div className="text-center py-4 text-gray-500">No positions found</div>
+                <div className="text-center py-4 text-gray-500 col-span-full">No positions found</div>
               )}
             </div>
           </div>
