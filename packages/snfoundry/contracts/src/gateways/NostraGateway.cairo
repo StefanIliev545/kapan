@@ -1,5 +1,2 @@
-
 #[starknet::contract]
-mod NostraGateway {
-
-}
+mod NostraGateway {}

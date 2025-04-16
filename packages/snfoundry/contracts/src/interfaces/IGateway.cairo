@@ -10,26 +10,26 @@ pub struct BasicInstruction {
 #[derive(Drop, Serde)]
 pub struct Deposit {
     pub basic: BasicInstruction,
-    pub context: Option<Span<felt252>>
+    pub context: Option<Span<felt252>>,
 }
 
 
 #[derive(Drop, Serde)]
 pub struct Borrow {
     pub basic: BasicInstruction,
-    pub context: Option<Span<felt252>>
+    pub context: Option<Span<felt252>>,
 }
 
 #[derive(Drop, Serde)]
 pub struct Repay {
     pub basic: BasicInstruction,
-    pub context: Option<Span<felt252>>
+    pub context: Option<Span<felt252>>,
 }
 
 #[derive(Drop, Serde)]
 pub struct Withdraw {
     pub basic: BasicInstruction,
-    pub context: Option<Span<felt252>>
+    pub context: Option<Span<felt252>>,
 }
 
 
@@ -43,8 +43,5 @@ pub enum LendingInstruction {
 
 #[starknet::interface]
 pub trait ILendingInstructionProcessor<TContractState> {
-    fn process_instructions(
-        ref self: TContractState,
-        instructions: Span<LendingInstruction>
-    );
+    fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
 }

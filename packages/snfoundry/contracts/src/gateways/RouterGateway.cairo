@@ -1,10 +1,8 @@
-use starknet::ContractAddress;
-use core::array::Array;
-use core::array::Span;
+use core::array::{Array, Span};
 use core::bool;
 use core::traits::Into;
-use starknet::get_caller_address;
-use crate::interfaces::IGateway::{IGatewayDispatcher, IGatewayDispatcherTrait, Collateral};
+use starknet::{ContractAddress, get_caller_address};
+use crate::interfaces::IGateway::{Collateral, IGatewayDispatcher, IGatewayDispatcherTrait};
 
 #[starknet::interface]
 trait RouterGatewayTrait<TContractState> {
@@ -14,7 +12,7 @@ trait RouterGatewayTrait<TContractState> {
         protocol_name: felt252,
         token: ContractAddress,
         user: ContractAddress,
-        amount: u256
+        amount: u256,
     );
     fn move_debt(
         ref self: TContractState,
@@ -25,13 +23,13 @@ trait RouterGatewayTrait<TContractState> {
         collaterals: Array<Collateral>,
         from_protocol: felt252,
         to_protocol: felt252,
-        flash_loan_version: felt252
+        flash_loan_version: felt252,
     );
     fn get_gateway_balance(
         self: @TContractState,
         protocol_name: felt252,
         token: ContractAddress,
-        user: ContractAddress
+        user: ContractAddress,
     ) -> u256;
 }
 
@@ -42,31 +40,28 @@ trait IFlashLoanProvider<TContractState> {
         receiver: ContractAddress,
         tokens: Array<ContractAddress>,
         amounts: Array<u256>,
-        user_data: Array<felt252>
+        user_data: Array<felt252>,
     );
 }
 
 #[starknet::interface]
 trait IBalancerV3Vault<TContractState> {
-    fn send_to(ref self: TContractState, token: ContractAddress, recipient: ContractAddress, amount: u256);
+    fn send_to(
+        ref self: TContractState, token: ContractAddress, recipient: ContractAddress, amount: u256,
+    );
     fn settle(ref self: TContractState, token: ContractAddress, amount: u256);
     fn unlock(ref self: TContractState, data: Array<felt252>);
 }
 
 #[starknet::contract]
 mod RouterGateway {
-    use starknet::storage::StorageMapWriteAccess;
-use super::*;
-    use starknet::storage::{
-        Map,
-        StoragePathEntry,
-        StorageMapReadAccess,
-        StoragePointerWriteAccess,
-        StoragePointerReadAccess
-    };
-
     use core::num::traits::Zero;
-    
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess,
+    };
+    use super::*;
+
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
@@ -82,7 +77,7 @@ use super::*;
     #[storage]
     struct Storage {
         owner: ContractAddress,
-        gateways: Map::<felt252, ContractAddress>,
+        gateways: Map<felt252, ContractAddress>,
         balancer_v3_vault: ContractAddress,
         balancer_v2_vault: ContractAddress,
         flash_loan_enabled: bool,
@@ -93,7 +88,7 @@ use super::*;
         ref self: ContractState,
         v3_vault: ContractAddress,
         v2_vault: ContractAddress,
-        _owner: ContractAddress
+        _owner: ContractAddress,
     ) {
         self.owner.write(_owner);
         self.balancer_v3_vault.write(v3_vault);
@@ -116,7 +111,7 @@ use super::*;
             protocol_name: felt252,
             token: ContractAddress,
             user: ContractAddress,
-            amount: u256
+            amount: u256,
         ) {
             let gateway = self.gateways.read(protocol_name);
             assert(!gateway.is_zero(), 'Protocol not supported');
@@ -137,7 +132,7 @@ use super::*;
             collaterals: Array<Collateral>,
             from_protocol: felt252,
             to_protocol: felt252,
-            flash_loan_version: felt252
+            flash_loan_version: felt252,
         ) {
             // Verify caller is the user
             assert(get_caller_address() == user, 'User must be caller');
@@ -150,16 +145,15 @@ use super::*;
                 final_debt_amount = IGatewayDispatcher { contract_address: from_gateway }
                     .get_borrow_balance_current(debt_token, user);
             }
-
             // TODO: Implement flash loan logic for both v2 and v3
-            // This would require additional interfaces and complex encoding/decoding
+        // This would require additional interfaces and complex encoding/decoding
         }
 
         fn get_gateway_balance(
             self: @ContractState,
             protocol_name: felt252,
             token: ContractAddress,
-            user: ContractAddress
+            user: ContractAddress,
         ) -> u256 {
             let gateway = self.gateways.entry(protocol_name).read();
             assert(!gateway.is_zero(), 'Protocol not supported');
@@ -176,16 +170,15 @@ use super::*;
             debt_amount: u256,
             collaterals: Array<Collateral>,
             from_protocol: felt252,
-            to_protocol: felt252
+            to_protocol: felt252,
         ) {
             let from_gateway = self.gateways.read(from_protocol);
             let to_gateway = self.gateways.read(to_protocol);
-            
+
             assert(!from_gateway.is_zero(), 'From protocol not supported');
             assert(!to_gateway.is_zero(), 'To protocol not supported');
-
             // TODO: Implement the debt moving logic
-            // This would require complex token approval and transfer logic
+        // This would require complex token approval and transfer logic
         }
     }
-} 
+}

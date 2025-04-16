@@ -1,23 +1,21 @@
-use kapan::interfaces::IGateway::{
-    ILendingInstructionProcessorDispatcher, 
-    ILendingInstructionProcessorDispatcherTrait, 
-    LendingInstruction, 
-    Deposit, 
-    BasicInstruction, 
-    Withdraw,
-    Borrow,
-    Repay,
+use core::num::traits::Zero;
+use core::option::Option;
+use core::traits::Drop;
+use kapan::gateways::VesuGateway::{
+    IVesuGatewayAdminDispatcher, IVesuGatewayAdminDispatcherTrait, IVesuViewerDispatcher,
+    IVesuViewerDispatcherTrait, VesuContext,
 };
-use kapan::gateways::VesuGateway::{IVesuViewerDispatcher, IVesuViewerDispatcherTrait, IVesuGatewayAdminDispatcher, IVesuGatewayAdminDispatcherTrait};
+use kapan::interfaces::IGateway::{
+    BasicInstruction, Borrow, Deposit, ILendingInstructionProcessorDispatcher,
+    ILendingInstructionProcessorDispatcherTrait, LendingInstruction, Repay, Withdraw,
+};
+use kapan::interfaces::vesu::{
+    IERC4626Dispatcher, IERC4626DispatcherTrait, ISingletonDispatcher, ISingletonDispatcherTrait,
+};
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use openzeppelin::utils::serde::SerializedAppend;
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::{ContractAddress, contract_address_const, get_caller_address};
-use core::option::Option;
-use core::traits::{Drop};
-use kapan::interfaces::vesu::{ISingletonDispatcher, ISingletonDispatcherTrait, IERC4626Dispatcher, IERC4626DispatcherTrait};
-use kapan::gateways::VesuGateway::VesuContext;
-use core::num::traits::Zero;
 
 // Real contract address deployed on Sepolia
 fn SINGLETON_ADDRESS() -> ContractAddress {
@@ -67,15 +65,17 @@ fn setup_test_context() -> TestContext {
     let gateway_address = deploy_vesu_gateway("VesuGateway");
     let token_address = contract_address_const::<ETH_CONTRACT_ADDRESS>();
     let token_erc20 = IERC20Dispatcher { contract_address: token_address };
-    let gateway_dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway_address };
+    let gateway_dispatcher = ILendingInstructionProcessorDispatcher {
+        contract_address: gateway_address,
+    };
     let vtoken_address = contract_address_const::<VTOKEN_ETH_ADDRESS>();
     let vtoken_erc20 = IERC20Dispatcher { contract_address: vtoken_address };
     let vtoken_erc4626 = IERC4626Dispatcher { contract_address: vtoken_address };
-    
+
     // Pre-fund the test user
     println!("pre-funding address");
     prefund_address(USER_ADDRESS());
-    
+
     TestContext {
         gateway_address,
         token_address,
@@ -111,40 +111,37 @@ fn prefund_address(address: ContractAddress) {
     ethERC.transfer(address, 15000000000000000000);
 }
 
-fn modify_delegation(gateway: ContractAddress, user: ContractAddress, delegatee: ContractAddress, delegation: bool) {
+fn modify_delegation(
+    gateway: ContractAddress, user: ContractAddress, delegatee: ContractAddress, delegation: bool,
+) {
     let vesuDispatcher = ISingletonDispatcher { contract_address: gateway };
     cheat_caller_address(gateway, user, CheatSpan::TargetCalls(1));
     vesuDispatcher.modify_delegation(POOL_ID, delegatee, delegation);
 }
 
 // Helper function to create a basic instruction
-fn create_basic_instruction(token: ContractAddress, amount: u256, user: ContractAddress) -> BasicInstruction {
-    BasicInstruction {
-        token,
-        amount,
-        user,
-    }
+fn create_basic_instruction(
+    token: ContractAddress, amount: u256, user: ContractAddress,
+) -> BasicInstruction {
+    BasicInstruction { token, amount, user }
 }
 
 // Perform deposit operation with provided context and amount
 fn perform_deposit(ref context: TestContext, amount: u256) -> u256 {
     let basic = create_basic_instruction(context.token_address, amount, USER_ADDRESS());
-    let deposit = Deposit {
-        basic,
-        context: Option::None,
-    };
-    
+    let deposit = Deposit { basic, context: Option::None };
+
     let initial_balance = context.token_erc20.balance_of(USER_ADDRESS());
     assert(initial_balance >= amount, 'insufficient balance');
-    
+
     // Approve and deposit
     cheat_caller_address(context.token_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     context.token_erc20.approve(context.gateway_address, amount);
-    
+
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
     context.gateway_dispatcher.process_instructions(instructions.span());
-    
+
     // Return initial balance for verification
     initial_balance
 }
@@ -153,27 +150,27 @@ fn perform_deposit(ref context: TestContext, amount: u256) -> u256 {
 fn perform_withdrawal(ref context: TestContext, amount: u256) -> u256 {
     // Convert amount to shares
     let shares = context.vtoken_erc4626.convert_to_shares(amount);
-    
+
     // Approve vToken transfer
     cheat_caller_address(context.vtoken_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     context.vtoken_erc20.approve(context.gateway_address, shares);
-    
+
     // Enable delegation
     modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
-    
+
     // Record initial balance for verification
     let initial_balance = context.token_erc20.balance_of(USER_ADDRESS());
-    
+
     // Create and process withdrawal instruction
     let withdraw = Withdraw {
         basic: create_basic_instruction(context.token_address, amount, USER_ADDRESS()),
         context: Option::None,
     };
-    
+
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Withdraw(withdraw)];
     context.gateway_dispatcher.process_instructions(instructions.span());
-    
+
     // Return initial balance for verification
     initial_balance
 }
@@ -185,7 +182,7 @@ fn test_deposit() {
     let mut context = setup_test_context();
     let amount = 100000;
     let initial_balance = perform_deposit(ref context, amount);
-    
+
     // Verify balance change
     let current_balance = context.token_erc20.balance_of(USER_ADDRESS());
     assert(current_balance < initial_balance, 'balance not decreased');
@@ -197,13 +194,13 @@ fn test_deposit() {
 fn test_basic_withdraw() {
     let mut context = setup_test_context();
     let amount = 100000;
-    
+
     // First perform a deposit
     perform_deposit(ref context, amount);
-    
+
     // Now perform a withdrawal
     let initial_balance = perform_withdrawal(ref context, amount);
-    
+
     // Verify balance change
     let current_balance = context.token_erc20.balance_of(USER_ADDRESS());
     println!("balance: {}", current_balance);
@@ -220,11 +217,8 @@ fn test_borrow() {
 
     println!("deposited!");
     let mut context_array = array![];
-    VesuContext {
-        pool_id: POOL_ID,
-        position_counterpart_token: context.token_address,
-    }.serialize(ref context_array);
-
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: context.token_address }
+        .serialize(ref context_array);
 
     let usdcERC20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
     let initial_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
@@ -256,26 +250,24 @@ fn test_borrow() {
 fn test_repay() {
     let mut context = setup_test_context();
     let amount = 5000000000000000000;
-    
+
     // First perform a deposit
     perform_deposit(ref context, amount);
 
     println!("deposited!");
     let mut context_array = array![];
-    VesuContext {
-        pool_id: POOL_ID,
-        position_counterpart_token: context.token_address,
-    }.serialize(ref context_array);
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: context.token_address }
+        .serialize(ref context_array);
 
     let usdcERC20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
-    
+
     // First borrow some USDC
     let borrow_amount = 220000000;
     let borrow = Borrow {
         basic: create_basic_instruction(USDC_ERC20_ADDRESS(), borrow_amount, USER_ADDRESS()),
         context: Option::Some(context_array.span()),
     };
-    
+
     println!("delegating!");
     modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
     println!("borrowing!");
@@ -288,7 +280,7 @@ fn test_repay() {
 
     // Now repay half of the borrowed amount
     let repay_amount = borrow_amount / 2;
-    
+
     // Approve gateway to spend USDC
     cheat_caller_address(USDC_ERC20_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
     usdcERC20.approve(context.gateway_address, repay_amount);
@@ -298,14 +290,14 @@ fn test_repay() {
         basic: create_basic_instruction(USDC_ERC20_ADDRESS(), repay_amount, USER_ADDRESS()),
         context: Option::Some(context_array.span()),
     };
-    
+
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Repay(repay)];
     context.gateway_dispatcher.process_instructions(instructions.span());
 
     let final_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
     println!("usdc balance after repay: {}", final_usdc_balance);
-    
+
     // Verify that the balance decreased by the repay amount
     assert(final_usdc_balance == initial_usdc_balance - repay_amount, 'no-decrease');
 }
@@ -315,80 +307,78 @@ fn test_repay() {
 #[fork("MAINNET_LATEST")]
 fn test_get_all_positions() {
     let mut context = setup_test_context();
-    
+
     // Create ETH deposit position (collateral: ETH, debt: Zero)
     let eth_amount = 5000000000000000000; // 5 ETH
     perform_deposit(ref context, eth_amount);
-    
+
     // Create ETH-USDC borrow position
     let mut context_array = array![];
-    VesuContext {
-        pool_id: POOL_ID,
-        position_counterpart_token: context.token_address,
-    }.serialize(ref context_array);
-    
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: context.token_address }
+        .serialize(ref context_array);
+
     let borrow_amount = 110000000; // 110 USDC
     let borrow = Borrow {
         basic: create_basic_instruction(USDC_ERC20_ADDRESS(), borrow_amount, USER_ADDRESS()),
         context: Option::Some(context_array.span()),
     };
-    
+
     modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Borrow(borrow)];
     context.gateway_dispatcher.process_instructions(instructions.span());
-    
+
     // Create another ETH deposit position since borrowing moved the collateral
     let eth_amount_2 = 3000000000000000000; // 3 ETH
     perform_deposit(ref context, eth_amount_2);
-    
+
     // Create USDC deposit position
     let usdc_amount = 100000000; // 100 USDC
     let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
-    
+
     // Approve and deposit USDC
     cheat_caller_address(USDC_ERC20_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
     usdc_erc20.approve(context.gateway_address, usdc_amount);
-    
+
     let usdc_deposit = Deposit {
         basic: create_basic_instruction(USDC_ERC20_ADDRESS(), usdc_amount, USER_ADDRESS()),
         context: Option::None,
     };
-    
+
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(usdc_deposit)];
     context.gateway_dispatcher.process_instructions(instructions.span());
-    
+
     // Get all positions
     let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };
     let positions = vesuViewerDispatcher.get_all_positions(USER_ADDRESS());
-    
+
     // Verify positions
     let mut found_eth_deposit = false;
     let mut found_eth_usdc_borrow = false;
     let mut found_usdc_deposit = false;
-    
+
     assert(positions.len() == 3, 'wrong number of positions');
     for i in 0..positions.len() {
         let (collateral, debt, position) = *positions.at(i);
-        
+
         if collateral == context.token_address && debt == Zero::zero() {
             assert(position.collateral_shares > 0, 'ETH deposit position not found');
             found_eth_deposit = true;
         }
-        
+
         if collateral == context.token_address && debt == USDC_ERC20_ADDRESS() {
             assert(position.collateral_shares > 0, 'ETH-USDCc nf');
             assert(position.nominal_debt > 0, 'ETH-USDCb nf');
             found_eth_usdc_borrow = true;
         }
-        
+
         if collateral == USDC_ERC20_ADDRESS() && debt == Zero::zero() {
             assert(position.collateral_shares > 0, 'USDC deposit position not found');
             found_usdc_deposit = true;
         }
-    };
-    
+    }
+
     assert(found_eth_deposit, 'ETH deposit position missing');
     assert(found_eth_usdc_borrow, 'ETH-USDCb position missing');
     assert(found_usdc_deposit, 'USDC deposit position missing');
@@ -406,7 +396,7 @@ fn test_get_supported_assets_ui() {
     assert(assets.len() == crossCheckAssets.len(), 'assets length mismatch');
     // Verify we got some assets back
     assert(assets.len() > 0, 'no assets returned');
-    
+
     // Print the assets for debugging
     for i in 0..assets.len() {
         let asset = assets.at(i);

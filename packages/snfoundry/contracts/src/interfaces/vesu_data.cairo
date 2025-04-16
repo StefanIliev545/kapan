@@ -4,12 +4,12 @@ use starknet::ContractAddress;
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct Position {
     pub collateral_shares: u256, // packed as u128 [SCALE] 
-    pub nominal_debt: u256, // packed as u123 [SCALE]
+    pub nominal_debt: u256 // packed as u123 [SCALE]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct AssetConfig { //                                     | slot | packed | notes
-    //                                                      | ---- | ------ | ----- 
+    //                                                      | ---- | ------ | -----
     pub total_collateral_shares: u256, //       [SCALE]         | 1    | u128   |
     pub total_nominal_debt: u256, //            [SCALE]         | 1    | u123   |
     pub reserve: u256, //                       [asset scale]   | 2    | u128   |
@@ -20,12 +20,12 @@ pub struct AssetConfig { //                                     | slot | packed 
     pub last_updated: u64, //                   [seconds]       | 3    | u32    |
     pub last_rate_accumulator: u256, //         [SCALE]         | 3    | u64    |
     pub last_full_utilization_rate: u256, //    [SCALE]         | 3    | u64    |
-    pub fee_rate: u256, //                      [SCALE]         | 3    | u8     | percentage
+    pub fee_rate: u256 //                      [SCALE]         | 3    | u8     | percentage
 }
 
 #[derive(PartialEq, Copy, Drop, Serde, starknet::Store)]
 pub struct LTVConfig {
-    max_ltv: u64, // [SCALE]
+    max_ltv: u64 // [SCALE]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde, Default)]
@@ -70,21 +70,21 @@ pub struct AssetParams {
     initial_full_utilization_rate: u256, // [SCALE]
     max_utilization: u256, // [SCALE]
     is_legacy: bool,
-    fee_rate: u256, // [SCALE]
+    fee_rate: u256 // [SCALE]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct LTVParams {
     collateral_asset_index: usize,
     debt_asset_index: usize,
-    max_ltv: u64, // [SCALE]
+    max_ltv: u64 // [SCALE]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
 pub struct DebtCapParams {
     collateral_asset_index: usize,
     debt_asset_index: usize,
-    debt_cap: u256, // [SCALE]
+    debt_cap: u256 // [SCALE]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
@@ -95,7 +95,7 @@ pub struct ModifyPositionParams {
     pub user: ContractAddress,
     pub collateral: Amount,
     pub debt: Amount,
-    pub data: Span<felt252>
+    pub data: Span<felt252>,
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
@@ -110,7 +110,7 @@ pub struct TransferPositionParams {
     pub collateral: UnsignedAmount,
     pub debt: UnsignedAmount,
     pub from_data: Span<felt252>,
-    pub to_data: Span<felt252>
+    pub to_data: Span<felt252>,
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
@@ -120,7 +120,7 @@ pub struct LiquidatePositionParams {
     debt_asset: ContractAddress,
     user: ContractAddress,
     receive_as_shares: bool,
-    data: Span<felt252>
+    data: Span<felt252>,
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
@@ -129,7 +129,7 @@ pub struct UpdatePositionResponse {
     pub collateral_shares_delta: i257, // [SCALE]
     pub debt_delta: i257, // [asset scale]
     pub nominal_debt_delta: i257, // [SCALE]
-    pub bad_debt: u256, // [asset scale]
+    pub bad_debt: u256 // [asset scale]
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]
@@ -146,5 +146,5 @@ pub struct Context {
     pub debt_asset_fee_shares: u256,
     pub max_ltv: u64,
     pub user: ContractAddress,
-    pub position: Position
+    pub position: Position,
 }
