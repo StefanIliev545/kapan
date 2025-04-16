@@ -77,7 +77,7 @@ export const useTransactor = (
       } else if (tx != null) {
         transactionHash = (
           await walletClient.execute(tx, {
-            version: constants.TRANSACTION_VERSION.V3,
+            version: constants.TRANSACTION_VERSION.V2,
           })
         ).transaction_hash;
       } else {

@@ -38,7 +38,7 @@ const getContractDataFromDeployments = (): Record<
         try {
           const abiFilePath = path.join(
             __dirname,
-            `../../contracts/target/dev/kapan_${contractData.contract}.contract_class.json`
+            `../../contracts/target/release/kapan_${contractData.contract}.contract_class.json`
           );
           const abiContent: CompiledSierra = JSON.parse(
             fs.readFileSync(abiFilePath, "utf8")

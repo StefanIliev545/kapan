@@ -44,7 +44,7 @@ function main() {
 
   try {
     const command =
-      `cd contracts && scarb build && ts-node ../scripts-ts/deploy.ts` +
+      `cd contracts && scarb --profile release build && ts-node ../scripts-ts/deploy.ts` +
       ` --network ${argv.network || "devnet"}` +
       `${resetFlag ? " " + resetFlag : ""}` +
       ` && ts-node ../scripts-ts/helpers/parse-deployments.ts && cd ..`;

@@ -10,7 +10,7 @@ export async function mintEth(inputAddress: Address, eth: string) {
       body: JSON.stringify({
         address: inputAddress,
         amount: parseFloat(eth) * 10 ** 18,
-        unit: "WEI",
+        unit: "FRI",
       }),
     });
     if (!response.ok) {

@@ -93,6 +93,7 @@ export const VesuProtocolView: FC = () => {
           borrowRate={formatRate(borrowAPR)}
           price={formatPrice(asset.price.value)}
           utilization={formatUtilization(asset.utilization)}
+          address={address}
         />
       );
     });

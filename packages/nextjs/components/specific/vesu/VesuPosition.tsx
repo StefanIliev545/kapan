@@ -1,6 +1,7 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
+import { DepositModalStark } from "~~/components/modals/DepositModalStark";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -69,6 +70,8 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   isVtoken,
   supportedAssets,
 }) => {
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+
   // Find metadata for both assets
   const collateralMetadata = supportedAssets.find(
     asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === collateralAsset,
@@ -124,114 +127,128 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   const ltv = collateralValue > 0n ? (debtValue * 100n) / collateralValue : 0n;
 
   return (
-    <div className="card bg-base-100 shadow-md">
-      <div className="card-body p-4">
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-2">
-            <img src={tokenNameToLogo(collateralSymbol.toLowerCase())} alt={collateralSymbol} className="w-6 h-6" />
-            <span className="font-medium">{collateralSymbol}</span>
-            {isVtoken && <span className="badge badge-sm badge-primary">vToken</span>}
-          </div>
-          {nominalDebt !== "0" && (
+    <>
+      <div className="card bg-base-100 shadow-md">
+        <div className="card-body p-4">
+          <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
-              <img src={tokenNameToLogo(debtSymbol.toLowerCase())} alt={debtSymbol} className="w-6 h-6" />
-              <span className="font-medium">{debtSymbol}</span>
+              <img src={tokenNameToLogo(collateralSymbol.toLowerCase())} alt={collateralSymbol} className="w-6 h-6" />
+              <span className="font-medium">{collateralSymbol}</span>
+              {isVtoken && <span className="badge badge-sm badge-primary">vToken</span>}
             </div>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {/* Collateral Section */}
-          <div className="space-y-2">
-            <div className="text-2xl font-bold">
-              {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(4) : formattedCollateral}
-            </div>
-            <div className="text-lg text-gray-500">${(Number(collateralValue) / 1e18).toFixed(2)}</div>
-
-            <div className="divider my-1"></div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Supply APY</span>
-                <span className="text-sm font-medium text-success">
-                  {(collateralRates.supplyAPY * 100).toFixed(3)}%
-                </span>
+            {nominalDebt !== "0" && (
+              <div className="flex items-center gap-2">
+                <img src={tokenNameToLogo(debtSymbol.toLowerCase())} alt={debtSymbol} className="w-6 h-6" />
+                <span className="font-medium">{debtSymbol}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Monthly yield</span>
-                <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Debt Section */}
-          <div className="space-y-2">
-            {nominalDebt === "0" ? (
-              <>
-                <div className="text-2xl font-bold text-gray-400">No debt</div>
-                <div className="text-lg text-gray-400">$0.00</div>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {debtSymbol === "ETH" ? parseFloat(formattedDebt).toFixed(4) : formattedDebt}
-                </div>
-                <div className="text-lg text-gray-500">${(Number(debtValue) / 1e18).toFixed(2)}</div>
-              </>
             )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Collateral Section */}
+            <div className="space-y-2">
+              <div className="text-2xl font-bold">
+                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(4) : formattedCollateral}
+              </div>
+              <div className="text-lg text-gray-500">${(Number(collateralValue) / 1e18).toFixed(2)}</div>
 
-            <div className="divider my-1"></div>
+              <div className="divider my-1"></div>
 
-            <div className="space-y-1">
-              {nominalDebt === "0" ? (
+              <div className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-400">No debt</span>
-                  <span className="text-sm font-medium text-gray-400">-</span>
+                  <span className="text-sm text-gray-500">Supply APY</span>
+                  <span className="text-sm font-medium text-success">
+                    {(collateralRates.supplyAPY * 100).toFixed(3)}%
+                  </span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-500">Monthly yield</span>
+                  <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Debt Section */}
+            <div className="space-y-2">
+              {nominalDebt === "0" ? (
+                <>
+                  <div className="text-2xl font-bold text-gray-400">No debt</div>
+                  <div className="text-lg text-gray-400">$0.00</div>
+                </>
               ) : (
                 <>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Borrow APR</span>
-                    <span className="text-sm font-medium text-error">{(debtRates.borrowAPR * 100).toFixed(3)}%</span>
+                  <div className="text-2xl font-bold">
+                    {debtSymbol === "ETH" ? parseFloat(formattedDebt).toFixed(4) : formattedDebt}
                   </div>
+                  <div className="text-lg text-gray-500">${(Number(debtValue) / 1e18).toFixed(2)}</div>
+                </>
+              )}
+
+              <div className="divider my-1"></div>
+
+              <div className="space-y-1">
+                {nominalDebt === "0" ? (
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Monthly cost</span>
-                    <span className="text-sm font-medium">${(Number(monthlyCost) / 1e18).toFixed(2)}</span>
+                    <span className="text-sm text-gray-400">No debt</span>
+                    <span className="text-sm font-medium text-gray-400">-</span>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Borrow APR</span>
+                      <span className="text-sm font-medium text-error">{(debtRates.borrowAPR * 100).toFixed(3)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Monthly cost</span>
+                      <span className="text-sm font-medium">${(Number(monthlyCost) / 1e18).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="divider my-2"></div>
+
+          <div className="flex justify-between items-center">
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-500">Loan-to-value</span>
+              <span className="text-sm font-medium">{Number(ltv).toFixed(2)}%</span>
+            </div>
+            <div className="flex gap-2">
+              {isVtoken ? (
+                <>
+                  <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
+                  <button className="btn btn-sm btn-error">Withdraw</button>
+                </>
+              ) : nominalDebt === "0" ? (
+                <>
+                  <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
+                  <button className="btn btn-sm btn-primary">Borrow</button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
+                  <button className="btn btn-sm btn-primary">Borrow</button>
+                  <button className="btn btn-sm btn-primary">Repay</button>
+                  <button className="btn btn-sm btn-error">Withdraw</button>
                 </>
               )}
             </div>
           </div>
         </div>
-
-        <div className="divider my-2"></div>
-
-        <div className="flex justify-between items-center">
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-500">Loan-to-value</span>
-            <span className="text-sm font-medium">{Number(ltv).toFixed(2)}%</span>
-          </div>
-          <div className="flex gap-2">
-            {isVtoken ? (
-              <>
-                <button className="btn btn-sm btn-primary">Deposit</button>
-                <button className="btn btn-sm btn-error">Withdraw</button>
-              </>
-            ) : nominalDebt === "0" ? (
-              <>
-                <button className="btn btn-sm btn-primary">Deposit</button>
-                <button className="btn btn-sm btn-primary">Borrow</button>
-              </>
-            ) : (
-              <>
-                <button className="btn btn-sm btn-primary">Deposit</button>
-                <button className="btn btn-sm btn-primary">Borrow</button>
-                <button className="btn btn-sm btn-primary">Repay</button>
-                <button className="btn btn-sm btn-error">Withdraw</button>
-              </>
-            )}
-          </div>
-        </div>
       </div>
-    </div>
+
+      <DepositModalStark
+        isOpen={isDepositModalOpen}
+        onClose={() => setIsDepositModalOpen(false)}
+        token={{
+          name: collateralSymbol,
+          icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+          address: collateralAsset,
+          currentRate: collateralRates.supplyAPY * 100,
+        }}
+        protocolName="Vesu"
+      />
+    </>
   );
 };

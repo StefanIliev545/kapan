@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x4aafa2b594e4a69556ee865972ddae4680b8aa059860e876da4cf9483bf7a0a",
+        "0x3521b9e3f4d4800e6cf3de34dd508bb712ea7088feb84163de4755db301c38d",
       abi: [
         {
           type: "impl",

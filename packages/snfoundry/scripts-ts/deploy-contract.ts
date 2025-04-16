@@ -116,7 +116,7 @@ const findContractFile = (
   contract: string,
   fileType: "compiled_contract_class" | "contract_class"
 ): string => {
-  const targetDir = path.resolve(__dirname, "../contracts/target/dev");
+  const targetDir = path.resolve(__dirname, "../contracts/target/release");
   const files = fs.readdirSync(targetDir);
 
   // Look for files that end with the contract name and file type
@@ -126,7 +126,7 @@ const findContractFile = (
   if (!matchingFile) {
     throw new Error(
       `Could not find ${fileType} file for contract "${contract}". ` +
-        `Try removing snfoundry/contracts/target, then run 'yarn compile' and check if your contract name is correct inside the contracts/target/dev directory.`
+        `Try removing snfoundry/contracts/target, then run 'yarn compile' and check if your contract name is correct inside the contracts/target/release directory.`
     );
   }
 

@@ -33,7 +33,7 @@ pub struct TokenMetadata {
     pub scale: u256,
 } 
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub struct PositionWithAmounts {
     pub collateral_shares: u256,
     pub collateral_amount: u256,
