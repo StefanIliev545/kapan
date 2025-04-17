@@ -5,4 +5,5 @@ pub mod interfaces {
 }
 pub mod gateways {
     pub mod VesuGateway;
+    pub mod NostraGateway;
 }
