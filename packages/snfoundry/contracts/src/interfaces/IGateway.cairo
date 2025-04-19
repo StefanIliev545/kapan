@@ -7,33 +7,33 @@ pub struct BasicInstruction {
     pub user: ContractAddress,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub struct Deposit {
     pub basic: BasicInstruction,
     pub context: Option<Span<felt252>>,
 }
 
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub struct Borrow {
     pub basic: BasicInstruction,
     pub context: Option<Span<felt252>>,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub struct Repay {
     pub basic: BasicInstruction,
     pub context: Option<Span<felt252>>,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub struct Withdraw {
     pub basic: BasicInstruction,
     pub context: Option<Span<felt252>>,
 }
 
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub enum LendingInstruction {
     Deposit: Deposit,
     Borrow: Borrow,

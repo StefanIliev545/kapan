@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x3521b9e3f4d4800e6cf3de34dd508bb712ea7088feb84163de4755db301c38d",
+        "0x4a71d3deefb73c4dd09182e92436d5921b5f78fff9540c56c42cdfa1f257181",
       abi: [
         {
           type: "impl",
@@ -505,7 +505,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x590c763d6b9fb7d9e192b8ff8a96b838bc4b50cfd22424851e1758e1e60abce",
+        "0x6b5ffd351f2989cf37ba345922b8f81f7d0cd4de57f6139948ca978e731af92",
     },
   },
 } as const satisfies SNContractsType;

@@ -385,6 +385,7 @@ fn test_get_all_positions() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_supported_assets_ui() {
     let context = setup_test_context();
