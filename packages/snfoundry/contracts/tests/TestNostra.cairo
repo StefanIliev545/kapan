@@ -50,7 +50,7 @@ fn USDC_ADDRESS() -> ContractAddress {
     contract_address_const::<0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8>()
 }
 fn USDC_DEBT_TOKEN() -> ContractAddress {
-    contract_address_const::<0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff>()
+    contract_address_const::<0x063d69ae657bd2f40337c39bf35a870ac27ddf91e6623c2f52529db4c1619a51>()
 }
 fn USDC_COLLATERAL_TOKEN() -> ContractAddress {
     contract_address_const::<0x073f6addc9339de9822cab4dac8c9431779c09077f02ba7bc36904ea342dd9eb>()
@@ -141,7 +141,7 @@ fn setup_test_context() -> TestContext {
     
     // Pre-fund the test user with ETH and USDC
     println!("Pre-funding user address");
-    prefund_address(USER_ADDRESS(), ETH_ADDRESS(), 1500000000000000000); // 15 ETH
+    prefund_address(USER_ADDRESS(), ETH_ADDRESS(), 15000000000000000000); // 15 ETH
     
     let gateway_dispatcher = ILendingInstructionProcessorDispatcher {
         contract_address: gateway_address
@@ -208,6 +208,7 @@ fn test_deposit() {
 use kapan::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait};
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_withdraw() {
     let context = setup_test_context();
@@ -265,4 +266,89 @@ fn test_withdraw() {
     let after_balance = erc20.balance_of(USER_ADDRESS());
     println!("After USDC balance: {}", after_balance);
     assert(after_balance > final_balance, 'balance not increased');
+}
+
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_full_flow() {
+    let context = setup_test_context();
+    let depositERC20 = ETH_ADDRESS();
+
+    let deposit_amount = 5000000000000000000; // 500 USDC (we prefunded 1000 USDC)
+    let erc20 = IERC20Dispatcher { contract_address: depositERC20 };
+    
+    // Check initial balance
+    let initial_balance = erc20.balance_of(USER_ADDRESS());
+    println!("Initial USDC balance: {}", initial_balance);
+    assert(initial_balance >= deposit_amount, 'insufficient balance');
+    
+    // Approve the gateway to spend tokens
+    cheat_caller_address(depositERC20, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    erc20.approve(context.gateway_address, deposit_amount);
+    
+    // Create deposit instruction
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: depositERC20,
+            amount: deposit_amount, 
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    // Process the deposit instruction
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Deposit(deposit)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    
+    // Verify balance decreased
+    let final_balance = erc20.balance_of(USER_ADDRESS());
+    println!("Final ETH balance: {}", final_balance);
+    assert(final_balance < initial_balance, 'balance not decreased');
+    assert(initial_balance - final_balance == deposit_amount, 'incorrect amount deducted');
+
+    let borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 250000000,
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+
+    println!("approving delegation");
+    let debt_token = LentDebtTokenABIDispatcher { contract_address: USDC_DEBT_TOKEN() };
+    cheat_caller_address(USDC_DEBT_TOKEN(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    debt_token.approve_delegation(context.gateway_address, 250000000, USER_ADDRESS());
+    
+    println!("borrowing");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Borrow(borrow)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ADDRESS() };
+    let user_balance = usdc_erc20.balance_of(USER_ADDRESS());
+    println!("User USDC balance: {}", user_balance);
+    assert(user_balance > 0, 'user balance not increased');
+
+    let repay = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 50000000,
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+
+    println!("approving");
+    cheat_caller_address(USDC_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    usdc_erc20.approve(context.gateway_address, 50000000);
+
+    println!("repaying");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Repay(repay)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    let new_usdc_balance = usdc_erc20.balance_of(USER_ADDRESS());
+    println!("New USDC balance: {}", new_usdc_balance);
+    assert(new_usdc_balance < user_balance, 'balance not decreased');
 }

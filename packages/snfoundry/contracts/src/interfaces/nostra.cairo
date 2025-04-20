@@ -13,4 +13,10 @@ pub trait LentDebtTokenABI<TContractState> {
     fn transfer_from(
         ref self: TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256
     ) -> u256;
+    fn approve_delegation(
+        ref self: TContractState,
+        delegatee: ContractAddress,
+        amount: u256,
+        delegator: ContractAddress
+    ) -> bool;
 }

@@ -70,12 +70,37 @@ mod NostraGateway {
             collateral.burn(get_contract_address(), user, amount);
         }
 
-        fn borrow(ref self: ContractState, borrow: Borrow) {
+        fn borrow(ref self: ContractState, borrow: @Borrow) {
+            let borrow = *borrow;
+            let underlying = borrow.basic.token;
+            let amount = borrow.basic.amount;
+            let user = borrow.basic.user;
 
+            let debt = self.underlying_to_ndebt.read(underlying);
+            assert(debt != Zero::zero(), 'not-token');
+
+            let debt_token = LentDebtTokenABIDispatcher { contract_address: debt };
+            debt_token.borrow(user, amount);
+            let underlying_token = IERC20Dispatcher { contract_address: underlying };
+            assert(underlying_token.balance_of(get_contract_address()) >= amount, 'insufficient balance');
+            assert(underlying_token.transfer(user, amount), 'transfer failed');
         }
 
-        fn repay(ref self: ContractState, repay: Repay) {
+        fn repay(ref self: ContractState, repay: @Repay) {
+            let repay = *repay;
+            let underlying = repay.basic.token;
+            let amount = repay.basic.amount;
+            let user = repay.basic.user;
 
+            let debt = self.underlying_to_ndebt.read(underlying);
+            assert(debt != Zero::zero(), 'not-token');
+
+            let underlying_token = IERC20Dispatcher { contract_address: underlying };
+            underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount);
+            underlying_token.approve(debt, amount);
+            
+            let debt_token = LentDebtTokenABIDispatcher { contract_address: debt };
+            debt_token.repay(user, amount);
         }
     }
     
@@ -92,8 +117,10 @@ mod NostraGateway {
                         self.withdraw(instruction);
                     },
                     LendingInstruction::Borrow(instruction) => {
+                        self.borrow(instruction);
                     },
                     LendingInstruction::Repay(instruction) => {
+                        self.repay(instruction);
                     }
                 }
             }
