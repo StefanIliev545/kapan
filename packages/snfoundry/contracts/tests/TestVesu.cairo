@@ -245,9 +245,9 @@ fn test_borrow() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_repay() {
+    println!("testing repay");
     let mut context = setup_test_context();
     let amount = 5000000000000000000;
 

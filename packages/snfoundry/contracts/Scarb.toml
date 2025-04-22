@@ -24,6 +24,8 @@ sort-module-level-items = true
 
 [tool.scarb]  
 allow-prebuilt-plugins = ["snforge_std"]
+[tool.snforge]
+threads = 1
 
 [[tool.snforge.fork]]
 name = "MAINNET_LATEST"
