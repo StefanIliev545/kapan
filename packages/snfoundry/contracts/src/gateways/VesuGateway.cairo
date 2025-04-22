@@ -450,6 +450,10 @@ mod VesuGateway {
                 i += 1;
             }
         }
+        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)> {
+            let authorizations = ArrayTrait::new();
+            return authorizations.span();
+        }
     }
 
     #[abi(embed_v0)]

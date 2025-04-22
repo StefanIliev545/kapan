@@ -36,6 +36,7 @@ mod NostraGateway {
     #[generate_trait]
     impl NostraInternalFunctions of NostraInternalFunctionsTrait {
         fn deposit(ref self: ContractState, deposit: @Deposit) {
+            println!("deposit");
             let deposit = *deposit;
             let underlying = deposit.basic.token;
             let amount = deposit.basic.amount;
@@ -55,6 +56,7 @@ mod NostraGateway {
         }
 
         fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
+            println!("withdraw");
             let withdraw = *withdraw;
             let underlying = withdraw.basic.token;
             let amount = withdraw.basic.amount;
@@ -65,12 +67,13 @@ mod NostraGateway {
 
             let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
             println!("transferring from user {}", amount);
-            collateral.transfer_from(get_caller_address(), get_contract_address(), amount);
+            collateral.transfer_from(withdraw.basic.user, get_contract_address(), amount);
             println!("burning {}", amount);
-            collateral.burn(get_contract_address(), user, amount);
+            collateral.burn(get_contract_address(), get_caller_address(), amount);
         }
 
         fn borrow(ref self: ContractState, borrow: @Borrow) {
+            println!("borrow");
             let borrow = *borrow;
             let underlying = borrow.basic.token;
             let amount = borrow.basic.amount;
@@ -87,6 +90,7 @@ mod NostraGateway {
         }
 
         fn repay(ref self: ContractState, repay: @Repay) {
+            println!("repay");
             let repay = *repay;
             let underlying = repay.basic.token;
             let amount = repay.basic.amount;
@@ -124,6 +128,47 @@ mod NostraGateway {
                     }
                 }
             }
+        }
+
+        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)> {
+            let mut authorizations = ArrayTrait::new();
+            for instruction in instructions {
+                match instruction {
+                    LendingInstruction::Deposit(instruction) => {
+                        let token = *instruction.basic.token;
+                        let amount = instruction.basic.amount;
+                        let mut call_data: Array<felt252> = array![];
+                        Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
+                        Serde::serialize(amount, ref call_data);
+                        authorizations.append((token, selector!("approve"), call_data));
+                    },
+                    LendingInstruction::Borrow(instruction) => {
+                        let mut call_data: Array<felt252> = array![];
+                        Serde::serialize(@get_contract_address(), ref call_data);
+                        Serde::serialize(instruction.basic.amount, ref call_data);
+                        Serde::serialize(instruction.basic.user, ref call_data);
+                        let debt_token = self.underlying_to_ndebt.read(*instruction.basic.token);
+                        assert(debt_token != Zero::zero(), 'not-token');
+                        authorizations.append((debt_token, selector!("approve_delegation"), call_data));
+                    },
+                    LendingInstruction::Repay(instruction) => {
+                        let mut call_data: Array<felt252> = array![];
+                        Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
+                        Serde::serialize(instruction.basic.amount, ref call_data);
+                        authorizations.append((*instruction.basic.token, selector!("approve"), call_data));
+                    },
+                    LendingInstruction::Withdraw(instruction) => {
+                        let ibtoken = self.underlying_to_nibcollateral.read(*instruction.basic.token);
+                        assert(ibtoken != Zero::zero(), 'not-token');
+                        let mut call_data: Array<felt252> = array![];
+                        Serde::serialize(@get_contract_address(), ref call_data); //todo - this is a hack to get the address of the router..
+                        Serde::serialize(instruction.basic.amount, ref call_data);
+                        authorizations.append((ibtoken, selector!("approve"), call_data));
+                    },
+                    _ => {}
+                }
+            }
+            return authorizations.span();
         }
     }
 

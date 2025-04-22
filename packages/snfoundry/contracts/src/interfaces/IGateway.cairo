@@ -44,4 +44,5 @@ pub enum LendingInstruction {
 #[starknet::interface]
 pub trait ILendingInstructionProcessor<TContractState> {
     fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
+    fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)>;
 }

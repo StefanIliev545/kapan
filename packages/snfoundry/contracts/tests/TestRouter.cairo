@@ -36,6 +36,7 @@ use snforge_std::{
     CheatSpan,
     cheat_caller_address,
 };
+use starknet::syscalls::call_contract_syscall;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use openzeppelin::utils::serde::SerializedAppend;
 use kapan::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait};
@@ -202,27 +203,56 @@ fn test_router_setup() {
         },
         context: Option::None,
     };
+    let repay = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 200000000, // 10 USDC
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    let withdraw = Withdraw {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: 2500000000000000000, // 5 ETH
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
     
     // Create protocol instructions
+    // instructions have to be split in order to get the correct funding flow,
+    // else user is expected to have everything to go at step one, but here we repay with what we borrow.
     let mut protocol_instructions = array![];
     protocol_instructions.append(ProtocolInstructions {
         protocol_name: 'nostra',
         instructions: array![LendingInstruction::Deposit(deposit), LendingInstruction::Borrow(borrow)].span(),
     });
+    protocol_instructions.append(ProtocolInstructions {
+        protocol_name: 'nostra',
+        instructions: array![LendingInstruction::Repay(repay), LendingInstruction::Withdraw(withdraw)].span(),
+    });
     
     println!("Processing instructions through router");
-    // Process instructions through router
-    cheat_caller_address(USDC_DEBT_TOKEN(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    let usdc_debt_token = LentDebtTokenABIDispatcher { contract_address: USDC_DEBT_TOKEN() };
-    usdc_debt_token.approve_delegation(context.nostra_gateway_address, 200000000, USER_ADDRESS());
 
-    cheat_caller_address(ETH_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span());
+    println!("Authorizations: {:?}", authorizations);
+    println!("USDC DEBT TOKEN: {:?}", USDC_DEBT_TOKEN());
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        println!("Calling {:?} {:?} with {:?}", token, selector, call_data);
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    }
     let erc20 = IERC20Dispatcher { contract_address: ETH_ADDRESS() };
-    erc20.approve(context.router_address, 5000000000000000000);
+    let eth_balance = erc20.balance_of(USER_ADDRESS());
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
-    let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ADDRESS() };
-    let usdc_balance = usdc_erc20.balance_of(USER_ADDRESS());
-    println!("USDC balance: {}", usdc_balance);
-    assert(usdc_balance > 0, 'USDC balance not increased');
+
+    let eth_balance_after = erc20.balance_of(USER_ADDRESS());
+    println!("ETH balance before: {:?}", eth_balance);
+    println!("ETH balance after: {:?}", eth_balance_after);
+    assert(eth_balance-2500000000000000000 == eth_balance_after, 'ETH balance not increased');
 } 

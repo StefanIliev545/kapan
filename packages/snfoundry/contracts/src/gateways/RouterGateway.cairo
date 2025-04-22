@@ -20,6 +20,7 @@ pub struct ProtocolInstructions {
 pub trait RouterGatewayTrait<TContractState> {
     fn add_gateway(ref self: TContractState, protocol_name: felt252, gateway: ContractAddress);
     fn process_protocol_instructions(ref self: TContractState, instructions: Span<ProtocolInstructions>);
+    fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<ProtocolInstructions>) -> Span<(ContractAddress, felt252, Array<felt252>)>;
 }
 
 #[starknet::contract]
@@ -130,6 +131,20 @@ mod RouterGateway {
                 self.after_send_instructions(gateway, instructions_span);
                 i += 1;
             }
+        }
+
+        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>) -> Span<(ContractAddress, felt252, Array<felt252>)> {
+            let mut authorizations = ArrayTrait::new();
+            for instruction in instructions {
+                let gateway = self.gateways.read(*instruction.protocol_name);
+                let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
+                let gateway_authorizations = dispatcher.get_authorizations_for_instructions(*instruction.instructions);
+                for authorization in gateway_authorizations {
+                    let (token, selector, call_data) = authorization;
+                    authorizations.append((*token, *selector, call_data.clone()));
+                }
+            }
+            return authorizations.span();
         }
     }
 }
