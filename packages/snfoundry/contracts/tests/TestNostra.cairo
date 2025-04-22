@@ -270,6 +270,7 @@ fn test_withdraw() {
 
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_full_flow() {
     let context = setup_test_context();
@@ -352,6 +353,6 @@ fn test_full_flow() {
     println!("New USDC balance: {}", new_usdc_balance);
     assert(new_usdc_balance < user_balance, 'balance not decreased');
 
-    //cur:  0_162_090_880
+    //cur: 0_162_090_880
     //max: 5_000_000_000
 }

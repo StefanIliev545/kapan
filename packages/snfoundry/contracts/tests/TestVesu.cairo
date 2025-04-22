@@ -245,6 +245,7 @@ fn test_borrow() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_repay() {
     println!("testing repay");

@@ -46,7 +46,7 @@ mod NostraGateway {
 
             let ierc20 = IERC20Dispatcher { contract_address: underlying };
             println!("transferring from user {}", amount);
-            assert(ierc20.transfer_from(user, get_contract_address(), amount), 'transfer failed');
+            assert(ierc20.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
             assert(ierc20.approve(ibcollateral, amount), 'approve failed');
             
             let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
@@ -65,7 +65,7 @@ mod NostraGateway {
 
             let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
             println!("transferring from user {}", amount);
-            collateral.transfer_from(user, get_contract_address(), amount);
+            collateral.transfer_from(get_caller_address(), get_contract_address(), amount);
             println!("burning {}", amount);
             collateral.burn(get_contract_address(), user, amount);
         }
@@ -83,7 +83,7 @@ mod NostraGateway {
             debt_token.borrow(user, amount);
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
             assert(underlying_token.balance_of(get_contract_address()) >= amount, 'insufficient balance');
-            assert(underlying_token.transfer(user, amount), 'transfer failed');
+            assert(underlying_token.transfer(get_caller_address(), amount), 'transfer failed');
         }
 
         fn repay(ref self: ContractState, repay: @Repay) {
