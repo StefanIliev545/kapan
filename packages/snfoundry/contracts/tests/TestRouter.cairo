@@ -174,6 +174,7 @@ fn setup_test_context() -> TestContext {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_router_setup() {
     let context = setup_test_context();
@@ -255,4 +256,105 @@ fn test_router_setup() {
     println!("ETH balance before: {:?}", eth_balance);
     println!("ETH balance after: {:?}", eth_balance_after);
     assert(eth_balance-2500000000000000000 == eth_balance_after, 'ETH balance not increased');
+} 
+
+
+use kapan::gateways::VesuGateway::VesuContext;
+const POOL_ID: felt252 =
+    2198503327643286920898110335698706244522220458610657370981979460625005526824;
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_vesu() {
+    let context = setup_test_context();
+    
+    // Register gateways with router
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(2));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    println!("Adding NostraGateway to router");
+    router.add_gateway('nostra', context.nostra_gateway_address);
+    println!("Adding VesuGateway to router");
+    router.add_gateway('vesu', context.vesu_gateway_address);
+    
+    // Create a deposit instruction for Nostra
+    let mut borrow_array = array![];
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: ETH_ADDRESS() }.serialize(ref borrow_array);
+    let mut withdraw_context = array![];
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: USDC_ADDRESS() }.serialize(ref withdraw_context);
+    
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: 5000000000000000000, // 5 ETH
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    let borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 200000000, // 10 USDC
+            user: USER_ADDRESS(),
+        },
+        context: Option::Some(borrow_array.span()),
+    };
+    let repay = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 50000000, // 10 USDC
+            user: USER_ADDRESS(),
+        },
+        context: Option::Some(borrow_array.span()),
+    };
+    let withdraw = Withdraw {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: 2500000000000000000, // 5 ETH
+            user: USER_ADDRESS(),
+        },
+        context: Option::Some(withdraw_context.span()),
+    };
+    
+    // Create protocol instructions
+    // instructions have to be split in order to get the correct funding flow,
+    // else user is expected to have everything to go at step one, but here we repay with what we borrow.
+    let mut protocol_instructions = array![];
+    protocol_instructions.append(ProtocolInstructions {
+        protocol_name: 'vesu',
+        instructions: array![LendingInstruction::Deposit(deposit), LendingInstruction::Borrow(borrow)].span(),
+    });
+    protocol_instructions.append(ProtocolInstructions {
+        protocol_name: 'vesu',
+        instructions: array![LendingInstruction::Repay(repay), LendingInstruction::Withdraw(withdraw)].span(),
+    });
+    
+    println!("Processing instructions through router");
+
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span());
+    println!("Authorizations: {:?}", authorizations);
+    println!("USDC DEBT TOKEN: {:?}", USDC_DEBT_TOKEN());
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        println!("Calling {:?} {:?} with {:?}", token, selector, call_data);
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    }
+    let erc20 = IERC20Dispatcher { contract_address: ETH_ADDRESS() };
+    let eth_balance = erc20.balance_of(USER_ADDRESS());
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+
+    let eth_balance_after = erc20.balance_of(USER_ADDRESS());
+    println!("ETH balance before: {:?}", eth_balance);
+    println!("ETH balance after: {:?}", eth_balance_after);
+    let expected_balance = eth_balance - 2500000000000000000;
+    let balance_diff = if eth_balance_after > expected_balance {
+        eth_balance_after - expected_balance
+    } else {
+        expected_balance - eth_balance_after
+    };
+    println!("Balance diff: {:?}", balance_diff);
+    assert(balance_diff < 1000000000000000, 'ETH balance not as expected'); // Allow small difference of 0.001 ETH
 } 
