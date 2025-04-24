@@ -21,6 +21,7 @@ pub trait RouterGatewayTrait<TContractState> {
     fn add_gateway(ref self: TContractState, protocol_name: felt252, gateway: ContractAddress);
     fn process_protocol_instructions(ref self: TContractState, instructions: Span<ProtocolInstructions>);
     fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<ProtocolInstructions>) -> Span<(ContractAddress, felt252, Array<felt252>)>;
+    fn move_debt(ref self: TContractState, instructions: Span<ProtocolInstructions>);
 }
 
 #[starknet::contract]
@@ -32,7 +33,7 @@ mod RouterGateway {
     };
     use super::*;
     use starknet::{contract_address_const, get_caller_address, get_contract_address};
-
+    use crate::interfaces::vesu::{IFlashloanReceiver, IFlashloanProviderDispatcher, IFlashloanProviderDispatcherTrait};
 
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -50,11 +51,13 @@ mod RouterGateway {
     struct Storage {
         owner: ContractAddress,
         gateways: Map<felt252, ContractAddress>,
+        flashloan_provider: ContractAddress,
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, _owner: ContractAddress) {
+    fn constructor(ref self: ContractState, _owner: ContractAddress, flashloan_provider: ContractAddress) {
         self.owner.write(_owner);
+        self.flashloan_provider.write(flashloan_provider);
     }
 
     #[generate_trait]
@@ -145,6 +148,45 @@ mod RouterGateway {
                 }
             }
             return authorizations.span();
+        }
+
+        fn move_debt(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
+            let flashloan_provider = IFlashloanProviderDispatcher { contract_address: self.flashloan_provider.read() };
+            // Get first instruction and ensure it's a repay
+            let first_protocol = instructions.at(0);
+            let first_instruction = *first_protocol.instructions.at(0);
+            let repay = match first_instruction {
+                LendingInstruction::Repay(repay) => repay,
+                _ => panic!("bad-instruction-order")
+            };
+
+            // Get asset and amount from repay instruction
+            let asset = repay.basic.token;
+            let amount = repay.basic.amount;
+            let is_legacy = false;
+
+            // Serialize instructions for flash loan data
+            let mut data = ArrayTrait::new();
+            Serde::serialize(@instructions, ref data);
+            flashloan_provider.flash_loan(get_contract_address(), asset, amount, is_legacy, data.span());
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl RouterGatewayFlashloanReceiver of IFlashloanReceiver<ContractState> {
+        fn on_flash_loan(ref self: ContractState, sender: ContractAddress, asset: ContractAddress, amount: u256, data: Span<felt252>) {
+            assert(sender == get_contract_address(), 'sender mismatch');
+            let mut data = data;
+            let mut protocol_instructions: Span<ProtocolInstructions> = Serde::deserialize(ref data).unwrap();
+
+
+            // settle flash loan
+            let erc20 = IERC20Dispatcher { contract_address: asset };
+            let balance = erc20.balance_of(get_contract_address());
+            println!("balance: {}", balance);
+            let result = erc20.approve(get_caller_address(), amount);
+            assert(result, 'transfer failed');
+            println!("flash-loan-end");
         }
     }
 }

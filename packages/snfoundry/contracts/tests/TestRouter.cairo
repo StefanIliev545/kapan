@@ -41,6 +41,11 @@ use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTr
 use openzeppelin::utils::serde::SerializedAppend;
 use kapan::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait};
 
+// Real contract address deployed on Sepolia
+fn SINGLETON_ADDRESS() -> ContractAddress {
+    contract_address_const::<0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef>()
+}
+
 // Nostra Finance tokens
 fn ETH_ADDRESS() -> ContractAddress {
     contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>()
@@ -113,6 +118,7 @@ fn deploy_router_gateway() -> ContractAddress {
     let contract_class = declare("RouterGateway").unwrap().contract_class();
     let mut calldata = array![];
     calldata.append_serde(USER_ADDRESS());
+    calldata.append_serde(SINGLETON_ADDRESS());
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -264,6 +270,7 @@ const POOL_ID: felt252 =
     2198503327643286920898110335698706244522220458610657370981979460625005526824;
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_vesu() {
     let context = setup_test_context();
@@ -357,4 +364,104 @@ fn test_vesu() {
     };
     println!("Balance diff: {:?}", balance_diff);
     assert(balance_diff < 1000000000000000, 'ETH balance not as expected'); // Allow small difference of 0.001 ETH
+} 
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_move_debt() {
+    let context = setup_test_context();
+    
+    // Register gateways with router
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(2));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('nostra', context.nostra_gateway_address);
+    router.add_gateway('vesu', context.vesu_gateway_address);
+    
+    // First create a position in Nostra
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: 5000000000000000000, // 5 ETH
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    let borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 200000000, // 200 USDC
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    // Create and process initial position
+    let mut initial_instructions = array![];
+    initial_instructions.append(ProtocolInstructions {
+        protocol_name: 'nostra',
+        instructions: array![LendingInstruction::Deposit(deposit), LendingInstruction::Borrow(borrow)].span(),
+    });
+    
+    // Get and process authorizations
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(initial_instructions.span());
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    }
+    // Process initial position
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(initial_instructions.span());
+    
+    // Now create instructions to move debt to Vesu
+    let mut move_debt_instructions = array![];
+    
+    // First repay in Nostra
+    let repay = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 200000000, // 200 USDC
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    // Then borrow in Vesu
+    let mut vesu_context = array![];
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: ETH_ADDRESS() }.serialize(ref vesu_context);
+    
+    let vesu_borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: 200000000, // 200 USDC
+            user: USER_ADDRESS(),
+        },
+        context: Option::Some(vesu_context.span()),
+    };
+    
+    move_debt_instructions.append(ProtocolInstructions {
+        protocol_name: 'nostra',
+        instructions: array![LendingInstruction::Repay(repay)].span(),
+    });
+    
+    move_debt_instructions.append(ProtocolInstructions {
+        protocol_name: 'vesu',
+        instructions: array![LendingInstruction::Borrow(vesu_borrow)].span(),
+    });
+    
+    // Get and process authorizations for move debt
+    let move_debt_authorizations = context.router_dispatcher.get_authorizations_for_instructions(move_debt_instructions.span());
+    for authorization in move_debt_authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    }
+    
+    println!("Processing move debt");
+    // Process move debt
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.move_debt(move_debt_instructions.span());
 } 

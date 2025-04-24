@@ -141,14 +141,7 @@ pub trait ISingleton<TContractState> {
         ref self: TContractState, params: ModifyPositionParams,
     ) -> UpdatePositionResponse;
     fn transfer_position(ref self: TContractState, params: TransferPositionParams);
-    fn flash_loan(
-        ref self: TContractState,
-        receiver: ContractAddress,
-        asset: ContractAddress,
-        amount: u256,
-        is_legacy: bool,
-        data: Span<felt252>,
-    );
+   
     fn modify_delegation(
         ref self: TContractState, pool_id: felt252, delegatee: ContractAddress, delegation: bool,
     );
@@ -206,3 +199,21 @@ pub trait IDefaultExtensionCL<TContractState> {
     ) -> ContractAddress;
 }
 
+#[starknet::interface]
+pub trait IFlashloanReceiver<TContractState> {
+    fn on_flash_loan(
+        ref self: TContractState, sender: ContractAddress, asset: ContractAddress, amount: u256, data: Span<felt252>
+    );
+}
+
+#[starknet::interface]
+pub trait IFlashloanProvider<TContractState> {
+    fn flash_loan(
+        ref self: TContractState,
+        receiver: ContractAddress,
+        asset: ContractAddress,
+        amount: u256,
+        is_legacy: bool,
+        data: Span<felt252>,
+    );
+}
