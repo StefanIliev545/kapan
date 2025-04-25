@@ -62,22 +62,25 @@ mod RouterGateway {
 
     #[generate_trait]
     impl InternalFunctions of InternalFunctionsTrait {
-        fn before_send_instructions(ref self: ContractState,gateway: ContractAddress, instructions: Span<LendingInstruction>) {
+        fn before_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, should_transfer: bool) {
             let mut i: usize = 0;
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit) => {
                         let basic = *deposit.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        assert(basic.user == get_caller_address(), 'user mismatch');
                         println!("before transfer {} ", basic.amount);
-                        assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
+                        if should_transfer {
+                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
+                        }
                         assert(erc20.approve(gateway, basic.amount), 'approve failed');
                     },
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
+                        if should_transfer {
+                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
+                        }
                         assert(erc20.approve(gateway, basic.amount), 'approve failed');
                     },
                     _ => {}
@@ -86,22 +89,45 @@ mod RouterGateway {
             }
         }
 
-        fn after_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>) {
+        fn after_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, should_transfer: bool) {
             let mut i: usize = 0;
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Borrow(borrow) => {
                         let basic = *borrow.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
+                        if should_transfer {
+                            assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
+                        }
                     },
                     LendingInstruction::Withdraw(withdraw) => {
                         let basic = *withdraw.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
+                        if should_transfer {
+                            assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
+                        }
                     },
                     _ => {}
                 }
+                i += 1;
+            }
+        }
+
+        fn process_protocol_instructions_internal(ref self: ContractState, instructions: Span<ProtocolInstructions>, should_transfer: bool) {
+            let mut i: usize = 0;
+            while i != instructions.len() {
+                let protocol_instruction = instructions.at(i);
+                let gateway = self.gateways.read(*protocol_instruction.protocol_name);
+                assert(!gateway.is_zero(), 'Gateway not supported');
+
+                let instructions_span = *protocol_instruction.instructions;
+                println!("before send instructions");
+                self.before_send_instructions(gateway, instructions_span, should_transfer);
+                println!("processing instructions through gateway");
+                let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
+                dispatcher.process_instructions(instructions_span);
+                println!("after send instructions");
+                self.after_send_instructions(gateway, instructions_span, should_transfer);
                 i += 1;
             }
         }
@@ -118,22 +144,7 @@ mod RouterGateway {
         }
 
         fn process_protocol_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
-            let mut i: usize = 0;
-            while i != instructions.len() {
-                let protocol_instruction = instructions.at(i);
-                let gateway = self.gateways.read(*protocol_instruction.protocol_name);
-                assert(!gateway.is_zero(), 'Gateway not supported');
-
-                let instructions_span = *protocol_instruction.instructions;
-                println!("before send instructions");
-                self.before_send_instructions(gateway, instructions_span);
-                println!("processing instructions through gateway");
-                let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
-                dispatcher.process_instructions(instructions_span);
-                println!("after send instructions");
-                self.after_send_instructions(gateway, instructions_span);
-                i += 1;
-            }
+            self.process_protocol_instructions_internal(instructions, true);
         }
 
         fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>) -> Span<(ContractAddress, felt252, Array<felt252>)> {
@@ -179,6 +190,7 @@ mod RouterGateway {
             let mut data = data;
             let mut protocol_instructions: Span<ProtocolInstructions> = Serde::deserialize(ref data).unwrap();
 
+            self.process_protocol_instructions_internal(protocol_instructions, false); //no outside transfer, we do it in place
 
             // settle flash loan
             let erc20 = IERC20Dispatcher { contract_address: asset };

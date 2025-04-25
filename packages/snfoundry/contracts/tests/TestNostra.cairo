@@ -353,6 +353,7 @@ fn test_full_flow() {
     println!("New USDC balance: {}", new_usdc_balance);
     assert(new_usdc_balance < user_balance, 'balance not decreased');
 
-    //cur: 0_162_090_880
-    //max: 5_000_000_000
+    //cur:  0_162_090_880
+    //max:  5_000_000_000
+    //test: 2_793_898_880
 }

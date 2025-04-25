@@ -427,11 +427,28 @@ fn test_move_debt() {
         },
         context: Option::None,
     };
+    let withdraw = Withdraw {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: 5000000000000000000, // 5 ETH
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
     
     // Then borrow in Vesu
     let mut vesu_context = array![];
     VesuContext { pool_id: POOL_ID, position_counterpart_token: ETH_ADDRESS() }.serialize(ref vesu_context);
     
+
+    let vesu_deposit = Deposit {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: 5000000000000000000, // 5 ETH
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
     let vesu_borrow = Borrow {
         basic: BasicInstruction {
             token: USDC_ADDRESS(),
@@ -443,12 +460,12 @@ fn test_move_debt() {
     
     move_debt_instructions.append(ProtocolInstructions {
         protocol_name: 'nostra',
-        instructions: array![LendingInstruction::Repay(repay)].span(),
+        instructions: array![LendingInstruction::Repay(repay), LendingInstruction::Withdraw(withdraw)].span(),
     });
     
     move_debt_instructions.append(ProtocolInstructions {
         protocol_name: 'vesu',
-        instructions: array![LendingInstruction::Borrow(vesu_borrow)].span(),
+        instructions: array![LendingInstruction::Deposit(vesu_deposit), LendingInstruction::Borrow(vesu_borrow)].span(),
     });
     
     // Get and process authorizations for move debt
