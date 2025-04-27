@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { mintEth } from "~~/services/web3/faucet";
+import { mintStrk } from "~~/services/web3/faucet";
 import { Address, devnet } from "@starknet-react/chains";
 import { useTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
 import useScaffoldEthBalance from "~~/hooks/scaffold-stark/useScaffoldEthBalance";
@@ -29,7 +29,7 @@ export const FaucetButton = () => {
 
     try {
       setLoading(true);
-      await mintEth(address as Address, NUM_OF_ETH);
+      await mintStrk(address as Address, NUM_OF_ETH);
       setLoading(false);
     } catch (error) {
       console.error("⚡️ ~ file: FaucetButton.tsx:sendETH ~ error", error);

@@ -10,6 +10,7 @@ import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
 import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
+import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
 // Define network options
 const networkOptions: NetworkOption[] = [
   {
@@ -85,7 +86,10 @@ const App: NextPage = () => {
         </>
       )}
       {selectedNetwork === "starknet" && (
-        <VesuProtocolView />
+        <>
+          <VesuProtocolView />
+          <NostraProtocolView />
+        </>
       )}
     </div>
   );

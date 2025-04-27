@@ -11,12 +11,6 @@ export const getConnectors = (): Connector[] => {
   const connectorsInstance = [
     new InjectedConnector({ options: { id: "braavos", name: "Braavos" } }) as unknown as Connector,
     new InjectedConnector({ options: { id: "argentX", name: "Argent X" } }) as unknown as Connector,
-    new InjectedConnector({ options: { id: "keplr", name: "Keplr" } }) as unknown as Connector,
-    new InjectedConnector({ options: { id: "metamask", name: "MetaMask" } }) as unknown as Connector,
-    new InjectedConnector({ options: { id: "okxwallet", name: "OKX" } }) as unknown as Connector,
-    new InjectedConnector({ options: { id: "fordefi", name: "Fordefi" } }) as unknown as Connector,
-    new ArgentMobileConnector() as unknown as Connector,
-    new WebWalletConnector({ url: "https://web.argent.xyz" }) as unknown as Connector,
   ];
   console.log("Connectors created");
   return connectorsInstance;

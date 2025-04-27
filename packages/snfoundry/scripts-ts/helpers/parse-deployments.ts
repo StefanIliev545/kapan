@@ -44,7 +44,6 @@ const getContractDataFromDeployments = (): Record<
             fs.readFileSync(abiFilePath, "utf8")
           );
 
-          console.log(`Abi content: ${abiContent.abi}`);
           allContractsData[chainId] = {
             ...allContractsData[chainId],
             [contractName]: {

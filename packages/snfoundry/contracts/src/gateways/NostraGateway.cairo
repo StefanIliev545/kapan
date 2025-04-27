@@ -1,20 +1,23 @@
 use starknet::contract_address::ContractAddress;
+use crate::interfaces::nostra::{InterestRateConfig, InterestRateModelABI};
 
 #[starknet::interface]
 pub trait INostraGateway<TContractState> {
     fn add_supported_asset(ref self: TContractState, underlying: ContractAddress, debt: ContractAddress, collateral: ContractAddress, ibcollateral: ContractAddress);
+    fn get_user_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, u256, u256)>;
+    fn get_interest_rates(self: @TContractState, underlyings: Span<ContractAddress>) -> Array<InterestRateConfig>;
 }
 
 #[starknet::contract]
 mod NostraGateway {
-    use starknet::storage::{ Map, StorageMapReadAccess, StorageMapWriteAccess };
+    use starknet::storage::{ Map, Vec, VecTrait, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerWriteAccess, StoragePointerReadAccess };
     use starknet::contract_address::ContractAddress;
     use crate::interfaces::IGateway::{
         ILendingInstructionProcessor,
         LendingInstruction,
     };
     use crate::interfaces::IGateway::{Deposit, Withdraw, Borrow, Repay};
-    use crate::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait};
+    use crate::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait, InterestRateModelABIDispatcher, InterestRateModelABIDispatcherTrait, InterestRateConfig};
     use super::INostraGateway;
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starknet::{contract_address_const, get_caller_address, get_contract_address};
@@ -27,10 +30,13 @@ mod NostraGateway {
         underlying_to_ndebt: Map<ContractAddress, ContractAddress>, // underlying -> Nostra debt token
         underlying_to_ncollateral: Map<ContractAddress, ContractAddress>, // underlying -> Nostra collateral token
         underlying_to_nibcollateral: Map<ContractAddress, ContractAddress>, // underlying -> Nostra interest bearing collateral token
+        supported_assets: Vec<ContractAddress>, // underlying tokens
+        interest_rate_model: ContractAddress,
     }
 
     #[constructor]
-    fn constructor(ref self:ContractState) {
+    fn constructor(ref self:ContractState, interest_rate_model: ContractAddress) {
+        self.interest_rate_model.write(interest_rate_model);
     }
 
     #[generate_trait]
@@ -178,6 +184,45 @@ mod NostraGateway {
             self.underlying_to_ndebt.write(underlying, debt);
             self.underlying_to_ncollateral.write(underlying, collateral);
             self.underlying_to_nibcollateral.write(underlying, ibcollateral);
+            self.supported_assets.push(underlying);
+        }
+
+        fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, u256, u256)> {
+            let mut positions = array![];
+            let mut i = 0;
+            println!("supported_assets.len() {}", self.supported_assets.len());
+            while i != self.supported_assets.len() {
+                let underlying = self.supported_assets.at(i).read();
+                let debt = self.underlying_to_ndebt.read(underlying);
+                let collateral = self.underlying_to_ncollateral.read(underlying);
+                let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
+
+                let debt_balance = IERC20Dispatcher { contract_address: debt }.balance_of(user);
+                let collateral_raw = IERC20Dispatcher { contract_address: collateral }.balance_of(user);
+                let collateral_balance = if collateral_raw == 0 {
+                    IERC20Dispatcher { contract_address: ibcollateral }.balance_of(user)
+                } else {
+                    collateral_raw
+                };
+                positions.append((underlying, debt_balance, collateral_balance));
+                i += 1;
+            }
+            return positions;
+        }
+
+        fn get_interest_rates(self: @ContractState, underlyings: Span<ContractAddress>) -> Array<InterestRateConfig> {
+            let mut rates = array![];
+            let mut i = 0;
+            while i != underlyings.len() {
+                let underlying = *underlyings.at(i);
+                let debt = self.underlying_to_ndebt.read(underlying);
+                let interest_rate_model = self.interest_rate_model.read();
+                let model = InterestRateModelABIDispatcher { contract_address: interest_rate_model };
+                let config = model.get_interest_state(debt);
+                rates.append(config);
+                i += 1;
+            }
+            return rates;
         }
     }
 }

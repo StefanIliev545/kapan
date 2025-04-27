@@ -12,14 +12,20 @@ const currentNetworkName = currentNetwork.network;
 
 // Get RPC URL for the current network
 const rpcUrl = currentNetwork.rpcUrls.public.http[0] || "";
-const provider =
-  rpcUrl === "/rpc" || containsDevnet(scaffoldConfig.targetSNNetworks)
-    ? publicProvider()
-    : jsonRpcProvider({
-        rpc: () => ({
-          nodeUrl: rpcUrl,
-          chainId: starknetChainId(currentNetwork.id),
-        }),
-      });
+
+// Important: if the rpcUrl is empty (not configed in .env), we use the publicProvider
+// which randomly choose a provider from the chain list of public providers.
+// Some public provider might have strict rate limits.
+if (!rpcUrl) {
+  console.warn(`No RPC Provider URL configured for ${currentNetworkName}. Using public provider.`);
+}
+
+const provider = jsonRpcProvider({
+  rpc: () => ({
+    nodeUrl: rpcUrl,
+    specVersion: "0.8",
+    chainId: starknetChainId(currentNetwork.id),
+  }),
+});
 
 export default provider;

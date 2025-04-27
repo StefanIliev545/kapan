@@ -1,25 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTargetNetwork } from "./useTargetNetwork";
+import { devnet } from "@starknet-react/chains";
+import { useProvider } from "@starknet-react/core";
+import { Abi, ExtractAbiEvent, ExtractAbiEventNames } from "abi-wan-kanabi/kanabi";
+import { RpcProvider, hash } from "starknet";
+import { CallData, events as starknetEvents } from "starknet";
 import { useInterval } from "usehooks-ts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import scaffoldConfig from "~~/scaffold.config";
 import { replacer } from "~~/utils/scaffold-stark/common";
-import {
-  Abi,
-  ExtractAbiEvent,
-  ExtractAbiEventNames,
-} from "abi-wan-kanabi/kanabi";
-import {
-  ContractAbi,
-  ContractName,
-  UseScaffoldEventHistoryConfig,
-} from "~~/utils/scaffold-stark/contract";
-import { devnet } from "@starknet-react/chains";
-import { useProvider } from "@starknet-react/core";
-import { hash, RpcProvider } from "starknet";
-import { events as starknetEvents, CallData } from "starknet";
-import { parseEventData } from "~~/utils/scaffold-stark/eventsData";
+import { ContractAbi, ContractName, UseScaffoldEventHistoryConfig } from "~~/utils/scaffold-stark/contract";
 import { composeEventFilterKeys } from "~~/utils/scaffold-stark/eventKeyFilter";
+import { parseEventData } from "~~/utils/scaffold-stark/eventsData";
 
 const MAX_KEYS_COUNT = 16;
 /**
@@ -52,20 +44,13 @@ export const useScaffoldEventHistory = <
   watch,
   format = true,
   enabled = true,
-}: UseScaffoldEventHistoryConfig<
-  TContractName,
-  TEventName,
-  TBlockData,
-  TTransactionData,
-  TReceiptData
->) => {
+}: UseScaffoldEventHistoryConfig<TContractName, TEventName, TBlockData, TTransactionData, TReceiptData>) => {
   const [events, setEvents] = useState<any[]>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [fromBlockUpdated, setFromBlockUpdated] = useState<bigint>(fromBlock);
 
-  const { data: deployedContractData, isLoading: deployedContractLoading } =
-    useDeployedContractInfo(contractName);
+  const { data: deployedContractData, isLoading: deployedContractLoading } = useDeployedContractInfo(contractName);
   const { provider } = useProvider();
   const { targetNetwork } = useTargetNetwork();
 
@@ -76,34 +61,31 @@ export const useScaffoldEventHistory = <
   }, [targetNetwork.rpcUrls.public.http]);
 
   const readEvents = async (fromBlock?: bigint) => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
+      if (deployedContractLoading) {
+        return;
+      }
+
       if (!deployedContractData) {
         throw new Error("Contract not found");
       }
 
-      if (!enabled) {
-        throw new Error("Hook disabled");
-      }
-
       const event = (deployedContractData.abi as Abi).find(
-        (part) => part.type === "event" && part.name === eventName,
+        part => part.type === "event" && part.name === eventName,
       ) as ExtractAbiEvent<ContractAbi<TContractName>, TEventName>;
 
-      const blockNumber = (await publicClient.getBlockLatestAccepted())
-        .block_number;
+      const blockNumber = (await publicClient.getBlockLatestAccepted()).block_number;
 
-      if (
-        (fromBlock && blockNumber >= fromBlock) ||
-        blockNumber >= fromBlockUpdated
-      ) {
-        let keys: string[][] = [
-          [hash.getSelectorFromName(event.name.split("::").slice(-1)[0])],
-        ];
+      if ((fromBlock && blockNumber >= fromBlock) || blockNumber >= fromBlockUpdated) {
+        let keys: string[][] = [[hash.getSelectorFromName(event.name.split("::").slice(-1)[0])]];
         if (filters) {
-          keys = keys.concat(
-            composeEventFilterKeys(filters, event, deployedContractData.abi),
-          );
+          keys = keys.concat(composeEventFilterKeys(filters, event, deployedContractData.abi));
         }
         keys = keys.slice(0, MAX_KEYS_COUNT);
         const rawEventResp = await publicClient.getEvents({
@@ -130,15 +112,11 @@ export const useScaffoldEventHistory = <
                 : await publicClient.getBlockWithTxHashes(logs[i].block_hash),
             transaction:
               transactionData && logs[i].transaction_hash !== null
-                ? await publicClient.getTransactionByHash(
-                    logs[i].transaction_hash,
-                  )
+                ? await publicClient.getTransactionByHash(logs[i].transaction_hash)
                 : null,
             receipt:
               receiptData && logs[i].transaction_hash !== null
-                ? await publicClient.getTransactionReceipt(
-                    logs[i].transaction_hash,
-                  )
+                ? await publicClient.getTransactionReceipt(logs[i].transaction_hash)
                 : null,
           });
         }
@@ -195,16 +173,12 @@ export const useScaffoldEventHistory = <
         readEvents();
       }
     },
-    watch
-      ? targetNetwork.id !== devnet.id
-        ? scaffoldConfig.pollingInterval
-        : 4_000
-      : null,
+    watch ? (targetNetwork.id !== devnet.id ? scaffoldConfig.pollingInterval : 4_000) : null,
   );
 
   const eventHistoryData = useMemo(() => {
     if (deployedContractData) {
-      return (events || []).map((event) => {
+      return (events || []).map(event => {
         const logs = [JSON.parse(JSON.stringify(event.log))];
         const parsed = starknetEvents.parseEvents(
           logs,
@@ -227,7 +201,7 @@ export const useScaffoldEventHistory = <
 
   return {
     data: eventHistoryData,
-    isLoading: isLoading,
+    isLoading: isLoading || deployedContractLoading,
     error: error,
   };
 };

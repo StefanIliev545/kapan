@@ -28,6 +28,7 @@ use snforge_std::{
     cheat_caller_address,
 };
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+use openzeppelin::utils::serde::SerializedAppend;
 
 // Nostra Finance tokens
 
@@ -81,6 +82,10 @@ fn USER_ADDRESS() -> ContractAddress {
     contract_address_const::<0x0113c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>()
 }
 
+fn INTEREST_RATE_MODEL() -> ContractAddress {
+    contract_address_const::<0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff>()
+}
+
 // Helper struct for test context
 #[derive(Drop)]
 struct TestContext {
@@ -91,7 +96,8 @@ struct TestContext {
 // Deploy NostraGateway
 fn deploy_nostra_gateway() -> ContractAddress {
     let contract_class = declare("NostraGateway").unwrap().contract_class();
-    let calldata = array![];
+    let mut calldata = array![];
+    calldata.append_serde(INTEREST_RATE_MODEL());
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -355,5 +361,5 @@ fn test_full_flow() {
 
     //cur:  0_162_090_880
     //max:  5_000_000_000
-    //test: 2_793_898_880
+    //router-test-all: 2_793_898_880
 }

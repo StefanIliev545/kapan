@@ -1,14 +1,14 @@
 import scaffoldConfig from "~~/scaffold.config";
 
-export const fetchPriceFromCoingecko = async (symbol: string, retries = 3): Promise<number> => {
+export const fetchPrice = async (retries = 3): Promise<number> => {
   let attempt = 0;
   while (attempt < retries) {
     try {
-      const response = await fetch(`/api/price/${symbol}`);
+      const response = await fetch(`/api/price`);
       const data = await response.json();
-      return symbol === "ETH" ? data.ethereum.usd : data.starknet.usd;
+      return data.starknet.usd;
     } catch (error) {
-      console.error(`Attempt ${attempt + 1} - Error fetching ${symbol} price from Coingecko: `, error);
+      console.error(`Attempt ${attempt + 1} - Error fetching STRK price from Coingecko: `, error);
       attempt++;
       if (attempt === retries) {
         console.error(`Failed to fetch price after ${retries} attempts.`);
@@ -26,11 +26,9 @@ class PriceService {
     any,
     {
       setNativeCurrencyPrice: (price: number) => void;
-      setStrkCurrencyPrice: (price: number) => void;
     }
   > = new Map();
   private currentNativeCurrencyPrice = 0;
-  private currentStrkCurrencyPrice = 0;
   private idCounter = 0;
 
   static getInstance(): PriceService {
@@ -44,17 +42,12 @@ class PriceService {
     return ++this.idCounter;
   }
 
-  public startPolling(
-    ref: any,
-    setNativeCurrencyPrice: (price: number) => void,
-    setStrkCurrencyPrice: (price: number) => void,
-  ) {
+  public startPolling(ref: any, setNativeCurrencyPrice: (price: number) => void) {
     if (this.listeners.has(ref)) return;
-    this.listeners.set(ref, { setNativeCurrencyPrice, setStrkCurrencyPrice });
+    this.listeners.set(ref, { setNativeCurrencyPrice });
 
     if (this.intervalId) {
       setNativeCurrencyPrice(this.currentNativeCurrencyPrice);
-      setStrkCurrencyPrice(this.currentStrkCurrencyPrice);
       return;
     }
 
@@ -79,21 +72,14 @@ class PriceService {
     return this.currentNativeCurrencyPrice;
   }
 
-  public getCurrentStrkCurrencyPrice() {
-    return this.currentStrkCurrencyPrice;
-  }
-
   private async fetchPrices() {
     try {
-      const ethPrice = await fetchPriceFromCoingecko("ETH");
-      const strkPrice = await fetchPriceFromCoingecko("STRK");
-      if (ethPrice && strkPrice) {
-        this.currentNativeCurrencyPrice = ethPrice;
-        this.currentStrkCurrencyPrice = strkPrice;
+      const strkPrice = await fetchPrice();
+      if (strkPrice) {
+        this.currentNativeCurrencyPrice = strkPrice;
       }
       this.listeners.forEach(listener => {
-        listener.setNativeCurrencyPrice(ethPrice || this.currentNativeCurrencyPrice);
-        listener.setStrkCurrencyPrice(strkPrice || this.currentStrkCurrencyPrice);
+        listener.setNativeCurrencyPrice(strkPrice || this.currentNativeCurrencyPrice);
       });
     } catch (error) {
       console.error("Error fetching prices:", error);

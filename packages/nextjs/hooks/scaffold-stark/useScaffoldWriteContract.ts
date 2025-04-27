@@ -22,11 +22,8 @@ export const useScaffoldWriteContract = <
 }: UseScaffoldWriteConfig<TAbi, TContractName, TFunctionName>) => {
   const { data: deployedContractData } = useDeployedContractInfo(contractName);
   const { chain } = useNetwork();
-  const sendTxnWrapper = useTransactor();
+  const { writeTransaction: sendTxnWrapper, sendTransactionInstance } = useTransactor();
   const { targetNetwork } = useTargetNetwork();
-
-  // leave blank for now since default args will be called by the trigger function anyway
-  const sendTransactionInstance = useSendTransaction({});
 
   const sendContractWriteTx = useCallback(
     async (params?: { args?: UseScaffoldWriteConfig<TAbi, TContractName, TFunctionName>["args"] }) => {
@@ -54,18 +51,10 @@ export const useScaffoldWriteContract = <
 
       const newCalls = deployedContractData ? [contractInstance.populate(functionName, newArgs as any[])] : [];
 
-      if (sendTransactionInstance.sendAsync) {
-        try {
-          // setIsMining(true);
-          return await sendTxnWrapper(() => sendTransactionInstance.sendAsync(newCalls as any[]));
-        } catch (e: any) {
-          throw e;
-        } finally {
-          // setIsMining(false);
-        }
-      } else {
-        notification.error("Contract writer error. Try again.");
-        return;
+      try {
+        return await sendTxnWrapper(newCalls as any[]);
+      } catch (e: any) {
+        throw e;
       }
     },
     [args, chain?.id, deployedContractData, functionName, sendTransactionInstance, sendTxnWrapper, targetNetwork.id],

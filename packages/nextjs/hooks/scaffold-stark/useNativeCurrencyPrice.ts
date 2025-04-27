@@ -12,7 +12,7 @@ export const useNativeCurrencyPrice = () => {
   const ref = useRef<string>(priceService.getNextId().toString());
   useEffect(() => {
     const id = ref.current;
-    priceService.startPolling(id, setNativeCurrencyPrice, setStrkCurrencyPrice);
+    priceService.startPolling(id, setNativeCurrencyPrice);
     return () => {
       priceService.stopPolling(id);
     };

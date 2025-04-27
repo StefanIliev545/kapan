@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
-import { StarknetConfig, starkscan } from "@starknet-react/core";
+import { StarknetConfig, argent, braavos, starkscan, useInjectedConnectors } from "@starknet-react/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
@@ -12,7 +12,7 @@ import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
-import { appChains, connectors } from "~~/services/web3/connectors";
+import { appChains } from "~~/services/web3/connectors";
 import provider from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 
@@ -49,11 +49,18 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     setMounted(true);
   }, []);
 
+  const connectors = useInjectedConnectors({
+    recommended: [argent(), braavos()],
+    includeRecommended: "onlyIfNoConnectors",
+    order: "random",
+  });
+
+
   return (
     <StarknetConfig
       chains={appChains}
       provider={provider}
-      connectors={connectors}
+      connectors={connectors.connectors}
       explorer={starkscan}
       autoConnect={true}
     >

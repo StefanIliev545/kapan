@@ -36,7 +36,6 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { address: userAddress } = useAccount();
   const { data: deployedContractData } = useDeployedContractInfo("VesuGateway");
-  console.log(`Token: ${token.address}`)
 
       // Convert the decimal amount (entered in UI) to wei (18 decimals)
     const decimalAmount = parseFloat(amount? amount : "0");
@@ -66,13 +65,6 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
         functionName: "approve",
         args: [deployedContractData?.address, amountWei]
       },
-      {
-        contractName: "VesuGateway",
-        functionName: "process_instructions",
-        args: [[
-            lendingInstruction
-        ]],
-      }
     ],
   });
 

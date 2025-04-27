@@ -6,7 +6,7 @@ import { Address as AddressType, devnet } from "@starknet-react/chains";
 import { useAccount, useNetwork, useProvider } from "@starknet-react/core";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { AddressInput, EtherInput } from "~~/components/scaffold-stark";
-import { mintEth } from "~~/services/web3/faucet";
+import { mintStrk } from "~~/services/web3/faucet";
 import { notification } from "~~/utils/scaffold-stark";
 
 /**
@@ -61,7 +61,7 @@ export const Faucet = () => {
       return;
     }
 
-    const res = await mintEth(inputAddress, sendValue);
+    const res = await mintStrk(inputAddress, sendValue);
     if (!res.new_balance) {
       setLoading(false);
       notification.error(`${res}`);
@@ -70,7 +70,7 @@ export const Faucet = () => {
     setLoading(false);
     setInputAddress(undefined);
     setSendValue("");
-    notification.success("ETH sent successfully!");
+    notification.success("STRK sent successfully!");
   };
 
   // Render only on local chain

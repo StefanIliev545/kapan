@@ -20,3 +20,20 @@ pub trait LentDebtTokenABI<TContractState> {
         delegator: ContractAddress
     ) -> bool;
 }
+
+#[derive(Drop, Serde)]
+pub struct InterestRateConfig {
+    pub optimal_utilization_rate: u256,
+    pub base_borrowing_rate: u256,
+    pub rate_slope_1: u256,
+    pub rate_slope_2: u256,
+    pub general_protocol_fee: u256,
+    pub fees_recipient: ContractAddress,
+    pub interest_bearing_token: ContractAddress,
+    pub interest_bearing_collateral_token: ContractAddress,
+}
+
+#[starknet::interface]
+pub trait InterestRateModelABI<TContractState> {
+    fn get_interest_state(self: @TContractState, debt_token: ContractAddress) -> InterestRateConfig;
+}
