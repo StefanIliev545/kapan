@@ -87,6 +87,7 @@ const App: NextPage = () => {
       )}
       {selectedNetwork === "starknet" && (
         <>
+          <VesuProtocolView />
           <NostraProtocolView />
         </>
       )}

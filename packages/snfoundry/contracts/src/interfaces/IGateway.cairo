@@ -46,3 +46,9 @@ pub trait ILendingInstructionProcessor<TContractState> {
     fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
     fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)>;
 }
+
+#[starknet::interface]
+pub trait InterestRateView<TContractState> {
+    fn get_borrow_rate(ref self: TContractState, token_address: ContractAddress) -> u256;
+    fn get_supply_rate(ref self: TContractState, token_address: ContractAddress) -> u256;
+}

@@ -4,7 +4,8 @@ import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -52,41 +53,49 @@ export const CompoundProtocolView: FC = () => {
 
   // For each token, call the aggregated getCompoundData function.
   // getCompoundData returns a tuple: [supplyRate, borrowRate, balance, borrowBalance]
-  const { data: wethCompoundData } = useScaffoldReadContract({
+  const { data: wethCompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [wethAddress, queryAddress],
   });
-  const { data: usdcCompoundData } = useScaffoldReadContract({
+  const { data: usdcCompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [usdcAddress, queryAddress],
   });
-  const { data: usdtCompoundData } = useScaffoldReadContract({
+  const { data: usdtCompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [usdtAddress, queryAddress],
   });
-  const { data: usdcECompoundData } = useScaffoldReadContract({
+  const { data: usdcECompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [usdcEAddress, queryAddress],
   });
 
   // Fetch decimals for each token.
-  const { data: wethDecimals } = useScaffoldReadContract({
+  const { data: wethDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "eth",
     functionName: "decimals",
   });
-  const { data: usdcDecimals } = useScaffoldReadContract({
+  const { data: usdcDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "USDC",
     functionName: "decimals",
   });
-  const { data: usdtDecimals } = useScaffoldReadContract({
+  const { data: usdtDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "USDT",
     functionName: "decimals",
   });
-  const { data: usdcEDecimals } = useScaffoldReadContract({
+  const { data: usdcEDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "USDCe",
     functionName: "decimals",
   });
@@ -212,6 +221,7 @@ export const CompoundProtocolView: FC = () => {
         borrowedPositions={borrowedPositions}
         hideUtilization={true}
         forceShowAll={forceShowAll}
+        networkType="evm"
       />
     </div>
   );

@@ -3,7 +3,8 @@ import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
 export const AaveProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
@@ -40,7 +41,8 @@ export const AaveProtocolView: FC = () => {
   const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 
   // Get all token info, including supply and borrow balances, using query address
-  const { data: allTokensInfo } = useScaffoldReadContract({
+  const { data: allTokensInfo } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "AaveGateway",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
@@ -104,6 +106,7 @@ export const AaveProtocolView: FC = () => {
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
       forceShowAll={forceShowAll}
+      networkType="evm"
     />
   );
 };

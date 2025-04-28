@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x1d6e524e1b7e2ba13d1521281a18ae16f8e650045422b19c40339a4b2194da1",
+        "0x447ed7a47eb0c610b278b49503ab380c5e6d4d6c1c7c65c1e7af6d410e35423",
       abi: [
         {
           type: "impl",
@@ -233,6 +233,49 @@ const contracts = {
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "InterestRateViewImpl",
+          interface_name: "kapan::interfaces::IGateway::InterestRateView",
+        },
+        {
+          type: "interface",
+          name: "kapan::interfaces::IGateway::InterestRateView",
+          items: [
+            {
+              type: "function",
+              name: "get_borrow_rate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_supply_rate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -531,11 +574,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x5acc7d15a24f6105e48666e09a4046249bf454022aa0187b10cfca3ed682558",
+        "0x3a88afb8b9aab98e482dec13d2db1e220378b392808f4ef17821c52a89eed8e",
     },
     NostraGateway: {
       address:
-        "0x45ecbf8dfeaa867a539db4b7ec2e262312f5b9a1212336a50fbf4c38806c613",
+        "0x3f6675f0dfa6fdd827401ce4e6d8dbf1a67ccc76a0e27093f3d7e01b48f5ee1",
       abi: [
         {
           type: "impl",
@@ -835,6 +878,49 @@ const contracts = {
           ],
         },
         {
+          type: "impl",
+          name: "InterestRateViewImpl",
+          interface_name: "kapan::interfaces::IGateway::InterestRateView",
+        },
+        {
+          type: "interface",
+          name: "kapan::interfaces::IGateway::InterestRateView",
+          items: [
+            {
+              type: "function",
+              name: "get_borrow_rate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_supply_rate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
           type: "constructor",
           name: "constructor",
           inputs: [
@@ -852,7 +938,125 @@ const contracts = {
         },
       ],
       classHash:
-        "0x4622593d3b2a02f621be37f110f66d11307677d963b54ebdf8510752d6ed0c4",
+        "0x381fb177fbbac6a0f0bb5bc0a197e5d6f88267b0575840bc6d79be209fc6c53",
+    },
+    OptimalInterestRateFinder: {
+      address:
+        "0x749ec1c860d382891f8b925dbae4c28a6f7d72472998079721d569de87fc922",
+      abi: [
+        {
+          type: "impl",
+          name: "IOptimalInterestRateFinderImpl",
+          interface_name:
+            "kapan::utils::optimal_interest_rate_finder::IOptimalInterestRateFinder",
+        },
+        {
+          type: "struct",
+          name: "core::integer::u256",
+          members: [
+            {
+              name: "low",
+              type: "core::integer::u128",
+            },
+            {
+              name: "high",
+              type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "kapan::utils::optimal_interest_rate_finder::IOptimalInterestRateFinder",
+          items: [
+            {
+              type: "function",
+              name: "find_optimal_borrow_rate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "(core::felt252, core::integer::u256)",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "find_optimal_supply_rate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "(core::felt252, core::integer::u256)",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "findOptimalSupplyRate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "(core::felt252, core::integer::u256)",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "findOptimalBorrowRate",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "(core::felt252, core::integer::u256)",
+                },
+              ],
+              state_mutability: "view",
+            },
+          ],
+        },
+        {
+          type: "constructor",
+          name: "constructor",
+          inputs: [
+            {
+              name: "nostra_gateway",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "vesu_gateway",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "kapan::utils::optimal_interest_rate_finder::OptimalInterestRateFinder::Event",
+          kind: "enum",
+          variants: [],
+        },
+      ],
+      classHash:
+        "0x782fd31b8dc3aa7d53435712ffee7692704e3b720b5084b556eff8f5475e04d",
     },
   },
 } as const satisfies SNContractsType;

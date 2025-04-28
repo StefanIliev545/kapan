@@ -2,10 +2,11 @@ import { FC, useMemo, useState, useEffect } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { ContractName } from "~~/utils/scaffold-stark/contract";
 import { useAccount } from "~~/hooks/useAccount";
 import { feltToString } from "~~/utils/protocols";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
 type UserPositionTuple = {
   0: bigint; // underlying token address
@@ -32,8 +33,9 @@ export const NostraProtocolView: FC = () => {
   console.log("queryAddress", queryAddress);
 
   // Get user positions
-  const { data: userPositions } = useScaffoldReadContract({
-    contractName: "NostraGateway" as ContractName,
+  const { data: userPositions } = useNetworkAwareReadContract({
+    networkType: "starknet",
+    contractName: "NostraGateway",
     functionName: "get_user_positions",
     args: [queryAddress],
     refetchInterval: 0,
@@ -51,8 +53,9 @@ export const NostraProtocolView: FC = () => {
   }, [userPositions]);
 
   // Get interest rates for all supported assets
-  const { data: interestRates } = useScaffoldReadContract({
-    contractName: "NostraGateway" as ContractName,
+  const { data: interestRates } = useNetworkAwareReadContract({
+    networkType: "starknet",
+    contractName: "NostraGateway",
     functionName: "get_interest_rates",
     args: [uniqueContractAddresses],
     refetchInterval: 0,
@@ -120,6 +123,7 @@ export const NostraProtocolView: FC = () => {
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
       forceShowAll={forceShowAll}
+      networkType="starknet"
     />
   );
 };

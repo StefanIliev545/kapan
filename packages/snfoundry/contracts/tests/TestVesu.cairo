@@ -405,3 +405,16 @@ fn test_get_supported_assets_ui() {
         println!("Asset {}: symbol={}, decimals={}", i, asset.symbol, asset.decimals);
     };
 }
+
+use kapan::interfaces::IGateway::{InterestRateViewDispatcher, InterestRateViewDispatcherTrait};
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_get_borrow_rate() {
+    let mut context = setup_test_context();
+    let interestRateViewDispatcher = InterestRateViewDispatcher { contract_address: context.gateway_address };
+    let borrow_rate = interestRateViewDispatcher.get_borrow_rate(context.token_address);
+    println!("borrow rate: {}", borrow_rate);
+    let supply_rate = interestRateViewDispatcher.get_supply_rate(context.token_address);
+    println!("supply rate: {}", supply_rate);
+}

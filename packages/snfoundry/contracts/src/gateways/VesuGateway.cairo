@@ -6,6 +6,9 @@ use openzeppelin::token::erc20::interface::{
 };
 use starknet::ContractAddress;
 use crate::interfaces::vesu_data::{AssetPrice, Position};
+use core::num::traits::Pow;
+use core::traits::Into;
+use core::integer::u256;
 
 pub mod Errors {
     pub const APPROVE_FAILED: felt252 = 'Approve failed';
@@ -517,6 +520,82 @@ mod VesuGateway {
                 }
             }
             return authorizations.span();
+        }
+    }
+
+    use crate::interfaces::IGateway::InterestRateView;
+    use alexandria_math::{pow};
+
+    #[abi(embed_v0)]
+    impl InterestRateViewImpl of InterestRateView<ContractState> {
+        fn get_borrow_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
+            let pool_id = self.pool_id.read();
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+            let extension = IDefaultExtensionCLDispatcher {
+                contract_address: singleton_dispatcher.extension(pool_id),
+            };
+
+            // Get rate information from the singleton
+            let utilization = singleton_dispatcher.utilization(pool_id, token_address);
+            let (asset_config, _) = singleton_dispatcher.asset_config(pool_id, token_address);
+            let interest_per_second = extension.interest_rate(
+                pool_id,
+                token_address,
+                utilization,
+                asset_config.last_updated,
+                asset_config.last_full_utilization_rate,
+            );
+
+            // Convert to APR (multiply by YEAR_IN_SECONDS and divide by SCALE)
+            let year_in_seconds: u256 = 31536000; // 365 days
+            let scale: u256 = pow(10,10);
+            let borrow_rate = (interest_per_second * year_in_seconds) ;
+
+            // Return rate and scale
+            borrow_rate
+        }
+
+        fn get_supply_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
+            let pool_id = self.pool_id.read();
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+            let extension = IDefaultExtensionCLDispatcher {
+                contract_address: singleton_dispatcher.extension(pool_id),
+            };
+    
+            // Fetch rate data
+            let utilization = singleton_dispatcher.utilization(pool_id, token_address);
+            let (asset_config, _) = singleton_dispatcher.asset_config(pool_id, token_address);
+            let interest_per_second = extension.interest_rate(
+                pool_id,
+                token_address,
+                utilization,
+                asset_config.last_updated,
+                asset_config.last_full_utilization_rate,
+            );
+    
+            let year_in_seconds: u256 = 31536000;
+            let scale: u256 = pow(10, 18);
+    
+            // 1. Compute numerator: interest * year * total_debt * last_rate (no divisions yet)
+            let mut numerator = interest_per_second * year_in_seconds;
+            numerator = numerator * asset_config.total_nominal_debt;
+            numerator = numerator * asset_config.last_rate_accumulator;
+    
+            // 2. Compute denominator components with scaling
+            let reserve_scale_part = (asset_config.reserve * scale) / asset_config.scale;
+            let total_borrowed_part = (asset_config.total_nominal_debt * asset_config.last_rate_accumulator) / scale;
+    
+            // 3. Combine denominator and scale it
+            let denominator = (reserve_scale_part + total_borrowed_part) * scale;
+    
+            // 4. Final division (precision preserved)
+            let supply_rate = numerator / denominator;
+    
+            supply_rate
         }
     }
 

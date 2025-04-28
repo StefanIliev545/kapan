@@ -29,6 +29,7 @@ interface ProtocolViewProps {
   borrowedPositions: ProtocolPosition[];
   hideUtilization?: boolean;
   forceShowAll?: boolean; // If true, always show all assets regardless of showAll toggle
+  networkType: "evm" | "starknet"; // Specify which network this protocol view is for
 }
 
 // Health status indicator component that shows utilization percentage
@@ -59,6 +60,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   borrowedPositions,
   hideUtilization = false,
   forceShowAll = false,
+  networkType,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -249,7 +251,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <div className=" pt-2 space-y-3">
                   {filteredSuppliedPositions.map((position, index) => (
                     <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
-                      <SupplyPosition {...position} protocolName={protocolName} />
+                      <SupplyPosition {...position} protocolName={protocolName} networkType={networkType} />
                     </div>
                   ))}
 
@@ -285,7 +287,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <div className="pt-2 space-y-3">
                   {filteredBorrowedPositions.map((position, index) => (
                     <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
-                      <BorrowPosition {...position} protocolName={protocolName} />
+                      <BorrowPosition {...position} protocolName={protocolName} networkType={networkType} />
                     </div>
                   ))}
                   
@@ -398,6 +400,7 @@ export const ExampleProtocolView: FC = () => {
       maxLtv={80}
       suppliedPositions={exampleSuppliedPositions}
       borrowedPositions={exampleBorrowedPositions}
+      networkType="evm"
     />
   );
 };

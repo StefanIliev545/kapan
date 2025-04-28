@@ -71,6 +71,14 @@ const deployScript = async (): Promise<string> => {
     },
   });
 
+  await deployContract({
+    contract: "OptimalInterestRateFinder",
+    constructorArgs: {
+      nostra_gateway: nostraGatewayAddress,
+      vesu_gateway: vesuGatewayAddress,
+    },
+  });
+
   return nostraGatewayAddress;
 };
 
@@ -82,7 +90,7 @@ const initializeContracts = async (gatewayAddress: string): Promise<void> => {
     {
       contractAddress: gatewayAddress,
       entrypoint: "add_supported_asset",
-    calldata: [
+      calldata: [
         "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
         "0x00ba3037d968790ac486f70acaa9a1cab10cf5843bb85c986624b4d0e5a82e74", // ETH debt
         "0x044debfe17e4d9a5a1e226dabaf286e72c9cc36abbe71c5b847e669da4503893", // ETH collateral

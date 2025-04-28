@@ -7,12 +7,13 @@ import { RepayModal } from "./modals/RepayModal";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { FiatBalance } from "./FiatBalance";
-
+import { feltToString } from "~~/utils/protocols";
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
   protocolName: string;
+  networkType: "evm" | "starknet";
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -25,8 +26,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   tokenAddress,
   tokenPrice,
   tokenDecimals,
+  tokenSymbol,
   collateralView,
   collateralValue,
+  networkType,
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
@@ -41,7 +44,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const hasBalance = tokenBalance > 0;
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract
-  const { data: optimalRateData } = useScaffoldReadContract({
+  const { data: optimalRateData } = useNetworkAwareReadContract({
+    networkType,
     contractName: "OptimalInterestRateFinder",
     functionName: "findOptimalBorrowRate",
     args: [tokenAddress],
@@ -50,7 +54,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   let optimalProtocol = "";
   let optimalRateDisplay = 0;
   if (optimalRateData) {
-    const [proto, rate] = optimalRateData;
+    let proto;
+    let rate; 
+    if (networkType === "starknet") {
+      proto = feltToString(BigInt(optimalRateData?.[0]?.toString() || "0"));
+      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
+    } else {
+      proto = optimalRateData?.[0]?.toString() || "";
+      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
+    }
     optimalProtocol = proto;
     optimalRateDisplay = Number(rate) / 1e8;
   }
@@ -182,9 +194,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 <Image
                   src={getProtocolLogo(optimalProtocol)}
                   alt={optimalProtocol}
-                  width={16}
-                  height={16}
-                  className="flex-shrink-0 rounded-full ml-1"
+                  width={optimalProtocol == "vesu" ? 35: 16}
+                  height={optimalProtocol == "vesu" ? 35: 16}
+                  className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
             </div>

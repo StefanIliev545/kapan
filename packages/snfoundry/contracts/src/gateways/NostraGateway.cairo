@@ -238,4 +238,26 @@ mod NostraGateway {
             return rates;
         }
     }
+
+
+    use crate::interfaces::IGateway::InterestRateView;
+
+    #[abi(embed_v0)]
+    impl InterestRateViewImpl of InterestRateView<ContractState> {
+        fn get_borrow_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
+            let interest_rate_model = self.interest_rate_model.read();
+            let debt = self.underlying_to_ndebt.read(token_address);
+            let model = InterestRateModelABIDispatcher { contract_address: interest_rate_model };
+            let config = model.get_interest_state(debt);
+            config.borrowing_rate
+        }
+
+        fn get_supply_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
+            let interest_rate_model = self.interest_rate_model.read();
+            let debt = self.underlying_to_ndebt.read(token_address);
+            let model = InterestRateModelABIDispatcher { contract_address: interest_rate_model };
+            let config = model.get_interest_state(debt);
+            config.lending_rate
+        }
+    }
 }

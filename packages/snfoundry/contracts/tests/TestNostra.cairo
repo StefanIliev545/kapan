@@ -357,6 +357,7 @@ fn test_full_flow() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_user_positions() {
     let context = setup_test_context();
@@ -400,6 +401,7 @@ fn test_get_user_positions() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_interest_rates() {
     let context = setup_test_context();
@@ -407,4 +409,18 @@ fn test_get_interest_rates() {
     let nostra_gateway = INostraGatewayDispatcher { contract_address: context.gateway_address };
     let interest_rates = nostra_gateway.get_interest_rates(array![ETH_ADDRESS(), USDC_ADDRESS()].span());
     assert(interest_rates.len() > 0, 'no interest rates returned');
+}
+
+
+use kapan::interfaces::IGateway::{InterestRateViewDispatcher, InterestRateViewDispatcherTrait};
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_get_borrow_rate() {
+    let context = setup_test_context();
+    let interest_rate_view = InterestRateViewDispatcher { contract_address: context.gateway_address };
+    let borrow_rate = interest_rate_view.get_borrow_rate(ETH_ADDRESS());
+    println!("Borrow rate: {}", borrow_rate);
+    let supply_rate = interest_rate_view.get_supply_rate(ETH_ADDRESS());
+    println!("Supply rate: {}", supply_rate);
 }

@@ -218,7 +218,8 @@ export const VenusProtocolView: FC = () => {
             comptrollerAddress={comptrollerAddress}
             tokenSymbol={symbol}
           />
-        ) : null
+        ) : null,
+        networkType: "evm",
       });
       
       // Create borrow position
@@ -267,6 +268,7 @@ export const VenusProtocolView: FC = () => {
       suppliedPositions={suppliedPositions as SupplyPositionProps[]}
       borrowedPositions={borrowedPositions}
       forceShowAll={forceShowAll}
+      networkType="evm"
     />
   );
 };

@@ -8,11 +8,14 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { ProtocolPosition } from "./ProtocolView";
 import { FiatBalance } from "./FiatBalance";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { feltToString } from "~~/utils/protocols";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
   afterInfoContent?: React.ReactNode;
+  networkType: "evm" | "starknet";
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -26,6 +29,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   tokenPrice,
   tokenDecimals,
   afterInfoContent,
+  networkType,
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -39,16 +43,25 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const hasBalance = tokenBalance > 0;
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract
-  const { data: optimalRateData } = useScaffoldReadContract({
+  const { data: optimalRateData } = useNetworkAwareReadContract({
     contractName: "OptimalInterestRateFinder",
     functionName: "findOptimalSupplyRate",
     args: [tokenAddress],
+    networkType: networkType,
   });
 
   let optimalProtocol = "";
   let optimalRateDisplay = 0;
   if (optimalRateData) {
-    const [proto, rate] = optimalRateData;
+    let proto;
+    let rate; 
+    if (networkType === "starknet") {
+      proto = feltToString(BigInt(optimalRateData?.[0]?.toString() || "0"));
+      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
+    } else {
+      proto = optimalRateData?.[0]?.toString() || "";
+      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
+    }
     optimalProtocol = proto;
     optimalRateDisplay = Number(rate) / 1e8;
   }
@@ -155,9 +168,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 <Image
                   src={getProtocolLogo(optimalProtocol)}
                   alt={optimalProtocol}
-                  width={16}
-                  height={16}
-                  className="flex-shrink-0 rounded-full ml-1"
+                  width={optimalProtocol == "vesu" ? 35: 16}
+                  height={optimalProtocol == "vesu" ? 35: 16}
+                  className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
             </div>
