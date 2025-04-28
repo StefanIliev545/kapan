@@ -1,11 +1,17 @@
 use starknet::contract_address::ContractAddress;
-use crate::interfaces::nostra::{InterestRateConfig, InterestRateModelABI};
+use crate::interfaces::nostra::{InterestState};
 
 #[starknet::interface]
 pub trait INostraGateway<TContractState> {
     fn add_supported_asset(ref self: TContractState, underlying: ContractAddress, debt: ContractAddress, collateral: ContractAddress, ibcollateral: ContractAddress);
-    fn get_user_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, u256, u256)>;
-    fn get_interest_rates(self: @TContractState, underlyings: Span<ContractAddress>) -> Array<InterestRateConfig>;
+    fn get_user_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)>;
+    fn get_interest_rates(self: @TContractState, underlyings: Span<ContractAddress>) -> Array<InterestState>;
+}
+
+
+#[starknet::interface]
+trait IERC20Symbol<TContractState> {
+    fn symbol(self: @TContractState) -> felt252;
 }
 
 #[starknet::contract]
@@ -19,9 +25,11 @@ mod NostraGateway {
     use crate::interfaces::IGateway::{Deposit, Withdraw, Borrow, Repay};
     use crate::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait, InterestRateModelABIDispatcher, InterestRateModelABIDispatcherTrait, InterestRateConfig};
     use super::INostraGateway;
+    use super::{IERC20SymbolDispatcher, IERC20SymbolDispatcherTrait};
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starknet::{contract_address_const, get_caller_address, get_contract_address};
     use core::num::traits::Zero;
+    use super::InterestState;
 
 
     
@@ -187,12 +195,15 @@ mod NostraGateway {
             self.supported_assets.push(underlying);
         }
 
-        fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, u256, u256)> {
+        fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)> {
             let mut positions = array![];
             let mut i = 0;
             println!("supported_assets.len() {}", self.supported_assets.len());
             while i != self.supported_assets.len() {
+                println!("i {}", i);
                 let underlying = self.supported_assets.at(i).read();
+                let symbol = IERC20SymbolDispatcher { contract_address: underlying }.symbol();
+                
                 let debt = self.underlying_to_ndebt.read(underlying);
                 let collateral = self.underlying_to_ncollateral.read(underlying);
                 let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
@@ -204,19 +215,21 @@ mod NostraGateway {
                 } else {
                     collateral_raw
                 };
-                positions.append((underlying, debt_balance, collateral_balance));
+                positions.append((underlying, symbol, debt_balance, collateral_balance));
                 i += 1;
             }
+            println!("returning positions");
             return positions;
         }
 
-        fn get_interest_rates(self: @ContractState, underlyings: Span<ContractAddress>) -> Array<InterestRateConfig> {
+        fn get_interest_rates(self: @ContractState, underlyings: Span<ContractAddress>) -> Array<InterestState> {
             let mut rates = array![];
             let mut i = 0;
             while i != underlyings.len() {
                 let underlying = *underlyings.at(i);
                 let debt = self.underlying_to_ndebt.read(underlying);
                 let interest_rate_model = self.interest_rate_model.read();
+                println!("interest_rate_model {}", i);
                 let model = InterestRateModelABIDispatcher { contract_address: interest_rate_model };
                 let config = model.get_interest_state(debt);
                 rates.append(config);

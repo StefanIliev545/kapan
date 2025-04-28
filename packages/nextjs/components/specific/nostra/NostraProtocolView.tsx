@@ -5,16 +5,21 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { ContractName } from "~~/utils/scaffold-stark/contract";
 import { useAccount } from "~~/hooks/useAccount";
+import { feltToString } from "~~/utils/protocols";
 
-type NostraPosition = {
-  underlying: string;
-  debtBalance: bigint;
-  collateralBalance: bigint;
+type UserPositionTuple = {
+  0: bigint; // underlying token address
+  1: bigint; // symbol
+  2: bigint; // debt balance
+  3: bigint; // collateral balance
 };
 
-type InterestRateConfig = {
-  supply_rate: bigint;
-  borrow_rate: bigint;
+type InterestState = {
+  lending_rate: bigint;
+  borrowing_rate: bigint;
+  last_update_timestamp: bigint;
+  lending_index: bigint;
+  borrowing_index: bigint;
 };
 
 export const NostraProtocolView: FC = () => {
@@ -24,6 +29,7 @@ export const NostraProtocolView: FC = () => {
   
   // Determine the address to use for queries - use contract's own address as fallback
   const queryAddress = connectedAddress;
+  console.log("queryAddress", queryAddress);
 
   // Get user positions
   const { data: userPositions } = useScaffoldReadContract({
@@ -33,14 +39,12 @@ export const NostraProtocolView: FC = () => {
     refetchInterval: 0,
   });
 
-  console.log("userPositions", userPositions);
-
   // Memoize the unique contract addresses from user positions
   const uniqueContractAddresses = useMemo(() => {
     if (!userPositions) return [];
 
-    const positions = userPositions as unknown as NostraPosition[];
-    const addresses = positions.map(position => position.underlying);
+    const positions = userPositions as unknown as UserPositionTuple[];
+    const addresses = positions.map(position => `0x${position[0].toString(16).padStart(64, "0")}`);
     
     // Remove duplicates and filter out empty/invalid addresses
     return [...new Set(addresses)].filter(addr => addr && addr !== "0x0");
@@ -59,43 +63,49 @@ export const NostraProtocolView: FC = () => {
     const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
 
-    if (!userPositions || !interestRates) return { suppliedPositions: supplied, borrowedPositions: borrowed };
+    if (!userPositions) {
+      console.log("No user positions");
+      return { suppliedPositions: supplied, borrowedPositions: borrowed };
+    }
+    console.log("userPositions", userPositions);
 
     // Process each position
-    const positions = userPositions as unknown as NostraPosition[];
-    const rates = interestRates as unknown as InterestRateConfig[];
+    const positions = userPositions as unknown as UserPositionTuple[];
+    const rates = interestRates as unknown as InterestState[];
 
     positions.forEach((position, index) => {
-      const { underlying, debtBalance, collateralBalance } = position;
-      const interestRate = rates[index];
+      const underlying = `0x${position[0].toString(16).padStart(64, "0")}`;
+      const symbol = feltToString(position[1]);
+      const debtBalance = position[2];
+      const collateralBalance = position[3];
+      const interestRate = rates?.[index];
+      
+      console.log("interestRate", interestRate);
+      // Convert rates to APY/APR (rates are in RAY format - 1e27)
+      const supplyAPY = interestRate ? (Number(interestRate.lending_rate)/1e16) : 0; // Convert to percentage
+      const borrowAPR = interestRate ? (Number(interestRate.borrowing_rate)/1e16) : 0; // Convert to percentage
 
-      // Convert rates to APY (assuming rates are in RAY format like Aave)
-      const supplyAPY = interestRate ? Number(interestRate.supply_rate) / 1e25 : 0;
-      const borrowAPY = interestRate ? Number(interestRate.borrow_rate) / 1e25 : 0;
-
+      console.log("supplyAPY", supplyAPY);
+      console.log("borrowAPR", borrowAPR);
       // Add supply position
-      if (collateralBalance > 0n) {
-        supplied.push({
-          icon: tokenNameToLogo(underlying),
-          name: underlying,
-          balance: Number(formatUnits(collateralBalance, 18)), // Assuming 18 decimals
-          tokenBalance: collateralBalance,
-          currentRate: supplyAPY,
-          tokenAddress: underlying,
-        });
-      }
+      supplied.push({
+        icon: tokenNameToLogo(symbol.toLowerCase()),
+        name: symbol,
+        balance: Number(formatUnits(collateralBalance, 18)), // Assuming 18 decimals
+        tokenBalance: collateralBalance,
+        currentRate: supplyAPY,
+        tokenAddress: underlying,
+      });
 
       // Add borrow position
-      if (debtBalance > 0n) {
-        borrowed.push({
-          icon: tokenNameToLogo(underlying),
-          name: underlying,
-          balance: -Number(formatUnits(debtBalance, 18)), // Negative balance for borrowed amount
-          tokenBalance: debtBalance,
-          currentRate: borrowAPY,
-          tokenAddress: underlying,
-        });
-      }
+      borrowed.push({
+        icon: tokenNameToLogo(symbol.toLowerCase()),
+        name: symbol,
+        balance: -Number(formatUnits(debtBalance, 18)), // Negative balance for borrowed amount
+        tokenBalance: debtBalance,
+        currentRate: borrowAPR,
+        tokenAddress: underlying,
+      });
     });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };

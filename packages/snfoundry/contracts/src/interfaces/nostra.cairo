@@ -33,7 +33,17 @@ pub struct InterestRateConfig {
     pub interest_bearing_collateral_token: ContractAddress,
 }
 
+#[derive(Drop, Serde)]
+pub struct InterestState {
+    pub lending_rate: u256,
+    pub borrowing_rate: u256,
+    pub last_update_timestamp: felt252,
+    pub lending_index: u256,
+    pub borrowing_index: u256,
+}
+
 #[starknet::interface]
 pub trait InterestRateModelABI<TContractState> {
-    fn get_interest_state(self: @TContractState, debt_token: ContractAddress) -> InterestRateConfig;
+    fn get_interest_rate_config(self: @TContractState, debt_token: ContractAddress) -> InterestRateConfig;
+    fn get_interest_state(self: @TContractState, debt_token: ContractAddress) -> InterestState;
 }

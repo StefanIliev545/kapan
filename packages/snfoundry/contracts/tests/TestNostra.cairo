@@ -54,10 +54,10 @@ fn USDC_DEBT_TOKEN() -> ContractAddress {
     contract_address_const::<0x063d69ae657bd2f40337c39bf35a870ac27ddf91e6623c2f52529db4c1619a51>()
 }
 fn USDC_COLLATERAL_TOKEN() -> ContractAddress {
-    contract_address_const::<0x073f6addc9339de9822cab4dac8c9431779c09077f02ba7bc36904ea342dd9eb>()
+    contract_address_const::<0x05f296e1b9f4cf1ab452c218e72e02a8713cee98921dad2d3b5706235e128ee4>()
 }
 fn USDC_IBCOLLATERAL_TOKEN() -> ContractAddress {
-    contract_address_const::<0x073f6addc9339de9822cab4dac8c9431779c09077f02ba7bc36904ea342dd9eb>()
+    contract_address_const::<0x05dcd26c25d9d8fd9fc860038dcb6e4d835e524eb8a85213a8cda5b7fff845f6>()
 }
 
 // WBTC
@@ -119,14 +119,6 @@ fn add_supported_assets(gateway_address: ContractAddress) {
         USDC_DEBT_TOKEN(),
         USDC_COLLATERAL_TOKEN(),
         USDC_IBCOLLATERAL_TOKEN()
-    );
-    
-    // Add WBTC
-    nostra_gateway.add_supported_asset(
-        WBTC_ADDRESS(),
-        WBTC_DEBT_TOKEN(),
-        WBTC_COLLATERAL_TOKEN(),
-        WBTC_IBCOLLATERAL_TOKEN()
     );
 }
 
@@ -362,4 +354,57 @@ fn test_full_flow() {
     //cur:  0_162_090_880
     //max:  5_000_000_000
     //router-test-all: 2_793_898_880
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_get_user_positions() {
+    let context = setup_test_context();
+    let depositERC20 = ETH_ADDRESS();
+
+    let deposit_amount = 5000000000000000000; // 5 ETH
+    let erc20 = IERC20Dispatcher { contract_address: depositERC20 };
+    
+    // Check initial balance
+    let initial_balance = erc20.balance_of(USER_ADDRESS());
+    println!("Initial ETH balance: {}", initial_balance);
+    assert(initial_balance >= deposit_amount, 'insufficient balance');
+    
+    // Approve the gateway to spend tokens
+    cheat_caller_address(depositERC20, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    erc20.approve(context.gateway_address, deposit_amount);
+    
+    // Create deposit instruction
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: depositERC20,
+            amount: deposit_amount, 
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    // Process the deposit instruction
+    println!("depositing");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Deposit(deposit)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+
+    // Get user positions
+    println!("getting positions");
+    let nostra_gateway = INostraGatewayDispatcher { contract_address: context.gateway_address };
+    let positions = nostra_gateway.get_user_positions(USER_ADDRESS());
+    
+    // Verify positions
+    assert(positions.len() > 0, 'no positions returned');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_get_interest_rates() {
+    let context = setup_test_context();
+
+    let nostra_gateway = INostraGatewayDispatcher { contract_address: context.gateway_address };
+    let interest_rates = nostra_gateway.get_interest_rates(array![ETH_ADDRESS(), USDC_ADDRESS()].span());
+    assert(interest_rates.len() > 0, 'no interest rates returned');
 }

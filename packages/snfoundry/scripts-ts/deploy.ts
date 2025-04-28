@@ -82,7 +82,7 @@ const initializeContracts = async (gatewayAddress: string): Promise<void> => {
     {
       contractAddress: gatewayAddress,
       entrypoint: "add_supported_asset",
-      calldata: [
+    calldata: [
         "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
         "0x00ba3037d968790ac486f70acaa9a1cab10cf5843bb85c986624b4d0e5a82e74", // ETH debt
         "0x044debfe17e4d9a5a1e226dabaf286e72c9cc36abbe71c5b847e669da4503893", // ETH collateral
@@ -95,7 +95,7 @@ const initializeContracts = async (gatewayAddress: string): Promise<void> => {
       calldata: [
         "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8", // USDC
         "0x063d69ae657bd2f40337c39bf35a870ac27ddf91e6623c2f52529db4c1619a51", // USDC debt
-        "0x073f6addc9339de9822cab4dac8c9431779c09077f02ba7bc36904ea342dd9eb", // USDC collateral
+        "0x05f296e1b9f4cf1ab452c218e72e02a8713cee98921dad2d3b5706235e128ee4", // USDC collateral
         "0x05dcd26c25d9d8fd9fc860038dcb6e4d835e524eb8a85213a8cda5b7fff845f6", // USDC ibcollateral
       ],
     },

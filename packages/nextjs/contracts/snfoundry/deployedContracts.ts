@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x5793c57649dfea4a74fa4ab59c44f36d2d59e16775545d1c895e186200e1ba4",
+        "0x1d6e524e1b7e2ba13d1521281a18ae16f8e650045422b19c40339a4b2194da1",
       abi: [
         {
           type: "impl",
@@ -535,7 +535,7 @@ const contracts = {
     },
     NostraGateway: {
       address:
-        "0x5d3e07258be7763ff5d01754e33204f19c87207473ce1a9a78f56ff59668a4a",
+        "0x45ecbf8dfeaa867a539db4b7ec2e262312f5b9a1212336a50fbf4c38806c613",
       abi: [
         {
           type: "impl",
@@ -748,39 +748,27 @@ const contracts = {
         },
         {
           type: "struct",
-          name: "kapan::interfaces::nostra::InterestRateConfig",
+          name: "kapan::interfaces::nostra::InterestState",
           members: [
             {
-              name: "optimal_utilization_rate",
+              name: "lending_rate",
               type: "core::integer::u256",
             },
             {
-              name: "base_borrowing_rate",
+              name: "borrowing_rate",
               type: "core::integer::u256",
             },
             {
-              name: "rate_slope_1",
+              name: "last_update_timestamp",
+              type: "core::felt252",
+            },
+            {
+              name: "lending_index",
               type: "core::integer::u256",
             },
             {
-              name: "rate_slope_2",
+              name: "borrowing_index",
               type: "core::integer::u256",
-            },
-            {
-              name: "general_protocol_fee",
-              type: "core::integer::u256",
-            },
-            {
-              name: "fees_recipient",
-              type: "core::starknet::contract_address::ContractAddress",
-            },
-            {
-              name: "interest_bearing_token",
-              type: "core::starknet::contract_address::ContractAddress",
-            },
-            {
-              name: "interest_bearing_collateral_token",
-              type: "core::starknet::contract_address::ContractAddress",
             },
           ],
         },
@@ -823,7 +811,7 @@ const contracts = {
               ],
               outputs: [
                 {
-                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::integer::u256, core::integer::u256)>",
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u256, core::integer::u256)>",
                 },
               ],
               state_mutability: "view",
@@ -839,7 +827,7 @@ const contracts = {
               ],
               outputs: [
                 {
-                  type: "core::array::Array::<kapan::interfaces::nostra::InterestRateConfig>",
+                  type: "core::array::Array::<kapan::interfaces::nostra::InterestState>",
                 },
               ],
               state_mutability: "view",
@@ -864,7 +852,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x2103eec8de057eadf6461be084f80b196f74f195e02b14366db6f859b424ca4",
+        "0x4622593d3b2a02f621be37f110f66d11307677d963b54ebdf8510752d6ed0c4",
     },
   },
 } as const satisfies SNContractsType;
