@@ -94,6 +94,7 @@ export const VesuProtocolView: FC = () => {
           price={formatPrice(asset.price.value)}
           utilization={formatUtilization(asset.utilization)}
           address={address}
+          networkType="starknet"
         />
       );
     });

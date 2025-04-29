@@ -1,13 +1,13 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { useAccount } from "wagmi";
+import { FiatBalance } from "./FiatBalance";
+import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
-import { FiInfo, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
+import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { ProtocolPosition } from "./ProtocolView";
-import { FiatBalance } from "./FiatBalance";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString } from "~~/utils/protocols";
 
@@ -34,7 +34,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Get wallet connection status
   const { address: userAddress } = useAccount();
   const isWalletConnected = !!userAddress;
@@ -54,7 +54,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   let optimalRateDisplay = 0;
   if (optimalRateData) {
     let proto;
-    let rate; 
+    let rate;
     if (networkType === "starknet") {
       proto = feltToString(BigInt(optimalRateData?.[0]?.toString() || "0"));
       rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
@@ -77,7 +77,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest('.dropdown')) {
+    if ((e.target as HTMLElement).closest(".dropdown")) {
       return;
     }
     setIsExpanded(prev => !prev);
@@ -86,8 +86,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   return (
     <>
       {/* Outer container - clickable to expand/collapse */}
-      <div 
-        className={`w-full p-3 rounded-md ${isExpanded ? 'bg-base-300' : 'bg-base-200'} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
+      <div
+        className={`w-full p-3 rounded-md ${isExpanded ? "bg-base-300" : "bg-base-200"} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -97,9 +97,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
             <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
+            <div
+              className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
+              onClick={e => e.stopPropagation()}
+            >
               <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                <FiInfo 
+                <FiInfo
                   className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
                   aria-hidden="true"
                 />
@@ -127,13 +130,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 </div>
               </div>
             </div>
-            
+
             {/* Render additional content after the info button if provided */}
-            {afterInfoContent && (
-              <div onClick={e => e.stopPropagation()}>
-                {afterInfoContent}
-              </div>
-            )}
+            {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
           </div>
 
           {/* Stats: Rates */}
@@ -141,9 +140,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
               <div className="text-sm font-medium h-6 line-clamp-1">
-                <FiatBalance 
+                <FiatBalance
                   tokenAddress={tokenAddress}
-                  rawValue={typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0)}
+                  rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
                   price={tokenPrice}
                   decimals={tokenDecimals}
                   tokenSymbol={name}
@@ -152,9 +151,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </div>
             </div>
             <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">
-                APY
-              </div>
+              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
                 {currentRate.toFixed(2)}%
               </div>
@@ -168,8 +165,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 <Image
                   src={getProtocolLogo(optimalProtocol)}
                   alt={optimalProtocol}
-                  width={optimalProtocol == "vesu" ? 35: 16}
-                  height={optimalProtocol == "vesu" ? 35: 16}
+                  width={optimalProtocol == "vesu" ? 35 : 16}
+                  height={optimalProtocol == "vesu" ? 35 : 16}
                   className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
@@ -178,7 +175,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
           {/* Expand Indicator */}
           <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? 'bg-primary/20' : 'bg-base-300/50'} transition-colors duration-200`}>
+            <div
+              className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"} transition-colors duration-200`}
+            >
               {isExpanded ? (
                 <FiChevronUp className="w-4 h-4 text-primary" />
               ) : (
@@ -193,7 +192,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Mobile layout - full width buttons stacked vertically */}
             <div className="flex flex-col gap-2 md:hidden">
-              <button 
+              <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
                 onClick={() => setIsDepositModalOpen(true)}
                 disabled={!isWalletConnected}
@@ -207,7 +206,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
                 onClick={() => setIsMoveModalOpen(true)}
                 disabled={!isWalletConnected || !hasBalance}
-                title={!isWalletConnected ? "Connect wallet to move supply" : !hasBalance ? "No balance to move" : "Move supply to another protocol"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move supply"
+                    : !hasBalance
+                      ? "No balance to move"
+                      : "Move supply to another protocol"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Move</span>
@@ -217,7 +222,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
             {/* Desktop layout - evenly distributed buttons in a row */}
             <div className="hidden md:grid grid-cols-2 gap-3">
-              <button 
+              <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
                 onClick={() => setIsDepositModalOpen(true)}
                 disabled={!isWalletConnected}
@@ -231,7 +236,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 className="btn btn-sm btn-outline flex justify-center items-center"
                 onClick={() => setIsMoveModalOpen(true)}
                 disabled={!isWalletConnected || !hasBalance}
-                title={!isWalletConnected ? "Connect wallet to move supply" : !hasBalance ? "No balance to move" : "Move supply to another protocol"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move supply"
+                    : !hasBalance
+                      ? "No balance to move"
+                      : "Move supply to another protocol"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Move</span>
@@ -249,7 +260,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         token={{
           name,
           icon,
-          rawBalance: typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0),
+          rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
           currentRate,
           address: tokenAddress,
           decimals: tokenDecimals,
@@ -266,4 +277,4 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       />
     </>
   );
-}; 
+};

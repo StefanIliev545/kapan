@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x447ed7a47eb0c610b278b49503ab380c5e6d4d6c1c7c65c1e7af6d410e35423",
+        "0x25ffa4b8cbcd673dce7926dc75bd0be5f158ab8168094f11753b6b81f2ca801",
       abi: [
         {
           type: "impl",
@@ -578,7 +578,7 @@ const contracts = {
     },
     NostraGateway: {
       address:
-        "0x3f6675f0dfa6fdd827401ce4e6d8dbf1a67ccc76a0e27093f3d7e01b48f5ee1",
+        "0x77bbf2f1d705c3166248127d9d63b9e5f676364a980ef6c89fc0437f5018fea",
       abi: [
         {
           type: "impl",
@@ -942,7 +942,7 @@ const contracts = {
     },
     OptimalInterestRateFinder: {
       address:
-        "0x749ec1c860d382891f8b925dbae4c28a6f7d72472998079721d569de87fc922",
+        "0x3d8650abc95fc811d431644ff2b5f3f2d8f3eb1f6ad65897fc45176d3564510",
       abi: [
         {
           type: "impl",
