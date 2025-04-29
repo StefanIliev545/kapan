@@ -205,11 +205,11 @@ export const VesuProtocolView: FC = () => {
                 </div>
               ) : null}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-wrap gap-4 justify-start">
               {positionRows?.length ? (
                 positionRows
               ) : (
-                <div className="text-center py-4 text-gray-500 col-span-full">No positions found</div>
+                <div className="text-center py-4 text-gray-500 w-full">No positions found</div>
               )}
             </div>
           </div>

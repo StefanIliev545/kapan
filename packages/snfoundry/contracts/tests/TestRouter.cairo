@@ -186,7 +186,6 @@ fn setup_test_context() -> TestContext {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_router_setup() {
     let context = setup_test_context();
@@ -276,7 +275,6 @@ const POOL_ID: felt252 =
     2198503327643286920898110335698706244522220458610657370981979460625005526824;
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_vesu() {
     let context = setup_test_context();
@@ -373,7 +371,6 @@ fn test_vesu() {
 } 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();

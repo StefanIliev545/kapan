@@ -209,30 +209,20 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
           <div className="divider my-2"></div>
 
-          <div className="flex justify-between items-center">
-            <div className="flex flex-col">
-              <span className="text-sm text-gray-500">Loan-to-value</span>
-              <span className="text-sm font-medium">{Number(ltv).toFixed(2)}%</span>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-500">Loan-to-value: <span className="font-medium">{Number(ltv).toFixed(2)}%</span></span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex gap-1.5">
+              <button className="btn btn-xs btn-primary px-2" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
+              <button className="btn btn-xs btn-primary px-2">Withdraw</button>
             </div>
-            <div className="flex gap-2">
-              {isVtoken ? (
-                <>
-                  <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
-                  <button className="btn btn-sm btn-error">Withdraw</button>
-                </>
-              ) : nominalDebt === "0" ? (
-                <>
-                  <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
-                  <button className="btn btn-sm btn-primary">Borrow</button>
-                </>
-              ) : (
-                <>
-                  <button className="btn btn-sm btn-primary" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
-                  <button className="btn btn-sm btn-primary">Borrow</button>
-                  <button className="btn btn-sm btn-primary">Repay</button>
-                  <button className="btn btn-sm btn-error">Withdraw</button>
-                </>
-              )}
+            <div className="flex justify-end">
+              <div className="flex gap-1.5">
+                <button className="btn btn-xs btn-primary px-2">Borrow</button>
+                <button className={`btn btn-xs btn-primary px-2 ${nominalDebt === "0" ? "btn-disabled" : ""}`}>Repay</button>
+              </div>
             </div>
           </div>
         </div>
