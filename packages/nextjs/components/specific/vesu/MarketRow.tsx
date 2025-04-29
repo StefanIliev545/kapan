@@ -34,6 +34,7 @@ export const MarketRow: FC<MarketRowProps> = ({
     functionName: "findOptimalSupplyRate",
     args: [address],
     networkType,
+    refetchInterval: 10000,
   });
 
   const { data: optimalBorrowRateData } = useNetworkAwareReadContract({
@@ -41,6 +42,7 @@ export const MarketRow: FC<MarketRowProps> = ({
     functionName: "findOptimalBorrowRate",
     args: [address],
     networkType,
+    refetchInterval: 10000,
   });
 
   let optimalSupplyProtocol = "";
@@ -73,7 +75,6 @@ export const MarketRow: FC<MarketRowProps> = ({
     }
     optimalBorrowProtocol = proto;
     optimalBorrowRateDisplay = Number(rate) / 1e8;
-    console.log("optimalBorrowRateDisplay", optimalBorrowRateDisplay);
   }
 
   const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);

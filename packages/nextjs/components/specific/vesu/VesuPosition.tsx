@@ -214,14 +214,14 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex gap-1.5">
-              <button className="btn btn-xs btn-primary px-2" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
-              <button className="btn btn-xs btn-primary px-2">Withdraw</button>
+            <div className="flex">
+              <button className="btn btn-xs btn-primary rounded-r-none px-2 w-16" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
+              <button className="btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16">Withdraw</button>
             </div>
             <div className="flex justify-end">
-              <div className="flex gap-1.5">
-                <button className="btn btn-xs btn-primary px-2">Borrow</button>
-                <button className={`btn btn-xs btn-primary px-2 ${nominalDebt === "0" ? "btn-disabled" : ""}`}>Repay</button>
+              <div className="flex">
+                <button className="btn btn-xs btn-primary rounded-r-none px-2 w-16">Borrow</button>
+                <button className={`btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16 ${nominalDebt === "0" ? "btn-disabled" : ""}`}>Repay</button>
               </div>
             </div>
           </div>

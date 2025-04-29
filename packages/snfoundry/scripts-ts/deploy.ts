@@ -42,7 +42,7 @@ import { CallData, constants } from "starknet";
  *
  * @returns {Promise<void>}
  */
-const deployScript = async (): Promise<string> => {
+const deployScript = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -79,16 +79,24 @@ const deployScript = async (): Promise<string> => {
     },
   });
 
-  return nostraGatewayAddress;
+  const { address: routerGatewayAddress } = await deployContract({
+    contract: "RouterGateway",
+    constructorArgs: {
+      _owner: deployer.address,
+      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+    },
+  });
+
+  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
 };
 
-const initializeContracts = async (gatewayAddress: string): Promise<void> => {
+const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
 
   const nonce = await deployer.getNonce();
 
   const calls = [
     {
-      contractAddress: gatewayAddress,
+      contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
         "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -98,7 +106,7 @@ const initializeContracts = async (gatewayAddress: string): Promise<void> => {
       ],
     },
     {
-      contractAddress: gatewayAddress,
+      contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
         "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8", // USDC
@@ -108,7 +116,7 @@ const initializeContracts = async (gatewayAddress: string): Promise<void> => {
       ],
     },
     {
-      contractAddress: gatewayAddress,
+      contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
         "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac", // WBTC
@@ -116,6 +124,22 @@ const initializeContracts = async (gatewayAddress: string): Promise<void> => {
         "0x036b68238f3a90639d062669fdec08c4d0bdd09826b1b6d24ef49de6d8141eaa", // WBTC collateral
         "0x05b7d301fa769274f20e89222169c0fad4d846c366440afc160aafadd6f88f0c", // WBTC ibcollateral
       ],
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "nostra",
+        addresses.nostraGatewayAddress,
+      ]
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "vesu",
+        addresses.vesuGatewayAddress,
+      ]
     }
   ]
 
