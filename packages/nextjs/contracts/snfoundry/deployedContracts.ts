@@ -20,7 +20,7 @@ const contracts = {
   devnet: {
     VesuGateway: {
       address:
-        "0x1f129ac545e3878d001d313690cd06eaef2c367b54a6bb2de65022f06e5625b",
+        "0xb93ac45703be53f62c34d6a0a131b8aeb5b70882480ecefefb4e113fd2b267",
       abi: [
         {
           type: "impl",
@@ -574,11 +574,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x3a88afb8b9aab98e482dec13d2db1e220378b392808f4ef17821c52a89eed8e",
+        "0x44f97be62c937b08cbaeb6f891248613795a2fc40eb11a0c86697cb46c0c4eb",
     },
     NostraGateway: {
       address:
-        "0x506af0bf6b9af8d1cc55eab3abda0845575a1b1583ba678880d195a7aae234f",
+        "0x79eae7690a5251bd45709e363b07266199779b447703773f6c6e88be4e0c96a",
       abi: [
         {
           type: "impl",
@@ -938,11 +938,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x381fb177fbbac6a0f0bb5bc0a197e5d6f88267b0575840bc6d79be209fc6c53",
+        "0x52ccf57655517dc5e95b3e50e4f764a60889ead7afc3f06d898b36e59a3cab5",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x78e0e760e5e2027bcbf8af481c66e218d090778f701dd5c8059251b25ec7d8b",
+        "0x359f584ec55b94373ea52216bc7ee5ddf7bf5eb0fc1a53fb8377d92addb51d5",
       abi: [
         {
           type: "impl",
@@ -1056,11 +1056,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x782fd31b8dc3aa7d53435712ffee7692704e3b720b5084b556eff8f5475e04d",
+        "0x4ba0fa551b6bce19f09631997fcc2355eff78b088863c8fe020cdf2b0c64748",
     },
     RouterGateway: {
       address:
-        "0x39ed16bdf9bd7dbd9a812a66e93078bde9264d891d9150c0a43637ce6e8b754",
+        "0x3997b203e1269332dcc21a66e1a3c1f1cff7f7e9399f375a19a63a869a0d74c",
       abi: [
         {
           type: "impl",
@@ -1387,7 +1387,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x3e53d2e278ff2b0a80b33b823b140ae32a1e1145a0aff656181968874816b71",
+        "0x4630ef48d9076d4eddbff9ae7ef77c6d25536dcb7c22ee4328c85d8a6a2cb1",
     },
   },
 } as const satisfies SNContractsType;

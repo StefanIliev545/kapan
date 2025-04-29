@@ -1,7 +1,7 @@
 import { useTargetNetwork } from "./useTargetNetwork";
 import { useTransactor } from "./useTransactor";
 import { Abi, useNetwork, useSendTransaction } from "@starknet-react/core";
-import { Call, InvocationsDetails, Contract as StarknetJsContract } from "starknet";
+import { Call, InvocationsDetails, Contract as StarknetJsContract, WalletAccount } from "starknet";
 import { notification } from "~~/utils/scaffold-stark";
 import {
   Contract,
@@ -24,13 +24,15 @@ export const useScaffoldMultiWriteContract = <
 >({
   calls,
   options,
+  walletAccount,
 }: {
   calls: Array<UseScaffoldWriteConfig<TAbi, TContractName, TFunctionName> | Call>;
   options?: InvocationsDetails;
+  walletAccount?: WalletAccount;
 }) => {
   const { targetNetwork } = useTargetNetwork();
   const { chain } = useNetwork();
-  const { writeTransaction: sendTxnWrapper, sendTransactionInstance } = useTransactor();
+  const { writeTransaction: sendTxnWrapper, sendTransactionInstance } = useTransactor(walletAccount);
 
   const sendContractWriteTx = async () => {
     if (!chain?.id) {
@@ -67,7 +69,7 @@ export const useScaffoldMultiWriteContract = <
         }
       })();
 
-      return await sendTxnWrapper(parsedCalls);
+      return await sendTxnWrapper(parsedCalls, false);
     } catch (e: any) {
       throw e;
     }

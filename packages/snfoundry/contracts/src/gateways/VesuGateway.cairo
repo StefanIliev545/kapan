@@ -69,7 +69,7 @@ mod VesuGateway {
     use alexandria_math::i257::{I257Impl, i257};
     use core::array::ArrayTrait;
     use core::num::traits::Zero;
-    use core::option::OptionTrait;
+    use core::option::{OptionTrait, Option};
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::token::erc20::interface::{
         IERC20Dispatcher, IERC20DispatcherTrait, IERC20MetadataDispatcher,
@@ -128,7 +128,7 @@ mod VesuGateway {
         self.pool_id.write(pool_id);
         self.ownable.initializer(get_caller_address());
         for asset in supported_assets {
-            self.supported_assets.push(asset);
+            self.supported_assets.append().write(asset);
         }
     }
 
@@ -223,7 +223,7 @@ mod VesuGateway {
             let user = basic.user;
 
             if instruction.context.is_some() {
-                let mut context_bytes = instruction.context.unwrap();
+                let mut context_bytes: Span<felt252> = (*instruction.context).unwrap();
                 let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
                 if vesu_context.pool_id != Zero::zero() {
                     pool_id = vesu_context.pool_id;
@@ -479,20 +479,20 @@ mod VesuGateway {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(amount, ref call_data);
-                        authorizations.append((token, selector!("approve"), call_data));
+                        authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Repay(repay_params) => {
                         let token = *repay_params.basic.token;
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(repay_params.basic.amount, ref call_data);
-                        authorizations.append((token, selector!("approve"), call_data));
+                        authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Borrow(borrow_params) => {
                         let mut pool_id = self.pool_id.read();
                         let singleton = self.vesu_singleton.read();
                         if borrow_params.context.is_some() {
-                            let mut context_bytes = borrow_params.context.unwrap();
+                            let mut context_bytes: Span<felt252> = (*borrow_params).context.unwrap();
                             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
                             pool_id = vesu_context.pool_id;
                         }
@@ -500,13 +500,13 @@ mod VesuGateway {
                         Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(@get_contract_address(), ref call_data);
                         Serde::serialize(@true, ref call_data);
-                        authorizations.append((singleton, selector!("modify_delegation"), call_data));
+                        authorizations.append((singleton, 'modify_delegation', call_data));
                     },
                     LendingInstruction::Withdraw(withdraw_params) => {
                         let mut pool_id = self.pool_id.read();
                         let singleton = self.vesu_singleton.read();
                         if withdraw_params.context.is_some() {
-                            let mut context_bytes = withdraw_params.context.unwrap();
+                            let mut context_bytes: Span<felt252> = (*withdraw_params).context.unwrap();
                             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
                             pool_id = vesu_context.pool_id;
                         }
@@ -514,11 +514,11 @@ mod VesuGateway {
                         Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(@get_contract_address(), ref call_data);
                         Serde::serialize(@true, ref call_data);
-                        authorizations.append((singleton, selector!("modify_delegation"), call_data));
+                        authorizations.append((singleton, 'modify_delegation', call_data));
                     },
                     _ => {}
                 }
-            }
+            };
             return authorizations.span();
         }
     }
@@ -607,7 +607,7 @@ mod VesuGateway {
             let len = supported_assets.len();
             for i in 0..len {
                 assets.append(self.supported_assets.at(i).read());
-            }
+            };
             assets
         }
 
@@ -705,7 +705,7 @@ mod VesuGateway {
                             );
                     }
                 }
-            }
+            };
             positions
         }
 
@@ -767,7 +767,7 @@ mod VesuGateway {
                     scale: asset_config.scale,
                 };
                 assets.append(metadata.into());
-            }
+            };
             assets
         }
     }

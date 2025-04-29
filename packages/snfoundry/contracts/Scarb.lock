@@ -138,15 +138,15 @@ checksum = "sha256:fd348b31c4a4407add33adc3c2b8f26dca71dbd7431faaf726168f37a91db
 
 [[package]]
 name = "snforge_scarb_plugin"
-version = "0.40.0"
+version = "0.38.0"
 source = "registry+https://scarbs.xyz/"
-checksum = "sha256:7c3b21f6cdab14fc63e19f9e6789b6a3d44f5618ebcf02d03b397375304e1891"
+checksum = "sha256:c4d128eedb5fca4362be38a84e5f5a85bd94ec1557bab7c045d48de0163e406c"
 
 [[package]]
 name = "snforge_std"
-version = "0.40.0"
+version = "0.38.0"
 source = "registry+https://scarbs.xyz/"
-checksum = "sha256:0221bbe959eec72eb2e30be68df66c4ff5dcd924ec491f285c974e49671fabc0"
+checksum = "sha256:8b3eaff778105c313b78708974c253cd927ecf5c896f4557a0ea4f10f427b554"
 dependencies = [
  "snforge_scarb_plugin",
 ]

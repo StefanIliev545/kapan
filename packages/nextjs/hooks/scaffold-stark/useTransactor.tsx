@@ -91,6 +91,7 @@ export const useTransactor = (_walletClient?: AccountInterface): UseTransactorRe
       notificationId = notification.loading(<TxnNotification message="Awaiting for user confirmation" />);
       if (tx != null && withSendTransaction) {
         // Tx is already prepared by the caller
+        console.log("sending transaction", tx);
         const result = await sendTransactionInstance.sendAsync(tx);
         if (typeof result === "string") {
           transactionHash = result;
@@ -100,8 +101,9 @@ export const useTransactor = (_walletClient?: AccountInterface): UseTransactorRe
       } else if (tx != null) {
         try {
           // First try to estimate fees
+          console.log("estimating fee for tx", tx, walletClient);
           const estimatedFee = await walletClient.estimateInvokeFee(tx as Call[]);
-
+          console.log("estimated fee", estimatedFee);
           // Use estimated fee with a safety margin (multiply by 1.5)
           const maxFee = (BigInt(estimatedFee.overall_fee) * BigInt(15)) / BigInt(10);
 
@@ -109,8 +111,12 @@ export const useTransactor = (_walletClient?: AccountInterface): UseTransactorRe
           const txOptions = {
             version: constants.TRANSACTION_VERSION.V3,
             maxFee: "0x" + maxFee.toString(16),
+            l1_data_gas: {
+              max_amount: "0x1000000",
+              max_price_per_unit: "0x1",
+            },
           };
-
+          console.log("executing transaction");
           transactionHash = (await walletClient.execute(tx, txOptions)).transaction_hash;
         } catch (feeEstimationError) {
           console.warn("Fee estimation failed, using fallback values:", feeEstimationError);

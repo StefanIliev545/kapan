@@ -2,7 +2,7 @@
   "name": "@ss-2/snfoundry",
   "version": "0.0.1",
   "scripts": {
-    "chain": "starknet-devnet --seed 0 --predeclare-argent --fork-network https://starknet-mainnet.public.blastapi.io/rpc/v0_8 --fork-block 1354971",
+    "chain": "starknet-devnet --seed 0 --dump-on exit --dump-path ./sn-dumps --fork-network https://starknet-mainnet.public.blastapi.io/rpc/v0_7 --fork-block 1358626",
     "deploy": "ts-node scripts-ts/helpers/deploy-wrapper.ts",
     "deploy:clear": "cd deployments && node clear.mjs $* && cd .. && ts-node scripts-ts/helpers/deploy-wrapper.ts $*",
     "deploy:no-reset": "yarn workspace @ss-2/snfoundry deploy --no-reset",
@@ -29,7 +29,7 @@
     "dotenv": "^16.3.1",
     "envfile": "^6.18.0",
     "prettier": "^2.8.8",
-    "starknet": "next",
+    "starknet": "6.24.1",
     "toml": "^3.0.0",
     "tslib": "^2.6.2"
   },

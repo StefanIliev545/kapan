@@ -10,7 +10,7 @@ use crate::interfaces::IGateway::{
 };
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 
-#[derive(Drop, Serde)]
+#[derive(Drop, Serde, Copy)]
 pub struct ProtocolInstructions {
     pub protocol_name: felt252,
     pub instructions: Span<LendingInstruction>,
@@ -157,7 +157,7 @@ mod RouterGateway {
                     let (token, selector, call_data) = authorization;
                     authorizations.append((*token, *selector, call_data.clone()));
                 }
-            }
+            };
             return authorizations.span();
         }
 
@@ -165,7 +165,7 @@ mod RouterGateway {
             let flashloan_provider = IFlashloanProviderDispatcher { contract_address: self.flashloan_provider.read() };
             // Get first instruction and ensure it's a repay
             let first_protocol = instructions.at(0);
-            let first_instruction = *first_protocol.instructions.at(0);
+            let first_instruction = (*first_protocol.instructions).at(0);
             let repay = match first_instruction {
                 LendingInstruction::Repay(repay) => repay,
                 _ => panic!("bad-instruction-order")
@@ -179,7 +179,7 @@ mod RouterGateway {
             // Serialize instructions for flash loan data
             let mut data = ArrayTrait::new();
             Serde::serialize(@instructions, ref data);
-            flashloan_provider.flash_loan(get_contract_address(), asset, amount, is_legacy, data.span());
+            flashloan_provider.flash_loan(get_contract_address(), *asset, *amount, is_legacy, data.span());
         }
     }
 

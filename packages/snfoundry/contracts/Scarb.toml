@@ -2,19 +2,19 @@
 name = "kapan"
 version = "0.0.1"
 edition = "2024_07"
-cairo-version = "2.11.4"
+cairo-version = "2.9.4"
 
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-starknet = "2.11.4"
+starknet = "2.9.4"
 # Change to just "openzeppelin" to use full features
 openzeppelin = "1.0.0"
 alexandria_math = "0.4.0"
 
 [dev-dependencies]
 openzeppelin_utils = "1.0.0"
-snforge_std = "0.40.0"
+snforge_std = "0.38.0"
 
 [[target.starknet-contract]]
 casm = true

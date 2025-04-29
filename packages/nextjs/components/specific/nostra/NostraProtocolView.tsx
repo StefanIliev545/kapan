@@ -30,7 +30,6 @@ export const NostraProtocolView: FC = () => {
   
   // Determine the address to use for queries - use contract's own address as fallback
   const queryAddress = connectedAddress;
-  console.log("queryAddress", queryAddress);
 
   // Get user positions
   const { data: userPositions } = useNetworkAwareReadContract({
@@ -67,10 +66,8 @@ export const NostraProtocolView: FC = () => {
     const borrowed: ProtocolPosition[] = [];
 
     if (!userPositions) {
-      console.log("No user positions");
       return { suppliedPositions: supplied, borrowedPositions: borrowed };
     }
-    console.log("userPositions", userPositions);
 
     // Process each position
     const positions = userPositions as unknown as UserPositionTuple[];
@@ -83,13 +80,9 @@ export const NostraProtocolView: FC = () => {
       const collateralBalance = position[3];
       const interestRate = rates?.[index];
       
-      console.log("interestRate", interestRate);
       // Convert rates to APY/APR (rates are in RAY format - 1e27)
       const supplyAPY = interestRate ? (Number(interestRate.lending_rate)/1e16) : 0; // Convert to percentage
       const borrowAPR = interestRate ? (Number(interestRate.borrowing_rate)/1e16) : 0; // Convert to percentage
-
-      console.log("supplyAPY", supplyAPY);
-      console.log("borrowAPR", borrowAPR);
       // Add supply position
       supplied.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),

@@ -55,7 +55,7 @@
     "rehype-highlight": "^7.0.2",
     "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "starknet": "^6.24.1",
+    "starknet": "6.24.1",
     "starknetkit": "latest",
     "usehooks-ts": "~3.1.0",
     "viem": "^2.26.3",

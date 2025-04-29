@@ -53,14 +53,12 @@ export const VesuProtocolView: FC = () => {
     args: [],
     refetchInterval: 0,
   });
-
-  console.log("Supported Assets:", userAddress);
   // Fetch user positions if connected
   const { data: userPositions, error: positionsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions",
     args: [userAddress || "0x0"], // Use zero address if not connected
-    refetchInterval: 0,
+    refetchInterval: 10000,
   });
 
   // Memoize the market rows to prevent unnecessary re-renders
@@ -105,23 +103,11 @@ export const VesuProtocolView: FC = () => {
     if (!userPositions || !supportedAssets) return null;
 
     const positions = userPositions as unknown as PositionTuple[];
-    console.log("Raw positions data:", positions); // Debug log
 
     return positions?.map((position, index) => {
       const collateralAsset = `0x${position[0].toString(16).padStart(64, "0")}`;
       const debtAsset = `0x${position[1].toString(16).padStart(64, "0")}`;
       const positionData = position[2];
-
-      // Debug log for each position
-      console.log("Processing position:", {
-        index,
-        collateralAsset,
-        debtAsset,
-        collateralShares: positionData.collateral_shares.toString(),
-        collateralAmount: positionData.collateral_amount.toString(),
-        nominalDebt: positionData.nominal_debt.toString(),
-        isVtoken: positionData.is_vtoken,
-      });
 
       return (
         <VesuPosition

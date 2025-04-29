@@ -1,13 +1,29 @@
-import { FC, ReactNode, useEffect, useState, useMemo } from "react";
+import { FC, ReactNode, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { connect } from "@starknet-io/get-starknet";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
+import {
+  ByteArray,
+  CairoCustomEnum,
+  CairoOption,
+  CairoOptionVariant,
+  CallData,
+  RpcProvider,
+  num,
+  uint256,
+} from "starknet";
+import { WalletAccount, wallet } from "starknet";
 import { formatUnits, parseUnits } from "viem";
 import { ERC20ABI } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract, useScaffoldMultiWriteContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
+import {
+  useDeployedContractInfo,
+  useScaffoldMultiWriteContract,
+  useScaffoldReadContract,
+} from "~~/hooks/scaffold-stark";
+import { useAccount } from "~~/hooks/useAccount";
 import { universalErc20Abi } from "~~/utils/Constants";
-import { CairoCustomEnum, CairoOption, CairoOptionVariant, ByteArray, CallData } from "starknet";
-import { useAccount } from "~~/hooks/useAccount"; 
+import { feltToString } from "~~/utils/protocols";
 
 // Helper to convert a string to its felt representation
 const stringToFelt = (s: string): string => {
@@ -58,8 +74,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<ActionStep>("idle");
   const [isLoading, setIsLoading] = useState(false);
-  // Get the RouterGateway contract
+  const [walletAccount, setWalletAccount] = useState<WalletAccount | null>(null);
 
+  // Get the RouterGateway contract
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
 
   // Read token decimals
@@ -71,15 +88,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     enabled: isOpen,
   });
 
-  if (isOpen) {
-    console.log("isOpen", isOpen);
-    console.log("token.address", token.address);
-    console.log("decimals", decimals);
-    console.log("userAddress", userAddress);
-  }
-  // Construct calls based on current state
-  const calls = useMemo(() => {
-    if (!amount || !userAddress || !routerGateway || !decimals) return [];
+  // Construct instruction based on current state
+  const instruction = useMemo(() => {
+    if (!amount || !userAddress || !decimals) return null;
 
     const parsedAmount = parseUnits(amount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
@@ -92,7 +103,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           Deposit: {
             basic: {
               token: token.address,
-              amount: parsedAmount,
+              amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
             context: new CairoOption<ByteArray>(CairoOptionVariant.None),
@@ -104,7 +115,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           Borrow: {
             basic: {
               token: token.address,
-              amount: parsedAmount,
+              amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
             context: new CairoOption<ByteArray>(CairoOptionVariant.None),
@@ -116,7 +127,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           Repay: {
             basic: {
               token: token.address,
-              amount: parsedAmount,
+              amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
             context: new CairoOption<ByteArray>(CairoOptionVariant.None),
@@ -125,30 +136,53 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         break;
     }
 
-    const instruction = CallData.compile({
-        type: "ProtocolInstruction",
-        protocol: stringToFelt(lowerProtocolName),
-        instruction: lendingInstruction,
+    return CallData.compile({
+      instructions: [
+        {
+          protocol_name: lowerProtocolName,
+          instructions: [lendingInstruction],
+        },
+      ],
     });
+  }, [amount, userAddress, decimals, protocolName, actionType, token.address]);
+
+  const { data: protocolInstructions } = useScaffoldReadContract({
+    contractName: "RouterGateway",
+    functionName: "get_authorizations_for_instructions",
+    args: [instruction],
+    enabled: !!instruction,
+    refetchInterval: 0,
+  });
+
+  // Construct calls based on current state
+  const calls = useMemo(() => {
+    if (!instruction) return [];
+
+    const authorizations = [];
+    if (protocolInstructions) {
+      for (const instruction of protocolInstructions) {
+        const address = num.toHexString(instruction[0]);
+        const entrypoint = feltToString(instruction[1]);
+        authorizations.push({
+          contractAddress: address,
+          entrypoint: entrypoint,
+          calldata: (instruction[2] as bigint[]).map(f => num.toHexString(f)),
+        });
+      }
+    }
+    
 
     return [
+      ...authorizations,
       {
-        contractAddress: token.address,
-        entrypoint: "approve" as const,
-        abi: universalErc20Abi,
-        args: [routerGateway.address, parsedAmount]
+        contractName: "RouterGateway",
+        functionName: "process_protocol_instructions",
+        args: instruction,
       },
-      {
-        contractName: "RouterGateway" as const,
-        functionName: "process_protocol_instructions" as const,
-        abi: routerGateway.abi,
-        args: [[instruction]]
-      }
     ];
-  }, [amount, userAddress, routerGateway, decimals, protocolName, actionType, token.address]);
+  }, [instruction, protocolInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
-
   // Read token balance
   const { data: balance } = useReadContract({
     address: token.address as `0x${string}`,
@@ -158,10 +192,6 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     blockIdentifier: "pending",
     enabled: true,
   });
-
-  if (isOpen) {
-    console.log("balance", balance);
-  }
 
   const formattedBalance = balance && decimals ? formatUnits(balance as bigint, Number(decimals)) : "0";
 
@@ -180,19 +210,6 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       setIsLoading(false);
     }
   }, [isOpen]);
-
-  // Helper for mapping action type to function name
-  const getRouterFunctionName = (action: TokenActionType): "borrow" | "supply" | "repay" => {
-    switch (action) {
-      case "borrow":
-        return "borrow";
-      case "deposit":
-        return "supply";
-      case "repay":
-        return "repay";
-    }
-  };
-
   // Execute the token action
   const handleAction = async () => {
     const missingDeps = [];
@@ -210,7 +227,6 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       setError(null);
       setStep("approving");
       setStep("executing");
-
       // Execute the transaction
       const tx = await sendAsync();
       console.log(`${actionType} tx sent:`, tx);

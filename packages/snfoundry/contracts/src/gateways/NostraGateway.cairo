@@ -181,7 +181,7 @@ mod NostraGateway {
                     },
                     _ => {}
                 }
-            }
+            };
             return authorizations.span();
         }
     }
@@ -192,7 +192,7 @@ mod NostraGateway {
             self.underlying_to_ndebt.write(underlying, debt);
             self.underlying_to_ncollateral.write(underlying, collateral);
             self.underlying_to_nibcollateral.write(underlying, ibcollateral);
-            self.supported_assets.push(underlying);
+            self.supported_assets.append().write(underlying);
         }
 
         fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)> {
@@ -217,7 +217,7 @@ mod NostraGateway {
                 };
                 positions.append((underlying, symbol, debt_balance, collateral_balance));
                 i += 1;
-            }
+            };
             println!("returning positions");
             return positions;
         }
@@ -234,7 +234,7 @@ mod NostraGateway {
                 let config = model.get_interest_state(debt);
                 rates.append(config);
                 i += 1;
-            }
+            };
             return rates;
         }
     }
