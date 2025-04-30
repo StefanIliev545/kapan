@@ -1,7 +1,8 @@
 import { FC, useState } from "react";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
-import { DepositModalStark } from "~~/components/modals/DepositModalStark";
+import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
+import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -71,6 +72,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   supportedAssets,
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
   // Find metadata for both assets
   const collateralMetadata = supportedAssets.find(
@@ -216,7 +218,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex">
               <button className="btn btn-xs btn-primary rounded-r-none px-2 w-16" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
-              <button className="btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16">Withdraw</button>
+              <button className="btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16" onClick={() => setIsWithdrawModalOpen(true)}>Withdraw</button>
             </div>
             <div className="flex justify-end">
               <div className="flex">
@@ -231,6 +233,18 @@ export const VesuPosition: FC<VesuPositionProps> = ({
       <DepositModalStark
         isOpen={isDepositModalOpen}
         onClose={() => setIsDepositModalOpen(false)}
+        token={{
+          name: collateralSymbol,
+          icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+          address: collateralAsset,
+          currentRate: collateralRates.supplyAPY * 100,
+        }}
+        protocolName="Vesu"
+      />
+
+      <WithdrawModalStark
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
         token={{
           name: collateralSymbol,
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),

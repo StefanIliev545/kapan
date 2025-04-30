@@ -3,6 +3,8 @@ import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
+import { DepositModalStark } from "./modals/stark/DepositModalStark";
+import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
 import { useAccount } from "wagmi";
@@ -33,6 +35,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 }) => {
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Get wallet connection status
@@ -204,6 +207,16 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                onClick={() => setIsWithdrawModalOpen(true)}
+                disabled={!isWalletConnected || !hasBalance}
+                title={!isWalletConnected ? "Connect wallet to withdraw" : !hasBalance ? "No balance to withdraw" : "Withdraw tokens"}
+              >
+                <div className="flex items-center justify-center">
+                  <span>Withdraw</span>
+                </div>
+              </button>
+              <button
+                className="btn btn-sm btn-outline w-full flex justify-center items-center"
                 onClick={() => setIsMoveModalOpen(true)}
                 disabled={!isWalletConnected || !hasBalance}
                 title={
@@ -221,7 +234,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             </div>
 
             {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className="hidden md:grid grid-cols-2 gap-3">
+            <div className="hidden md:grid grid-cols-3 gap-3">
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
                 onClick={() => setIsDepositModalOpen(true)}
@@ -230,6 +243,16 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               >
                 <div className="flex items-center justify-center">
                   <span>Deposit</span>
+                </div>
+              </button>
+              <button
+                className="btn btn-sm btn-outline flex justify-center items-center"
+                onClick={() => setIsWithdrawModalOpen(true)}
+                disabled={!isWalletConnected || !hasBalance}
+                title={!isWalletConnected ? "Connect wallet to withdraw" : !hasBalance ? "No balance to withdraw" : "Withdraw tokens"}
+              >
+                <div className="flex items-center justify-center">
+                  <span>Withdraw</span>
                 </div>
               </button>
               <button
@@ -269,12 +292,39 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         fromProtocol={protocolName}
       />
 
-      <DepositModal
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        token={{ name, icon, currentRate, address: tokenAddress }}
-        protocolName={protocolName}
-      />
+      {networkType === "starknet" ? (
+        <>
+          <DepositModalStark
+            isOpen={isDepositModalOpen}
+            onClose={() => setIsDepositModalOpen(false)}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+            }}
+            protocolName={protocolName}
+          />
+          <WithdrawModalStark
+            isOpen={isWithdrawModalOpen}
+            onClose={() => setIsWithdrawModalOpen(false)}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+            }}
+            protocolName={protocolName}
+          />
+        </>
+      ) : (
+        <DepositModal
+          isOpen={isDepositModalOpen}
+          onClose={() => setIsDepositModalOpen(false)}
+          token={{ name, icon, currentRate, address: tokenAddress }}
+          protocolName={protocolName}
+        />
+      )}
     </>
   );
 };

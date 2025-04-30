@@ -185,6 +185,10 @@ fn setup_test_context() -> TestContext {
     }
 }
 
+
+use core::poseidon::PoseidonTrait;
+use core::hash::{HashStateTrait, HashStateExTrait};
+
 #[test]
 #[fork("MAINNET_LATEST")]
 fn test_router_setup() {
@@ -254,9 +258,10 @@ fn test_router_setup() {
         let (token, selector, call_data) = authorization;
         cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
         println!("Calling {:?} {:?} with {:?}", token, selector, call_data);
-        let result = call_contract_syscall(*token, *selector, call_data.span());
+        let selector_hash = PoseidonTrait::new().update_with(*selector).finalize();
+        let result = call_contract_syscall(*token, selector_hash, call_data.span());
         assert(result.is_ok(), 'call failed');
-    }
+    };
     let erc20 = IERC20Dispatcher { contract_address: ETH_ADDRESS() };
     let eth_balance = erc20.balance_of(USER_ADDRESS());
 
@@ -268,7 +273,6 @@ fn test_router_setup() {
     println!("ETH balance after: {:?}", eth_balance_after);
     assert(eth_balance-2500000000000000000 == eth_balance_after, 'ETH balance not increased');
 } 
-
 
 use kapan::gateways::VesuGateway::VesuContext;
 const POOL_ID: felt252 =
@@ -348,9 +352,10 @@ fn test_vesu() {
         let (token, selector, call_data) = authorization;
         cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
         println!("Calling {:?} {:?} with {:?}", token, selector, call_data);
-        let result = call_contract_syscall(*token, *selector, call_data.span());
+        let selector_hash = PoseidonTrait::new().update_with(*selector).finalize();
+        let result = call_contract_syscall(*token, selector_hash, call_data.span());
         assert(result.is_ok(), 'call failed');
-    }
+    };
     let erc20 = IERC20Dispatcher { contract_address: ETH_ADDRESS() };
     let eth_balance = erc20.balance_of(USER_ADDRESS());
 
@@ -412,9 +417,10 @@ fn test_move_debt() {
     for authorization in authorizations {
         let (token, selector, call_data) = authorization;
         cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-        let result = call_contract_syscall(*token, *selector, call_data.span());
+        let selector_hash = PoseidonTrait::new().update_with(*selector).finalize();
+        let result = call_contract_syscall(*token, selector_hash, call_data.span());
         assert(result.is_ok(), 'call failed');
-    }
+    };
     // Process initial position
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     context.router_dispatcher.process_protocol_instructions(initial_instructions.span());
@@ -477,9 +483,10 @@ fn test_move_debt() {
     for authorization in move_debt_authorizations {
         let (token, selector, call_data) = authorization;
         cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-        let result = call_contract_syscall(*token, *selector, call_data.span());
+        let selector_hash = PoseidonTrait::new().update_with(*selector).finalize();
+        let result = call_contract_syscall(*token, selector_hash, call_data.span());
         assert(result.is_ok(), 'call failed');
-    }
+    };
     
     println!("Processing move debt");
     // Process move debt

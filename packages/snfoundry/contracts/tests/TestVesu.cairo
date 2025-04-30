@@ -378,7 +378,7 @@ fn test_get_all_positions() {
             assert(position.collateral_shares > 0, 'USDC deposit position not found');
             found_usdc_deposit = true;
         }
-    }
+    };
 
     assert(found_eth_deposit, 'ETH deposit position missing');
     assert(found_eth_usdc_borrow, 'ETH-USDCb position missing');

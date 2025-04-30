@@ -154,7 +154,7 @@ mod NostraGateway {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(amount, ref call_data);
-                        authorizations.append((token, selector!("approve"), call_data));
+                        authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Borrow(instruction) => {
                         let mut call_data: Array<felt252> = array![];
@@ -163,13 +163,13 @@ mod NostraGateway {
                         Serde::serialize(instruction.basic.user, ref call_data);
                         let debt_token = self.underlying_to_ndebt.read(*instruction.basic.token);
                         assert(debt_token != Zero::zero(), 'not-token');
-                        authorizations.append((debt_token, selector!("approve_delegation"), call_data));
+                        authorizations.append((debt_token, 'approve_delegation', call_data));
                     },
                     LendingInstruction::Repay(instruction) => {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(instruction.basic.amount, ref call_data);
-                        authorizations.append((*instruction.basic.token, selector!("approve"), call_data));
+                        authorizations.append((*instruction.basic.token, 'approve', call_data));
                     },
                     LendingInstruction::Withdraw(instruction) => {
                         let ibtoken = self.underlying_to_nibcollateral.read(*instruction.basic.token);
@@ -177,7 +177,7 @@ mod NostraGateway {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_contract_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(instruction.basic.amount, ref call_data);
-                        authorizations.append((ibtoken, selector!("approve"), call_data));
+                        authorizations.append((ibtoken, 'approve', call_data));
                     },
                     _ => {}
                 }

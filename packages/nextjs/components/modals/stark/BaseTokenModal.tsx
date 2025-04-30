@@ -44,7 +44,7 @@ export interface VesuContext {
 }
 
 // Different action types supported
-export type TokenActionType = "borrow" | "deposit" | "repay";
+export type TokenActionType = "borrow" | "deposit" | "repay" | "withdraw";
 
 // Step tracking for all token action flows
 export type ActionStep = "idle" | "approving" | "approved" | "executing" | "done";
@@ -97,10 +97,31 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
     // Create the appropriate lending instruction based on action type
     let lendingInstruction;
+    console.log(`actionType: ${actionType}`);
     switch (actionType) {
       case "deposit":
+        console.log(`deposit`);
         lendingInstruction = new CairoCustomEnum({
           Deposit: {
+            basic: {
+              token: token.address,
+              amount: uint256.bnToUint256(parsedAmount),
+              user: userAddress,
+            },
+            context: new CairoOption<ByteArray>(CairoOptionVariant.None),
+          },
+          Withdraw: undefined,
+          Repay: undefined,
+          Borrow: undefined,
+        });
+        break;
+      case "withdraw":
+        console.log(`withdraw`);
+        lendingInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: {
             basic: {
               token: token.address,
               amount: uint256.bnToUint256(parsedAmount),
@@ -112,6 +133,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         break;
       case "borrow":
         lendingInstruction = new CairoCustomEnum({
+          Deposit: undefined,
           Borrow: {
             basic: {
               token: token.address,
@@ -120,10 +142,14 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             },
             context: new CairoOption<ByteArray>(CairoOptionVariant.None),
           },
+          Repay: undefined,
+          Withdraw: undefined,
         });
         break;
       case "repay":
         lendingInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
           Repay: {
             basic: {
               token: token.address,
@@ -132,6 +158,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             },
             context: new CairoOption<ByteArray>(CairoOptionVariant.None),
           },
+          Withdraw: undefined,
         });
         break;
     }
@@ -162,6 +189,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     if (protocolInstructions) {
       for (const instruction of protocolInstructions) {
         const address = num.toHexString(instruction[0]);
+        console.log(`address: ${address}`);
         const entrypoint = feltToString(instruction[1]);
         authorizations.push({
           contractAddress: address,
@@ -170,7 +198,6 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         });
       }
     }
-    
 
     return [
       ...authorizations,

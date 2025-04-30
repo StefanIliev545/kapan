@@ -4069,7 +4069,7 @@ __metadata:
     rehype-highlight: ^7.0.2
     rehype-slug: ^6.0.0
     remark-gfm: ^4.0.1
-    starknet: 6.24.1
+    starknet: ^6.24.1
     starknetkit: latest
     tailwindcss: ~3.4.11
     type-fest: ~4.26.1
@@ -19154,7 +19154,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"starknet@npm:6.24.1":
+"starknet@npm:6.24.1, starknet@npm:^6.24.1":
   version: 6.24.1
   resolution: "starknet@npm:6.24.1"
   dependencies:

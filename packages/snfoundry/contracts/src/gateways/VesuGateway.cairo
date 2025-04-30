@@ -474,6 +474,7 @@ mod VesuGateway {
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Deposit(deposit_params) => {
+                        println!("deposit authorization");
                         let token = *deposit_params.basic.token;
                         let amount = deposit_params.basic.amount;
                         let mut call_data: Array<felt252> = array![];
@@ -482,6 +483,7 @@ mod VesuGateway {
                         authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Repay(repay_params) => {
+                        println!("repay authorization");
                         let token = *repay_params.basic.token;
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
@@ -489,6 +491,7 @@ mod VesuGateway {
                         authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Borrow(borrow_params) => {
+                        println!("borrow authorization");
                         let mut pool_id = self.pool_id.read();
                         let singleton = self.vesu_singleton.read();
                         if borrow_params.context.is_some() {
@@ -503,6 +506,7 @@ mod VesuGateway {
                         authorizations.append((singleton, 'modify_delegation', call_data));
                     },
                     LendingInstruction::Withdraw(withdraw_params) => {
+                        println!("withdraw authorization");
                         let mut pool_id = self.pool_id.read();
                         let singleton = self.vesu_singleton.read();
                         if withdraw_params.context.is_some() {

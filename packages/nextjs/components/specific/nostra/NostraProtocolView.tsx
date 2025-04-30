@@ -37,7 +37,7 @@ export const NostraProtocolView: FC = () => {
     contractName: "NostraGateway",
     functionName: "get_user_positions",
     args: [queryAddress],
-    refetchInterval: 0,
+    refetchInterval: 10000,
   });
 
   // Memoize the unique contract addresses from user positions
@@ -121,4 +121,4 @@ export const NostraProtocolView: FC = () => {
   );
 };
 
-export default NostraProtocolView; 
+export default NostraProtocolView;

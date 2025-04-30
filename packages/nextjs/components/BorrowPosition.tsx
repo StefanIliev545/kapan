@@ -2,6 +2,8 @@ import React, { FC, useState } from "react";
 import Image from "next/image";
 import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
+import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
+import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { MovePositionModal } from "./modals/MovePositionModal";
 import { RepayModal } from "./modals/RepayModal";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
@@ -324,19 +326,39 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
         }}
       />
 
-      <RepayModal
-        isOpen={isRepayModalOpen}
-        onClose={() => setIsRepayModalOpen(false)}
-        token={{ name, icon, currentRate, address: tokenAddress }}
-        protocolName={protocolName}
-      />
+      {networkType === "starknet" ? (
+        <>
+          <RepayModalStark
+            isOpen={isRepayModalOpen}
+            onClose={() => setIsRepayModalOpen(false)}
+            token={{ name, icon, currentRate, address: tokenAddress }}
+            protocolName={protocolName}
+          />
 
-      <BorrowModal
-        isOpen={isBorrowModalOpen}
-        onClose={handleCloseBorrowModal}
-        token={{ name, icon, currentRate, address: tokenAddress }}
-        protocolName={protocolName}
-      />
+          <BorrowModalStark
+            isOpen={isBorrowModalOpen}
+            onClose={handleCloseBorrowModal}
+            token={{ name, icon, currentRate, address: tokenAddress }}
+            protocolName={protocolName}
+          />
+        </>
+      ) : (
+        <>
+          <RepayModal
+            isOpen={isRepayModalOpen}
+            onClose={() => setIsRepayModalOpen(false)}
+            token={{ name, icon, currentRate, address: tokenAddress }}
+            protocolName={protocolName}
+          />
+
+          <BorrowModal
+            isOpen={isBorrowModalOpen}
+            onClose={handleCloseBorrowModal}
+            token={{ name, icon, currentRate, address: tokenAddress }}
+            protocolName={protocolName}
+          />
+        </>
+      )}
     </>
   );
 };

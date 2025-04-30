@@ -1,7 +1,7 @@
 import { FC } from "react";
-import { BaseTokenModal } from "./stark/BaseTokenModal";
+import { BaseTokenModal } from "./BaseTokenModal";
 
-interface DepositModalStarkProps {
+interface RepayModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
   token: {
@@ -14,7 +14,7 @@ interface DepositModalStarkProps {
   counterpartToken?: string;
 }
 
-export const DepositModalStark: FC<DepositModalStarkProps> = ({
+export const RepayModalStark: FC<RepayModalStarkProps> = ({
   isOpen,
   onClose,
   token,
@@ -27,8 +27,8 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
       onClose={onClose}
       token={token}
       protocolName={protocolName}
-      actionType="deposit"
-      actionLabel="Deposit"
+      actionType="repay"
+      actionLabel="Repay"
     />
   );
-};
+}; 
