@@ -5,9 +5,9 @@ export const SCALE = 10n ** 18n;
 // Helper function to convert felt252 to string
 export const feltToString = (felt: bigint): string => {
   // Convert felt to hex string and remove leading zeros
-  const hex = felt.toString(16).replace(/^0+/, '');
+  const hex = felt.toString(16).replace(/^0+/, "");
   // Convert hex to ASCII
-  return Buffer.from(hex, 'hex').toString('ascii');
+  return Buffer.from(hex, "hex").toString("ascii");
 };
 
 // Rate calculation functions
@@ -47,11 +47,19 @@ export const formatTokenAmount = (amount: string, decimals: number): string => {
     const divisor = BigInt(10) ** BigInt(decimals);
     const whole = bigIntAmount / divisor;
     const fraction = bigIntAmount % divisor;
-    const fractionStr = fraction.toString().padStart(Number(decimals), '0');
-    return `${whole}.${fractionStr}`;
+    const fractionStr = fraction.toString().padStart(Number(decimals), "0");
+    const formatted = `${whole}.${fractionStr}`;
+
+    // Ensure exactly 3 decimal places
+    const parts = formatted.split(".");
+    if (parts.length === 1) {
+      return `${parts[0]}.000`;
+    }
+    const decimalPart = parts[1].slice(0, 3).padEnd(3, "0");
+    return `${parts[0]}.${decimalPart}`;
   } catch (error) {
-    console.error('Error formatting token amount:', error);
-    return '0';
+    console.error("Error formatting token amount:", error);
+    return "0.000";
   }
 };
 
@@ -98,4 +106,4 @@ export type PositionData = {
   collateral_amount: bigint;
   nominal_debt: bigint;
   is_vtoken: boolean;
-}; 
+};

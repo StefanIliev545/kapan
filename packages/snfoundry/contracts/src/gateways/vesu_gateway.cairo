@@ -339,49 +339,6 @@ mod VesuGateway {
             singleton_dispatcher.modify_position(modify_params)
         }
 
-        fn modify_debt_for(
-            ref self: ContractState,
-            pool_id: felt252,
-            collateral_asset: ContractAddress,
-            debt_asset: ContractAddress,
-            user: ContractAddress,
-            debt_amount: i257,
-        ) {
-            let singleton_dispatcher = ISingletonDispatcher {
-                contract_address: self.vesu_singleton.read(),
-            };
-
-            // Check if position exists
-            let (position, _, _) = singleton_dispatcher
-                .position(pool_id, collateral_asset, debt_asset, user);
-            if position.collateral_shares == 0 && position.nominal_debt == 0 {
-                // Transfer position from zero debt to target debt
-                self.transfer_position_for(pool_id, collateral_asset, debt_asset, user, 0);
-            }
-
-            // Approve singleton to spend tokens if needed
-            if !debt_amount.is_negative() {
-                let erc20 = IERC20Dispatcher { contract_address: debt_asset };
-                let result = erc20.approve(self.vesu_singleton.read(), debt_amount.abs());
-                assert(result, Errors::APPROVE_FAILED);
-            }
-
-            let modify_params = ModifyPositionParams {
-                pool_id,
-                collateral_asset,
-                debt_asset,
-                user,
-                collateral: Default::default(),
-                debt: Amount {
-                    amount_type: AmountType::Delta,
-                    denomination: AmountDenomination::Assets,
-                    value: debt_amount,
-                },
-                data: ArrayTrait::new().span(),
-            };
-            singleton_dispatcher.modify_position(modify_params);
-        }
-
         fn borrow(ref self: ContractState, instruction: @Borrow) {
             let basic = *instruction.basic;
             let context = *instruction.context;
@@ -389,7 +346,10 @@ mod VesuGateway {
             let mut context_bytes = context.unwrap();
             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
 
-            let pool_id = self.pool_id.read();
+            let mut pool_id = self.pool_id.read();
+            if vesu_context.pool_id != Zero::zero() {
+                pool_id = vesu_context.pool_id;
+            }
             let user = basic.user;
             let collateral_asset = vesu_context.position_counterpart_token;
             let debt_asset = basic.token;
@@ -412,7 +372,10 @@ mod VesuGateway {
             let mut context_bytes = context.unwrap();
             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
 
-            let pool_id = self.pool_id.read();
+            let mut pool_id = self.pool_id.read();
+            if vesu_context.pool_id != Zero::zero() {
+                pool_id = vesu_context.pool_id;
+            }
             let user = basic.user;
             let collateral_asset = vesu_context.position_counterpart_token;
             let debt_asset = basic.token;
@@ -422,9 +385,50 @@ mod VesuGateway {
             let result = erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount);
             assert(result, Errors::TRANSFER_FAILED);
 
+            let erc20 = IERC20Dispatcher { contract_address: debt_asset };
+            let result = erc20.approve(self.vesu_singleton.read(), basic.amount);
+            assert(result, Errors::APPROVE_FAILED);
+
             // Create negative i257 for repay (reducing debt)
             let debt_amount = I257Impl::new(basic.amount, true);
             self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
+        }
+
+        
+        fn modify_debt_for(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            debt_amount: i257,
+        ) {
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+
+            // Check if position exists
+            let (position, _, _) = singleton_dispatcher
+                .position(pool_id, collateral_asset, debt_asset, user);
+            if position.collateral_shares == 0 && position.nominal_debt == 0 {
+                // Transfer position from zero debt to target debt
+                self.transfer_position_for(pool_id, collateral_asset, debt_asset, user, 0);
+            }
+
+            let modify_params = ModifyPositionParams {
+                pool_id,
+                collateral_asset,
+                debt_asset,
+                user,
+                collateral: Default::default(),
+                debt: Amount {
+                    amount_type: AmountType::Delta,
+                    denomination: AmountDenomination::Assets,
+                    value: debt_amount,
+                },
+                data: ArrayTrait::new().span(),
+            };
+            singleton_dispatcher.modify_position(modify_params);
         }
     }
 
@@ -483,7 +487,9 @@ mod VesuGateway {
                         if borrow_params.context.is_some() {
                             let mut context_bytes: Span<felt252> = (*borrow_params).context.unwrap();
                             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
-                            pool_id = vesu_context.pool_id;
+                            if vesu_context.pool_id != Zero::zero() {
+                                pool_id = vesu_context.pool_id;
+                            }
                         }
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..
@@ -497,7 +503,9 @@ mod VesuGateway {
                         if withdraw_params.context.is_some() {
                             let mut context_bytes: Span<felt252> = (*withdraw_params).context.unwrap();
                             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
-                            pool_id = vesu_context.pool_id;
+                            if vesu_context.pool_id != Zero::zero() {
+                                pool_id = vesu_context.pool_id;
+                            }
                         }
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..

@@ -1393,7 +1393,7 @@ const contracts = {
   sepolia: {
     VesuGateway: {
       address:
-        "0x2cca54ecce48b6d0fcd1ac6b28456fbe84168457dfb85d1fde4497b9d39e756",
+        "0x74adceebf349dcef85ef113b44d8fafae48244df1ba7543929194f6a7cfc340",
       abi: [
         {
           type: "impl",
@@ -1947,11 +1947,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0xee9cde7d54a5b64eb2d6874e11ed4337477328c969c07d93a336a4932bb31f",
+        "0x407954d0e8321f5af9262a1cbb15e7d8505fa9e7c2524444e866582f1e973f5",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x1bf8e2243e27d1b76715529bc69ce4793eb7e4ad274f601bb8bd61c306ebf25",
+        "0x426c79da4bdf074f54aee564ee1548808ca9bea74a155ff9c9f1fef40885f75",
       abi: [
         {
           type: "impl",
@@ -2069,7 +2069,7 @@ const contracts = {
     },
     RouterGateway: {
       address:
-        "0xac22ae81361aa328fe57016d2bdb92c178274cc2eb87fdf6ff73858f4c52c4",
+        "0xccd9c4abb028dc933604d5f9e78a58cfdc7f90bc67d9f118b87b230283661c",
       abi: [
         {
           type: "impl",
@@ -2396,7 +2396,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x67f73c1ba9cf71d49917147e79985550d143549f339081c442fe9d1c4f77330",
+        "0x1a539c480b0ad5c9afe8dd0236aa5283f16433de2f719e5f3edfa43ca758874",
     },
   },
 } as const satisfies SNContractsType;

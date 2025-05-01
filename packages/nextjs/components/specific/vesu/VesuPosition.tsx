@@ -155,9 +155,11 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             {/* Collateral Section */}
             <div className="space-y-2">
               <div className="text-2xl font-bold">
-                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(4) : formattedCollateral}
+                ${(Number(collateralValue) / 1e18).toFixed(3)}
               </div>
-              <div className="text-lg text-gray-500">${(Number(collateralValue) / 1e18).toFixed(2)}</div>
+              <div className="text-lg text-gray-500">
+                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(3) : formattedCollateral} {collateralSymbol}
+              </div>
 
               <div className="divider my-1"></div>
 
@@ -170,7 +172,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500">Monthly yield</span>
-                  <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(2)}</span>
+                  <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(3)}</span>
                 </div>
               </div>
             </div>
@@ -179,15 +181,17 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             <div className="space-y-2">
               {nominalDebt === "0" ? (
                 <>
-                  <div className="text-2xl font-bold text-gray-400">No debt</div>
-                  <div className="text-lg text-gray-400">$0.00</div>
+                  <div className="text-2xl font-bold text-gray-400">$0.000</div>
+                  <div className="text-lg text-gray-400">0 {debtSymbol}</div>
                 </>
               ) : (
                 <>
                   <div className="text-2xl font-bold">
-                    {debtSymbol === "ETH" ? parseFloat(formattedDebt).toFixed(4) : formattedDebt}
+                    ${(Number(debtValue) / 1e18).toFixed(3)}
                   </div>
-                  <div className="text-lg text-gray-500">${(Number(debtValue) / 1e18).toFixed(2)}</div>
+                  <div className="text-lg text-gray-500">
+                    {debtSymbol === "ETH" ? parseFloat(formattedDebt).toFixed(3) : formattedDebt} {debtSymbol}
+                  </div>
                 </>
               )}
 
@@ -207,7 +211,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-500">Monthly cost</span>
-                      <span className="text-sm font-medium">${(Number(monthlyCost) / 1e18).toFixed(2)}</span>
+                      <span className="text-sm font-medium">${(Number(monthlyCost) / 1e18).toFixed(3)}</span>
                     </div>
                   </>
                 )}

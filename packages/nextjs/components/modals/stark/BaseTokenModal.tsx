@@ -121,9 +121,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             },
             context: context,
           },
-          Withdraw: undefined,
           Repay: undefined,
           Borrow: undefined,
+          Withdraw: undefined,
         });
         break;
       case "withdraw":
@@ -202,6 +202,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         const address = num.toHexString(instruction[0]);
         console.log(`address: ${address}`);
         const entrypoint = feltToString(instruction[1]);
+        console.log(`entrypoint: ${entrypoint}`);
+        console.log(`instruction[2]: ${instruction[2]}`);
         authorizations.push({
           contractAddress: address,
           entrypoint: entrypoint,

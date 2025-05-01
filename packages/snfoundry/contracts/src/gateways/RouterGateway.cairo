@@ -77,6 +77,7 @@ mod RouterGateway {
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                        assert(should_transfer, 'should_transfer-false');
                         if should_transfer {
                             assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
                         }
