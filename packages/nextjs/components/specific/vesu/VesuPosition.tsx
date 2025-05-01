@@ -93,6 +93,11 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     return null;
   }
 
+  // nominal debt seems to be eth decimal scaled rather than token.
+  if (debtMetadata) {
+    debtMetadata.decimals = 18;
+  }
+
   const collateralSymbol = feltToString(collateralMetadata.symbol);
   const debtSymbol = debtMetadata ? feltToString(debtMetadata.symbol) : "N/A";
 
