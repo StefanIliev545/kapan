@@ -11,7 +11,10 @@ interface WithdrawModalStarkProps {
     currentRate: number;
   };
   protocolName: string;
-  counterpartToken?: string;
+  vesuContext?: {
+    pool_id: bigint;
+    counterpart_token: string;
+  };
 }
 
 export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
@@ -19,7 +22,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
   onClose,
   token,
   protocolName,
-  counterpartToken,
+  vesuContext,
 }) => {
   return (
     <BaseTokenModal
@@ -29,6 +32,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
       protocolName={protocolName}
       actionType="withdraw"
       actionLabel="Withdraw"
+      vesuContext={vesuContext}
     />
   );
 }; 

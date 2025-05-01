@@ -89,6 +89,8 @@ export type TokenMetadata = {
   last_rate_accumulator: bigint;
   reserve: bigint;
   scale: bigint;
+  borrowAPR?: number;
+  supplyAPY?: number;
 };
 
 export type PositionData = {

@@ -4,12 +4,14 @@ import { connect } from "@starknet-io/get-starknet";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import {
+  BigNumberish,
   ByteArray,
   CairoCustomEnum,
   CairoOption,
   CairoOptionVariant,
   CallData,
   RpcProvider,
+  byteArray,
   num,
   uint256,
 } from "starknet";
@@ -67,6 +69,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   protocolName,
   actionType,
   actionLabel,
+  vesuContext,
   children,
 }) => {
   const { address: userAddress } = useAccount();
@@ -95,6 +98,14 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     const parsedAmount = parseUnits(amount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
 
+    let context = new CairoOption<BigNumberish[]>(CairoOptionVariant.None);
+    if (vesuContext) {
+      context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
+        vesuContext.pool_id,
+        vesuContext.counterpart_token,
+      ]);
+    }
+
     // Create the appropriate lending instruction based on action type
     let lendingInstruction;
     console.log(`actionType: ${actionType}`);
@@ -108,7 +119,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
-            context: new CairoOption<ByteArray>(CairoOptionVariant.None),
+            context: context,
           },
           Withdraw: undefined,
           Repay: undefined,
@@ -127,7 +138,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
-            context: new CairoOption<ByteArray>(CairoOptionVariant.None),
+            context: context,
           },
         });
         break;
@@ -140,7 +151,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
-            context: new CairoOption<ByteArray>(CairoOptionVariant.None),
+            context: context,
           },
           Repay: undefined,
           Withdraw: undefined,
@@ -156,7 +167,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
-            context: new CairoOption<ByteArray>(CairoOptionVariant.None),
+            context: context,
           },
           Withdraw: undefined,
         });

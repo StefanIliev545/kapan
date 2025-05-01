@@ -3,6 +3,9 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
+import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
+import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
+import { RepayModalStark } from "~~/components/modals/stark/RepayModalStark";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -73,6 +76,9 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
+  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
+  const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
 
   // Find metadata for both assets
   const collateralMetadata = supportedAssets.find(
@@ -222,8 +228,28 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             </div>
             <div className="flex justify-end">
               <div className="flex">
-                <button className="btn btn-xs btn-primary rounded-r-none px-2 w-16">Borrow</button>
-                <button className={`btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16 ${nominalDebt === "0" ? "btn-disabled" : ""}`}>Repay</button>
+                <button 
+                  className="btn btn-xs btn-primary rounded-r-none px-2 w-16" 
+                  onClick={() => {
+                    if (nominalDebt === "0") {
+                      setIsTokenSelectModalOpen(true);
+                    } else if (debtMetadata) {
+                      setIsBorrowModalOpen(true);
+                    }
+                  }}
+                >
+                  Borrow
+                </button>
+                <button 
+                  className={`btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16 ${nominalDebt === "0" ? "btn-disabled" : ""}`}
+                  onClick={() => {
+                    if (nominalDebt !== "0" && debtMetadata) {
+                      setIsRepayModalOpen(true);
+                    }
+                  }}
+                >
+                  Repay
+                </button>
               </div>
             </div>
           </div>
@@ -240,6 +266,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           currentRate: collateralRates.supplyAPY * 100,
         }}
         protocolName="Vesu"
+        vesuContext={{
+          pool_id: 0n,
+          counterpart_token: debtAsset,
+        }}
       />
 
       <WithdrawModalStark
@@ -252,7 +282,62 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           currentRate: collateralRates.supplyAPY * 100,
         }}
         protocolName="Vesu"
+        vesuContext={{
+          pool_id: 0n,
+          counterpart_token: debtAsset,
+        }}
       />
+
+      <TokenSelectModalStark
+        isOpen={isTokenSelectModalOpen}
+        onClose={() => setIsTokenSelectModalOpen(false)}
+        tokens={supportedAssets}
+        protocolName="Vesu"
+        collateralAsset={collateralAsset}
+        isVesu={true}
+        vesuContext={{
+          pool_id: 0n,
+          counterpart_token: collateralAsset,
+        }}
+      />
+
+      {debtMetadata && (
+        <>
+          <BorrowModalStark
+            isOpen={isBorrowModalOpen}
+            onClose={() => setIsBorrowModalOpen(false)}
+            token={{
+              name: debtSymbol,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+              address: debtAsset,
+              currentRate: debtRates.borrowAPR * 100,
+            }}
+            protocolName="Vesu"
+            supportedAssets={supportedAssets}
+            isVesu={true}
+            vesuContext={{
+              pool_id: 0n,
+              counterpart_token: collateralAsset,
+            }}
+          />
+
+          <RepayModalStark
+            isOpen={isRepayModalOpen}
+            onClose={() => setIsRepayModalOpen(false)}
+            token={{
+              name: debtSymbol,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+              address: debtAsset,
+              currentRate: debtRates.borrowAPR * 100,
+            }}
+            protocolName="Vesu"
+            vesuContext={{
+              pool_id: 0n,
+              counterpart_token: collateralAsset,
+            }}
+          />
+        </>
+      )}
     </>
   );
 };

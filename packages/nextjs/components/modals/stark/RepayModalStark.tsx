@@ -11,7 +11,10 @@ interface RepayModalStarkProps {
     currentRate: number;
   };
   protocolName: string;
-  counterpartToken?: string;
+  vesuContext?: {
+    pool_id: bigint;
+    counterpart_token: string;
+  };
 }
 
 export const RepayModalStark: FC<RepayModalStarkProps> = ({
@@ -19,7 +22,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   onClose,
   token,
   protocolName,
-  counterpartToken,
+  vesuContext,
 }) => {
   return (
     <BaseTokenModal
@@ -29,6 +32,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
       protocolName={protocolName}
       actionType="repay"
       actionLabel="Repay"
+      vesuContext={vesuContext}
     />
   );
 }; 

@@ -110,6 +110,23 @@ export const VesuProtocolView: FC = () => {
       const debtAsset = `0x${position[1].toString(16).padStart(64, "0")}`;
       const positionData = position[2];
 
+      // Calculate rates for all supported assets
+      const assetsWithRates = (supportedAssets as unknown as ContractResponse).map(asset => {
+        const { borrowAPR, supplyAPY } = toAnnualRates(
+          asset.fee_rate,
+          asset.total_nominal_debt,
+          asset.last_rate_accumulator,
+          asset.reserve,
+          asset.scale,
+        );
+
+        return {
+          ...asset,
+          borrowAPR,
+          supplyAPY,
+        };
+      });
+
       return (
         <VesuPosition
           key={`${collateralAsset}-${debtAsset}-${index}`}
@@ -119,7 +136,7 @@ export const VesuProtocolView: FC = () => {
           collateralAmount={positionData.collateral_amount.toString()}
           nominalDebt={positionData.nominal_debt.toString()}
           isVtoken={positionData.is_vtoken}
-          supportedAssets={supportedAssets as unknown as TokenMetadata[]}
+          supportedAssets={assetsWithRates as unknown as TokenMetadata[]}
         />
       );
     });

@@ -11,7 +11,10 @@ interface DepositModalStarkProps {
     currentRate: number;
   };
   protocolName: string;
-  counterpartToken?: string;
+  vesuContext?: {
+    pool_id: bigint;
+    counterpart_token: string;
+  };
 }
 
 export const DepositModalStark: FC<DepositModalStarkProps> = ({
@@ -19,7 +22,7 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
   onClose,
   token,
   protocolName,
-  counterpartToken,
+  vesuContext,
 }) => {
   return (
     <BaseTokenModal
@@ -29,6 +32,7 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
       protocolName={protocolName}
       actionType="deposit"
       actionLabel="Deposit"
+      vesuContext={vesuContext}
     />
   );
 };

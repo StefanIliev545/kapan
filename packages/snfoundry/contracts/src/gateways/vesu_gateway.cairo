@@ -182,9 +182,17 @@ mod VesuGateway {
 
         fn deposit(ref self: ContractState, instruction: @Deposit) {
             let basic = *instruction.basic;
+            let mut pool_id = self.pool_id.read();
+            let mut debt_asset = Zero::zero(); // Zero debt token for deposit
             if instruction.context.is_some() {
-                // todo - trigger modify as we are adding collateral
-                return;
+                let mut context_bytes: Span<felt252> = (*instruction.context).unwrap();
+                let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
+                if vesu_context.pool_id != Zero::zero() {
+                    pool_id = vesu_context.pool_id;
+                }
+                if vesu_context.position_counterpart_token != Zero::zero() {
+                    debt_asset = vesu_context.position_counterpart_token;
+                }
             }
 
             let erc20 = IERC20Dispatcher { contract_address: basic.token };
@@ -198,9 +206,7 @@ mod VesuGateway {
             assert(approve_result, Errors::APPROVE_FAILED);
 
             // Use modify position to add collateral
-            let pool_id = self.pool_id.read();
             let collateral_asset = basic.token;
-            let debt_asset = Zero::zero(); // Zero debt token for deposit
             let user = basic.user;
 
             // Create positive i257 for deposit
