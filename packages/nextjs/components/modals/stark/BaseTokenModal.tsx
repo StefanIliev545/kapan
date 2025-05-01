@@ -178,7 +178,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     functionName: "get_authorizations_for_instructions",
     args: [instruction],
     enabled: !!instruction,
-    refetchInterval: 0,
+    refetchInterval: 5000,
   });
 
   // Construct calls based on current state

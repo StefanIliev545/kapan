@@ -211,7 +211,6 @@ const deployContract = async (
     };
   }
 
-  console.log(compiledContractSierra.abi);
   const contractCalldata = new CallData(compiledContractSierra.abi);
   const constructorCalldata = constructorArgs
     ? contractCalldata.compile("constructor", constructorArgs)

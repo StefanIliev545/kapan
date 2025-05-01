@@ -4,7 +4,7 @@ use kapan::gateways::NostraGateway::{
     INostraGatewayDispatcherTrait,
     INostraGatewayDispatcher,
 };
-use kapan::gateways::VesuGateway::{
+use kapan::gateways::vesu_gateway::{
     IVesuGatewayAdminDispatcher,
     IVesuGatewayAdminDispatcherTrait,
 };
@@ -274,7 +274,7 @@ fn test_router_setup() {
     assert(eth_balance-2500000000000000000 == eth_balance_after, 'ETH balance not increased');
 } 
 
-use kapan::gateways::VesuGateway::VesuContext;
+use kapan::gateways::vesu_gateway::VesuContext;
 const POOL_ID: felt252 =
     2198503327643286920898110335698706244522220458610657370981979460625005526824;
 

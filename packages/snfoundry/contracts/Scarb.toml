@@ -18,6 +18,7 @@ snforge_std = "0.38.0"
 
 [[target.starknet-contract]]
 casm = true
+sierra = true
 
 [tool.fmt]
 sort-module-level-items = true

@@ -62,7 +62,6 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
         transactionHash = (
           await walletClient.execute(tx, {
             version: constants.TRANSACTION_VERSION.V2,
-            nonce: await walletClient.getNonce(),
           })
         ).transaction_hash;
       } else {

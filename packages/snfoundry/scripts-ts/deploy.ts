@@ -7,42 +7,7 @@ import {
 import { green, red } from "./helpers/colorize-log";
 import { CallData, constants } from "starknet";
 
-/**
- * Deploy a contract using the specified parameters.
- *
- * @example (deploy contract with constructorArgs)
- * const deployScript = async (): Promise<void> => {
- *   await deployContract(
- *     {
- *       contract: "YourContract",
- *       contractName: "YourContractExportName",
- *       constructorArgs: {
- *         owner: deployer.address,
- *       },
- *       options: {
- *         maxFee: BigInt(1000000000000)
- *       }
- *     }
- *   );
- * };
- *
- * @example (deploy contract without constructorArgs)
- * const deployScript = async (): Promise<void> => {
- *   await deployContract(
- *     {
- *       contract: "YourContract",
- *       contractName: "YourContractExportName",
- *       options: {
- *         maxFee: BigInt(1000000000000)
- *       }
- *     }
- *   );
- * };
- *
- *
- * @returns {Promise<void>}
- */
-const deployScript = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
+const deployScriptDevnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -90,12 +55,54 @@ const deployScript = async (): Promise<{ nostraGatewayAddress: string, vesuGatew
   return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
 };
 
+const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
+  // Deploy VesuGateway
+  const supportedAssets = [
+    "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
+    "0xabbd6f1e590eb83addd87ba5ac27960d859b1f17d11a3c1cd6a0006704b141", // WBTC
+    "0x715649d4c493ca350743e43915b88d2e6838b1c78ddc23d6d9385446b9d6844", // USDC
+    "0x41301316d5313cb7ee3389a04cfb788db7dd600d6369bc1ffd7982d6d808ff4",
+    "0x173d770db353707f2bfac025f760d2a45a288e06f56d48d545bcbdcebe3daa2"
+    //"0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8", // USDT
+    //"0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2", // DAI
+    //"0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // LINK
+    //"0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // UNI
+  ];
+
+  const { address: vesuGatewayAddress } = await deployContract({
+    contract: "VesuGateway",
+    constructorArgs: {
+      vesu_singleton: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
+      pool_id: "730993554056884283224259059297934576024721456828383733531590831263129347422",
+      supported_assets: supportedAssets,
+    },
+  });
+
+  await deployContract({
+    contract: "OptimalInterestRateFinder",
+    constructorArgs: {
+      nostra_gateway: vesuGatewayAddress,
+      vesu_gateway: vesuGatewayAddress,
+    },
+  });
+
+  const { address: routerGatewayAddress } = await deployContract({
+    contract: "RouterGateway",
+    constructorArgs: {
+      _owner: deployer.address,
+      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+    },
+  });
+
+  return { nostraGatewayAddress: vesuGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+};
+
 const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
 
   const nonce = await deployer.getNonce();
 
   const calls = [
-    {
+    /*{
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
@@ -124,15 +131,7 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
         "0x036b68238f3a90639d062669fdec08c4d0bdd09826b1b6d24ef49de6d8141eaa", // WBTC collateral
         "0x05b7d301fa769274f20e89222169c0fad4d846c366440afc160aafadd6f88f0c", // WBTC ibcollateral
       ],
-    },
-    {
-      contractAddress: addresses.routerGatewayAddress,
-      entrypoint: "add_gateway",
-      calldata: [
-        "nostra",
-        addresses.nostraGatewayAddress,
-      ]
-    },
+    },*/
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
@@ -165,7 +164,7 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
 
 const main = async (): Promise<void> => {
   try {
-    const gatewayAddress = await deployScript();
+    const gatewayAddress = await deployScriptSepolia();
     await executeDeployCalls();
     await initializeContracts(gatewayAddress);
     exportDeployments();
