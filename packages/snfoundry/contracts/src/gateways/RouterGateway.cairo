@@ -69,7 +69,6 @@ mod RouterGateway {
                     LendingInstruction::Deposit(deposit) => {
                         let basic = *deposit.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        println!("before transfer {} ", basic.amount);
                         if should_transfer {
                             assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
                         }
@@ -121,12 +120,9 @@ mod RouterGateway {
                 assert(!gateway.is_zero(), 'Gateway not supported');
 
                 let instructions_span = *protocol_instruction.instructions;
-                println!("before send instructions");
                 self.before_send_instructions(gateway, instructions_span, should_transfer);
-                println!("processing instructions through gateway");
                 let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
                 dispatcher.process_instructions(instructions_span);
-                println!("after send instructions");
                 self.after_send_instructions(gateway, instructions_span, should_transfer);
                 i += 1;
             }
@@ -195,10 +191,8 @@ mod RouterGateway {
             // settle flash loan
             let erc20 = IERC20Dispatcher { contract_address: asset };
             let balance = erc20.balance_of(get_contract_address());
-            println!("balance: {}", balance);
             let result = erc20.approve(get_caller_address(), amount);
             assert(result, 'transfer failed');
-            println!("flash-loan-end");
         }
     }
 }

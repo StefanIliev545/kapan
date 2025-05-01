@@ -58,6 +58,7 @@ export const VesuProtocolView: FC = () => {
     contractName: "VesuGateway",
     functionName: "get_all_positions",
     args: [userAddress || "0x0"], // Use zero address if not connected
+    watch: true,
     refetchInterval: 10000,
   });
 

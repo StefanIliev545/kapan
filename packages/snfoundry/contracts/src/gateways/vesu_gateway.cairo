@@ -181,14 +181,12 @@ mod VesuGateway {
         }
 
         fn deposit(ref self: ContractState, instruction: @Deposit) {
-            println!("depositing");
             let basic = *instruction.basic;
             if instruction.context.is_some() {
                 // todo - trigger modify as we are adding collateral
                 return;
             }
 
-            println!("transferring from user");
             let erc20 = IERC20Dispatcher { contract_address: basic.token };
             let result = erc20
                 .transfer_from(get_caller_address(), get_contract_address(), basic.amount);
@@ -206,7 +204,6 @@ mod VesuGateway {
             let user = basic.user;
 
             // Create positive i257 for deposit
-            println!("creating positive i257 for deposit");
             let collateral_amount = I257Impl::new(basic.amount, false);
             let response = self
                 .modify_collateral_for(
@@ -215,7 +212,6 @@ mod VesuGateway {
         }
 
         fn withdraw(ref self: ContractState, instruction: @Withdraw) {
-            println!("withdrawing");
             let basic = *instruction.basic;
             let mut pool_id = self.pool_id.read();
             let collateral_asset = basic.token;
@@ -241,7 +237,6 @@ mod VesuGateway {
                     pool_id, collateral_asset, debt_asset, user, collateral_amount,
                 );
 
-            println!("withdrawing collateral");
             // Transfer tokens back to user using the actual amount withdrawn
             let erc20 = IERC20Dispatcher { contract_address: basic.token };
             let result = erc20.transfer(user, response.collateral_delta.abs());
@@ -265,7 +260,6 @@ mod VesuGateway {
                 .position(pool_id, collateral_asset, debt_asset, user);
             if position.collateral_shares == 0 && position.nominal_debt == 0 {
                 // Transfer position from zero debt to target debt
-                println!("transferring position {} collateral", collateral_amount);
                 let transfer_params = TransferPositionParams {
                     pool_id,
                     from_collateral_asset: collateral_asset,
@@ -284,7 +278,6 @@ mod VesuGateway {
                     to_data: ArrayTrait::new().span(),
                 };
                 singleton_dispatcher.transfer_position(transfer_params);
-                println!("transferred position");
             }
         }
 
@@ -308,7 +301,6 @@ mod VesuGateway {
             let mut final_amount = collateral_amount;
             let mut amount_type = AmountType::Delta;
             if collateral_amount.is_negative() {
-                println!("is negative");
 
                 let vtoken = self.get_vtoken_for_collateral(collateral_asset);
                 let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
@@ -316,21 +308,16 @@ mod VesuGateway {
                 let available_shares = vesu_context.position.collateral_shares;
                 assert(available_shares > 0, 'No-collateral');
 
-                println!("requested_shares: {}", requested_shares);
-                println!("available_shares: {}", available_shares);
                 if requested_shares >= available_shares {
                     // For exact or over withdrawals, use Target with 0
                     amount_type = AmountType::Target;
                     final_amount = I257Impl::new(0, false);
-                    println!("using target amount type");
                 } else {
                     // For partial withdrawals, use Delta with the negative amount
                     let max_assets = erc4626.convert_to_assets(requested_shares);
                     final_amount = I257Impl::new(max_assets, true);
-                    println!("using delta amount type");
                 }
             }
-            println!("final_amount_premodify: {}", final_amount);
 
             let modify_params = ModifyPositionParams {
                 pool_id,
@@ -371,7 +358,6 @@ mod VesuGateway {
                 let erc20 = IERC20Dispatcher { contract_address: debt_asset };
                 let result = erc20.approve(self.vesu_singleton.read(), debt_amount.abs());
                 assert(result, Errors::APPROVE_FAILED);
-                println!("approved debt {}", debt_amount.abs());
             }
 
             let modify_params = ModifyPositionParams {
@@ -391,7 +377,6 @@ mod VesuGateway {
         }
 
         fn borrow(ref self: ContractState, instruction: @Borrow) {
-            println!("borrowing");
             let basic = *instruction.basic;
             let context = *instruction.context;
             assert(context.is_some(), 'Context is required for borrow');
@@ -415,7 +400,6 @@ mod VesuGateway {
 
 
         fn repay(ref self: ContractState, instruction: @Repay) {
-            println!("repaying");
             let basic = *instruction.basic;
             let context = *instruction.context;
             assert(context.is_some(), 'Context is required for repay');
@@ -434,7 +418,6 @@ mod VesuGateway {
 
             // Create negative i257 for repay (reducing debt)
             let debt_amount = I257Impl::new(basic.amount, true);
-            println!("debt_amount: {}", debt_amount);
             self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
         }
     }
@@ -474,7 +457,6 @@ mod VesuGateway {
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Deposit(deposit_params) => {
-                        println!("deposit authorization");
                         let token = *deposit_params.basic.token;
                         let amount = deposit_params.basic.amount;
                         let mut call_data: Array<felt252> = array![];
@@ -483,7 +465,6 @@ mod VesuGateway {
                         authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Repay(repay_params) => {
-                        println!("repay authorization");
                         let token = *repay_params.basic.token;
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
@@ -491,7 +472,6 @@ mod VesuGateway {
                         authorizations.append((token, 'approve', call_data));
                     },
                     LendingInstruction::Borrow(borrow_params) => {
-                        println!("borrow authorization");
                         let mut pool_id = self.pool_id.read();
                         let singleton = self.vesu_singleton.read();
                         if borrow_params.context.is_some() {
@@ -506,7 +486,6 @@ mod VesuGateway {
                         authorizations.append((singleton, 'modify_delegation', call_data));
                     },
                     LendingInstruction::Withdraw(withdraw_params) => {
-                        println!("withdraw authorization");
                         let mut pool_id = self.pool_id.read();
                         let singleton = self.vesu_singleton.read();
                         if withdraw_params.context.is_some() {
@@ -629,7 +608,6 @@ mod VesuGateway {
             };
 
             // Iterate through all possible pairs of supported assets
-            println!("supported_assets: {}", supported_assets.len());
             let len = supported_assets.len();
             for i in 0..len {
                 let collateral_asset = *supported_assets.at(i);
@@ -660,7 +638,6 @@ mod VesuGateway {
                 let (position, _, _) = singleton_dispatcher
                     .position(pool_id, collateral_asset, Zero::zero(), user);
                 if position.collateral_shares > 0 {
-                    println!("found earning position");
                     let vtoken = extension.v_token_for_collateral_asset(pool_id, collateral_asset);
                     let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
                     let collateral_amount = erc4626.convert_to_assets(position.collateral_shares);
@@ -688,7 +665,6 @@ mod VesuGateway {
                     let (position, _, _) = singleton_dispatcher
                         .position(pool_id, collateral_asset, debt_asset, user);
                     if position.collateral_shares > 0 || position.nominal_debt > 0 {
-                        println!("found position");
                         let vtoken = extension
                             .v_token_for_collateral_asset(pool_id, collateral_asset);
                         let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
@@ -726,26 +702,18 @@ mod VesuGateway {
             };
 
             for i in 0..len {
-                println!("i: {}", i);
                 let asset = self.supported_assets.at(i).read();
                 let asset_felt: felt252 = asset.into();
-                println!("asset: {}", asset_felt);
 
                 let dispatcher = IERC20SymbolDispatcher { contract_address: asset };
                 let symbol_felt = dispatcher.symbol();
 
                 let decimals = IERC20MetadataDispatcher { contract_address: asset }.decimals();
-                println!("symbol: {}", symbol_felt);
-                println!("decimals: {}", decimals);
 
                 // Get rate information from the singleton
-                println!("getting rate accumulator");
                 let rate_accumulator = singleton_dispatcher.rate_accumulator(pool_id, asset);
-                println!("getting utilization");
                 let utilization = singleton_dispatcher.utilization(pool_id, asset);
-                println!("getting asset config");
                 let (asset_config, _) = singleton_dispatcher.asset_config(pool_id, asset);
-                println!("getting fee rate");
                 let fee_rate = extension
                     .interest_rate(
                         pool_id,
@@ -754,7 +722,6 @@ mod VesuGateway {
                         asset_config.last_updated,
                         asset_config.last_full_utilization_rate,
                     );
-                println!("getting price");
                 let price = extension.price(pool_id, asset);
 
                 let metadata = TokenMetadata {

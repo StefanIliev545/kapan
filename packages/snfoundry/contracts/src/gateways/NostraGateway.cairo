@@ -50,7 +50,6 @@ mod NostraGateway {
     #[generate_trait]
     impl NostraInternalFunctions of NostraInternalFunctionsTrait {
         fn deposit(ref self: ContractState, deposit: @Deposit) {
-            println!("deposit");
             let deposit = *deposit;
             let underlying = deposit.basic.token;
             let amount = deposit.basic.amount;
@@ -60,17 +59,14 @@ mod NostraGateway {
             assert(ibcollateral != Zero::zero(), 'not-token');
 
             let ierc20 = IERC20Dispatcher { contract_address: underlying };
-            println!("transferring from user {}", amount);
             assert(ierc20.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
             assert(ierc20.approve(ibcollateral, amount), 'approve failed');
             
             let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
-            println!("minting to user {}", amount);
             collateral.mint(user, amount);
         }
 
         fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
-            println!("withdraw");
             let withdraw = *withdraw;
             let underlying = withdraw.basic.token;
             let amount = withdraw.basic.amount;
@@ -80,14 +76,11 @@ mod NostraGateway {
             assert(ibcollateral != Zero::zero(), 'not-token');
 
             let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
-            println!("transferring from user {}", amount);
             collateral.transfer_from(withdraw.basic.user, get_contract_address(), amount);
-            println!("burning {}", amount);
             collateral.burn(get_contract_address(), get_caller_address(), amount);
         }
 
         fn borrow(ref self: ContractState, borrow: @Borrow) {
-            println!("borrow");
             let borrow = *borrow;
             let underlying = borrow.basic.token;
             let amount = borrow.basic.amount;
@@ -104,7 +97,6 @@ mod NostraGateway {
         }
 
         fn repay(ref self: ContractState, repay: @Repay) {
-            println!("repay");
             let repay = *repay;
             let underlying = repay.basic.token;
             let amount = repay.basic.amount;
@@ -198,9 +190,7 @@ mod NostraGateway {
         fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)> {
             let mut positions = array![];
             let mut i = 0;
-            println!("supported_assets.len() {}", self.supported_assets.len());
             while i != self.supported_assets.len() {
-                println!("i {}", i);
                 let underlying = self.supported_assets.at(i).read();
                 let symbol = IERC20SymbolDispatcher { contract_address: underlying }.symbol();
                 
@@ -218,7 +208,6 @@ mod NostraGateway {
                 positions.append((underlying, symbol, debt_balance, collateral_balance));
                 i += 1;
             };
-            println!("returning positions");
             return positions;
         }
 
@@ -229,7 +218,6 @@ mod NostraGateway {
                 let underlying = *underlyings.at(i);
                 let debt = self.underlying_to_ndebt.read(underlying);
                 let interest_rate_model = self.interest_rate_model.read();
-                println!("interest_rate_model {}", i);
                 let model = InterestRateModelABIDispatcher { contract_address: interest_rate_model };
                 let config = model.get_interest_state(debt);
                 rates.append(config);

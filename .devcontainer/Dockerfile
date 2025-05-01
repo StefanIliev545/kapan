@@ -1,6 +1,6 @@
-FROM starknetfoundation/starknet-dev:2.9.4
+FROM starknetfoundation/starknet-dev:2.11.4
 
-ENV DEVNET_VERSION=0.2.3
+ENV DEVNET_VERSION=0.4.0
 RUN ARCH=$(uname -m) && \
     echo "Architecture detected: ${ARCH}" && \
     if [ "${ARCH}" = "x86_64" ]; then \
