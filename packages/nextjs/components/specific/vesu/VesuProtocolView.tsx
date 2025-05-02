@@ -193,7 +193,7 @@ export const VesuProtocolView: FC = () => {
                         let debtValue = 0;
                         if (position.props.nominalDebt !== "0" && debtMetadata) {
                           const debtAmtNum = parseFloat(
-                            formatTokenAmount(position.props.nominalDebt, debtMetadata.decimals),
+                            formatTokenAmount(position.props.nominalDebt, 18),
                           );
                           const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata.price.value.toString(), 18));
                           debtValue = debtAmtNum * debtPriceNum;

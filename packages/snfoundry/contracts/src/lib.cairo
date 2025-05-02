@@ -14,3 +14,7 @@ pub mod utils {
     pub mod optimal_interest_rate_finder;
     pub mod ui_helper;
 }
+
+pub mod pricefeed {
+    pub mod mock_feed;
+}
