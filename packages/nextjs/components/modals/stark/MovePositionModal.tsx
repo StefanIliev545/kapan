@@ -81,10 +81,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   // Use the new hook to get all collateral info
   const { collaterals: collateralsForSelector, isLoading: isLoadingCollaterals } = useCollateral({
-    protocolName: selectedProtocol as "Vesu" | "Nostra",
+    protocolName: fromProtocol as "Vesu" | "Nostra",
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
     isOpen,
   });
+
+  // Only show collaterals with balance > 0
+  const filteredCollateralsForSelector = useMemo(
+    () => collateralsForSelector.filter(c => c.balance > 0),
+    [collateralsForSelector]
+  );
 
   // Construct instruction based on current state
   const instruction = useMemo(() => {
@@ -249,38 +255,38 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-2xl p-0 overflow-hidden">
-        {/* Header with gradient background */}
-        <div className="relative p-6 bg-gradient-to-r from-base-200 to-base-300">
-          <div className="absolute top-4 right-4">
-            <button className="btn btn-sm btn-circle btn-ghost" onClick={onClose} disabled={loading && step !== "done"}>
+      <div className="modal-box bg-base-100 max-w-2xl max-h-[100vh] h-[90vh] p-0 overflow-hidden flex flex-col">
+        {/* Header with gradient background, reduced height */}
+        <div className="relative p-3 bg-gradient-to-r from-base-200 to-base-300">
+          <div className="absolute top-2 right-2">
+            <button className="btn btn-xs btn-circle btn-ghost" onClick={onClose} disabled={loading && step !== "done"}>
               ✕
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="relative flex items-center justify-center">
               <div className="avatar">
-                <div className="w-14 h-14 rounded-full ring-2 ring-base-content/5 p-1 bg-base-100 shadow-md">
+                <div className="w-10 h-10 rounded-full ring-2 ring-base-content/5 p-1 bg-base-100 shadow-md">
                   <Image
                     src={tokenNameToLogo(position.name)}
                     alt={position.name}
-                    width={48}
-                    height={48}
+                    width={40}
+                    height={40}
                     className="rounded-full"
                   />
                 </div>
               </div>
-              <div className="absolute -right-2 -bottom-2 bg-base-100 rounded-full p-0.5 shadow-md">
+              <div className="absolute -right-1 -bottom-1 bg-base-100 rounded-full p-0.5 shadow-md">
                 {position.type === "borrow" ? (
-                  <FiArrowRightCircle className="text-primary w-6 h-6" />
+                  <FiArrowRightCircle className="text-primary w-5 h-5" />
                 ) : (
-                  <FiTrendingUp className="text-emerald-500 w-6 h-6" />
+                  <FiTrendingUp className="text-emerald-500 w-5 h-5" />
                 )}
               </div>
             </div>
             <div>
-              <h3 className="text-2xl font-bold flex items-center gap-2">
+              <h3 className="text-xl font-bold flex items-center gap-2">
                 <span
                   className={`font-extrabold bg-gradient-to-r ${
                     position.type === "borrow"
@@ -292,7 +298,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 </span>
                 <span className="text-base-content">{position.name}</span>
               </h3>
-              <div className="text-sm opacity-70 flex items-center gap-1">
+              <div className="text-xs opacity-70 flex items-center gap-1">
                 {position.type === "borrow" ? (
                   <>
                     <FiMinusCircle className="w-4 h-4 text-primary" />
@@ -309,46 +315,46 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="p-6 space-y-6">
+        {/* Main content area - scrollable with NO button inside */}
+        <div className="p-2 space-y-3 flex-1 overflow-y-auto">
           {/* Protocol Selection Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* From Protocol */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-base-content/80">From Protocol</label>
-              <div className="bg-base-200/60 py-3 px-4 rounded-lg flex items-center justify-between h-[52px]">
-                <div className="flex items-center gap-3 truncate">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-base-content/80">From Protocol</label>
+              <div className="bg-base-200/60 py-2 px-3 rounded-lg flex items-center justify-between h-[40px]">
+                <div className="flex items-center gap-2 truncate">
                   <Image
                     src={getProtocolLogo(fromProtocol)}
                     alt={fromProtocol}
-                    width={24}
-                    height={24}
-                    className="rounded-full min-w-[24px]"
+                    width={20}
+                    height={20}
+                    className="rounded-full min-w-[20px]"
                   />
-                  <span className="truncate font-medium">{fromProtocol}</span>
+                  <span className="truncate font-medium text-sm">{fromProtocol}</span>
                 </div>
               </div>
             </div>
 
             {/* To Protocol */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-base-content/80">To Protocol</label>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-base-content/80">To Protocol</label>
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
-                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-3 px-4 rounded-lg flex items-center justify-between cursor-pointer h-[52px]"
+                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
                 >
-                  <div className="flex items-center gap-3 w-[calc(100%-24px)] overflow-hidden">
+                  <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
                     {selectedProtocol ? (
                       <>
                         <Image
                           src={getProtocolLogo(selectedProtocol)}
                           alt={selectedProtocol}
-                          width={24}
-                          height={24}
-                          className="rounded-full min-w-[24px]"
+                          width={20}
+                          height={20}
+                          className="rounded-full min-w-[20px]"
                         />
-                        <span className="truncate font-medium">{selectedProtocol}</span>
+                        <span className="truncate font-medium text-sm">{selectedProtocol}</span>
                       </>
                     ) : (
                       <span className="text-base-content/50">Select protocol</span>
@@ -367,17 +373,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     .map(protocol => (
                       <li key={protocol.name}>
                         <button
-                          className="flex items-center gap-3 py-2"
+                          className="flex items-center gap-2 py-1"
                           onClick={() => setSelectedProtocol(protocol.name)}
                         >
                           <Image
                             src={getProtocolLogo(protocol.name)}
                             alt={protocol.name}
-                            width={24}
-                            height={24}
-                            className="rounded-full min-w-[24px]"
+                            width={20}
+                            height={20}
+                            className="rounded-full min-w-[20px]"
                           />
-                          <span className="truncate">{protocol.name}</span>
+                          <span className="truncate text-sm">{protocol.name}</span>
                         </button>
                       </li>
                     ))}
@@ -387,31 +393,39 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* Amount Input */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
+              <label className="text-xs font-medium text-base-content/80 flex items-center gap-1">
                 Amount
                 {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
               </label>
-              <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
+              <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
                 <span className="text-base-content/70">Available:</span>
                 <span className="font-medium ml-1">
-                  {formatDisplayNumber(position.balance)} {position.name}
+                  {formatDisplayNumber(Math.abs(position.balance))} {position.name}
                 </span>
               </div>
             </div>
             <div className="relative">
               <input
                 type="text"
-                className="input input-bordered w-full pr-20 h-14 text-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                className="input input-bordered w-full pr-20 h-10 text-base focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 placeholder="0.00"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 disabled={loading || step !== "idle"}
               />
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
-                onClick={() => setAmount(position.balance.toString())}
+                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-xs btn-outline h-7"
+                onClick={() => {
+                  const maxValue = Math.abs(position.balance);
+                  if (!isNaN(maxValue) && isFinite(maxValue)) {
+                    setAmount(maxValue.toString());
+                  } else {
+                    setAmount("0");
+                    console.error("Invalid position balance:", position.balance);
+                  }
+                }}
                 disabled={loading || step !== "idle"}
               >
                 MAX
@@ -419,16 +433,29 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </div>
           </div>
 
-          {/* Collateral Selection */}
-          {position.type === "borrow" && (
-            <CollateralSelector
-              collaterals={collateralsForSelector}
-              isLoading={isLoadingCollaterals}
-              selectedProtocol={selectedProtocol}
-              onCollateralSelectionChange={handleCollateralSelectionChange}
-              marketToken={position.tokenAddress}
-            />
-          )}
+          {/* Loading state for collaterals */}
+          {position.type === "borrow" && isLoadingCollaterals ? (
+            <div className="flex flex-col items-center justify-center min-h-[30vh] py-8">
+              <span className="loading loading-spinner loading-md mb-3"></span>
+              <span className="text-base-content/70">Loading collaterals...</span>
+            </div>
+          ) : position.type === "borrow" && filteredCollateralsForSelector.length > 0 ? (
+            <div className="max-h-[60vh] overflow-y-auto">
+              <div className="space-y-1">
+                <CollateralSelector
+                  collaterals={filteredCollateralsForSelector}
+                  isLoading={false}
+                  selectedProtocol={selectedProtocol}
+                  onCollateralSelectionChange={handleCollateralSelectionChange}
+                  marketToken={position.tokenAddress}
+                />
+              </div>
+            </div>
+          ) : position.type === "borrow" ? (
+            <div className="alert alert-info shadow-sm">
+              <div className="text-sm">No collaterals available with balance greater than 0.</div>
+            </div>
+          ) : null}
 
           {/* Error message */}
           {error && (
@@ -437,51 +464,31 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <div className="text-sm flex-1">{error}</div>
             </div>
           )}
-
-          {/* Action buttons */}
-          <div className="pt-5 flex flex-col gap-3 mt-2">
-            {step === "done" ? (
-              <button className="btn btn-success btn-lg w-full gap-2 h-14 shadow-md" onClick={onClose}>
-                <FiCheck className="w-5 h-5" /> Position Moved Successfully
-              </button>
-            ) : (
-              <>
-                {/* Check if we can move the position */}
-                {(() => {
-                  const isDisabled =
-                    loading ||
-                    !selectedProtocol ||
-                    !amount ||
-                    !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-                    step !== "idle";
-
-                  return (
-                    <button
-                      className={`btn ${getActionButtonClass()} btn-lg w-full h-14 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
-                      onClick={handleMovePosition}
-                      disabled={isDisabled}
-                    >
-                      {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                      {getActionButtonText()}
-                      {!loading &&
-                        step === "idle" &&
-                        (position.type === "supply" ? (
-                          <FiTrendingUp className="w-5 h-5 ml-1" />
-                        ) : (
-                          <FiArrowRight className="w-5 h-5 ml-1" />
-                        ))}
-                    </button>
-                  );
-                })()}
-              </>
-            )}
-
-            {step !== "done" && (
-              <button className="btn btn-ghost btn-sm w-full hover:bg-base-200" onClick={onClose} disabled={loading}>
-                Cancel
-              </button>
-            )}
-          </div>
+        </div>
+        
+        {/* Button positioned at the bottom of the modal, outside the scrollable area */}
+        <div className="p-4 border-t border-base-200 bg-base-100">
+          <button
+            className={`btn ${getActionButtonClass()} btn-md w-full h-12 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
+            onClick={handleMovePosition}
+            disabled={
+              loading ||
+              !selectedProtocol ||
+              !amount ||
+              !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
+              step !== "idle"
+            }
+          >
+            {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+            {getActionButtonText()}
+            {!loading &&
+              step === "idle" &&
+              (position.type === "supply" ? (
+                <FiTrendingUp className="w-5 h-5 ml-1" />
+              ) : (
+                <FiArrowRight className="w-5 h-5 ml-1" />
+              ))}
+          </button>
         </div>
       </div>
 
