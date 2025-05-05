@@ -153,15 +153,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     const lowerProtocolName = fromProtocol.toLowerCase();
     const destProtocolName = selectedProtocol.toLowerCase();
 
-    console.log("parsedAmount", parsedAmount);
-    console.log("position.tokenAddress", position.tokenAddress);
-    console.log("userAddress", userAddress);
-    console.log("fromProtocol", fromProtocol);
-    console.log("selectedProtocol", selectedProtocol);
-    console.log("selectedCollateralsWithAmounts", selectedCollateralsWithAmounts);
-    console.log("routerGateway", routerGateway);
-    console.log("amount", amount);
-
     let repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
@@ -175,6 +166,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       ]);
     }
 
+    let borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+    if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
+      borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+        0n,
+        BigInt(selectedCollateralsWithAmounts[0].token),
+      ]);
+    }
+    console.log("repayAmount", parsedAmount);
     const repayInstruction = new CairoCustomEnum({
       Deposit: undefined,
       Borrow: undefined,
@@ -194,7 +193,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     // Auth instructions only need withdraw and borrow
     const withdrawInstructions = selectedCollateralsWithAmounts.map(collateral => {
-      const amount = uint256.bnToUint256(parseUnits(collateral.amount.toString(), 18));
+      const amount = uint256.bnToUint256(collateral.amount);
       return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
@@ -239,7 +238,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         target_instruction_index: 0,
         approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
         user: userAddress,
-        context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+        context: borrowInstructionContext,
       },
     });
 
@@ -279,9 +278,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   }, [amount, userAddress, fromProtocol, selectedProtocol, position, routerGateway, selectedCollateralsWithAmounts]);
 
   // Get authorizations for the instructions
-  if (isOpen) {
-    console.log("authInstruction", authInstruction);
-  }
+
   const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
     contractName: "RouterGateway" as const,
     functionName: "get_authorizations_for_instructions" as const,
@@ -290,10 +287,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     refetchInterval: 1000,
   } as any);
 
-  if (isOpen) {
-    console.log("protocolInstructionsError", protocolInstructionsError);
-    console.log("protocolInstructions", protocolInstructions);
-  }
   // Construct calls based on current state
   const calls = useMemo(() => {
     if (!fullInstruction) return [];

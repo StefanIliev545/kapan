@@ -44,7 +44,6 @@ export function useCollateral({
         }
         const decimalsNum = decimals ? Number(decimals) : 18;
         const addressString = `0x${BigInt(address).toString(16).padStart(64, "0")}`;
-        console.log("addressString", addressString);
         return {
           address: addressString,
           symbol: feltToString(typeof symbol === "bigint" ? symbol : BigInt(symbol)),
