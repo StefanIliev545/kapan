@@ -4032,7 +4032,7 @@ const contracts = {
   },
   42161: {
     AaveGateway: {
-      address: "0x45d4D2e048aE2AA7c7506671D4E592B7b18f6Bdf",
+      address: "0x3C99FD8E51272e8Fd1dE9eD70e5D6c81EC69442b",
       abi: [
         {
           inputs: [
@@ -4779,7 +4779,7 @@ const contracts = {
       },
     },
     CompoundGateway: {
-      address: "0xA8F468888368f8f46852C139311b557Da42DB9e6",
+      address: "0xdF4402e1bc549Fe87F724e922CF8161515209ff2",
       abi: [
         {
           inputs: [
@@ -5729,7 +5729,7 @@ const contracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0x14EEE2B032E4f1b056608b517dc62b2615BCF13D",
+      address: "0x92e593724251daa854568309B97e328aaA23c228",
       abi: [
         {
           inputs: [],
@@ -6143,7 +6143,7 @@ const contracts = {
       },
     },
     RouterGateway: {
-      address: "0xAB25FDc3A23514A5651F7b616500049E181F9523",
+      address: "0xa17c2714BA30e61D70dfbBE204C1c9548D604b0f",
       abi: [
         {
           inputs: [
@@ -6351,6 +6351,45 @@ const contracts = {
               internalType: "bool",
               name: "canMove",
               type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "canMoveSupply",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "canMove",
+              type: "bool",
+            },
+            {
+              internalType: "uint256",
+              name: "fromBalance",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -6785,6 +6824,46 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct IGateway.Collateral[]",
+              name: "collaterals",
+              type: "tuple[]",
+            },
+            {
+              internalType: "string",
+              name: "fromProtocol",
+              type: "string",
+            },
+            {
+              internalType: "string",
+              name: "toProtocol",
+              type: "string",
+            },
+          ],
+          name: "moveSupply",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "owner",
           outputs: [
@@ -7032,7 +7111,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGateway: {
-      address: "0x1ccee19016f9E6Aa1637698471Cf90759f6b3CaB",
+      address: "0x8670728778B1b80BC3b71CBF1De64214788b64bc",
       abi: [
         {
           inputs: [
