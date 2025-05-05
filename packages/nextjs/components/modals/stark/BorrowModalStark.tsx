@@ -14,7 +14,7 @@ interface BorrowModalStarkProps {
     currentRate: number;
   };
   protocolName: string;
-  supportedAssets: TokenMetadata[];
+  supportedAssets?: TokenMetadata[];
   isVesu?: boolean;
   vesuContext?: {
     pool_id: bigint;
@@ -27,7 +27,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
   onClose,
   token,
   protocolName,
-  supportedAssets,
+  supportedAssets = [],
   isVesu = false,
   vesuContext,
 }) => {
@@ -53,29 +53,35 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
       actionLabel="Borrow"
       vesuContext={vesuContext}
     >
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-base-content/80">Select Debt Asset</label>
-        <select
-          className="select select-bordered w-full"
-          value={selectedDebtAsset ? `0x${BigInt(selectedDebtAsset.address).toString(16).padStart(64, "0")}` : ""}
-          onChange={(e) => {
-            const asset = availableDebtAssets.find(
-              asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === e.target.value
-            );
-            setSelectedDebtAsset(asset || null);
-          }}
-        >
-          {availableDebtAssets.map((asset) => {
-            const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
-            const symbol = feltToString(asset.symbol);
-            return (
-              <option key={address} value={address}>
-                {symbol}
-              </option>
-            );
-          })}
-        </select>
-      </div>
+      {availableDebtAssets.length > 0 ? (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-base-content/80">Select Debt Asset</label>
+          <select
+            className="select select-bordered w-full"
+            value={selectedDebtAsset ? `0x${BigInt(selectedDebtAsset.address).toString(16).padStart(64, "0")}` : ""}
+            onChange={(e) => {
+              const asset = availableDebtAssets.find(
+                asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === e.target.value
+              );
+              setSelectedDebtAsset(asset || null);
+            }}
+          >
+            {availableDebtAssets.map((asset) => {
+              const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
+              const symbol = feltToString(asset.symbol);
+              return (
+                <option key={address} value={address}>
+                  {symbol}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      ) : (
+        <div className="text-sm text-base-content/80">
+          No debt assets available for this position.
+        </div>
+      )}
     </BaseTokenModal>
   );
 }; 

@@ -1,11 +1,18 @@
 use starknet::contract_address::ContractAddress;
 
 #[starknet::interface]
+pub trait DebtTokenABI<TContractState> {
+    fn mint(ref self: TContractState, to: ContractAddress, amount: u256);
+    fn burn(ref self: TContractState, from: ContractAddress, amount: u256) -> u256;
+}
+
+#[starknet::interface]
 pub trait LentDebtTokenABI<TContractState> {
     // ILentDebtToken
     fn mint(ref self: TContractState, to: ContractAddress, amount: u256);
     fn borrow(ref self: TContractState, to: ContractAddress, amount: u256);
     fn burn(ref self: TContractState, from: ContractAddress, to: ContractAddress, amount: u256) -> u256;
+    fn burn_from(ref self: TContractState, user: ContractAddress, amount: u256, from: ContractAddress) -> u256;
     fn repay(ref self: TContractState, from: ContractAddress, amount: u256) -> u256;
     fn interest_rate_model(self: @TContractState) -> ContractAddress;
     fn allowance(self: @TContractState, owner: ContractAddress, spender: ContractAddress) -> u256;

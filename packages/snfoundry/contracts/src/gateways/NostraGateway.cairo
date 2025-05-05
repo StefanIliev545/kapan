@@ -23,7 +23,15 @@ mod NostraGateway {
         LendingInstruction,
     };
     use crate::interfaces::IGateway::{Deposit, Withdraw, Borrow, Repay};
-    use crate::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait, InterestRateModelABIDispatcher, InterestRateModelABIDispatcherTrait, InterestRateConfig};
+    use crate::interfaces::nostra::{
+        LentDebtTokenABIDispatcher, 
+        LentDebtTokenABIDispatcherTrait, 
+        InterestRateModelABIDispatcher, 
+        InterestRateModelABIDispatcherTrait, 
+        InterestRateConfig,
+        DebtTokenABIDispatcher,
+        DebtTokenABIDispatcherTrait,
+    };
     use super::INostraGateway;
     use super::{IERC20SymbolDispatcher, IERC20SymbolDispatcherTrait};
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
@@ -89,9 +97,14 @@ mod NostraGateway {
             let debt = self.underlying_to_ndebt.read(underlying);
             assert(debt != Zero::zero(), 'not-token');
 
-            let debt_token = LentDebtTokenABIDispatcher { contract_address: debt };
-            debt_token.borrow(user, amount);
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
+            let debt_token = DebtTokenABIDispatcher { contract_address: debt };
+
+            let balance_before = underlying_token.balance_of(get_contract_address());
+            debt_token.mint(user, amount);
+            let balance_after = underlying_token.balance_of(get_contract_address());
+            assert(balance_after > balance_before, 'mint failed');
+
             assert(underlying_token.balance_of(get_contract_address()) >= amount, 'insufficient balance');
             assert(underlying_token.transfer(get_caller_address(), amount), 'transfer failed');
         }
@@ -109,8 +122,8 @@ mod NostraGateway {
             underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount);
             underlying_token.approve(debt, amount);
             
-            let debt_token = LentDebtTokenABIDispatcher { contract_address: debt };
-            debt_token.repay(user, amount);
+            let debt_token = DebtTokenABIDispatcher { contract_address: debt };
+            debt_token.burn(user, amount);
         }
     }
     

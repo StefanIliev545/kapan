@@ -162,6 +162,7 @@ const deployContract = async (
   const { contract, constructorArgs, contractName, options } = params;
 
   try {
+    console.log(deployer.address);
     await deployer.getContractVersion(deployer.address);
   } catch (e) {
     if (e.toString().includes("Contract not found")) {

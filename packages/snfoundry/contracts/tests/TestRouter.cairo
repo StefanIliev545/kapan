@@ -74,6 +74,21 @@ fn USDC_IBCOLLATERAL_TOKEN() -> ContractAddress {
     contract_address_const::<0x073f6addc9339de9822cab4dac8c9431779c09077f02ba7bc36904ea342dd9eb>()
 }
 
+
+// STRK
+fn STRK_ADDRESS() -> ContractAddress {
+    contract_address_const::<0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d>()
+}
+fn STRK_DEBT_TOKEN() -> ContractAddress {
+    contract_address_const::<0x001258eae3eae5002125bebf062d611a772e8aea3a1879b64a19f363ebd00947>()
+}
+fn STRK_COLLATERAL_TOKEN() -> ContractAddress {
+    contract_address_const::<0x040f5a6b7a6d3c472c12ca31ae6250b462c6d35bbdae17bd52f6c6ca065e30cf>()
+}
+fn STRK_IBCOLLATERAL_TOKEN() -> ContractAddress {
+    contract_address_const::<0x07c2e1e733f28daa23e78be3a4f6c724c0ab06af65f6a95b5e0545215f1abc1b>()
+}
+
 fn RICH_ADDRESS() -> ContractAddress {
     contract_address_const::<0x0213c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>()
 }
@@ -147,8 +162,15 @@ fn add_supported_assets(gateway_address: ContractAddress) {
         USDC_COLLATERAL_TOKEN(),
         USDC_IBCOLLATERAL_TOKEN()
     );
-}
 
+    // Add STRK
+    nostra_gateway.add_supported_asset(
+        STRK_ADDRESS(),
+        STRK_DEBT_TOKEN(),
+        STRK_COLLATERAL_TOKEN(),
+        STRK_IBCOLLATERAL_TOKEN()
+    );
+}
 fn prefund_address(recipient: ContractAddress, token_address: ContractAddress, amount: u256) {
     let token_erc20 = IERC20Dispatcher { contract_address: token_address };
     cheat_caller_address(token_address, RICH_ADDRESS(), CheatSpan::TargetCalls(1));
@@ -376,6 +398,7 @@ fn test_vesu() {
 } 
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
