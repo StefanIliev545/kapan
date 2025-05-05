@@ -1,5 +1,7 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useAccount } from "@starknet-react/core";
+import { useReadContract } from "@starknet-react/core";
 import {
   FiAlertTriangle,
   FiArrowRight,
@@ -11,19 +13,21 @@ import {
   FiPlusCircle,
   FiTrendingUp,
 } from "react-icons/fi";
+import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount } from "@starknet-react/core";
-import { useDeployedContractInfo, useScaffoldMultiWriteContract, useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
-import { getProtocolLogo } from "~~/utils/protocol";
-import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
-import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, uint256, num } from "starknet";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { feltToString } from "~~/utils/protocols";
-import { useReadContract } from "@starknet-react/core";
-import { ERC20ABI } from "~~/contracts/externalContracts";
+import {
+  useDeployedContractInfo,
+  useScaffoldMultiWriteContract,
+  useScaffoldReadContract,
+} from "~~/hooks/scaffold-stark";
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
+import { getProtocolLogo } from "~~/utils/protocol";
+import { feltToString } from "~~/utils/protocols";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -48,6 +52,13 @@ interface MovePositionModalProps {
     type: "supply" | "borrow";
     tokenAddress: string;
   };
+  preSelectedCollaterals?: CollateralWithAmount[];
+  disableCollateralSelection?: boolean;
+}
+
+type VesuContext = {
+  pool_id: bigint;
+  counterpart_token: string;
 }
 
 type FlashLoanProvider = {
@@ -62,16 +73,15 @@ const FLASH_LOAN_PROVIDER: FlashLoanProvider = {
   version: "v1",
 } as const;
 
-export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
+export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position, preSelectedCollaterals, disableCollateralSelection }) => {
   const { address: userAddress } = useAccount();
-  const protocols = [
-    { name: "Nostra" },
-    { name: "Vesu" },
-  ];
+  const protocols = [{ name: "Nostra" }, { name: "Vesu" }];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
-  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>([]);
+  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
+    preSelectedCollaterals || []
+  );
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -79,111 +89,212 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   // Get the RouterGateway contract
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
 
-  // Use the new hook to get all collateral info
-  const { collaterals: collateralsForSelector, isLoading: isLoadingCollaterals } = useCollateral({
+  // For source protocol, use preselected collaterals for Vesu or fetch from useCollateral
+  const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
     protocolName: fromProtocol as "Vesu" | "Nostra",
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
-    isOpen,
+    isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"), // Skip for preselected Vesu
+  });
+
+  // For target protocol, always fetch collaterals to determine compatibility
+  const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
+    protocolName: selectedProtocol as "Vesu" | "Nostra",
+    userAddress: userAddress || "0x0000000000000000000000000000000000000000",
+    isOpen: isOpen && !!selectedProtocol,
   });
 
   // Only show collaterals with balance > 0
-  const filteredCollateralsForSelector = useMemo(
-    () => collateralsForSelector.filter(c => c.balance > 0),
-    [collateralsForSelector]
-  );
+  const collateralsForSelector = useMemo(() => {
+    // For Vesu with preselected collaterals, use those directly
+    if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
+      // Convert preSelectedCollaterals to CollateralToken format
+      return preSelectedCollaterals.map(collateral => ({
+        symbol: collateral.symbol,
+        balance: Number(collateral.inputValue || collateral.amount.toString()),
+        address: collateral.token,
+        decimals: collateral.decimals,
+        rawBalance: collateral.amount,
+        supported: true
+      }));
+    }
+
+    // Otherwise use filtered source collaterals
+    const filtered = sourceCollaterals.filter(c => c.balance > 0);
+    
+    // Check which collaterals are supported by the target protocol
+    if (targetCollaterals.length > 0) {
+      return filtered.map(collateral => {
+        const isSupported = targetCollaterals.some(
+          tc => tc.address.toLowerCase() === collateral.address.toLowerCase()
+        );
+        return {
+          ...collateral,
+          supported: isSupported
+        };
+      });
+    }
+    
+    return filtered;
+  }, [sourceCollaterals, targetCollaterals, preSelectedCollaterals, disableCollateralSelection, fromProtocol]);
+
+  // Track loading state for all collaterals
+  const isLoadingCollaterals = isLoadingSourceCollaterals || isLoadingTargetCollaterals;
 
   // Construct instruction based on current state
-  const instruction = useMemo(() => {
-    if (!amount || !userAddress || !routerGateway) return null;
+  const { fullInstruction, authInstruction } = useMemo(() => {
+    if (!amount || !userAddress || !routerGateway) return { fullInstruction: null, authInstruction: null };
 
     const parsedAmount = parseUnits(amount, 18); // Assuming 18 decimals for StarkNet tokens
     const lowerProtocolName = fromProtocol.toLowerCase();
+    const destProtocolName = selectedProtocol.toLowerCase();
 
-    // Create the appropriate lending instruction based on position type
-    let lendingInstruction;
-    if (position.type === "borrow") {
-      // For borrow positions, we need to create a repay instruction for the source protocol
-      // and a borrow instruction for the destination protocol
-      lendingInstruction = new CairoCustomEnum({
-        Repay: {
-          basic: {
-            token: position.tokenAddress,
-            amount: uint256.bnToUint256(parsedAmount),
-            user: userAddress,
-          },
-          context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+    let repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+    let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+    if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
+        repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+            0n,
+            BigInt(selectedCollateralsWithAmounts[0].token),
+        ]);
+        withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+            0n,
+            BigInt(position.tokenAddress),
+        ]);
+    }
+
+    const repayInstruction = new CairoCustomEnum({
+      Deposit: undefined,
+      Borrow: undefined,
+      Repay: {
+        basic: {
+          token: position.tokenAddress,
+          amount: uint256.bnToUint256(parsedAmount),
+          user: userAddress,
         },
-        Deposit: undefined,
-        Borrow: undefined,
-        Withdraw: undefined,
-      });
-    } else {
-      // For supply positions, we need to create a withdraw instruction for the source protocol
-      // and a deposit instruction for the destination protocol
-      lendingInstruction = new CairoCustomEnum({
-        Withdraw: {
-          basic: {
-            token: position.tokenAddress,
-            amount: uint256.bnToUint256(parsedAmount),
-            user: userAddress,
-          },
-          context: new CairoOption<bigint[]>(CairoOptionVariant.None),
-        },
+        context: repayInstructionContext,
+      },
+      Withdraw: undefined,
+    });
+    
+    // Auth instructions only need withdraw and borrow
+    const withdrawInstructions = selectedCollateralsWithAmounts.map(collateral => {
+      const amount = uint256.bnToUint256(parseUnits(collateral.amount.toString(), 18));
+      return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
         Repay: undefined,
+        Withdraw: {
+          basic: {
+            token: collateral.token,
+            amount: amount,
+            user: userAddress,
+          },
+          context: withdrawInstructionContext,
+        },
       });
-    }
+    });
 
-    return CallData.compile({
+    const depositInstructions = selectedCollateralsWithAmounts.map(collateral => {
+      const amount = uint256.bnToUint256(parseUnits(collateral.amount.toString(), 18));
+      return new CairoCustomEnum({
+        Deposit: {
+          basic: {
+            token: collateral.token,
+            amount: amount,
+            user: userAddress,
+          },
+          context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+        },
+        Borrow: undefined,
+        Repay: undefined,
+        Withdraw: undefined,
+      });
+    });
+    
+    const borrowInstruction = new CairoCustomEnum({
+      Deposit: undefined,
+      Borrow: {
+        basic: {
+          token: position.tokenAddress,
+          amount: uint256.bnToUint256(parsedAmount),
+          user: userAddress,
+        },
+        context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+      },
+      Repay: undefined,
+      Withdraw: undefined,
+    });
+
+    // Complete set of instructions for execution
+    const fullInstructionData = CallData.compile({
       instructions: [
         {
           protocol_name: lowerProtocolName,
-          instructions: [lendingInstruction],
+          instructions: [repayInstruction, ...withdrawInstructions],
+        },
+        {
+          protocol_name: destProtocolName,
+          instructions: [...depositInstructions, borrowInstruction],
         },
       ],
     });
-  }, [amount, userAddress, fromProtocol, position, routerGateway]);
+
+    // Only withdraw and borrow instructions for authorization
+    const authInstructionData = CallData.compile({
+      instructions: [
+        {
+          protocol_name: lowerProtocolName,
+          instructions: [...withdrawInstructions],
+        },
+        {
+          protocol_name: destProtocolName,
+          instructions: [borrowInstruction],
+        },
+      ],
+    });
+
+    return { 
+      fullInstruction: fullInstructionData, 
+      authInstruction: authInstructionData 
+    };
+  }, [amount, userAddress, fromProtocol, selectedProtocol, position, routerGateway, selectedCollateralsWithAmounts]);
 
   // Get authorizations for the instructions
   const { data: protocolInstructions } = useScaffoldReadContract({
-    contractName: "RouterGateway",
-    functionName: "get_authorizations_for_instructions",
-    args: [instruction],
-    enabled: !!instruction,
+    contractName: "RouterGateway" as const,
+    functionName: "get_authorizations_for_instructions" as const,
+    args: authInstruction ? [authInstruction] : undefined,
+    enabled: !!authInstruction,
     refetchInterval: 5000,
-  });
+  } as any);
 
   // Construct calls based on current state
   const calls = useMemo(() => {
-    if (!instruction) return [];
+    if (!fullInstruction) return [];
 
     const authorizations = [];
     if (protocolInstructions) {
-      for (const instruction of protocolInstructions) {
+      // Use explicit type for instruction
+      const instructionsArray = protocolInstructions as unknown as [bigint, bigint, bigint[]][];
+      for (const instruction of instructionsArray) {
         const address = num.toHexString(instruction[0]);
         const entrypoint = feltToString(instruction[1]);
         authorizations.push({
-          contractName: "RouterGateway" as const,
-          functionName: "process_protocol_instructions" as const,
-          args: {
-            contractAddress: address,
-            entrypoint: entrypoint,
-            calldata: (instruction[2] as bigint[]).map(f => num.toHexString(f)),
-          },
+          contractAddress: address,
+          entrypoint: entrypoint,
+          calldata: (instruction[2] as bigint[]).map(f => num.toHexString(f)),
         });
       }
     }
 
     return [
-      ...authorizations,
+      ...(authorizations as any),
       {
         contractName: "RouterGateway" as const,
         functionName: "move_debt" as const,
-        args: instruction,
+        args: fullInstruction,
       },
     ];
-  }, [instruction, protocolInstructions]);
+  }, [fullInstruction, protocolInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -439,16 +550,22 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <span className="loading loading-spinner loading-md mb-3"></span>
               <span className="text-base-content/70">Loading collaterals...</span>
             </div>
-          ) : position.type === "borrow" && filteredCollateralsForSelector.length > 0 ? (
+          ) : position.type === "borrow" && collateralsForSelector.length > 0 ? (
             <div className="max-h-[60vh] overflow-y-auto">
               <div className="space-y-1">
                 <CollateralSelector
-                  collaterals={filteredCollateralsForSelector}
+                  collaterals={collateralsForSelector}
                   isLoading={false}
                   selectedProtocol={selectedProtocol}
                   onCollateralSelectionChange={handleCollateralSelectionChange}
                   marketToken={position.tokenAddress}
                 />
+                
+                {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
+                  <div className="text-xs text-base-content/70 mt-2 p-2 bg-info/10 rounded">
+                    <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this collateral cannot be changed.
+                  </div>
+                )}
               </div>
             </div>
           ) : position.type === "borrow" ? (
@@ -465,7 +582,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </div>
           )}
         </div>
-        
+
         {/* Button positioned at the bottom of the modal, outside the scrollable area */}
         <div className="p-4 border-t border-base-200 bg-base-100">
           <button
@@ -501,4 +618,4 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       </form>
     </dialog>
   );
-}; 
+};

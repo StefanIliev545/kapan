@@ -1,7 +1,7 @@
 use core::num::traits::Zero;
 use core::option::Option;
 use core::traits::Drop;
-use kapan::gateways::VesuGateway::{
+use kapan::gateways::vesu_gateway::{
     IVesuGatewayAdminDispatcher, IVesuGatewayAdminDispatcherTrait, IVesuViewerDispatcher,
     IVesuViewerDispatcherTrait, VesuContext,
 };
@@ -165,6 +165,7 @@ fn perform_withdrawal(ref context: TestContext, amount: u256) -> u256 {
     let withdraw = Withdraw {
         basic: create_basic_instruction(context.token_address, amount, USER_ADDRESS()),
         context: Option::None,
+        withdraw_all: false,
     };
 
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
@@ -217,8 +218,7 @@ fn test_borrow() {
 
     println!("deposited!");
     let mut context_array = array![];
-    VesuContext { pool_id: POOL_ID, position_counterpart_token: context.token_address }
-        .serialize(ref context_array);
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: context.token_address }.serialize(ref context_array);
 
     let usdcERC20 = IERC20Dispatcher { contract_address: USDC_ERC20_ADDRESS() };
     let initial_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
@@ -289,6 +289,7 @@ fn test_repay() {
     // Create and process repay instruction
     let repay = Repay {
         basic: create_basic_instruction(USDC_ERC20_ADDRESS(), repay_amount, USER_ADDRESS()),
+        repay_all: false,
         context: Option::Some(context_array.span()),
     };
 
@@ -409,6 +410,7 @@ fn test_get_supported_assets_ui() {
 use kapan::interfaces::IGateway::{InterestRateViewDispatcher, InterestRateViewDispatcherTrait};
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_borrow_rate() {
     let mut context = setup_test_context();

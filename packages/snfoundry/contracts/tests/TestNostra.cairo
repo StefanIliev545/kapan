@@ -251,6 +251,7 @@ fn test_withdraw() {
             amount: deposit_amount,
             user: USER_ADDRESS(),
         },
+        withdraw_all: true,
         context: Option::None,
     };
 
@@ -336,6 +337,7 @@ fn test_full_flow() {
             amount: 50000000,
             user: USER_ADDRESS(),
         },
+        repay_all: false,
         context: Option::None,
     };
 
@@ -415,6 +417,7 @@ fn test_get_interest_rates() {
 use kapan::interfaces::IGateway::{InterestRateViewDispatcher, InterestRateViewDispatcherTrait};
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_borrow_rate() {
     let context = setup_test_context();

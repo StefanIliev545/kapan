@@ -190,7 +190,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     args: [instruction],
     enabled: !!instruction,
     refetchInterval: 5000,
-  });
+  } as any); //todo fix typescript hack
 
   // Construct calls based on current state
   const calls = useMemo(() => {
@@ -198,7 +198,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
     const authorizations = [];
     if (protocolInstructions) {
-      for (const instruction of protocolInstructions) {
+      const instructionsArray = protocolInstructions as unknown as [bigint, bigint, bigint[]][];
+      for (const instruction of instructionsArray) {
         const address = num.toHexString(instruction[0]);
         console.log(`address: ${address}`);
         const entrypoint = feltToString(instruction[1]);
@@ -213,7 +214,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     }
 
     return [
-      ...authorizations,
+      ...authorizations as any,
       {
         contractName: "RouterGateway",
         functionName: "process_protocol_instructions",

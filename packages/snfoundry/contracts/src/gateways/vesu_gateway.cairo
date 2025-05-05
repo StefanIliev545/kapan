@@ -215,7 +215,7 @@ mod VesuGateway {
 
             // Transfer tokens back to user using the actual amount withdrawn
             let erc20 = IERC20Dispatcher { contract_address: basic.token };
-            let result = erc20.transfer(user, response.collateral_delta.abs());
+            let result = erc20.transfer(get_caller_address(), response.collateral_delta.abs());
             assert(result, Errors::TRANSFER_FAILED);
         }
 
@@ -360,9 +360,16 @@ mod VesuGateway {
             let result = erc20.approve(self.vesu_singleton.read(), basic.amount);
             assert(result, Errors::APPROVE_FAILED);
 
+            let balance_before = erc20.balance_of(get_contract_address());
             // Create negative i257 for repay (reducing debt)
             let debt_amount = I257Impl::new(basic.amount, true);
             self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
+
+            let balance_after = erc20.balance_of(get_contract_address());
+            let remainder = balance_before - (balance_after + basic.amount);
+            if remainder > 0 {
+                erc20.transfer(get_caller_address(), remainder);
+            }
         }
 
         
@@ -434,11 +441,12 @@ mod VesuGateway {
                     LendingInstruction::Repay(repay_params) => { 
                         self.repay(repay_params); 
                     },
+                    _ => {}
                 }
                 i += 1;
             }
         }
-        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)> {
+        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {
             let mut authorizations = ArrayTrait::new();
             for instruction in instructions {
                 match instruction {
@@ -448,14 +456,16 @@ mod VesuGateway {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(amount, ref call_data);
-                        authorizations.append((token, 'approve', call_data));
+                        let selector = if !rawSelectors { 'approve' } else { selector!("approve") };
+                        authorizations.append((token, selector, call_data));
                     },
                     LendingInstruction::Repay(repay_params) => {
                         let token = *repay_params.basic.token;
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(repay_params.basic.amount, ref call_data);
-                        authorizations.append((token, 'approve', call_data));
+                        let selector = if !rawSelectors { 'approve' } else { selector!("approve") };
+                        authorizations.append((token, selector, call_data));
                     },
                     LendingInstruction::Borrow(borrow_params) => {
                         let mut pool_id = self.pool_id.read();
@@ -471,7 +481,8 @@ mod VesuGateway {
                         Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(@get_contract_address(), ref call_data);
                         Serde::serialize(@true, ref call_data);
-                        authorizations.append((singleton, 'modify_delegation', call_data));
+                        let selector = if !rawSelectors { 'modify_delegation' } else { selector!("modify_delegation") };
+                        authorizations.append((singleton, selector, call_data));
                     },
                     LendingInstruction::Withdraw(withdraw_params) => {
                         let mut pool_id = self.pool_id.read();
@@ -487,15 +498,51 @@ mod VesuGateway {
                         Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(@get_contract_address(), ref call_data);
                         Serde::serialize(@true, ref call_data);
-                        authorizations.append((singleton, 'modify_delegation', call_data));
+                        let selector = if !rawSelectors { 'modify_delegation' } else { selector!("modify_delegation") };
+                        authorizations.append((singleton, selector, call_data));
+                    },
+                    LendingInstruction::Reborrow(reborrow_params) => {
+                        let mut pool_id = self.pool_id.read();
+                        let singleton = self.vesu_singleton.read();
+                        if reborrow_params.context.is_some() {
+                            let mut context_bytes: Span<felt252> = (*reborrow_params).context.unwrap();
+                            let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
+                            if vesu_context.pool_id != Zero::zero() {
+                                pool_id = vesu_context.pool_id;
+                            }
+                        }
+                        let mut call_data: Array<felt252> = array![];
+                        Serde::serialize(@pool_id, ref call_data); //todo - this is a hack to get the address of the router..
+                        Serde::serialize(@get_contract_address(), ref call_data);
+                        Serde::serialize(@true, ref call_data);
+                        let selector = if !rawSelectors { 'modify_delegation' } else { selector!("modify_delegation") };
+                        authorizations.append((singleton, selector, call_data));
                     },
                     _ => {}
                 }
             };
             return authorizations.span();
         }
-    }
 
+        fn get_flash_loan_amount(ref self: ContractState, repay: Repay) -> u256 {
+            let mut amount = repay.basic.amount;
+            if repay.repay_all {
+                let context = repay.context;
+                assert(context.is_some(), 'Context is required for repay');
+                let mut context_bytes: Span<felt252> = context.unwrap();
+                let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
+                let singleton = ISingletonDispatcher { contract_address: self.vesu_singleton.read() };
+                let mut pool_id = self.pool_id.read();
+                if vesu_context.pool_id != Zero::zero() {
+                    pool_id = vesu_context.pool_id;
+                }
+                let context = singleton.context(pool_id, vesu_context.position_counterpart_token, repay.basic.token, repay.basic.user);
+                let (position, _, debt) = singleton.position(pool_id, vesu_context.position_counterpart_token, repay.basic.token, repay.basic.user);
+                amount = debt;
+            }
+            amount
+        }
+    }
     use crate::interfaces::IGateway::InterestRateView;
     use alexandria_math::{pow};
 
@@ -684,7 +731,7 @@ mod VesuGateway {
                         continue; // Skip same asset pairs
                     }
                     let debt_asset = *supported_assets.at(j);
-                    let (position, _, _) = singleton_dispatcher
+                    let (position, _, debt) = singleton_dispatcher
                         .position(pool_id, collateral_asset, debt_asset, user);
                     if position.collateral_shares > 0 || position.nominal_debt > 0 {
                         let vtoken = extension
@@ -700,7 +747,7 @@ mod VesuGateway {
                                     PositionWithAmounts {
                                         collateral_shares: position.collateral_shares,
                                         collateral_amount,
-                                        nominal_debt: position.nominal_debt,
+                                        nominal_debt: debt,
                                         is_vtoken: false,
                                     },
                                 ),

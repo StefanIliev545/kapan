@@ -162,22 +162,27 @@ mod NostraGateway {
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Deposit(instruction) => {
+                        println!("Processing deposit");
                         self.deposit(instruction);
                     },
                     LendingInstruction::Withdraw(instruction) => {
+                        println!("Processing withdraw");
                         self.withdraw(instruction);
                     },
                     LendingInstruction::Borrow(instruction) => {
+                        println!("Processing borrow");
                         self.borrow(instruction);
                     },
                     LendingInstruction::Repay(instruction) => {
+                        println!("Processing repay");
                         self.repay(instruction);
-                    }
+                    },
+                    _ => {}
                 }
             }
         }
 
-        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)> {
+        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {
             let mut authorizations = ArrayTrait::new();
             for instruction in instructions {
                 match instruction {
@@ -187,7 +192,8 @@ mod NostraGateway {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(amount, ref call_data);
-                        authorizations.append((token, 'approve', call_data));
+                        let selector = if !rawSelectors { 'approve' } else { selector!("approve") };
+                        authorizations.append((token, selector, call_data));
                     },
                     LendingInstruction::Borrow(instruction) => {
                         let mut call_data: Array<felt252> = array![];
@@ -196,13 +202,15 @@ mod NostraGateway {
                         Serde::serialize(instruction.basic.user, ref call_data);
                         let debt_token = self.underlying_to_ndebt.read(*instruction.basic.token);
                         assert(debt_token != Zero::zero(), 'not-token');
-                        authorizations.append((debt_token, 'approve_delegation', call_data));
+                        let selector = if !rawSelectors { 'approve_delegation' } else { selector!("approve_delegation") };
+                        authorizations.append((debt_token, selector, call_data));
                     },
                     LendingInstruction::Repay(instruction) => {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_caller_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(instruction.basic.amount, ref call_data);
-                        authorizations.append((*instruction.basic.token, 'approve', call_data));
+                        let selector = if !rawSelectors { 'approve' } else { selector!("approve") };
+                        authorizations.append((*instruction.basic.token, selector, call_data));
                     },
                     LendingInstruction::Withdraw(instruction) => {
                         let ibtoken = self.underlying_to_nibcollateral.read(*instruction.basic.token);
@@ -210,12 +218,32 @@ mod NostraGateway {
                         let mut call_data: Array<felt252> = array![];
                         Serde::serialize(@get_contract_address(), ref call_data); //todo - this is a hack to get the address of the router..
                         Serde::serialize(instruction.basic.amount, ref call_data);
-                        authorizations.append((ibtoken, 'approve', call_data));
+                        let selector = if !rawSelectors { 'approve' } else { selector!("approve") };
+                        authorizations.append((ibtoken, selector, call_data));
+                    },
+                    LendingInstruction::Reborrow(instruction) => {
+                        let mut call_data: Array<felt252> = array![];
+                        Serde::serialize(@get_contract_address(), ref call_data); //todo - this is a hack to get the address of the router..
+                        Serde::serialize(instruction.approval_amount, ref call_data);
+                        Serde::serialize(instruction.user, ref call_data);
+                        let selector = if !rawSelectors { 'approve_delegation' } else { selector!("approve_delegation") };
+                        let debt_token = self.underlying_to_ndebt.read(*instruction.token);
+                        assert(debt_token != Zero::zero(), 'not-token');
+                        authorizations.append((debt_token, selector, call_data));
                     },
                     _ => {}
                 }
             };
             return authorizations.span();
+        }
+
+        fn get_flash_loan_amount(ref self: ContractState, repay: Repay) -> u256 {
+            if repay.repay_all {
+                let debt_token = IERC20Dispatcher { contract_address: self.underlying_to_ndebt.read(repay.basic.token) };
+                debt_token.balance_of(repay.basic.user)
+            } else {
+                repay.basic.amount
+            }
         }
     }
 

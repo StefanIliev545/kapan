@@ -23,15 +23,32 @@ pub struct Borrow {
 #[derive(Drop, Serde, Copy)]
 pub struct Repay {
     pub basic: BasicInstruction,
+    pub repay_all: bool,
     pub context: Option<Span<felt252>>,
 }
 
 #[derive(Drop, Serde, Copy)]
 pub struct Withdraw {
     pub basic: BasicInstruction,
+    pub withdraw_all: bool,
     pub context: Option<Span<felt252>>,
 }
 
+#[derive(Drop, Serde, Copy)]
+pub struct Redeposit {
+    pub token: ContractAddress,
+    pub target_instruction_index: u32,
+    pub user: ContractAddress,
+}
+
+#[derive(Drop, Serde, Copy)]
+pub struct Reborrow {
+    pub token: ContractAddress,
+    pub target_instruction_index: u32,
+    pub approval_amount: u256, //amount to approve for the borrow; not actual borrow.
+    pub user: ContractAddress,
+    pub context: Option<Span<felt252>>,
+}
 
 #[derive(Drop, Serde, Copy)]
 pub enum LendingInstruction {
@@ -39,12 +56,15 @@ pub enum LendingInstruction {
     Borrow: Borrow,
     Repay: Repay,
     Withdraw: Withdraw,
+    Redeposit: Redeposit,
+    Reborrow: Reborrow,
 }
 
 #[starknet::interface]
 pub trait ILendingInstructionProcessor<TContractState> {
     fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
-    fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>) -> Span<(ContractAddress, felt252, Array<felt252>)>;
+    fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)>;
+    fn get_flash_loan_amount(ref self: TContractState, repay: Repay) -> u256;
 }
 
 #[starknet::interface]
