@@ -4,6 +4,8 @@ use crate::interfaces::nostra::{InterestState};
 #[starknet::interface]
 pub trait INostraGateway<TContractState> {
     fn add_supported_asset(ref self: TContractState, underlying: ContractAddress, debt: ContractAddress, collateral: ContractAddress, ibcollateral: ContractAddress);
+    fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
+    fn get_supported_assets_info(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)>;
     fn get_user_positions(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)>;
     fn get_interest_rates(self: @TContractState, underlyings: Span<ContractAddress>) -> Array<InterestState>;
 }
@@ -34,6 +36,7 @@ mod NostraGateway {
     };
     use super::INostraGateway;
     use super::{IERC20SymbolDispatcher, IERC20SymbolDispatcherTrait};
+    use openzeppelin::token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starknet::{contract_address_const, get_caller_address, get_contract_address};
     use core::num::traits::Zero;
@@ -223,6 +226,37 @@ mod NostraGateway {
             self.underlying_to_ncollateral.write(underlying, collateral);
             self.underlying_to_nibcollateral.write(underlying, ibcollateral);
             self.supported_assets.append().write(underlying);
+        }
+
+        fn get_supported_assets_array(self: @ContractState) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let supported_assets = self.supported_assets;
+            let len = supported_assets.len();
+            for i in 0..len {
+                assets.append(self.supported_assets.at(i).read());
+            };
+            assets
+        }
+
+        fn get_supported_assets_info(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)> {
+            let mut assets = array![];
+            let supported_assets = self.supported_assets;
+            let len = supported_assets.len();
+            for i in 0..len {
+                let underlying = self.supported_assets.at(i).read();
+                let symbol = IERC20SymbolDispatcher { contract_address: underlying }.symbol();
+                let decimals = IERC20MetadataDispatcher { contract_address: underlying }.decimals();
+                let nibcollateral = self.underlying_to_nibcollateral.read(underlying);
+                let nib_token = IERC20Dispatcher { contract_address: nibcollateral };
+                let mut balance = nib_token.balance_of(user);
+                if balance == 0 {
+                    let ncollateral = self.underlying_to_ncollateral.read(underlying);
+                    let ncollateral_token = IERC20Dispatcher { contract_address: ncollateral };
+                    balance = ncollateral_token.balance_of(user);
+                };
+                assets.append((underlying, symbol, decimals, balance));
+            };
+            assets
         }
 
         fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)> {

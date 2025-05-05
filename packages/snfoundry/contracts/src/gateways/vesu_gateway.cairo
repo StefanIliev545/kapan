@@ -49,6 +49,7 @@ pub trait IVesuViewer<TContractState> {
         self: @TContractState, user: ContractAddress,
     ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
     fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
+    fn get_supported_assets_info(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)>;
     fn get_supported_assets_ui(self: @TContractState) -> Array<TokenMetadata>;
 }
 
@@ -571,6 +572,8 @@ mod VesuGateway {
         }
     }
 
+    use core::dict::{Felt252Dict, Felt252DictTrait, Felt252DictEntryTrait};
+    
     #[abi(embed_v0)]
     impl IVesuViewerImpl of IVesuViewer<ContractState> {
         fn get_supported_assets_array(self: @ContractState) -> Array<ContractAddress> {
@@ -579,6 +582,36 @@ mod VesuGateway {
             let len = supported_assets.len();
             for i in 0..len {
                 assets.append(self.supported_assets.at(i).read());
+            };
+            assets
+        }
+
+        fn get_supported_assets_info(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)> {
+            let mut assets = array![];
+            let supported_assets = self.supported_assets;
+            let len = supported_assets.len();
+
+            let positions = self.get_all_positions(user);
+            let mut positions_map : Felt252Dict<u32> = Default::default();
+
+            for number in 0..positions.len() {
+                let ( collateral_asset, _, _ ) = positions.at(number);
+                positions_map.insert((*collateral_asset).into(), number+1);
+            };
+
+            for i in 0..len {
+                let underlying = self.supported_assets.at(i).read();
+                let symbol = IERC20SymbolDispatcher { contract_address: underlying }.symbol();
+                let decimals = IERC20MetadataDispatcher { contract_address: underlying }.decimals();
+                let mut number = positions_map.get(underlying.into());
+                let mut collateral_amount = 0;
+                if number != 0 {
+                    number -= 1;
+                    let position = positions.at(number);
+                    let ( _, _, position_with_amounts ) = position;
+                    collateral_amount = *position_with_amounts.collateral_amount;
+                }
+                assets.append((underlying, symbol, decimals, collateral_amount));
             };
             assets
         }

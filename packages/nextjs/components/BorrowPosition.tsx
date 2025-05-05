@@ -5,6 +5,7 @@ import { BorrowModal } from "./modals/BorrowModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { MovePositionModal } from "./modals/MovePositionModal";
+import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModal } from "./modals/RepayModal";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { useAccount } from "wagmi";
@@ -314,17 +315,31 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       )}
 
       {/* Modals */}
-      <MovePositionModal
-        isOpen={isMoveModalOpen}
-        onClose={() => setIsMoveModalOpen(false)}
-        fromProtocol={protocolName}
-        position={{
-          name,
-          balance: balance ? balance : 0,
-          type: "borrow",
-          tokenAddress,
-        }}
-      />
+      {networkType === "starknet" ? (
+        <MovePositionModalStark
+          isOpen={isMoveModalOpen}
+          onClose={() => setIsMoveModalOpen(false)}
+          fromProtocol={protocolName}
+          position={{
+            name,
+            balance: balance ? balance : 0,
+            type: "borrow",
+            tokenAddress,
+          }}
+        />
+      ) : (
+        <MovePositionModal
+          isOpen={isMoveModalOpen}
+          onClose={() => setIsMoveModalOpen(false)}
+          fromProtocol={protocolName}
+          position={{
+            name,
+            balance: balance ? balance : 0,
+            type: "borrow",
+            tokenAddress,
+          }}
+        />
+      )}
 
       {networkType === "starknet" ? (
         <>

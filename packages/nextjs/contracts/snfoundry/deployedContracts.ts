@@ -420,6 +420,22 @@ const contracts = {
             },
             {
               type: "function",
+              name: "get_supported_assets_info",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u8, core::integer::u256)>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
               name: "get_supported_assets_ui",
               inputs: [],
               outputs: [
@@ -502,6 +518,10 @@ const contracts = {
             {
               name: "pool_id",
               type: "core::felt252",
+            },
+            {
+              name: "router",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "supported_assets",
@@ -845,6 +865,33 @@ const contracts = {
             },
             {
               type: "function",
+              name: "get_supported_assets_array",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::array::Array::<core::starknet::contract_address::ContractAddress>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_supported_assets_info",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u8, core::integer::u256)>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
               name: "get_user_positions",
               inputs: [
                 {
@@ -921,6 +968,66 @@ const contracts = {
           ],
         },
         {
+          type: "impl",
+          name: "OwnableMixinImpl",
+          interface_name: "openzeppelin_access::ownable::interface::OwnableABI",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_access::ownable::interface::OwnableABI",
+          items: [
+            {
+              type: "function",
+              name: "owner",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "transfer_ownership",
+              inputs: [
+                {
+                  name: "new_owner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounce_ownership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "transferOwnership",
+              inputs: [
+                {
+                  name: "newOwner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounceOwnership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
           type: "constructor",
           name: "constructor",
           inputs: [
@@ -928,13 +1035,74 @@ const contracts = {
               name: "interest_rate_model",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "router",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "OwnershipTransferred",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+              kind: "nested",
+            },
+            {
+              name: "OwnershipTransferStarted",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+              kind: "nested",
+            },
           ],
         },
         {
           type: "event",
           name: "kapan::gateways::NostraGateway::NostraGateway::Event",
           kind: "enum",
-          variants: [],
+          variants: [
+            {
+              name: "OwnableEvent",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+              kind: "flat",
+            },
+          ],
         },
       ],
       classHash:
@@ -1391,9 +1559,340 @@ const contracts = {
     },
   },
   mainnet: {
+    RouterGateway: {
+      address:
+        "0x418c2cf38ed2246bb10dd5b963394b011dd0d7b5c0dec02f8fffc20a7899328",
+      abi: [
+        {
+          type: "impl",
+          name: "RouterGatewayImpl",
+          interface_name: "kapan::gateways::RouterGateway::RouterGatewayTrait",
+        },
+        {
+          type: "struct",
+          name: "core::integer::u256",
+          members: [
+            {
+              name: "low",
+              type: "core::integer::u128",
+            },
+            {
+              name: "high",
+              type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::BasicInstruction",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<core::felt252>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::felt252>",
+            },
+          ],
+        },
+        {
+          type: "enum",
+          name: "core::option::Option::<core::array::Span::<core::felt252>>",
+          variants: [
+            {
+              name: "Some",
+              type: "core::array::Span::<core::felt252>",
+            },
+            {
+              name: "None",
+              type: "()",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Deposit",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Borrow",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Repay",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Withdraw",
+          members: [
+            {
+              name: "basic",
+              type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "enum",
+          name: "kapan::interfaces::IGateway::LendingInstruction",
+          variants: [
+            {
+              name: "Deposit",
+              type: "kapan::interfaces::IGateway::Deposit",
+            },
+            {
+              name: "Borrow",
+              type: "kapan::interfaces::IGateway::Borrow",
+            },
+            {
+              name: "Repay",
+              type: "kapan::interfaces::IGateway::Repay",
+            },
+            {
+              name: "Withdraw",
+              type: "kapan::interfaces::IGateway::Withdraw",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<kapan::interfaces::IGateway::LendingInstruction>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::gateways::RouterGateway::ProtocolInstructions",
+          members: [
+            {
+              name: "protocol_name",
+              type: "core::felt252",
+            },
+            {
+              name: "instructions",
+              type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "kapan::gateways::RouterGateway::RouterGatewayTrait",
+          items: [
+            {
+              type: "function",
+              name: "add_gateway",
+              inputs: [
+                {
+                  name: "protocol_name",
+                  type: "core::felt252",
+                },
+                {
+                  name: "gateway",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "process_protocol_instructions",
+              inputs: [
+                {
+                  name: "instructions",
+                  type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_authorizations_for_instructions",
+              inputs: [
+                {
+                  name: "instructions",
+                  type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "move_debt",
+              inputs: [
+                {
+                  name: "instructions",
+                  type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "RouterGatewayFlashloanReceiver",
+          interface_name: "kapan::interfaces::vesu::IFlashloanReceiver",
+        },
+        {
+          type: "interface",
+          name: "kapan::interfaces::vesu::IFlashloanReceiver",
+          items: [
+            {
+              type: "function",
+              name: "on_flash_loan",
+              inputs: [
+                {
+                  name: "sender",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "amount",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "data",
+                  type: "core::array::Span::<core::felt252>",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "constructor",
+          name: "constructor",
+          inputs: [
+            {
+              name: "_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "flashloan_provider",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "kapan::gateways::RouterGateway::RouterGateway::GatewayAdded",
+          kind: "struct",
+          members: [
+            {
+              name: "protocol_name",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "gateway",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "kapan::gateways::RouterGateway::RouterGateway::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "GatewayAdded",
+              type: "kapan::gateways::RouterGateway::RouterGateway::GatewayAdded",
+              kind: "nested",
+            },
+          ],
+        },
+      ],
+      classHash:
+        "0x1a539c480b0ad5c9afe8dd0236aa5283f16433de2f719e5f3edfa43ca758874",
+    },
     VesuGateway: {
       address:
-        "0x7b878f391194b22cf8a4fe6d4b89c4f828ada008c1e4a50e484c5abd9665614",
+        "0x11c4deec0c18a75caecfc75009487eaf97a898bb2f471d63f175483beaeca58",
       abi: [
         {
           type: "impl",
@@ -1793,6 +2292,22 @@ const contracts = {
             },
             {
               type: "function",
+              name: "get_supported_assets_info",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u8, core::integer::u256)>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
               name: "get_supported_assets_ui",
               inputs: [],
               outputs: [
@@ -1877,6 +2392,10 @@ const contracts = {
               type: "core::felt252",
             },
             {
+              name: "router",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
               name: "supported_assets",
               type: "core::array::Array::<core::starknet::contract_address::ContractAddress>",
             },
@@ -1947,11 +2466,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x407954d0e8321f5af9262a1cbb15e7d8505fa9e7c2524444e866582f1e973f5",
+        "0x3a7c9458dd802656d25a7418d71503cfa917b6a9de4ffb0be168677dcb920f0",
     },
     NostraGateway: {
       address:
-        "0x3b107dc21ce18a6eb6598f13b456833559713242a53d885914f6bad163df5ad",
+        "0x2837b3b21da950bc272a5221b66caf36502b930f3df49ede0782d34d2f4975",
       abi: [
         {
           type: "impl",
@@ -2218,6 +2737,33 @@ const contracts = {
             },
             {
               type: "function",
+              name: "get_supported_assets_array",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::array::Array::<core::starknet::contract_address::ContractAddress>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_supported_assets_info",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u8, core::integer::u256)>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
               name: "get_user_positions",
               inputs: [
                 {
@@ -2294,6 +2840,66 @@ const contracts = {
           ],
         },
         {
+          type: "impl",
+          name: "OwnableMixinImpl",
+          interface_name: "openzeppelin_access::ownable::interface::OwnableABI",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_access::ownable::interface::OwnableABI",
+          items: [
+            {
+              type: "function",
+              name: "owner",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "transfer_ownership",
+              inputs: [
+                {
+                  name: "new_owner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounce_ownership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "transferOwnership",
+              inputs: [
+                {
+                  name: "newOwner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounceOwnership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
           type: "constructor",
           name: "constructor",
           inputs: [
@@ -2301,21 +2907,82 @@ const contracts = {
               name: "interest_rate_model",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "router",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "OwnershipTransferred",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+              kind: "nested",
+            },
+            {
+              name: "OwnershipTransferStarted",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+              kind: "nested",
+            },
           ],
         },
         {
           type: "event",
           name: "kapan::gateways::NostraGateway::NostraGateway::Event",
           kind: "enum",
-          variants: [],
+          variants: [
+            {
+              name: "OwnableEvent",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+              kind: "flat",
+            },
+          ],
         },
       ],
       classHash:
-        "0x1d70cfede36036cd187597f6b0ddfccc42010a4f85beb5a8662dc7434cd0cc1",
+        "0x35c9d6e5a5ad788296f2d983c9ebdfc2fa70424224cd03090f76348a2f4a2c",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x313458bbdcfbe2084a1e101918777ba5b26a77d9e15b86454f38843c452f87f",
+        "0x511aba44ca7fd7bb0b92bf1d6304a57143aa241d806449055c68b5f9c461b1f",
       abi: [
         {
           type: "impl",
@@ -2430,337 +3097,6 @@ const contracts = {
       ],
       classHash:
         "0x782fd31b8dc3aa7d53435712ffee7692704e3b720b5084b556eff8f5475e04d",
-    },
-    RouterGateway: {
-      address:
-        "0x3dd97080b63d85e52456c7271b03a993b0131b8199311664bed103126dbaa25",
-      abi: [
-        {
-          type: "impl",
-          name: "RouterGatewayImpl",
-          interface_name: "kapan::gateways::RouterGateway::RouterGatewayTrait",
-        },
-        {
-          type: "struct",
-          name: "core::integer::u256",
-          members: [
-            {
-              name: "low",
-              type: "core::integer::u128",
-            },
-            {
-              name: "high",
-              type: "core::integer::u128",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "kapan::interfaces::IGateway::BasicInstruction",
-          members: [
-            {
-              name: "token",
-              type: "core::starknet::contract_address::ContractAddress",
-            },
-            {
-              name: "amount",
-              type: "core::integer::u256",
-            },
-            {
-              name: "user",
-              type: "core::starknet::contract_address::ContractAddress",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "core::array::Span::<core::felt252>",
-          members: [
-            {
-              name: "snapshot",
-              type: "@core::array::Array::<core::felt252>",
-            },
-          ],
-        },
-        {
-          type: "enum",
-          name: "core::option::Option::<core::array::Span::<core::felt252>>",
-          variants: [
-            {
-              name: "Some",
-              type: "core::array::Span::<core::felt252>",
-            },
-            {
-              name: "None",
-              type: "()",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "kapan::interfaces::IGateway::Deposit",
-          members: [
-            {
-              name: "basic",
-              type: "kapan::interfaces::IGateway::BasicInstruction",
-            },
-            {
-              name: "context",
-              type: "core::option::Option::<core::array::Span::<core::felt252>>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "kapan::interfaces::IGateway::Borrow",
-          members: [
-            {
-              name: "basic",
-              type: "kapan::interfaces::IGateway::BasicInstruction",
-            },
-            {
-              name: "context",
-              type: "core::option::Option::<core::array::Span::<core::felt252>>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "kapan::interfaces::IGateway::Repay",
-          members: [
-            {
-              name: "basic",
-              type: "kapan::interfaces::IGateway::BasicInstruction",
-            },
-            {
-              name: "context",
-              type: "core::option::Option::<core::array::Span::<core::felt252>>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "kapan::interfaces::IGateway::Withdraw",
-          members: [
-            {
-              name: "basic",
-              type: "kapan::interfaces::IGateway::BasicInstruction",
-            },
-            {
-              name: "context",
-              type: "core::option::Option::<core::array::Span::<core::felt252>>",
-            },
-          ],
-        },
-        {
-          type: "enum",
-          name: "kapan::interfaces::IGateway::LendingInstruction",
-          variants: [
-            {
-              name: "Deposit",
-              type: "kapan::interfaces::IGateway::Deposit",
-            },
-            {
-              name: "Borrow",
-              type: "kapan::interfaces::IGateway::Borrow",
-            },
-            {
-              name: "Repay",
-              type: "kapan::interfaces::IGateway::Repay",
-            },
-            {
-              name: "Withdraw",
-              type: "kapan::interfaces::IGateway::Withdraw",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
-          members: [
-            {
-              name: "snapshot",
-              type: "@core::array::Array::<kapan::interfaces::IGateway::LendingInstruction>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "kapan::gateways::RouterGateway::ProtocolInstructions",
-          members: [
-            {
-              name: "protocol_name",
-              type: "core::felt252",
-            },
-            {
-              name: "instructions",
-              type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
-          members: [
-            {
-              name: "snapshot",
-              type: "@core::array::Array::<kapan::gateways::RouterGateway::ProtocolInstructions>",
-            },
-          ],
-        },
-        {
-          type: "struct",
-          name: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
-          members: [
-            {
-              name: "snapshot",
-              type: "@core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
-            },
-          ],
-        },
-        {
-          type: "interface",
-          name: "kapan::gateways::RouterGateway::RouterGatewayTrait",
-          items: [
-            {
-              type: "function",
-              name: "add_gateway",
-              inputs: [
-                {
-                  name: "protocol_name",
-                  type: "core::felt252",
-                },
-                {
-                  name: "gateway",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "process_protocol_instructions",
-              inputs: [
-                {
-                  name: "instructions",
-                  type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "get_authorizations_for_instructions",
-              inputs: [
-                {
-                  name: "instructions",
-                  type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
-                },
-              ],
-              outputs: [
-                {
-                  type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
-                },
-              ],
-              state_mutability: "external",
-            },
-            {
-              type: "function",
-              name: "move_debt",
-              inputs: [
-                {
-                  name: "instructions",
-                  type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-          ],
-        },
-        {
-          type: "impl",
-          name: "RouterGatewayFlashloanReceiver",
-          interface_name: "kapan::interfaces::vesu::IFlashloanReceiver",
-        },
-        {
-          type: "interface",
-          name: "kapan::interfaces::vesu::IFlashloanReceiver",
-          items: [
-            {
-              type: "function",
-              name: "on_flash_loan",
-              inputs: [
-                {
-                  name: "sender",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "asset",
-                  type: "core::starknet::contract_address::ContractAddress",
-                },
-                {
-                  name: "amount",
-                  type: "core::integer::u256",
-                },
-                {
-                  name: "data",
-                  type: "core::array::Span::<core::felt252>",
-                },
-              ],
-              outputs: [],
-              state_mutability: "external",
-            },
-          ],
-        },
-        {
-          type: "constructor",
-          name: "constructor",
-          inputs: [
-            {
-              name: "_owner",
-              type: "core::starknet::contract_address::ContractAddress",
-            },
-            {
-              name: "flashloan_provider",
-              type: "core::starknet::contract_address::ContractAddress",
-            },
-          ],
-        },
-        {
-          type: "event",
-          name: "kapan::gateways::RouterGateway::RouterGateway::GatewayAdded",
-          kind: "struct",
-          members: [
-            {
-              name: "protocol_name",
-              type: "core::felt252",
-              kind: "data",
-            },
-            {
-              name: "gateway",
-              type: "core::starknet::contract_address::ContractAddress",
-              kind: "data",
-            },
-          ],
-        },
-        {
-          type: "event",
-          name: "kapan::gateways::RouterGateway::RouterGateway::Event",
-          kind: "enum",
-          variants: [
-            {
-              name: "GatewayAdded",
-              type: "kapan::gateways::RouterGateway::RouterGateway::GatewayAdded",
-              kind: "nested",
-            },
-          ],
-        },
-      ],
-      classHash:
-        "0x1a539c480b0ad5c9afe8dd0236aa5283f16433de2f719e5f3edfa43ca758874",
     },
   },
   sepolia: {
@@ -3166,6 +3502,22 @@ const contracts = {
             },
             {
               type: "function",
+              name: "get_supported_assets_info",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u8, core::integer::u256)>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
               name: "get_supported_assets_ui",
               inputs: [],
               outputs: [
@@ -3248,6 +3600,10 @@ const contracts = {
             {
               name: "pool_id",
               type: "core::felt252",
+            },
+            {
+              name: "router",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "supported_assets",
@@ -3591,6 +3947,33 @@ const contracts = {
             },
             {
               type: "function",
+              name: "get_supported_assets_array",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::array::Array::<core::starknet::contract_address::ContractAddress>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_supported_assets_info",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::felt252, core::integer::u8, core::integer::u256)>",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
               name: "get_user_positions",
               inputs: [
                 {
@@ -3667,6 +4050,66 @@ const contracts = {
           ],
         },
         {
+          type: "impl",
+          name: "OwnableMixinImpl",
+          interface_name: "openzeppelin_access::ownable::interface::OwnableABI",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_access::ownable::interface::OwnableABI",
+          items: [
+            {
+              type: "function",
+              name: "owner",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "transfer_ownership",
+              inputs: [
+                {
+                  name: "new_owner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounce_ownership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "transferOwnership",
+              inputs: [
+                {
+                  name: "newOwner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounceOwnership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
           type: "constructor",
           name: "constructor",
           inputs: [
@@ -3674,13 +4117,74 @@ const contracts = {
               name: "interest_rate_model",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "router",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "OwnershipTransferred",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+              kind: "nested",
+            },
+            {
+              name: "OwnershipTransferStarted",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+              kind: "nested",
+            },
           ],
         },
         {
           type: "event",
           name: "kapan::gateways::NostraGateway::NostraGateway::Event",
           kind: "enum",
-          variants: [],
+          variants: [
+            {
+              name: "OwnableEvent",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+              kind: "flat",
+            },
+          ],
         },
       ],
       classHash:
