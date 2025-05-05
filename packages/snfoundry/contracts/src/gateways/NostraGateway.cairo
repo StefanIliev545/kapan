@@ -39,8 +39,19 @@ mod NostraGateway {
     use core::num::traits::Zero;
     use super::InterestState;
 
+    use openzeppelin::access::ownable::OwnableComponent;
 
-    
+    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+    #[abi(embed_v0)]
+    impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
+    impl InternalImpl = OwnableComponent::InternalImpl<ContractState>;
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        #[flat]
+        OwnableEvent: OwnableComponent::Event,
+    }
+
     #[storage]
     struct Storage {
         underlying_to_ndebt: Map<ContractAddress, ContractAddress>, // underlying -> Nostra debt token
@@ -48,11 +59,16 @@ mod NostraGateway {
         underlying_to_nibcollateral: Map<ContractAddress, ContractAddress>, // underlying -> Nostra interest bearing collateral token
         supported_assets: Vec<ContractAddress>, // underlying tokens
         interest_rate_model: ContractAddress,
+        router: ContractAddress,
+        #[substorage(v0)]
+        ownable: OwnableComponent::Storage,
     }
 
     #[constructor]
-    fn constructor(ref self:ContractState, interest_rate_model: ContractAddress) {
+    fn constructor(ref self:ContractState, interest_rate_model: ContractAddress, router: ContractAddress) {
         self.interest_rate_model.write(interest_rate_model);
+        self.router.write(router);
+        self.ownable.initializer(get_caller_address()); 
     }
 
     #[generate_trait]
@@ -80,6 +96,8 @@ mod NostraGateway {
             let amount = withdraw.basic.amount;
             let user = withdraw.basic.user;
 
+            self.assert_router_or_user(user);
+
             let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
             assert(ibcollateral != Zero::zero(), 'not-token');
 
@@ -93,6 +111,8 @@ mod NostraGateway {
             let underlying = borrow.basic.token;
             let amount = borrow.basic.amount;
             let user = borrow.basic.user;
+
+            self.assert_router_or_user(user);
 
             let debt = self.underlying_to_ndebt.read(underlying);
             assert(debt != Zero::zero(), 'not-token');
@@ -124,6 +144,11 @@ mod NostraGateway {
             
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
             debt_token.burn(user, amount);
+        }
+
+        fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
+            let router = self.router.read();
+            assert(router == get_caller_address() || user == get_caller_address(), 'unauthorized');
         }
     }
     

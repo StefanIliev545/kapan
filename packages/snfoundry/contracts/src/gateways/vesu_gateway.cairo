@@ -113,6 +113,7 @@ mod VesuGateway {
         vesu_singleton: ContractAddress,
         pool_id: felt252,
         supported_assets: Vec<ContractAddress>,
+        router: ContractAddress,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
     }
@@ -122,51 +123,19 @@ mod VesuGateway {
         ref self: ContractState,
         vesu_singleton: ContractAddress,
         pool_id: felt252,
+        router: ContractAddress,
         supported_assets: Array<ContractAddress>,
     ) {
         self.vesu_singleton.write(vesu_singleton);
         self.pool_id.write(pool_id);
+        self.router.write(router);
         self.ownable.initializer(get_caller_address());
         for asset in supported_assets {
             self.supported_assets.append().write(asset);
         }
     }
 
-
-    trait IVesuGatewayInternal {
-        fn get_vtoken_for_collateral(
-            self: @ContractState, collateral: ContractAddress,
-        ) -> ContractAddress;
-        fn deposit(ref self: ContractState, instruction: @Deposit);
-        fn withdraw(ref self: ContractState, instruction: @Withdraw);
-        fn borrow(ref self: ContractState, instruction: @Borrow);
-        fn repay(ref self: ContractState, instruction: @Repay);
-        fn transfer_position_for(
-            ref self: ContractState,
-            pool_id: felt252,
-            collateral_asset: ContractAddress,
-            debt_asset: ContractAddress,
-            user: ContractAddress,
-            collateral_amount: u256,
-        );
-        fn modify_collateral_for(
-            ref self: ContractState,
-            pool_id: felt252,
-            collateral_asset: ContractAddress,
-            debt_asset: ContractAddress,
-            user: ContractAddress,
-            collateral_amount: i257,
-        ) -> UpdatePositionResponse;
-        fn modify_debt_for(
-            ref self: ContractState,
-            pool_id: felt252,
-            collateral_asset: ContractAddress,
-            debt_asset: ContractAddress,
-            user: ContractAddress,
-            debt_amount: i257,
-        );
-    }
-
+    #[generate_trait]
     impl VesuGatewayInternal of IVesuGatewayInternal {
         fn get_vtoken_for_collateral(
             self: @ContractState, collateral: ContractAddress,
@@ -223,7 +192,7 @@ mod VesuGateway {
             let collateral_asset = basic.token;
             let mut debt_asset = Zero::zero(); // Zero debt token for withdraw
             let user = basic.user;
-
+            self.assert_router_or_user(user);
             if instruction.context.is_some() {
                 let mut context_bytes: Span<felt252> = (*instruction.context).unwrap();
                 let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
@@ -342,6 +311,7 @@ mod VesuGateway {
         fn borrow(ref self: ContractState, instruction: @Borrow) {
             let basic = *instruction.basic;
             let context = *instruction.context;
+            self.assert_router_or_user(basic.user);
             assert(context.is_some(), 'Context is required for borrow');
             let mut context_bytes = context.unwrap();
             let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
@@ -429,6 +399,11 @@ mod VesuGateway {
                 data: ArrayTrait::new().span(),
             };
             singleton_dispatcher.modify_position(modify_params);
+        }
+
+        fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
+            let router = self.router.read();
+            assert(router == get_caller_address() || user == get_caller_address(), 'unauthorized');
         }
     }
 

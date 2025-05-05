@@ -18,11 +18,20 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
   ];
 
+  const { address: routerGatewayAddress } = await deployContract({
+    contract: "RouterGateway",
+    constructorArgs: {
+      _owner: deployer.address,
+      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+    },
+  });
+
   const { address: vesuGatewayAddress } = await deployContract({
     contract: "VesuGateway",
     constructorArgs: {
       vesu_singleton: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
       pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
+      router: routerGatewayAddress,
       supported_assets: supportedAssets,
     },
   });
@@ -32,6 +41,7 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     contract: "NostraGateway",
     constructorArgs: {
       interest_rate_model: "0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff",
+      router: routerGatewayAddress,
     },
   });
 
@@ -43,13 +53,7 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
-  const { address: routerGatewayAddress } = await deployContract({
-    contract: "RouterGateway",
-    constructorArgs: {
-      _owner: deployer.address,
-      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
-    },
-  });
+
 
   return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
 };
@@ -68,11 +72,22 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     //"0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // UNI
   ];
 
+  
+  const { address: routerGatewayAddress } = await deployContract({
+    contract: "RouterGateway",
+    constructorArgs: {
+      _owner: deployer.address,
+      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+    },
+  });
+
+
   const { address: vesuGatewayAddress } = await deployContract({
     contract: "VesuGateway",
     constructorArgs: {
       vesu_singleton: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
       pool_id: "730993554056884283224259059297934576024721456828383733531590831263129347422",
+      router: routerGatewayAddress,
       supported_assets: supportedAssets,
     },
   });
@@ -82,6 +97,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     contract: "NostraGateway",
     constructorArgs: {
       interest_rate_model: "0x047a2a6ffbbd42713b9aa00c5f489f0a20b92c22188eb8dac64b1fe4901cfa3b",
+      router: routerGatewayAddress,
     },
   });
 
@@ -90,14 +106,6 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     constructorArgs: {
       nostra_gateway: vesuGatewayAddress,
       vesu_gateway: vesuGatewayAddress,
-    },
-  });
-
-  const { address: routerGatewayAddress } = await deployContract({
-    contract: "RouterGateway",
-    constructorArgs: {
-      _owner: deployer.address,
-      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
     },
   });
 
