@@ -156,13 +156,6 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
           supportedAssets={tokens}
           isVesu={isVesu}
           vesuContext={vesuContext}
-          collateralToken={collateralAsset ? {
-            name: feltToString(tokens.find(t => `0x${BigInt(t.address).toString(16).padStart(64, "0")}` === collateralAsset)?.symbol || 0n),
-            icon: tokenNameToLogo(feltToString(tokens.find(t => `0x${BigInt(t.address).toString(16).padStart(64, "0")}` === collateralAsset)?.symbol || 0n).toLowerCase()),
-            address: collateralAsset,
-            currentRate: tokens.find(t => `0x${BigInt(t.address).toString(16).padStart(64, "0")}` === collateralAsset)?.supplyAPY ? 
-              tokens.find(t => `0x${BigInt(t.address).toString(16).padStart(64, "0")}` === collateralAsset)!.supplyAPY! * 100 : 0,
-          } : undefined}
         />
       )}
     </>
