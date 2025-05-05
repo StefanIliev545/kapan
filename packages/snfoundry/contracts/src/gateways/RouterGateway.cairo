@@ -194,7 +194,6 @@ mod RouterGateway {
                 let protocol_instruction = instructions.at(i);
                 let gateway = self.gateways.read(*protocol_instruction.protocol_name);
                 assert(!gateway.is_zero(), 'Gateway not supported');
-                println!("Processing instructions for gateway: {:?}", gateway);
 
                 let mut instructions_span = *protocol_instruction.instructions;
                 if balancesDiffs.len() != 0 {
@@ -204,7 +203,6 @@ mod RouterGateway {
                 let balancesBefore = self.before_send_instructions(gateway, instructions_span, should_transfer);
                 let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
                 dispatcher.process_instructions(instructions_span);
-                println!("Processed instructions for gateway: {:?}", gateway);
                 balancesDiffs = self.after_send_instructions(gateway, instructions_span, balancesBefore, should_transfer);
                 i += 1;
             }
@@ -221,11 +219,9 @@ mod RouterGateway {
             };
 
             let mut amount = repay.basic.amount;
-            println!("Repay amount: {:?}", amount);
             if repay.repay_all {
                 let gateway = ILendingInstructionProcessorDispatcher { contract_address: self.gateways.read(*first_protocol.protocol_name) };
                 amount = gateway.get_flash_loan_amount(repay);
-                println!("Repay amount flash loan: {:?}", amount);
             }
             (repay.basic.token, amount)
         }

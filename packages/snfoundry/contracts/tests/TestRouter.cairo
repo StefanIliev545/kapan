@@ -408,7 +408,6 @@ fn test_vesu() {
 } 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
@@ -486,20 +485,16 @@ fn test_move_debt() {
     VesuContext { pool_id: POOL_ID, position_counterpart_token: ETH_ADDRESS() }.serialize(ref vesu_context);
     
 
-    let vesu_deposit = Deposit {
-        basic: BasicInstruction {
-            token: ETH_ADDRESS(),
-            amount: 5000000000000000000, // 5 ETH
-            user: USER_ADDRESS(),
-        },
-        context: Option::None,
+    let vesu_deposit = Redeposit {
+        token: ETH_ADDRESS(),
+        target_instruction_index: 1,
+        user: USER_ADDRESS(),
     };
-    let vesu_borrow = Borrow {
-        basic: BasicInstruction {
-            token: USDC_ADDRESS(),
-            amount: 200000000, // 200 USDC
-            user: USER_ADDRESS(),
-        },
+    let vesu_borrow = Reborrow {
+        token: USDC_ADDRESS(),
+        target_instruction_index: 0,
+        approval_amount: 200000000, // 200 USDC
+        user: USER_ADDRESS(),
         context: Option::Some(vesu_context.span()),
     };
     
@@ -510,7 +505,7 @@ fn test_move_debt() {
     
     move_debt_instructions.append(ProtocolInstructions {
         protocol_name: 'vesu',
-        instructions: array![LendingInstruction::Deposit(vesu_deposit), LendingInstruction::Borrow(vesu_borrow)].span(),
+        instructions: array![LendingInstruction::Redeposit(vesu_deposit), LendingInstruction::Reborrow(vesu_borrow)].span(),
     });
     
     // Get and process authorizations for move debt
@@ -530,6 +525,7 @@ fn test_move_debt() {
 
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt_reverse() {
     let context = setup_test_context();

@@ -74,6 +74,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 }) => {
   const { address: userAddress } = useAccount();
   const [amount, setAmount] = useState("");
+  const [isMaxAmount, setIsMaxAmount] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<ActionStep>("idle");
   const [isLoading, setIsLoading] = useState(false);
@@ -92,8 +93,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   });
 
   // Construct instruction based on current state
-  const instruction = useMemo(() => {
-    if (!amount || !userAddress || !decimals) return null;
+  const { fullInstruction, authInstruction } = useMemo(() => {
+    if (!amount || !userAddress || !decimals) return { fullInstruction: null, authInstruction: null };
 
     const parsedAmount = parseUnits(amount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
@@ -124,6 +125,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           Repay: undefined,
           Borrow: undefined,
           Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
         });
         break;
       case "withdraw":
@@ -138,8 +141,11 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
+            withdraw_all: isMaxAmount,
             context: context,
           },
+          Redeposit: undefined,
+          Reborrow: undefined,
         });
         break;
       case "borrow":
@@ -155,6 +161,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           },
           Repay: undefined,
           Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
         });
         break;
       case "repay":
@@ -167,14 +175,18 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
+            repay_all: isMaxAmount,
             context: context,
           },
           Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
         });
         break;
     }
 
-    return CallData.compile({
+    // Both instructions use the same lending instruction
+    const fullInstructionData = CallData.compile({
       instructions: [
         {
           protocol_name: lowerProtocolName,
@@ -182,19 +194,35 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         },
       ],
     });
-  }, [amount, userAddress, decimals, protocolName, actionType, token.address]);
 
-  const { data: protocolInstructions } = useScaffoldReadContract({
-    contractName: "RouterGateway",
-    functionName: "get_authorizations_for_instructions",
-    args: [instruction],
-    enabled: !!instruction,
+    // Auth instruction is the same but includes the rawSelectors: false flag
+    const authInstructionData = CallData.compile({
+      instructions: [
+        {
+          protocol_name: lowerProtocolName,
+          instructions: [lendingInstruction],
+        },
+      ],
+      rawSelectors: false,
+    });
+
+    return {
+      fullInstruction: fullInstructionData,
+      authInstruction: authInstructionData,
+    };
+  }, [amount, userAddress, decimals, protocolName, vesuContext, actionType, token.address, isMaxAmount]);
+
+  const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
+    contractName: "RouterGateway" as const,
+    functionName: "get_authorizations_for_instructions" as const,
+    args: [authInstruction],
+    enabled: !!authInstruction && isOpen,
     refetchInterval: 5000,
-  } as any); //todo fix typescript hack
+  } as any);
 
   // Construct calls based on current state
   const calls = useMemo(() => {
-    if (!instruction) return [];
+    if (!fullInstruction) return [];
 
     const authorizations = [];
     if (protocolInstructions) {
@@ -216,12 +244,12 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     return [
       ...authorizations as any,
       {
-        contractName: "RouterGateway",
-        functionName: "process_protocol_instructions",
-        args: instruction,
+        contractName: "RouterGateway" as const,
+        functionName: "process_protocol_instructions" as const,
+        args: fullInstruction,
       },
     ];
-  }, [instruction, protocolInstructions]);
+  }, [fullInstruction, protocolInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
   // Read token balance
@@ -249,8 +277,17 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       setError(null);
       setStep("idle");
       setIsLoading(false);
+      setIsMaxAmount(false);
     }
   }, [isOpen]);
+
+  // Add a useEffect to reset isMaxAmount when amount changes manually
+  useEffect(() => {
+    if (amount !== formattedBalance) {
+      setIsMaxAmount(false);
+    }
+  }, [amount, formattedBalance]);
+
   // Execute the token action
   const handleAction = async () => {
     const missingDeps = [];
@@ -408,7 +445,10 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               {(actionType === "deposit" || actionType === "repay") && (
                 <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
-                  onClick={() => setAmount(formattedBalance)}
+                  onClick={() => {
+                    setAmount(formattedBalance);
+                    setIsMaxAmount(true);
+                  }}
                   disabled={isLoading || step !== "idle"}
                 >
                   MAX

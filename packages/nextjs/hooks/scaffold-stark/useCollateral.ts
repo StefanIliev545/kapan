@@ -43,8 +43,10 @@ export function useCollateral({
           rawBalanceBigInt = BigInt(rawBalance);
         }
         const decimalsNum = decimals ? Number(decimals) : 18;
+        const addressString = `0x${BigInt(address).toString(16).padStart(64, "0")}`;
+        console.log("addressString", addressString);
         return {
-          address: feltToString(typeof address === "bigint" ? address : BigInt(address)) as `0x${string}`,
+          address: addressString,
           symbol: feltToString(typeof symbol === "bigint" ? symbol : BigInt(symbol)),
           decimals: decimalsNum,
           supported: true,

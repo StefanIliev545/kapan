@@ -162,19 +162,15 @@ mod NostraGateway {
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Deposit(instruction) => {
-                        println!("Processing deposit");
                         self.deposit(instruction);
                     },
                     LendingInstruction::Withdraw(instruction) => {
-                        println!("Processing withdraw");
                         self.withdraw(instruction);
                     },
                     LendingInstruction::Borrow(instruction) => {
-                        println!("Processing borrow");
                         self.borrow(instruction);
                     },
                     LendingInstruction::Repay(instruction) => {
-                        println!("Processing repay");
                         self.repay(instruction);
                     },
                     _ => {}

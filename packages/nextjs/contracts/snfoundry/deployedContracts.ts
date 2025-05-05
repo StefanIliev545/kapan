@@ -136,12 +136,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -156,6 +174,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -182,6 +248,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -229,10 +303,30 @@ const contracts = {
                   name: "instructions",
                   type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
                 },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
+                },
               ],
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_flash_loan_amount",
+              inputs: [
+                {
+                  name: "repay",
+                  type: "kapan::interfaces::IGateway::Repay",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -286,20 +380,6 @@ const contracts = {
           type: "impl",
           name: "IVesuViewerImpl",
           interface_name: "kapan::gateways::vesu_gateway::IVesuViewer",
-        },
-        {
-          type: "enum",
-          name: "core::bool",
-          variants: [
-            {
-              name: "False",
-              type: "()",
-            },
-            {
-              name: "True",
-              type: "()",
-            },
-          ],
         },
         {
           type: "struct",
@@ -691,12 +771,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -711,6 +809,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -737,6 +883,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -784,10 +938,30 @@ const contracts = {
                   name: "instructions",
                   type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
                 },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
+                },
               ],
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_flash_loan_amount",
+              inputs: [
+                {
+                  name: "repay",
+                  type: "kapan::interfaces::IGateway::Repay",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -1320,12 +1494,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -1340,6 +1532,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -1366,6 +1606,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -1452,6 +1700,10 @@ const contracts = {
                 {
                   name: "instructions",
                   type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+                },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
                 },
               ],
               outputs: [
@@ -1561,7 +1813,7 @@ const contracts = {
   mainnet: {
     RouterGateway: {
       address:
-        "0x3f872e7b79f6283a235f120d932bcc2fc8f3bc0c1f34d80fa4827d66efed529",
+        "0x77281e7716c27041413aff79b5e77a3616966d7f033ce7b4c76b471442ad614",
       abi: [
         {
           type: "impl",
@@ -1653,12 +1905,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -1673,6 +1943,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -1699,6 +2017,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -1785,6 +2111,10 @@ const contracts = {
                 {
                   name: "instructions",
                   type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+                },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
                 },
               ],
               outputs: [
@@ -1888,11 +2218,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x67f73c1ba9cf71d49917147e79985550d143549f339081c442fe9d1c4f77330",
+        "0x739f27b9c8e58f02837c72c05975d44f1455cc7a82de0ab5a0f5dce4a3d2781",
     },
     VesuGateway: {
       address:
-        "0x3c264d1c0bc5bc5fd8f44812fb14bc9c223c62aa5e926df74c160df4a5a7fab",
+        "0x2d5c42d38bb0760ca9814121b66bd0767f0e136a69cdb2bcc1cf5da97d67a71",
       abi: [
         {
           type: "impl",
@@ -2008,12 +2338,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -2028,6 +2376,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -2054,6 +2450,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -2101,10 +2505,30 @@ const contracts = {
                   name: "instructions",
                   type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
                 },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
+                },
               ],
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_flash_loan_amount",
+              inputs: [
+                {
+                  name: "repay",
+                  type: "kapan::interfaces::IGateway::Repay",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -2158,20 +2582,6 @@ const contracts = {
           type: "impl",
           name: "IVesuViewerImpl",
           interface_name: "kapan::gateways::vesu_gateway::IVesuViewer",
-        },
-        {
-          type: "enum",
-          name: "core::bool",
-          variants: [
-            {
-              name: "False",
-              type: "()",
-            },
-            {
-              name: "True",
-              type: "()",
-            },
-          ],
         },
         {
           type: "struct",
@@ -2466,11 +2876,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x3a7c9458dd802656d25a7418d71503cfa917b6a9de4ffb0be168677dcb920f0",
+        "0x1d8820bb52619971bb54e26ae00af4ed7520dc5f0ee45972f8ead16e2e6754",
     },
     NostraGateway: {
       address:
-        "0x75093a2d6cf8bbb9613db4bc2f0414ea8913c850c768c48bb3ed7bfb89dbcd9",
+        "0x26fccb579c2c9785e381bfe8d2e56ae0469784acccced4e8cb66460036a33a1",
       abi: [
         {
           type: "impl",
@@ -2563,12 +2973,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -2583,6 +3011,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -2609,6 +3085,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -2656,10 +3140,30 @@ const contracts = {
                   name: "instructions",
                   type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
                 },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
+                },
               ],
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_flash_loan_amount",
+              inputs: [
+                {
+                  name: "repay",
+                  type: "kapan::interfaces::IGateway::Repay",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -2978,11 +3482,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x35c9d6e5a5ad788296f2d983c9ebdfc2fa70424224cd03090f76348a2f4a2c",
+        "0xe396bdb8287536c9fdcbef1ad95c712863d26084ca23f0a1bc968146dc0695",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x785069a75a4ef5ca74b759475571865bce75353fa34d3b390fdbd0354db8714",
+        "0x460129921b68655c91c1745de7198c9dc4f1c67afb6750741c96fd19a042116",
       abi: [
         {
           type: "impl",
@@ -3218,12 +3722,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -3238,6 +3760,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -3264,6 +3834,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -3311,10 +3889,30 @@ const contracts = {
                   name: "instructions",
                   type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
                 },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
+                },
               ],
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_flash_loan_amount",
+              inputs: [
+                {
+                  name: "repay",
+                  type: "kapan::interfaces::IGateway::Repay",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -3368,20 +3966,6 @@ const contracts = {
           type: "impl",
           name: "IVesuViewerImpl",
           interface_name: "kapan::gateways::vesu_gateway::IVesuViewer",
-        },
-        {
-          type: "enum",
-          name: "core::bool",
-          variants: [
-            {
-              name: "False",
-              type: "()",
-            },
-            {
-              name: "True",
-              type: "()",
-            },
-          ],
         },
         {
           type: "struct",
@@ -3773,12 +4357,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -3793,6 +4395,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -3819,6 +4469,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -3866,10 +4524,30 @@ const contracts = {
                   name: "instructions",
                   type: "core::array::Span::<kapan::interfaces::IGateway::LendingInstruction>",
                 },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
+                },
               ],
               outputs: [
                 {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
+                },
+              ],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_flash_loan_amount",
+              inputs: [
+                {
+                  name: "repay",
+                  type: "kapan::interfaces::IGateway::Repay",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
                 },
               ],
               state_mutability: "external",
@@ -4402,12 +5080,30 @@ const contracts = {
           ],
         },
         {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
+            },
+          ],
+        },
+        {
           type: "struct",
           name: "kapan::interfaces::IGateway::Repay",
           members: [
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "repay_all",
+              type: "core::bool",
             },
             {
               name: "context",
@@ -4422,6 +5118,54 @@ const contracts = {
             {
               name: "basic",
               type: "kapan::interfaces::IGateway::BasicInstruction",
+            },
+            {
+              name: "withdraw_all",
+              type: "core::bool",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Redeposit",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "kapan::interfaces::IGateway::Reborrow",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "target_instruction_index",
+              type: "core::integer::u32",
+            },
+            {
+              name: "approval_amount",
+              type: "core::integer::u256",
+            },
+            {
+              name: "user",
+              type: "core::starknet::contract_address::ContractAddress",
             },
             {
               name: "context",
@@ -4448,6 +5192,14 @@ const contracts = {
             {
               name: "Withdraw",
               type: "kapan::interfaces::IGateway::Withdraw",
+            },
+            {
+              name: "Redeposit",
+              type: "kapan::interfaces::IGateway::Redeposit",
+            },
+            {
+              name: "Reborrow",
+              type: "kapan::interfaces::IGateway::Reborrow",
             },
           ],
         },
@@ -4534,6 +5286,10 @@ const contracts = {
                 {
                   name: "instructions",
                   type: "core::array::Span::<kapan::gateways::RouterGateway::ProtocolInstructions>",
+                },
+                {
+                  name: "rawSelectors",
+                  type: "core::bool",
                 },
               ],
               outputs: [
