@@ -218,19 +218,22 @@ mod RouterGateway {
 
 
         fn get_flash_loan_amount(ref self: ContractState, instructions: Span<ProtocolInstructions>) -> (ContractAddress, u256) {
-            let first_protocol = instructions.at(0);
-            let first_instruction = (*first_protocol.instructions).at(0);
-            let repay = match first_instruction {
-                LendingInstruction::Repay(repay) => *repay,
-                _ => panic!("bad-instruction-order")
-            };
-
-            let mut amount = repay.basic.amount;
-            if repay.repay_all {
-                let gateway = ILendingInstructionProcessorDispatcher { contract_address: self.gateways.read(*first_protocol.protocol_name) };
-                amount = gateway.get_flash_loan_amount(repay);
-            }
-            (repay.basic.token, amount)
+           let mut flash_loan_amount : u256 = 0;
+           let mut token : ContractAddress = Zero::zero();
+           for protocolInstruction in instructions {
+                for instruction in protocolInstruction.instructions {
+                    if let LendingInstruction::Repay(repay) = instruction {
+                        assert(*repay.basic.amount != 0, 'repay-amount-is-zero');
+                        if *repay.repay_all {
+                            let gateway = ILendingInstructionProcessorDispatcher { contract_address: self.gateways.read(*protocolInstruction.protocol_name) };
+                            return (*repay.basic.token, gateway.get_flash_loan_amount(*repay));
+                        }
+                        flash_loan_amount += *repay.basic.amount;
+                        token = *repay.basic.token;
+                    }
+                };
+           };
+           (token, flash_loan_amount)
         }
 
         fn ensure_user_matches_caller(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
@@ -317,22 +320,57 @@ mod RouterGateway {
             assert(sender == get_contract_address(), 'sender mismatch');
             let mut data = data;
             let mut protocol_instructions: Span<ProtocolInstructions> = Serde::deserialize(ref data).unwrap();
+                  // Collect all repay amounts and calculate total
+            let mut repay_amounts = array![];
+            let mut total_repay_amount = 0;
+            let mut repay_count = 0;
+            
+            // First pass: Collect all repay amounts and count
+            for protocolInstruction in protocol_instructions {
+                for instruction in protocolInstruction.instructions {
+                    if let LendingInstruction::Repay(repay) = instruction {
+                        let repay = *repay;
+                        repay_amounts.append(repay.basic.amount);
+                        total_repay_amount += repay.basic.amount;
+                        repay_count += 1;
+                    }
+                }
+            }
+            
+            // Calculate remaining amount to distribute
+            let remaining_amount = amount - total_repay_amount;
+            assert(remaining_amount >= 0, 'flashloan insufficient');
+            
+            // Second pass: Modify instructions with adjusted amounts
             let mut remadeProtocolInstructions = array![];
+            let mut repay_index = 0;
+            
             for instruction in protocol_instructions {
                 let mut remadeInstructions = array![];
                 for instruction in instruction.instructions {
                     match instruction {
                         LendingInstruction::Repay(repay) => {
                             let repay = *repay;
+                            let mut modified_amount = repay.basic.amount;
+                            
+                            // Add remaining amount to last repay
+                            if repay_index == repay_count - 1 {
+                                modified_amount += remaining_amount;
+                            }
+                            
+                            assert(modified_amount <= amount, 'repay amount exceeds flash loan');
+                            
                             remadeInstructions.append(LendingInstruction::Repay(Repay {
                                 basic: BasicInstruction {
                                     token: repay.basic.token,
-                                    amount: amount,
+                                    amount: modified_amount,
                                     user: repay.basic.user,
                                 },
-                                repay_all: repay.repay_all,
+                                repay_all: false, // Force explicit amount
                                 context: repay.context,
                             }));
+                            
+                            repay_index += 1;
                         },
                         _ => {
                             remadeInstructions.append(*instruction);
@@ -344,6 +382,8 @@ mod RouterGateway {
                     instructions: remadeInstructions.span(),
                 });
             }
+            
+
             self.process_protocol_instructions_internal(remadeProtocolInstructions.span(), false); //no outside transfer, we do it in place
 
             // settle flash loan

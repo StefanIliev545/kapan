@@ -86,7 +86,6 @@ export const NostraProtocolView: FC = () => {
     if (!tokenDecimals) return { tokenToDecimals: {}, tokenToPrices: {} };
     const decimals = tokenDecimals as unknown as bigint[];
     const prices = tokenPrices as unknown as bigint[];
-    console.log(decimals);
     const tokenToDecimals = decimals.reduce(
       (acc, decimals, index) => {
         acc[tokenAddresses[index]] = Number(decimals);
@@ -94,7 +93,7 @@ export const NostraProtocolView: FC = () => {
       },
       {} as Record<string, number>,
     );
-    const tokenToPrices = prices.reduce(
+    const tokenToPrices = prices?.reduce(
       (acc, price, index) => {
         acc[tokenAddresses[index]] = price / 10n ** 10n; // haven't figured out why this works but fuck it.
         return acc;

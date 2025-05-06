@@ -3662,7 +3662,7 @@ const contracts = {
   sepolia: {
     RouterGateway: {
       address:
-        "0xa6f1a4bf02af3a41926a413cdb13cea79d0175bc63f475dad078d4c163cc12",
+        "0xe8e949514dd712ee32978f5821c09646fe8672344f9b3115e8905f67dc011d",
       abi: [
         {
           type: "impl",
@@ -4071,11 +4071,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x6cf5779aabd017ceafbcb9a6440e540cc27bbe9023cfb2e23717658ead18876",
+        "0x403a38f15e3059e11c9612019bb1de305c4e592d69f044fb2f8a08f7d4627e9",
     },
     VesuGateway: {
       address:
-        "0x83060a3f4ee6a48e6a065e154eb68e17079430f35348b54bb7912ab689bf6e",
+        "0x27c2011dd8d09283295a6447353fd723838b5baead5840f6a48fed942ecf4b2",
       abi: [
         {
           type: "impl",
@@ -4753,7 +4753,7 @@ const contracts = {
     },
     NostraGateway: {
       address:
-        "0x493323860e0cf7828fa77f29ee64aa0efdede8d817237f9f17c346fd84352f3",
+        "0x137d44422a03eb927c4ecd63978f71ecf8b450648d162fb24281c5ee1c64e79",
       abi: [
         {
           type: "impl",
@@ -5359,11 +5359,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x2af6a8d4523412f5cf6a914d678837d0f33a1840d0c3bb28da2210bca48f18b",
+        "0x971a79c8eeb8eb33bd746affce4943a226b64f7cdf4fd800e0a237975eb7cc",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x1404e651385e7f128d699fcfbc47d71d88c5b298f939f4496db0cb9635f0496",
+        "0x5191a4890d0cec0880a6a4f5774874280172c8b95a3077613877e1cef81292a",
       abi: [
         {
           type: "impl",
@@ -5481,7 +5481,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x18eaf539cb831732f5b22c60bec986a148bbb59d4e11d21730a346be6b62bb",
+        "0x76ddb80c1b92fd84bf5667b06075013d5493884f5c2ab0d123cd3c9f4ae5c1b",
       abi: [
         {
           type: "impl",

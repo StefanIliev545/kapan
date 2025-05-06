@@ -81,6 +81,9 @@ mod NostraGateway {
             let underlying = deposit.basic.token;
             let amount = deposit.basic.amount;
             let user = deposit.basic.user;
+            if (amount == 0) {
+                return;
+            }
 
             let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
             assert(ibcollateral != Zero::zero(), 'not-token');

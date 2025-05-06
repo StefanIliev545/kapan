@@ -37,7 +37,7 @@ const formatDisplayNumber = (value: string | number) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
   }).format(num);
-};
+}; 
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -150,24 +150,317 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
 
     return filtered;
-  }, [sourceCollaterals, targetCollaterals, preSelectedCollaterals, disableCollateralSelection, fromProtocol, selectedProtocol, position]);
+  }, [
+    sourceCollaterals,
+    targetCollaterals,
+    preSelectedCollaterals,
+    disableCollateralSelection,
+    fromProtocol,
+    selectedProtocol,
+    position,
+  ]);
+
+  const { data: tokenPrices } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "get_asset_prices",
+    args: [[...collateralsForSelector.map(c => c.address), position.tokenAddress]],
+    refetchInterval: 5000,
+    enabled: !!collateralsForSelector.length && isOpen,
+  });
+
+  const { tokenToPrices } = useMemo(() => {
+    if (!tokenPrices) return { tokenToPrices: {} };
+    const prices = tokenPrices as unknown as bigint[];
+    const addresses = [...collateralsForSelector.map(c => c.address), position.tokenAddress];
+    const tokenToPrices = prices.reduce(
+      (acc, price, index) => {
+        acc[addresses[index]] = price / 10n ** 10n;
+        return acc;
+      },
+      {} as Record<string, bigint>,
+    );
+    return { tokenToPrices };
+  }, [tokenPrices, collateralsForSelector, position.tokenAddress]);
 
   // Track loading state for all collaterals
   const isLoadingCollaterals = isLoadingSourceCollaterals || isLoadingTargetCollaterals;
-  if (isOpen) {
-    console.log("positionBalance", position.balance);
-  }
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway) return { fullInstruction: null, authInstruction: null };
 
-    console.log("position.decimals", position.decimals);
-    console.log("amount", amount);
     const tokenDecimals = Number(position.decimals) ?? Number(18); // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
     const lowerProtocolName = fromProtocol.toLowerCase();
     const destProtocolName = selectedProtocol.toLowerCase();
 
+    // Calculate proportions for multiple collaterals
+    if (selectedCollateralsWithAmounts.length > 1) {
+      // Calculate USD values for each collateral using actual token prices from tokenToPrices
+      const collateralUsdValues = selectedCollateralsWithAmounts.map(collateral => {
+        // Convert BigInt amount to a normalized value based on decimals
+        const tokenDecimals = collateral.decimals || 18;
+        const normalizedAmount = Number(formatUnits(collateral.amount, tokenDecimals));
+
+        // Get token price from tokenToPrices
+        const tokenPrice = tokenToPrices[collateral.token.toLowerCase()];
+
+        // Calculate actual USD value using price if available
+        let usdValue = normalizedAmount; // Fallback to normalized amount
+        if (tokenPrice) {
+          // According to the implementation, tokenPrice is already normalized (divided by 10^10)
+          usdValue = normalizedAmount * Number(formatUnits(tokenPrice, 8));
+        }
+
+        return {
+          token: collateral.token,
+          symbol: collateral.symbol,
+          amount: collateral.amount,
+          decimals: tokenDecimals,
+          price: tokenPrice || 0n,
+          usdValue: usdValue,
+        };
+      });
+
+      // Calculate total USD value
+      const totalUsdValue = collateralUsdValues.reduce((sum, collateral) => sum + collateral.usdValue, 0);
+
+      // Store original debt amount
+      const totalDebtAmount = parsedAmount;
+
+      // Calculate proportion for each collateral based on USD values
+      const proportions = collateralUsdValues.map(collateral => {
+        // Calculate proportion with high precision (as basis points - 1/10000)
+        const proportionBps = totalUsdValue > 0 ? Math.floor((collateral.usdValue / totalUsdValue) * 10000) : 0;
+
+        // Calculate debt amount for this collateral based on proportion
+        const debtAmountForCollateral =
+          totalUsdValue > 0 ? (totalDebtAmount * BigInt(proportionBps)) / BigInt(10000) : 0n;
+
+        return {
+          token: collateral.token,
+          symbol: collateral.symbol,
+          proportionBps,
+          proportion: proportionBps / 10000,
+          priceUsd: collateral.price ? Number(formatUnits(collateral.price, 8)) : 0,
+          usdValue: collateral.usdValue,
+          debtAmount: debtAmountForCollateral,
+          debtAmountFormatted: formatUnits(debtAmountForCollateral, tokenDecimals),
+        };
+      });
+
+      // Ensure we allocate 100% of the debt by assigning any remainder to the first collateral
+      const allocatedDebtSum = proportions.reduce((sum, p) => sum + p.debtAmount, 0n);
+      const remainder = parsedAmount - allocatedDebtSum;
+
+      if (remainder > 0 && proportions.length > 0) {
+        proportions[0].debtAmount += remainder;
+        proportions[0].debtAmountFormatted = formatUnits(proportions[0].debtAmount, tokenDecimals);
+      }
+
+      console.log("Collateral USD values:", collateralUsdValues);
+      console.log("Total USD value:", totalUsdValue);
+      console.log("Collateral proportions with USD prices:", proportions);
+      console.log("Total debt amount:", formatUnits(parsedAmount, tokenDecimals));
+      console.log("Sum of allocated debt:", formatUnits(allocatedDebtSum, tokenDecimals));
+      console.log("Remainder added to first collateral:", formatUnits(remainder, tokenDecimals));
+    }
+
+    // Function to generate Vesu instructions with proportional debt allocation
+    const generateVesuInstructions = () => {
+      // Only generate proportional instructions if we have multiple collaterals
+      if (selectedCollateralsWithAmounts.length <= 1) {
+        return null;
+      }
+
+      console.log("Generating Vesu instructions with proportional debt allocation");
+
+      // Calculate USD values and proportions for each collateral
+      const collateralUsdValues = selectedCollateralsWithAmounts.map(collateral => {
+        const tokenDecimals = collateral.decimals || 18;
+        const normalizedAmount = Number(formatUnits(collateral.amount, tokenDecimals));
+        const tokenPrice = tokenToPrices[collateral.token.toLowerCase()];
+
+        let usdValue = normalizedAmount;
+        if (tokenPrice) {
+          usdValue = normalizedAmount * Number(formatUnits(tokenPrice, 8));
+        }
+
+        return {
+          token: collateral.token,
+          amount: collateral.amount,
+          decimals: tokenDecimals,
+          usdValue,
+        };
+      });
+
+      const totalUsdValue = collateralUsdValues.reduce((sum, c) => sum + c.usdValue, 0);
+
+      // Calculate debt allocation based on proportions
+      const debtAllocations = collateralUsdValues.map(collateral => {
+        const proportionBps = totalUsdValue > 0 ? Math.floor((collateral.usdValue / totalUsdValue) * 10000) : 0;
+
+        return {
+          token: collateral.token,
+          proportionBps,
+          debtAmount: totalUsdValue > 0 ? (parsedAmount * BigInt(proportionBps)) / BigInt(10000) : 0n,
+        };
+      });
+
+      // Ensure 100% allocation
+      const totalAllocated = debtAllocations.reduce((sum, a) => sum + a.debtAmount, 0n);
+      const remainder = parsedAmount - totalAllocated;
+
+      if (remainder > 0 && debtAllocations.length > 0) {
+        debtAllocations[0].debtAmount += remainder;
+      }
+
+      // For each collateral and its debt allocation, create redeposit + reborrow instructions
+      const instructions = debtAllocations
+        .map((allocation, index) => {
+          // Skip if no debt allocated
+          if (allocation.debtAmount <= 0n) return [];
+
+          // Find the corresponding collateral from selectedCollateralsWithAmounts
+          const collateral = selectedCollateralsWithAmounts.find(c => c.token === allocation.token);
+          if (!collateral) return [];
+
+          const isCollateralMaxClicked = maxClickedCollaterals[collateral.token] || false;
+          const uppedAmount = isCollateralMaxClicked
+            ? (collateral.amount * BigInt(101)) / BigInt(100)
+            : collateral.amount;
+
+          console.log("allocation.debtAmount", allocation.debtAmount);
+          // Create context with paired tokens for Vesu
+          const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+            0n,
+            BigInt(position.tokenAddress),
+          ]);
+          const contextReborrow = new CairoOption<bigint[]>(CairoOptionVariant.Some, [0n, BigInt(collateral.token)]);
+          const repayAll = isAmountMaxClicked && index === debtAllocations.length - 1;
+          console.log("repayAll index", index, repayAll);
+          const nostraInstructions = [
+            new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: undefined,
+              Repay: {
+                basic: {
+                  token: position.tokenAddress,
+                  amount: uint256.bnToUint256(allocation.debtAmount),
+                  user: userAddress,
+                },
+                repay_all: repayAll,
+                context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+              },
+              Withdraw: undefined,
+              Redeposit: undefined,
+              Reborrow: undefined,
+            }),
+            new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: undefined,
+              Repay: undefined,
+              Withdraw: {
+                basic: {
+                  token: collateral.token,
+                  amount: uint256.bnToUint256(uppedAmount),
+                  user: userAddress,
+                },
+                withdraw_all: isCollateralMaxClicked,
+                context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+              },
+              Redeposit: undefined,
+              Reborrow: undefined,
+            }),
+          ];
+
+          const vesuInstructions = [
+            new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: undefined,
+              Repay: undefined,
+              Withdraw: undefined,
+              Redeposit: {
+                token: collateral.token,
+                target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
+                user: userAddress,
+                context: contextRedeposit,
+              },
+              Reborrow: undefined,
+            }),
+            new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: undefined,
+              Repay: undefined,
+              Withdraw: undefined,
+              Redeposit: undefined,
+              Reborrow: {
+                token: position.tokenAddress,
+                target_instruction_index: 0, // Point to repay instruction
+                approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
+                user: userAddress,
+                context: contextReborrow,
+              },
+            }),
+          ];
+          return [
+            {
+              protocol_name: lowerProtocolName,
+              instructions: nostraInstructions,
+            },
+            {
+              protocol_name: destProtocolName,
+              instructions: vesuInstructions,
+            },
+          ];
+        })
+        .flat();
+
+      console.log(
+        `Generated ${instructions.length} instructions based on collateral proportions ${instructions
+          .map(i =>
+            i.instructions.map(j => {
+              const repay_all = j.unwrap().repay_all;
+              if (repay_all != undefined) {
+                return repay_all;
+              }
+              return "x";
+            }),
+          )
+          .join(", ")}`,
+      );
+
+      // Compile the instructions
+      const fullInstructionData = CallData.compile({
+        instructions: instructions,
+      });
+
+      const authInstructionData = CallData.compile({
+        instructions: instructions.map(protocolInstruction => {
+            const filteredInstructions = protocolInstruction.instructions.filter(instruction => {
+                if (instruction.activeVariant() === "Withdraw" || instruction.activeVariant() === "Reborrow") {
+                    return true;
+                }
+                return false;
+            });
+            return { protocol_name: protocolInstruction.protocol_name, instructions: filteredInstructions }
+        }),
+        rawSelectors: false,
+      });
+
+      return {
+        fullInstruction: fullInstructionData,
+        authInstruction: authInstructionData,
+      };
+    };
+
+    // If target protocol is Vesu and we have multiple collaterals, use proportional allocation
+    if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 1) {
+      return (
+        generateVesuInstructions() || { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] } }
+      );
+    }
+
+    // Otherwise, use the original approach for other protocols or single collateral
     let repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
@@ -312,6 +605,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     routerGateway,
     selectedCollateralsWithAmounts,
     maxClickedCollaterals,
+    tokenToPrices,
   ]);
 
   // Get authorizations for the instructions
@@ -426,10 +720,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         setAmount("0");
         return;
       }
-      
+
       const formattedMaxValue = formatUnits(position.balance, position.decimals);
       const maxValue = parseFloat(formattedMaxValue);
-      
+
       if (!isNaN(maxValue) && isFinite(maxValue)) {
         // Ensure proper string formatting based on decimals
         setAmount(formattedMaxValue);
@@ -497,7 +791,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     try {
       if (!position.balance) return "0.00";
       const formattedValue = formatUnits(position.balance, position.decimals);
-      return formatDisplayNumber(parseFloat(formattedValue)); 
+      return formatDisplayNumber(parseFloat(formattedValue));
     } catch (error) {
       console.error("Error formatting balance:", error);
       return "0.00";
