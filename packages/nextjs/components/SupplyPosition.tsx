@@ -12,7 +12,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString } from "~~/utils/protocols";
-
+import { useAccount as useAccountStark } from "~~/hooks/useAccount";
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
@@ -40,7 +40,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   // Get wallet connection status
   const { address: userAddress } = useAccount();
-  const isWalletConnected = !!userAddress;
+  const { address: userAddressStark } = useAccountStark();
+  const isWalletConnected = networkType === "evm" ? !!userAddress : !!userAddressStark;
 
   // Check if position has a balance
   const hasBalance = tokenBalance > 0;

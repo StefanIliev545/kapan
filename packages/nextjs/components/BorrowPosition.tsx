@@ -1,18 +1,20 @@
 import React, { FC, useState } from "react";
 import Image from "next/image";
+import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
-import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
-import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { MovePositionModal } from "./modals/MovePositionModal";
-import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModal } from "./modals/RepayModal";
+import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
+import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
+import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { useAccount } from "wagmi";
+import { useAccount as useAccountStark } from "~~/hooks/useAccount";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { FiatBalance } from "./FiatBalance";
 import { feltToString } from "~~/utils/protocols";
+
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
   protocolName: string;
@@ -38,10 +40,11 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Get wallet connection status
   const { address: userAddress } = useAccount();
-  const isWalletConnected = !!userAddress;
+  const { address: userAddressStark } = useAccountStark();
+  const isWalletConnected = networkType === "evm" ? !!userAddress : !!userAddressStark;
 
   // Check if position has a balance (debt)
   const hasBalance = tokenBalance > 0;
@@ -59,7 +62,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   let optimalRateDisplay = 0;
   if (optimalRateData) {
     let proto;
-    let rate; 
+    let rate;
     if (networkType === "starknet") {
       proto = feltToString(BigInt(optimalRateData?.[0]?.toString() || "0"));
       rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
@@ -90,7 +93,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest('.dropdown')) {
+    if ((e.target as HTMLElement).closest(".dropdown")) {
       return;
     }
     setIsExpanded(prev => !prev);
@@ -98,17 +101,17 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
-    ? React.cloneElement(collateralView as React.ReactElement, { 
+    ? React.cloneElement(collateralView as React.ReactElement, {
         isVisible: isExpanded,
-        initialShowAll: false
+        initialShowAll: false,
       })
     : null;
 
   return (
     <>
       {/* Outer container - clickable to expand/collapse */}
-      <div 
-        className={`w-full p-3 rounded-md ${isExpanded ? 'bg-base-300' : 'bg-base-200'} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
+      <div
+        className={`w-full p-3 rounded-md ${isExpanded ? "bg-base-300" : "bg-base-200"} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -118,7 +121,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
             <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
+            <div
+              className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
+              onClick={e => e.stopPropagation()}
+            >
               <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
                 <FiInfo
                   className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
@@ -148,10 +154,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                       <>
                         <p className="text-base-content/70">Collateral Value:</p>
                         <p>
-                          <FiatBalance 
+                          <FiatBalance
                             tokenAddress={tokenAddress}
-                            rawValue={BigInt(Math.round(collateralValue * 10**8))}
-                            price={BigInt(10**8)}
+                            rawValue={BigInt(Math.round(collateralValue * 10 ** 8))}
+                            price={BigInt(10 ** 8)}
                             decimals={8}
                             tokenSymbol={name}
                             isNegative={false}
@@ -170,21 +176,19 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
               <div className="text-sm font-medium h-6 line-clamp-1">
-                <FiatBalance 
+                <FiatBalance
                   tokenAddress={tokenAddress}
-                  rawValue={typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0)} 
+                  rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
                   price={tokenPrice}
                   decimals={tokenDecimals}
                   tokenSymbol={name}
-                  isNegative={true} 
+                  isNegative={true}
                   className="text-red-500"
                 />
               </div>
             </div>
             <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">
-                APR
-              </div>
+              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
                 {currentRate.toFixed(2)}%
               </div>
@@ -198,8 +202,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 <Image
                   src={getProtocolLogo(optimalProtocol)}
                   alt={optimalProtocol}
-                  width={optimalProtocol == "vesu" ? 35: 16}
-                  height={optimalProtocol == "vesu" ? 35: 16}
+                  width={optimalProtocol == "vesu" ? 35 : 16}
+                  height={optimalProtocol == "vesu" ? 35 : 16}
                   className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
@@ -208,7 +212,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
           {/* Expand Indicator */}
           <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? 'bg-primary/20' : 'bg-base-300/50'} transition-colors duration-200`}>
+            <div
+              className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"} transition-colors duration-200`}
+            >
               {isExpanded ? (
                 <FiChevronUp className="w-4 h-4 text-primary" />
               ) : (
