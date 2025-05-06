@@ -99,7 +99,7 @@ export const NostraProtocolView: FC = () => {
         return acc;
       },
       {} as Record<string, bigint>,
-    );
+    ) ?? {};
     return { tokenToDecimals, tokenToPrices };
   }, [tokenDecimals, tokenAddresses, tokenPrices]);
 
@@ -135,7 +135,7 @@ export const NostraProtocolView: FC = () => {
         currentRate: supplyAPY,
         tokenAddress: underlying,
         tokenDecimals: tokenToDecimals[underlying],
-        tokenPrice: tokenToPrices[underlying],
+        tokenPrice: tokenToPrices[underlying] ?? 0,
       });
 
       // Add borrow position
@@ -147,7 +147,7 @@ export const NostraProtocolView: FC = () => {
         currentRate: borrowAPR,
         tokenAddress: underlying,
         tokenDecimals: tokenToDecimals[underlying],
-        tokenPrice: tokenToPrices[underlying],
+        tokenPrice: tokenToPrices[underlying] ?? 0,
       });
     });
 
