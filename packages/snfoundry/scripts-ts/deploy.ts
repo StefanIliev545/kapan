@@ -236,32 +236,32 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
   const calls = [
     {
       contractAddress: addresses.nostraGatewayAddress,
-      entrypoint: "add_supported_asset", 
+      entrypoint: "add_supported_asset",
       calldata: [
-        "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
-        "0x06d5b528e5569e6e93b8e51f81b56dcc7b27a859bfa2733f6c5ab0e9a72e9776", // ETH debt
-        "0x01f1bb2a65318e1439608795937a667a65f746a7e55206a2b7b9ae9942e3312c", // ETH Ncollateral
-        "0x057b6c3a85f21303c07a7c71ecf0d0a021c1c1e557a7333b879ad45015fd8a11", // ETH ibcollateral
+        "0x01f7153b9b26d13a800a96f117fcdf0ee76c51879414e70dbb267368bd23d008", // ETH
+        "0x03b03b1fa4e67e71c327160863749589f4b86d2ad7633e20ed27d9cc9f9d4ff7", // ETH debt
+        "0x0168fa06192fab62dae5c363f4f33d43770933389ef7508c298df5b98f6b22a5", // ETH Ncollateral
+        "0x05a2e5c763496078125a9d23d1538d0d0ed63190e29eff303888a976709ee093", // ETH ibcollateral
       ],
     },
     {
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
-        "0x715649d4c493ca350743e43915b88d2e6838b1c78ddc23d6d9385446b9d6844", // USDC
-        "0x068a22dfc5940a44c1cf191377fa6acbd029c28bfc339b554e6e6cd3d474299f", // USDC debt
-        "0x04a5c03c80657f9d4e181eb2b2dd46215b7688266ef1af7236649c23f4b2811d", // USDC Ncollateral
-        "0x079b895e7ffd0f3957d2b8312589970ed9f3bd2bcd69ddc9da63fb62ad0b90d1", // USDC ibcollateral
+        "0x03a2d4f7966b72a096fb3df03f0f6398cc212ea2e85a70c77d49dc16f0b33a52", // USDC
+        "0x071d419001168d9e3812a7a909a74ede4c1fad3fe731b6f0e8ff9cc6cb431bb9", // USDC debt
+        "0x0743295f7ef1577c257a206ebe149cc75ad903f6199152e57de1fb1213f8cbb3", // USDC Ncollateral
+        "0x0620ad68e560408144f9fc336c799d73212a4361ca4d32813ba9f441110e446b", // USDC ibcollateral
       ],
     },
     {
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
-        "0xabbd6f1e590eb83addd87ba5ac27960d859b1f17d11a3c1cd6a0006704b141", // WBTC
-        "0x051c62791ca5d8b5846a6514a28d552f2a245aa1d227cf6a7a01aeb4e4486d18", // WBTC debt
-        "0x03546b705fcaf88c6fd21e148a470b3e0c51999435392e3805da36a7f95be8ef", // WBTC Ncollateral
-        "0x02b37449701c0c8047010cb7dae019164f2e2d7c18ec193ea6ce60e1be448853", // WBTC ibcollateral
+        "0x051847124669a82b885fa3b68f8a807dd85a6d58adc00ba45cda70b42e9f500e", // WBTC
+        "0x02dece90d7518aa4a58aa1f6ec600750d4a03d2304ef06bf809927d25c32354a", // WBTC debt
+        "0x0295a98cca46b3413c900d919edc77982c8b7e4bebee8d7a5efc21383c6dd049", // WBTC Ncollateral
+        "0x0138fe69353f77e9a3f8d855ec7a03bc4c5c141fe8e2058f16b54a7b33ceb750", // WBTC ibcollateral
       ],
     },
     {
