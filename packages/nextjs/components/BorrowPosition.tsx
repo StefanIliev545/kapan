@@ -350,7 +350,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               balance: tokenBalance ?? 0n,
               type: "borrow",
               tokenAddress,
-              decimals: tokenDecimals,
+              decimals: tokenDecimals ?? 18,
             }}
           />
         </>
