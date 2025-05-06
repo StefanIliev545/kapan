@@ -201,6 +201,10 @@ const contracts = {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
           ],
         },
         {
@@ -835,6 +839,10 @@ const contracts = {
             {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
             },
           ],
         },
@@ -1559,6 +1567,10 @@ const contracts = {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
           ],
         },
         {
@@ -1969,6 +1981,10 @@ const contracts = {
             {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
             },
           ],
         },
@@ -2402,6 +2418,10 @@ const contracts = {
             {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
             },
           ],
         },
@@ -3038,6 +3058,10 @@ const contracts = {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
             },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
+            },
           ],
         },
         {
@@ -3606,7 +3630,7 @@ const contracts = {
   sepolia: {
     RouterGateway: {
       address:
-        "0x48d37de86ad04c078c692af2fd4587b1174355a1cdfb7820a88723ba35c399f",
+        "0x7e6f3398474c6a4f2609bc57ec2139df865106312030b1f1c98fc7820760422",
       abi: [
         {
           type: "impl",
@@ -3762,6 +3786,10 @@ const contracts = {
             {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
             },
           ],
         },
@@ -4011,11 +4039,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x739f27b9c8e58f02837c72c05975d44f1455cc7a82de0ab5a0f5dce4a3d2781",
+        "0x6cf5779aabd017ceafbcb9a6440e540cc27bbe9023cfb2e23717658ead18876",
     },
     VesuGateway: {
       address:
-        "0x71632ef31c3360f14562371323b7d30088f60d81921c9e10410d7cb6c5a8eb8",
+        "0x2b17bb2e022a1a0d9ecaa905cdd993b009a0f7583c528813a1e54f162e1cb34",
       abi: [
         {
           type: "impl",
@@ -4195,6 +4223,10 @@ const contracts = {
             {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
             },
           ],
         },
@@ -4669,11 +4701,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x1d8820bb52619971bb54e26ae00af4ed7520dc5f0ee45972f8ead16e2e6754",
+        "0x63dac6d2651c3a5f492dc105f3a277581955916fec1096dd5e50b69b5289f30",
     },
     NostraGateway: {
       address:
-        "0x79993cdb7ef52766ebf67a001771d785c8c76d993f14be6665372bf189402fc",
+        "0x6009d1ddb207665178e051f3fed7c88b4d4b795183e57862bd7991209d8b474",
       abi: [
         {
           type: "impl",
@@ -4830,6 +4862,10 @@ const contracts = {
             {
               name: "user",
               type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "context",
+              type: "core::option::Option::<core::array::Span::<core::felt252>>",
             },
           ],
         },
@@ -5275,11 +5311,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0xe396bdb8287536c9fdcbef1ad95c712863d26084ca23f0a1bc968146dc0695",
+        "0x2af6a8d4523412f5cf6a914d678837d0f33a1840d0c3bb28da2210bca48f18b",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x54a64bd21cd8e12f7b3a257c52d74758f3415803075e75ee8d712d650b7879c",
+        "0x79e18c6819e27ba7153187396b8954727ebb9d7f2a2053c0f2cb3c6f01760d6",
       abi: [
         {
           type: "impl",
@@ -5394,6 +5430,67 @@ const contracts = {
       ],
       classHash:
         "0x782fd31b8dc3aa7d53435712ffee7692704e3b720b5084b556eff8f5475e04d",
+    },
+    UiHelper: {
+      address:
+        "0x48c608f6dc603162b52a99467b3e8219debae04357952fb39f62151f2b96876",
+      abi: [
+        {
+          type: "impl",
+          name: "ImplUIHelper",
+          interface_name: "kapan::utils::ui_helper::IUIHelper",
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<core::starknet::contract_address::ContractAddress>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::starknet::contract_address::ContractAddress>",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<core::integer::u8>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::integer::u8>",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "kapan::utils::ui_helper::IUIHelper",
+          items: [
+            {
+              type: "function",
+              name: "get_token_decimals",
+              inputs: [
+                {
+                  name: "token_address",
+                  type: "core::array::Span::<core::starknet::contract_address::ContractAddress>",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Span::<core::integer::u8>",
+                },
+              ],
+              state_mutability: "view",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "kapan::utils::ui_helper::UiHelper::Event",
+          kind: "enum",
+          variants: [],
+        },
+      ],
+      classHash:
+        "0x79be5f320d999c2bda132370c2d539702f180709f47fe1ce45d83aa6a73ef3e",
     },
   },
 } as const satisfies SNContractsType;

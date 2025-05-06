@@ -277,21 +277,6 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       </div>
 
       {/* Modals */}
-      <MoveSupplyModal
-        isOpen={isMoveModalOpen}
-        onClose={() => setIsMoveModalOpen(false)}
-        token={{
-          name,
-          icon,
-          rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
-          currentRate,
-          address: tokenAddress,
-          decimals: tokenDecimals,
-          price: tokenPrice,
-        }}
-        fromProtocol={protocolName}
-      />
-
       {networkType === "starknet" ? (
         <>
           <DepositModalStark
@@ -313,18 +298,41 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               icon,
               address: tokenAddress,
               currentRate,
+              protocolAmount: tokenBalance,
             }}
             protocolName={protocolName}
           />
         </>
       ) : (
-        <DepositModal
-          isOpen={isDepositModalOpen}
-          onClose={() => setIsDepositModalOpen(false)}
-          token={{ name, icon, currentRate, address: tokenAddress }}
-          protocolName={protocolName}
-        />
+        <>
+          <DepositModal
+            isOpen={isDepositModalOpen}
+            onClose={() => setIsDepositModalOpen(false)}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+            }}
+            protocolName={protocolName}
+          />
+        </>
       )}
+
+      <MoveSupplyModal
+        isOpen={isMoveModalOpen}
+        onClose={() => setIsMoveModalOpen(false)}
+        token={{
+          name,
+          icon,
+          address: tokenAddress,
+          currentRate,
+          rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
+          decimals: tokenDecimals,
+          price: tokenPrice,
+        }}
+        fromProtocol={protocolName}
+      />
     </>
   );
 };

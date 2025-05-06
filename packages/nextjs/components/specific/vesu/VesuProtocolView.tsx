@@ -5,18 +5,18 @@ import { useAccount } from "@starknet-react/core";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import {
-  YEAR_IN_SECONDS,
+  PositionData,
   SCALE,
+  TokenMetadata,
+  YEAR_IN_SECONDS,
   feltToString,
+  formatPrice,
+  formatRate,
+  formatTokenAmount,
+  formatUtilization,
   toAPR,
   toAPY,
   toAnnualRates,
-  formatRate,
-  formatTokenAmount,
-  formatPrice,
-  formatUtilization,
-  TokenMetadata,
-  PositionData,
 } from "~~/utils/protocols";
 
 type ContractResponse = {
@@ -59,7 +59,7 @@ export const VesuProtocolView: FC = () => {
     functionName: "get_all_positions",
     args: [userAddress || "0x0"], // Use zero address if not connected
     watch: true,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   // Memoize the market rows to prevent unnecessary re-renders
@@ -192,9 +192,7 @@ export const VesuProtocolView: FC = () => {
                         // Calculate debt value
                         let debtValue = 0;
                         if (position.props.nominalDebt !== "0" && debtMetadata) {
-                          const debtAmtNum = parseFloat(
-                            formatTokenAmount(position.props.nominalDebt, 18),
-                          );
+                          const debtAmtNum = parseFloat(formatTokenAmount(position.props.nominalDebt, 18));
                           const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata.price.value.toString(), 18));
                           debtValue = debtAmtNum * debtPriceNum;
                         }

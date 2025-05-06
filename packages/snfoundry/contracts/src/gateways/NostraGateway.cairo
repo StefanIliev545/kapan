@@ -96,7 +96,7 @@ mod NostraGateway {
         fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
             let withdraw = *withdraw;
             let underlying = withdraw.basic.token;
-            let amount = withdraw.basic.amount;
+            let mut amount = withdraw.basic.amount;
             let user = withdraw.basic.user;
 
             self.assert_router_or_user(user);
@@ -104,8 +104,13 @@ mod NostraGateway {
             let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
             assert(ibcollateral != Zero::zero(), 'not-token');
 
+            if withdraw.withdraw_all {
+                let collateralERC20 = IERC20Dispatcher { contract_address: ibcollateral };
+                amount = collateralERC20.balance_of(user);
+            }
+
             let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
-            collateral.transfer_from(withdraw.basic.user, get_contract_address(), amount);
+            collateral.transfer_from(user, get_contract_address(), amount);
             collateral.burn(get_contract_address(), get_caller_address(), amount);
         }
 
@@ -135,11 +140,16 @@ mod NostraGateway {
         fn repay(ref self: ContractState, repay: @Repay) {
             let repay = *repay;
             let underlying = repay.basic.token;
-            let amount = repay.basic.amount;
+            let mut amount = repay.basic.amount;
             let user = repay.basic.user;
 
             let debt = self.underlying_to_ndebt.read(underlying);
             assert(debt != Zero::zero(), 'not-token');
+
+            if repay.repay_all {
+                let debt_token_erc20 = IERC20Dispatcher { contract_address: debt };
+                amount = debt_token_erc20.balance_of(user);
+            }
 
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
             underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount);

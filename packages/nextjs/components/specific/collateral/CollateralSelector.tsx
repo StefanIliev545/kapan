@@ -203,6 +203,7 @@ interface CollateralSelectorProps {
   selectedProtocol?: string;
   marketToken: string;
   onCollateralSelectionChange: (collaterals: CollateralWithAmount[]) => void;
+  onMaxClick?: (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => void;
 }
 
 export const CollateralSelector: FC<CollateralSelectorProps> = ({
@@ -211,6 +212,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   selectedProtocol,
   marketToken,
   onCollateralSelectionChange,
+  onMaxClick,
 }) => {
   // Store selected collaterals with amounts
   const [selectedCollaterals, setSelectedCollaterals] = useState<CollateralWithAmount[]>([]);
@@ -398,16 +400,25 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
     });
   };
 
-  // Handle setting max amount for a collateral
+  // Modify the handleSetMax function to call onMaxClick when provided
   const handleSetMax = (token: string) => {
-    setSelectedCollaterals(prev => {
-      return prev.map(c => {
-        if (c.token === token) {
-          return { ...c, amount: c.maxAmount };
-        }
-        return c;
-      });
-    });
+    const selected = selectedCollaterals.find(c => c.token === token);
+    if (selected) {
+      const maxAmount = selected.maxAmount;
+      const formattedMaxAmount = formatUnits(maxAmount, selected.decimals);
+      
+      // Update local state
+      const updated = selectedCollaterals.map(c =>
+        c.token === token ? { ...c, amount: maxAmount, inputValue: formattedMaxAmount } : c
+      );
+      setSelectedCollaterals(updated);
+      onCollateralSelectionChange(updated);
+      
+      // Call the onMaxClick handler if provided
+      if (onMaxClick) {
+        onMaxClick(token, maxAmount, formattedMaxAmount);
+      }
+    }
   };
 
   // Handle removing a collateral from the selected list

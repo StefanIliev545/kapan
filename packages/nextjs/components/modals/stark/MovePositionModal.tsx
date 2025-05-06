@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useAccount } from "@starknet-react/core";
 import { useReadContract } from "@starknet-react/core";
@@ -48,9 +48,10 @@ interface MovePositionModalProps {
   fromProtocol: string;
   position: {
     name: string;
-    balance: number; // USD value (display only)
+    balance: bigint; // USD value (display only)
     type: "supply" | "borrow";
     tokenAddress: string;
+    decimals: number; // Add decimals for proper amount parsing
   };
   preSelectedCollaterals?: CollateralWithAmount[];
   disableCollateralSelection?: boolean;
@@ -86,9 +87,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
+  const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
     preSelectedCollaterals || [],
   );
+  // Track which collaterals have had MAX clicked
+  const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -125,8 +129,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       }));
     }
 
-    // Otherwise use filtered source collaterals
-    const filtered = sourceCollaterals.filter(c => c.balance > 0);
+    // Otherwise use filtered source collaterals - removing any with zero balance
+    let filtered = sourceCollaterals.filter(c => c.balance > 0);
+
+    // When moving from Nostra to Vesu, remove the debt token from available collaterals
+    // Vesu doesn't allow the same token to be used as both debt and collateral in a pair
+    if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && position.type === "borrow") {
+      filtered = filtered.filter(c => c.address.toLowerCase() !== position.tokenAddress.toLowerCase());
+    }
 
     // Check which collaterals are supported by the target protocol
     if (targetCollaterals.length > 0) {
@@ -140,16 +150,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
 
     return filtered;
-  }, [sourceCollaterals, targetCollaterals, preSelectedCollaterals, disableCollateralSelection, fromProtocol]);
+  }, [sourceCollaterals, targetCollaterals, preSelectedCollaterals, disableCollateralSelection, fromProtocol, selectedProtocol, position]);
 
   // Track loading state for all collaterals
   const isLoadingCollaterals = isLoadingSourceCollaterals || isLoadingTargetCollaterals;
-
+  if (isOpen) {
+    console.log("positionBalance", position.balance);
+  }
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway) return { fullInstruction: null, authInstruction: null };
 
-    const parsedAmount = parseUnits(amount, 18); // Assuming 18 decimals for StarkNet tokens
+    console.log("position.decimals", position.decimals);
+    console.log("amount", amount);
+    const tokenDecimals = Number(position.decimals) ?? Number(18); // Use position decimals if available, otherwise default to 18
+    const parsedAmount = parseUnits(amount, tokenDecimals);
     const lowerProtocolName = fromProtocol.toLowerCase();
     const destProtocolName = selectedProtocol.toLowerCase();
 
@@ -167,13 +182,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
 
     let borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+    let depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         0n,
         BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
+      depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+        0n,
+        BigInt(position.tokenAddress),
+      ]);
     }
-    console.log("repayAmount", parsedAmount);
+
     const repayInstruction = new CairoCustomEnum({
       Deposit: undefined,
       Borrow: undefined,
@@ -183,7 +204,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           amount: uint256.bnToUint256(parsedAmount),
           user: userAddress,
         },
-        repay_all: true,
+        repay_all: isAmountMaxClicked,
         context: repayInstructionContext,
       },
       Withdraw: undefined,
@@ -193,7 +214,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     // Auth instructions only need withdraw and borrow
     const withdrawInstructions = selectedCollateralsWithAmounts.map(collateral => {
-      const amount = uint256.bnToUint256(collateral.amount);
+      // Check if MAX was clicked for this collateral
+      const isCollateralMaxClicked = maxClickedCollaterals[collateral.token] || false;
+      // Add 1% buffer if MAX was clicked for this collateral
+      const uppedAmount = isCollateralMaxClicked ? (collateral.amount * BigInt(101)) / BigInt(100) : collateral.amount;
+      const amount = uint256.bnToUint256(uppedAmount);
+
       return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
@@ -204,7 +230,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             amount: amount,
             user: userAddress,
           },
-          withdraw_all: false,
+          withdraw_all: isCollateralMaxClicked,
           context: withdrawInstructionContext,
         },
         Redeposit: undefined,
@@ -222,6 +248,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           token: collateral.token,
           target_instruction_index: 1 + index,
           user: userAddress,
+          context: depositInstructionContext,
         },
         Reborrow: undefined,
       });
@@ -275,7 +302,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
     };
-  }, [amount, userAddress, fromProtocol, selectedProtocol, position, routerGateway, selectedCollateralsWithAmounts]);
+  }, [
+    amount,
+    isAmountMaxClicked,
+    userAddress,
+    fromProtocol,
+    selectedProtocol,
+    position,
+    routerGateway,
+    selectedCollateralsWithAmounts,
+    maxClickedCollaterals,
+  ]);
 
   // Get authorizations for the instructions
 
@@ -318,7 +355,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
-  // Reset the state when the modal is closed
+  // Reset the modal state when opening/closing
   useEffect(() => {
     if (!isOpen) {
       setAmount("");
@@ -326,8 +363,86 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setStep("idle");
       setLoading(false);
       setSelectedCollateralsWithAmounts([]);
+      setMaxClickedCollaterals({});
+      setIsAmountMaxClicked(false);
     }
   }, [isOpen]);
+
+  // Initialize selected collaterals when preselected ones are provided
+  useEffect(() => {
+    if (isOpen && preSelectedCollaterals && preSelectedCollaterals.length > 0) {
+      setSelectedCollateralsWithAmounts(preSelectedCollaterals);
+    }
+  }, [isOpen, preSelectedCollaterals]);
+
+  // Handler for collateral selection and amount changes - wrap in useCallback
+  const handleCollateralSelectionChange = useCallback((collaterals: CollateralWithAmount[]) => {
+    // Update the selected collaterals
+    setSelectedCollateralsWithAmounts(collaterals);
+
+    // When collateral selection changes, reset MAX clicked states for any removed collaterals
+    setMaxClickedCollaterals(prevState => {
+      const updatedMaxClicked = { ...prevState };
+      const newTokens = new Set(collaterals.map(c => c.token));
+
+      // Remove entries for tokens that are no longer selected
+      Object.keys(updatedMaxClicked).forEach(token => {
+        if (!newTokens.has(token)) {
+          delete updatedMaxClicked[token];
+        }
+      });
+
+      return updatedMaxClicked;
+    });
+  }, []);
+
+  // Handle MAX click for a specific collateral - wrap in useCallback
+  const handleCollateralMaxClick = useCallback(
+    (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => {
+      // Update the collateral amount to max
+      setSelectedCollateralsWithAmounts(prev =>
+        prev.map(c => (c.token === collateralToken ? { ...c, amount: maxAmount, inputValue: formattedMaxAmount } : c)),
+      );
+
+      // Mark this collateral as having MAX clicked
+      setMaxClickedCollaterals(prev => ({
+        ...prev,
+        [collateralToken]: true,
+      }));
+    },
+    [],
+  );
+
+  // Add this new useCallback for amount handling
+  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmount(e.target.value);
+    setIsAmountMaxClicked(false); // Reset MAX state when value is manually changed
+  }, []);
+
+  const handleMaxClick = useCallback(() => {
+    try {
+      // Convert BigInt to string for formatUnits
+      if (!position.balance) {
+        setAmount("0");
+        return;
+      }
+      
+      const formattedMaxValue = formatUnits(position.balance, position.decimals);
+      const maxValue = parseFloat(formattedMaxValue);
+      
+      if (!isNaN(maxValue) && isFinite(maxValue)) {
+        // Ensure proper string formatting based on decimals
+        setAmount(formattedMaxValue);
+        setIsAmountMaxClicked(true); // Track that MAX was clicked
+      } else {
+        setAmount("0");
+        console.error("Invalid position balance:", position.balance);
+      }
+    } catch (error) {
+      console.error("Error setting max amount:", error);
+      setAmount("0");
+    }
+  }, [position.balance, position.decimals]);
 
   const handleMovePosition = async () => {
     try {
@@ -338,8 +453,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
       // Execute the transaction
       const tx = await sendAsync();
-      console.log("Move position tx sent:", tx);
-      console.log("Move position tx confirmed");
 
       setStep("done");
       // Close modal after a short delay on success
@@ -354,7 +467,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   };
 
   // Get action button text based on current step
-  const getActionButtonText = () => {
+  const actionButtonText = useMemo(() => {
     if (loading) {
       switch (step) {
         case "executing":
@@ -369,20 +482,27 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
 
     return "Move Position";
-  };
+  }, [loading, step]);
 
   // Get action button class based on current step
-  const getActionButtonClass = () => {
+  const actionButtonClass = useMemo(() => {
     if (step === "done") {
       return "btn-success";
     }
     return "btn-primary";
-  };
+  }, [step]);
 
-  // Handler for collateral selection and amount changes
-  const handleCollateralSelectionChange = (collaterals: CollateralWithAmount[]) => {
-    setSelectedCollateralsWithAmounts(collaterals);
-  };
+  // Helper function to safely format the balance
+  const getFormattedBalance = useMemo(() => {
+    try {
+      if (!position.balance) return "0.00";
+      const formattedValue = formatUnits(position.balance, position.decimals);
+      return formatDisplayNumber(parseFloat(formattedValue)); 
+    } catch (error) {
+      console.error("Error formatting balance:", error);
+      return "0.00";
+    }
+  }, [position.balance, position.decimals]);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -533,7 +653,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
                 <span className="text-base-content/70">Available:</span>
                 <span className="font-medium ml-1">
-                  {formatDisplayNumber(Math.abs(position.balance))} {position.name}
+                  {getFormattedBalance} {position.name}
                 </span>
               </div>
             </div>
@@ -543,20 +663,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 className="input input-bordered w-full pr-20 h-10 text-base focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 placeholder="0.00"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={handleAmountChange}
                 disabled={loading || step !== "idle"}
               />
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-xs btn-outline h-7"
-                onClick={() => {
-                  const maxValue = Math.abs(position.balance);
-                  if (!isNaN(maxValue) && isFinite(maxValue)) {
-                    setAmount(maxValue.toString());
-                  } else {
-                    setAmount("0");
-                    console.error("Invalid position balance:", position.balance);
-                  }
-                }}
+                onClick={handleMaxClick}
                 disabled={loading || step !== "idle"}
               >
                 MAX
@@ -579,6 +691,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   selectedProtocol={selectedProtocol}
                   onCollateralSelectionChange={handleCollateralSelectionChange}
                   marketToken={position.tokenAddress}
+                  onMaxClick={handleCollateralMaxClick}
                 />
 
                 {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
@@ -607,7 +720,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         {/* Button positioned at the bottom of the modal, outside the scrollable area */}
         <div className="p-4 border-t border-base-200 bg-base-100">
           <button
-            className={`btn ${getActionButtonClass()} btn-md w-full h-12 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
+            className={`btn ${actionButtonClass} btn-md w-full h-12 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
             onClick={handleMovePosition}
             disabled={
               loading ||
@@ -618,7 +731,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             }
           >
             {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-            {getActionButtonText()}
+            {actionButtonText}
             {!loading &&
               step === "idle" &&
               (position.type === "supply" ? (

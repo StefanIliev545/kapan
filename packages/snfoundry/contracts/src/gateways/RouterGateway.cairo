@@ -1,9 +1,8 @@
 use core::array::{Array, Span};
 use core::bool;
 use core::traits::Into;
-use starknet::{ContractAddress, get_caller_address};
+use starknet::{ContractAddress};
 use crate::interfaces::IGateway::{
-    ILendingInstructionProcessor, 
     LendingInstruction,
     Deposit, 
     Withdraw, 
@@ -48,6 +47,8 @@ mod RouterGateway {
         GatewayAdded: GatewayAdded,
     }
 
+    
+
     #[derive(Drop, starknet::Event)]
     struct GatewayAdded {
         protocol_name: felt252,
@@ -91,7 +92,7 @@ mod RouterGateway {
                                 amount: *balanceDiffs.at(*redeposit.target_instruction_index),
                                 user: *redeposit.user,
                             },
-                            context: Option::None,
+                            context: *redeposit.context,
                         }));
                     },
                     _ => {
@@ -162,17 +163,23 @@ mod RouterGateway {
                     LendingInstruction::Withdraw(withdraw) => {
                         let basic = *withdraw.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        if should_transfer {
-                            assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
-                        }
                         let balance = erc20.balance_of(get_contract_address());
-                        balancesAfter.append(balance - *balancesBefore.at(i));
+                        let diff = balance - *balancesBefore.at(i);
+                        balancesAfter.append(diff);
+                        if should_transfer {
+                            erc20.transfer(basic.user, diff);
+                        }
                     },
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        balancesAfter.append(*balancesBefore.at(i) - balance);
+                        let diff = *balancesBefore.at(i) - balance;
+                        balancesAfter.append(diff);
+                        if basic.amount > diff {
+                            let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                            erc20.transfer(basic.user, basic.amount - diff);
+                        }
                     },
                     LendingInstruction::Deposit(deposit) => {
                         let basic = *deposit.basic;
@@ -225,6 +232,41 @@ mod RouterGateway {
             }
             (repay.basic.token, amount)
         }
+
+        fn ensure_user_matches_caller(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
+            for protocolInstruction in instructions {
+                for instruction in protocolInstruction.instructions {
+                    let user = match instruction {
+                        LendingInstruction::Repay(repay) => {
+                            let basic = repay.basic;
+                            basic.user
+                        },
+                        LendingInstruction::Borrow(borrow) => {
+                            let basic = borrow.basic;
+                            basic.user
+                        },
+                        LendingInstruction::Withdraw(withdraw) => {
+                            let basic = withdraw.basic;
+                            basic.user
+                        },
+                        LendingInstruction::Deposit(deposit) => {
+                            let basic = deposit.basic;
+                            basic.user
+                        },
+                        LendingInstruction::Reborrow(reborrow) => {
+                           reborrow.user
+                        },
+                        LendingInstruction::Redeposit(redeposit) => {
+                            redeposit.user
+                        },
+                        _ => {
+                            panic!("bad-instruction-order")
+                        }
+                    };
+                    assert(*user == get_caller_address(), 'user mismatch');
+                }
+            }
+        }
     }
 
     #[abi(embed_v0)]
@@ -238,6 +280,7 @@ mod RouterGateway {
         }
 
         fn process_protocol_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
+            self.ensure_user_matches_caller(instructions);
             self.process_protocol_instructions_internal(instructions, true);
         }
 
@@ -256,6 +299,7 @@ mod RouterGateway {
         }
 
         fn move_debt(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
+            self.ensure_user_matches_caller(instructions);
             let flashloan_provider = IFlashloanProviderDispatcher { contract_address: self.flashloan_provider.read() };
             let (asset, amount) = self.get_flash_loan_amount(instructions);
             let is_legacy = false;

@@ -45,7 +45,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Check if position has a balance (debt)
   const hasBalance = tokenBalance > 0;
-  console.log("network type", networkType)
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract
   const { data: optimalRateData } = useNetworkAwareReadContract({
@@ -53,6 +52,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     contractName: "OptimalInterestRateFinder",
     functionName: "findOptimalBorrowRate",
     args: [tokenAddress],
+    refetchInterval: 0,
   });
 
   let optimalProtocol = "";
@@ -317,61 +317,78 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
       {/* Modals */}
       {networkType === "starknet" ? (
-        <MovePositionModalStark
-          isOpen={isMoveModalOpen}
-          onClose={() => setIsMoveModalOpen(false)}
-          fromProtocol={protocolName}
-          position={{
-            name,
-            balance: balance ? balance : 0,
-            type: "borrow",
-            tokenAddress,
-          }}
-        />
-      ) : (
-        <MovePositionModal
-          isOpen={isMoveModalOpen}
-          onClose={() => setIsMoveModalOpen(false)}
-          fromProtocol={protocolName}
-          position={{
-            name,
-            balance: balance ? balance : 0,
-            type: "borrow",
-            tokenAddress,
-          }}
-        />
-      )}
-
-      {networkType === "starknet" ? (
         <>
-          <RepayModalStark
-            isOpen={isRepayModalOpen}
-            onClose={() => setIsRepayModalOpen(false)}
-            token={{ name, icon, currentRate, address: tokenAddress }}
-            protocolName={protocolName}
-          />
-
           <BorrowModalStark
             isOpen={isBorrowModalOpen}
             onClose={handleCloseBorrowModal}
-            token={{ name, icon, currentRate, address: tokenAddress }}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+            }}
             protocolName={protocolName}
+          />
+          <RepayModalStark
+            isOpen={isRepayModalOpen}
+            onClose={() => setIsRepayModalOpen(false)}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              protocolAmount: tokenBalance,
+            }}
+            protocolName={protocolName}
+          />
+          <MovePositionModalStark
+            isOpen={isMoveModalOpen}
+            onClose={() => setIsMoveModalOpen(false)}
+            fromProtocol={protocolName}
+            position={{
+              name,
+              balance: tokenBalance ?? 0n,
+              type: "borrow",
+              tokenAddress,
+              decimals: tokenDecimals,
+            }}
           />
         </>
       ) : (
         <>
-          <RepayModal
-            isOpen={isRepayModalOpen}
-            onClose={() => setIsRepayModalOpen(false)}
-            token={{ name, icon, currentRate, address: tokenAddress }}
-            protocolName={protocolName}
-          />
-
           <BorrowModal
             isOpen={isBorrowModalOpen}
             onClose={handleCloseBorrowModal}
-            token={{ name, icon, currentRate, address: tokenAddress }}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+            }}
             protocolName={protocolName}
+          />
+          <RepayModal
+            isOpen={isRepayModalOpen}
+            onClose={() => setIsRepayModalOpen(false)}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+            }}
+            protocolName={protocolName}
+          />
+          <MovePositionModal
+            isOpen={isMoveModalOpen}
+            onClose={() => setIsMoveModalOpen(false)}
+            fromProtocol={protocolName}
+            position={{
+              name,
+              balance: balance ? balance : 0,
+              type: "borrow",
+              tokenAddress,
+              decimals: tokenDecimals || 18,
+            }}
           />
         </>
       )}

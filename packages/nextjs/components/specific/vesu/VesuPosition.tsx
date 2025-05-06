@@ -306,6 +306,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
+          protocolAmount: BigInt(collateralAmount),
         }}
         protocolName="Vesu"
         vesuContext={{
@@ -355,6 +356,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               icon: tokenNameToLogo(debtSymbol.toLowerCase()),
               address: debtAsset,
               currentRate: debtRates.borrowAPR * 100,
+              protocolAmount: BigInt(nominalDebt),
             }}
             protocolName="Vesu"
             vesuContext={{
@@ -369,9 +371,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             fromProtocol="Vesu"
             position={{
               name: debtSymbol,
-              balance: parseFloat(formattedDebt),
+              balance: BigInt(nominalDebt),
               type: "borrow",
               tokenAddress: debtAsset,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : Number(18),
             }}
             preSelectedCollaterals={preSelectedCollateral}
             disableCollateralSelection={true}

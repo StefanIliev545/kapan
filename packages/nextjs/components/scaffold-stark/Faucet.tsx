@@ -75,15 +75,11 @@ export const Faucet = () => {
         },
       ]
     : [];
-
-  console.log("Mint calls configured:", mintCalls);
     
   // Use the scaffold hook for multi-write
   const multiWriteResult = useScaffoldMultiWriteContract({ calls: mintCalls });
   const { sendAsync } = multiWriteResult;
   
-  console.log("Multi-write hook result:", multiWriteResult);
-
   useEffect(() => {
     const checkChain = async () => {
       try {

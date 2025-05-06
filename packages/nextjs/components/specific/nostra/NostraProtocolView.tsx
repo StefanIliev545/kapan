@@ -1,12 +1,12 @@
-import { FC, useMemo, useState, useEffect } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
-import { ContractName } from "~~/utils/scaffold-stark/contract";
 import { useAccount } from "~~/hooks/useAccount";
-import { feltToString } from "~~/utils/protocols";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { feltToString } from "~~/utils/protocols";
+import { ContractName } from "~~/utils/scaffold-stark/contract";
 
 type UserPositionTuple = {
   0: bigint; // underlying token address
@@ -24,10 +24,10 @@ type InterestState = {
 };
 
 export const NostraProtocolView: FC = () => {
-  const { address: connectedAddress } = useAccount();  
+  const { address: connectedAddress } = useAccount();
   // State to track if we should force showing all assets when wallet is not connected
   const [forceShowAll, setForceShowAll] = useState(false);
-  
+
   // Determine the address to use for queries - use contract's own address as fallback
   const queryAddress = connectedAddress;
 
@@ -46,7 +46,7 @@ export const NostraProtocolView: FC = () => {
 
     const positions = userPositions as unknown as UserPositionTuple[];
     const addresses = positions.map(position => `0x${position[0].toString(16).padStart(64, "0")}`);
-    
+
     // Remove duplicates and filter out empty/invalid addresses
     return [...new Set(addresses)].filter(addr => addr && addr !== "0x0");
   }, [userPositions]);
@@ -59,6 +59,35 @@ export const NostraProtocolView: FC = () => {
     args: [uniqueContractAddresses],
     refetchInterval: 0,
   });
+
+  const { tokenAddresses } = useMemo(() => {
+    if (!userPositions) return { tokenAddresses: [] };
+    const positions = userPositions as unknown as UserPositionTuple[];
+
+    const tokenAddresses = positions?.map(position => `0x${position[0].toString(16).padStart(64, "0")}`);
+    return { tokenAddresses };
+  }, [userPositions]);
+
+  const { data: tokenDecimals } = useNetworkAwareReadContract({
+    networkType: "starknet",
+    contractName: "UiHelper",
+    functionName: "get_token_decimals",
+    args: [tokenAddresses],
+  });
+
+  const { tokenToDecimals } = useMemo(() => {
+    if (!tokenDecimals) return { tokenToDecimals: {} };
+    const decimals = tokenDecimals as unknown as bigint[];
+    console.log(decimals);
+    const tokenToDecimals = decimals.reduce(
+      (acc, decimals, index) => {
+        acc[tokenAddresses[index]] = Number(decimals);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    return { tokenToDecimals };
+  }, [tokenDecimals, tokenAddresses]);
 
   // Aggregate positions by iterating over the returned tokens
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
@@ -79,10 +108,10 @@ export const NostraProtocolView: FC = () => {
       const debtBalance = position[2];
       const collateralBalance = position[3];
       const interestRate = rates?.[index];
-      
+
       // Convert rates to APY/APR (rates are in RAY format - 1e27)
-      const supplyAPY = interestRate ? (Number(interestRate.lending_rate)/1e16) : 0; // Convert to percentage
-      const borrowAPR = interestRate ? (Number(interestRate.borrowing_rate)/1e16) : 0; // Convert to percentage
+      const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e16 : 0; // Convert to percentage
+      const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e16 : 0; // Convert to percentage
       // Add supply position
       supplied.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
@@ -91,6 +120,7 @@ export const NostraProtocolView: FC = () => {
         tokenBalance: collateralBalance,
         currentRate: supplyAPY,
         tokenAddress: underlying,
+        tokenDecimals: tokenToDecimals[underlying],
       });
 
       // Add borrow position
@@ -101,11 +131,12 @@ export const NostraProtocolView: FC = () => {
         tokenBalance: debtBalance,
         currentRate: borrowAPR,
         tokenAddress: underlying,
+        tokenDecimals: tokenToDecimals[underlying],
       });
     });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
-  }, [userPositions, interestRates]);
+  }, [userPositions, interestRates, tokenToDecimals]);
 
   return (
     <ProtocolView

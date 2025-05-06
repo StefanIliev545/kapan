@@ -38,6 +38,7 @@ export interface TokenInfo {
   icon: string;
   currentRate: number;
   address: string;
+  protocolAmount?: bigint; // Add protocol balance/debt amount for withdraw/repay actions
 }
 
 export interface VesuContext {
@@ -92,10 +93,46 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     enabled: isOpen,
   });
 
+  // Read token balance from wallet - used for deposit and repay operations
+  const { data: walletBalance } = useReadContract({
+    address: token.address as `0x${string}`,
+    functionName: "balance_of",
+    abi: universalErc20Abi,
+    args: [userAddress as `0x${string}`],
+    blockIdentifier: "pending",
+    enabled: isOpen && (actionType === "deposit" || actionType === "repay"),
+  });
+
+  // Determine which balance to use based on action type
+  const effectiveBalance = useMemo(() => {
+    // For withdraw, use protocol balance if provided
+    if (actionType === "withdraw" && token.protocolAmount !== undefined) {
+      return token.protocolAmount;
+    }
+    // For repay, use the minimum of wallet balance and protocol amount (debt)
+    // This ensures users can't attempt to repay more than they have in their wallet
+    if (actionType === "repay" && token.protocolAmount !== undefined) {
+      const walletBal = walletBalance as bigint || BigInt(0);
+      return walletBal < token.protocolAmount ? walletBal : token.protocolAmount;
+    }
+    // Otherwise, fall back to wallet balance
+    return walletBalance as bigint || BigInt(0);
+  }, [actionType, token.protocolAmount, walletBalance]);
+
+  const formattedBalance = effectiveBalance && decimals 
+    ? formatUnits(effectiveBalance, Number(decimals)) 
+    : "0";
+
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
     if (!amount || !userAddress || !decimals) return { fullInstruction: null, authInstruction: null };
 
+    // If max amount is selected, add 1% to account for potential calculation discrepancies
+    let adjustedAmount = amount;
+    if (isMaxAmount) {
+      const amountNum = parseFloat(amount);
+      adjustedAmount = (amountNum * 1.01).toString();
+    }
     const parsedAmount = parseUnits(amount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
 
@@ -175,7 +212,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
-            repay_all: isMaxAmount,
+            repay_all: isMaxAmount && (!token.protocolAmount || (walletBalance && BigInt(walletBalance.toString()) >= token.protocolAmount)),
             context: context,
           },
           Withdraw: undefined,
@@ -252,17 +289,6 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   }, [fullInstruction, protocolInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
-  // Read token balance
-  const { data: balance } = useReadContract({
-    address: token.address as `0x${string}`,
-    functionName: "balance_of",
-    abi: universalErc20Abi,
-    args: [userAddress as `0x${string}`],
-    blockIdentifier: "pending",
-    enabled: true,
-  });
-
-  const formattedBalance = balance && decimals ? formatUnits(balance as bigint, Number(decimals)) : "0";
 
   // Calculate USD value
   const getUsdValue = () => {
@@ -421,7 +447,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                   <span>{getUsdValue()}</span>
                 </div>
               </div>
-              {(actionType === "deposit" || actionType === "repay") && (
+              {(actionType === "deposit" || actionType === "repay" || actionType === "withdraw") && (
                 <div className="text-sm text-base-content/70">
                   Balance:{" "}
                   <span className="font-medium">
@@ -442,7 +468,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                 max={actionType === "borrow" ? undefined : formattedBalance}
               />
 
-              {(actionType === "deposit" || actionType === "repay") && (
+              {(actionType === "deposit" || actionType === "repay" || actionType === "withdraw") && (
                 <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
                   onClick={() => {

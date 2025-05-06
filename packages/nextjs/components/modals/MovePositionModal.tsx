@@ -33,6 +33,7 @@ interface MovePositionModalProps {
     balance: number; // USD value (display only)
     type: "supply" | "borrow";
     tokenAddress: string;
+    decimals: number;
   };
 }
 

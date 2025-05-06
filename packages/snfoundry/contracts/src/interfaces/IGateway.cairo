@@ -39,6 +39,7 @@ pub struct Redeposit {
     pub token: ContractAddress,
     pub target_instruction_index: u32,
     pub user: ContractAddress,
+    pub context: Option<Span<felt252>>,
 }
 
 #[derive(Drop, Serde, Copy)]
