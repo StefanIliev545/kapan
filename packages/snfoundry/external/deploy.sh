@@ -33,7 +33,15 @@ CDP=$(starkli deploy 0x078e647e45d1d01f6af14124f5dcc58fccc3a3c888d97169e321e2fbe
 sleep 3
 
 # Deploy Price Feed
-PRICE_FEED=$(starkli deploy 0x03b6c6b615ff3df037d5fdad054b62ad89092149958b1500c1d281fd6f2fd14b --network sepolia --watch \
+PRICE_FEED_WBTC=$(starkli deploy 0x03b6c6b615ff3df037d5fdad054b62ad89092149958b1500c1d281fd6f2fd14b --network sepolia --watch \
+  $OWNER | tail -n 1)
+sleep 3
+
+PRICE_FEED_USDC=$(starkli deploy 0x03b6c6b615ff3df037d5fdad054b62ad89092149958b1500c1d281fd6f2fd14b --network sepolia --watch \
+  $OWNER | tail -n 1)
+sleep 3
+
+PRICE_FEED_ETH=$(starkli deploy 0x03b6c6b615ff3df037d5fdad054b62ad89092149958b1500c1d281fd6f2fd14b --network sepolia --watch \
   $OWNER | tail -n 1)
 sleep 3
 
@@ -183,7 +191,9 @@ echo "Deployed contracts:"
 echo "Shared Contracts:"
 echo "CDP: $CDP"
 echo "IRM: $IRM"
-echo "PRICE_FEED: $PRICE_FEED"
+echo "PRICE_FEED_WBTC: $PRICE_FEED_WBTC"
+echo "PRICE_FEED_USDC: $PRICE_FEED_USDC"
+echo "PRICE_FEED_ETH: $PRICE_FEED_ETH"
 
 echo "WBTC Contracts:"
 echo "MOCK_PRICE_FEED_WBTC: $MOCK_PRICE_FEED_WBTC"
@@ -207,13 +217,22 @@ echo "IBC_ETH: $IBC_ETH"
 echo "IB_ETH: $IB_ETH"
 
 # Configure WBTC
-starkli invoke --watch $PRICE_FEED selector:set_main_oracle $MOCK_PRICE_FEED_WBTC
+starkli invoke --watch $PRICE_FEED_WBTC selector:set_main_oracle $MOCK_PRICE_FEED_WBTC
 sleep 3
-starkli invoke --watch $PRICE_FEED selector:set_fallback_oracle $MOCK_PRICE_FEED_WBTC
+starkli invoke --watch $PRICE_FEED_WBTC selector:set_fallback_oracle $MOCK_PRICE_FEED_WBTC
 sleep 3
-starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_WBTC "2" $PRICE_FEED u256:900000000000000000
+starkli invoke --watch $PRICE_FEED_ETH selector:set_main_oracle $MOCK_PRICE_FEED_ETH
 sleep 3
-starkli invoke --watch $CDP selector:register_collateral $UNDERLYING_WBTC u256:800000000000000000 $PRICE_FEED u256:20000000000000000 $OWNER
+starkli invoke --watch $PRICE_FEED_ETH selector:set_fallback_oracle $MOCK_PRICE_FEED_ETH
+sleep 3
+starkli invoke --watch $PRICE_FEED_USDC selector:set_main_oracle $MOCK_PRICE_FEED_USDC
+sleep 3
+starkli invoke --watch $PRICE_FEED_USDC selector:set_fallback_oracle $MOCK_PRICE_FEED_USDC
+sleep 3
+
+starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_WBTC "2" $PRICE_FEED_WBTC u256:900000000000000000
+sleep 3
+starkli invoke --watch $CDP selector:register_collateral $UNDERLYING_WBTC u256:800000000000000000 $PRICE_FEED_WBTC u256:20000000000000000 $OWNER
 sleep 3
 starkli invoke --watch $CDP selector:set_collateral_tokens $UNDERLYING_WBTC 0x02 $IBC_WBTC $NCOL_WBTC
 sleep 3
@@ -221,13 +240,13 @@ starkli invoke --watch $IRM selector:init_market $DEBT_ASSET_WBTC $IB_WBTC $IBC_
 sleep 3
 
 # Configure USDC
-starkli invoke --watch $PRICE_FEED selector:set_main_oracle $MOCK_PRICE_FEED_USDC
+starkli invoke --watch $PRICE_FEED_USDC selector:set_main_oracle $MOCK_PRICE_FEED_USDC
 sleep 3
-starkli invoke --watch $PRICE_FEED selector:set_fallback_oracle $MOCK_PRICE_FEED_USDC
+starkli invoke --watch $PRICE_FEED_USDC selector:set_fallback_oracle $MOCK_PRICE_FEED_USDC
 sleep 3
-starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_USDC "2" $PRICE_FEED u256:900000000000000000
+starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_USDC "2" $PRICE_FEED_USDC u256:900000000000000000
 sleep 3
-starkli invoke --watch $CDP selector:register_collateral $UNDERLYING_USDC u256:800000000000000000 $PRICE_FEED u256:20000000000000000 $OWNER
+starkli invoke --watch $CDP selector:register_collateral $UNDERLYING_USDC u256:800000000000000000 $PRICE_FEED_USDC u256:20000000000000000 $OWNER
 sleep 3
 starkli invoke --watch $CDP selector:set_collateral_tokens $UNDERLYING_USDC 0x02 $IBC_USDC $NCOL_USDC
 sleep 3
@@ -235,13 +254,13 @@ starkli invoke --watch $IRM selector:init_market $DEBT_ASSET_USDC $IB_USDC $IBC_
 sleep 3
 
 # Configure ETH
-starkli invoke --watch $PRICE_FEED selector:set_main_oracle $MOCK_PRICE_FEED_ETH
+starkli invoke --watch $PRICE_FEED_ETH selector:set_main_oracle $MOCK_PRICE_FEED_ETH
 sleep 3
-starkli invoke --watch $PRICE_FEED selector:set_fallback_oracle $MOCK_PRICE_FEED_ETH
+starkli invoke --watch $PRICE_FEED_ETH selector:set_fallback_oracle $MOCK_PRICE_FEED_ETH
 sleep 3
-starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_ETH "2" $PRICE_FEED u256:900000000000000000
+starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_ETH "2" $PRICE_FEED_ETH u256:900000000000000000
 sleep 3
-starkli invoke --watch $CDP selector:register_collateral $UNDERLYING_ETH u256:800000000000000000 $PRICE_FEED u256:20000000000000000 $OWNER
+starkli invoke --watch $CDP selector:register_collateral $UNDERLYING_ETH u256:800000000000000000 $PRICE_FEED_ETH u256:20000000000000000 $OWNER
 sleep 3
 starkli invoke --watch $CDP selector:set_collateral_tokens $UNDERLYING_ETH 0x02 $IBC_ETH $NCOL_ETH
 sleep 3
