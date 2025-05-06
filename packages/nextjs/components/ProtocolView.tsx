@@ -8,7 +8,6 @@ import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
-import { TokenMetadata } from "~~/utils/protocols";
 
 export interface ProtocolPosition {
   icon: string;

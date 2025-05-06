@@ -51,6 +51,7 @@ pub trait IVesuViewer<TContractState> {
     fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
     fn get_supported_assets_info(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)>;
     fn get_supported_assets_ui(self: @TContractState) -> Array<TokenMetadata>;
+    fn get_asset_price(self: @TContractState, asset: ContractAddress) -> u256;
 }
 
 #[derive(Drop, Serde)]
@@ -756,6 +757,18 @@ mod VesuGateway {
                 }
             };
             positions
+        }
+
+        fn get_asset_price(self: @ContractState, asset: ContractAddress) -> u256 {
+            let pool_id = self.pool_id.read();
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+            let extension = IDefaultExtensionCLDispatcher {
+                contract_address: singleton_dispatcher.extension(pool_id),
+            };
+            let price = extension.price(pool_id, asset);
+            price.value
         }
 
         fn get_supported_assets_ui(self: @ContractState) -> Array<TokenMetadata> {

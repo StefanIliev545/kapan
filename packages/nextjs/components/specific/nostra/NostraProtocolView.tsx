@@ -75,9 +75,17 @@ export const NostraProtocolView: FC = () => {
     args: [tokenAddresses],
   });
 
-  const { tokenToDecimals } = useMemo(() => {
-    if (!tokenDecimals) return { tokenToDecimals: {} };
+  const { data: tokenPrices } = useNetworkAwareReadContract({
+    networkType: "starknet",
+    contractName: "UiHelper",
+    functionName: "get_asset_prices",
+    args: [tokenAddresses],
+  });
+
+  const { tokenToDecimals, tokenToPrices } = useMemo(() => {
+    if (!tokenDecimals) return { tokenToDecimals: {}, tokenToPrices: {} };
     const decimals = tokenDecimals as unknown as bigint[];
+    const prices = tokenPrices as unknown as bigint[];
     console.log(decimals);
     const tokenToDecimals = decimals.reduce(
       (acc, decimals, index) => {
@@ -86,8 +94,15 @@ export const NostraProtocolView: FC = () => {
       },
       {} as Record<string, number>,
     );
-    return { tokenToDecimals };
-  }, [tokenDecimals, tokenAddresses]);
+    const tokenToPrices = prices.reduce(
+      (acc, price, index) => {
+        acc[tokenAddresses[index]] = price / 10n ** 10n; // haven't figured out why this works but fuck it.
+        return acc;
+      },
+      {} as Record<string, bigint>,
+    );
+    return { tokenToDecimals, tokenToPrices };
+  }, [tokenDecimals, tokenAddresses, tokenPrices]);
 
   // Aggregate positions by iterating over the returned tokens
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
@@ -116,27 +131,29 @@ export const NostraProtocolView: FC = () => {
       supplied.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        balance: Number(formatUnits(collateralBalance, 18)), // Assuming 18 decimals
+        balance: Number(formatUnits(collateralBalance, tokenToDecimals[underlying])), // Assuming 18 decimals
         tokenBalance: collateralBalance,
         currentRate: supplyAPY,
         tokenAddress: underlying,
         tokenDecimals: tokenToDecimals[underlying],
+        tokenPrice: tokenToPrices[underlying],
       });
 
       // Add borrow position
       borrowed.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        balance: -Number(formatUnits(debtBalance, 18)), // Negative balance for borrowed amount
+        balance: -Number(formatUnits(debtBalance, tokenToDecimals[underlying])), // Negative balance for borrowed amount
         tokenBalance: debtBalance,
         currentRate: borrowAPR,
         tokenAddress: underlying,
         tokenDecimals: tokenToDecimals[underlying],
+        tokenPrice: tokenToPrices[underlying],
       });
     });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
-  }, [userPositions, interestRates, tokenToDecimals]);
+  }, [userPositions, interestRates, tokenToDecimals, tokenToPrices]);
 
   return (
     <ProtocolView

@@ -112,16 +112,14 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     // For repay, use the minimum of wallet balance and protocol amount (debt)
     // This ensures users can't attempt to repay more than they have in their wallet
     if (actionType === "repay" && token.protocolAmount !== undefined) {
-      const walletBal = walletBalance as bigint || BigInt(0);
+      const walletBal = (walletBalance as bigint) || BigInt(0);
       return walletBal < token.protocolAmount ? walletBal : token.protocolAmount;
     }
     // Otherwise, fall back to wallet balance
-    return walletBalance as bigint || BigInt(0);
+    return (walletBalance as bigint) || BigInt(0);
   }, [actionType, token.protocolAmount, walletBalance]);
 
-  const formattedBalance = effectiveBalance && decimals 
-    ? formatUnits(effectiveBalance, Number(decimals)) 
-    : "0";
+  const formattedBalance = effectiveBalance && decimals ? formatUnits(effectiveBalance, Number(decimals)) : "0";
 
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
@@ -129,11 +127,11 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
     // If max amount is selected, add 1% to account for potential calculation discrepancies
     let adjustedAmount = amount;
-    if (isMaxAmount) {
+    if (isMaxAmount && actionType !== "deposit") {
       const amountNum = parseFloat(amount);
       adjustedAmount = (amountNum * 1.01).toString();
     }
-    const parsedAmount = parseUnits(amount, Number(decimals));
+    const parsedAmount = parseUnits(adjustedAmount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
 
     let context = new CairoOption<BigNumberish[]>(CairoOptionVariant.None);
@@ -212,7 +210,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               amount: uint256.bnToUint256(parsedAmount),
               user: userAddress,
             },
-            repay_all: isMaxAmount && (!token.protocolAmount || (walletBalance && BigInt(walletBalance.toString()) >= token.protocolAmount)),
+            repay_all:
+              isMaxAmount &&
+              (!token.protocolAmount || (walletBalance && BigInt(walletBalance.toString()) >= token.protocolAmount)),
             context: context,
           },
           Withdraw: undefined,
@@ -279,7 +279,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     }
 
     return [
-      ...authorizations as any,
+      ...(authorizations as any),
       {
         contractName: "RouterGateway" as const,
         functionName: "process_protocol_instructions" as const,

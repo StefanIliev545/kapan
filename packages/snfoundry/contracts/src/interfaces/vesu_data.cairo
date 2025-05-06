@@ -58,8 +58,8 @@ pub struct UnsignedAmount {
 
 #[derive(PartialEq, Copy, Drop, Serde, Default)]
 pub struct AssetPrice {
-    value: u256,
-    is_valid: bool,
+    pub value: u256,
+    pub is_valid: bool,
 }
 
 #[derive(PartialEq, Copy, Drop, Serde)]

@@ -529,6 +529,22 @@ const contracts = {
               ],
               state_mutability: "view",
             },
+            {
+              type: "function",
+              name: "get_asset_price",
+              inputs: [
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
           ],
         },
         {
@@ -2747,6 +2763,22 @@ const contracts = {
               ],
               state_mutability: "view",
             },
+            {
+              type: "function",
+              name: "get_asset_price",
+              inputs: [
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
           ],
         },
         {
@@ -3630,7 +3662,7 @@ const contracts = {
   sepolia: {
     RouterGateway: {
       address:
-        "0x7e6f3398474c6a4f2609bc57ec2139df865106312030b1f1c98fc7820760422",
+        "0xa6f1a4bf02af3a41926a413cdb13cea79d0175bc63f475dad078d4c163cc12",
       abi: [
         {
           type: "impl",
@@ -4043,7 +4075,7 @@ const contracts = {
     },
     VesuGateway: {
       address:
-        "0x2b17bb2e022a1a0d9ecaa905cdd993b009a0f7583c528813a1e54f162e1cb34",
+        "0x83060a3f4ee6a48e6a065e154eb68e17079430f35348b54bb7912ab689bf6e",
       abi: [
         {
           type: "impl",
@@ -4552,6 +4584,22 @@ const contracts = {
               ],
               state_mutability: "view",
             },
+            {
+              type: "function",
+              name: "get_asset_price",
+              inputs: [
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
           ],
         },
         {
@@ -4701,11 +4749,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x63dac6d2651c3a5f492dc105f3a277581955916fec1096dd5e50b69b5289f30",
+        "0x452702d6d52f0405a4d4c9c2f9bb3a6a0f3c68efea8c9f815135ffeca18584b",
     },
     NostraGateway: {
       address:
-        "0x6009d1ddb207665178e051f3fed7c88b4d4b795183e57862bd7991209d8b474",
+        "0x493323860e0cf7828fa77f29ee64aa0efdede8d817237f9f17c346fd84352f3",
       abi: [
         {
           type: "impl",
@@ -5315,7 +5363,7 @@ const contracts = {
     },
     OptimalInterestRateFinder: {
       address:
-        "0x79e18c6819e27ba7153187396b8954727ebb9d7f2a2053c0f2cb3c6f01760d6",
+        "0x1404e651385e7f128d699fcfbc47d71d88c5b298f939f4496db0cb9635f0496",
       abi: [
         {
           type: "impl",
@@ -5433,7 +5481,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x48c608f6dc603162b52a99467b3e8219debae04357952fb39f62151f2b96876",
+        "0x18eaf539cb831732f5b22c60bec986a148bbb59d4e11d21730a346be6b62bb",
       abi: [
         {
           type: "impl",
@@ -5461,6 +5509,30 @@ const contracts = {
           ],
         },
         {
+          type: "struct",
+          name: "core::integer::u256",
+          members: [
+            {
+              name: "low",
+              type: "core::integer::u128",
+            },
+            {
+              name: "high",
+              type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::array::Span::<core::integer::u256>",
+          members: [
+            {
+              name: "snapshot",
+              type: "@core::array::Array::<core::integer::u256>",
+            },
+          ],
+        },
+        {
           type: "interface",
           name: "kapan::utils::ui_helper::IUIHelper",
           items: [
@@ -5480,6 +5552,32 @@ const contracts = {
               ],
               state_mutability: "view",
             },
+            {
+              type: "function",
+              name: "get_asset_prices",
+              inputs: [
+                {
+                  name: "token_addresses",
+                  type: "core::array::Span::<core::starknet::contract_address::ContractAddress>",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Span::<core::integer::u256>",
+                },
+              ],
+              state_mutability: "view",
+            },
+          ],
+        },
+        {
+          type: "constructor",
+          name: "constructor",
+          inputs: [
+            {
+              name: "vesu_gateway",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
           ],
         },
         {
@@ -5490,7 +5588,7 @@ const contracts = {
         },
       ],
       classHash:
-        "0x79be5f320d999c2bda132370c2d539702f180709f47fe1ce45d83aa6a73ef3e",
+        "0x30816e0e489ed5fbc49d21e6cd876e231ab5781b34a71f9d16af074b62d09d5",
     },
   },
 } as const satisfies SNContractsType;

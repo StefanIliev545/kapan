@@ -55,7 +55,9 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
 
   await deployContract({
     contract: "UiHelper",
-    constructorArgs: {},
+    constructorArgs: {
+      vesu_gateway: vesuGatewayAddress,
+    },
   });
 
 
@@ -117,7 +119,9 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
 
   await deployContract({
     contract: "UiHelper",
-    constructorArgs: {},
+    constructorArgs: {
+      vesu_gateway: vesuGatewayAddress,
+    },
   });
 
   return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
