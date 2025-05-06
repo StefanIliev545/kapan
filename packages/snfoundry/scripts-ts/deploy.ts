@@ -103,7 +103,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
     constructorArgs: {
-      interest_rate_model: "0x004e58e38545f4956bfaf3747d85408e81e3baf49f344a249e471e76ec1cc231",
+      interest_rate_model: "0x02cf4bd3936e99a9f46f3499d1adfe68be8765caef19bf2381e9e4e14a1ca1c6",
       router: routerGatewayAddress,
     },
   });
@@ -238,7 +238,7 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
-        "0x01f7153b9b26d13a800a96f117fcdf0ee76c51879414e70dbb267368bd23d008", // ETH
+        "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
         "0x03b03b1fa4e67e71c327160863749589f4b86d2ad7633e20ed27d9cc9f9d4ff7", // ETH debt
         "0x0168fa06192fab62dae5c363f4f33d43770933389ef7508c298df5b98f6b22a5", // ETH Ncollateral
         "0x05a2e5c763496078125a9d23d1538d0d0ed63190e29eff303888a976709ee093", // ETH ibcollateral
@@ -248,7 +248,7 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
-        "0x03a2d4f7966b72a096fb3df03f0f6398cc212ea2e85a70c77d49dc16f0b33a52", // USDC
+        "0x715649d4c493ca350743e43915b88d2e6838b1c78ddc23d6d9385446b9d6844", // USDC
         "0x071d419001168d9e3812a7a909a74ede4c1fad3fe731b6f0e8ff9cc6cb431bb9", // USDC debt
         "0x0743295f7ef1577c257a206ebe149cc75ad903f6199152e57de1fb1213f8cbb3", // USDC Ncollateral
         "0x0620ad68e560408144f9fc336c799d73212a4361ca4d32813ba9f441110e446b", // USDC ibcollateral
@@ -258,7 +258,7 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
-        "0x051847124669a82b885fa3b68f8a807dd85a6d58adc00ba45cda70b42e9f500e", // WBTC
+        "0xabbd6f1e590eb83addd87ba5ac27960d859b1f17d11a3c1cd6a0006704b141", // WBTC
         "0x02dece90d7518aa4a58aa1f6ec600750d4a03d2304ef06bf809927d25c32354a", // WBTC debt
         "0x0295a98cca46b3413c900d919edc77982c8b7e4bebee8d7a5efc21383c6dd049", // WBTC Ncollateral
         "0x0138fe69353f77e9a3f8d855ec7a03bc4c5c141fe8e2058f16b54a7b33ceb750", // WBTC ibcollateral

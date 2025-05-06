@@ -221,14 +221,6 @@ starkli invoke --watch $PRICE_FEED_WBTC selector:set_main_oracle $MOCK_PRICE_FEE
 sleep 3
 starkli invoke --watch $PRICE_FEED_WBTC selector:set_fallback_oracle $MOCK_PRICE_FEED_WBTC
 sleep 3
-starkli invoke --watch $PRICE_FEED_ETH selector:set_main_oracle $MOCK_PRICE_FEED_ETH
-sleep 3
-starkli invoke --watch $PRICE_FEED_ETH selector:set_fallback_oracle $MOCK_PRICE_FEED_ETH
-sleep 3
-starkli invoke --watch $PRICE_FEED_USDC selector:set_main_oracle $MOCK_PRICE_FEED_USDC
-sleep 3
-starkli invoke --watch $PRICE_FEED_USDC selector:set_fallback_oracle $MOCK_PRICE_FEED_USDC
-sleep 3
 
 starkli invoke --watch $CDP selector:register_debt $DEBT_ASSET_WBTC "2" $PRICE_FEED_WBTC u256:900000000000000000
 sleep 3
