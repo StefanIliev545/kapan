@@ -45,6 +45,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Check if position has a balance (debt)
   const hasBalance = tokenBalance > 0;
+  console.log("network type", networkType)
 
   // Fetch optimal rate from the OptimalInterestRateFinder contract
   const { data: optimalRateData } = useNetworkAwareReadContract({

@@ -77,7 +77,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     contract: "RouterGateway",
     constructorArgs: {
       _owner: deployer.address,
-      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+      flashloan_provider: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
     },
   });
 
@@ -96,7 +96,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
     constructorArgs: {
-      interest_rate_model: "0x047a2a6ffbbd42713b9aa00c5f489f0a20b92c22188eb8dac64b1fe4901cfa3b",
+      interest_rate_model: "0x004e58e38545f4956bfaf3747d85408e81e3baf49f344a249e471e76ec1cc231",
       router: routerGatewayAddress,
     },
   });
@@ -221,12 +221,12 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
   const calls = [
     {
       contractAddress: addresses.nostraGatewayAddress,
-      entrypoint: "add_supported_asset",
+      entrypoint: "add_supported_asset", 
       calldata: [
         "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
-        "0x01a7112d034129e5f101b36a920806dc94542a56aea8b084a0f81fb2a217f0b1", // ETH debt
-        "0x063bfc57e6d626db7d66c607c2532957fac06d5563cd66e4784791ad0181fd5f", // ETH collateral
-        "0x01f3316ef4a582d971900d777b2a0db0ac25614522f14808d8da3db0ff916b30", // ETH ibcollateral
+        "0x06d5b528e5569e6e93b8e51f81b56dcc7b27a859bfa2733f6c5ab0e9a72e9776", // ETH debt
+        "0x01f1bb2a65318e1439608795937a667a65f746a7e55206a2b7b9ae9942e3312c", // ETH Ncollateral
+        "0x057b6c3a85f21303c07a7c71ecf0d0a021c1c1e557a7333b879ad45015fd8a11", // ETH ibcollateral
       ],
     },
     {
@@ -234,9 +234,9 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       entrypoint: "add_supported_asset",
       calldata: [
         "0x715649d4c493ca350743e43915b88d2e6838b1c78ddc23d6d9385446b9d6844", // USDC
-        "0x07b14654648e9ea6d0821343266037f16570188d3d5ef3999b364dd99e7c7061", // USDC debt
-        "0x021c34dcc27e9be68e0bbeaa555dda28f8c754d0ec70e6e8f916326dc939bd24", // USDC collateral
-        "0x00e7d28fd5ec0921bf682f0638d6b6dc2b9ebc7f41669443bc4d88447d26e732", // USDC ibcollateral
+        "0x068a22dfc5940a44c1cf191377fa6acbd029c28bfc339b554e6e6cd3d474299f", // USDC debt
+        "0x04a5c03c80657f9d4e181eb2b2dd46215b7688266ef1af7236649c23f4b2811d", // USDC Ncollateral
+        "0x079b895e7ffd0f3957d2b8312589970ed9f3bd2bcd69ddc9da63fb62ad0b90d1", // USDC ibcollateral
       ],
     },
     {
@@ -244,9 +244,9 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       entrypoint: "add_supported_asset",
       calldata: [
         "0xabbd6f1e590eb83addd87ba5ac27960d859b1f17d11a3c1cd6a0006704b141", // WBTC
-        "0x03724c7609622b15cf35025c0649c39a6d370f7ede668474c6b7421212d66a65", // WBTC debt
-        "0x01b436a21c402dab47d28ae52346295dc8a647284a2124196e85db4ed5a65157", // WBTC collateral
-        "0x026299c775870406ba193c0ee5ea74b99de9e489eae0df275f9bb19eef88a0ba", // WBTC ibcollateral
+        "0x051c62791ca5d8b5846a6514a28d552f2a245aa1d227cf6a7a01aeb4e4486d18", // WBTC debt
+        "0x03546b705fcaf88c6fd21e148a470b3e0c51999435392e3805da36a7f95be8ef", // WBTC Ncollateral
+        "0x02b37449701c0c8047010cb7dae019164f2e2d7c18ec193ea6ce60e1be448853", // WBTC ibcollateral
       ],
     },
     {
@@ -289,9 +289,9 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
 
 const main = async (): Promise<void> => {
   try {
-    const gatewayAddress = await deployScriptMainnet();
+    const gatewayAddress = await deployScriptSepolia();
     await executeDeployCalls();
-    await initializeContracts(gatewayAddress);
+    await initializeContractsSepolia(gatewayAddress);
     exportDeployments();
 
     console.log(green("All Setup Done!"));

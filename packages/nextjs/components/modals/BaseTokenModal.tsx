@@ -280,6 +280,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           </div>
           
           <div className="flex items-center gap-3">
+            <div> EVM </div>
             <div className="avatar">
               <div className="w-14 h-14 rounded-full ring-2 ring-base-content/5 p-1 bg-base-100 shadow-md">
                 <Image 
