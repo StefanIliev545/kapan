@@ -37,7 +37,7 @@ const formatDisplayNumber = (value: string | number) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
   }).format(num);
-}; 
+};
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -82,113 +82,101 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   preSelectedCollaterals,
   disableCollateralSelection,
 }) => {
-  const { address: userAddress } = useAccount();
-  const protocols = [{ name: "Nostra" }, { name: "Vesu" }];
-
-  const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
-  const [amount, setAmount] = useState("");
-  const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
-  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
-    preSelectedCollaterals || [],
-  );
-  // Track which collaterals have had MAX clicked
-  const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<MoveStep>("idle");
-  const [error, setError] = useState<string | null>(null);
-
-  // Get the RouterGateway contract
-  const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
-
-  // For source protocol, use preselected collaterals for Vesu or fetch from useCollateral
-  const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
-    protocolName: fromProtocol as "Vesu" | "Nostra",
-    userAddress: userAddress || "0x0000000000000000000000000000000000000000",
-    isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"), // Skip for preselected Vesu
-  });
-
-  // For target protocol, always fetch collaterals to determine compatibility
-  const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
-    protocolName: selectedProtocol as "Vesu" | "Nostra",
-    userAddress: userAddress || "0x0000000000000000000000000000000000000000",
-    isOpen: isOpen && !!selectedProtocol,
-  });
-
-  // Only show collaterals with balance > 0
-  const collateralsForSelector = useMemo(() => {
-    // For Vesu with preselected collaterals, use those directly
-    if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
-      // Convert preSelectedCollaterals to CollateralToken format
-      return preSelectedCollaterals.map(collateral => ({
-        symbol: collateral.symbol,
-        balance: Number(collateral.inputValue || collateral.amount.toString()),
-        address: collateral.token,
-        decimals: collateral.decimals,
-        rawBalance: collateral.amount,
-        supported: true,
-      }));
-    }
-
-    // Otherwise use filtered source collaterals - removing any with zero balance
-    let filtered = sourceCollaterals.filter(c => c.balance > 0);
-
-    // When moving from Nostra to Vesu, remove the debt token from available collaterals
-    // Vesu doesn't allow the same token to be used as both debt and collateral in a pair
-    if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && position.type === "borrow") {
-      filtered = filtered.filter(c => c.address.toLowerCase() !== position.tokenAddress.toLowerCase());
-    }
-
-    // Check which collaterals are supported by the target protocol
-    if (targetCollaterals.length > 0) {
-      return filtered.map(collateral => {
-        const isSupported = targetCollaterals.some(tc => tc.address.toLowerCase() === collateral.address.toLowerCase());
-        return {
-          ...collateral,
-          supported: isSupported,
-        };
-      });
-    }
-
-    return filtered;
-  }, [
-    sourceCollaterals,
-    targetCollaterals,
-    preSelectedCollaterals,
-    disableCollateralSelection,
-    fromProtocol,
-    selectedProtocol,
-    position,
-  ]);
+    const { address: userAddress } = useAccount();
+    const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }], []);
+    const { tokenAddress, decimals, type, name, balance } = position;
+  
+    const [selectedProtocol, setSelectedProtocol] = useState(() => 
+      protocols.find(p => p.name !== fromProtocol)?.name || ""
+    );
+    const [amount, setAmount] = useState("");
+    const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
+    const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
+      preSelectedCollaterals || []
+    );
+    const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
+    const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState<MoveStep>("idle");
+    const [error, setError] = useState<string | null>(null);
+  
+    const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
+  
+    const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
+      protocolName: fromProtocol as "Vesu" | "Nostra",
+      userAddress: userAddress || "0x0000000000000000000000000000000000000000",
+      isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"),
+    });
+  
+    const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
+      protocolName: selectedProtocol as "Vesu" | "Nostra",
+      userAddress: userAddress || "0x0000000000000000000000000000000000000000",
+      isOpen: isOpen && !!selectedProtocol,
+    });
+  
+    const collateralsForSelector = useMemo(() => {
+      if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
+        return preSelectedCollaterals.map(collateral => ({
+          symbol: collateral.symbol,
+          balance: Number(collateral.inputValue || collateral.amount.toString()),
+          address: collateral.token,
+          decimals: collateral.decimals,
+          rawBalance: collateral.amount,
+          supported: true,
+        }));
+      }
+  
+      let filtered = sourceCollaterals.filter(c => c.balance > 0);
+      if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && type === "borrow") {
+        filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
+      }
+  
+      return targetCollaterals.length > 0
+        ? filtered.map(collateral => ({
+            ...collateral,
+            supported: targetCollaterals.some(tc => 
+              tc.address.toLowerCase() === collateral.address.toLowerCase()
+            ),
+          }))
+        : filtered;
+    }, [
+      sourceCollaterals,
+      targetCollaterals,
+      preSelectedCollaterals,
+      disableCollateralSelection,
+      fromProtocol,
+      selectedProtocol,
+      type,
+      tokenAddress,
+    ]);
 
   const { data: tokenPrices } = useScaffoldReadContract({
     contractName: "UiHelper",
     functionName: "get_asset_prices",
-    args: [[...collateralsForSelector.map(c => c.address), position.tokenAddress]],
-    refetchInterval: 5000,
+    args: [[...collateralsForSelector.map(c => c.address), tokenAddress]],
+    refetchInterval: 30000, // Reduced from 5s to 30s
     enabled: !!collateralsForSelector.length && isOpen,
   });
 
   const { tokenToPrices } = useMemo(() => {
     if (!tokenPrices) return { tokenToPrices: {} };
     const prices = tokenPrices as unknown as bigint[];
-    const addresses = [...collateralsForSelector.map(c => c.address), position.tokenAddress];
-    const tokenToPrices = prices.reduce(
-      (acc, price, index) => {
-        acc[addresses[index]] = price / 10n ** 10n;
-        return acc;
-      },
-      {} as Record<string, bigint>,
-    );
-    return { tokenToPrices };
-  }, [tokenPrices, collateralsForSelector, position.tokenAddress]);
+    const addresses = [...collateralsForSelector.map(c => c.address), tokenAddress];
+    return {
+      tokenToPrices: prices.reduce((acc, price, index) => ({
+        ...acc,
+        [addresses[index]]: price / 10n ** 10n,
+      }), {} as Record<string, bigint>)
+    };
+  }, [tokenPrices, collateralsForSelector, tokenAddress]);
 
   // Track loading state for all collaterals
   const isLoadingCollaterals = isLoadingSourceCollaterals || isLoadingTargetCollaterals;
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
-    if (!amount || !userAddress || !routerGateway) return { fullInstruction: null, authInstruction: null };
+    if (!amount || !userAddress || !routerGateway?.address) 
+      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] } };
 
-    const tokenDecimals = Number(position.decimals) ?? Number(18); // Use position decimals if available, otherwise default to 18
+    const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
     const lowerProtocolName = fromProtocol.toLowerCase();
     const destProtocolName = selectedProtocol.toLowerCase();
@@ -256,13 +244,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         proportions[0].debtAmount += remainder;
         proportions[0].debtAmountFormatted = formatUnits(proportions[0].debtAmount, tokenDecimals);
       }
-
-      console.log("Collateral USD values:", collateralUsdValues);
-      console.log("Total USD value:", totalUsdValue);
-      console.log("Collateral proportions with USD prices:", proportions);
-      console.log("Total debt amount:", formatUnits(parsedAmount, tokenDecimals));
-      console.log("Sum of allocated debt:", formatUnits(allocatedDebtSum, tokenDecimals));
-      console.log("Remainder added to first collateral:", formatUnits(remainder, tokenDecimals));
     }
 
     // Function to generate Vesu instructions with proportional debt allocation
@@ -271,8 +252,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       if (selectedCollateralsWithAmounts.length <= 1) {
         return null;
       }
-
-      console.log("Generating Vesu instructions with proportional debt allocation");
 
       // Calculate USD values and proportions for each collateral
       const collateralUsdValues = selectedCollateralsWithAmounts.map(collateral => {
@@ -329,15 +308,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             ? (collateral.amount * BigInt(101)) / BigInt(100)
             : collateral.amount;
 
-          console.log("allocation.debtAmount", allocation.debtAmount);
-          // Create context with paired tokens for Vesu
+            // Create context with paired tokens for Vesu
           const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
             0n,
             BigInt(position.tokenAddress),
           ]);
           const contextReborrow = new CairoOption<bigint[]>(CairoOptionVariant.Some, [0n, BigInt(collateral.token)]);
           const repayAll = isAmountMaxClicked && index === debtAllocations.length - 1;
-          console.log("repayAll index", index, repayAll);
           const nostraInstructions = [
             new CairoCustomEnum({
               Deposit: undefined,
@@ -414,21 +391,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           ];
         })
         .flat();
-
-      console.log(
-        `Generated ${instructions.length} instructions based on collateral proportions ${instructions
-          .map(i =>
-            i.instructions.map(j => {
-              const repay_all = j.unwrap().repay_all;
-              if (repay_all != undefined) {
-                return repay_all;
-              }
-              return "x";
-            }),
-          )
-          .join(", ")}`,
-      );
-
       // Compile the instructions
       const fullInstructionData = CallData.compile({
         instructions: instructions,
@@ -436,13 +398,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
       const authInstructionData = CallData.compile({
         instructions: instructions.map(protocolInstruction => {
-            const filteredInstructions = protocolInstruction.instructions.filter(instruction => {
-                if (instruction.activeVariant() === "Withdraw" || instruction.activeVariant() === "Reborrow") {
-                    return true;
-                }
-                return false;
-            });
-            return { protocol_name: protocolInstruction.protocol_name, instructions: filteredInstructions }
+          const filteredInstructions = protocolInstruction.instructions.filter(instruction => {
+            if (instruction.activeVariant() === "Withdraw" || instruction.activeVariant() === "Reborrow") {
+              return true;
+            }
+            return false;
+          });
+          return { protocol_name: protocolInstruction.protocol_name, instructions: filteredInstructions };
         }),
         rawSelectors: false,
       });
@@ -601,8 +563,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     userAddress,
     fromProtocol,
     selectedProtocol,
-    position,
-    routerGateway,
+    tokenAddress,
+    decimals,
+    type,
+    name,
+    balance,
+    routerGateway?.address,
     selectedCollateralsWithAmounts,
     maxClickedCollaterals,
     tokenToPrices,
@@ -789,14 +755,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   // Helper function to safely format the balance
   const getFormattedBalance = useMemo(() => {
     try {
-      if (!position.balance) return "0.00";
-      const formattedValue = formatUnits(position.balance, position.decimals);
-      return formatDisplayNumber(parseFloat(formattedValue));
+      if (!balance) return "0.00";
+      return formatDisplayNumber(Number(formatUnits(balance, decimals)));
     } catch (error) {
-      console.error("Error formatting balance:", error);
       return "0.00";
     }
-  }, [position.balance, position.decimals]);
+  }, [balance, decimals]);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>

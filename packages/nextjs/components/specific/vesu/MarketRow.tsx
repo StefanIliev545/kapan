@@ -81,64 +81,197 @@ export const MarketRow: FC<MarketRowProps> = ({
 
   return (
     <>
-      <div className="flex items-center justify-between py-2 px-4 hover:bg-base-200/50 rounded-lg transition-colors">
-        <div className="flex items-center gap-3 w-1/5">
-          <Image
-            src={icon}
-            alt={name}
-            width={24}
-            height={24}
-            className="rounded-full"
-          />
-          <span className="font-medium">{name}</span>
+      <div className="p-4 hover:bg-base-200/50 rounded-lg transition-colors">
+        {/* Large screen view (lg+) - full flex row layout */}
+        <div className="hidden lg:flex items-center justify-between">
+          <div className="flex items-center gap-3 w-1/5">
+            <Image
+              src={icon}
+              alt={name}
+              width={24}
+              height={24}
+              className="rounded-full"
+            />
+            <span className="font-medium">{name}</span>
+          </div>
+          <div className="flex items-center justify-between w-4/5">
+            <div className="flex flex-col items-center w-1/5">
+              <div className="text-sm text-base-content/70">Price</div>
+              <div className="font-medium">${price}</div>
+            </div>
+            <div className="flex flex-col items-center w-1/5">
+              <div className="text-sm text-base-content/70">Utilization</div>
+              <div className="font-medium">{utilization}%</div>
+            </div>
+            <div className="flex flex-col items-center w-1/5">
+              <div className="text-sm text-base-content/70">Supply APY</div>
+              <div className="flex items-center gap-1">
+                <div className="font-medium text-success">{supplyRate}</div>
+                <div className="badge badge-sm flex items-center gap-1 px-2.5 py-2 bg-base-300/80 text-base-content">
+                  <span className="text-xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
+                  <Image
+                    src={getProtocolLogo(optimalSupplyProtocol)}
+                    alt={optimalSupplyProtocol}
+                    width={20}
+                    height={20}
+                    className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-center w-1/5">
+              <div className="text-sm text-base-content/70">Borrow APR</div>
+              <div className="flex items-center gap-1">
+                <div className="font-medium text-error">{borrowRate}</div>
+                <div className="badge badge-sm flex items-center gap-1 px-2.5 py-2 bg-base-300/80 text-base-content">
+                  <span className="text-xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
+                  <Image
+                    src={getProtocolLogo(optimalBorrowProtocol)}
+                    alt={optimalBorrowProtocol}
+                    width={20}
+                    height={20}
+                    className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <button 
+              className="btn btn-sm btn-primary ml-4"
+              onClick={() => setIsDepositModalOpen(true)}
+            >
+              Deposit
+            </button>
+          </div>
         </div>
-        <div className="flex items-center justify-between w-4/5">
-          <div className="flex flex-col items-center w-1/5">
-            <div className="text-sm text-base-content/70">Price</div>
-            <div className="font-medium">${price}</div>
+
+        {/* Medium screen view (md) - simplified row with wrapping */}
+        <div className="hidden md:block lg:hidden">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Image
+                src={icon}
+                alt={name}
+                width={24}
+                height={24}
+                className="rounded-full"
+              />
+              <span className="font-medium">{name}</span>
+            </div>
+            <button 
+              className="btn btn-sm btn-primary"
+              onClick={() => setIsDepositModalOpen(true)}
+            >
+              Deposit
+            </button>
           </div>
-          <div className="flex flex-col items-center w-1/5">
-            <div className="text-sm text-base-content/70">Utilization</div>
-            <div className="font-medium">{utilization}%</div>
-          </div>
-          <div className="flex flex-col items-center w-1/5">
-            <div className="text-sm text-base-content/70">Supply APY</div>
-            <div className="flex items-center gap-1">
-              <div className="font-medium text-success">{supplyRate}</div>
-              <div className="badge badge-sm flex items-center gap-1 px-2.5 py-2 bg-base-300/80 text-base-content">
-                <span className="text-xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
-                <Image
-                  src={getProtocolLogo(optimalSupplyProtocol)}
-                  alt={optimalSupplyProtocol}
-                  width={20}
-                  height={20}
-                  className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
-                />
+          
+          <div className="flex flex-wrap gap-3">
+            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
+              <div className="text-sm text-base-content/70">Price</div>
+              <div className="font-medium">${price}</div>
+            </div>
+            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
+              <div className="text-sm text-base-content/70">Utilization</div>
+              <div className="font-medium">{utilization}%</div>
+            </div>
+            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
+              <div className="text-sm text-base-content/70">Supply APY</div>
+              <div className="flex items-center gap-1">
+                <div className="font-medium text-success">{supplyRate}</div>
+                <div className="badge badge-sm flex items-center gap-1 px-2 py-1.5 bg-base-300/80 text-base-content">
+                  <span className="text-xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
+                  <Image
+                    src={getProtocolLogo(optimalSupplyProtocol)}
+                    alt={optimalSupplyProtocol}
+                    width={18}
+                    height={18}
+                    className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
+              <div className="text-sm text-base-content/70">Borrow APR</div>
+              <div className="flex items-center gap-1">
+                <div className="font-medium text-error">{borrowRate}</div>
+                <div className="badge badge-sm flex items-center gap-1 px-2 py-1.5 bg-base-300/80 text-base-content">
+                  <span className="text-xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
+                  <Image
+                    src={getProtocolLogo(optimalBorrowProtocol)}
+                    alt={optimalBorrowProtocol}
+                    width={18}
+                    height={18}
+                    className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
+                  />
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-center w-1/5">
-            <div className="text-sm text-base-content/70">Borrow APR</div>
-            <div className="flex items-center gap-1">
-              <div className="font-medium text-error">{borrowRate}</div>
-              <div className="badge badge-sm flex items-center gap-1 px-2.5 py-2 bg-base-300/80 text-base-content">
-                <span className="text-xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
-                <Image
-                  src={getProtocolLogo(optimalBorrowProtocol)}
-                  alt={optimalBorrowProtocol}
-                  width={20}
-                  height={20}
-                  className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
-                />
+        </div>
+
+        {/* Small screen view (sm and below) - 2-column grid */}
+        <div className="md:hidden">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Image
+                src={icon}
+                alt={name}
+                width={24}
+                height={24}
+                className="rounded-full"
+              />
+              <span className="font-medium">{name}</span>
+            </div>
+            <button 
+              className="btn btn-xs btn-primary"
+              onClick={() => setIsDepositModalOpen(true)}
+            >
+              Deposit
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-base-200/50 p-2 rounded-md">
+              <div className="text-xs text-base-content/70">Price</div>
+              <div className="font-medium text-sm">${price}</div>
+            </div>
+            <div className="bg-base-200/50 p-2 rounded-md">
+              <div className="text-xs text-base-content/70">Utilization</div>
+              <div className="font-medium text-sm">{utilization}%</div>
+            </div>
+            <div className="bg-base-200/50 p-2 rounded-md">
+              <div className="text-xs text-base-content/70">Supply APY</div>
+              <div className="flex items-center gap-1">
+                <div className="font-medium text-sm text-success">{supplyRate}</div>
+                <div className="badge badge-xs flex items-center gap-0.5 px-1 py-1 bg-base-300/80 text-base-content">
+                  <span className="text-2xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
+                  <Image
+                    src={getProtocolLogo(optimalSupplyProtocol)}
+                    alt={optimalSupplyProtocol}
+                    width={12}
+                    height={12}
+                    className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="bg-base-200/50 p-2 rounded-md">
+              <div className="text-xs text-base-content/70">Borrow APR</div>
+              <div className="flex items-center gap-1">
+                <div className="font-medium text-sm text-error">{borrowRate}</div>
+                <div className="badge badge-xs flex items-center gap-0.5 px-1 py-1 bg-base-300/80 text-base-content">
+                  <span className="text-2xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
+                  <Image
+                    src={getProtocolLogo(optimalBorrowProtocol)}
+                    alt={optimalBorrowProtocol}
+                    width={12}
+                    height={12}
+                    className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
+                  />
+                </div>
               </div>
             </div>
           </div>
-          <button 
-            className="btn btn-sm btn-primary ml-4"
-            onClick={() => setIsDepositModalOpen(true)}
-          >
-            Deposit
-          </button>
         </div>
       </div>
 
