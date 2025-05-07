@@ -32,6 +32,7 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
       vesu_singleton: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
       pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
       router: routerGatewayAddress,
+      owner: deployer.address,
       supported_assets: supportedAssets,
     },
   });
@@ -42,6 +43,7 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     constructorArgs: {
       interest_rate_model: "0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff",
       router: routerGatewayAddress,
+      owner: deployer.address,
     },
   });
 
@@ -95,6 +97,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
       vesu_singleton: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
       pool_id: "730993554056884283224259059297934576024721456828383733531590831263129347422",
       router: routerGatewayAddress,
+      owner: deployer.address,
       supported_assets: supportedAssets,
     },
   });
@@ -105,6 +108,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     constructorArgs: {
       interest_rate_model: "0x02cf4bd3936e99a9f46f3499d1adfe68be8765caef19bf2381e9e4e14a1ca1c6",
       router: routerGatewayAddress,
+      owner: deployer.address,
     },
   });
 
@@ -130,6 +134,9 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
 const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
 
   const nonce = await deployer.getNonce();
+
+  const re7Pool = "3592370751539490711610556844458488648008775713878064059760995781404350938653";
+  const alterscopeWstETh = "2612229586214495842527551768232431476062656055007024497123940017576986139174";
 
   const calls = [
     {
@@ -193,6 +200,96 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
       ],
     },
     {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool",
+      calldata: [ re7Pool ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        re7Pool, 
+        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" // USDC
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        re7Pool, 
+        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7" // ETH
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        re7Pool, 
+        "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2" // WSTETH
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        re7Pool, 
+        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" // STRK
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        re7Pool, 
+        "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac" // WBTC
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool",
+      calldata: [ alterscopeWstETh ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        alterscopeWstETh, 
+        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" // USDC
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        alterscopeWstETh, 
+        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7" // ETH
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        alterscopeWstETh, 
+        "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2" // WSTETH
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        alterscopeWstETh, 
+        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" // STRK
+      ]
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_asset",
+      calldata: [ 
+        alterscopeWstETh, 
+        "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac" // WBTC
+      ]
+    },
+    {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
       calldata: [
@@ -232,6 +329,8 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
 
 const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
   const nonce = await deployer.getNonce();
+
+  const re7Pool = "3592370751539490711610556844458488648008775713878064059760995781404350938653";
 
   const calls = [
     {
@@ -304,9 +403,9 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
 
 const main = async (): Promise<void> => {
   try {
-    const gatewayAddress = await deployScriptSepolia();
+    const gatewayAddress = await deployScriptMainnet();
     await executeDeployCalls();
-    await initializeContractsSepolia(gatewayAddress);
+    await initializeContracts(gatewayAddress);
     exportDeployments();
 
     console.log(green("All Setup Done!"));

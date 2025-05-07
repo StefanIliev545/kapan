@@ -68,10 +68,10 @@ mod NostraGateway {
     }
 
     #[constructor]
-    fn constructor(ref self:ContractState, interest_rate_model: ContractAddress, router: ContractAddress) {
+    fn constructor(ref self:ContractState, interest_rate_model: ContractAddress, router: ContractAddress, owner: ContractAddress) {
         self.interest_rate_model.write(interest_rate_model);
         self.router.write(router);
-        self.ownable.initializer(get_caller_address()); 
+        self.ownable.initializer(owner); 
     }
 
     #[generate_trait]
@@ -259,6 +259,7 @@ mod NostraGateway {
     #[abi(embed_v0)]
     impl INostraGatewayImpl of INostraGateway<ContractState> {
         fn add_supported_asset(ref self: ContractState, underlying: ContractAddress, debt: ContractAddress, collateral: ContractAddress, ibcollateral: ContractAddress) {
+            self.ownable.assert_only_owner();
             self.underlying_to_ndebt.write(underlying, debt);
             self.underlying_to_ncollateral.write(underlying, collateral);
             self.underlying_to_nibcollateral.write(underlying, ibcollateral);

@@ -52,7 +52,7 @@ pub trait IVesuViewer<TContractState> {
     ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
     fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
     fn get_supported_assets_info(self: @TContractState, user: ContractAddress, pool_id: felt252) -> Array<(ContractAddress, felt252, u8, u256)>;
-    fn get_supported_assets_ui(self: @TContractState) -> Array<TokenMetadata>;
+    fn get_supported_assets_ui(self: @TContractState, pool_id: felt252) -> Array<TokenMetadata>;
     fn get_asset_price(self: @TContractState, asset: ContractAddress) -> u256;
 }
 
@@ -130,12 +130,13 @@ mod VesuGateway {
         vesu_singleton: ContractAddress,
         pool_id: felt252,
         router: ContractAddress,
+        owner: ContractAddress,
         supported_assets: Array<ContractAddress>,
     ) {
         self.vesu_singleton.write(vesu_singleton);
         self.pool_id.write(pool_id);
         self.router.write(router);
-        self.ownable.initializer(get_caller_address());
+        self.ownable.initializer(owner);
         for asset in supported_assets {
             self.supported_assets.append().write(asset);
         }
@@ -786,10 +787,10 @@ mod VesuGateway {
             price.value
         }
 
-        fn get_supported_assets_ui(self: @ContractState) -> Array<TokenMetadata> {
+        fn get_supported_assets_ui(self: @ContractState, pool_id: felt252) -> Array<TokenMetadata> {
             let mut assets = array![];
             let len = self.supported_assets.len();
-            let pool_id = self.pool_id.read();
+            let pool_id = if pool_id == Zero::zero() { self.pool_id.read() } else { pool_id };
             let singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
             };

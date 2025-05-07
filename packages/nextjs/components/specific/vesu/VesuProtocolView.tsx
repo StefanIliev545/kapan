@@ -19,6 +19,13 @@ import {
   toAnnualRates,
 } from "~~/utils/protocols";
 
+// Define pool IDs
+const POOL_IDS = {
+  "Genesis": 0n,
+  "Re7 USDC": 3592370751539490711610556844458488648008775713878064059760995781404350938653n,
+  "Alterscope wstETH": 2612229586214495842527551768232431476062656055007024497123940017576986139174n,
+} as const;
+
 type ContractResponse = {
   readonly type: "core::array::Array::<kapan::gateways::VesuGateway::TokenMetadata>";
   readonly address: bigint;
@@ -45,19 +52,21 @@ type PositionTuple = {
 
 export const VesuProtocolView: FC = () => {
   const { address: userAddress } = useAccount();
+  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
 
   // Fetch supported assets
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
-    args: [],
+    args: [selectedPoolId],
     refetchInterval: 0,
   });
+
   // Fetch user positions if connected
   const { data: userPositions, error: positionsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions",
-    args: [userAddress || "0x0", 0n], // Use zero address if not connected
+    args: [userAddress || "0x0", selectedPoolId], // Use zero address if not connected
     watch: true,
     refetchInterval: 5000,
   });
@@ -112,6 +121,13 @@ export const VesuProtocolView: FC = () => {
 
       // Calculate rates for all supported assets
       const assetsWithRates = (supportedAssets as unknown as ContractResponse).map(asset => {
+        if (asset.scale == 0n) {
+          return {
+            ...asset,
+            borrowAPR: 0,
+            supplyAPY: 0,
+          };
+        }
         const { borrowAPR, supplyAPY } = toAnnualRates(
           asset.fee_rate,
           asset.total_nominal_debt,
@@ -137,10 +153,11 @@ export const VesuProtocolView: FC = () => {
           nominalDebt={positionData.nominal_debt.toString()}
           isVtoken={positionData.is_vtoken}
           supportedAssets={assetsWithRates as unknown as TokenMetadata[]}
+          poolId={selectedPoolId}
         />
       );
     });
-  }, [userPositions, supportedAssets]);
+  }, [userPositions, supportedAssets, selectedPoolId]);
 
   if (assetsError) {
     console.error("Error fetching supported assets:", assetsError);
@@ -152,6 +169,29 @@ export const VesuProtocolView: FC = () => {
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
           <h2 className="card-title text-lg border-b border-base-200 pb-2">Vesu Markets</h2>
+          
+          {/* Pool Selection Tabs */}
+          <div className="tabs tabs-boxed mb-4">
+            <button
+              className={`tab ${selectedPoolId === POOL_IDS["Genesis"] ? "tab-active" : ""}`}
+              onClick={() => setSelectedPoolId(POOL_IDS["Genesis"])}
+            >
+              Genesis
+            </button>
+            <button
+              className={`tab ${selectedPoolId === POOL_IDS["Re7 USDC"] ? "tab-active" : ""}`}
+              onClick={() => setSelectedPoolId(POOL_IDS["Re7 USDC"])}
+            >
+              Re7 USDC
+            </button>
+            <button
+              className={`tab ${selectedPoolId === POOL_IDS["Alterscope wstETH"] ? "tab-active" : ""}`}
+              onClick={() => setSelectedPoolId(POOL_IDS["Alterscope wstETH"])}
+            >
+              Alterscope wstETH
+            </button>
+          </div>
+
           <div className="space-y-2">{marketRows}</div>
         </div>
       </div>

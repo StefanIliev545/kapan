@@ -26,6 +26,11 @@ export const toAnnualRates = (
   reserve: bigint,
   scale: bigint,
 ) => {
+  // Return early if scale is 0 to avoid division by zero
+  if (scale === 0n) {
+    return { borrowAPR: 0, supplyAPY: 0 };
+  }
+
   const borrowAPR = toAPR(interestPerSecond);
   const totalBorrowed = Number((total_nominal_debt * last_rate_accumulator) / SCALE);
   const reserveScale = Number((reserve * SCALE) / scale);

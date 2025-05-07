@@ -26,6 +26,7 @@ interface VesuPositionProps {
   nominalDebt: string;
   isVtoken: boolean;
   supportedAssets: TokenMetadata[];
+  poolId: bigint;
 }
 
 // Helper: Format BigInt values with a provided number of decimals (for display)
@@ -75,6 +76,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   nominalDebt,
   isVtoken,
   supportedAssets,
+  poolId,
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -375,6 +377,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               type: "borrow",
               tokenAddress: debtAsset,
               decimals: debtMetadata ? Number(debtMetadata.decimals) : Number(18),
+              poolId: poolId,
             }}
             preSelectedCollaterals={preSelectedCollateral}
             disableCollateralSelection={true}

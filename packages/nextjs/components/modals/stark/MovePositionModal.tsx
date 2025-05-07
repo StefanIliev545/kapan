@@ -42,6 +42,19 @@ const formatDisplayNumber = (value: string | number) => {
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
 
+// Define pool IDs
+const POOL_IDS = {
+  "Genesis": 0n,
+  "Re7 USDC": 3592370751539490711610556844458488648008775713878064059760995781404350938653n,
+  "Alterscope wstETH": 2612229586214495842527551768232431476062656055007024497123940017576986139174n,
+} as const;
+
+// Helper function to get pool name from ID
+const getPoolNameFromId = (poolId: bigint): string => {
+  const entry = Object.entries(POOL_IDS).find(([_, id]) => id === poolId);
+  return entry ? entry[0] : "Unknown Pool";
+};
+
 interface MovePositionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,6 +65,7 @@ interface MovePositionModalProps {
     type: "supply" | "borrow";
     tokenAddress: string;
     decimals: number; // Add decimals for proper amount parsing
+    poolId?: bigint; // Add current pool ID
   };
   preSelectedCollaterals?: CollateralWithAmount[];
   disableCollateralSelection?: boolean;
@@ -84,11 +98,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 }) => {
   const { address: userAddress } = useAccount();
   const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }], []);
-  const { tokenAddress, decimals, type, name, balance } = position;
+  const { tokenAddress, decimals, type, name, balance, poolId: currentPoolId } = position;
 
   const [selectedProtocol, setSelectedProtocol] = useState(
     () => protocols.find(p => p.name !== fromProtocol)?.name || "",
   );
+  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
@@ -428,11 +443,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        0n,
+        currentPoolId || 0n,
         BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        0n,
+        currentPoolId || 0n,
         BigInt(position.tokenAddress),
       ]);
     }
@@ -442,11 +457,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        0n,
+        selectedPoolId,
         BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        0n,
+        selectedPoolId,
         BigInt(position.tokenAddress),
       ]);
     }
@@ -570,6 +585,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     isAmountMaxClicked,
     tokenToPrices,
     maxClickedCollaterals,
+    currentPoolId,
   ]);
 
   // Get authorizations for the instructions
@@ -701,6 +717,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setAmount("0");
     }
   }, [position.balance, position.decimals]);
+
+  // Modify the protocol selection handler
+  const handleProtocolSelection = (protocolName: string) => {
+    setSelectedProtocol(protocolName);
+    // Reset pool selection when changing protocols
+    if (protocolName !== "Vesu") {
+      setSelectedPoolId(POOL_IDS["Genesis"]);
+    }
+  };
 
   const handleMovePosition = async () => {
     try {
@@ -876,12 +901,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
                 >
                   {protocols
-                    .filter(p => p.name !== fromProtocol)
+                    .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu"))
                     .map(protocol => (
                       <li key={protocol.name}>
                         <button
                           className="flex items-center gap-2 py-1"
-                          onClick={() => setSelectedProtocol(protocol.name)}
+                          onClick={() => handleProtocolSelection(protocol.name)}
                         >
                           <Image
                             src={getProtocolLogo(protocol.name)}
@@ -898,6 +923,55 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Add Pool Selection for Vesu to Vesu */}
+          {selectedProtocol === "Vesu" && (
+            <div className="space-y-1">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-medium text-base-content/80">Target Pool</label>
+                {fromProtocol === "Vesu" && (
+                  <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
+                    <span className="text-base-content/70">Current Pool:</span>
+                    <span className="font-medium ml-1">{currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}</span>
+                  </div>
+                )}
+              </div>
+              <div className="dropdown w-full">
+                <div
+                  tabIndex={0}
+                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
+                >
+                  <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
+                    {Object.entries(POOL_IDS).map(([name, id]) => (
+                      id === selectedPoolId && (
+                        <span key={name} className="truncate font-medium text-sm">{name}</span>
+                      )
+                    ))}
+                  </div>
+                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                >
+                  {Object.entries(POOL_IDS)
+                    .filter(([_, id]) => fromProtocol !== "Vesu" || id !== currentPoolId) // Only filter out current pool if source is Vesu
+                    .map(([name, id]) => (
+                      <li key={name}>
+                        <button
+                          className="flex items-center gap-2 py-1"
+                          onClick={() => setSelectedPoolId(id)}
+                        >
+                          <span className="truncate text-sm">{name}</span>
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            </div>
+          )}
 
           {/* Amount Input */}
           <div className="space-y-1">
@@ -983,7 +1057,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               !selectedProtocol ||
               !amount ||
               !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-              step !== "idle"
+              step !== "idle" ||
+              (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId) // Prevent same pool selection
             }
           >
             {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
