@@ -57,7 +57,7 @@ export const VesuProtocolView: FC = () => {
   const { data: userPositions, error: positionsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions",
-    args: [userAddress || "0x0"], // Use zero address if not connected
+    args: [userAddress || "0x0", 0n], // Use zero address if not connected
     watch: true,
     refetchInterval: 5000,
   });

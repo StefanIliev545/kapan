@@ -43,6 +43,34 @@ const contracts = {
               outputs: [],
               state_mutability: "external",
             },
+            {
+              type: "function",
+              name: "add_pool",
+              inputs: [
+                {
+                  name: "pool",
+                  type: "core::felt252",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "add_pool_asset",
+              inputs: [
+                {
+                  name: "pool",
+                  type: "core::felt252",
+                },
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
           ],
         },
         {
@@ -483,6 +511,10 @@ const contracts = {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
+                },
               ],
               outputs: [
                 {
@@ -509,6 +541,10 @@ const contracts = {
                 {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
                 },
               ],
               outputs: [
@@ -2277,6 +2313,34 @@ const contracts = {
               outputs: [],
               state_mutability: "external",
             },
+            {
+              type: "function",
+              name: "add_pool",
+              inputs: [
+                {
+                  name: "pool",
+                  type: "core::felt252",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "add_pool_asset",
+              inputs: [
+                {
+                  name: "pool",
+                  type: "core::felt252",
+                },
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
           ],
         },
         {
@@ -2717,6 +2781,10 @@ const contracts = {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
+                },
               ],
               outputs: [
                 {
@@ -2743,6 +2811,10 @@ const contracts = {
                 {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
                 },
               ],
               outputs: [
@@ -3662,7 +3734,7 @@ const contracts = {
   sepolia: {
     RouterGateway: {
       address:
-        "0x1e689c546512e3d0a8621f8cdc0b694132405ebf2ab480453e76532494669cb",
+        "0xb97df197ec78d31429bc12871dca425df3bf8338ed0c6baaba8c3130fd58cd",
       abi: [
         {
           type: "impl",
@@ -4075,7 +4147,7 @@ const contracts = {
     },
     VesuGateway: {
       address:
-        "0x77235ada0b52d52161449d9a6493a82472998f2e7252fd53f2ace61defddde5",
+        "0x531aaaea374a732ade79618895161227461b6551601af93776d9af99973cef6",
       abi: [
         {
           type: "impl",
@@ -4090,6 +4162,34 @@ const contracts = {
               type: "function",
               name: "add_asset",
               inputs: [
+                {
+                  name: "asset",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "add_pool",
+              inputs: [
+                {
+                  name: "pool",
+                  type: "core::felt252",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "add_pool_asset",
+              inputs: [
+                {
+                  name: "pool",
+                  type: "core::felt252",
+                },
                 {
                   name: "asset",
                   type: "core::starknet::contract_address::ContractAddress",
@@ -4538,6 +4638,10 @@ const contracts = {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
                 },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
+                },
               ],
               outputs: [
                 {
@@ -4564,6 +4668,10 @@ const contracts = {
                 {
                   name: "user",
                   type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
                 },
               ],
               outputs: [
@@ -4749,11 +4857,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x452702d6d52f0405a4d4c9c2f9bb3a6a0f3c68efea8c9f815135ffeca18584b",
+        "0x4610b81492a860434b575b6121c76fa18a246e2f7e53562027ea22716d8a431",
     },
     NostraGateway: {
       address:
-        "0x1175686a64d8b971eb2a0fe118a49e90023b60b31fed1de0277b63f27f3db8f",
+        "0x514584a6670826091169ed6f6177af23773f9702fccdeae30d6ce33f6ed022",
       abi: [
         {
           type: "impl",
@@ -5363,7 +5471,7 @@ const contracts = {
     },
     OptimalInterestRateFinder: {
       address:
-        "0x6b7c3ba7179c031cbab1e9843fc99f72c621322fae7ff526d6dce3625daa177",
+        "0x22060e42ad9a928b3b6dac2a1dcabec6810173794aa7854e8994cf425c802f8",
       abi: [
         {
           type: "impl",
@@ -5481,7 +5589,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x36c4b3074fec815a398803e66333a3570d1bc41b0918b9d95cc698b32bcb075",
+        "0x6b195a8ef3e3bed2940aa25ea3542ace4e8be97e601092f256d7d3abf30b68f",
       abi: [
         {
           type: "impl",

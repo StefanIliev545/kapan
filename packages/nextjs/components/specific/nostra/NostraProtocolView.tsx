@@ -93,13 +93,14 @@ export const NostraProtocolView: FC = () => {
       },
       {} as Record<string, number>,
     );
-    const tokenToPrices = prices?.reduce(
-      (acc, price, index) => {
-        acc[tokenAddresses[index]] = price / 10n ** 10n; // haven't figured out why this works but fuck it.
-        return acc;
-      },
-      {} as Record<string, bigint>,
-    ) ?? {};
+    const tokenToPrices =
+      prices?.reduce(
+        (acc, price, index) => {
+          acc[tokenAddresses[index]] = price / 10n ** 10n; // haven't figured out why this works but fuck it.
+          return acc;
+        },
+        {} as Record<string, bigint>,
+      ) ?? {};
     return { tokenToDecimals, tokenToPrices };
   }, [tokenDecimals, tokenAddresses, tokenPrices]);
 

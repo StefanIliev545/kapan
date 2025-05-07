@@ -82,72 +82,70 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   preSelectedCollaterals,
   disableCollateralSelection,
 }) => {
-    const { address: userAddress } = useAccount();
-    const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }], []);
-    const { tokenAddress, decimals, type, name, balance } = position;
-  
-    const [selectedProtocol, setSelectedProtocol] = useState(() => 
-      protocols.find(p => p.name !== fromProtocol)?.name || ""
-    );
-    const [amount, setAmount] = useState("");
-    const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
-    const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
-      preSelectedCollaterals || []
-    );
-    const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
-    const [loading, setLoading] = useState(false);
-    const [step, setStep] = useState<MoveStep>("idle");
-    const [error, setError] = useState<string | null>(null);
-  
-    const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
-  
-    const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
-      protocolName: fromProtocol as "Vesu" | "Nostra",
-      userAddress: userAddress || "0x0000000000000000000000000000000000000000",
-      isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"),
-    });
-  
-    const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
-      protocolName: selectedProtocol as "Vesu" | "Nostra",
-      userAddress: userAddress || "0x0000000000000000000000000000000000000000",
-      isOpen: isOpen && !!selectedProtocol,
-    });
-  
-    const collateralsForSelector = useMemo(() => {
-      if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
-        return preSelectedCollaterals.map(collateral => ({
-          symbol: collateral.symbol,
-          balance: Number(collateral.inputValue || collateral.amount.toString()),
-          address: collateral.token,
-          decimals: collateral.decimals,
-          rawBalance: collateral.amount,
-          supported: true,
-        }));
-      }
-  
-      let filtered = sourceCollaterals.filter(c => c.balance > 0);
-      if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && type === "borrow") {
-        filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
-      }
-  
-      return targetCollaterals.length > 0
-        ? filtered.map(collateral => ({
-            ...collateral,
-            supported: targetCollaterals.some(tc => 
-              tc.address.toLowerCase() === collateral.address.toLowerCase()
-            ),
-          }))
-        : filtered;
-    }, [
-      sourceCollaterals,
-      targetCollaterals,
-      preSelectedCollaterals,
-      disableCollateralSelection,
-      fromProtocol,
-      selectedProtocol,
-      type,
-      tokenAddress,
-    ]);
+  const { address: userAddress } = useAccount();
+  const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }], []);
+  const { tokenAddress, decimals, type, name, balance } = position;
+
+  const [selectedProtocol, setSelectedProtocol] = useState(
+    () => protocols.find(p => p.name !== fromProtocol)?.name || "",
+  );
+  const [amount, setAmount] = useState("");
+  const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
+  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
+    preSelectedCollaterals || [],
+  );
+  const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<MoveStep>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
+
+  const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
+    protocolName: fromProtocol as "Vesu" | "Nostra",
+    userAddress: userAddress || "0x0000000000000000000000000000000000000000",
+    isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"),
+  });
+
+  const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
+    protocolName: selectedProtocol as "Vesu" | "Nostra",
+    userAddress: userAddress || "0x0000000000000000000000000000000000000000",
+    isOpen: isOpen && !!selectedProtocol,
+  });
+
+  const collateralsForSelector = useMemo(() => {
+    if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
+      return preSelectedCollaterals.map(collateral => ({
+        symbol: collateral.symbol,
+        balance: Number(collateral.inputValue || collateral.amount.toString()),
+        address: collateral.token,
+        decimals: collateral.decimals,
+        rawBalance: collateral.amount,
+        supported: true,
+      }));
+    }
+
+    let filtered = sourceCollaterals.filter(c => c.balance > 0);
+    if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && type === "borrow") {
+      filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
+    }
+
+    return targetCollaterals.length > 0
+      ? filtered.map(collateral => ({
+          ...collateral,
+          supported: targetCollaterals.some(tc => tc.address.toLowerCase() === collateral.address.toLowerCase()),
+        }))
+      : filtered;
+  }, [
+    sourceCollaterals,
+    targetCollaterals,
+    preSelectedCollaterals,
+    disableCollateralSelection,
+    fromProtocol,
+    selectedProtocol,
+    type,
+    tokenAddress,
+  ]);
 
   const { data: tokenPrices } = useScaffoldReadContract({
     contractName: "UiHelper",
@@ -162,10 +160,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     const prices = tokenPrices as unknown as bigint[];
     const addresses = [...collateralsForSelector.map(c => c.address), tokenAddress];
     return {
-      tokenToPrices: prices.reduce((acc, price, index) => ({
-        ...acc,
-        [addresses[index]]: price / 10n ** 10n,
-      }), {} as Record<string, bigint>)
+      tokenToPrices: prices.reduce(
+        (acc, price, index) => ({
+          ...acc,
+          [addresses[index]]: price / 10n ** 10n,
+        }),
+        {} as Record<string, bigint>,
+      ),
     };
   }, [tokenPrices, collateralsForSelector, tokenAddress]);
 
@@ -173,7 +174,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const isLoadingCollaterals = isLoadingSourceCollaterals || isLoadingTargetCollaterals;
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
-    if (!amount || !userAddress || !routerGateway?.address) 
+    if (!amount || !userAddress || !routerGateway?.address)
       return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] } };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
@@ -308,7 +309,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             ? (collateral.amount * BigInt(101)) / BigInt(100)
             : collateral.amount;
 
-            // Create context with paired tokens for Vesu
+          // Create context with paired tokens for Vesu
           const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
             0n,
             BigInt(position.tokenAddress),
@@ -559,19 +560,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     };
   }, [
     amount,
-    isAmountMaxClicked,
     userAddress,
+    routerGateway?.address,
+    position.decimals,
+    position.tokenAddress,
     fromProtocol,
     selectedProtocol,
-    tokenAddress,
-    decimals,
-    type,
-    name,
-    balance,
-    routerGateway?.address,
     selectedCollateralsWithAmounts,
-    maxClickedCollaterals,
+    isAmountMaxClicked,
     tokenToPrices,
+    maxClickedCollaterals,
   ]);
 
   // Get authorizations for the instructions

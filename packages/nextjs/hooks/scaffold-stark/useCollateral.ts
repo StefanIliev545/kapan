@@ -27,9 +27,10 @@ export function useCollateral({
   const { data, isLoading } = useScaffoldReadContract({
     contractName,
     functionName: "get_supported_assets_info",
-    args: [userAddress],
+    args: (protocolName === "Vesu" ? [userAddress, 0n] : [userAddress]) as any,
+    refetchInterval: 10000,
     enabled: isOpen && !!userAddress,
-  });
+  } as any); //hack cause function definitions differ for nostra and vesu. TODO: fix this
 
   // data: Array<(ContractAddress, felt252, u8, u256)>
   const collaterals: CollateralToken[] = Array.isArray(data)

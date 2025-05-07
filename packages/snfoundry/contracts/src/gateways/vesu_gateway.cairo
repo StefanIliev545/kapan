@@ -18,6 +18,8 @@ pub mod Errors {
 #[starknet::interface]
 pub trait IVesuGatewayAdmin<TContractState> {
     fn add_asset(ref self: TContractState, asset: ContractAddress);
+    fn add_pool(ref self: TContractState, pool: felt252);
+    fn add_pool_asset(ref self: TContractState, pool: felt252, asset: ContractAddress);
 }
 
 #[derive(Drop, Serde)]
@@ -46,10 +48,10 @@ pub struct PositionWithAmounts {
 #[starknet::interface]
 pub trait IVesuViewer<TContractState> {
     fn get_all_positions(
-        self: @TContractState, user: ContractAddress,
+        self: @TContractState, user: ContractAddress, pool_id: felt252
     ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
     fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
-    fn get_supported_assets_info(self: @TContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)>;
+    fn get_supported_assets_info(self: @TContractState, user: ContractAddress, pool_id: felt252) -> Array<(ContractAddress, felt252, u8, u256)>;
     fn get_supported_assets_ui(self: @TContractState) -> Array<TokenMetadata>;
     fn get_asset_price(self: @TContractState, asset: ContractAddress) -> u256;
 }
@@ -115,6 +117,8 @@ mod VesuGateway {
         vesu_singleton: ContractAddress,
         pool_id: felt252,
         supported_assets: Vec<ContractAddress>,
+        supported_pools: Vec<felt252>,
+        supported_pool_assets: Map<felt252, Vec<ContractAddress>>,
         router: ContractAddress,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
@@ -422,6 +426,17 @@ mod VesuGateway {
             self.ownable.assert_only_owner();
             self.supported_assets.append().write(asset);
         }
+
+        fn add_pool(ref self: ContractState, pool: felt252) {
+            self.ownable.assert_only_owner();
+            self.supported_pools.push(pool);
+        }
+
+        fn add_pool_asset(ref self: ContractState, pool: felt252, asset: ContractAddress) {
+            self.ownable.assert_only_owner();
+            let mut supported_pool_assets = self.supported_pool_assets.entry(pool);
+            supported_pool_assets.push(asset);
+        }
     }
 
     #[abi(embed_v0)]
@@ -634,12 +649,12 @@ mod VesuGateway {
             assets
         }
 
-        fn get_supported_assets_info(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)> {
+        fn get_supported_assets_info(self: @ContractState, user: ContractAddress, pool_id: felt252) -> Array<(ContractAddress, felt252, u8, u256)> {
             let mut assets = array![];
             let supported_assets = self.supported_assets;
             let len = supported_assets.len();
 
-            let positions = self.get_all_positions(user);
+            let positions = self.get_all_positions(user, pool_id);
             let mut positions_map : Felt252Dict<u32> = Default::default();
 
             for number in 0..positions.len() {
@@ -665,11 +680,11 @@ mod VesuGateway {
         }
 
         fn get_all_positions(
-            self: @ContractState, user: ContractAddress,
+            self: @ContractState, user: ContractAddress, pool_id: felt252
         ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
             let mut positions = array![];
             let supported_assets = self.get_supported_assets_array();
-            let pool_id = self.pool_id.read();
+            let pool_id = if pool_id == Zero::zero() { self.pool_id.read() } else { pool_id };
             let singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
             };
