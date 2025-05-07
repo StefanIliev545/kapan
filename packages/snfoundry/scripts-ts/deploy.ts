@@ -14,8 +14,8 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac", // WBTC
     "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8", // USDC
     "0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8", // USDT
-    "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2", // WSTETH
     "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
+    "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // WSTETH NEW
   ];
 
   const { address: routerGatewayAddress } = await deployContract({
@@ -225,7 +225,7 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
       entrypoint: "add_pool_asset",
       calldata: [ 
         re7Pool, 
-        "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2" // WSTETH
+        "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" // WSTETH
       ]
     },
     {
@@ -270,7 +270,7 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
       entrypoint: "add_pool_asset",
       calldata: [ 
         alterscopeWstETh, 
-        "0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2" // WSTETH
+        "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" // WSTETH
       ]
     },
     {
