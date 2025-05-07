@@ -29,7 +29,7 @@ const ConnectModal = () => {
   return (
     <div
       onClick={connectWallet}
-      className="text-sm font-semibold text-primary hover:opacity-80 transition-opacity duration-200 cursor-pointer whitespace-nowrap"
+      className="text-sm font-semibold text-primary dark:text-accent hover:opacity-80 transition-opacity duration-200 cursor-pointer whitespace-nowrap"
     >
       Connect Starknet
     </div>
