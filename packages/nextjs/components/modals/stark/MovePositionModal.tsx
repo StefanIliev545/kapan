@@ -964,6 +964,42 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                           className="flex items-center gap-2 py-1"
                           onClick={() => setSelectedPoolId(id)}
                         >
+                          {name === "Genesis" && (
+                            <Image
+                              src="/logos/vesu.svg"
+                              alt="Vesu"
+                              width={20}
+                              height={20}
+                              className="rounded-full min-w-[20px]"
+                            />
+                          )}
+                          {name === "Re7 USDC" && (
+                            <Image
+                              src="/logos/re7.svg"
+                              alt="Re7"
+                              width={20}
+                              height={20}
+                              className="rounded-full min-w-[20px]"
+                            />
+                          )}
+                          {name === "Alterscope wstETH" && (
+                            <>
+                              <Image
+                                src="/logos/alterscope_symbol_black.svg"
+                                alt="Alterscope"
+                                width={20}
+                                height={20}
+                                className="rounded-full min-w-[20px] dark:hidden"
+                              />
+                              <Image
+                                src="/logos/alterscope_symbol_white.svg"
+                                alt="Alterscope"
+                                width={20}
+                                height={20}
+                                className="rounded-full min-w-[20px] hidden dark:block"
+                              />
+                            </>
+                          )}
                           <span className="truncate text-sm">{name}</span>
                         </button>
                       </li>
