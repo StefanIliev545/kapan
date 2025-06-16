@@ -71,6 +71,8 @@ mod RouterGateway {
     #[generate_trait]
     impl InternalFunctions of InternalFunctionsTrait {
 
+        // @dev - Internal function that translates redeposit and reborrow to normal borrow and deposit instructions as
+        // those instructions only have a meaning here in the router during the flash loan process.
         fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, balanceDiffs: Span<u256>) -> Span<LendingInstruction> {
             let mut remappedInstructions = array![];
             for instruction in instructions {
@@ -102,6 +104,9 @@ mod RouterGateway {
             }
             remappedInstructions.span()
         }
+
+        // @dev - befor sending instructions to the protocol's gateway we need to grant necessary approvals.
+        // furthermore we keep track of the balances beforehand in order to calculate diffs.
         fn before_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, should_transfer: bool) -> Span<u256> {
             let mut i: usize = 0;
             let mut balancesBefore = array![];
@@ -146,6 +151,9 @@ mod RouterGateway {
             balancesBefore.span()
         }
 
+        // @dev - after the instructions are executed we need to send back to the user the balance differences.
+        // It is however possible to skip the transfer in cases of debt refinancing where the balances are used in place
+        // to fund the follow up redeposit. 
         fn after_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, balancesBefore: Span<u256>, should_transfer: bool) -> Span<u256> {
             let mut i: usize = 0;
             let mut balancesAfter = array![];
@@ -194,10 +202,13 @@ mod RouterGateway {
             balancesAfter.span()
         }
 
+        // @dev - the core logic loop of the router. It goes protocol by protocol, giving approvals and transfering from caller
+        // before forwarding to the concrete protocol's gateway. Then it looks at balance diffs and transfers back to the user.
         fn process_protocol_instructions_internal(ref self: ContractState, instructions: Span<ProtocolInstructions>, should_transfer: bool) {
             let mut i: usize = 0;
             let mut balancesDiffs = array![].span();
             while i != instructions.len() {
+                println!("Processing protocol instruction {}", i);
                 let protocol_instruction = instructions.at(i);
                 let gateway = self.gateways.read(*protocol_instruction.protocol_name);
                 assert(!gateway.is_zero(), 'Gateway not supported');
@@ -207,16 +218,19 @@ mod RouterGateway {
                     instructions_span = self.remap_instructions(instructions_span, balancesDiffs);
                 }
 
+
                 let balancesBefore = self.before_send_instructions(gateway, instructions_span, should_transfer);
                 let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
                 dispatcher.process_instructions(instructions_span);
                 balancesDiffs = self.after_send_instructions(gateway, instructions_span, balancesBefore, should_transfer);
+                println!("Processed protocol instruction {}", i);
                 i += 1;
             }
         }
 
 
-
+        // @dev - gets how much to borrow for a flash loan. If we want to repay all, then we need to pull the current debt
+        // at the time of processing the transaction as it varies with time.
         fn get_flash_loan_amount(ref self: ContractState, instructions: Span<ProtocolInstructions>) -> (ContractAddress, u256) {
            let mut flash_loan_amount : u256 = 0;
            let mut token : ContractAddress = Zero::zero();
@@ -236,6 +250,8 @@ mod RouterGateway {
            (token, flash_loan_amount)
         }
 
+        // @dev - as each instruction is carrying a user, we need to ensure it matches the caller.
+        // A bit ugly, but it was an oversight in the design :/ 
         fn ensure_user_matches_caller(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
             for protocolInstruction in instructions {
                 for instruction in protocolInstruction.instructions {
@@ -282,11 +298,16 @@ mod RouterGateway {
             self.emit(GatewayAdded { protocol_name, gateway });
         }
 
+        // @dev - entrypoint for all processing of logic. Allows bundling multiple operations in one single call,
+        // like deposit and borrow for example. 
         fn process_protocol_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
             self.ensure_user_matches_caller(instructions);
             self.process_protocol_instructions_internal(instructions, true);
         }
 
+        // @dev - view function that returns encoded calls which are used to give approval for the operations desired in the instructions.
+        // This is used in the UI, but can be used by other contracts. Relies on the assumption that none of the contracts are upgradeable.
+        // Otherwise integrating this function in a contract would be unsafe.
         fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {
             let mut authorizations = ArrayTrait::new();
             for instruction in instructions {
@@ -301,6 +322,10 @@ mod RouterGateway {
             return authorizations.span();
         }
 
+        // @dev - entrypoint for the logic that refinances debt between two protocols.
+        // It is a wrapper around the flash loan logic, which redirects back to processing protocol instructions.
+        // Ensures that the flash loan reflects accurate debt amounts as they scale with time and you cannot craft a transaction
+        // that exactly matches the debt amount, thus the contract needs to replace the amount to be borrowed if we want to repay all.
         fn move_debt(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
             self.ensure_user_matches_caller(instructions);
             let flashloan_provider = IFlashloanProviderDispatcher { contract_address: self.flashloan_provider.read() };
@@ -310,14 +335,19 @@ mod RouterGateway {
             // Serialize instructions for flash loan data
             let mut data = ArrayTrait::new();
             Serde::serialize(@instructions, ref data);
+            println!("Requesting flash loan");
             flashloan_provider.flash_loan(get_contract_address(), asset, amount, is_legacy, data.span());
         }
     }
 
     #[abi(embed_v0)]
     impl RouterGatewayFlashloanReceiver of IFlashloanReceiver<ContractState> {
+        // @dev - The callback function that vesu calls when the flash loan is executed.
+        // Relies on the assumption that sender cannot be cheated as it prevents other contracts from calling this through
+        // the flash loan provider.
         fn on_flash_loan(ref self: ContractState, sender: ContractAddress, asset: ContractAddress, amount: u256, data: Span<felt252>) {
             assert(sender == get_contract_address(), 'sender mismatch');
+            println!("Received flash loan");
             let mut data = data;
             let mut protocol_instructions: Span<ProtocolInstructions> = Serde::deserialize(ref data).unwrap();
                   // Collect all repay amounts and calculate total

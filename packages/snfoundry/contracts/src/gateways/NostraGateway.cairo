@@ -38,7 +38,7 @@ mod NostraGateway {
     use super::{IERC20SymbolDispatcher, IERC20SymbolDispatcherTrait};
     use openzeppelin::token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use starknet::{contract_address_const, get_caller_address, get_contract_address};
+    use starknet::{get_caller_address, get_contract_address};
     use core::num::traits::Zero;
     use super::InterestState;
 
@@ -76,6 +76,7 @@ mod NostraGateway {
 
     #[generate_trait]
     impl NostraInternalFunctions of NostraInternalFunctionsTrait {
+        // @dev - deposit underlying into nostra minting collateral tokens.
         fn deposit(ref self: ContractState, deposit: @Deposit) {
             let deposit = *deposit;
             let underlying = deposit.basic.token;
@@ -96,6 +97,8 @@ mod NostraGateway {
             collateral.mint(user, amount);
         }
 
+        // @dev - pull the underlying collateral from a user. Requires permission from the user to this contract.
+        // caller is restricted to router or the user in the instruction as this is an outbound flow.
         fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
             let withdraw = *withdraw;
             let underlying = withdraw.basic.token;
@@ -117,6 +120,8 @@ mod NostraGateway {
             collateral.burn(get_contract_address(), get_caller_address(), amount);
         }
 
+        // @dev - mint the debt token and transfer the underlying to caller.
+        // caller is restricted to router or the user in the instruction as this is an outbound flow.
         fn borrow(ref self: ContractState, borrow: @Borrow) {
             let borrow = *borrow;
             let underlying = borrow.basic.token;
@@ -140,6 +145,8 @@ mod NostraGateway {
             assert(underlying_token.transfer(get_caller_address(), amount), 'transfer failed');
         }
 
+        // @dev - burns the debt token amounts by transfering the underlying.
+        // caller not restricted as this is inbound flow.
         fn repay(ref self: ContractState, repay: @Repay) {
             let repay = *repay;
             let underlying = repay.basic.token;
@@ -191,6 +198,7 @@ mod NostraGateway {
             }
         }
 
+        // @dev - encodes approvals for depositing into nostra or approvals for minting borrow tokens on behalf of the user by THIS contract.
         fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {
             let mut authorizations = ArrayTrait::new();
             for instruction in instructions {
@@ -246,6 +254,7 @@ mod NostraGateway {
             return authorizations.span();
         }
 
+        // @dev - for a given repay instruction, pulls the current debt amount.
         fn get_flash_loan_amount(ref self: ContractState, repay: Repay) -> u256 {
             if repay.repay_all {
                 let debt_token = IERC20Dispatcher { contract_address: self.underlying_to_ndebt.read(repay.basic.token) };
@@ -266,6 +275,7 @@ mod NostraGateway {
             self.supported_assets.append().write(underlying);
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_supported_assets_array(self: @ContractState) -> Array<ContractAddress> {
             let mut assets = array![];
             let supported_assets = self.supported_assets;
@@ -276,6 +286,7 @@ mod NostraGateway {
             assets
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_supported_assets_info(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u8, u256)> {
             let mut assets = array![];
             let supported_assets = self.supported_assets;
@@ -297,6 +308,7 @@ mod NostraGateway {
             assets
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_user_positions(self: @ContractState, user: ContractAddress) -> Array<(ContractAddress, felt252, u256, u256)> {
             let mut positions = array![];
             let mut i = 0;
@@ -321,6 +333,7 @@ mod NostraGateway {
             return positions;
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_interest_rates(self: @ContractState, underlyings: Span<ContractAddress>) -> Array<InterestState> {
             let mut rates = array![];
             let mut i = 0;
@@ -342,6 +355,7 @@ mod NostraGateway {
 
     #[abi(embed_v0)]
     impl InterestRateViewImpl of InterestRateView<ContractState> {
+        // @dev - This is only used for UI purposes.
         fn get_borrow_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
             let interest_rate_model = self.interest_rate_model.read();
             let debt = self.underlying_to_ndebt.read(token_address);
@@ -350,6 +364,7 @@ mod NostraGateway {
             config.borrowing_rate
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_supply_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
             let interest_rate_model = self.interest_rate_model.read();
             let debt = self.underlying_to_ndebt.read(token_address);

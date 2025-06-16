@@ -45,7 +45,7 @@ use kapan::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDisp
 
 // Real contract address deployed on Sepolia
 fn SINGLETON_ADDRESS() -> ContractAddress {
-    contract_address_const::<0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef>()
+    contract_address_const::<0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160>()
 }
 
 // Nostra Finance tokens
@@ -119,6 +119,7 @@ fn deploy_nostra_gateway(router: ContractAddress) -> ContractAddress {
     let mut calldata = array![];
     calldata.append_serde(INTEREST_RATE_MODEL());
     calldata.append_serde(router);
+    calldata.append_serde(USER_ADDRESS());
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -127,9 +128,10 @@ fn deploy_nostra_gateway(router: ContractAddress) -> ContractAddress {
 fn deploy_vesu_gateway(router: ContractAddress) -> ContractAddress {
     let contract_class = declare("VesuGateway").unwrap().contract_class();
     let mut calldata = array![];
-    calldata.append_serde(contract_address_const::<0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef>());
+    calldata.append_serde(SINGLETON_ADDRESS());
     calldata.append_serde(2198503327643286920898110335698706244522220458610657370981979460625005526824);
     calldata.append_serde(router);
+    calldata.append_serde(USER_ADDRESS());
     let mut supported_assets = array![];
     supported_assets.append(ETH_ADDRESS());
     supported_assets.append(USDC_ADDRESS());
@@ -143,7 +145,7 @@ fn deploy_router_gateway() -> ContractAddress {
     let contract_class = declare("RouterGateway").unwrap().contract_class();
     let mut calldata = array![];
     calldata.append_serde(USER_ADDRESS());
-    calldata.append_serde(SINGLETON_ADDRESS());
+    calldata.append_serde(contract_address_const::<0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160>());
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -151,6 +153,7 @@ fn deploy_router_gateway() -> ContractAddress {
 // Add supported assets to NostraGateway
 fn add_supported_assets(gateway_address: ContractAddress) {
     let mut nostra_gateway = INostraGatewayDispatcher{ contract_address: gateway_address };
+    cheat_caller_address(gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
     // Add ETH
     nostra_gateway.add_supported_asset(
         ETH_ADDRESS(),
@@ -489,6 +492,7 @@ fn test_move_debt() {
         token: ETH_ADDRESS(),
         target_instruction_index: 1,
         user: USER_ADDRESS(),
+        context: Option::None,
     };
     let vesu_borrow = Reborrow {
         token: USDC_ADDRESS(),
@@ -611,6 +615,7 @@ fn test_move_debt_reverse() {
         token: ETH_ADDRESS(),
         target_instruction_index: 1,
         user: USER_ADDRESS(),
+        context: Option::None,
     };
     
     let vesu_borrow = Reborrow {

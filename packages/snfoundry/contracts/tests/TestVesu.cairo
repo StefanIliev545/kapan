@@ -16,10 +16,11 @@ use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTr
 use openzeppelin::utils::serde::SerializedAppend;
 use snforge_std::{CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare};
 use starknet::{ContractAddress, contract_address_const, get_caller_address};
+use core::array::ArrayTrait;
 
 // Real contract address deployed on Sepolia
 fn SINGLETON_ADDRESS() -> ContractAddress {
-    contract_address_const::<0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef>()
+    contract_address_const::<0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160>()
 }
 
 const POOL_ID: felt252 =
@@ -95,6 +96,9 @@ fn deploy_vesu_gateway(name: ByteArray) -> ContractAddress {
     let mut calldata = array![];
     calldata.append_serde(SINGLETON_ADDRESS());
     calldata.append_serde(POOL_ID);
+    calldata.append_serde(USER_ADDRESS()); // fake router
+    calldata.append_serde(USER_ADDRESS());
+
     // Add supported assets array
     let mut supported_assets = array![];
     supported_assets.append(eth_address);
@@ -353,7 +357,7 @@ fn test_get_all_positions() {
 
     // Get all positions
     let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };
-    let positions = vesuViewerDispatcher.get_all_positions(USER_ADDRESS());
+    let positions = vesuViewerDispatcher.get_all_positions(USER_ADDRESS(), POOL_ID);
 
     // Verify positions
     let mut found_eth_deposit = false;
@@ -392,7 +396,7 @@ fn test_get_all_positions() {
 fn test_get_supported_assets_ui() {
     let context = setup_test_context();
     let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };
-    let assets = vesuViewerDispatcher.get_supported_assets_ui();
+    let assets = vesuViewerDispatcher.get_supported_assets_ui(POOL_ID);
     let crossCheckAssets = vesuViewerDispatcher.get_supported_assets_array();
 
     assert(crossCheckAssets.len() == 2, 'sumtin-wrong');

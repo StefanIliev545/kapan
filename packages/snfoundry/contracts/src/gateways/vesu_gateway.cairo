@@ -225,6 +225,7 @@ mod VesuGateway {
             assert(result, Errors::TRANSFER_FAILED);
         }
 
+        // @dev - moves the assets in vesu between a collateral + zero key to collateral + debt key.
         fn transfer_position_for(
             ref self: ContractState,
             pool_id: felt252,
@@ -263,6 +264,8 @@ mod VesuGateway {
             }
         }
 
+        // @dev - calls modify on vesu with a delta in the collateral. This means both deposit and withdraw logic
+        // is handled here. 
         fn modify_collateral_for(
             ref self: ContractState,
             pool_id: felt252,
@@ -281,7 +284,7 @@ mod VesuGateway {
 
             // If withdrawing, ensure we don't withdraw more than available
             let mut final_amount = collateral_amount;
-            let mut amount_type = AmountType::Delta;
+            let mut amount_type = AmountType::Delta; // means we apply the delta from the current position size
             if collateral_amount.is_negative() {
 
                 let vtoken = self.get_vtoken_for_collateral(collateral_asset);
@@ -378,7 +381,9 @@ mod VesuGateway {
             }
         }
 
-        
+        // @dev - This calls vesu to modify a position. Positions in vesu are marked by collateral/debt pairs,
+        // so in case its a first time borrow on this pair transfer must be called first in order to switch the position
+        // key in vesu.
         fn modify_debt_for(
             ref self: ContractState,
             pool_id: felt252,
@@ -415,6 +420,8 @@ mod VesuGateway {
             singleton_dispatcher.modify_position(modify_params);
         }
 
+        // @dev - helper function that should be used in places that bring money OUT of the lending protocols.
+        // Basically the router is trusted to have done user verifications OR the user can call this contract directly.
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
             let router = self.router.read();
             assert(router == get_caller_address() || user == get_caller_address(), 'unauthorized');
@@ -463,6 +470,10 @@ mod VesuGateway {
                 i += 1;
             }
         }
+
+        // @dev - helper function that returns encoded calls which are either approvals for tokens or approval in vesu for 
+        // borrowing/managing collateral on the users behalf. This approval is quite critical as it allows this contract to act on a
+        // users behalf so other users shouldn't be able to call pretending to be someone else as funds are transfered to callers.
         fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {
             let mut authorizations = ArrayTrait::new();
             for instruction in instructions {
@@ -541,6 +552,7 @@ mod VesuGateway {
             return authorizations.span();
         }
 
+        // @dev - for a given repay instruction, pulls the current debt amount.
         fn get_flash_loan_amount(ref self: ContractState, repay: Repay) -> u256 {
             let mut amount = repay.basic.amount;
             if repay.repay_all {
@@ -565,6 +577,7 @@ mod VesuGateway {
 
     #[abi(embed_v0)]
     impl InterestRateViewImpl of InterestRateView<ContractState> {
+        // @dev - UI only. Ignore
         fn get_borrow_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
             let pool_id = self.pool_id.read();
             let singleton_dispatcher = ISingletonDispatcher {
@@ -594,6 +607,7 @@ mod VesuGateway {
             borrow_rate
         }
 
+        // @dev - UI only. Ignore
         fn get_supply_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
             let pool_id = self.pool_id.read();
             let singleton_dispatcher = ISingletonDispatcher {
@@ -640,6 +654,7 @@ mod VesuGateway {
     
     #[abi(embed_v0)]
     impl IVesuViewerImpl of IVesuViewer<ContractState> {
+        // @dev - This is only used for UI purposes.
         fn get_supported_assets_array(self: @ContractState) -> Array<ContractAddress> {
             let mut assets = array![];
             let supported_assets = self.supported_assets;
@@ -650,6 +665,7 @@ mod VesuGateway {
             assets
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_supported_assets_info(self: @ContractState, user: ContractAddress, pool_id: felt252) -> Array<(ContractAddress, felt252, u8, u256)> {
             let mut assets = array![];
             let supported_assets = self.supported_assets;
@@ -679,7 +695,8 @@ mod VesuGateway {
             };
             assets
         }
-
+        
+        // @dev - This is only used for UI purposes.
         fn get_all_positions(
             self: @ContractState, user: ContractAddress, pool_id: felt252
         ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
@@ -775,6 +792,7 @@ mod VesuGateway {
             positions
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_asset_price(self: @ContractState, asset: ContractAddress) -> u256 {
             let pool_id = self.pool_id.read();
             let singleton_dispatcher = ISingletonDispatcher {
@@ -787,6 +805,7 @@ mod VesuGateway {
             price.value
         }
 
+        // @dev - This is only used for UI purposes.
         fn get_supported_assets_ui(self: @ContractState, pool_id: felt252) -> Array<TokenMetadata> {
             let mut assets = array![];
             let len = self.supported_assets.len();

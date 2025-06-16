@@ -29,6 +29,7 @@ use snforge_std::{
 };
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use openzeppelin::utils::serde::SerializedAppend;
+use core::array::ArrayTrait;
 
 // Nostra Finance tokens
 
@@ -98,6 +99,8 @@ fn deploy_nostra_gateway() -> ContractAddress {
     let contract_class = declare("NostraGateway").unwrap().contract_class();
     let mut calldata = array![];
     calldata.append_serde(INTEREST_RATE_MODEL());
+    calldata.append_serde(USER_ADDRESS()); // fake router
+    calldata.append_serde(USER_ADDRESS());
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -105,6 +108,7 @@ fn deploy_nostra_gateway() -> ContractAddress {
 // Add supported assets to NostraGateway
 fn add_supported_assets(gateway_address: ContractAddress) {
     let mut nostra_gateway = INostraGatewayDispatcher{ contract_address: gateway_address };
+    cheat_caller_address(gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
     // Add ETH
     nostra_gateway.add_supported_asset(
         ETH_ADDRESS(),
