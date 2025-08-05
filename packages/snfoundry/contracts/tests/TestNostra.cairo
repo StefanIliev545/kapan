@@ -109,7 +109,7 @@ fn deploy_nostra_gateway() -> ContractAddress {
 fn add_supported_assets(gateway_address: ContractAddress) {
     let mut nostra_gateway = INostraGatewayDispatcher{ contract_address: gateway_address };
     cheat_caller_address(gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
-    // Add ETH
+    // Add pETH
     nostra_gateway.add_supported_asset(
         ETH_ADDRESS(),
         ETH_DEBT_TOKEN(),

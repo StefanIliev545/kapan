@@ -110,25 +110,19 @@ mod RouterGateway {
         fn before_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, should_transfer: bool) -> Span<u256> {
             let mut i: usize = 0;
             let mut balancesBefore = array![];
+
+            // First pass: collect balances before any transfers/approvals
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit) => {
                         let basic = *deposit.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        if should_transfer {
-                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
-                        }
-                        assert(erc20.approve(gateway, basic.amount), 'approve failed');
                         let balance = erc20.balance_of(get_contract_address());
                         balancesBefore.append(balance);
                     },
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        if should_transfer {
-                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
-                        }
-                        assert(erc20.approve(gateway, basic.amount), 'approve failed');
                         let balance = erc20.balance_of(get_contract_address());
                         balancesBefore.append(balance);
                     },
@@ -148,13 +142,46 @@ mod RouterGateway {
                 }
                 i += 1;
             }
+
+            // Second pass: execute transfers/approvals as needed
+            i = 0;
+            while i != instructions.len() {
+                match instructions.at(i) {
+                    LendingInstruction::Deposit(deposit) => {
+                        let basic = *deposit.basic;
+                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                        if should_transfer {
+                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
+                        }
+                        assert(erc20.approve(gateway, basic.amount), 'approve failed');
+                    },
+                    LendingInstruction::Repay(repay) => {
+                        let basic = *repay.basic;
+                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                        if should_transfer {
+                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
+                        }
+                        assert(erc20.approve(gateway, basic.amount), 'approve failed');
+                    },
+                    _ => {}
+                }
+                i += 1;
+            }
+
             balancesBefore.span()
         }
 
         // @dev - after the instructions are executed we need to send back to the user the balance differences.
         // It is however possible to skip the transfer in cases of debt refinancing where the balances are used in place
         // to fund the follow up redeposit. 
-        fn after_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, balancesBefore: Span<u256>, should_transfer: bool) -> Span<u256> {
+        fn after_send_instructions(
+            ref self: ContractState,
+            gateway: ContractAddress,
+            instructions: Span<LendingInstruction>,
+            balancesBefore: Span<u256>,
+            should_transfer: bool
+        ) -> Span<u256> {
+            // First pass: count balances after execution
             let mut i: usize = 0;
             let mut balancesAfter = array![];
             while i != instructions.len() {
@@ -162,9 +189,6 @@ mod RouterGateway {
                     LendingInstruction::Borrow(borrow) => {
                         let basic = *borrow.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        if should_transfer {
-                            assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
-                        }
                         let balance = erc20.balance_of(get_contract_address());
                         balancesAfter.append(balance - *balancesBefore.at(i));
                     },
@@ -174,9 +198,6 @@ mod RouterGateway {
                         let balance = erc20.balance_of(get_contract_address());
                         let diff = balance - *balancesBefore.at(i);
                         balancesAfter.append(diff);
-                        if should_transfer {
-                            erc20.transfer(basic.user, diff);
-                        }
                     },
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
@@ -184,10 +205,6 @@ mod RouterGateway {
                         let balance = erc20.balance_of(get_contract_address());
                         let diff = *balancesBefore.at(i) - balance;
                         balancesAfter.append(diff);
-                        if basic.amount > diff {
-                            let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                            erc20.transfer(basic.user, basic.amount - diff);
-                        }
                     },
                     LendingInstruction::Deposit(deposit) => {
                         let basic = *deposit.basic;
@@ -199,6 +216,37 @@ mod RouterGateway {
                 }
                 i += 1;
             }
+
+            // Second pass: perform transfers if needed
+            if should_transfer {
+                i = 0;
+                while i != instructions.len() {
+                    match instructions.at(i) {
+                        LendingInstruction::Borrow(borrow) => {
+                            let basic = *borrow.basic;
+                            let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                            assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
+                        },
+                        LendingInstruction::Withdraw(withdraw) => {
+                            let basic = *withdraw.basic;
+                            let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                            let diff = balancesAfter.at(i);
+                            assert(erc20.transfer(basic.user, *diff), 'transfer failed');
+                        },
+                        LendingInstruction::Repay(repay) => {
+                            let basic = *repay.basic;
+                            let diff = balancesAfter.at(i);
+                            if basic.amount > *diff {
+                                let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                                assert(erc20.transfer(basic.user, basic.amount - *diff), 'transfer failed');
+                            }
+                        },
+                        _ => {}
+                    }
+                    i += 1;
+                }
+            }
+
             balancesAfter.span()
         }
 
@@ -208,7 +256,6 @@ mod RouterGateway {
             let mut i: usize = 0;
             let mut balancesDiffs = array![].span();
             while i != instructions.len() {
-                println!("Processing protocol instruction {}", i);
                 let protocol_instruction = instructions.at(i);
                 let gateway = self.gateways.read(*protocol_instruction.protocol_name);
                 assert(!gateway.is_zero(), 'Gateway not supported');
@@ -223,7 +270,6 @@ mod RouterGateway {
                 let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
                 dispatcher.process_instructions(instructions_span);
                 balancesDiffs = self.after_send_instructions(gateway, instructions_span, balancesBefore, should_transfer);
-                println!("Processed protocol instruction {}", i);
                 i += 1;
             }
         }
@@ -232,22 +278,34 @@ mod RouterGateway {
         // @dev - gets how much to borrow for a flash loan. If we want to repay all, then we need to pull the current debt
         // at the time of processing the transaction as it varies with time.
         fn get_flash_loan_amount(ref self: ContractState, instructions: Span<ProtocolInstructions>) -> (ContractAddress, u256) {
-           let mut flash_loan_amount : u256 = 0;
-           let mut token : ContractAddress = Zero::zero();
-           for protocolInstruction in instructions {
+            let mut flash_loan_amount: u256 = 0;
+            let mut token: ContractAddress = Zero::zero();
+            for protocolInstruction in instructions {
                 for instruction in protocolInstruction.instructions {
                     if let LendingInstruction::Repay(repay) = instruction {
                         assert(*repay.basic.amount != 0, 'repay-amount-is-zero');
+                        // If repay_all, get the amount from the gateway and add it to the flash loan amount
                         if *repay.repay_all {
                             let gateway = ILendingInstructionProcessorDispatcher { contract_address: self.gateways.read(*protocolInstruction.protocol_name) };
-                            return (*repay.basic.token, gateway.get_flash_loan_amount(*repay));
+                            let (repay_token, repay_amount) = ( *repay.basic.token, gateway.get_flash_loan_amount(*repay) );
+                            // If token is already set, ensure it matches
+                            if token != Zero::zero() {
+                                assert(token == repay_token, 'repay-token-mismatch');
+                            }
+                            token = repay_token;
+                            flash_loan_amount += repay_amount;
+                        } else {
+                            // If token is already set, ensure it matches
+                            if token != Zero::zero() {
+                                assert(token == *repay.basic.token, 'repay-token-mismatch');
+                            }
+                            token = *repay.basic.token;
+                            flash_loan_amount += *repay.basic.amount;
                         }
-                        flash_loan_amount += *repay.basic.amount;
-                        token = *repay.basic.token;
                     }
-                };
-           };
-           (token, flash_loan_amount)
+                }
+            }
+            (token, flash_loan_amount)
         }
 
         // @dev - as each instruction is carrying a user, we need to ensure it matches the caller.
@@ -335,7 +393,6 @@ mod RouterGateway {
             // Serialize instructions for flash loan data
             let mut data = ArrayTrait::new();
             Serde::serialize(@instructions, ref data);
-            println!("Requesting flash loan");
             flashloan_provider.flash_loan(get_contract_address(), asset, amount, is_legacy, data.span());
         }
     }
@@ -346,8 +403,8 @@ mod RouterGateway {
         // Relies on the assumption that sender cannot be cheated as it prevents other contracts from calling this through
         // the flash loan provider.
         fn on_flash_loan(ref self: ContractState, sender: ContractAddress, asset: ContractAddress, amount: u256, data: Span<felt252>) {
+            assert(get_caller_address() == self.flashloan_provider.read(), 'caller-not-flashprovider');
             assert(sender == get_contract_address(), 'sender mismatch');
-            println!("Received flash loan");
             let mut data = data;
             let mut protocol_instructions: Span<ProtocolInstructions> = Serde::deserialize(ref data).unwrap();
                   // Collect all repay amounts and calculate total

@@ -146,14 +146,14 @@ mod VesuGateway {
     impl VesuGatewayInternal of IVesuGatewayInternal {
         fn get_vtoken_for_collateral(
             self: @ContractState, collateral: ContractAddress,
+            pool_id: felt252,
         ) -> ContractAddress {
             let vesu_singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
             };
-            let poolId = self.pool_id.read();
-            let extensionForPool = vesu_singleton_dispatcher.extension(poolId);
+            let extensionForPool = vesu_singleton_dispatcher.extension(pool_id);
             let extension = IDefaultExtensionCLDispatcher { contract_address: extensionForPool };
-            extension.v_token_for_collateral_asset(poolId, collateral)
+            extension.v_token_for_collateral_asset(pool_id, collateral)
         }
 
         fn deposit(ref self: ContractState, instruction: @Deposit) {
@@ -287,7 +287,7 @@ mod VesuGateway {
             let mut amount_type = AmountType::Delta; // means we apply the delta from the current position size
             if collateral_amount.is_negative() {
 
-                let vtoken = self.get_vtoken_for_collateral(collateral_asset);
+                let vtoken = self.get_vtoken_for_collateral(collateral_asset, pool_id);
                 let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
                 let requested_shares = erc4626.convert_to_shares(collateral_amount.abs());
                 let available_shares = vesu_context.position.collateral_shares;
@@ -377,7 +377,7 @@ mod VesuGateway {
             let balance_after = erc20.balance_of(get_contract_address());
             let remainder = balance_before - (balance_after + basic.amount);
             if remainder > 0 {
-                erc20.transfer(get_caller_address(), remainder);
+                assert(erc20.transfer(get_caller_address(), remainder), 'transfer failed');
             }
         }
 

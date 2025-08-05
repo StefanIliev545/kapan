@@ -162,8 +162,8 @@ mod NostraGateway {
             }
 
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
-            underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount);
-            underlying_token.approve(debt, amount);
+            assert(underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
+            assert(underlying_token.approve(debt, amount), 'approve failed');
             
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
             debt_token.burn(user, amount);
