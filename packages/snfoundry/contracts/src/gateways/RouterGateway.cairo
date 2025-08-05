@@ -1,6 +1,7 @@
 use core::array::{Array, Span};
 use core::bool;
 use core::traits::Into;
+use core::integer::BoundedInt;
 use starknet::{ContractAddress};
 use crate::interfaces::IGateway::{
     LendingInstruction,
@@ -161,6 +162,10 @@ mod RouterGateway {
                         if should_transfer {
                             assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
                         }
+                        let mut amount = basic.amount;
+                        if *repay.repay_all {
+                            amount = BoundedInt::max();
+                        }
                         assert(erc20.approve(gateway, basic.amount), 'approve failed');
                     },
                     _ => {}
@@ -205,6 +210,9 @@ mod RouterGateway {
                         let balance = erc20.balance_of(get_contract_address());
                         let diff = *balancesBefore.at(i) - balance;
                         balancesAfter.append(diff);
+                        if *repay.repay_all {
+                            erc20.approve(gateway, 0);
+                        }
                     },
                     LendingInstruction::Deposit(deposit) => {
                         let basic = *deposit.basic;
@@ -312,6 +320,8 @@ mod RouterGateway {
         // A bit ugly, but it was an oversight in the design :/ 
         fn ensure_user_matches_caller(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
             for protocolInstruction in instructions {
+                // Ensure there is at most one borrow/withdraw per ERC20 token in this protocol's instruction list
+                self.ensure_unique_borrow_withdraw_tokens(*protocolInstruction.instructions);
                 for instruction in protocolInstruction.instructions {
                     let user = match instruction {
                         LendingInstruction::Repay(repay) => {
@@ -341,6 +351,43 @@ mod RouterGateway {
                         }
                     };
                     assert(*user == get_caller_address(), 'user mismatch');
+                }
+            }
+        }
+
+        // @dev - ensures there is only one Borrow or Withdraw instruction per ERC20 token in the same instructions span.
+        fn ensure_unique_borrow_withdraw_tokens(ref self: ContractState, instructions: Span<LendingInstruction>) {
+            // Keep track of tokens we have already seen in a borrow/withdraw instruction
+            let mut seen_tokens = array![];
+            for instr in instructions {
+                match instr {
+                    LendingInstruction::Borrow(borrow) => {
+                        let token = *borrow.basic.token;
+                        let mut i: usize = 0;
+                        let mut found = false;
+                        while i != seen_tokens.len() {
+                            if *seen_tokens.at(i) == token {
+                                found = true;
+                            };
+                            i += 1;
+                        };
+                        assert(!found, 'duplicate-borrow-withdraw-token');
+                        seen_tokens.append(token);
+                    },
+                    LendingInstruction::Withdraw(withdraw) => {
+                        let token = *withdraw.basic.token;
+                        let mut i: usize = 0;
+                        let mut found = false;
+                        while i != seen_tokens.len() {
+                            if *seen_tokens.at(i) == token {
+                                found = true;
+                            };
+                            i += 1;
+                        };
+                        assert(!found, 'duplicate-borrow-withdraw-token');
+                        seen_tokens.append(token);
+                    },
+                    _ => {}
                 }
             }
         }
