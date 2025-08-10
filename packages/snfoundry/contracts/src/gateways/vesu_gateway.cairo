@@ -54,6 +54,14 @@ pub trait IVesuViewer<TContractState> {
     fn get_supported_assets_info(self: @TContractState, user: ContractAddress, pool_id: felt252) -> Array<(ContractAddress, felt252, u8, u256)>;
     fn get_supported_assets_ui(self: @TContractState, pool_id: felt252) -> Array<TokenMetadata>;
     fn get_asset_price(self: @TContractState, asset: ContractAddress) -> u256;
+    // New: paginated positions fetch to avoid RPC step limits
+    fn get_all_positions_range(
+        self: @TContractState,
+        user: ContractAddress,
+        pool_id: felt252,
+        start_index: usize,
+        end_index: usize,
+    ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
 }
 
 #[derive(Drop, Serde)]
@@ -700,8 +708,23 @@ mod VesuGateway {
         fn get_all_positions(
             self: @ContractState, user: ContractAddress, pool_id: felt252
         ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
+            // Delegate to range-based implementation over full range
+            let supported_assets = self.get_supported_assets_array();
+            let len = supported_assets.len();
+            self.get_all_positions_range(user, pool_id, 0, len)
+        }
+
+        // @dev - Paginated version to avoid exceeding RPC step limits. Iterates collateral assets in [start_index, end_index).
+        fn get_all_positions_range(
+            self: @ContractState,
+            user: ContractAddress,
+            pool_id: felt252,
+            start_index: usize,
+            end_index: usize,
+        ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
             let mut positions = array![];
             let supported_assets = self.get_supported_assets_array();
+            let len = supported_assets.len();
             let pool_id = if pool_id == Zero::zero() { self.pool_id.read() } else { pool_id };
             let singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
@@ -710,9 +733,13 @@ mod VesuGateway {
                 contract_address: singleton_dispatcher.extension(pool_id),
             };
 
-            // Iterate through all possible pairs of supported assets
-            let len = supported_assets.len();
-            for i in 0..len {
+            // Clamp bounds
+            let start = if start_index > len { len } else { start_index };
+            let end = if end_index > len { len } else { end_index };
+
+            // Iterate through the requested range of collateral assets
+            let mut i = start;
+            while i != end {
                 let collateral_asset = *supported_assets.at(i);
 
                 // Check vtoken balance first
@@ -788,6 +815,8 @@ mod VesuGateway {
                             );
                     }
                 }
+
+                i += 1;
             };
             positions
         }

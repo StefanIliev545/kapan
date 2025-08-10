@@ -22,7 +22,7 @@ import Image from "next/image";
 
 // Define pool IDs
 const POOL_IDS = {
-  "Genesis": 0n,
+  Genesis: 2198503327643286920898110335698706244522220458610657370981979460625005526824n,
   "Re7 USDC": 3592370751539490711610556844458488648008775713878064059760995781404350938653n,
   "Alterscope wstETH": 2612229586214495842527551768232431476062656055007024497123940017576986139174n,
 } as const;
@@ -63,14 +63,41 @@ export const VesuProtocolView: FC = () => {
     refetchInterval: 0,
   });
 
-  // Fetch user positions if connected
-  const { data: userPositions, error: positionsError } = useScaffoldReadContract({
+  if (assetsError) {
+    console.error("Error fetching supported assets:", assetsError);
+  }
+
+  // Paginated user positions reads
+  const { data: userPositionsPart1, error: positionsError1 } = useScaffoldReadContract({
     contractName: "VesuGateway",
-    functionName: "get_all_positions",
-    args: [userAddress || "0x0", selectedPoolId], // Use zero address if not connected
+    functionName: "get_all_positions_range",
+    // start at 0, end at 50 (exclusive). Adjust page size as needed.
+    args: [userAddress || "0x0", selectedPoolId, 0n, 3n],
     watch: true,
     refetchInterval: 5000,
   });
+  const { data: userPositionsPart2, error: positionsError2 } = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_all_positions_range",
+    // second page 50..100
+    args: [userAddress || "0x0", selectedPoolId, 3n, 10n],
+    watch: true,
+    refetchInterval: 5000,
+  });
+
+  if (positionsError1) {
+    console.error("Error fetching user positions (part 1):", positionsError1);
+  }
+  if (positionsError2) {
+    console.error("Error fetching user positions (part 2):", positionsError2);
+  }
+
+  // Merge paginated results
+  const mergedUserPositions = useMemo(() => {
+    const p1 = (userPositionsPart1 as unknown as PositionTuple[]) || [];
+    const p2 = (userPositionsPart2 as unknown as PositionTuple[]) || [];
+    return [...p1, ...p2];
+  }, [userPositionsPart1, userPositionsPart2]);
 
   // Memoize the market rows to prevent unnecessary re-renders
   const marketRows = useMemo(() => {
@@ -111,9 +138,9 @@ export const VesuProtocolView: FC = () => {
 
   // Memoize the position rows to prevent unnecessary re-renders
   const positionRows = useMemo(() => {
-    if (!userPositions || !supportedAssets) return null;
+    if (!mergedUserPositions || !supportedAssets) return null;
 
-    const positions = userPositions as unknown as PositionTuple[];
+    const positions = mergedUserPositions as unknown as PositionTuple[];
 
     return positions?.map((position, index) => {
       const collateralAsset = `0x${position[0].toString(16).padStart(64, "0")}`;
@@ -158,7 +185,7 @@ export const VesuProtocolView: FC = () => {
         />
       );
     });
-  }, [userPositions, supportedAssets, selectedPoolId]);
+  }, [mergedUserPositions, supportedAssets, selectedPoolId]);
 
   if (assetsError) {
     console.error("Error fetching supported assets:", assetsError);

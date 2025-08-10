@@ -1,5 +1,5 @@
 import { useReadLocalStorage } from "usehooks-ts";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 import { BurnerConnector, burnerAccounts } from "@scaffold-stark/stark-burner";
@@ -9,9 +9,27 @@ import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
  * Automatically connect to a wallet/connector based on config and prior wallet
  */
 export const useAutoConnect = (): void => {
-  const savedConnector = useReadLocalStorage<{ id: string; ix?: number } | string>(
-    "lastUsedConnector",
-  );
+  /**
+   * The `useReadLocalStorage` hook from `usehooks-ts` attempts `JSON.parse` on the stored
+   * value which throws when the value is a plain string like `braavos`.
+   * To avoid crashing the entire React tree we read the value manually and parse it in a
+   * try/catch, falling back to the raw string when it is not valid JSON.
+   */
+  const [savedConnector, setSavedConnector] = useState<{ id: string; ix?: number } | string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = window.localStorage.getItem("lastUsedConnector");
+    if (!raw) return;
+
+    try {
+      setSavedConnector(JSON.parse(raw));
+    } catch (_) {
+      // Value is not JSON encoded, use it as-is.
+      setSavedConnector(raw);
+    }
+  }, []);
 
   const lastConnectionTime = useReadLocalStorage<number>(
     LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,

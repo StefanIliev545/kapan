@@ -586,6 +586,34 @@ const contracts = {
               ],
               state_mutability: "view",
             },
+            {
+              type: "function",
+              name: "get_all_positions_range",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
+                },
+                {
+                  name: "start_index",
+                  type: "core::integer::u32",
+                },
+                {
+                  name: "end_index",
+                  type: "core::integer::u32",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::starknet::contract_address::ContractAddress, kapan::gateways::vesu_gateway::PositionWithAmounts)>",
+                },
+              ],
+              state_mutability: "view",
+            },
           ],
         },
         {
@@ -1890,7 +1918,7 @@ const contracts = {
   mainnet: {
     RouterGateway: {
       address:
-        "0x1f1ae764856b2a433b46856719a22c764234a93b9c5d58e425831ce112b3989",
+        "0x52d60c685b12bc7bcc1362eee13830831b0a469eb6f1bf3cdd83b913ece5e48",
       abi: [
         {
           type: "impl",
@@ -2303,7 +2331,7 @@ const contracts = {
     },
     VesuGateway: {
       address:
-        "0x150621fc59a884526b501a8ada59cf41970ba341fbb758bd2c2d57a8d1d39dd",
+        "0x14635c4345b59e1143f145f8a457d2b54ee30492baa3549af8424b3ad8325",
       abi: [
         {
           type: "impl",
@@ -2869,6 +2897,34 @@ const contracts = {
               ],
               state_mutability: "view",
             },
+            {
+              type: "function",
+              name: "get_all_positions_range",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
+                },
+                {
+                  name: "start_index",
+                  type: "core::integer::u32",
+                },
+                {
+                  name: "end_index",
+                  type: "core::integer::u32",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::starknet::contract_address::ContractAddress, kapan::gateways::vesu_gateway::PositionWithAmounts)>",
+                },
+              ],
+              state_mutability: "view",
+            },
           ],
         },
         {
@@ -3022,11 +3078,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x2a99ac23ec43d9e4557c339012009e3243ce0c3c5ca79f956c83d824b2dd09f",
+        "0x3280ab4e4b4d415ca458cd4fac0dd79093db8d938a2824f77acb77b51af88a2",
     },
     NostraGateway: {
       address:
-        "0x6dd6124523305bed54b57566ae70ed5901cc1edd3b45c77e4742cfd3e5e18",
+        "0x7777a27583f823feeaf199f1b9d22b8e159689dcefc4598f830aadc7ff3181",
       abi: [
         {
           type: "impl",
@@ -3640,7 +3696,7 @@ const contracts = {
     },
     OptimalInterestRateFinder: {
       address:
-        "0x139b978ed9f33cd3e7950344a683a03d7d86b1a28c6e257cf1a3024e60cab7c",
+        "0x56ad5911588be899583817420d6ab6828d8a0ab1ef043ea91d4f2f934e2572e",
       abi: [
         {
           type: "impl",
@@ -3758,7 +3814,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x714a39e630378d6e1b0e144a54eaaf2f1cda8b2c4eb83f0729fbe668f2484d3",
+        "0x616d69572ef92b2c71741c600be025583b1ecff595b6308814f542eb84cff45",
       abi: [
         {
           type: "impl",
@@ -4846,6 +4902,34 @@ const contracts = {
               outputs: [
                 {
                   type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_all_positions_range",
+              inputs: [
+                {
+                  name: "user",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "pool_id",
+                  type: "core::felt252",
+                },
+                {
+                  name: "start_index",
+                  type: "core::integer::u32",
+                },
+                {
+                  name: "end_index",
+                  type: "core::integer::u32",
+                },
+              ],
+              outputs: [
+                {
+                  type: "core::array::Array::<(core::starknet::contract_address::ContractAddress, core::starknet::contract_address::ContractAddress, kapan::gateways::vesu_gateway::PositionWithAmounts)>",
                 },
               ],
               state_mutability: "view",
