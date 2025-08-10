@@ -1890,7 +1890,7 @@ const contracts = {
   mainnet: {
     RouterGateway: {
       address:
-        "0x621cb93250c20388d352566d8d65526f66023e67183f670c7d7a906fd91a665",
+        "0x1f1ae764856b2a433b46856719a22c764234a93b9c5d58e425831ce112b3989",
       abi: [
         {
           type: "impl",
@@ -2299,11 +2299,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x403a38f15e3059e11c9612019bb1de305c4e592d69f044fb2f8a08f7d4627e9",
+        "0x746b72f4e7eb1b3610df400b77a244cad6358e24aaa08f50b2ca73c961875a4",
     },
     VesuGateway: {
       address:
-        "0x3ca08314763161d00a7fece09b85b9fecd04ffb0d23e2718b81feebdd251aef",
+        "0x150621fc59a884526b501a8ada59cf41970ba341fbb758bd2c2d57a8d1d39dd",
       abi: [
         {
           type: "impl",
@@ -3022,11 +3022,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x787cc2b2f8ac4ec9c44427ba11229c8a9a1154f9e2f2dfa1845ee291d5fce56",
+        "0x2a99ac23ec43d9e4557c339012009e3243ce0c3c5ca79f956c83d824b2dd09f",
     },
     NostraGateway: {
       address:
-        "0x2ade9dfce348ba85845f3cc9030fee498cd2f85eac7ae7c7876ef873ed2aabc",
+        "0x6dd6124523305bed54b57566ae70ed5901cc1edd3b45c77e4742cfd3e5e18",
       abi: [
         {
           type: "impl",
@@ -3636,11 +3636,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x6f909c7849f4e05707761204551741de7ba3478a251aea0cb2d108c140aed9d",
+        "0x6fb8296a928ca4ce9a3b5e777875633cf6c0c09cb65fc81ea8bd33ac1dacf65",
     },
     OptimalInterestRateFinder: {
       address:
-        "0x645d59414e64653c60df9039cf3ddd09cb3373804bfcf5d8f2046f6c6bc8be1",
+        "0x139b978ed9f33cd3e7950344a683a03d7d86b1a28c6e257cf1a3024e60cab7c",
       abi: [
         {
           type: "impl",
@@ -3758,7 +3758,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x4f733ea7e675df66d0703e472dc60a805e7dabdd0ae6eb8262c40d41f8f21d4",
+        "0x714a39e630378d6e1b0e144a54eaaf2f1cda8b2c4eb83f0729fbe668f2484d3",
       abi: [
         {
           type: "impl",

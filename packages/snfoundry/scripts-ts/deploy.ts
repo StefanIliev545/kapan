@@ -22,14 +22,14 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     contract: "RouterGateway",
     constructorArgs: {
       _owner: deployer.address,
-      flashloan_provider: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+      flashloan_provider: "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
     },
   });
 
   const { address: vesuGatewayAddress } = await deployContract({
     contract: "VesuGateway",
     constructorArgs: {
-      vesu_singleton: "0x2545b2e5d519fc230e9cd781046d3a64e092114f07e44771e0d719d148725ef",
+      vesu_singleton: "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
       pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
       router: routerGatewayAddress,
       owner: deployer.address,
