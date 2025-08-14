@@ -166,7 +166,7 @@ mod RouterGateway {
                         if *repay.repay_all {
                             amount = BoundedInt::max();
                         }
-                        assert(erc20.approve(gateway, basic.amount), 'approve failed');
+                        assert(erc20.approve(gateway, amount), 'approve failed');
                     },
                     _ => {}
                 }
@@ -376,6 +376,19 @@ mod RouterGateway {
                     },
                     LendingInstruction::Withdraw(withdraw) => {
                         let token = *withdraw.basic.token;
+                        let mut i: usize = 0;
+                        let mut found = false;
+                        while i != seen_tokens.len() {
+                            if *seen_tokens.at(i) == token {
+                                found = true;
+                            };
+                            i += 1;
+                        };
+                        assert(!found, 'duplicate-borrow-withdraw-token');
+                        seen_tokens.append(token);
+                    },
+                    LendingInstruction::Reborrow(reborrow) => {
+                        let token = *reborrow.token;
                         let mut i: usize = 0;
                         let mut found = false;
                         while i != seen_tokens.len() {
