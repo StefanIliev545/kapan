@@ -262,22 +262,37 @@ mod RouterGateway {
         // before forwarding to the concrete protocol's gateway. Then it looks at balance diffs and transfers back to the user.
         fn process_protocol_instructions_internal(ref self: ContractState, instructions: Span<ProtocolInstructions>, should_transfer: bool) {
             let mut i: usize = 0;
-            let mut balancesDiffs = array![].span();
+            let mut previous_protocol_diffs = array![].span();
             while i != instructions.len() {
                 let protocol_instruction = instructions.at(i);
                 let gateway = self.gateways.read(*protocol_instruction.protocol_name);
                 assert(!gateway.is_zero(), 'Gateway not supported');
 
+                // Apply remapping (for redeposit/reborrow) using diffs from the previous protocol
                 let mut instructions_span = *protocol_instruction.instructions;
-                if balancesDiffs.len() != 0 {
-                    instructions_span = self.remap_instructions(instructions_span, balancesDiffs);
+                if previous_protocol_diffs.len() != 0 {
+                    instructions_span = self.remap_instructions(instructions_span, previous_protocol_diffs);
                 }
 
+                // Process instructions one-by-one, aggregating their diffs in order
+                let mut aggregated_diffs = array![];
+                let mut j: usize = 0;
+                while j != instructions_span.len() {
+                    // Build a single-instruction span
+                    let mut single = array![];
+                    single.append(*instructions_span.at(j));
+                    let single_span = single.span();
 
-                let balancesBefore = self.before_send_instructions(gateway, instructions_span, should_transfer);
-                let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
-                dispatcher.process_instructions(instructions_span);
-                balancesDiffs = self.after_send_instructions(gateway, instructions_span, balancesBefore, should_transfer);
+                    let balances_before = self.before_send_instructions(gateway, single_span, should_transfer);
+                    let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
+                    dispatcher.process_instructions(single_span);
+                    let diffs = self.after_send_instructions(gateway, single_span, balances_before, should_transfer);
+                    // diffs.len() is 1 here; append in order to preserve indices
+                    aggregated_diffs.append(*diffs.at(0));
+                    j += 1;
+                }
+
+                previous_protocol_diffs = aggregated_diffs.span();
                 i += 1;
             }
         }
@@ -474,11 +489,18 @@ mod RouterGateway {
             
             // First pass: Collect all repay amounts and count
             for protocolInstruction in protocol_instructions {
+                let gateway_addr = self.gateways.read(*protocolInstruction.protocol_name);
+                let gateway = ILendingInstructionProcessorDispatcher { contract_address: gateway_addr };
                 for instruction in protocolInstruction.instructions {
                     if let LendingInstruction::Repay(repay) = instruction {
                         let repay = *repay;
-                        repay_amounts.append(repay.basic.amount);
-                        total_repay_amount += repay.basic.amount;
+                        let mut this_amount = repay.basic.amount;
+                        if repay.repay_all {
+                            // For repay_all, fetch the exact current debt amount from the gateway
+                            this_amount = gateway.get_flash_loan_amount(repay);
+                        }
+                        repay_amounts.append(this_amount);
+                        total_repay_amount += this_amount;
                         repay_count += 1;
                     }
                 }
@@ -498,7 +520,7 @@ mod RouterGateway {
                     match instruction {
                         LendingInstruction::Repay(repay) => {
                             let repay = *repay;
-                            let mut modified_amount = repay.basic.amount;
+                            let mut modified_amount = *repay_amounts.at(repay_index);
                             
                             // Add remaining amount to last repay
                             if repay_index == repay_count - 1 {
