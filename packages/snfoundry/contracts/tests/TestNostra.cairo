@@ -431,3 +431,119 @@ fn test_get_borrow_rate() {
     let supply_rate = interest_rate_view.get_supply_rate(ETH_ADDRESS());
     println!("Supply rate: {}", supply_rate);
 }
+
+#[test]
+#[ignore]
+#[fork("MAINNET_LATEST")]
+fn test_repay_all_withdraw_all() {
+    let context = setup_test_context();
+    
+    // Step 1: Deposit ETH as collateral
+    let deposit_amount = 5000000000000000000; // 5 ETH
+    let eth_erc20 = IERC20Dispatcher { contract_address: ETH_ADDRESS() };
+    
+    let initial_eth_balance = eth_erc20.balance_of(USER_ADDRESS());
+    println!("Initial ETH balance: {}", initial_eth_balance);
+    assert(initial_eth_balance >= deposit_amount, 'insufficient ETH balance');
+    
+    // Approve and deposit ETH
+    cheat_caller_address(ETH_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    eth_erc20.approve(context.gateway_address, deposit_amount);
+    
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: deposit_amount, 
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Deposit(deposit)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    println!("OK Deposited {} ETH", deposit_amount);
+    
+    // Step 2: Borrow USDC against ETH collateral
+    let borrow_amount = 250000000; // 250 USDC
+    let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ADDRESS() };
+    
+    let initial_usdc_balance = usdc_erc20.balance_of(USER_ADDRESS());
+    println!("Initial USDC balance: {}", initial_usdc_balance);
+    
+    // Approve delegation for borrowing
+    let debt_token = LentDebtTokenABIDispatcher { contract_address: USDC_DEBT_TOKEN() };
+    cheat_caller_address(USDC_DEBT_TOKEN(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    debt_token.approve_delegation(context.gateway_address, borrow_amount, USER_ADDRESS());
+    
+    let borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: borrow_amount,
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Borrow(borrow)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    
+    let usdc_balance_after_borrow = usdc_erc20.balance_of(USER_ADDRESS());
+    println!("USDC balance after borrow: {}", usdc_balance_after_borrow);
+    assert(usdc_balance_after_borrow > initial_usdc_balance, 'borrow failed');
+    println!("OK Borrowed {} USDC", borrow_amount);
+    
+    // Step 3: Repay All USDC debt
+    let repay_all = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: borrow_amount, // This will be ignored since repay_all = true
+            user: USER_ADDRESS(),
+        },
+        repay_all: true, // This is the key - repay ALL debt
+        context: Option::None,
+    };
+    
+    // Approve enough USDC for repayment (more than borrowed to cover interest)
+    let approve_amount = borrow_amount + 50000000; // Extra for interest
+    cheat_caller_address(USDC_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    usdc_erc20.approve(context.gateway_address, approve_amount);
+    
+    println!("Attempting repay_all...");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Repay(repay_all)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    
+    let usdc_balance_after_repay = usdc_erc20.balance_of(USER_ADDRESS());
+    println!("USDC balance after repay_all: {}", usdc_balance_after_repay);
+    println!("OK Repaid all USDC debt");
+    
+    // Step 4: Withdraw All ETH collateral  
+    let withdraw_all = Withdraw {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: deposit_amount, // This will be ignored since withdraw_all = true
+            user: USER_ADDRESS(),
+        },
+        withdraw_all: true, // This is the key - withdraw ALL collateral
+        context: Option::None,
+    };
+    
+    // Approve ibCollateral token for withdrawal
+    cheat_caller_address(ETH_IBCOLLATERAL_TOKEN(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let ibcollateral = LentDebtTokenABIDispatcher { contract_address: ETH_IBCOLLATERAL_TOKEN() };
+    ibcollateral.approve(context.gateway_address, deposit_amount);
+    
+    println!("Attempting withdraw_all...");
+    cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let instructions = array![LendingInstruction::Withdraw(withdraw_all)];
+    context.gateway_dispatcher.process_instructions(instructions.span());
+    
+    let final_eth_balance = eth_erc20.balance_of(USER_ADDRESS());
+    println!("Final ETH balance: {}", final_eth_balance);
+    assert(final_eth_balance > initial_eth_balance - deposit_amount, 'withdraw failed');
+    println!("OK Withdrew all ETH collateral");
+    
+    println!("Test completed successfully!");
+}

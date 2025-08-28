@@ -153,20 +153,37 @@ mod NostraGateway {
             let mut amount = repay.basic.amount;
             let user = repay.basic.user;
 
+            println!("NostraGateway: repay called - token: {:?}, original_amount: {}, user: {:?}, repay_all: {}", underlying, amount, user, repay.repay_all);
+
             let debt = self.underlying_to_ndebt.read(underlying);
             assert(debt != Zero::zero(), 'not-token');
 
             if repay.repay_all {
                 let debt_token_erc20 = IERC20Dispatcher { contract_address: debt };
-                amount = debt_token_erc20.balance_of(user);
+                let debt_balance = debt_token_erc20.balance_of(user);
+                println!("NostraGateway: repay_all=true, user debt balance: {}, using amount: {}", debt_balance, amount);
+                amount = debt_balance;
             }
 
+            println!("NostraGateway: final repay amount: {}", amount);
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
+            
+            let router_balance_before = underlying_token.balance_of(get_caller_address());
+            let gateway_balance_before = underlying_token.balance_of(get_contract_address());
+            println!("NostraGateway: Before transfer - router balance: {}, gateway balance: {}", router_balance_before, gateway_balance_before);
+            
             assert(underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
+            
+            let gateway_balance_after_transfer = underlying_token.balance_of(get_contract_address());
+            println!("NostraGateway: After transfer - gateway balance: {}", gateway_balance_after_transfer);
+            
             assert(underlying_token.approve(debt, amount), 'approve failed');
             
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
             debt_token.burn(user, amount);
+            
+            let gateway_balance_after_burn = underlying_token.balance_of(get_contract_address());
+            println!("NostraGateway: After burn - gateway balance: {}", gateway_balance_after_burn);
         }
 
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {

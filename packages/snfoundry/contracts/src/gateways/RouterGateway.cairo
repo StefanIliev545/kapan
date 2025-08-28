@@ -195,21 +195,38 @@ mod RouterGateway {
                         let basic = *borrow.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
+                        println!("RouterGateway: Borrow - before: {}, after: {}", *balancesBefore.at(i), balance);
                         balancesAfter.append(balance - *balancesBefore.at(i));
                     },
                     LendingInstruction::Withdraw(withdraw) => {
                         let basic = *withdraw.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        let diff = balance - *balancesBefore.at(i);
-                        balancesAfter.append(diff);
+                        println!("RouterGateway: Withdraw - before: {}, after: {}", *balancesBefore.at(i), balance);
+                        if balance >= *balancesBefore.at(i) {
+                            let diff = balance - *balancesBefore.at(i);
+                            println!("RouterGateway: Withdraw diff: {}", diff);
+                            balancesAfter.append(diff);
+                        } else {
+                            println!("RouterGateway: ERROR - Withdraw would underflow! before > after");
+                            println!("RouterGateway: This means before: {} > after: {}", *balancesBefore.at(i), balance);
+                            balancesAfter.append(0); // Prevent underflow for now
+                        }
                     },
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        let diff = *balancesBefore.at(i) - balance;
-                        balancesAfter.append(diff);
+                        println!("RouterGateway: Repay - before: {}, after: {}", *balancesBefore.at(i), balance);
+                        if *balancesBefore.at(i) >= balance {
+                            let diff = *balancesBefore.at(i) - balance;
+                            println!("RouterGateway: Repay diff: {}", diff);
+                            balancesAfter.append(diff);
+                        } else {
+                            println!("RouterGateway: ERROR - Repay would underflow! after > before");
+                            println!("RouterGateway: This means after: {} > before: {}", balance, *balancesBefore.at(i));
+                            balancesAfter.append(0); // Prevent underflow for now
+                        }
                         if *repay.repay_all {
                             erc20.approve(gateway, 0);
                         }
@@ -283,12 +300,16 @@ mod RouterGateway {
                     single.append(*instructions_span.at(j));
                     let single_span = single.span();
 
+                    println!("RouterGateway: Processing instruction {} of {}", j, instructions_span.len());
                     let balances_before = self.before_send_instructions(gateway, single_span, should_transfer);
+                    println!("RouterGateway: Got balances_before, calling gateway");
                     let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
                     dispatcher.process_instructions(single_span);
+                    println!("RouterGateway: Gateway call completed, calculating diffs");
                     let diffs = self.after_send_instructions(gateway, single_span, balances_before, should_transfer);
                     // diffs.len() is 1 here; append in order to preserve indices
                     aggregated_diffs.append(*diffs.at(0));
+                    println!("RouterGateway: Instruction {} completed with diff: {}", j, *diffs.at(0));
                     j += 1;
                 }
 

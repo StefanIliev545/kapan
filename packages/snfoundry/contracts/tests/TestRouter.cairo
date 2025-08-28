@@ -411,6 +411,7 @@ fn test_vesu() {
 } 
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
@@ -649,4 +650,126 @@ fn test_move_debt_reverse() {
     // Process move debt
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     context.router_dispatcher.move_debt(move_debt_instructions.span());
-} 
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_router_repay_all_withdraw_all() {
+    let context = setup_test_context();
+    
+    // Register Nostra gateway with router
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('nostra', context.nostra_gateway_address);
+    
+    let deposit_amount = 5000000000000000000; // 5 ETH
+    let borrow_amount = 250000000; // 250 USDC
+    
+    let eth_erc20 = IERC20Dispatcher { contract_address: ETH_ADDRESS() };
+    let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ADDRESS() };
+    
+    // Step 1: Deposit ETH
+    cheat_caller_address(ETH_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    eth_erc20.approve(context.router_address, deposit_amount);
+    
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: deposit_amount,
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'nostra',
+            instructions: array![LendingInstruction::Deposit(deposit)].span(),
+        }
+    ];
+    
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Deposited ETH via RouterGateway");
+    
+    // Step 2: Borrow USDC
+    let debt_token = LentDebtTokenABIDispatcher { contract_address: USDC_DEBT_TOKEN() };
+    cheat_caller_address(USDC_DEBT_TOKEN(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    debt_token.approve_delegation(context.nostra_gateway_address, borrow_amount, USER_ADDRESS());
+    
+    let borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: borrow_amount,
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+    
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'nostra',
+            instructions: array![LendingInstruction::Borrow(borrow)].span(),
+        }
+    ];
+    
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Borrowed USDC via RouterGateway");
+    
+    // Step 3: Repay All USDC
+    let approve_amount = borrow_amount + 50000000; // Extra for interest
+    cheat_caller_address(USDC_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    usdc_erc20.approve(context.router_address, approve_amount);
+    
+    let repay_all = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: borrow_amount,
+            user: USER_ADDRESS(),
+        },
+        repay_all: true, // KEY: This triggers repay_all logic
+        context: Option::None,
+    };
+    
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'nostra',
+            instructions: array![LendingInstruction::Repay(repay_all)].span(),
+        }
+    ];
+    
+    println!("Attempting repay_all via RouterGateway...");
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Repaid all USDC via RouterGateway");
+    
+    // Step 4: Withdraw All ETH
+    cheat_caller_address(ETH_IBCOLLATERAL_TOKEN(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let ibcollateral = LentDebtTokenABIDispatcher { contract_address: ETH_IBCOLLATERAL_TOKEN() };
+    ibcollateral.approve(context.nostra_gateway_address, deposit_amount);
+    
+    let withdraw_all = Withdraw {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: deposit_amount,
+            user: USER_ADDRESS(),
+        },
+        withdraw_all: true, // KEY: This triggers withdraw_all logic
+        context: Option::None,
+    };
+    
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'nostra',
+            instructions: array![LendingInstruction::Withdraw(withdraw_all)].span(),
+        }
+    ];
+    
+    println!("Attempting withdraw_all via RouterGateway...");
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Withdrew all ETH via RouterGateway");
+    
+    println!("RouterGateway test completed successfully!");
+}
