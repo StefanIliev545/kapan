@@ -1,23 +1,26 @@
 import { useAccount as useAccountEVM } from "wagmi";
 import { useAccount as useAccountStark } from "./useAccount";
-import { useNetworkType, NetworkType } from "./useNetworkType";
 
 /**
- * Hook that abstracts wallet connection logic across EVM and Starknet networks.
- * Optionally accepts a network type override; otherwise uses the current network type.
+ * Hook that exposes wallet connection information for both EVM and Starknet
+ * accounts simultaneously. This allows the application to interact with
+ * wallets on both networks at the same time.
  */
-export const useWalletConnection = (networkTypeOverride?: NetworkType) => {
-  const detectedNetwork = useNetworkType();
-  const networkType = networkTypeOverride ?? detectedNetwork;
-
+export const useWalletConnection = () => {
   const evmAccount = useAccountEVM();
   const starkAccount = useAccountStark();
 
-  const address = networkType === "evm" ? evmAccount.address : starkAccount.address;
-  const isConnected =
-    networkType === "evm" ? Boolean(evmAccount.address) : starkAccount.status === "connected";
-  const status = networkType === "evm" ? evmAccount.status : starkAccount.status;
-
-  return { address, isConnected, status, networkType };
+  return {
+    evm: {
+      address: evmAccount.address,
+      isConnected: Boolean(evmAccount.address),
+      status: evmAccount.status,
+    },
+    starknet: {
+      address: starkAccount.address,
+      isConnected: starkAccount.status === "connected",
+      status: starkAccount.status,
+    },
+  };
 };
 

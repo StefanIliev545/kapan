@@ -37,9 +37,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const expanded = useToggle();
   const isExpanded = expanded.isOpen;
 
-  // Get wallet connection status
-  const { address } = useWalletConnection(networkType);
-  const isWalletConnected = !!address;
+  // Get wallet connection status for both networks
+  const { evm, starknet } = useWalletConnection();
+  const address = networkType === "evm" ? evm.address : starknet.address;
+  const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance
   const hasBalance = tokenBalance > 0;
