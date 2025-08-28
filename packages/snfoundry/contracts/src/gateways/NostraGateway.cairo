@@ -97,6 +97,19 @@ mod NostraGateway {
             collateral.mint(user, amount);
         }
 
+        fn _get_collateral_with_balance(self: @ContractState, underlying: ContractAddress, user: ContractAddress) -> ContractAddress {
+            let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
+            assert(ibcollateral != Zero::zero(), 'not-token');
+            let ncollateral = self.underlying_to_ncollateral.read(underlying);
+            assert(ncollateral != Zero::zero(), 'not-token');
+
+            let ib_balance = IERC20Dispatcher { contract_address: ibcollateral }.balance_of(user);
+            let nc_balance = IERC20Dispatcher { contract_address: ncollateral }.balance_of(user);
+
+            let chosen_collateral = if nc_balance > ib_balance { ncollateral } else { ibcollateral };
+            chosen_collateral
+        }
+
         // @dev - pull the underlying collateral from a user. Requires permission from the user to this contract.
         // caller is restricted to router or the user in the instruction as this is an outbound flow.
         fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
@@ -107,15 +120,14 @@ mod NostraGateway {
 
             self.assert_router_or_user(user);
 
-            let ibcollateral = self.underlying_to_nibcollateral.read(underlying);
-            assert(ibcollateral != Zero::zero(), 'not-token');
+            let chosen_collateral = self._get_collateral_with_balance(underlying, user);
 
             if withdraw.withdraw_all {
-                let collateralERC20 = IERC20Dispatcher { contract_address: ibcollateral };
+                let collateralERC20 = IERC20Dispatcher { contract_address: chosen_collateral };
                 amount = collateralERC20.balance_of(user);
             }
 
-            let collateral = LentDebtTokenABIDispatcher { contract_address: ibcollateral };
+            let collateral = LentDebtTokenABIDispatcher { contract_address: chosen_collateral };
             collateral.transfer_from(user, get_contract_address(), amount);
             collateral.burn(get_contract_address(), get_caller_address(), amount);
         }

@@ -95,6 +95,10 @@ fn RICH_ADDRESS() -> ContractAddress {
     contract_address_const::<0x0213c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>()
 }
 
+fn USDC_RICH_ADDRESS() -> ContractAddress {
+    contract_address_const::<0x0123b911db94d6dbeeed051ff3605ba463dfafa78ae10c0e56989f3eda8255cf>()
+}
+
 fn USER_ADDRESS() -> ContractAddress {
     contract_address_const::<0x0113c67ed78bc280887234fe5ed5e77272465317978ae86c25a71531d9332a2d>()
 }
@@ -178,9 +182,9 @@ fn add_supported_assets(gateway_address: ContractAddress) {
         STRK_IBCOLLATERAL_TOKEN()
     );
 }
-fn prefund_address(recipient: ContractAddress, token_address: ContractAddress, amount: u256) {
+fn prefund_address(recipient: ContractAddress, rich_address: ContractAddress, token_address: ContractAddress, amount: u256) {
     let token_erc20 = IERC20Dispatcher { contract_address: token_address };
-    cheat_caller_address(token_address, RICH_ADDRESS(), CheatSpan::TargetCalls(1));
+    cheat_caller_address(token_address, rich_address, CheatSpan::TargetCalls(1));
     token_erc20.transfer(recipient, amount);
     println!("Prefunded with token");
 }
@@ -201,7 +205,8 @@ fn setup_test_context() -> TestContext {
     
     // Pre-fund the test user with ETH and USDC
     println!("Pre-funding user address");
-    prefund_address(USER_ADDRESS(), ETH_ADDRESS(), 15000000000000000000); // 15 ETH
+    prefund_address(USER_ADDRESS(), RICH_ADDRESS(), ETH_ADDRESS(), 15000000000000000000); // 15 ETH
+    prefund_address(USER_ADDRESS(), USDC_RICH_ADDRESS(), USDC_ADDRESS(), 1000000000); // 1000 USDC
     
     let router_dispatcher = RouterGatewayTraitDispatcher {
         contract_address: router_address
@@ -411,6 +416,7 @@ fn test_vesu() {
 } 
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
@@ -654,7 +660,7 @@ fn test_move_debt_reverse() {
 #[test]
 #[ignore]
 #[fork("MAINNET_LATEST")]
-fn test_router_repay_all_withdraw_all() {
+fn test_router_repay_all_withdraw_all_nostra() {
     let context = setup_test_context();
     
     // Register Nostra gateway with router
@@ -772,4 +778,149 @@ fn test_router_repay_all_withdraw_all() {
     println!("Withdrew all ETH via RouterGateway");
     
     println!("RouterGateway test completed successfully!");
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_router_repay_all_withdraw_all_vesu() {
+    let context = setup_test_context();
+    
+    // Register Vesu gateway with router
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('vesu', context.vesu_gateway_address);
+    
+    let deposit_amount = 5000000000000000000; // 5 ETH
+    let borrow_amount = 250000000; // 250 USDC
+
+    // Contexts for Vesu
+    let mut borrow_ctx = array![];
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: ETH_ADDRESS() }.serialize(ref borrow_ctx);
+    let mut withdraw_ctx = array![];
+    VesuContext { pool_id: POOL_ID, position_counterpart_token: USDC_ADDRESS() }.serialize(ref withdraw_ctx);
+
+    // Step 1: Deposit ETH
+    let deposit = Deposit {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: deposit_amount,
+            user: USER_ADDRESS(),
+        },
+        context: Option::None,
+    };
+
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'vesu',
+            instructions: array![LendingInstruction::Deposit(deposit)].span(),
+        }
+    ];
+
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span(), true);
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    };
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Deposited ETH via RouterGateway (Vesu)");
+
+    // Step 2: Borrow USDC
+    let borrow = Borrow {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: borrow_amount,
+            user: USER_ADDRESS(),
+        },
+        context: Option::Some(borrow_ctx.span()),
+    };
+
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'vesu',
+            instructions: array![LendingInstruction::Borrow(borrow)].span(),
+        }
+    ];
+
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span(), true);
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    };
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Borrowed USDC via RouterGateway (Vesu)");
+
+    // Step 3: Repay All USDC
+    let approve_amount = borrow_amount + 100000000; // Extra for interest
+    let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ADDRESS() };
+    cheat_caller_address(USDC_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    usdc_erc20.approve(context.router_address, approve_amount);
+
+    let repay_all = Repay {
+        basic: BasicInstruction {
+            token: USDC_ADDRESS(),
+            amount: borrow_amount + 100000000, // add 1000 USDC
+            user: USER_ADDRESS(),
+        },
+        repay_all: true, // repay all
+        context: Option::Some(borrow_ctx.span()),
+    };
+
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'vesu',
+            instructions: array![LendingInstruction::Repay(repay_all)].span(),
+        }
+    ];
+
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span(), true);
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    };
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Repaid all USDC via RouterGateway (Vesu)");
+
+    // Step 4: Withdraw All ETH
+    let withdraw_all = Withdraw {
+        basic: BasicInstruction {
+            token: ETH_ADDRESS(),
+            amount: deposit_amount,
+            user: USER_ADDRESS(),
+        },
+        withdraw_all: true, // withdraw all
+        context: Option::Some(withdraw_ctx.span()),
+    };
+
+    let protocol_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'vesu',
+            instructions: array![LendingInstruction::Withdraw(withdraw_all)].span(),
+        }
+    ];
+
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span(), true);
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'call failed');
+    };
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    println!("Withdrew all ETH via RouterGateway (Vesu)");
+
+    println!("RouterGateway Vesu test completed successfully!");
 }

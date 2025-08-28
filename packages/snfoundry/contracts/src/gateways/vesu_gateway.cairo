@@ -368,22 +368,22 @@ mod VesuGateway {
             let collateral_asset = vesu_context.position_counterpart_token;
             let debt_asset = basic.token;
 
-            // Transfer debt tokens from user to gateway
             let erc20 = IERC20Dispatcher { contract_address: debt_asset };
+            let balance_before = erc20.balance_of(get_contract_address());
+
+            // Transfer debt tokens from user to gateway
             let result = erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount);
             assert(result, Errors::TRANSFER_FAILED);
 
-            let erc20 = IERC20Dispatcher { contract_address: debt_asset };
             let result = erc20.approve(self.vesu_singleton.read(), basic.amount);
             assert(result, Errors::APPROVE_FAILED);
 
-            let balance_before = erc20.balance_of(get_contract_address());
             // Create negative i257 for repay (reducing debt)
             let debt_amount = I257Impl::new(basic.amount, true);
             self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
 
             let balance_after = erc20.balance_of(get_contract_address());
-            let remainder = balance_before - (balance_after + basic.amount);
+            let remainder = balance_after - balance_before; // balance after should be equal or bigger always.
             if remainder > 0 {
                 assert(erc20.transfer(get_caller_address(), remainder), 'transfer failed');
             }
@@ -433,6 +433,33 @@ mod VesuGateway {
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
             let router = self.router.read();
             assert(router == get_caller_address() || user == get_caller_address(), 'unauthorized');
+        }
+
+        // @dev - internal helper to compute user's current debt for a position using repay context
+        fn get_debt_for_user_position(self: @ContractState, repay: Repay) -> u256 {
+            let context = repay.context;
+            assert(context.is_some(), 'Context is required for repay');
+            let mut context_bytes: Span<felt252> = context.unwrap();
+            let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
+            let singleton = ISingletonDispatcher { contract_address: self.vesu_singleton.read() };
+            let mut pool_id = self.pool_id.read();
+            if vesu_context.pool_id != Zero::zero() {
+                pool_id = vesu_context.pool_id;
+            }
+            // Touch context to ensure any lazy updates are reflected
+            let _ctx = singleton.context(
+                pool_id,
+                vesu_context.position_counterpart_token,
+                repay.basic.token,
+                repay.basic.user,
+            );
+            let (_, _, debt) = singleton.position(
+                pool_id,
+                vesu_context.position_counterpart_token,
+                repay.basic.token,
+                repay.basic.user,
+            );
+            debt
         }
     }
 
@@ -564,18 +591,7 @@ mod VesuGateway {
         fn get_flash_loan_amount(ref self: ContractState, repay: Repay) -> u256 {
             let mut amount = repay.basic.amount;
             if repay.repay_all {
-                let context = repay.context;
-                assert(context.is_some(), 'Context is required for repay');
-                let mut context_bytes: Span<felt252> = context.unwrap();
-                let vesu_context: VesuContext = Serde::deserialize(ref context_bytes).unwrap();
-                let singleton = ISingletonDispatcher { contract_address: self.vesu_singleton.read() };
-                let mut pool_id = self.pool_id.read();
-                if vesu_context.pool_id != Zero::zero() {
-                    pool_id = vesu_context.pool_id;
-                }
-                let context = singleton.context(pool_id, vesu_context.position_counterpart_token, repay.basic.token, repay.basic.user);
-                let (position, _, debt) = singleton.position(pool_id, vesu_context.position_counterpart_token, repay.basic.token, repay.basic.user);
-                amount = debt;
+                amount = self.get_debt_for_user_position(repay);
             }
             amount
         }
