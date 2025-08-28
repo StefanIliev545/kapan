@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -7,12 +7,10 @@ import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
-import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { feltToString } from "~~/utils/protocols";
-import { useAccount as useAccountStark } from "~~/hooks/useAccount";
+import { useWalletConnection } from "~~/hooks/useWalletConnection";
+import { useOptimalRate } from "~~/hooks/useOptimalRate";
+import { useModal, useToggle } from "~~/hooks/useModal";
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
@@ -33,42 +31,25 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   afterInfoContent,
   networkType,
 }) => {
-  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const moveModal = useModal();
+  const depositModal = useModal();
+  const withdrawModal = useModal();
+  const expanded = useToggle();
+  const isExpanded = expanded.isOpen;
 
   // Get wallet connection status
-  const { address: userAddress } = useAccount();
-  const { address: userAddressStark } = useAccountStark();
-  const isWalletConnected = networkType === "evm" ? !!userAddress : !!userAddressStark;
+  const { address } = useWalletConnection(networkType);
+  const isWalletConnected = !!address;
 
   // Check if position has a balance
   const hasBalance = tokenBalance > 0;
 
-  // Fetch optimal rate from the OptimalInterestRateFinder contract
-  const { data: optimalRateData } = useNetworkAwareReadContract({
-    contractName: "OptimalInterestRateFinder",
-    functionName: "findOptimalSupplyRate",
-    args: [tokenAddress],
-    networkType: networkType,
+  // Fetch optimal rate
+  const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
+    networkType,
+    tokenAddress,
+    type: "supply",
   });
-
-  let optimalProtocol = "";
-  let optimalRateDisplay = 0;
-  if (optimalRateData) {
-    let proto;
-    let rate;
-    if (networkType === "starknet") {
-      proto = feltToString(BigInt(optimalRateData?.[0]?.toString() || "0"));
-      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
-    } else {
-      proto = optimalRateData?.[0]?.toString() || "";
-      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
-    }
-    optimalProtocol = proto;
-    optimalRateDisplay = Number(rate) / 1e8;
-  }
 
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
@@ -84,7 +65,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     if ((e.target as HTMLElement).closest(".dropdown")) {
       return;
     }
-    setIsExpanded(prev => !prev);
+    expanded.toggle();
   };
 
   return (
@@ -198,7 +179,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             <div className="flex flex-col gap-2 md:hidden">
               <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={() => setIsDepositModalOpen(true)}
+                onClick={depositModal.open}
                 disabled={!isWalletConnected}
                 title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
               >
@@ -208,7 +189,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={() => setIsWithdrawModalOpen(true)}
+                onClick={withdrawModal.open}
                 disabled={!isWalletConnected || !hasBalance}
                 title={!isWalletConnected ? "Connect wallet to withdraw" : !hasBalance ? "No balance to withdraw" : "Withdraw tokens"}
               >
@@ -218,7 +199,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={() => setIsMoveModalOpen(true)}
+                onClick={moveModal.open}
                 disabled={!isWalletConnected || !hasBalance}
                 title={
                   !isWalletConnected
@@ -238,7 +219,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             <div className="hidden md:grid grid-cols-3 gap-3">
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={() => setIsDepositModalOpen(true)}
+                onClick={depositModal.open}
                 disabled={!isWalletConnected}
                 title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
               >
@@ -248,7 +229,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={() => setIsWithdrawModalOpen(true)}
+                onClick={withdrawModal.open}
                 disabled={!isWalletConnected || !hasBalance}
                 title={!isWalletConnected ? "Connect wallet to withdraw" : !hasBalance ? "No balance to withdraw" : "Withdraw tokens"}
               >
@@ -258,7 +239,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={() => setIsMoveModalOpen(true)}
+                onClick={moveModal.open}
                 disabled={!isWalletConnected || !hasBalance}
                 title={
                   !isWalletConnected
@@ -281,8 +262,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       {networkType === "starknet" ? (
         <>
           <DepositModalStark
-            isOpen={isDepositModalOpen}
-            onClose={() => setIsDepositModalOpen(false)}
+            isOpen={depositModal.isOpen}
+            onClose={depositModal.close}
             token={{
               name,
               icon,
@@ -292,8 +273,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             protocolName={protocolName}
           />
           <WithdrawModalStark
-            isOpen={isWithdrawModalOpen}
-            onClose={() => setIsWithdrawModalOpen(false)}
+            isOpen={withdrawModal.isOpen}
+            onClose={withdrawModal.close}
             token={{
               name,
               icon,
@@ -307,8 +288,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       ) : (
         <>
           <DepositModal
-            isOpen={isDepositModalOpen}
-            onClose={() => setIsDepositModalOpen(false)}
+            isOpen={depositModal.isOpen}
+            onClose={depositModal.close}
             token={{
               name,
               icon,
@@ -321,8 +302,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       )}
 
       <MoveSupplyModal
-        isOpen={isMoveModalOpen}
-        onClose={() => setIsMoveModalOpen(false)}
+        isOpen={moveModal.isOpen}
+        onClose={moveModal.close}
         token={{
           name,
           icon,
