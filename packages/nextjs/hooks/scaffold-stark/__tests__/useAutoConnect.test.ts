@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { useAutoConnect } from "../useAutoConnect";
-import { useConnect } from "@starknet-react/core";
+import { useConnect, useAccount } from "@starknet-react/core";
 import { useReadLocalStorage } from "usehooks-ts";
 import scaffoldConfig from "~~/scaffold.config";
 import { burnerAccounts } from "@scaffold-stark/stark-burner";
@@ -13,6 +13,7 @@ vi.mock("usehooks-ts", () => ({
 
 vi.mock("@starknet-react/core", () => ({
   useConnect: vi.fn(),
+  useAccount: vi.fn(),
 }));
 
 vi.mock("~~/scaffold.config", () => ({
@@ -39,6 +40,9 @@ describe("useAutoConnect", () => {
     (useConnect as ReturnType<typeof vi.fn>).mockReturnValue({
       connect: mockConnect,
       connectors: mockConnectors,
+    });
+    (useAccount as ReturnType<typeof vi.fn>).mockReturnValue({
+      status: "disconnected",
     });
     vi.spyOn(scaffoldConfig, "walletAutoConnect", "get").mockReturnValue(true);
   });
@@ -84,6 +88,9 @@ describe("useAutoConnect", () => {
       connect: mockConnect,
       connectors: mockConnectors,
     });
+    (useAccount as ReturnType<typeof vi.fn>).mockReturnValue({
+      status: "disconnected",
+    });
 
     renderHook(() => useAutoConnect());
 
@@ -106,6 +113,17 @@ describe("useAutoConnect", () => {
   it("should not connect if saved connector is not found in the connectors list", () => {
     vi.mocked(useReadLocalStorage).mockReturnValue({
       id: "non-existent-connector",
+    });
+
+    renderHook(() => useAutoConnect());
+
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  it("should not auto-connect if already connected", () => {
+    vi.mocked(useReadLocalStorage).mockReturnValue({ id: "wallet-1" });
+    (useAccount as ReturnType<typeof vi.fn>).mockReturnValue({
+      status: "connected",
     });
 
     renderHook(() => useAutoConnect());

@@ -1,6 +1,6 @@
 import { useReadLocalStorage } from "usehooks-ts";
-import { useEffect, useState } from "react";
-import { useConnect } from "@starknet-react/core";
+import { useEffect, useRef, useState } from "react";
+import { useAccount, useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 import { BurnerConnector, burnerAccounts } from "@scaffold-stark/stark-burner";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
@@ -36,22 +36,31 @@ export const useAutoConnect = (): void => {
   );
 
   const { connect, connectors } = useConnect();
+  const { status } = useAccount();
+  const hasTriedRef = useRef(false);
 
   useEffect(() => {
+    if (hasTriedRef.current || status !== "disconnected") return;
+
+    hasTriedRef.current = true;
+
     if (scaffoldConfig.walletAutoConnect) {
       const currentTime = Date.now();
       const ttlExpired =
         currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
       if (!ttlExpired) {
-        const connectorId = typeof savedConnector === 'string' ? savedConnector : savedConnector?.id;
+        const connectorId =
+          typeof savedConnector === "string"
+            ? savedConnector
+            : savedConnector?.id;
         const connector = connectors.find(
-          (conn) => conn.id === connectorId,
+          conn => conn.id === connectorId,
         );
 
         if (connector) {
           if (
             connector.id === "burner-wallet" &&
-            typeof savedConnector === 'object' &&
+            typeof savedConnector === "object" &&
             savedConnector?.ix !== undefined &&
             connector instanceof BurnerConnector
           ) {
@@ -61,5 +70,5 @@ export const useAutoConnect = (): void => {
         }
       }
     }
-  }, [connect, connectors, lastConnectionTime, savedConnector]);
+  }, [connect, connectors, lastConnectionTime, savedConnector, status]);
 };
