@@ -130,8 +130,6 @@ fn prefund_address(recipient: ContractAddress, token_address: ContractAddress, a
     let token_erc20 = IERC20Dispatcher { contract_address: token_address };
     cheat_caller_address(token_address, RICH_ADDRESS(), CheatSpan::TargetCalls(1));
     token_erc20.transfer(recipient, amount);
-    
-    println!("Prefunded with token");
 }
 
 fn setup_test_context() -> TestContext {
@@ -490,9 +488,7 @@ fn test_repay_all_withdraw_all() {
     context.gateway_dispatcher.process_instructions(instructions.span());
     
     let usdc_balance_after_borrow = usdc_erc20.balance_of(USER_ADDRESS());
-    println!("USDC balance after borrow: {}", usdc_balance_after_borrow);
     assert(usdc_balance_after_borrow > initial_usdc_balance, 'borrow failed');
-    println!("OK Borrowed {} USDC", borrow_amount);
     
     // Step 3: Repay All USDC debt
     let repay_all = Repay {
@@ -510,14 +506,11 @@ fn test_repay_all_withdraw_all() {
     cheat_caller_address(USDC_ADDRESS(), USER_ADDRESS(), CheatSpan::TargetCalls(1));
     usdc_erc20.approve(context.gateway_address, approve_amount);
     
-    println!("Attempting repay_all...");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Repay(repay_all)];
     context.gateway_dispatcher.process_instructions(instructions.span());
     
     let usdc_balance_after_repay = usdc_erc20.balance_of(USER_ADDRESS());
-    println!("USDC balance after repay_all: {}", usdc_balance_after_repay);
-    println!("OK Repaid all USDC debt");
     
     // Step 4: Withdraw All ETH collateral  
     let withdraw_all = Withdraw {
@@ -535,15 +528,10 @@ fn test_repay_all_withdraw_all() {
     let ibcollateral = LentDebtTokenABIDispatcher { contract_address: ETH_IBCOLLATERAL_TOKEN() };
     ibcollateral.approve(context.gateway_address, deposit_amount);
     
-    println!("Attempting withdraw_all...");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Withdraw(withdraw_all)];
     context.gateway_dispatcher.process_instructions(instructions.span());
     
     let final_eth_balance = eth_erc20.balance_of(USER_ADDRESS());
-    println!("Final ETH balance: {}", final_eth_balance);
     assert(final_eth_balance > initial_eth_balance - deposit_amount, 'withdraw failed');
-    println!("OK Withdrew all ETH collateral");
-    
-    println!("Test completed successfully!");
 }

@@ -411,7 +411,6 @@ fn test_vesu() {
 } 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
@@ -653,6 +652,7 @@ fn test_move_debt_reverse() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_router_repay_all_withdraw_all() {
     let context = setup_test_context();

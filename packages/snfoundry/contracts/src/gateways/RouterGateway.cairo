@@ -116,10 +116,7 @@ mod RouterGateway {
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit) => {
-                        let basic = *deposit.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesBefore.append(balance);
+                        balancesBefore.append(0); // Irrelevant
                     },
                     LendingInstruction::Repay(repay) => {
                         let basic = *repay.basic;
@@ -195,21 +192,16 @@ mod RouterGateway {
                         let basic = *borrow.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        println!("RouterGateway: Borrow - before: {}, after: {}", *balancesBefore.at(i), balance);
                         balancesAfter.append(balance - *balancesBefore.at(i));
                     },
                     LendingInstruction::Withdraw(withdraw) => {
                         let basic = *withdraw.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        println!("RouterGateway: Withdraw - before: {}, after: {}", *balancesBefore.at(i), balance);
                         if balance >= *balancesBefore.at(i) {
                             let diff = balance - *balancesBefore.at(i);
-                            println!("RouterGateway: Withdraw diff: {}", diff);
                             balancesAfter.append(diff);
                         } else {
-                            println!("RouterGateway: ERROR - Withdraw would underflow! before > after");
-                            println!("RouterGateway: This means before: {} > after: {}", *balancesBefore.at(i), balance);
                             balancesAfter.append(0); // Prevent underflow for now
                         }
                     },
@@ -217,14 +209,10 @@ mod RouterGateway {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        println!("RouterGateway: Repay - before: {}, after: {}", *balancesBefore.at(i), balance);
                         if *balancesBefore.at(i) >= balance {
                             let diff = *balancesBefore.at(i) - balance;
-                            println!("RouterGateway: Repay diff: {}", diff);
                             balancesAfter.append(diff);
                         } else {
-                            println!("RouterGateway: ERROR - Repay would underflow! after > before");
-                            println!("RouterGateway: This means after: {} > before: {}", balance, *balancesBefore.at(i));
                             balancesAfter.append(0); // Prevent underflow for now
                         }
                         if *repay.repay_all {
@@ -232,10 +220,7 @@ mod RouterGateway {
                         }
                     },
                     LendingInstruction::Deposit(deposit) => {
-                        let basic = *deposit.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesAfter.append(*balancesBefore.at(i) - balance);
+                        balancesAfter.append(0);
                     },
                     _ => {}
                 }
@@ -261,9 +246,9 @@ mod RouterGateway {
                         LendingInstruction::Repay(repay) => {
                             let basic = *repay.basic;
                             let diff = balancesAfter.at(i);
-                            if basic.amount > *diff {
+                            if *diff != 0 {
                                 let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                                assert(erc20.transfer(basic.user, basic.amount - *diff), 'transfer failed');
+                                assert(erc20.transfer(basic.user, *diff), 'transfer failed');
                             }
                         },
                         _ => {}
@@ -291,29 +276,12 @@ mod RouterGateway {
                     instructions_span = self.remap_instructions(instructions_span, previous_protocol_diffs);
                 }
 
-                // Process instructions one-by-one, aggregating their diffs in order
-                let mut aggregated_diffs = array![];
-                let mut j: usize = 0;
-                while j != instructions_span.len() {
-                    // Build a single-instruction span
-                    let mut single = array![];
-                    single.append(*instructions_span.at(j));
-                    let single_span = single.span();
-
-                    println!("RouterGateway: Processing instruction {} of {}", j, instructions_span.len());
-                    let balances_before = self.before_send_instructions(gateway, single_span, should_transfer);
-                    println!("RouterGateway: Got balances_before, calling gateway");
-                    let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
-                    dispatcher.process_instructions(single_span);
-                    println!("RouterGateway: Gateway call completed, calculating diffs");
-                    let diffs = self.after_send_instructions(gateway, single_span, balances_before, should_transfer);
-                    // diffs.len() is 1 here; append in order to preserve indices
-                    aggregated_diffs.append(*diffs.at(0));
-                    println!("RouterGateway: Instruction {} completed with diff: {}", j, *diffs.at(0));
-                    j += 1;
-                }
-
-                previous_protocol_diffs = aggregated_diffs.span();
+                // Process all instructions for this protocol at once
+                let balances_before = self.before_send_instructions(gateway, instructions_span, should_transfer);
+                let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
+                dispatcher.process_instructions(instructions_span);
+                let diffs = self.after_send_instructions(gateway, instructions_span, balances_before, should_transfer);
+                previous_protocol_diffs = diffs;
                 i += 1;
             }
         }
@@ -357,7 +325,7 @@ mod RouterGateway {
         fn ensure_user_matches_caller(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
             for protocolInstruction in instructions {
                 // Ensure there is at most one borrow/withdraw per ERC20 token in this protocol's instruction list
-                self.ensure_unique_borrow_withdraw_tokens(*protocolInstruction.instructions);
+                self.ensure_unique_diff_tokens(*protocolInstruction.instructions);
                 for instruction in protocolInstruction.instructions {
                     let user = match instruction {
                         LendingInstruction::Repay(repay) => {
@@ -392,7 +360,7 @@ mod RouterGateway {
         }
 
         // @dev - ensures there is only one Borrow or Withdraw instruction per ERC20 token in the same instructions span.
-        fn ensure_unique_borrow_withdraw_tokens(ref self: ContractState, instructions: Span<LendingInstruction>) {
+        fn ensure_unique_diff_tokens(ref self: ContractState, instructions: Span<LendingInstruction>) {
             // Keep track of tokens we have already seen in a borrow/withdraw instruction
             let mut seen_tokens = array![];
             for instr in instructions {
@@ -425,6 +393,19 @@ mod RouterGateway {
                     },
                     LendingInstruction::Reborrow(reborrow) => {
                         let token = *reborrow.token;
+                        let mut i: usize = 0;
+                        let mut found = false;
+                        while i != seen_tokens.len() {
+                            if *seen_tokens.at(i) == token {
+                                found = true;
+                            };
+                            i += 1;
+                        };
+                        assert(!found, 'duplicate-borrow-withdraw-token');
+                        seen_tokens.append(token);
+                    },
+                    LendingInstruction::Repay(repay) => {
+                        let token = *repay.basic.token;
                         let mut i: usize = 0;
                         let mut found = false;
                         while i != seen_tokens.len() {
