@@ -1,4 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "@starknet-react/core";
 import { useReadContract } from "@starknet-react/core";
@@ -28,7 +29,6 @@ import {
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
-import { useRef } from "react";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -45,7 +45,7 @@ type MoveStep = "idle" | "executing" | "done";
 
 // Define pool IDs
 const POOL_IDS = {
-  "Genesis": 0n,
+  Genesis: 0n,
   "Re7 USDC": 3592370751539490711610556844458488648008775713878064059760995781404350938653n,
   "Alterscope wstETH": 2612229586214495842527551768232431476062656055007024497123940017576986139174n,
 } as const;
@@ -134,11 +134,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   useEffect(() => {
     if (
       (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") ||
-      !isLoadingSourceCollaterals && !isLoadingTargetCollaterals
+      (!isLoadingSourceCollaterals && !isLoadingTargetCollaterals)
     ) {
       firstCollateralsReadyRef.current = true;
     }
-  }, [disableCollateralSelection, preSelectedCollaterals, fromProtocol, isLoadingSourceCollaterals, isLoadingTargetCollaterals]);
+  }, [
+    disableCollateralSelection,
+    preSelectedCollaterals,
+    fromProtocol,
+    isLoadingSourceCollaterals,
+    isLoadingTargetCollaterals,
+  ]);
 
   const collateralsForSelector = useMemo(() => {
     if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
@@ -201,9 +207,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const isLoadingCollaterals =
     !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
   // Construct instruction based on current state
-  const { fullInstruction, authInstruction } = useMemo(() => {
+  const { fullInstruction, authInstruction, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
-      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] } };
+      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, pairInstructions: [] };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
@@ -323,112 +329,108 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       }
 
       // For each collateral and its debt allocation, create redeposit + reborrow instructions
-      const instructions = debtAllocations
-        .map((allocation, index) => {
-          // Skip if no debt allocated
-          if (allocation.debtAmount <= 0n) return [];
+      const instructions = debtAllocations.map((allocation, index) => {
+        // Skip if no debt allocated
+        if (allocation.debtAmount <= 0n) return [];
 
-          // Find the corresponding collateral from selectedCollateralsWithAmounts
-          const collateral = selectedCollateralsWithAmounts.find(c => c.token === allocation.token);
-          if (!collateral) return [];
+        // Find the corresponding collateral from selectedCollateralsWithAmounts
+        const collateral = selectedCollateralsWithAmounts.find(c => c.token === allocation.token);
+        if (!collateral) return [];
 
-          const isCollateralMaxClicked = maxClickedCollaterals[collateral.token] || false;
-          const uppedAmount = isCollateralMaxClicked
-            ? (collateral.amount * BigInt(101)) / BigInt(100)
-            : collateral.amount;
+        const isCollateralMaxClicked = maxClickedCollaterals[collateral.token] || false;
+        const uppedAmount = isCollateralMaxClicked
+          ? (collateral.amount * BigInt(101)) / BigInt(100)
+          : collateral.amount;
 
-          // Create context with paired tokens for Vesu
-          const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-            0n,
-            BigInt(position.tokenAddress),
-          ]);
-          const contextReborrow = new CairoOption<bigint[]>(CairoOptionVariant.Some, [0n, BigInt(collateral.token)]);
-          const repayAll = isAmountMaxClicked && index === debtAllocations.length - 1;
-          const nostraInstructions = [
-            new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: undefined,
-              Repay: {
-                basic: {
-                  token: position.tokenAddress,
-                  amount: uint256.bnToUint256(allocation.debtAmount),
-                  user: userAddress,
-                },
-                repay_all: repayAll,
-                context: new CairoOption<bigint[]>(CairoOptionVariant.None),
-              },
-              Withdraw: undefined,
-              Redeposit: undefined,
-              Reborrow: undefined,
-            }),
-            new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: undefined,
-              Repay: undefined,
-              Withdraw: {
-                basic: {
-                  token: collateral.token,
-                  amount: uint256.bnToUint256(uppedAmount),
-                  user: userAddress,
-                },
-                withdraw_all: isCollateralMaxClicked,
-                context: new CairoOption<bigint[]>(CairoOptionVariant.None),
-              },
-              Redeposit: undefined,
-              Reborrow: undefined,
-            }),
-          ];
-
-          const vesuInstructions = [
-            new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: undefined,
-              Repay: undefined,
-              Withdraw: undefined,
-              Redeposit: {
-                token: collateral.token,
-                target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
-                user: userAddress,
-                context: contextRedeposit,
-              },
-              Reborrow: undefined,
-            }),
-            new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: undefined,
-              Repay: undefined,
-              Withdraw: undefined,
-              Redeposit: undefined,
-              Reborrow: {
+        // Create context with paired tokens for Vesu
+        const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+          0n,
+          BigInt(position.tokenAddress),
+        ]);
+        const contextReborrow = new CairoOption<bigint[]>(CairoOptionVariant.Some, [0n, BigInt(collateral.token)]);
+        const repayAll = isAmountMaxClicked && index === debtAllocations.length - 1;
+        const nostraInstructions = [
+          new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: {
+              basic: {
                 token: position.tokenAddress,
-                target_instruction_index: 0, // Point to repay instruction
-                approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
+                amount: uint256.bnToUint256(allocation.debtAmount),
                 user: userAddress,
-                context: contextReborrow,
               },
-            }),
-          ];
-          return [
-            {
-              protocol_name: lowerProtocolName,
-              instructions: nostraInstructions,
+              repay_all: repayAll,
+              context: new CairoOption<bigint[]>(CairoOptionVariant.None),
             },
-            {
-              protocol_name: destProtocolName,
-              instructions: vesuInstructions,
+            Withdraw: undefined,
+            Redeposit: undefined,
+            Reborrow: undefined,
+          }),
+          new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: {
+              basic: {
+                token: collateral.token,
+                amount: uint256.bnToUint256(uppedAmount),
+                user: userAddress,
+              },
+              withdraw_all: isCollateralMaxClicked,
+              context: new CairoOption<bigint[]>(CairoOptionVariant.None),
             },
-          ];
-        })
-        .flat();
+            Redeposit: undefined,
+            Reborrow: undefined,
+          }),
+        ];
+
+        const vesuInstructions = [
+          new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: undefined,
+            Redeposit: {
+              token: collateral.token,
+              target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
+              user: userAddress,
+              context: contextRedeposit,
+            },
+            Reborrow: undefined,
+          }),
+          new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: undefined,
+            Redeposit: undefined,
+            Reborrow: {
+              token: position.tokenAddress,
+              target_instruction_index: 0, // Point to repay instruction
+              approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
+              user: userAddress,
+              context: contextReborrow,
+            },
+          }),
+        ];
+        return [
+          {
+            protocol_name: lowerProtocolName,
+            instructions: nostraInstructions,
+          },
+          {
+            protocol_name: destProtocolName,
+            instructions: vesuInstructions,
+          },
+        ];
+      });
       // Compile the instructions
       const fullInstructionData = CallData.compile({
-        instructions: instructions,
+        instructions: instructions.flat(),
       });
 
-      console.log("instructions", instructions);
-
       const authInstructionData = CallData.compile({
-        instructions: instructions.map(protocolInstruction => {
+        instructions: instructions.flat().map(protocolInstruction => {
           const filteredInstructions = protocolInstruction.instructions.filter(instruction => {
             if (instruction.activeVariant() === "Withdraw" || instruction.activeVariant() === "Reborrow") {
               return true;
@@ -443,13 +445,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       return {
         fullInstruction: fullInstructionData,
         authInstruction: authInstructionData,
+        pairInstructions: instructions,
       };
     };
 
     // If target protocol is Vesu and we have multiple collaterals, use proportional allocation
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 1) {
       return (
-        generateVesuInstructions() || { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] } }
+        generateVesuInstructions() || {
+          fullInstruction: { instructions: [] },
+          authInstruction: { instructions: [] },
+          pairInstructions: [],
+        }
       );
     }
 
@@ -587,21 +594,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return {
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
+      pairInstructions: [],
     };
-  }, [
-    amount,
-    userAddress,
-    routerGateway?.address,
-    position.decimals,
-    position.tokenAddress,
-    fromProtocol,
-    selectedProtocol,
-    selectedCollateralsWithAmounts,
-    isAmountMaxClicked,
-    tokenToPrices,
-    maxClickedCollaterals,
-    currentPoolId,
-  ]);
+  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId]);
 
   // Get authorizations for the instructions
 
@@ -634,13 +629,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     return [
       ...(authorizations as any),
-      {
-        contractName: "RouterGateway" as const,
-        functionName: "move_debt" as const,
-        args: fullInstruction,
-      },
+      ...pairInstructions.map(instructions => {
+        return {
+          contractName: "RouterGateway" as const,
+          functionName: "move_debt" as const,
+          args: CallData.compile({ instructions: instructions }),
+        }
+      }),
     ];
-  }, [fullInstruction, protocolInstructions]);
+  }, [fullInstruction, protocolInstructions, pairInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -947,7 +944,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 {fromProtocol === "Vesu" && (
                   <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
                     <span className="text-base-content/70">Current Pool:</span>
-                    <span className="font-medium ml-1">{currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}</span>
+                    <span className="font-medium ml-1">
+                      {currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}
+                    </span>
                   </div>
                 )}
               </div>
@@ -957,11 +956,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
                 >
                   <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
-                    {Object.entries(POOL_IDS).map(([name, id]) => (
-                      id === selectedPoolId && (
-                        <span key={name} className="truncate font-medium text-sm">{name}</span>
-                      )
-                    ))}
+                    {Object.entries(POOL_IDS).map(
+                      ([name, id]) =>
+                        id === selectedPoolId && (
+                          <span key={name} className="truncate font-medium text-sm">
+                            {name}
+                          </span>
+                        ),
+                    )}
                   </div>
                   <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -975,10 +977,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     .filter(([_, id]) => fromProtocol !== "Vesu" || id !== currentPoolId) // Only filter out current pool if source is Vesu
                     .map(([name, id]) => (
                       <li key={name}>
-                        <button
-                          className="flex items-center gap-2 py-1"
-                          onClick={() => setSelectedPoolId(id)}
-                        >
+                        <button className="flex items-center gap-2 py-1" onClick={() => setSelectedPoolId(id)}>
                           {name === "Genesis" && (
                             <Image
                               src="/logos/vesu.svg"
