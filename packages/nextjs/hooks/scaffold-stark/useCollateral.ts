@@ -2,6 +2,7 @@ import { useScaffoldReadContract } from "./useScaffoldReadContract";
 import { CollateralToken } from "~~/components/specific/collateral/CollateralSelector";
 import { Uint256 } from "starknet";
 import { feltToString } from "~~/utils/protocols";
+import { useEffect, useRef, useState } from "react";
 
 interface SupportedAssetInfoResp {
     0: string | bigint;
@@ -28,13 +29,33 @@ export function useCollateral({
     contractName,
     functionName: "get_supported_assets_info",
     args: (protocolName === "Vesu" ? [userAddress, 0n] : [userAddress]) as any,
-    refetchInterval: 10000,
     enabled: isOpen && !!userAddress,
+    watch: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   } as any); //hack cause function definitions differ for nostra and vesu. TODO: fix this
 
+  // Track first successful load to suppress loading state on subsequent refetches
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  useEffect(() => {
+    if (!hasLoadedOnce && Array.isArray(data)) {
+      setHasLoadedOnce(true);
+    }
+  }, [data, hasLoadedOnce]);
+
+  // Keep previous successful data to avoid UI clearing during refetch
+  const previousDataRef = useRef<any[]>([]);
+  useEffect(() => {
+    if (Array.isArray(data) && data.length > 0) {
+      previousDataRef.current = data as any[];
+    }
+  }, [data]);
+
+  const sourceData = Array.isArray(data) ? data : previousDataRef.current;
+
   // data: Array<(ContractAddress, felt252, u8, u256)>
-  const collaterals: CollateralToken[] = Array.isArray(data)
-    ? data.map((item: SupportedAssetInfoResp) => {
+  const collaterals: CollateralToken[] = Array.isArray(sourceData)
+    ? sourceData.map((item: SupportedAssetInfoResp) => {
         const { 0: address, 1: symbol, 2: decimals, 3: rawBalance } = item;
         // Handle Uint256 for rawBalance
         let rawBalanceBigInt = 0n;
@@ -56,5 +77,5 @@ export function useCollateral({
       })
     : [];
 
-  return { collaterals, isLoading };
+  return { collaterals, isLoading: isLoading && !hasLoadedOnce };
 }

@@ -28,6 +28,7 @@ import {
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
+import { useRef } from "react";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -128,6 +129,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     isOpen: isOpen && !!selectedProtocol,
   });
 
+  // Track first load completion (never reset) to avoid spinner after initial data is shown
+  const firstCollateralsReadyRef = useRef(false);
+  useEffect(() => {
+    if (
+      (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") ||
+      !isLoadingSourceCollaterals && !isLoadingTargetCollaterals
+    ) {
+      firstCollateralsReadyRef.current = true;
+    }
+  }, [disableCollateralSelection, preSelectedCollaterals, fromProtocol, isLoadingSourceCollaterals, isLoadingTargetCollaterals]);
+
   const collateralsForSelector = useMemo(() => {
     if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
       return preSelectedCollaterals.map(collateral => ({
@@ -185,8 +197,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     };
   }, [tokenPrices, collateralsForSelector, tokenAddress]);
 
-  // Track loading state for all collaterals
-  const isLoadingCollaterals = isLoadingSourceCollaterals || isLoadingTargetCollaterals;
+  // Spinner only before first successful data render
+  const isLoadingCollaterals =
+    !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
   // Construct instruction based on current state
   const { fullInstruction, authInstruction } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
@@ -411,6 +424,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       const fullInstructionData = CallData.compile({
         instructions: instructions,
       });
+
+      console.log("instructions", instructions);
 
       const authInstructionData = CallData.compile({
         instructions: instructions.map(protocolInstruction => {
