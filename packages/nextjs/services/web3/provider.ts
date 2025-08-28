@@ -1,5 +1,5 @@
 import * as chains from "@starknet-react/chains";
-import { jsonRpcProvider, publicProvider, starknetChainId } from "@starknet-react/core";
+import { jsonRpcProvider, starknetChainId } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 
 const containsDevnet = (networks: readonly chains.Chain[]) => {
@@ -23,7 +23,7 @@ if (!rpcUrl) {
 const provider = jsonRpcProvider({
   rpc: () => ({
     nodeUrl: rpcUrl,
-    specVersion: "0.7",
+    specVersion: "0.8.1",
     chainId: starknetChainId(currentNetwork.id),
   }),
 });
