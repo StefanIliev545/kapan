@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+import React, { FC } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -9,11 +9,10 @@ import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
-import { useAccount } from "wagmi";
-import { useAccount as useAccountStark } from "~~/hooks/useAccount";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { feltToString } from "~~/utils/protocols";
+import { useWalletConnection } from "~~/hooks/useWalletConnection";
+import { useOptimalRate } from "~~/hooks/useOptimalRate";
+import { useModal, useToggle } from "~~/hooks/useModal";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -36,43 +35,26 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   collateralValue,
   networkType,
 }) => {
-  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
-  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const moveModal = useModal();
+  const repayModal = useModal();
+  const borrowModal = useModal();
+  const expanded = useToggle();
+  const isExpanded = expanded.isOpen;
 
-  // Get wallet connection status
-  const { address: userAddress } = useAccount();
-  const { address: userAddressStark } = useAccountStark();
-  const isWalletConnected = networkType === "evm" ? !!userAddress : !!userAddressStark;
+  // Get wallet connection status for both networks
+  const { evm, starknet } = useWalletConnection();
+  const address = networkType === "evm" ? evm.address : starknet.address;
+  const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance (debt)
   const hasBalance = tokenBalance > 0;
 
-  // Fetch optimal rate from the OptimalInterestRateFinder contract
-  const { data: optimalRateData } = useNetworkAwareReadContract({
+  // Fetch optimal rate
+  const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
     networkType,
-    contractName: "OptimalInterestRateFinder",
-    functionName: "findOptimalBorrowRate",
-    args: [tokenAddress],
-    refetchInterval: 0,
+    tokenAddress,
+    type: "borrow",
   });
-
-  let optimalProtocol = "";
-  let optimalRateDisplay = 0;
-  if (optimalRateData) {
-    let proto;
-    let rate;
-    if (networkType === "starknet") {
-      proto = feltToString(BigInt(optimalRateData?.[0]?.toString() || "0"));
-      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
-    } else {
-      proto = optimalRateData?.[0]?.toString() || "";
-      rate = Number(optimalRateData?.[1]?.toString() || "0") / 1e8;
-    }
-    optimalProtocol = proto;
-    optimalRateDisplay = Number(rate) / 1e8;
-  }
 
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
@@ -82,21 +64,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
-  const handleOpenBorrowModal = () => {
-    setIsBorrowModalOpen(true);
-  };
-
-  const handleCloseBorrowModal = () => {
-    setIsBorrowModalOpen(false);
-  };
-
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
     if ((e.target as HTMLElement).closest(".dropdown")) {
       return;
     }
-    setIsExpanded(prev => !prev);
+    expanded.toggle();
   };
 
   // Get the collateral view with isVisible prop
@@ -231,7 +205,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             <div className="flex flex-col gap-2 md:hidden">
               <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={() => setIsRepayModalOpen(true)}
+                onClick={repayModal.open}
                 disabled={!hasBalance || !isWalletConnected}
                 aria-label="Repay"
                 title={!isWalletConnected ? "Connect wallet to repay" : "Repay debt"}
@@ -244,7 +218,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={() => setIsMoveModalOpen(true)}
+                onClick={moveModal.open}
                 disabled={!hasBalance || !isWalletConnected}
                 aria-label="Move"
                 title={!isWalletConnected ? "Connect wallet to move debt" : "Move debt to another protocol"}
@@ -257,7 +231,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
               <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={handleOpenBorrowModal}
+                onClick={borrowModal.open}
                 disabled={!isWalletConnected}
                 aria-label="Borrow"
                 title={!isWalletConnected ? "Connect wallet to borrow" : "Borrow more tokens"}
@@ -273,7 +247,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             <div className="hidden md:grid grid-cols-3 gap-3">
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={() => setIsRepayModalOpen(true)}
+                onClick={repayModal.open}
                 disabled={!hasBalance || !isWalletConnected}
                 aria-label="Repay"
                 title={!isWalletConnected ? "Connect wallet to repay" : "Repay debt"}
@@ -286,7 +260,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
               <button
                 className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={() => setIsMoveModalOpen(true)}
+                onClick={moveModal.open}
                 disabled={!hasBalance || !isWalletConnected}
                 aria-label="Move"
                 title={!isWalletConnected ? "Connect wallet to move debt" : "Move debt to another protocol"}
@@ -299,7 +273,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={handleOpenBorrowModal}
+                onClick={borrowModal.open}
                 disabled={!isWalletConnected}
                 aria-label="Borrow"
                 title={!isWalletConnected ? "Connect wallet to borrow" : "Borrow more tokens"}
@@ -325,8 +299,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       {networkType === "starknet" ? (
         <>
           <BorrowModalStark
-            isOpen={isBorrowModalOpen}
-            onClose={handleCloseBorrowModal}
+            isOpen={borrowModal.isOpen}
+            onClose={borrowModal.close}
             token={{
               name,
               icon,
@@ -336,8 +310,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
           />
           <RepayModalStark
-            isOpen={isRepayModalOpen}
-            onClose={() => setIsRepayModalOpen(false)}
+            isOpen={repayModal.isOpen}
+            onClose={repayModal.close}
             token={{
               name,
               icon,
@@ -348,8 +322,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
           />
           <MovePositionModalStark
-            isOpen={isMoveModalOpen}
-            onClose={() => setIsMoveModalOpen(false)}
+            isOpen={moveModal.isOpen}
+            onClose={moveModal.close}
             fromProtocol={protocolName}
             position={{
               name,
@@ -363,8 +337,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       ) : (
         <>
           <BorrowModal
-            isOpen={isBorrowModalOpen}
-            onClose={handleCloseBorrowModal}
+            isOpen={borrowModal.isOpen}
+            onClose={borrowModal.close}
             token={{
               name,
               icon,
@@ -374,8 +348,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
           />
           <RepayModal
-            isOpen={isRepayModalOpen}
-            onClose={() => setIsRepayModalOpen(false)}
+            isOpen={repayModal.isOpen}
+            onClose={repayModal.close}
             token={{
               name,
               icon,
@@ -385,8 +359,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
           />
           <MovePositionModal
-            isOpen={isMoveModalOpen}
-            onClose={() => setIsMoveModalOpen(false)}
+            isOpen={moveModal.isOpen}
+            onClose={moveModal.close}
             fromProtocol={protocolName}
             position={{
               name,
