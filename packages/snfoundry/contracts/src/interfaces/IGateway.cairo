@@ -1,3 +1,4 @@
+use ekubo::interfaces::router::{RouteNode, TokenAmount};
 use starknet::ContractAddress;
 
 #[derive(Drop, Serde, Copy)]
@@ -52,6 +53,14 @@ pub struct Reborrow {
 }
 
 #[derive(Drop, Serde, Copy)]
+pub struct EkuboSwap {
+    pub router: ContractAddress,
+    pub node: RouteNode,
+    pub token_amount: TokenAmount,
+    pub user: ContractAddress,
+}
+
+#[derive(Drop, Serde, Copy)]
 pub enum LendingInstruction {
     Deposit: Deposit,
     Borrow: Borrow,
@@ -59,12 +68,15 @@ pub enum LendingInstruction {
     Withdraw: Withdraw,
     Redeposit: Redeposit,
     Reborrow: Reborrow,
+    EkuboSwap: EkuboSwap,
 }
 
 #[starknet::interface]
 pub trait ILendingInstructionProcessor<TContractState> {
     fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
-    fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)>;
+    fn get_authorizations_for_instructions(
+        ref self: TContractState, instructions: Span<LendingInstruction>, rawSelectors: bool,
+    ) -> Span<(ContractAddress, felt252, Array<felt252>)>;
     fn get_flash_loan_amount(ref self: TContractState, repay: Repay) -> u256;
 }
 
