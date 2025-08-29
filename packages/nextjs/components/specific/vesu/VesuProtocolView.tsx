@@ -52,7 +52,7 @@ type PositionTuple = {
 export const VesuProtocolView: FC = () => {
   const { address: userAddress } = useAccount();
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
   // Fetch supported assets
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({

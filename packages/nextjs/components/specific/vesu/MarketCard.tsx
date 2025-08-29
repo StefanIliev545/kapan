@@ -83,13 +83,11 @@ export const MarketCard: FC<MarketCardProps> = ({
     <>
       <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow">
         <div className="card-body p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src={icon} alt={name} width={32} height={32} className="rounded-full" />
-              <h3 className="text-lg font-semibold">{name}</h3>
-            </div>
+          <div className="flex items-center gap-3">
+            <Image src={icon} alt={name} width={32} height={32} className="rounded-full" />
+            <h3 className="text-lg font-semibold flex-1">{name}</h3>
             <button
-              className="btn btn-sm btn-primary btn-circle"
+              className="btn btn-sm btn-primary btn-circle ml-auto"
               onClick={() => setIsDepositModalOpen(true)}
               aria-label="Deposit"
             >
