@@ -38,6 +38,7 @@ export interface TokenInfo {
   currentRate: number;
   address: string;
   protocolAmount?: bigint; // Add protocol balance/debt amount for withdraw/repay actions
+  usdPrice?: number;
 }
 
 export interface VesuContext {
@@ -289,10 +290,11 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
-  // Calculate USD value
+  // Calculate USD value using token price if available
   const getUsdValue = () => {
     if (!amount || isNaN(Number(amount))) return "0.00";
-    return formatDisplayNumber(Number(amount) * token.currentRate);
+    const price = token.usdPrice ?? 0;
+    return formatDisplayNumber(Number(amount) * price);
   };
 
   // Reset the state when the modal is closed
