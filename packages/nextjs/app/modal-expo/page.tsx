@@ -10,6 +10,7 @@ import {
   FiTrendingUp,
   FiZap,
 } from "react-icons/fi";
+import { FaGasPump } from "react-icons/fa";
 
 // Shared mocked data for modal prototypes
 const mock = {
@@ -69,8 +70,24 @@ const VariantOne = () => {
 
           <div className="p-6 space-y-6">
             <div className="form-control">
-              <label className="label">Amount</label>
-              <input type="number" className="input input-bordered" placeholder="0.0" />
+              <label className="label justify-between">
+                <span>Amount</span>
+                <span className="text-xs opacity-60">
+                  Wallet: {format(mock.walletBalance)}
+                </span>
+              </label>
+              <input
+                type="number"
+                className="input input-bordered w-full"
+                placeholder="0.0"
+              />
+              <div className="mt-2 flex gap-2">
+                {[25, 50, 100].map(p => (
+                  <button key={p} className="btn btn-outline btn-xs">
+                    {p}%
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -97,7 +114,12 @@ const VariantOne = () => {
             </div>
 
             <div className="modal-action">
-              <button className="btn btn-primary w-full">Confirm deposit</button>
+              <button className="btn btn-primary w-full flex justify-between">
+                <span>Confirm deposit</span>
+                <span className="flex items-center gap-1 text-xs">
+                  <FaGasPump /> ${mock.gasCostUsd}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -128,39 +150,78 @@ const VariantTwo = () => {
       </div>
 
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-md">
+        <div className="modal-box max-w-md rounded-3xl">
           <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
             <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
             Supply {mock.token.name}
           </h3>
 
           <div className="form-control mb-4">
-            <label className="label">Amount</label>
-            <input type="number" className="input input-bordered" placeholder="0.0" />
+            <label className="label justify-between">
+              <span>Amount</span>
+              <span className="text-xs opacity-60">LTV {mock.ltv}%</span>
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              placeholder="0.0"
+            />
+            <div className="mt-2 flex gap-2">
+              {[25, 50, 75, 100].map(p => (
+                <button key={p} className="btn btn-outline btn-xs">
+                  {p}%
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <div className="font-semibold mb-1">Current</div>
-              <div className="flex items-center gap-1"><FiActivity /> HF {mock.healthFactor}</div>
+              <div className="font-semibold mb-1 flex items-center gap-1">
+                <FiActivity /> Current
+              </div>
               <div className="flex items-center gap-1"><FiPieChart /> LTV {mock.ltv}%</div>
+              <progress
+                className="progress progress-secondary w-full mb-2"
+                value={mock.ltv}
+                max="100"
+              ></progress>
+              <div className="flex items-center gap-1"><FiActivity /> HF {mock.healthFactor}</div>
             </div>
             <div>
-              <div className="font-semibold mb-1">After</div>
-              <div className="flex items-center gap-1"><FiActivity /> HF {mock.newHealthFactor}</div>
-              <div className="flex items-center gap-1"><FiPieChart /> LTV {mock.ltv - 5}%</div>
+              <div className="font-semibold mb-1 flex items-center gap-1">
+                <FiTrendingUp /> After
+              </div>
+              <div className="flex items-center gap-1">
+                <FiPieChart /> LTV {mock.ltv - 5}%
+              </div>
+              <progress
+                className="progress progress-secondary w-full mb-2"
+                value={mock.ltv - 5}
+                max="100"
+              ></progress>
+              <div className="flex items-center gap-1">
+                <FiActivity /> HF {mock.newHealthFactor}
+              </div>
             </div>
           </div>
 
           <div className="mt-4 flex justify-between text-sm opacity-80">
-            <span className="flex items-center gap-1"><FiZap /> ${mock.gasCostUsd}</span>
+            <span className="flex items-center gap-1">
+              <FaGasPump /> ${mock.gasCostUsd}
+            </span>
             <span className="flex items-center gap-1">
               <FiDollarSign /> ${format(mock.poolLiquidity)} pool
             </span>
           </div>
 
           <div className="modal-action">
-            <button className="btn btn-secondary w-full">Confirm supply</button>
+            <button className="btn btn-secondary w-full flex justify-between">
+              <span>Confirm supply</span>
+              <span className="flex items-center gap-1 text-xs">
+                <FaGasPump /> ${mock.gasCostUsd}
+              </span>
+            </button>
           </div>
         </div>
         <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -190,31 +251,59 @@ const VariantThree = () => {
       </div>
 
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-2xl">
-          <h3 className="font-bold text-xl mb-4">Borrow {mock.token.name}</h3>
-          <div className="flex gap-6">
-            <div className="flex-1 space-y-4">
+        <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
+          <div className="flex">
+            <div className="flex-1 p-6 space-y-4">
+              <h3 className="font-bold text-xl">Borrow {mock.token.name}</h3>
               <div className="form-control">
-                <label className="label">Amount</label>
-                <input type="number" className="input input-bordered" placeholder="0.0" />
+                <label className="label justify-between">
+                  <span>Amount</span>
+                  <span className="text-xs opacity-60">Price ${mock.tokenPrice}</span>
+                </label>
+                <input
+                  type="number"
+                  className="input input-bordered w-full"
+                  placeholder="0.0"
+                />
+                <div className="mt-2 flex gap-2">
+                  {[25, 50, 100].map(p => (
+                    <button key={p} className="btn btn-outline btn-xs">
+                      {p}%
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center gap-1"><FiTrendingUp /> Borrow APY {mock.borrowApy}%</div>
-                <div className="flex items-center gap-1"><FiDollarSign /> Price ${mock.tokenPrice}</div>
+                <div className="flex items-center gap-1">
+                  <FiTrendingUp /> Borrow APY {mock.borrowApy}%
+                </div>
+                <div className="flex items-center gap-1">
+                  <FiPieChart /> LTV {mock.ltv}%
+                </div>
+              </div>
+
+              <div className="modal-action pt-4">
+                <button className="btn btn-accent w-full flex justify-between">
+                  <span>Confirm borrow</span>
+                  <span className="flex items-center gap-1 text-xs">
+                    <FaGasPump /> ${mock.gasCostUsd}
+                  </span>
+                </button>
               </div>
             </div>
 
-            <div className="w-52 bg-base-200 rounded-xl p-4 text-sm space-y-2">
+            <div className="w-60 bg-base-200 p-6 space-y-3 text-sm">
               <div className="font-semibold mb-2">Risk &amp; stats</div>
-              <div className="flex items-center gap-1"><FiActivity /> HF {mock.healthFactor} → {mock.newHealthFactor}</div>
-              <div className="flex items-center gap-1"><FiPieChart /> LTV {mock.ltv}%</div>
-              <div className="flex items-center gap-1"><FiZap /> Gas ${mock.gasCostUsd}</div>
-              <div className="flex items-center gap-1"><FiTrendingUp /> Util {mock.utilization}%</div>
+              <div className="flex items-center gap-1">
+                <FiActivity /> HF {mock.healthFactor} → {mock.newHealthFactor}
+              </div>
+              <div className="flex items-center gap-1">
+                <FiTrendingUp /> Util {mock.utilization}%
+              </div>
+              <div className="flex items-center gap-1">
+                <FaGasPump /> ${mock.gasCostUsd}
+              </div>
             </div>
-          </div>
-
-          <div className="modal-action">
-            <button className="btn btn-accent w-full">Confirm borrow</button>
           </div>
         </div>
         <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -244,28 +333,51 @@ const VariantFour = () => {
       </div>
 
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-lg">
-          <h3 className="font-bold text-xl mb-4">Repay {mock.token.name}</h3>
+        <div className="modal-box max-w-lg rounded-2xl">
+          <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+            <FiDollarSign /> Repay {mock.token.name}
+          </h3>
 
           <ul className="steps mb-6">
-            <li className="step step-primary">Amount</li>
-            <li className="step">Review</li>
-            <li className="step">Confirm</li>
+            <li className="step step-primary" data-content="1"></li>
+            <li className="step" data-content="2"></li>
+            <li className="step" data-content="3"></li>
           </ul>
 
           <div className="form-control">
-            <label className="label">Amount</label>
-            <input type="number" className="input input-bordered" placeholder="0.0" />
+            <label className="label justify-between">
+              <span>Amount</span>
+              <span className="text-xs opacity-60">
+                Wallet {format(mock.walletBalance)}
+              </span>
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              placeholder="0.0"
+            />
+            <div className="mt-2 flex gap-2">
+              {[25, 50, 100].map(p => (
+                <button key={p} className="btn btn-outline btn-xs">
+                  {p}%
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="mt-4 text-sm space-y-1 opacity-80">
-            <div className="flex items-center gap-1"><FiDollarSign /> Wallet {format(mock.walletBalance)}</div>
-            <div className="flex items-center gap-1"><FiZap /> Gas ${mock.gasCostUsd}</div>
-            <div className="flex items-center gap-1"><FiActivity /> HF → {mock.newHealthFactor}</div>
+            <div className="flex items-center gap-1">
+              <FiActivity /> HF → {mock.newHealthFactor}
+            </div>
           </div>
 
           <div className="modal-action">
-            <button className="btn btn-info w-full">Next step</button>
+            <button className="btn btn-info w-full flex justify-between">
+              <span>Next step</span>
+              <span className="flex items-center gap-1 text-xs">
+                <FaGasPump /> ${mock.gasCostUsd}
+              </span>
+            </button>
           </div>
         </div>
         <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -296,8 +408,10 @@ const VariantFive = () => {
       </div>
 
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-md">
-          <h3 className="font-bold text-xl mb-4">Withdraw {mock.token.name}</h3>
+        <div className="modal-box max-w-md rounded-3xl border-2 border-warning">
+          <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+            <FiDollarSign /> Withdraw {mock.token.name}
+          </h3>
 
           <div role="tablist" className="tabs tabs-boxed mb-4">
             <a
@@ -317,24 +431,53 @@ const VariantFive = () => {
           </div>
 
           <div className="form-control mb-4">
-            <label className="label">Amount</label>
-            <input type="number" className="input input-bordered" placeholder="0.0" />
+            <label className="label justify-between">
+              <span>Amount</span>
+              <span className="text-xs opacity-60">
+                Wallet {format(mock.walletBalance)}
+              </span>
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              placeholder="0.0"
+            />
+            <div className="mt-2 flex gap-2">
+              {[25, 50, 100].map(p => (
+                <button key={p} className="btn btn-outline btn-xs">
+                  {p}%
+                </button>
+              ))}
+            </div>
           </div>
 
           {tab === "details" ? (
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-1"><FiDollarSign /> Liquidity ${format(mock.poolLiquidity)}</div>
-              <div className="flex items-center gap-1"><FiTrendingUp /> APY {mock.supplyApy}%</div>
+              <div className="flex items-center gap-1">
+                <FiDollarSign /> Liquidity ${format(mock.poolLiquidity)}
+              </div>
+              <div className="flex items-center gap-1">
+                <FiTrendingUp /> APY {mock.supplyApy}%
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-1"><FiActivity /> HF {mock.healthFactor} → {mock.newHealthFactor}</div>
-              <div className="flex items-center gap-1"><FiPieChart /> LTV {mock.ltv}%</div>
+              <div className="flex items-center gap-1">
+                <FiActivity /> HF {mock.healthFactor} → {mock.newHealthFactor}
+              </div>
+              <div className="flex items-center gap-1">
+                <FiPieChart /> LTV {mock.ltv}%
+              </div>
             </div>
           )}
 
           <div className="modal-action mt-6">
-            <button className="btn btn-warning w-full">Confirm withdraw</button>
+            <button className="btn btn-warning w-full flex justify-between">
+              <span>Confirm withdraw</span>
+              <span className="flex items-center gap-1 text-xs">
+                <FaGasPump /> ${mock.gasCostUsd}
+              </span>
+            </button>
           </div>
         </div>
         <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -364,13 +507,19 @@ const VariantSix = () => {
       </div>
 
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-xl">
+        <div className="modal-box max-w-xl rounded-xl">
           <h3 className="font-bold text-xl mb-6">Deposit {mock.token.name}</h3>
 
           <div className="flex items-center gap-4 mb-6">
-            <div className="flex items-center gap-1"><FiActivity /> HF {mock.healthFactor}</div>
-            <div className="flex items-center gap-1"><FiPieChart /> LTV {mock.ltv}%</div>
-            <div className="flex items-center gap-1"><FiZap /> Gas ${mock.gasCostUsd}</div>
+            <div className="flex items-center gap-1">
+              <FiActivity /> HF {mock.healthFactor}
+            </div>
+            <div className="flex items-center gap-1">
+              <FiPieChart /> LTV {mock.ltv}%
+            </div>
+            <div className="flex items-center gap-1">
+              <FaGasPump /> ${mock.gasCostUsd}
+            </div>
           </div>
 
           <progress
@@ -383,13 +532,34 @@ const VariantSix = () => {
           </div>
 
           <div className="form-control mt-6">
-            <label className="label">Amount</label>
-            <input type="number" className="input input-bordered" placeholder="0.0" />
+            <label className="label justify-between">
+              <span>Amount</span>
+              <span className="text-xs opacity-60">
+                Wallet {format(mock.walletBalance)}
+              </span>
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              placeholder="0.0"
+            />
+            <div className="mt-2 flex gap-2">
+              {[25, 50, 100].map(p => (
+                <button key={p} className="btn btn-outline btn-xs">
+                  {p}%
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="modal-action mt-6">
-            <button className="btn btn-success w-full">
-              Continue <FiArrowRight className="ml-2" />
+            <button className="btn btn-success w-full flex justify-between">
+              <span>
+                Continue <FiArrowRight className="ml-2" />
+              </span>
+              <span className="flex items-center gap-1 text-xs">
+                <FaGasPump /> ${mock.gasCostUsd}
+              </span>
             </button>
           </div>
         </div>
