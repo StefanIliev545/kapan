@@ -23,7 +23,15 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   vesuContext,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
-  const { execute } = useLendingAction("stark", "Repay", token.address, protocolName, decimals, vesuContext);
+  const { execute } = useLendingAction(
+    "stark",
+    "Repay",
+    token.address,
+    protocolName,
+    decimals,
+    vesuContext,
+    debtBalance,
+  );
   const gasCostUsd = useGasEstimate("stark");
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   return (

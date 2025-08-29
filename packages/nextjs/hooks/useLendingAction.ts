@@ -23,6 +23,7 @@ export const useLendingAction = (
   protocolName: string,
   decimals?: number,
   vesuContext?: VesuContext,
+  maxAmount?: bigint,
 ) => {
   if (network === "stark") {
     const { address, account } = useStarkAccount();
@@ -32,9 +33,15 @@ export const useLendingAction = (
       if (!address || !account || !decimals || !routerGateway) return;
       try {
         let parsedAmount = parseUnits(amount, decimals);
-        if (isMax && (action === "Repay" || action === "Withdraw")) {
-          const bumped = (parsedAmount * 101n) / 100n;
-          parsedAmount = bumped > walletBalance ? walletBalance : bumped;
+        if (isMax) {
+          if (action === "Repay") {
+            const limit = maxAmount !== undefined && maxAmount < walletBalance ? maxAmount : walletBalance;
+            const bumped = (parsedAmount * 101n) / 100n;
+            parsedAmount = bumped > limit ? limit : bumped;
+          } else if (action === "Withdraw" && maxAmount !== undefined) {
+            const bumped = (parsedAmount * 101n) / 100n;
+            parsedAmount = bumped > maxAmount ? maxAmount : bumped;
+          }
         }
         const basic = {
           token: tokenAddress,
@@ -127,9 +134,15 @@ export const useLendingAction = (
   const execute = async (amount: string, isMax = false) => {
     if (!decimals || !address) return;
     let parsed = parseUnits(amount, decimals);
-    if (isMax && (action === "Repay" || action === "Withdraw")) {
-      const bumped = (parsed * 101n) / 100n;
-      parsed = bumped > walletBalance ? walletBalance : bumped;
+    if (isMax) {
+      if (action === "Repay") {
+        const limit = maxAmount !== undefined && maxAmount < walletBalance ? maxAmount : walletBalance;
+        const bumped = (parsed * 101n) / 100n;
+        parsed = bumped > limit ? limit : bumped;
+      } else if (action === "Withdraw" && maxAmount !== undefined) {
+        const bumped = (parsed * 101n) / 100n;
+        parsed = bumped > maxAmount ? maxAmount : bumped;
+      }
     }
     await writeContractAsync({
       functionName: fnMap[action] as any,

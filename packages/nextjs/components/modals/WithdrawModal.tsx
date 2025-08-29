@@ -14,7 +14,15 @@ interface WithdrawModalProps {
 
 export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, protocolName, supplyBalance }) => {
   const decimals = token.decimals;
-  const { execute } = useLendingAction("evm", "Withdraw", token.address, protocolName, decimals);
+  const { execute } = useLendingAction(
+    "evm",
+    "Withdraw",
+    token.address,
+    protocolName,
+    decimals,
+    undefined,
+    supplyBalance,
+  );
   const gasCostUsd = useGasEstimate("evm");
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   return (

@@ -15,7 +15,7 @@ interface RepayModalProps {
 
 export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName, debtBalance }) => {
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
-  const { execute } = useLendingAction("evm", "Repay", token.address, protocolName, decimals);
+  const { execute } = useLendingAction("evm", "Repay", token.address, protocolName, decimals, undefined, debtBalance);
   const gasCostUsd = useGasEstimate("evm");
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   return (

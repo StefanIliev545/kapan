@@ -22,7 +22,15 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
   vesuContext,
 }) => {
   const decimals = token.decimals;
-  const { execute } = useLendingAction("stark", "Withdraw", token.address, protocolName, decimals, vesuContext);
+  const { execute } = useLendingAction(
+    "stark",
+    "Withdraw",
+    token.address,
+    protocolName,
+    decimals,
+    vesuContext,
+    supplyBalance,
+  );
   const gasCostUsd = useGasEstimate("stark");
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   return (

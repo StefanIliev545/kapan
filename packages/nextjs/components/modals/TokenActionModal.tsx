@@ -274,7 +274,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                   )}
                 </span>
                 <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump /> ${gasCostUsd.toFixed(2)}
+                  <FaGasPump /> ${gasCostUsd < 0.01 ? gasCostUsd.toFixed(4) : gasCostUsd.toFixed(2)}
                 </span>
               </button>
             </div>
