@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { QueryObserverResult, RefetchOptions, useQueryClient } from "@tanstack/react-query";
 import type { ExtractAbiFunctionNames } from "abitype";
 import { ReadContractErrorType } from "viem";
-import { useBlockNumber, useReadContract } from "wagmi";
-import { useSelectedNetwork } from "~~/hooks/scaffold-eth";
+import { useReadContract } from "wagmi";
+import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import {
@@ -39,8 +39,7 @@ export const useScaffoldReadContract = <
   });
 
   const { query: queryOptions, watch, ...readContractConfig } = readConfig;
-  // set watch to true by default
-  const defaultWatch = watch ?? true;
+  const defaultWatch = watch ?? false;
 
   const readContractHookRes = useReadContract({
     chainId: selectedNetwork.id,
@@ -61,20 +60,14 @@ export const useScaffoldReadContract = <
   };
 
   const queryClient = useQueryClient();
-  const { data: blockNumber } = useBlockNumber({
-    watch: defaultWatch,
-    chainId: selectedNetwork.id,
-    query: {
-      enabled: defaultWatch,
-    },
-  });
+  const blockNumber = useBlockNumberContext();
 
   useEffect(() => {
-    if (defaultWatch) {
+    if (defaultWatch && blockNumber !== undefined) {
       queryClient.invalidateQueries({ queryKey: readContractHookRes.queryKey });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockNumber]);
+  }, [blockNumber, defaultWatch]);
 
   return readContractHookRes;
 };

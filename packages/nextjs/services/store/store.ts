@@ -28,6 +28,8 @@ type GlobalState = {
   setTargetEVMNetwork: (newTargetEVMNetwork: ChainWithAttributes) => void;
   targetSNNetwork: SNChainWithAttributes;
   setTargetSNNetwork: (newTargetSNNetwork: SNChainWithAttributes) => void;
+  blockNumber?: bigint;
+  setBlockNumber: (blockNumber: bigint | undefined) => void;
 };
 
 export const useGlobalState = create<GlobalState>(set => ({
@@ -48,4 +50,6 @@ export const useGlobalState = create<GlobalState>(set => ({
   targetSNNetwork: scaffoldConfig.targetSNNetworks[0],
   setTargetSNNetwork: (newTargetSNNetwork: SNChainWithAttributes) =>
     set(() => ({ targetSNNetwork: newTargetSNNetwork })),
+  blockNumber: undefined,
+  setBlockNumber: (blockNumber: bigint | undefined) => set(() => ({ blockNumber })),
 }));

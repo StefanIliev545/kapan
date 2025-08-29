@@ -12,12 +12,17 @@ export const enabledChains = targetNetworks.find((network: Chain) => network.id 
   ? targetNetworks
   : ([...targetNetworks, mainnet] as const);
 
+const clientCache = new Map<number, any>();
+
 export const wagmiConfig = createConfig({
   chains: enabledChains,
   connectors: getWagmiConnectors(),
   multiInjectedProviderDiscovery: false,
   ssr: true,
   client({ chain }) {
+    const cached = clientCache.get(chain.id);
+    if (cached) return cached;
+
     let rpcFallbacks = [http()];
 
     const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
@@ -27,7 +32,7 @@ export const wagmiConfig = createConfig({
       rpcFallbacks = isUsingDefaultKey ? [http(), http(alchemyHttpUrl)] : [http(alchemyHttpUrl), http()];
     }
 
-    return createClient({
+    const client = createClient({
       chain,
       transport: fallback(rpcFallbacks),
       ...(chain.id !== (hardhat as Chain).id
@@ -36,5 +41,7 @@ export const wagmiConfig = createConfig({
           }
         : {}),
     });
+    clientCache.set(chain.id, client);
+    return client;
   },
 });

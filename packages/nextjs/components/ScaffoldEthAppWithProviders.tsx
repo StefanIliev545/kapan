@@ -12,6 +12,7 @@ import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
+import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
 import { appChains } from "~~/services/web3/connectors";
 import provider from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
@@ -71,13 +72,15 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     >
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
-          <ProgressBar height="3px" color="#2299dd" />
-          <RainbowKitProvider
-            avatar={BlockieAvatar}
-            theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-          >
-            <ScaffoldEthApp>{children}</ScaffoldEthApp>
-          </RainbowKitProvider>
+          <BlockNumberProvider>
+            <ProgressBar height="3px" color="#2299dd" />
+            <RainbowKitProvider
+              avatar={BlockieAvatar}
+              theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+            >
+              <ScaffoldEthApp>{children}</ScaffoldEthApp>
+            </RainbowKitProvider>
+          </BlockNumberProvider>
         </QueryClientProvider>
       </WagmiProvider>
     </StarknetConfig>
