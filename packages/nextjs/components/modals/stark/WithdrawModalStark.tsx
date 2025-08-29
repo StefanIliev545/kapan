@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
-import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { useLendingAction } from "~~/hooks/useLendingAction";
 
 interface WithdrawModalStarkProps {
@@ -8,11 +8,19 @@ interface WithdrawModalStarkProps {
   onClose: () => void;
   token: TokenInfo;
   protocolName: string;
+  supplyBalance: number;
 }
 
-export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({ isOpen, onClose, token, protocolName }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "stark");
+export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
+  isOpen,
+  onClose,
+  token,
+  protocolName,
+  supplyBalance,
+}) => {
+  const decimals = token.decimals;
   const { execute } = useLendingAction("stark", "Withdraw", token.address, protocolName, decimals);
+  const gasCostUsd = useGasEstimate("stark");
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -23,11 +31,11 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({ isOpen, onClos
       apyLabel="Supply APY"
       apy={token.currentRate}
       metricLabel="Total supplied"
-      before={0}
-      after={0}
-      balance={balance}
+      before={supplyBalance}
+      balance={supplyBalance}
+      percentBase={supplyBalance}
+      gasCostUsd={gasCostUsd}
       onConfirm={execute}
     />
   );
 };
-

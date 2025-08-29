@@ -39,6 +39,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const isExpanded = expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const supplyAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -286,6 +287,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
           />
@@ -298,8 +300,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            supplyBalance={supplyAmount}
           />
         </>
       ) : (
@@ -313,6 +317,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
           />

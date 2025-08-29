@@ -111,6 +111,8 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   // Format amounts with correct decimals
   const formattedCollateral = formatTokenAmount(collateralAmount, collateralMetadata.decimals);
   const formattedDebt = debtMetadata ? formatTokenAmount(nominalDebt, debtMetadata.decimals) : "0";
+  const collateralNum = parseFloat(formattedCollateral);
+  const debtNum = parseFloat(formattedDebt);
 
   // Calculate USD values - handle price scaling correctly
   const collateralValue =
@@ -308,6 +310,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
           usdPrice: collateralUsdPrice,
+          decimals: Number(collateralMetadata.decimals),
         }}
         protocolName="Vesu"
       />
@@ -321,8 +324,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
           usdPrice: collateralUsdPrice,
+          decimals: Number(collateralMetadata.decimals),
         }}
         protocolName="Vesu"
+        supplyBalance={collateralNum}
       />
 
       <TokenSelectModalStark
@@ -345,6 +350,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               address: debtAsset,
               currentRate: debtRates.borrowAPR * 100,
               usdPrice: debtUsdPrice,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
             }}
             protocolName="Vesu"
           />
@@ -358,8 +364,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               address: debtAsset,
               currentRate: debtRates.borrowAPR * 100,
               usdPrice: debtUsdPrice,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
             }}
             protocolName="Vesu"
+            debtBalance={debtNum}
           />
 
           <MovePositionModal

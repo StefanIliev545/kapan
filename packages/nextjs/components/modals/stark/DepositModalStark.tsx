@@ -1,7 +1,8 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
-import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
 interface DepositModalStarkProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface DepositModalStarkProps {
 export const DepositModalStark: FC<DepositModalStarkProps> = ({ isOpen, onClose, token, protocolName }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
   const { execute } = useLendingAction("stark", "Deposit", token.address, protocolName, decimals);
+  const gasCostUsd = useGasEstimate("stark");
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -24,10 +26,9 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({ isOpen, onClose,
       apy={token.currentRate}
       metricLabel="Total supplied"
       before={0}
-      after={0}
       balance={balance}
+      gasCostUsd={gasCostUsd}
       onConfirm={execute}
     />
   );
 };
-

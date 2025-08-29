@@ -42,6 +42,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const isExpanded = expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -309,6 +310,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
           />
@@ -321,8 +323,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            debtBalance={debtAmount}
           />
           <MovePositionModalStark
             isOpen={moveModal.isOpen}
@@ -348,6 +352,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
           />
@@ -360,8 +365,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            debtBalance={debtAmount}
           />
           <MovePositionModal
             isOpen={moveModal.isOpen}

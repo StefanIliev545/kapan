@@ -21,16 +21,12 @@ export interface TokenActionModalProps {
   protocolName?: string;
   metricLabel: string;
   before: number;
-  after: number;
   balance: number;
   percentBase?: number;
   gasCostUsd?: number;
   hf?: number;
-  newHf?: number;
   utilization?: number;
-  newUtilization?: number;
   ltv?: number;
-  newLtv?: number;
   onConfirm?: (amount: string) => Promise<unknown> | void;
 }
 
@@ -92,10 +88,15 @@ const PercentInput: FC<{ balance: number; price?: number; onChange: (v: string) 
         <input
           type="number"
           value={amount}
+          max={max ?? balance}
           onChange={e => {
-            setAmount(e.target.value);
+            const base = max ?? balance;
+            const val = e.target.value;
+            const num = parseFloat(val || "0");
+            const clamped = num > base ? base.toString() : val;
+            setAmount(clamped);
             setActive(null);
-            onChange(e.target.value);
+            onChange(clamped);
           }}
           placeholder="0.0"
           className="input input-bordered w-full pr-24"
@@ -153,20 +154,30 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   protocolName,
   metricLabel,
   before,
-  after,
   balance,
   percentBase,
   gasCostUsd = 0,
   hf = 1.9,
-  newHf = 2.1,
   utilization = 65,
-  newUtilization = 65,
   ltv = 75,
-  newLtv = 75,
   onConfirm,
 }) => {
   const [amount, setAmount] = useState("");
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
+
+  const parsed = parseFloat(amount || "0");
+  const afterValue = (() => {
+    switch (action) {
+      case "Borrow":
+      case "Deposit":
+        return before + parsed;
+      case "Withdraw":
+      case "Repay":
+        return Math.max(0, before - parsed);
+      default:
+        return before;
+    }
+  })();
 
   const handleClose = () => {
     setAmount("");
@@ -216,12 +227,12 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             </div>
             <PercentInput balance={balance} price={token.usdPrice} onChange={setAmount} max={percentBase} />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-              <HealthFactor value={newHf} />
-              <Utilization value={newUtilization} />
-              <LoanToValue value={newLtv} />
+              <HealthFactor value={hf} />
+              <Utilization value={utilization} />
+              <LoanToValue value={ltv} />
               <div className="flex items-center gap-2">
                 <span>{metricLabel}</span>
-                <TokenPill value={after} icon={token.icon} name={token.name} />
+                <TokenPill value={afterValue} icon={token.icon} name={token.name} />
               </div>
             </div>
             <div className="modal-action pt-2">

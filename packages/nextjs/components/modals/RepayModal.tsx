@@ -1,5 +1,6 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
@@ -8,12 +9,13 @@ interface RepayModalProps {
   onClose: () => void;
   token: TokenInfo;
   protocolName: string;
+  debtBalance: number;
 }
 
-export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName }) => {
+export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName, debtBalance }) => {
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
-  const debtBalance = 100; // mocked
   const { execute } = useLendingAction("evm", "Repay", token.address, protocolName, decimals);
+  const gasCostUsd = useGasEstimate("evm");
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -25,9 +27,9 @@ export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protoc
       apy={token.currentRate}
       metricLabel="Total debt"
       before={debtBalance}
-      after={debtBalance}
       balance={walletBalance}
       percentBase={debtBalance}
+      gasCostUsd={gasCostUsd}
       onConfirm={execute}
     />
   );
