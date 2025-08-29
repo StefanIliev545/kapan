@@ -1,40 +1,33 @@
 import { FC } from "react";
-import { BaseTokenModal } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "../TokenActionModal";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useLendingAction } from "~~/hooks/useLendingAction";
 
 interface WithdrawModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
-  token: {
-    name: string;
-    icon: string;
-    address: string;
-    currentRate: number;
-    protocolAmount?: bigint;
-    usdPrice?: number;
-  };
+  token: TokenInfo;
   protocolName: string;
-  vesuContext?: {
-    pool_id: bigint;
-    counterpart_token: string;
-  };
 }
 
-export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
-  isOpen,
-  onClose,
-  token,
-  protocolName,
-  vesuContext,
-}) => {
+export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({ isOpen, onClose, token, protocolName }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { execute } = useLendingAction("stark", "Withdraw", token.address, protocolName, decimals);
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Withdraw"
       token={token}
       protocolName={protocolName}
-      actionType="withdraw"
-      actionLabel="Withdraw"
-      vesuContext={vesuContext}
+      apyLabel="Supply APY"
+      apy={token.currentRate}
+      metricLabel="Total supplied"
+      before={0}
+      after={0}
+      balance={balance}
+      onConfirm={execute}
     />
   );
-}; 
+};
+

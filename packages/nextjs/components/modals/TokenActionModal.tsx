@@ -1,9 +1,6 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { useAccount, useReadContract } from "wagmi";
-import { formatUnits } from "viem";
 import { FaGasPump } from "react-icons/fa";
-import { ERC20ABI } from "~~/contracts/externalContracts";
 
 export interface TokenInfo {
   name: string;
@@ -25,6 +22,7 @@ export interface TokenActionModalProps {
   metricLabel: string;
   before: number;
   after: number;
+  balance: number;
   gasCostUsd?: number;
   hf?: number;
   newHf?: number;
@@ -150,6 +148,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   metricLabel,
   before,
   after,
+  balance,
   gasCostUsd = 0,
   hf = 1.9,
   newHf = 2.1,
@@ -159,22 +158,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   newLtv = 75,
   onConfirm,
 }) => {
-  const { address } = useAccount();
-  const { data: balance } = useReadContract({
-    address: token.address as `0x${string}`,
-    abi: ERC20ABI,
-    functionName: "balanceOf",
-    args: [address ?? "0x"],
-    query: { enabled: isOpen && !!address && !!token.address },
-  });
-  const { data: decimals } = useReadContract({
-    address: token.address as `0x${string}`,
-    abi: ERC20ABI,
-    functionName: "decimals",
-    query: { enabled: isOpen && !!token.address },
-  });
-  const balanceNum = balance && decimals ? Number(formatUnits(balance as bigint, decimals as number)) : 0;
-
   const [amount, setAmount] = useState("");
 
   return (
@@ -202,7 +185,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             <div className="badge badge-outline text-xs w-max">
               {apyLabel} {apy}%
             </div>
-            <PercentInput balance={balanceNum} price={token.usdPrice} onChange={setAmount} />
+            <PercentInput balance={balance} price={token.usdPrice} onChange={setAmount} />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
               <HealthFactor value={newHf} />
               <Utilization value={newUtilization} />

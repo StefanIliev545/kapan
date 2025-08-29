@@ -1,40 +1,33 @@
 import { FC } from "react";
-import { BaseTokenModal } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "../TokenActionModal";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useLendingAction } from "~~/hooks/useLendingAction";
 
 interface RepayModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
-  token: {
-    name: string;
-    icon: string;
-    address: string;
-    currentRate: number;
-    protocolAmount?: bigint;
-    usdPrice?: number;
-  };
+  token: TokenInfo;
   protocolName: string;
-  vesuContext?: {
-    pool_id: bigint;
-    counterpart_token: string;
-  };
 }
 
-export const RepayModalStark: FC<RepayModalStarkProps> = ({
-  isOpen,
-  onClose,
-  token,
-  protocolName,
-  vesuContext,
-}) => {
+export const RepayModalStark: FC<RepayModalStarkProps> = ({ isOpen, onClose, token, protocolName }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { execute } = useLendingAction("stark", "Repay", token.address, protocolName, decimals);
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Repay"
       token={token}
       protocolName={protocolName}
-      actionType="repay"
-      actionLabel="Repay"
-      vesuContext={vesuContext}
+      apyLabel="Borrow APY"
+      apy={token.currentRate}
+      metricLabel="Total debt"
+      before={0}
+      after={0}
+      balance={balance}
+      onConfirm={execute}
     />
   );
-}; 
+};
+

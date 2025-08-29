@@ -1,5 +1,7 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useLendingAction } from "~~/hooks/useLendingAction";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -9,6 +11,8 @@ interface WithdrawModalProps {
 }
 
 export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, protocolName }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "evm");
+  const { execute } = useLendingAction("evm", "Withdraw", token.address, protocolName, decimals);
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -21,6 +25,8 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, 
       metricLabel="Total supplied"
       before={0}
       after={0}
+      balance={balance}
+      onConfirm={execute}
     />
   );
 };
