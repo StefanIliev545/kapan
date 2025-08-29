@@ -8,7 +8,7 @@ export const useGasEstimate = (network: "evm" | "stark", gasUnits: bigint = 2000
 
   useEffect(() => {
     const fetchGas = async () => {
-      if (network !== "evm") {
+      if (network !== "evm" || !publicClient) {
         setUsd(0);
         return;
       }
