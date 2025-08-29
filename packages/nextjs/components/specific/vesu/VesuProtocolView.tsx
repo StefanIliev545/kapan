@@ -59,7 +59,7 @@ export const VesuProtocolView: FC = () => {
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
     args: [selectedPoolId],
-    refetchInterval: 0,
+    watch: false,
   });
 
   if (assetsError) {
@@ -67,21 +67,24 @@ export const VesuProtocolView: FC = () => {
   }
 
   // Paginated user positions reads
+  const enabled = !!userAddress;
   const { data: userPositionsPart1, error: positionsError1 } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     // start at 0, end at 50 (exclusive). Adjust page size as needed.
     args: [userAddress || "0x0", selectedPoolId, 0n, 3n],
-    watch: true,
-    refetchInterval: 5000,
+    watch: enabled,
+    enabled,
+    refetchInterval: enabled ? 5000 : false,
   });
   const { data: userPositionsPart2, error: positionsError2 } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     // second page 50..100
     args: [userAddress || "0x0", selectedPoolId, 3n, 10n],
-    watch: true,
-    refetchInterval: 5000,
+    watch: enabled,
+    enabled,
+    refetchInterval: enabled ? 5000 : false,
   });
 
   if (positionsError1) {

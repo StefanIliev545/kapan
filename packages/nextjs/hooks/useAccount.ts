@@ -2,7 +2,7 @@ import {
   UseAccountResult,
   useAccount as useStarknetReactAccount,
 } from "@starknet-react/core";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { AccountInterface, constants } from "starknet";
 
 /**
@@ -25,25 +25,34 @@ export function useAccount(): UseAccountResult {
   const starknetAccount = useStarknetReactAccount();
   const { account, address, status } = starknetAccount;
 
+  // Cache the account instance so re-renders don't trigger a fresh enable
+  const accountRef = useRef<AccountInterface | undefined>();
+  useEffect(() => {
+    if (account) {
+      accountRef.current = account;
+    }
+  }, [account]);
+  const stableAccount = account ?? accountRef.current;
+
   const correctedStatus = useMemo(() => {
-    if (status === "connected" && !account) {
+    if (status === "connected" && !stableAccount) {
       return "connecting";
     }
     return status;
-  }, [status, account]);
+  }, [status, stableAccount]);
 
   const [accountChainId, setAccountChainId] = useState<bigint>(0n);
 
   useEffect(() => {
-    if (account) {
+    if (stableAccount) {
       const getChainId = async () => {
         try {
           let chainId: string | bigint;
 
-          if (typeof account.getChainId === "function") {
-            chainId = await account.getChainId();
-          } else if ((account as any).channel?.getChainId) {
-            chainId = await (account as any).channel.getChainId();
+          if (typeof stableAccount.getChainId === "function") {
+            chainId = await stableAccount.getChainId();
+          } else if ((stableAccount as any).channel?.getChainId) {
+            chainId = await (stableAccount as any).channel.getChainId();
           } else {
             chainId = constants.StarknetChainId.SN_MAIN;
           }
@@ -58,10 +67,10 @@ export function useAccount(): UseAccountResult {
 
       getChainId();
     }
-  }, [account]);
+  }, [stableAccount]);
 
   const patchedAccount = useMemo(() => {
-    if (status === "connected" && address && !account) {
+    if (status === "connected" && address && !stableAccount) {
       const provisionalAccount = {
         address,
         execute: async () => {
@@ -84,8 +93,8 @@ export function useAccount(): UseAccountResult {
       return provisionalAccount as unknown as AccountInterface;
     }
 
-    return account;
-  }, [status, address, account]);
+    return stableAccount;
+  }, [status, address, stableAccount]);
 
   return {
     ...starknetAccount,
