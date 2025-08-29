@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import {
   Connector,
+  ConnectorData,
   StarknetConfig,
   argent,
   braavos,
@@ -66,6 +67,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
 
   // Debug wrapper to trace connector method calls and suppress duplicate connects
   const connectedMap = useRef<Record<string, boolean>>({});
+  const connectedDataMap = useRef<Record<string, ConnectorData | undefined>>({});
   const wrapConnector = (connector: Connector): Connector => {
     const originalConnect = connector.connect.bind(connector);
     const originalAvailable = connector.available.bind(connector);
@@ -80,11 +82,12 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
               console.debug(
                 `[starknet connector] connect skipped: ${connector.id}`,
               );
-              return { account: (connector as any).account } as any;
+              return connectedDataMap.current[connector.id];
             }
             console.debug(`[starknet connector] connect: ${connector.id}`);
             const result = await originalConnect(...args);
             connectedMap.current[connector.id] = true;
+            connectedDataMap.current[connector.id] = result;
             console.debug(
               `[starknet connector] connect resolved: ${connector.id}`,
             );
