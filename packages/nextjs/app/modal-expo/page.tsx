@@ -9,6 +9,7 @@ const mock = {
   walletBalance: 1234.56,
   price: 1.0,
   borrowApy: 6.1,
+  supplyApy: 2.4,
   ltv: 75,
   hf: 1.9,
   newHf: 2.1,
@@ -114,16 +115,19 @@ const LeftMetrics = ({ className = "" }: { className?: string }) => (
   </div>
 );
 
-/* -------------------------------------------------------------------------- */
-/*                                Variant A                                  */
-/* -------------------------------------------------------------------------- */
-const VariantA = () => {
+type Operation = {
+  action: string;
+  apyLabel: string;
+  apy: number;
+};
+
+const OperationModal = ({ action, apyLabel, apy }: Operation) => {
   const [open, setOpen] = useState(false);
   return (
     <>
       <div className="card bg-base-300">
         <div className="card-body">
-          <h2 className="card-title">Classic layout</h2>
+          <h2 className="card-title">{action} modal</h2>
           <button className="btn" onClick={() => setOpen(true)}>
             Preview
           </button>
@@ -133,246 +137,30 @@ const VariantA = () => {
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
         <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
           <div className="flex flex-col md:flex-row">
-            <LeftMetrics className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300" />
+            <LeftMetrics className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300 space-y-4" />
             <div className="flex-1 p-6 space-y-4">
               <div className="flex items-center gap-2">
                 <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
-                <h3 className="font-bold text-xl">Borrow {mock.token.name}</h3>
+                <h3 className="font-bold text-xl">
+                  {action} {mock.token.name}
+                </h3>
               </div>
-              <div className="badge badge-outline text-xs w-max">Borrow APY {mock.borrowApy}%</div>
+              <div className="badge badge-outline text-xs w-max">
+                {apyLabel} {apy}%
+              </div>
               <PercentInput balance={mock.walletBalance} />
-              <div className="space-y-2 text-xs pt-2">
-                <div className="font-semibold mb-1">After</div>
+              <div className="grid grid-cols-2 gap-2 text-xs pt-2">
                 <HealthFactor value={mock.newHf} />
                 <Utilization value={mock.utilization} />
                 <LoanToValue value={mock.ltv - 10} />
                 <div className="flex items-center gap-2">
-                  <span>Debt</span>
-                  <DebtPill value={mock.newTotalDebt} />
-                </div>
-              </div>
-              <div className="modal-action pt-4">
-                <button className="btn btn-primary w-full flex justify-between">
-                  <span>Execute</span>
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump /> ${mock.gasCostUsd}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
-          <button>close</button>
-        </form>
-      </dialog>
-    </>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/*                                Variant B                                  */
-/* -------------------------------------------------------------------------- */
-const VariantB = () => {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <div className="card bg-base-300">
-        <div className="card-body">
-          <h2 className="card-title">Colored column</h2>
-          <button className="btn" onClick={() => setOpen(true)}>
-            Preview
-          </button>
-        </div>
-      </div>
-
-      <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            <LeftMetrics className="bg-primary/10 border-b md:border-b-0 md:border-r border-primary/20" />
-            <div className="flex-1 p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
-                <h3 className="font-bold text-xl">Borrow {mock.token.name}</h3>
-              </div>
-              <PercentInput balance={mock.walletBalance} />
-              <div className="space-y-2 text-xs pt-2">
-                <div className="font-semibold mb-1">After</div>
-                <HealthFactor value={mock.newHf} />
-                <Utilization value={mock.utilization} />
-                <LoanToValue value={mock.ltv - 10} />
-                <div className="flex items-center gap-2">
-                  <span>Debt</span>
-                  <DebtPill value={mock.newTotalDebt} />
-                </div>
-              </div>
-              <div className="modal-action pt-4">
-                <button className="btn btn-primary w-full flex justify-between">
-                  <span>Execute</span>
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump /> ${mock.gasCostUsd}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
-          <button>close</button>
-        </form>
-      </dialog>
-    </>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/*                                Variant C                                  */
-/* -------------------------------------------------------------------------- */
-const VariantC = () => {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <div className="card bg-base-300">
-        <div className="card-body">
-          <h2 className="card-title">Pill metrics</h2>
-          <button className="btn" onClick={() => setOpen(true)}>
-            Preview
-          </button>
-        </div>
-      </div>
-
-  <dialog className={`modal ${open ? "modal-open" : ""}`}>
-    <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
-      <div className="flex flex-col md:flex-row">
-        <LeftMetrics className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300 space-y-4" />
-        <div className="flex-1 p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
-            <h3 className="font-bold text-xl">Borrow {mock.token.name}</h3>
-          </div>
-          <PercentInput balance={mock.walletBalance} />
-          <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-            <HealthFactor value={mock.newHf} />
-            <Utilization value={mock.utilization} />
-            <LoanToValue value={mock.ltv - 10} />
-            <div className="flex items-center gap-2 col-span-2">
-              <span>Debt</span>
-              <DebtPill value={mock.newTotalDebt} />
-            </div>
-          </div>
-          <div className="modal-action pt-2">
-            <button className="btn btn-primary w-full flex justify-between">
-              <span>Execute</span>
-              <span className="flex items-center gap-1 text-xs">
-                <FaGasPump /> ${mock.gasCostUsd}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
-      <button>close</button>
-    </form>
-  </dialog>
-    </>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/*                                Variant D                                  */
-/* -------------------------------------------------------------------------- */
-const VariantD = () => {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <div className="card bg-base-300">
-        <div className="card-body">
-          <h2 className="card-title">Rounded edges</h2>
-          <button className="btn" onClick={() => setOpen(true)}>
-            Preview
-          </button>
-        </div>
-      </div>
-
-      <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-2xl p-0 rounded-2xl overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            <LeftMetrics className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300" />
-            <div className="flex-1 p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
-                <h3 className="font-bold text-xl">Borrow {mock.token.name}</h3>
-              </div>
-              <PercentInput balance={mock.walletBalance} />
-              <div className="space-y-2 text-xs pt-2">
-                <div className="font-semibold mb-1">After</div>
-                <HealthFactor value={mock.newHf} />
-                <Utilization value={mock.utilization} />
-                <LoanToValue value={mock.ltv - 10} />
-                <div className="flex items-center gap-2">
-                  <span>Debt</span>
-                  <DebtPill value={mock.newTotalDebt} />
-                </div>
-              </div>
-              <div className="modal-action pt-4">
-                <button className="btn btn-primary w-full flex justify-between">
-                  <span>Execute</span>
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump /> ${mock.gasCostUsd}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop" onClick={() => setOpen(false)}>
-          <button>close</button>
-        </form>
-      </dialog>
-    </>
-  );
-};
-
-/* -------------------------------------------------------------------------- */
-/*                                Variant E                                  */
-/* -------------------------------------------------------------------------- */
-const VariantE = () => {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <div className="card bg-base-300">
-        <div className="card-body">
-          <h2 className="card-title">Minimal</h2>
-          <button className="btn" onClick={() => setOpen(true)}>
-            Preview
-          </button>
-        </div>
-      </div>
-
-      <dialog className={`modal ${open ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            <LeftMetrics className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300" />
-            <div className="flex-1 p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
-                <h3 className="font-bold text-xl">Borrow {mock.token.name}</h3>
-              </div>
-              <PercentInput balance={mock.walletBalance} />
-              <div className="space-y-2 text-xs pt-2">
-                <div className="font-semibold mb-1">After</div>
-                <HealthFactor value={mock.newHf} />
-                <Utilization value={mock.utilization} />
-                <LoanToValue value={mock.ltv - 10} />
-                <div className="flex items-center gap-2">
-                  <span>Debt</span>
+                  <span>Total debt</span>
                   <DebtPill value={mock.newTotalDebt} />
                 </div>
               </div>
               <div className="modal-action pt-2">
                 <button className="btn btn-primary w-full flex justify-between">
-                  <span>Execute</span>
+                  <span>{action}</span>
                   <span className="flex items-center gap-1 text-xs">
                     <FaGasPump /> ${mock.gasCostUsd}
                   </span>
@@ -389,18 +177,20 @@ const VariantE = () => {
   );
 };
 
-/* -------------------------------------------------------------------------- */
-/*                              Modal Expo Page                               */
-/* -------------------------------------------------------------------------- */
 const ModalExpoPage = () => {
-  const variants = [VariantA, VariantB, VariantC, VariantD, VariantE];
+  const variants = [
+    { action: "Borrow", apyLabel: "Borrow APY", apy: mock.borrowApy },
+    { action: "Deposit", apyLabel: "Supply APY", apy: mock.supplyApy },
+    { action: "Withdraw", apyLabel: "Supply APY", apy: mock.supplyApy },
+    { action: "Repay", apyLabel: "Borrow APY", apy: mock.borrowApy },
+  ];
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-3xl font-bold">Modal Design Expo</h1>
       <p className="text-sm opacity-70">Mocked data to experiment with lending flow layouts.</p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-        {variants.map((Variant, i) => (
-          <Variant key={i} />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {variants.map(v => (
+          <OperationModal key={v.action} {...v} />
         ))}
       </div>
     </div>
