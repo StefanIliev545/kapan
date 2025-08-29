@@ -62,10 +62,18 @@ export function useAccount(): UseAccountResult {
             chainId = constants.StarknetChainId.SN_MAIN;
           }
 
-          if (chainId) {
-            setAccountChainId(BigInt(chainId.toString()));
+          if (chainId !== undefined && chainId !== null) {
+            try {
+              const parsedChainId =
+                typeof chainId === "bigint" ? chainId : BigInt(chainId.toString());
+              setAccountChainId(parsedChainId);
+            } catch (err) {
+              console.warn("useAccount: failed to parse chainId", chainId, err);
+              setAccountChainId(BigInt(constants.StarknetChainId.SN_MAIN));
+            }
           }
         } catch (error) {
+          console.warn("useAccount: getChainId threw", error);
           setAccountChainId(BigInt(constants.StarknetChainId.SN_MAIN));
         }
       };
