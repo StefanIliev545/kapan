@@ -13,6 +13,9 @@ const base: MarketCardProps = {
   networkType: "starknet",
 };
 
+const supplyBestRate = "10%";
+const borrowBestRate = "12%";
+
 const CardShell: FC<{ className?: string; children: ReactNode }> = ({ className = "", children }) => (
   <div className={`card ${className}`}>
     <div className="card-body p-4 space-y-4">{children}</div>
@@ -27,13 +30,28 @@ const Header: FC<{ button?: ReactNode }> = ({ button }) => (
   </div>
 );
 
-const InterestPills: FC<{ supplyGradient: string; borrowGradient: string }> = ({ supplyGradient, borrowGradient }) => (
-  <div className="flex justify-center gap-2">
-    <span className={`px-3 py-1 rounded-full text-sm text-white shadow bg-gradient-to-r ${supplyGradient}`}>{base.supplyRate}</span>
-    <span className={`px-3 py-1 rounded-full text-sm text-white shadow flex items-center gap-1 bg-gradient-to-r ${borrowGradient}`}>
-      {base.borrowRate}
-      <Image src="/logos/vesu.svg" alt="vesu" width={16} height={16} />
-    </span>
+const PillRow: FC<{ label: string; current: string; optimal: string; color: string }> = ({
+  label,
+  current,
+  optimal,
+  color,
+}) => (
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-base-content/70 w-16">{label}</span>
+    <div className="flex rounded-full overflow-hidden shadow text-sm text-white">
+      <span className={`px-3 py-1 ${color}`}>{current}</span>
+      <span className="px-3 py-1 flex items-center gap-1 bg-gradient-to-r from-fuchsia-500 to-purple-600 animate-pulse">
+        {optimal}
+        <Image src="/logos/vesu.svg" alt="vesu" width={16} height={16} />
+      </span>
+    </div>
+  </div>
+);
+
+const InterestPills: FC<{ supplyColor: string; borrowColor: string }> = ({ supplyColor, borrowColor }) => (
+  <div className="space-y-2">
+    <PillRow label="Supply" current={base.supplyRate} optimal={supplyBestRate} color={supplyColor} />
+    <PillRow label="Borrow" current={base.borrowRate} optimal={borrowBestRate} color={borrowColor} />
   </div>
 );
 
@@ -57,7 +75,7 @@ const VariantPurple: FC = () => (
   <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
     <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
     <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
-    <InterestPills supplyGradient="from-green-400 to-emerald-600" borrowGradient="from-fuchsia-500 to-purple-600" />
+    <InterestPills supplyColor="bg-green-600" borrowColor="bg-purple-600" />
     <PriceUtil progressClass="progress-secondary" />
   </CardShell>
 );
@@ -66,7 +84,7 @@ const VariantTeal: FC = () => (
   <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
     <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
     <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
-    <InterestPills supplyGradient="from-green-500 to-teal-600" borrowGradient="from-cyan-500 to-blue-600" />
+    <InterestPills supplyColor="bg-green-500" borrowColor="bg-cyan-500" />
     <PriceUtil progressClass="progress-info" />
   </CardShell>
 );
@@ -75,7 +93,7 @@ const VariantSunset: FC = () => (
   <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
     <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
     <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
-    <InterestPills supplyGradient="from-lime-400 to-green-600" borrowGradient="from-orange-500 to-pink-600" />
+    <InterestPills supplyColor="bg-lime-500" borrowColor="bg-orange-500" />
     <PriceUtil progressClass="progress-warning" />
   </CardShell>
 );
@@ -84,7 +102,7 @@ const VariantLime: FC = () => (
   <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
     <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
     <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
-    <InterestPills supplyGradient="from-green-400 to-lime-500" borrowGradient="from-purple-500 to-indigo-600" />
+    <InterestPills supplyColor="bg-green-500" borrowColor="bg-indigo-600" />
     <PriceUtil progressClass="progress-success" />
   </CardShell>
 );
