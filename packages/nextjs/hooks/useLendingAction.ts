@@ -1,4 +1,5 @@
 import type { Network } from "./useTokenBalance";
+import { useTokenBalance } from "./useTokenBalance";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, Contract, num, uint256 } from "starknet";
 import { parseUnits } from "viem";
 import { useAccount as useEvmAccount } from "wagmi";
@@ -25,11 +26,16 @@ export const useLendingAction = (
 ) => {
   if (network === "stark") {
     const { address, account } = useStarkAccount();
+    const { balance: walletBalance = 0n } = useTokenBalance(tokenAddress, "stark");
     const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
     const execute = async (amount: string, isMax = false) => {
       if (!address || !account || !decimals || !routerGateway) return;
       try {
-        const parsedAmount = parseUnits(amount, decimals);
+        let parsedAmount = parseUnits(amount, decimals);
+        if (isMax && (action === "Repay" || action === "Withdraw")) {
+          const bumped = (parsedAmount * 101n) / 100n;
+          parsedAmount = bumped > walletBalance ? walletBalance : bumped;
+        }
         const basic = {
           token: tokenAddress,
           amount: uint256.bnToUint256(parsedAmount),
@@ -110,6 +116,7 @@ export const useLendingAction = (
   }
 
   const { address } = useEvmAccount();
+  const { balance: walletBalance = 0n } = useTokenBalance(tokenAddress, "evm");
   const { writeContractAsync } = useEvmWrite({ contractName: "RouterGateway" });
   const fnMap: Record<Action, string> = {
     Borrow: "borrow",
@@ -117,11 +124,16 @@ export const useLendingAction = (
     Repay: "repay",
     Withdraw: "withdraw",
   };
-  const execute = async (amount: string) => {
+  const execute = async (amount: string, isMax = false) => {
     if (!decimals || !address) return;
+    let parsed = parseUnits(amount, decimals);
+    if (isMax && (action === "Repay" || action === "Withdraw")) {
+      const bumped = (parsed * 101n) / 100n;
+      parsed = bumped > walletBalance ? walletBalance : bumped;
+    }
     await writeContractAsync({
       functionName: fnMap[action] as any,
-      args: [protocolName.toLowerCase(), tokenAddress, address, parseUnits(amount, decimals)] as any,
+      args: [protocolName.toLowerCase(), tokenAddress, address, parsed] as any,
     });
   };
   return { execute };

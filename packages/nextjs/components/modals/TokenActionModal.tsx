@@ -93,7 +93,7 @@ const PercentInput: FC<{
     }
     const base = max ?? balance;
     let isMax = false;
-    if (parsed > base) {
+    if (parsed >= base) {
       parsed = base;
       val = formatUnits(base, decimals);
       isMax = true;
