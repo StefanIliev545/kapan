@@ -1,7 +1,10 @@
 import { FC, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { MarketCard } from "./MarketCard";
 import { MarketRow } from "./MarketRow";
 import { VesuPosition } from "./VesuPosition";
 import { useAccount } from "@starknet-react/core";
+import { ListBulletIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import {
@@ -18,7 +21,6 @@ import {
   toAPY,
   toAnnualRates,
 } from "~~/utils/protocols";
-import Image from "next/image";
 
 // Define pool IDs
 const POOL_IDS = {
@@ -54,6 +56,7 @@ type PositionTuple = {
 export const VesuProtocolView: FC = () => {
   const { address: userAddress } = useAccount();
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Fetch supported assets
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
@@ -120,21 +123,21 @@ export const VesuProtocolView: FC = () => {
         asset.scale,
       );
 
-      return (
-        <MarketRow
-          key={address}
-          icon={tokenNameToLogo(symbol.toLowerCase())}
-          name={symbol}
-          supplyRate={formatRate(supplyAPY)}
-          borrowRate={formatRate(borrowAPR)}
-          price={formatPrice(asset.price.value)}
-          utilization={formatUtilization(asset.utilization)}
-          address={address}
-          networkType="starknet"
-        />
-      );
+      const props = {
+        key: address,
+        icon: tokenNameToLogo(symbol.toLowerCase()),
+        name: symbol,
+        supplyRate: formatRate(supplyAPY),
+        borrowRate: formatRate(borrowAPR),
+        price: formatPrice(asset.price.value),
+        utilization: formatUtilization(asset.utilization),
+        address,
+        networkType: "starknet" as const,
+      };
+
+      return viewMode === "grid" ? <MarketCard {...props} /> : <MarketRow {...props} />;
     });
-  }, [supportedAssets]);
+  }, [supportedAssets, viewMode]);
 
   // Memoize the position rows to prevent unnecessary re-renders
   const positionRows = useMemo(() => {
@@ -196,8 +199,26 @@ export const VesuProtocolView: FC = () => {
     <div className="space-y-4">
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
-          <h2 className="card-title text-lg border-b border-base-200 pb-2">Vesu Markets</h2>
-          
+          <div className="flex items-center justify-between border-b border-base-200 pb-2 mb-4">
+            <h2 className="card-title text-lg">Vesu Markets</h2>
+            <div className="join">
+              <button
+                className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setViewMode("list")}
+                aria-label="List view"
+              >
+                <ListBulletIcon className="h-4 w-4" />
+              </button>
+              <button
+                className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setViewMode("grid")}
+                aria-label="Grid view"
+              >
+                <Squares2X2Icon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
           {/* Pool Selection Tabs */}
           <div className="tabs tabs-boxed mb-4">
             <button
@@ -236,7 +257,9 @@ export const VesuProtocolView: FC = () => {
             </button>
           </div>
 
-          <div className="space-y-2">{marketRows}</div>
+          <div className={viewMode === "grid" ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" : "space-y-2"}>
+            {marketRows}
+          </div>
         </div>
       </div>
 
