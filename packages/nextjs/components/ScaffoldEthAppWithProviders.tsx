@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
-import { StarknetConfig, argent, braavos, starkscan, useInjectedConnectors } from "@starknet-react/core";
+import {
+  Connector,
+  StarknetConfig,
+  argent,
+  braavos,
+  starkscan,
+  useInjectedConnectors,
+} from "@starknet-react/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
@@ -56,9 +63,28 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   });
   const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
 
-  const connectorsRef = useRef<typeof liveConnectors | null>(null);
-  if (!connectorsRef.current && liveConnectors?.length) {
-    connectorsRef.current = liveConnectors;
+  // Debug wrapper to trace connector method calls that may trigger wallet popups
+  const wrapConnector = (connector: Connector) => {
+    return {
+      ...connector,
+      connect: async (...args: Parameters<Connector["connect"]>) => {
+        console.debug(`[starknet connector] connect: ${connector.id}`);
+        const result = await connector.connect(...args);
+        console.debug(`[starknet connector] connect resolved: ${connector.id}`);
+        return result;
+      },
+      available: async (...args: Parameters<Connector["available"]>) => {
+        console.debug(`[starknet connector] available: ${connector.id}`);
+        return connector.available(...args);
+      },
+    } as Connector;
+  };
+
+  const wrapped = useMemo(() => liveConnectors.map(wrapConnector), [liveConnectors]);
+
+  const connectorsRef = useRef<typeof wrapped | null>(null);
+  if (!connectorsRef.current && wrapped?.length) {
+    connectorsRef.current = wrapped;
   }
 
   return (

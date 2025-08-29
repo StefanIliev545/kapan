@@ -34,6 +34,11 @@ export function useAccount(): UseAccountResult {
   }, [account]);
   const stableAccount = account ?? accountRef.current;
 
+  // Log status and address changes to help trace unexpected reconnects
+  useEffect(() => {
+    console.debug("useAccount", { status, address, hasAccount: !!account });
+  }, [status, address, account]);
+
   const correctedStatus = useMemo(() => {
     if (status === "connected" && !stableAccount) {
       return "connecting";
