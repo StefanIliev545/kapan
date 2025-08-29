@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { MarketCard } from "./MarketCard";
 import { MarketRow } from "./MarketRow";
@@ -9,16 +9,12 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import {
   PositionData,
-  SCALE,
   TokenMetadata,
-  YEAR_IN_SECONDS,
   feltToString,
   formatPrice,
   formatRate,
   formatTokenAmount,
   formatUtilization,
-  toAPR,
-  toAPY,
   toAnnualRates,
 } from "~~/utils/protocols";
 

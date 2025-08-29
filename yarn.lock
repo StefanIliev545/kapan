@@ -4656,6 +4656,7 @@ __metadata:
     date-fns: ^4.1.0
     eslint: ~8.57.1
     eslint-config-next: ^15.2.3
+    eslint-config-prettier: ~9.1.0
     eslint-plugin-prettier: ~5.2.1
     ethers: ^6.12.0
     framer-motion: ^12.4.10
@@ -11359,6 +11360,17 @@ __metadata:
     typescript:
       optional: true
   checksum: 136fe6767f256063a93912e240c7e7f1fddad2c7eb66e7e40d1745d0c452277b20f15c135a4b582be1fa2d099c1125d365a07a734347c272c933eabc2de273b7
+  languageName: node
+  linkType: hard
+
+"eslint-config-prettier@npm:~9.1.0":
+  version: 9.1.2
+  resolution: "eslint-config-prettier@npm:9.1.2"
+  peerDependencies:
+    eslint: ">=7.0.0"
+  bin:
+    eslint-config-prettier: bin/cli.js
+  checksum: e786b767331094fd024cb1b0899964a9da0602eaf4ebd617d6d9794752ccd04dbe997e3c14c17f256c97af20bee1c83c9273f69b74cb2081b6f514580d62408f
   languageName: node
   linkType: hard
 
