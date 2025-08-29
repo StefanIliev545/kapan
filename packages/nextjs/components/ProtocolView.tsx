@@ -77,6 +77,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     icon: string;
     address: string;
     currentRate: number;
+    tokenPrice?: bigint;
   } | null>(null);
 
   // Update showAll when forceShowAll prop changes
@@ -199,6 +200,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       icon: token.icon,
       address: token.tokenAddress,
       currentRate: token.currentRate,
+      tokenPrice: token.tokenPrice,
     });
     setIsTokenSelectModalOpen(false);
     setIsDepositModalOpen(true);
@@ -435,7 +437,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               token={{
                 name: selectedSupplyToken.name,
                 icon: selectedSupplyToken.icon,
-                address: selectedSupplyToken.tokenAddress,
+                address: selectedSupplyToken.address,
                 currentRate: selectedSupplyToken.currentRate,
                 usdPrice: selectedSupplyToken.tokenPrice
                   ? Number(selectedSupplyToken.tokenPrice) / 1e8
