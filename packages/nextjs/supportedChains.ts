@@ -28,7 +28,7 @@ const mainnetFork = {
       http: [rpcUrlDevnet],
     },
   },
-} as snchains.Chain;
+} as const satisfies snchains.Chain;
 
 const devnet = {
   ...snchains.devnet,

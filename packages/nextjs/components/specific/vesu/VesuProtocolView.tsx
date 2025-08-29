@@ -204,26 +204,14 @@ export const VesuProtocolView: FC = () => {
               className={`tab ${selectedPoolId === POOL_IDS["Genesis"] ? "tab-active" : ""}`}
               onClick={() => setSelectedPoolId(POOL_IDS["Genesis"])}
             >
-              <Image
-                src="/logos/vesu.svg"
-                alt="Vesu"
-                width={20}
-                height={20}
-                className="rounded-full min-w-[20px]"
-              />
+              <Image src="/logos/vesu.svg" alt="Vesu" width={20} height={20} className="rounded-full min-w-[20px]" />
               Genesis
             </button>
             <button
               className={`tab ${selectedPoolId === POOL_IDS["Re7 USDC"] ? "tab-active" : ""}`}
               onClick={() => setSelectedPoolId(POOL_IDS["Re7 USDC"])}
             >
-              <Image
-                src="/logos/re7.svg"
-                alt="Re7"
-                width={20}
-                height={20}
-                className="rounded-full min-w-[20px]"
-              />
+              <Image src="/logos/re7.svg" alt="Re7" width={20} height={20} className="rounded-full min-w-[20px]" />
               Re7 USDC
             </button>
             <button

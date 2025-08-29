@@ -7,7 +7,7 @@ import { AccountInterface, constants } from "starknet";
  */
 export function useAccount(): UseAccountResult {
   const starknetAccount = useStarknetReactAccount();
-  const { account, address, status } = starknetAccount;
+  const { account, status } = starknetAccount;
 
   const correctedStatus = useMemo(() => {
     if (status === "connected" && !account) {
@@ -44,32 +44,9 @@ export function useAccount(): UseAccountResult {
     }
   }, [account]);
 
-  const patchedAccount = useMemo(() => {
-    if (status === "connected" && address && !account) {
-      const provisionalAccount = {
-        address,
-        execute: async () => {
-          throw new Error("Wallet connection issue. Please refresh and reconnect.");
-        },
-        estimateInvokeFee: async () => {
-          throw new Error("Wallet connection issue. Please refresh and reconnect.");
-        },
-        getChainId: async () => {
-          return constants.StarknetChainId.SN_MAIN;
-        },
-        cairoVersion: "1",
-        signer: {},
-      };
-
-      return provisionalAccount as unknown as AccountInterface;
-    }
-
-    return account;
-  }, [status, address, account]);
-
   return {
     ...starknetAccount,
-    account: patchedAccount,
+    account: account,
     status: correctedStatus,
     chainId: accountChainId,
   } as UseAccountResult;
