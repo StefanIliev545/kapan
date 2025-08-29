@@ -13,8 +13,11 @@ const BlockNumberUpdater = () => {
 
   const fetchBlockNumber = async () => {
     try {
-      const latest = await provider.getBlockLatestAccepted();
-      setSnBlockNumber(BigInt(latest.block_number));
+      const latestBlock =
+        "getBlockLatestAccepted" in provider
+          ? await (provider as any).getBlockLatestAccepted()
+          : await (provider as any).getBlock("latest");
+      setSnBlockNumber(BigInt(latestBlock.block_number ?? latestBlock.blockNumber));
     } catch {
       setSnBlockNumber(undefined);
     }

@@ -77,7 +77,16 @@ export const useScaffoldEventHistory = <
         part => part.type === "event" && part.name === eventName,
       ) as ExtractAbiEvent<ContractAbi<TContractName>, TEventName>;
 
-      const blockNumber = Number(latestBlock ?? (await publicClient.getBlockLatestAccepted()).block_number);
+      const latestBlockNumber =
+        latestBlock ??
+        (
+          await (
+            (publicClient as any).getBlockLatestAccepted
+              ? (publicClient as any).getBlockLatestAccepted()
+              : (publicClient as any).getBlock("latest")
+          )
+        ).block_number;
+      const blockNumber = Number(latestBlockNumber);
 
       if ((fromBlock && blockNumber >= Number(fromBlock)) || blockNumber >= Number(fromBlockUpdated)) {
         let keys: string[][] = [[hash.getSelectorFromName(event.name.split("::").slice(-1)[0])]];
