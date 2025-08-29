@@ -11,7 +11,8 @@ const nextConfig = {
   },
   // Improve build-time debuggability
   productionBrowserSourceMaps: true,
-  swcMinify: false,
+  // Allow toggling SWC minification by env (default on for Next 15)
+  swcMinify: process.env.SWC_MINIFY !== "false",
   webpack: config => {
     config.resolve.fallback = { fs: false, net: false, tls: false };
     config.externals.push("pino-pretty", "lokijs", "encoding");
