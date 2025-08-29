@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { NextPage } from "next";
+import { ListBulletIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { AaveMarkets } from "~~/components/specific/aave/AaveMarkets";
 import { NostraMarkets } from "~~/components/specific/nostra/NostraMarkets";
@@ -17,6 +18,8 @@ const networkOptions: NetworkOption[] = [
 const MarketsPage: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [search, setSearch] = useState("");
 
   const { data: supportedAssets } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -27,11 +30,38 @@ const MarketsPage: NextPage = () => {
 
   return (
     <div className="container mx-auto px-5">
-      <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+      <div className="flex items-center justify-between mb-4">
+        <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Search"
+            className="input input-bordered input-xs w-28"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <div className="join">
+            <button
+              className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setViewMode("list")}
+              aria-label="List view"
+            >
+              <ListBulletIcon className="h-4 w-4" />
+            </button>
+            <button
+              className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setViewMode("grid")}
+              aria-label="Grid view"
+            >
+              <Squares2X2Icon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
       {selectedNetwork === "arbitrum" && (
         <>
-          <AaveMarkets />
-          <VenusMarkets />
+          <AaveMarkets viewMode={viewMode} search={search} />
+          <VenusMarkets viewMode={viewMode} search={search} />
         </>
       )}
       {selectedNetwork === "starknet" && (
@@ -40,8 +70,10 @@ const MarketsPage: NextPage = () => {
             selectedPoolId={selectedPoolId}
             onPoolChange={setSelectedPoolId}
             supportedAssets={supportedAssets as ContractResponse | undefined}
+            viewMode={viewMode}
+            search={search}
           />
-          <NostraMarkets />
+          <NostraMarkets viewMode={viewMode} search={search} />
         </>
       )}
     </div>

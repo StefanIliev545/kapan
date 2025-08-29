@@ -105,6 +105,8 @@ export const VesuProtocolView: FC = () => {
         selectedPoolId={selectedPoolId}
         onPoolChange={setSelectedPoolId}
         supportedAssets={supportedAssets as ContractResponse | undefined}
+        viewMode="grid"
+        search=""
       />
 
       {userAddress && (

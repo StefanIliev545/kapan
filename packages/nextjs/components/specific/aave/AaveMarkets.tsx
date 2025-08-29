@@ -9,7 +9,12 @@ import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContrac
 // Helper: Convert Aave RAY (1e27) rates to APY percentage
 const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 
-export const AaveMarkets: FC = () => {
+interface AaveMarketsProps {
+  viewMode: "list" | "grid";
+  search: string;
+}
+
+export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search }) => {
   const { address: connectedAddress } = useAccount();
   const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGateway" });
   const queryAddress = connectedAddress || contractInfo?.address;
@@ -42,7 +47,7 @@ export const AaveMarkets: FC = () => {
     });
   }, [allTokensInfo]);
 
-  return <MarketsSection title="Aave Markets" markets={markets} />;
+  return <MarketsSection title="Aave Markets" markets={markets} viewMode={viewMode} search={search} />;
 };
 
 export default AaveMarkets;

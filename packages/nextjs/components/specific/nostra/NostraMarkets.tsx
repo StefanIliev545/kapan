@@ -4,7 +4,12 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatPrice } from "~~/utils/protocols";
 
-export const NostraMarkets: FC = () => {
+interface NostraMarketsProps {
+  viewMode: "list" | "grid";
+  search: string;
+}
+
+export const NostraMarkets: FC<NostraMarketsProps> = ({ viewMode, search }) => {
   const { data: assetInfos } = useNetworkAwareReadContract({
     networkType: "starknet",
     contractName: "NostraGateway",
@@ -60,7 +65,7 @@ export const NostraMarkets: FC = () => {
     });
   }, [assetInfos, interestRates, prices]);
 
-  return <MarketsSection title="Nostra Markets" markets={markets} />;
+  return <MarketsSection title="Nostra Markets" markets={markets} viewMode={viewMode} search={search} />;
 };
 
 export default NostraMarkets;

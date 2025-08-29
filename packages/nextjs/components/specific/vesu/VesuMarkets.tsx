@@ -34,9 +34,17 @@ interface VesuMarketsProps {
   selectedPoolId: bigint;
   onPoolChange: (id: bigint) => void;
   supportedAssets?: ContractResponse;
+  viewMode: "list" | "grid";
+  search: string;
 }
 
-export const VesuMarkets: FC<VesuMarketsProps> = ({ selectedPoolId, onPoolChange, supportedAssets }) => {
+export const VesuMarkets: FC<VesuMarketsProps> = ({
+  selectedPoolId,
+  onPoolChange,
+  supportedAssets,
+  viewMode,
+  search,
+}) => {
 
   const markets: MarketData[] = useMemo(() => {
     if (!supportedAssets) return [];
@@ -103,7 +111,7 @@ export const VesuMarkets: FC<VesuMarketsProps> = ({ selectedPoolId, onPoolChange
     </div>
   );
 
-  return <MarketsSection title="Vesu Markets" markets={markets} extra={poolTabs} />;
+  return <MarketsSection title="Vesu Markets" markets={markets} extra={poolTabs} viewMode={viewMode} search={search} />;
 };
 
 export default VesuMarkets;

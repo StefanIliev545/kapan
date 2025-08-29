@@ -24,7 +24,12 @@ const getTokenDisplay = (tokenAddress: string, originalSymbol: string) => {
   return override ? { displayName: override.name, logo: override.logo } : { displayName: originalSymbol, logo: tokenNameToLogo(originalSymbol) };
 };
 
-export const VenusMarkets: FC = () => {
+interface VenusMarketsProps {
+  viewMode: "list" | "grid";
+  search: string;
+}
+
+export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search }) => {
   const { data: marketDetails } = useScaffoldReadContract({
     contractName: "VenusGateway",
     functionName: "getAllVenusMarkets",
@@ -65,7 +70,7 @@ export const VenusMarkets: FC = () => {
       .filter(Boolean) as MarketData[];
   }, [marketDetails, ratesData]);
 
-  return <MarketsSection title="Venus Markets" markets={markets} />;
+  return <MarketsSection title="Venus Markets" markets={markets} viewMode={viewMode} search={search} />;
 };
 
 export default VenusMarkets;
