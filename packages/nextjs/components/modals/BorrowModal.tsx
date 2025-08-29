@@ -1,5 +1,5 @@
 import { FC } from "react";
-import { BaseTokenModal, TokenInfo } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -10,13 +10,18 @@ interface BorrowModalProps {
 
 export const BorrowModal: FC<BorrowModalProps> = ({ isOpen, onClose, token, protocolName }) => {
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Borrow"
       token={token}
       protocolName={protocolName}
-      actionType="borrow"
-      actionLabel="Borrow"
+      apyLabel="Borrow APY"
+      apy={token.currentRate}
+      metricLabel="Total debt"
+      before={0}
+      after={0}
     />
   );
 };
+

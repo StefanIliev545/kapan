@@ -1,5 +1,5 @@
 import { FC } from "react";
-import { BaseTokenModal, TokenInfo } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -10,13 +10,18 @@ interface DepositModalProps {
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName }) => {
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Deposit"
       token={token}
       protocolName={protocolName}
-      actionType="deposit"
-      actionLabel="Deposit"
+      apyLabel="Supply APY"
+      apy={token.currentRate}
+      metricLabel="Total supplied"
+      before={0}
+      after={0}
     />
   );
 };
+

@@ -1,24 +1,24 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 
-interface RepayModalProps {
+interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   token: TokenInfo;
   protocolName: string;
 }
 
-export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName }) => {
+export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, protocolName }) => {
   return (
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
-      action="Repay"
+      action="Withdraw"
       token={token}
       protocolName={protocolName}
-      apyLabel="Borrow APY"
+      apyLabel="Supply APY"
       apy={token.currentRate}
-      metricLabel="Total debt"
+      metricLabel="Total supplied"
       before={0}
       after={0}
     />
