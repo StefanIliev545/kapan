@@ -8,10 +8,16 @@ source = "registry+https://scarbs.xyz/"
 checksum = "sha256:0ad256055661ed5b29ccef7bddbb44136995641cf537a6b259b94b6b6df14133"
 
 [[package]]
+name = "ekubo"
+version = "0.1.0"
+source = "git+https://github.com/EkuboProtocol/abis#f4a16b95967c5596d5a3cd4e0422bb9a2e3eb017"
+
+[[package]]
 name = "kapan"
 version = "0.0.1"
 dependencies = [
  "alexandria_math",
+ "ekubo",
  "openzeppelin",
  "openzeppelin_utils",
  "snforge_std",
