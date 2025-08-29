@@ -1,6 +1,5 @@
 import { FC, ReactNode, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { connect } from "@starknet-io/get-starknet";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import {

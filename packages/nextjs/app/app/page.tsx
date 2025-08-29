@@ -50,10 +50,10 @@ const App: NextPage = () => {
       // Using the default TwitterIcon from the component
     },
     {
-      title: "🌱 Fund via Gitcoin",
-      description: "We're part of Gitcoin GG23 OSS round — even a small donation goes a long way!",
-      buttonText: "Support on Gitcoin",
-      buttonLink: "https://explorer.gitcoin.co/#/round/42161/867/4",
+      title: "🌱 Fund via Giveth",
+      description: "We strive to provide everything for free, but we need your help to keep going!",
+      buttonText: "Support on Giveth",
+      buttonLink: "https://giveth.io/project/kapan-finance-defi-lending-management-protocol",
       // Using the default GitcoinIcon from the component
     },
     {
