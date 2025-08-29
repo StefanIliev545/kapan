@@ -13,10 +13,11 @@ export interface TokenInfo {
   currentRate: number;
   address: string;
   usdPrice?: number;
+  protocolAmount?: bigint;
 }
 
 // Different action types supported
-export type TokenActionType = "borrow" | "deposit" | "repay";
+export type TokenActionType = "borrow" | "deposit" | "repay" | "withdraw";
 
 // Step tracking for all token action flows
 export type ActionStep = "idle" | "approving" | "approved" | "executing" | "done";
@@ -59,14 +60,14 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   });
   const { writeContractAsync: writeErc20Async } = useWriteContract();
 
-  // Read token balance
+  // Read token balance from wallet for deposit/repay actions
   const { data: balance } = useReadContract({
     address: token.address as `0x${string}`,
     abi: ERC20ABI,
     functionName: "balanceOf",
     args: [walletClient?.account?.address as `0x${string}`],
     query: {
-      enabled: isOpen,
+      enabled: isOpen && actionType !== "withdraw",
       refetchInterval: 5000,
     },
   });
@@ -81,7 +82,13 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     },
   });
 
-  const formattedBalance = balance && decimals ? formatUnits(balance as bigint, decimals as number) : "0";
+  const formattedBalance = decimals
+    ? actionType === "withdraw"
+      ? formatUnits((token.protocolAmount || 0n) as bigint, decimals as number)
+      : balance
+        ? formatUnits(balance as bigint, decimals as number)
+        : "0"
+    : "0";
 
   // Calculate USD value using token price if available
   const getUsdValue = () => {
@@ -101,7 +108,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   }, [isOpen]);
 
   // Helper for mapping action type to function name
-  const getRouterFunctionName = (action: TokenActionType): "borrow" | "supply" | "repay" => {
+  const getRouterFunctionName = (
+    action: TokenActionType,
+  ): "borrow" | "supply" | "repay" | "withdraw" => {
     switch (action) {
       case "borrow":
         return "borrow";
@@ -109,6 +118,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         return "supply";
       case "repay":
         return "repay";
+      case "withdraw":
+        return "withdraw";
     }
   };
 
@@ -122,14 +133,12 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     try {
       setIsLoading(true);
       setError(null);
-      setStep("approving");
-      
+
       const parsedAmount = parseUnits(amount, decimals as number);
       const lowerProtocolName = protocolName.toLowerCase();
-      
-      // Step 1: Token approval (different for borrow vs deposit/repay)
+
       if (actionType === "borrow") {
-        // For borrowing, we need to get encoded debt approval
+        setStep("approving");
         try {
           const approvals = await routerGateway.read.getEncodedDebtApproval([
             lowerProtocolName,
@@ -138,10 +147,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             userAddress,
           ]);
 
-          // Approvals will be a tuple: [address[] targets, bytes[] encodedData]
           const [targets, data] = approvals;
-
-          // Execute approval transactions and wait for each receipt
           for (let i = 0; i < targets.length; i++) {
             const txHash = await walletClient.sendTransaction({
               to: targets[i],
@@ -157,8 +163,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           setIsLoading(false);
           return;
         }
-      } else {
-        // For deposit/repay, we need to approve ERC20 transfer
+        setStep("approved");
+      } else if (actionType === "deposit" || actionType === "repay") {
+        setStep("approving");
         try {
           const approveTx = await writeErc20Async({
             address: token.address as `0x${string}`,
@@ -166,7 +173,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             functionName: "approve",
             args: [routerGateway.address, parsedAmount],
           });
-          
+
           console.log("Approve tx sent:", approveTx);
           await publicClient.waitForTransactionReceipt({ hash: approveTx as `0x${string}` });
           console.log("Approve tx confirmed");
@@ -176,27 +183,24 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           setIsLoading(false);
           return;
         }
+        setStep("approved");
       }
-      
-      setStep("approved");
+
       setStep("executing");
-      
-      // Step 2: Execute the actual operation
+
       const functionName = getRouterFunctionName(actionType);
-      
+
       try {
         const actionTx = await writeRouterAsync({
           functionName,
           args: [lowerProtocolName, token.address, userAddress, parsedAmount],
         });
-        
+
         console.log(`${actionType} tx sent:`, actionTx);
         await publicClient.waitForTransactionReceipt({ hash: actionTx as `0x${string}` });
         console.log(`${actionType} tx confirmed`);
-        
+
         setStep("done");
-        
-        // Close modal after a short delay on success
         setTimeout(() => onClose(), 2000);
       } catch (err) {
         console.error(`Error executing ${actionType}:`, err);
@@ -316,7 +320,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                   <span>{getUsdValue()}</span>
                 </div>
               </div>
-              {(actionType === "deposit" || actionType === "repay") && (
+              {(actionType === "deposit" || actionType === "repay" || actionType === "withdraw") && (
                 <div className="text-sm text-base-content/70">
                   Balance: <span className="font-medium">{formatDisplayNumber(formattedBalance)} {token.name}</span>
                 </div>
@@ -334,8 +338,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                 max={actionType === "borrow" ? undefined : formattedBalance}
               />
               
-              {(actionType === "deposit" || actionType === "repay") && (
-                <button 
+              {(actionType === "deposit" || actionType === "repay" || actionType === "withdraw") && (
+                <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
                   onClick={() => setAmount(formattedBalance)}
                   disabled={isLoading || step !== "idle"}
@@ -350,15 +354,15 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           <div className="p-4 bg-base-200 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-base-content/70">
-                {actionType === "deposit" ? "Supply" : "Borrow"} APY:
+                {(actionType === "deposit" || actionType === "withdraw") ? "Supply" : "Borrow"} APY:
               </span>
               <span className="font-bold text-lg">
                 {token.currentRate.toFixed(2)}%
               </span>
             </div>
             <div className="mt-1 text-xs text-base-content/60">
-              {actionType === "deposit" 
-                ? "The estimated annual yield based on current market conditions." 
+              {actionType === "deposit" || actionType === "withdraw"
+                ? "The estimated annual yield based on current market conditions."
                 : "The estimated annual cost of borrowing based on current market conditions."}
             </div>
           </div>
@@ -367,48 +371,55 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           {children}
 
           {/* Transaction Flow Visual Steps */}
-          <div className="flex items-center w-full relative py-5">
-            {/* Step 1: Approve */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
-              step === "idle" ? "bg-base-300 text-base-content/50" : 
-              step === "approving" ? "bg-primary animate-pulse text-primary-content" : 
-              "bg-success text-success-content"
-            }`}>
-              {step === "idle" ? "1" : step === "approving" ? "1" : <FiCheck className="w-5 h-5" />}
-            </div>
-            
-            {/* Connecting Line */}
-            <div className={`flex-1 h-1 transition-all duration-500 ${
-              step === "idle" ? "bg-base-300" : 
-              step === "approving" ? "bg-primary/40" : 
-              "bg-success"
-            }`}></div>
-            
+          <div className={`flex items-center w-full relative py-5 ${actionType === "withdraw" ? "justify-center" : ""}`}>
+            {actionType !== "withdraw" && (
+              <>
+                {/* Step 1: Approve */}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
+                  step === "idle" ? "bg-base-300 text-base-content/50" :
+                  step === "approving" ? "bg-primary animate-pulse text-primary-content" :
+                  "bg-success text-success-content"
+                }`}>
+                  {step === "idle" ? "1" : step === "approving" ? "1" : <FiCheck className="w-5 h-5" />}
+                </div>
+
+                {/* Connecting Line */}
+                <div className={`flex-1 h-1 transition-all duration-500 ${
+                  step === "idle" ? "bg-base-300" :
+                  step === "approving" ? "bg-primary/40" :
+                  "bg-success"
+                }`}></div>
+              </>
+            )}
+
             {/* Step 2: Execute Action */}
             <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
-              step === "idle" || step === "approving" ? "bg-base-300 text-base-content/50" : 
-              step === "executing" ? "bg-primary animate-pulse text-primary-content" : 
+              step === "idle" || step === "approving" ? "bg-base-300 text-base-content/50" :
+              step === "executing" ? "bg-primary animate-pulse text-primary-content" :
               step === "done" ? "bg-success text-success-content" :
               "bg-primary text-primary-content"
             }`}>
-              {step === "idle" || step === "approving" ? "2" : 
-               step === "executing" ? "2" : 
+              {step === "idle" || step === "approving" ? "2" :
+               step === "executing" ? "2" :
                step === "done" ? <FiCheck className="w-5 h-5" /> : "2"}
             </div>
           </div>
-          
+
           {/* Step labels */}
-          <div className="flex justify-between text-sm px-1">
-            <div className="text-center max-w-[120px]">
-              <p className="font-medium">Approve</p>
-              <p className="text-xs text-base-content/70">Allow the contract to interact with your {token.name}</p>
-            </div>
+          <div className={`text-sm px-1 ${actionType === "withdraw" ? "flex justify-center" : "flex justify-between"}`}>
+            {actionType !== "withdraw" && (
+              <div className="text-center max-w-[120px]">
+                <p className="font-medium">Approve</p>
+                <p className="text-xs text-base-content/70">Allow the contract to interact with your {token.name}</p>
+              </div>
+            )}
             <div className="text-center max-w-[120px]">
               <p className="font-medium">{actionLabel || actionType}</p>
               <p className="text-xs text-base-content/70">
-                {actionType === "deposit" ? `Supply ${token.name} to ${protocolName}` : 
+                {actionType === "deposit" ? `Supply ${token.name} to ${protocolName}` :
                  actionType === "borrow" ? `Borrow ${token.name} from ${protocolName}` :
-                 `Repay ${token.name} to ${protocolName}`}
+                 actionType === "repay" ? `Repay ${token.name} to ${protocolName}` :
+                 `Withdraw ${token.name} from ${protocolName}`}
               </p>
             </div>
           </div>
