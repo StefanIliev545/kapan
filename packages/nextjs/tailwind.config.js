@@ -26,9 +26,9 @@ module.exports = {
           "base-300": "#E2E8F0",
           "base-content": "#1F2937",
           info: "#3ABFF8",
-          success: "#34D399",
+          success: "#3B82F6",
           warning: "#FBBF24",
-          error: "#FB7185",
+          error: "#F97316",
           "--rounded-btn": "0.375rem",
           ".tooltip": { "--tooltip-tail": "6px" },
           ".link": { textUnderlineOffset: "2px" },
@@ -62,9 +62,9 @@ module.exports = {
 
           // Retain some dynamic colors:
           info: "#0FF0FC",
-          success: "#34D399",
+          success: "#3B82F6",
           warning: "#FFCF72",
-          error: "#FF8863",
+          error: "#F97316",
 
           "--rounded-btn": "0.375rem",
           ".tooltip": {

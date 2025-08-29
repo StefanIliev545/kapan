@@ -195,9 +195,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                     {(collateralRates.supplyAPY * 100).toFixed(3)}%
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Monthly yield</span>
-                  <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(3)}</span>
+                <div className="flex justify-end">
+                  <span className="text-sm font-medium">
+                    ${(Number(monthlyYield) / 1e18).toFixed(3)} per month
+                  </span>
                 </div>
               </div>
             </div>
