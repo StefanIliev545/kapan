@@ -10,6 +10,7 @@ interface WithdrawModalStarkProps {
     address: string;
     currentRate: number;
     protocolAmount?: bigint;
+    tokenPrice?: bigint;
   };
   protocolName: string;
   vesuContext?: {

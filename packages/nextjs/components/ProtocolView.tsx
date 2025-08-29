@@ -77,6 +77,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     icon: string;
     address: string;
     currentRate: number;
+    tokenPrice?: bigint;
   } | null>(null);
 
   // Update showAll when forceShowAll prop changes
@@ -199,6 +200,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       icon: token.icon,
       address: token.tokenAddress,
       currentRate: token.currentRate,
+      tokenPrice: token.tokenPrice,
     });
     setIsTokenSelectModalOpen(false);
     setIsDepositModalOpen(true);
@@ -438,7 +440,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           }
 
           {/* Borrow Modal for Starknet */}
-          {isTokenBorrowModalOpen && 
+          {isTokenBorrowModalOpen &&
             <BorrowModalStark
               isOpen={isTokenBorrowModalOpen}
               onClose={handleCloseBorrowModal}
@@ -449,12 +451,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       icon: selectedToken.icon,
                       currentRate: selectedToken.currentRate,
                       address: selectedToken.tokenAddress,
+                      tokenPrice: selectedToken.tokenPrice,
                     }
                   : {
                       name: borrowedPositions[0]?.name || "",
                       icon: borrowedPositions[0]?.icon || "",
                       currentRate: borrowedPositions[0]?.currentRate || 0,
                       address: borrowedPositions[0]?.tokenAddress || "",
+                      tokenPrice: borrowedPositions[0]?.tokenPrice,
                     }
               }
               protocolName={protocolName}
@@ -493,12 +497,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       icon: selectedToken.icon,
                       address: selectedToken.tokenAddress,
                       currentRate: selectedToken.currentRate,
+                      tokenPrice: selectedToken.tokenPrice,
                     }
                   : {
                       name: borrowedPositions[0]?.name || "",
                       icon: borrowedPositions[0]?.icon || "",
                       address: borrowedPositions[0]?.tokenAddress || "",
                       currentRate: borrowedPositions[0]?.currentRate || 0,
+                      tokenPrice: borrowedPositions[0]?.tokenPrice,
                     }
               }
               protocolName={protocolName}

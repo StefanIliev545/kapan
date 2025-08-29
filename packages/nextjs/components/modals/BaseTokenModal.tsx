@@ -12,6 +12,7 @@ export interface TokenInfo {
   icon: string;
   currentRate: number;
   address: string;
+  tokenPrice?: bigint; // USD price with 8 decimals
 }
 
 // Different action types supported
@@ -84,8 +85,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
   // Calculate USD value
   const getUsdValue = () => {
-    if (!amount || isNaN(Number(amount))) return "0.00";
-    return formatDisplayNumber(Number(amount) * token.currentRate);
+    if (!amount || isNaN(Number(amount)) || !token.tokenPrice) return "0.00";
+    const price = Number(token.tokenPrice) / 1e8; // prices have 8 decimals
+    return formatDisplayNumber(Number(amount) * price);
   };
 
   // Reset the state when the modal is closed

@@ -306,6 +306,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               icon,
               address: tokenAddress,
               currentRate,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />
@@ -318,6 +319,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               protocolAmount: tokenBalance,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />
@@ -344,6 +346,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               icon,
               address: tokenAddress,
               currentRate,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />
@@ -355,6 +358,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               icon,
               address: tokenAddress,
               currentRate,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />

@@ -9,6 +9,7 @@ interface DepositModalStarkProps {
     icon: string;
     address: string;
     currentRate: number;
+    tokenPrice?: bigint;
   };
   protocolName: string;
   vesuContext?: {

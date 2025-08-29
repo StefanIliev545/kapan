@@ -292,6 +292,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
+          tokenPrice: collateralMetadata.price.value,
         }}
         protocolName="Vesu"
         vesuContext={{
@@ -309,6 +310,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
           protocolAmount: BigInt(collateralAmount),
+          tokenPrice: collateralMetadata.price.value,
         }}
         protocolName="Vesu"
         vesuContext={{
@@ -332,15 +334,16 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
       {debtMetadata && (
         <>
-          <BorrowModalStark
-            isOpen={isBorrowModalOpen}
-            onClose={() => setIsBorrowModalOpen(false)}
-            token={{
-              name: debtSymbol,
-              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-              address: debtAsset,
-              currentRate: debtRates.borrowAPR * 100,
-            }}
+        <BorrowModalStark
+          isOpen={isBorrowModalOpen}
+          onClose={() => setIsBorrowModalOpen(false)}
+          token={{
+            name: debtSymbol,
+            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+            address: debtAsset,
+            currentRate: debtRates.borrowAPR * 100,
+            tokenPrice: debtMetadata.price.value,
+          }}
             protocolName="Vesu"
             supportedAssets={supportedAssets}
             isVesu={true}
@@ -350,16 +353,17 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             }}
           />
 
-          <RepayModalStark
-            isOpen={isRepayModalOpen}
-            onClose={() => setIsRepayModalOpen(false)}
-            token={{
-              name: debtSymbol,
-              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-              address: debtAsset,
-              currentRate: debtRates.borrowAPR * 100,
-              protocolAmount: BigInt(nominalDebt),
-            }}
+        <RepayModalStark
+          isOpen={isRepayModalOpen}
+          onClose={() => setIsRepayModalOpen(false)}
+          token={{
+            name: debtSymbol,
+            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+            address: debtAsset,
+            currentRate: debtRates.borrowAPR * 100,
+            protocolAmount: BigInt(nominalDebt),
+            tokenPrice: debtMetadata.price.value,
+          }}
             protocolName="Vesu"
             vesuContext={{
               pool_id: 0n,

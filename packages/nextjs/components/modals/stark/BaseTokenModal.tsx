@@ -38,6 +38,7 @@ export interface TokenInfo {
   icon: string;
   currentRate: number;
   address: string;
+  tokenPrice?: bigint; // USD price with 18 decimals
   protocolAmount?: bigint; // Add protocol balance/debt amount for withdraw/repay actions
 }
 
@@ -292,8 +293,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
   // Calculate USD value
   const getUsdValue = () => {
-    if (!amount || isNaN(Number(amount))) return "0.00";
-    return formatDisplayNumber(Number(amount) * token.currentRate);
+    if (!amount || isNaN(Number(amount)) || !token.tokenPrice) return "0.00";
+    const price = Number(token.tokenPrice) / 1e18; // prices have 18 decimals
+    return formatDisplayNumber(Number(amount) * price);
   };
 
   // Reset the state when the modal is closed

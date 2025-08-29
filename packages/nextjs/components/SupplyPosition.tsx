@@ -270,6 +270,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               icon,
               address: tokenAddress,
               currentRate,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />
@@ -282,6 +283,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               address: tokenAddress,
               currentRate,
               protocolAmount: tokenBalance,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />
@@ -296,6 +298,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               icon,
               address: tokenAddress,
               currentRate,
+              tokenPrice,
             }}
             protocolName={protocolName}
           />
