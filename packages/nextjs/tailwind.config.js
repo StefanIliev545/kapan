@@ -75,6 +75,12 @@ module.exports = {
           ".link:hover": { opacity: "0.8" },
         },
       },
+      // Additional DaisyUI themes for more choices
+      "emerald",
+      "synthwave",
+      "retro",
+      "forest",
+      "valentine",
     ],
   },
   theme: {
