@@ -35,7 +35,7 @@ export const MarketRow: FC<MarketRowProps> = ({
             <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
             <span className="font-medium">{name}</span>
           </div>
-          <div className="flex items-center w-4/5">
+          <div className="flex items-center flex-1">
             <div className="flex flex-col items-center w-1/5">
               <div className="text-sm text-base-content/70">Price</div>
               <div className="font-medium">${price}</div>
@@ -50,10 +50,11 @@ export const MarketRow: FC<MarketRowProps> = ({
                 borrowRate={borrowRate}
                 address={address}
                 networkType={networkType}
+                labels="center"
               />
             </div>
             <button
-              className="btn btn-sm btn-primary ml-4"
+              className="btn btn-sm btn-primary ml-auto"
               onClick={() => setIsDepositModalOpen(true)}
             >
               Deposit
@@ -81,6 +82,7 @@ export const MarketRow: FC<MarketRowProps> = ({
             address={address}
             networkType={networkType}
             className="mb-3"
+            labels="center"
           />
           <div className="flex flex-wrap gap-3">
             <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
@@ -114,6 +116,7 @@ export const MarketRow: FC<MarketRowProps> = ({
             address={address}
             networkType={networkType}
             className="mb-3"
+            labels="center"
           />
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-base-200/50 p-2 rounded-md">

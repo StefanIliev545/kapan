@@ -50,6 +50,7 @@ export const MarketCard: FC<MarketCardProps> = ({
             borrowRate={borrowRate}
             address={address}
             networkType={networkType}
+            labels="between"
           />
           <div>
             <div className="flex justify-between text-sm text-base-content/70">
