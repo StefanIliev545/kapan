@@ -1,24 +1,20 @@
-import { FC, useEffect, useMemo, useState } from "react";
-import { MarketRow } from "./MarketRow";
+import { FC, useMemo, useState } from "react";
+import Image from "next/image";
+import { MarketCard } from "./MarketCard";
 import { VesuPosition } from "./VesuPosition";
 import { useAccount } from "@starknet-react/core";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import {
   PositionData,
-  SCALE,
   TokenMetadata,
-  YEAR_IN_SECONDS,
   feltToString,
   formatPrice,
   formatRate,
   formatTokenAmount,
   formatUtilization,
-  toAPR,
-  toAPY,
   toAnnualRates,
 } from "~~/utils/protocols";
-import Image from "next/image";
 
 // Define pool IDs
 const POOL_IDS = {
@@ -100,7 +96,7 @@ export const VesuProtocolView: FC = () => {
   }, [userPositionsPart1, userPositionsPart2]);
 
   // Memoize the market rows to prevent unnecessary re-renders
-  const marketRows = useMemo(() => {
+  const marketCards = useMemo(() => {
     if (!supportedAssets) return null;
 
     return (supportedAssets as unknown as ContractResponse)?.map((asset: ContractResponse[number]) => {
@@ -121,7 +117,7 @@ export const VesuProtocolView: FC = () => {
       );
 
       return (
-        <MarketRow
+        <MarketCard
           key={address}
           icon={tokenNameToLogo(symbol.toLowerCase())}
           name={symbol}
@@ -197,7 +193,7 @@ export const VesuProtocolView: FC = () => {
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
           <h2 className="card-title text-lg border-b border-base-200 pb-2">Vesu Markets</h2>
-          
+
           {/* Pool Selection Tabs */}
           <div className="tabs tabs-boxed mb-4">
             <button
@@ -236,7 +232,7 @@ export const VesuProtocolView: FC = () => {
             </button>
           </div>
 
-          <div className="space-y-2">{marketRows}</div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">{marketCards}</div>
         </div>
       </div>
 
