@@ -1,43 +1,24 @@
-import { FC, useEffect, useMemo, useState } from "react";
-import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
+import { FC, useMemo } from "react";
+import { ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
-import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { useForceShowAll } from "~~/hooks/useForceShowAll";
+import { buildProtocolPositions, convertCompoundRate, TokenPositionInput } from "~~/utils/positions";
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export const CompoundProtocolView: FC = () => {
-  const { address: connectedAddress } = useAccount();
+  const { address: connectedAddress, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
 
-  // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll, setForceShowAll] = useState(false);
+  // Determine if we should force showing all assets when wallet is not connected
+  const forceShowAll = useForceShowAll(isConnected);
 
   // Determine the address to use for queries
   const queryAddress = connectedAddress || ZERO_ADDRESS;
-
-  // Update forceShowAll when wallet connection status changes with a delay
-  useEffect(() => {
-    // If wallet is connected, immediately set forceShowAll to false
-    if (connectedAddress) {
-      setForceShowAll(false);
-      return;
-    }
-
-    // If wallet is not connected, wait a bit before forcing show all
-    // This gives time for wallet to connect during initial page load
-    const timeout = setTimeout(() => {
-      if (!connectedAddress) {
-        setForceShowAll(true);
-      }
-    }, 2500); // Wait 1.5 seconds before deciding wallet is not connected
-
-    return () => clearTimeout(timeout);
-  }, [connectedAddress]);
 
   // Load token contracts via useScaffoldContract.
   const { data: usdc } = useScaffoldContract({ contractName: "USDC", walletClient });
@@ -100,50 +81,28 @@ export const CompoundProtocolView: FC = () => {
     functionName: "decimals",
   });
 
-  // Helper: Convert Compound's per-second rate to an APR percentage.
-  const convertRateToAPR = (ratePerSecond: bigint): number => {
-    const SECONDS_PER_YEAR = 60 * 60 * 24 * 365; // as a number
-    const SCALE = 1e18; // as a number
-    return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
-  };
-
   // Aggregate positions using useMemo.
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
-    const supplied: ProtocolPosition[] = [];
-    const borrowed: ProtocolPosition[] = [];
+    const tokens: TokenPositionInput[] = [];
 
-    const computePosition = (
+    const pushToken = (
       tokenName: string,
       tokenAddress: string | undefined,
       compoundData: any,
       decimalsRaw: any,
     ) => {
       if (!tokenAddress || !compoundData || !decimalsRaw) return;
-      const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price, priceScale] = compoundData;
+      const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price] = compoundData;
       const decimals = Number(decimalsRaw);
-      const supplyAPR = supplyRate ? convertRateToAPR(BigInt(supplyRate)) : 0;
-      const borrowAPR = borrowRate ? convertRateToAPR(BigInt(borrowRate)) : 0;
-
-      const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
-      const usdBalance = balance * Number(formatUnits(price, 8));
-
-      const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
-      const usdBorrowBalance = borrowBalance * Number(formatUnits(price, 8));
-
-      // Always add to borrowed positions list, regardless of whether there's debt
-      borrowed.push({
-        icon: tokenNameToLogo(tokenName),
-        name: tokenName,
-        // Set negative balance if there's debt, otherwise zero balance
-        balance: borrowBalanceRaw && borrowBalanceRaw > 0n ? -usdBorrowBalance : 0,
-        // Store collateral value as a custom property
-        collateralValue: 0, // This is now calculated inside the CollateralView
-        tokenBalance: borrowBalanceRaw || 0n,
-        currentRate: borrowAPR,
-        tokenAddress: tokenAddress,
-        tokenPrice: price,
-        tokenDecimals: decimals,
-        tokenSymbol: tokenName,
+      tokens.push({
+        symbol: tokenName,
+        token: tokenAddress,
+        balance: balanceRaw,
+        borrowBalance: borrowBalanceRaw,
+        supplyRate: supplyRate ? BigInt(supplyRate) : 0n,
+        borrowRate: borrowRate ? BigInt(borrowRate) : 0n,
+        price,
+        decimals,
         collateralView: (
           <CompoundCollateralView
             baseToken={tokenAddress}
@@ -152,46 +111,14 @@ export const CompoundProtocolView: FC = () => {
           />
         ),
       });
-
-      supplied.push({
-        icon: tokenNameToLogo(tokenName),
-        name: tokenName,
-        balance: usdBalance,
-        tokenBalance: balanceRaw,
-        currentRate: supplyAPR,
-        tokenAddress: tokenAddress,
-        tokenPrice: price,
-        tokenDecimals: decimals,
-        tokenSymbol: tokenName,
-      });
     };
 
-    computePosition(
-      "WETH",
-      wethAddress,
-      wethCompoundData,
-      wethDecimals,
-    );
-    computePosition(
-      "USDC",
-      usdcAddress,
-      usdcCompoundData,
-      usdcDecimals,
-    );
-    computePosition(
-      "USDT",
-      usdtAddress,
-      usdtCompoundData,
-      usdtDecimals,
-    );
-    computePosition(
-      "USDC.e",
-      usdcEAddress,
-      usdcECompoundData,
-      usdcEDecimals,
-    );
+    pushToken("WETH", wethAddress, wethCompoundData, wethDecimals);
+    pushToken("USDC", usdcAddress, usdcCompoundData, usdcDecimals);
+    pushToken("USDT", usdtAddress, usdtCompoundData, usdtDecimals);
+    pushToken("USDC.e", usdcEAddress, usdcECompoundData, usdcEDecimals);
 
-    return { suppliedPositions: supplied, borrowedPositions: borrowed };
+    return buildProtocolPositions(tokens, convertCompoundRate);
   }, [
     wethAddress,
     wethCompoundData,

@@ -24,7 +24,7 @@
  * 4. Allow users to supply, borrow, repay, and migrate debt between protocols
  */
 
-import { FC, useMemo, useState, useEffect } from "react";
+import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
@@ -32,12 +32,13 @@ import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useForceShowAll } from "~~/hooks/useForceShowAll";
 
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
 
 export const VenusProtocolView: FC = () => {
-  const { address: connectedAddress } = useAccount();
+  const { address: connectedAddress, isConnected } = useAccount();
   const { data: venusGatewayContract } = useScaffoldContract({ contractName: "VenusGateway" });
   
   // Get Comptroller address from VenusGateway
@@ -46,27 +47,8 @@ export const VenusProtocolView: FC = () => {
     functionName: "comptroller",
   });
   
-  // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll, setForceShowAll] = useState(false);
-  
-  // Update forceShowAll when wallet connection status changes with a delay
-  useEffect(() => {
-    // If wallet is connected, immediately set forceShowAll to false
-    if (connectedAddress) {
-      setForceShowAll(false);
-      return;
-    }
-    
-    // If wallet is not connected, wait a bit before forcing show all
-    // This gives time for wallet to connect during initial page load
-    const timeout = setTimeout(() => {
-      if (!connectedAddress) {
-        setForceShowAll(true);
-      }
-    }, 2500); // Wait 2.5 seconds before deciding wallet is not connected
-    
-    return () => clearTimeout(timeout);
-  }, [connectedAddress]);
+  // Determine if we should force showing all assets when wallet is not connected
+  const forceShowAll = useForceShowAll(isConnected);
 
   // Helper: Convert Venus rates to APY percentage
   // Venus uses rates per block, so we need to convert to annual rates

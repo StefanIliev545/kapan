@@ -2,7 +2,7 @@ import { FC, useState } from "react";
 import Image from "next/image";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
 
 type MarketRowProps = {
@@ -76,8 +76,6 @@ export const MarketRow: FC<MarketRowProps> = ({
     optimalBorrowProtocol = proto;
     optimalBorrowRateDisplay = Number(rate) / 1e8;
   }
-
-  const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
   return (
     <>

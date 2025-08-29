@@ -6,8 +6,9 @@ import { DepositModal } from "./modals/DepositModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
-import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { InfoDropdown } from "./InfoDropdown";
+import { getProtocolLogo } from "~~/utils/protocol";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useModal, useToggle } from "~~/hooks/useModal";
@@ -54,14 +55,6 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     type: "supply",
   });
 
-  const formatNumber = (num: number) =>
-    new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(num));
-
-  const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
-
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
@@ -85,39 +78,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
             <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            <div
-              className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
-              onClick={e => e.stopPropagation()}
-            >
-              <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                <FiInfo
-                  className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
-                  aria-hidden="true"
-                />
-              </div>
-              <div
-                tabIndex={0}
-                className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-                style={{
-                  right: "auto",
-                  transform: "translateX(-50%)",
-                  left: "50%",
-                  borderRadius: "4px",
-                }}
-              >
-                <div className="card-body p-3">
-                  <h3 className="card-title text-sm">{name} Details</h3>
-                  <div className="text-xs space-y-1">
-                    <p className="text-base-content/70">Contract Address:</p>
-                    <p className="font-mono break-all">{tokenAddress}</p>
-                    <p className="text-base-content/70">Protocol:</p>
-                    <p>{protocolName}</p>
-                    <p className="text-base-content/70">Type:</p>
-                    <p className="capitalize">Supply Position</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <InfoDropdown
+              name={name}
+              tokenAddress={tokenAddress}
+              protocolName={protocolName}
+              positionType="Supply Position"
+            />
 
             {/* Render additional content after the info button if provided */}
             {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}

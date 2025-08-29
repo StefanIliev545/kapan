@@ -140,9 +140,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     ? borrowedPositions // Show all potential borrowable tokens
     : borrowedPositions.filter(p => p.balance < 0); // Only show positions with debt
 
-  // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
-  const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
-
   // Handle opening the token select modal for supply
   const handleAddSupply = () => {
     setIsTokenSelectModalOpen(true);
