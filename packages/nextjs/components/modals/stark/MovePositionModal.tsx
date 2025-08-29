@@ -596,7 +596,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return {
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
-      pairInstructions: instructions,
+      // Wrap instructions in an array so that callers always
+      // receive a list of instruction pairs. This ensures we
+      // execute a single move_debt call when moving between
+      // Vesu and Nostra while still supporting multiple calls
+      // for scenarios that require it (e.g. Nostra -> Vesu with
+      // several collaterals).
+      pairInstructions: [instructions],
     };
   }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId]);
 
