@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import { StarknetConfig, argent, braavos, starkscan, useInjectedConnectors } from "@starknet-react/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -54,13 +54,18 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     includeRecommended: "onlyIfNoConnectors",
     order: "alphabetical",
   });
-  const connectors = useMemo(() => injected.connectors, [injected.connectors]);
+  const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
+
+  const connectorsRef = useRef<typeof liveConnectors | null>(null);
+  if (!connectorsRef.current && liveConnectors?.length) {
+    connectorsRef.current = liveConnectors;
+  }
 
   return (
     <StarknetConfig
       chains={appChains}
       provider={provider}
-      connectors={connectors}
+      connectors={connectorsRef.current ?? []}
       explorer={starkscan}
       autoConnect={true}
     >

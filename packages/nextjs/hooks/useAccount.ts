@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { UseAccountResult, useAccount as useStarknetReactAccount } from "@starknet-react/core";
-import { AccountInterface, constants } from "starknet";
+import { useMemo } from "react";
+import { UseAccountResult, useAccount as useStarknetReactAccount, useNetwork } from "@starknet-react/core";
+import { constants } from "starknet";
 
 /**
  * Wrapper around starknet react's useAccount hook to fix inconsistencies
  */
 export function useAccount(): UseAccountResult {
   const starknetAccount = useStarknetReactAccount();
+  const { chain } = useNetwork();
   const { account, status } = starknetAccount;
 
   const correctedStatus = useMemo(() => {
@@ -16,33 +17,14 @@ export function useAccount(): UseAccountResult {
     return status;
   }, [status, account]);
 
-  const [accountChainId, setAccountChainId] = useState<bigint>(0n);
-
-  useEffect(() => {
-    if (account) {
-      const getChainId = async () => {
-        try {
-          let chainId: string | bigint;
-
-          if (typeof account.getChainId === "function") {
-            chainId = await account.getChainId();
-          } else if ((account as any).channel?.getChainId) {
-            chainId = await (account as any).channel.getChainId();
-          } else {
-            chainId = constants.StarknetChainId.SN_MAIN;
-          }
-
-          if (chainId) {
-            setAccountChainId(BigInt(chainId.toString()));
-          }
-        } catch (error) {
-          setAccountChainId(BigInt(constants.StarknetChainId.SN_MAIN));
-        }
-      };
-
-      getChainId();
+  const accountChainId = useMemo(() => {
+    if (correctedStatus !== "connected" || !chain?.id) return 0n;
+    try {
+      return BigInt(chain.id.toString());
+    } catch {
+      return BigInt(constants.StarknetChainId.SN_MAIN);
     }
-  }, [account]);
+  }, [correctedStatus, chain?.id]);
 
   return {
     ...starknetAccount,

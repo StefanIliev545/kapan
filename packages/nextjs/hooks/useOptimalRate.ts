@@ -14,7 +14,14 @@ interface UseOptimalRateArgs {
  * Wraps useNetworkAwareReadContract and parses the result into a usable format.
  */
 export const useOptimalRate = ({ networkType, tokenAddress, type }: UseOptimalRateArgs) => {
-  const functionName = type === "borrow" ? "findOptimalBorrowRate" : "findOptimalSupplyRate";
+  const functionName =
+    networkType === "evm"
+      ? type === "borrow"
+        ? "getAllProtocolBorrowRates"
+        : "getAllProtocolRates"
+      : type === "borrow"
+        ? "findOptimalBorrowRate"
+        : "findOptimalSupplyRate";
 
   const { data } = useNetworkAwareReadContract({
     networkType,
@@ -27,16 +34,30 @@ export const useOptimalRate = ({ networkType, tokenAddress, type }: UseOptimalRa
   return useMemo(() => {
     if (!data) return { protocol: "", rate: 0 };
 
-    let protocol: string;
-    let rate: number;
+    // Starknet path: contract returns [protocol_felt, rate_scaled_1e16]
     if (networkType === "starknet") {
-      protocol = feltToString(BigInt(data?.[0]?.toString() || "0"));
-      rate = Number(data?.[1]?.toString() || "0") / 1e16;
-    } else {
-      protocol = data?.[0]?.toString() || "";
-      rate = Number(data?.[1]?.toString() || "0") / 1e16;
+      const protocol = feltToString(BigInt((data as any)?.[0]?.toString() || "0"));
+      const rate = Number((data as any)?.[1]?.toString() || "0") / 1e16;
+      return { protocol, rate };
     }
 
+    // EVM path: contract returns [protocols: string[], rates: uint256[], success: bool[]]
+    const [protocols, rates, success] = data as unknown as [string[], bigint[] | string[], boolean[]];
+    let maxIx = -1;
+    let maxRate = 0n;
+    for (let i = 0; i < (rates?.length || 0); i++) {
+      const ok = success?.[i];
+      const r = BigInt((rates as any)[i] ?? 0);
+      if (ok && r > maxRate) {
+        maxRate = r;
+        maxIx = i;
+      }
+    }
+    if (maxIx === -1) return { protocol: "", rate: 0 };
+
+    const protocol = protocols?.[maxIx] || "";
+    // EVM rates are scaled by 1e8 per useProtocolRates/useTokenData
+    const rate = Number(maxRate) / 1e8;
     return { protocol, rate };
   }, [data, networkType]);
 };
