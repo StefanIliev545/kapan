@@ -2,7 +2,8 @@
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { ContractName } from "~~/utils/scaffold-stark/contract";
 import { Contract, Abi } from "starknet";
-import { useProvider, useAccount } from "@starknet-react/core";
+import { useProvider } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
 import { useMemo } from "react";
 
 export const useScaffoldContract = <TContractName extends ContractName>({

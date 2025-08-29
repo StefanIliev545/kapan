@@ -1,7 +1,7 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { useRef } from "react";
 import Image from "next/image";
-import { useAccount } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
 import {
   FiAlertTriangle,

@@ -8,7 +8,8 @@ import { AddressQRCodeModal } from "./AddressQRCodeModal";
 import ConnectModal from "./ConnectModal";
 import { WrongNetworkDropdown } from "./WrongNetworkDropdown";
 import { Address } from "@starknet-react/chains";
-import { useAccount, useConnect, useNetwork } from "@starknet-react/core";
+import { useConnect, useNetwork } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
 import { useTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-stark";
 
@@ -51,7 +52,7 @@ export const CustomConnectButton = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connector]);
 
-  if (status !== "connected" || accountChainId === 0n) return <ConnectModal />;
+  if (status !== "connected" || accountChainId === 0n || !accountAddress) return <ConnectModal />;
 
   if (accountChainId !== targetNetwork.id) {
     return <WrongNetworkDropdown />;

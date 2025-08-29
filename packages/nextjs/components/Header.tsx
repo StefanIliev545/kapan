@@ -17,7 +17,6 @@ import {
 } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
-import { Faucet } from "./scaffold-stark";
 
 type HeaderMenuLink = {
   label: string;
@@ -260,12 +259,7 @@ export const Header = () => {
                                 />
                               </div>
                             </div>
-                            <div className="relative">
-                              <Faucet />
-                            </div>  
-                            <div className="relative">
-                              <FaucetButton />
-                            </div>
+                            {/* Removed Stark faucet and FaucetButton from mobile drawer */}
                           </div>
                         </div>
                       </div>
@@ -329,7 +323,7 @@ export const Header = () => {
               </motion.div>
             </div>
 
-            {/* Connect button and faucet */}
+            {/* Connect button */}
             <motion.div
               className="hidden md:flex gap-2 items-center relative z-20"
               initial={{ opacity: 0 }}
@@ -362,12 +356,7 @@ export const Header = () => {
                   />
                 </div>
               </div>
-              <div className="relative">
-                <Faucet />
-              </div>
-              <div className="relative">
-                <FaucetButton />
-              </div>
+              {/* Removed Stark faucet and FaucetButton from desktop header */}
             </motion.div>
           </div>
         </div>
