@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { SwitchTheme } from "~~/components/SwitchTheme";
 
 type HeaderMenuLink = {
   label: string;
@@ -298,8 +299,9 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Right section - Alpha badge and buttons */}
+          {/* Right section - Theme switcher, Alpha badge and buttons */}
           <div className="flex items-center gap-4">
+            <SwitchTheme />
             {/* Alpha badge */}
             <div className="hidden sm:block">
               <motion.div
