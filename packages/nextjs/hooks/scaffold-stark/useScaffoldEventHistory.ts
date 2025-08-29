@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTargetNetwork } from "./useTargetNetwork";
-import { devnet } from "@starknet-react/chains";
-import { useProvider } from "@starknet-react/core";
+import { useStarkBlockNumber } from "./useBlockNumberContext";
 import { Abi, ExtractAbiEvent, ExtractAbiEventNames } from "abi-wan-kanabi/kanabi";
 import { RpcProvider, hash } from "starknet";
 import { CallData, events as starknetEvents } from "starknet";
-import { useInterval } from "usehooks-ts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
-import scaffoldConfig from "~~/scaffold.config";
 import { replacer } from "~~/utils/scaffold-stark/common";
 import { ContractAbi, ContractName, UseScaffoldEventHistoryConfig } from "~~/utils/scaffold-stark/contract";
 import { composeEventFilterKeys } from "~~/utils/scaffold-stark/eventKeyFilter";
@@ -24,7 +21,7 @@ const MAX_KEYS_COUNT = 16;
  * @param config.blockData - if set to true it will return the block data for each event (default: false)
  * @param config.transactionData - if set to true it will return the transaction data for each event (default: false)
  * @param config.receiptData - if set to true it will return the receipt data for each event (default: false)
- * @param config.watch - if set to true, the events will be updated every pollingInterval milliseconds set at scaffoldConfig (default: false)
+ * @param config.watch - if set to true, the events will be refreshed on each new block (default: false)
  * @param config.enabled - if set to false, disable the hook from running (default: true)
  */
 export const useScaffoldEventHistory = <
@@ -41,7 +38,7 @@ export const useScaffoldEventHistory = <
   blockData,
   transactionData,
   receiptData,
-  watch,
+  watch = false,
   format = true,
   enabled = true,
 }: UseScaffoldEventHistoryConfig<TContractName, TEventName, TBlockData, TTransactionData, TReceiptData>) => {
@@ -51,8 +48,8 @@ export const useScaffoldEventHistory = <
   const [fromBlockUpdated, setFromBlockUpdated] = useState<bigint>(fromBlock);
 
   const { data: deployedContractData, isLoading: deployedContractLoading } = useDeployedContractInfo(contractName);
-  const { provider } = useProvider();
   const { targetNetwork } = useTargetNetwork();
+  const blockNumberCtx = useStarkBlockNumber();
 
   const publicClient = useMemo(() => {
     return new RpcProvider({
@@ -60,7 +57,7 @@ export const useScaffoldEventHistory = <
     });
   }, [targetNetwork.rpcUrls.public.http]);
 
-  const readEvents = async (fromBlock?: bigint) => {
+  const readEvents = async (fromBlock?: bigint, latestBlock?: bigint) => {
     if (!enabled) {
       setIsLoading(false);
       return;
@@ -80,9 +77,9 @@ export const useScaffoldEventHistory = <
         part => part.type === "event" && part.name === eventName,
       ) as ExtractAbiEvent<ContractAbi<TContractName>, TEventName>;
 
-      const blockNumber = (await publicClient.getBlockLatestAccepted()).block_number;
+      const blockNumber = Number(latestBlock ?? (await publicClient.getBlockLatestAccepted()).block_number);
 
-      if ((fromBlock && blockNumber >= fromBlock) || blockNumber >= fromBlockUpdated) {
+      if ((fromBlock && blockNumber >= Number(fromBlock)) || blockNumber >= Number(fromBlockUpdated)) {
         let keys: string[][] = [[hash.getSelectorFromName(event.name.split("::").slice(-1)[0])]];
         if (filters) {
           keys = keys.concat(composeEventFilterKeys(filters, event, deployedContractData.abi));
@@ -137,17 +134,16 @@ export const useScaffoldEventHistory = <
   };
 
   useEffect(() => {
-    readEvents(fromBlock).then();
+    readEvents(fromBlock, blockNumberCtx).then();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromBlock, enabled]);
+  }, [fromBlock, enabled, blockNumberCtx]);
 
   useEffect(() => {
     if (!deployedContractLoading) {
-      readEvents().then();
+      readEvents(undefined, blockNumberCtx).then();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    provider,
     contractName,
     eventName,
     deployedContractLoading,
@@ -167,14 +163,12 @@ export const useScaffoldEventHistory = <
     setError(undefined);
   }, [fromBlock, targetNetwork.id]);
 
-  useInterval(
-    async () => {
-      if (!deployedContractLoading) {
-        readEvents();
-      }
-    },
-    watch ? (targetNetwork.id !== devnet.id ? scaffoldConfig.pollingInterval : 4_000) : null,
-  );
+  useEffect(() => {
+    if (watch && blockNumberCtx !== undefined && !deployedContractLoading) {
+      readEvents(undefined, blockNumberCtx).then();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockNumberCtx, watch, deployedContractLoading]);
 
   const eventHistoryData = useMemo(() => {
     if (deployedContractData) {

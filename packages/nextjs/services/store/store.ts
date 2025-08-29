@@ -30,6 +30,8 @@ type GlobalState = {
   setTargetSNNetwork: (newTargetSNNetwork: SNChainWithAttributes) => void;
   blockNumber?: bigint;
   setBlockNumber: (blockNumber: bigint | undefined) => void;
+  snBlockNumber?: bigint;
+  setSnBlockNumber: (blockNumber: bigint | undefined) => void;
 };
 
 export const useGlobalState = create<GlobalState>(set => ({
@@ -52,4 +54,6 @@ export const useGlobalState = create<GlobalState>(set => ({
     set(() => ({ targetSNNetwork: newTargetSNNetwork })),
   blockNumber: undefined,
   setBlockNumber: (blockNumber: bigint | undefined) => set(() => ({ blockNumber })),
+  snBlockNumber: undefined,
+  setSnBlockNumber: (snBlockNumber: bigint | undefined) => set(() => ({ snBlockNumber })),
 }));
