@@ -12,6 +12,7 @@ export type MarketCardProps = {
   utilization: string;
   address: string;
   networkType: "evm" | "starknet";
+  protocol: string;
 };
 
 export const MarketCard: FC<MarketCardProps> = ({
@@ -23,6 +24,7 @@ export const MarketCard: FC<MarketCardProps> = ({
   utilization,
   address,
   networkType,
+  protocol,
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
@@ -36,13 +38,15 @@ export const MarketCard: FC<MarketCardProps> = ({
               <h3 className="text-lg font-semibold">{name}</h3>
               <span className="text-sm text-base-content/70">${price}</span>
             </div>
-            <button
-              className="btn btn-sm btn-primary btn-circle ml-auto"
-              onClick={() => setIsDepositModalOpen(true)}
-              aria-label="Deposit"
-            >
-              +
-            </button>
+            {networkType === "starknet" && (
+              <button
+                className="btn btn-sm btn-primary btn-circle ml-auto"
+                onClick={() => setIsDepositModalOpen(true)}
+                aria-label="Deposit"
+              >
+                +
+              </button>
+            )}
           </div>
           <Image src={icon} alt={name} width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
           <InterestPillRow
@@ -50,7 +54,7 @@ export const MarketCard: FC<MarketCardProps> = ({
             borrowRate={borrowRate}
             address={address}
             networkType={networkType}
-            protocol="vesu"
+            protocol={protocol}
             labels="between"
           />
           <div>
@@ -63,17 +67,19 @@ export const MarketCard: FC<MarketCardProps> = ({
         </div>
       </div>
 
-      <DepositModalStark
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        token={{
-          name,
-          icon,
-          address,
-          currentRate: parseFloat(supplyRate.replace("%", "")),
-        }}
-        protocolName="Vesu"
-      />
+      {networkType === "starknet" && (
+        <DepositModalStark
+          isOpen={isDepositModalOpen}
+          onClose={() => setIsDepositModalOpen(false)}
+          token={{
+            name,
+            icon,
+            address,
+            currentRate: parseFloat(supplyRate.replace("%", "")),
+          }}
+          protocolName={protocol}
+        />
+      )}
     </>
   );
 };
