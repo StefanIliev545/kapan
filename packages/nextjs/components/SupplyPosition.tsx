@@ -3,14 +3,15 @@ import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
+import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
-import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useWalletConnection } from "~~/hooks/useWalletConnection";
-import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useModal, useToggle } from "~~/hooks/useModal";
+import { useOptimalRate } from "~~/hooks/useOptimalRate";
+import { useWalletConnection } from "~~/hooks/useWalletConnection";
+
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
@@ -194,7 +195,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
                 onClick={withdrawModal.open}
                 disabled={!isWalletConnected || !hasBalance}
-                title={!isWalletConnected ? "Connect wallet to withdraw" : !hasBalance ? "No balance to withdraw" : "Withdraw tokens"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to withdraw"
+                    : !hasBalance
+                      ? "No balance to withdraw"
+                      : "Withdraw tokens"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Withdraw</span>
@@ -234,7 +241,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 className="btn btn-sm btn-outline flex justify-center items-center"
                 onClick={withdrawModal.open}
                 disabled={!isWalletConnected || !hasBalance}
-                title={!isWalletConnected ? "Connect wallet to withdraw" : !hasBalance ? "No balance to withdraw" : "Withdraw tokens"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to withdraw"
+                    : !hasBalance
+                      ? "No balance to withdraw"
+                      : "Withdraw tokens"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Withdraw</span>
@@ -285,7 +298,6 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
-              protocolAmount: tokenBalance,
             }}
             protocolName={protocolName}
           />

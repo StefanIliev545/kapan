@@ -10,9 +10,9 @@ import { MovePositionModal as MovePositionModalStark } from "./modals/stark/Move
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useWalletConnection } from "~~/hooks/useWalletConnection";
-import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useModal, useToggle } from "~~/hooks/useModal";
+import { useOptimalRate } from "~~/hooks/useOptimalRate";
+import { useWalletConnection } from "~~/hooks/useWalletConnection";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -321,7 +321,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
-              protocolAmount: tokenBalance,
             }}
             protocolName={protocolName}
           />

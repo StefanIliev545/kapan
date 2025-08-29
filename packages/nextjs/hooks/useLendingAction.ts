@@ -1,10 +1,10 @@
+import type { Network } from "./useTokenBalance";
 import { parseUnits } from "viem";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useScaffoldWriteContract as useEvmWrite } from "~~/hooks/scaffold-eth";
-import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { useScaffoldWriteContract as useStarkWrite } from "~~/hooks/scaffold-stark/useScaffoldWriteContract";
+import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { notification } from "~~/utils/scaffold-stark";
-import type { Network } from "./useTokenBalance";
 
 export type Action = "Borrow" | "Deposit" | "Withdraw" | "Repay";
 
@@ -45,10 +45,9 @@ export const useLendingAction = (
   const execute = async (amount: string) => {
     if (!decimals || !address) return;
     await writeContractAsync({
-      functionName: fnMap[action],
-      args: [protocolName.toLowerCase(), tokenAddress, address, parseUnits(amount, decimals)],
+      functionName: fnMap[action] as any,
+      args: [protocolName.toLowerCase(), tokenAddress, address, parseUnits(amount, decimals)] as any,
     });
   };
   return { execute };
 };
-
