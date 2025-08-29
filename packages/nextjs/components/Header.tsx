@@ -300,9 +300,8 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Right section - Theme switcher, Alpha badge and buttons */}
+          {/* Right section - Alpha badge, buttons and theme controls */}
           <div className="flex items-center gap-4">
-            <SwitchTheme />
             {/* Alpha badge */}
             <div className="hidden sm:block">
               <motion.div
@@ -361,7 +360,10 @@ export const Header = () => {
               </div>
               {/* Removed Stark faucet and FaucetButton from desktop header */}
             </motion.div>
-            <ThemeSettings />
+            <div className="flex items-center gap-2">
+              <SwitchTheme />
+              <ThemeSettings />
+            </div>
           </div>
         </div>
       </div>

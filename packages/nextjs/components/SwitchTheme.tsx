@@ -5,14 +5,12 @@ import { useTheme } from "next-themes";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 
 export const SwitchTheme = ({ className }: { className?: string }) => {
-  const { setTheme, theme } = useTheme();
+  const { setTheme, theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  if (!mounted) return null;
 
   const lightTheme =
     typeof window !== "undefined"
@@ -22,7 +20,19 @@ export const SwitchTheme = ({ className }: { className?: string }) => {
     typeof window !== "undefined"
       ? localStorage.getItem("darkTheme") ?? "synthwave"
       : "synthwave";
-  const isDark = theme === darkTheme;
+
+  useEffect(() => {
+    if (mounted && theme === "system" && resolvedTheme) {
+      const preferred = resolvedTheme === "dark" ? darkTheme : lightTheme;
+      setTheme(preferred);
+      localStorage.setItem("theme", preferred);
+    }
+  }, [mounted, theme, resolvedTheme, darkTheme, lightTheme, setTheme]);
+
+  if (!mounted) return null;
+
+  const currentTheme = theme === "system" ? resolvedTheme : theme;
+  const isDark = currentTheme === darkTheme;
 
   const toggleTheme = () => {
     const next = isDark ? lightTheme : darkTheme;
