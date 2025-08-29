@@ -222,7 +222,7 @@ export const Header = () => {
                               />
                             </div>
                             <div>
-                              <div className="font-bold text-xl text-primary dark:text-accent">Kapan Finance</div>
+                              <div className="font-bold text-xl font-sans text-base-content">Kapan Finance</div>
                               <div className="text-xs text-base-content/60">Lending Made Easy</div>
                             </div>
                           </div>
@@ -284,7 +284,7 @@ export const Header = () => {
                   </div>
                 </div>
                 <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                  <div className="font-bold text-lg text-primary dark:text-accent">Kapan Finance</div>
+                  <div className="font-bold text-lg font-sans text-base-content">Kapan Finance</div>
                   <div className="text-[10px] text-base-content/60 -mt-1">Lending Made Easy</div>
                 </div>
               </div>
