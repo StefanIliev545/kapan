@@ -1,7 +1,7 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -11,7 +11,8 @@ interface RepayModalProps {
 }
 
 export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "evm");
+  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
+  const debtBalance = 100; // mocked
   const { execute } = useLendingAction("evm", "Repay", token.address, protocolName, decimals);
   return (
     <TokenActionModal
@@ -23,11 +24,11 @@ export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protoc
       apyLabel="Borrow APY"
       apy={token.currentRate}
       metricLabel="Total debt"
-      before={0}
-      after={0}
-      balance={balance}
+      before={debtBalance}
+      after={debtBalance}
+      balance={walletBalance}
+      percentBase={debtBalance}
       onConfirm={execute}
     />
   );
 };
-

@@ -23,6 +23,7 @@ export interface TokenActionModalProps {
   before: number;
   after: number;
   balance: number;
+  percentBase?: number;
   gasCostUsd?: number;
   hf?: number;
   newHf?: number;
@@ -30,11 +31,10 @@ export interface TokenActionModalProps {
   newUtilization?: number;
   ltv?: number;
   newLtv?: number;
-  onConfirm?: (amount: string) => void;
+  onConfirm?: (amount: string) => Promise<unknown> | void;
 }
 
-const format = (num: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
+const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
 const HealthFactor = ({ value }: { value: number }) => {
   const percent = Math.min(100, (value / 3) * 100);
@@ -70,11 +70,17 @@ const TokenPill = ({ value, icon, name }: { value: number; icon: string; name: s
   </div>
 );
 
-const PercentInput: FC<{ balance: number; price?: number; onChange: (v: string) => void }> = ({ balance, price = 0, onChange }) => {
+const PercentInput: FC<{ balance: number; price?: number; onChange: (v: string) => void; max?: number }> = ({
+  balance,
+  price = 0,
+  onChange,
+  max,
+}) => {
   const [amount, setAmount] = useState("");
   const [active, setActive] = useState<number | null>(null);
   const setPercent = (p: number) => {
-    const val = ((balance * p) / 100).toString();
+    const base = max ?? balance;
+    const val = ((base * p) / 100).toString();
     setAmount(val);
     setActive(p);
     onChange(val);
@@ -149,6 +155,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   before,
   after,
   balance,
+  percentBase,
   gasCostUsd = 0,
   hf = 1.9,
   newHf = 2.1,
@@ -159,6 +166,28 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   onConfirm,
 }) => {
   const [amount, setAmount] = useState("");
+  const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
+
+  const handleClose = () => {
+    setAmount("");
+    setTxState("idle");
+    onClose();
+  };
+
+  const handleConfirm = async () => {
+    if (txState === "success") {
+      handleClose();
+      return;
+    }
+    try {
+      setTxState("pending");
+      await onConfirm?.(amount);
+      setTxState("success");
+    } catch (e) {
+      console.error(e);
+      setTxState("idle");
+    }
+  };
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -185,7 +214,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             <div className="badge badge-outline text-xs w-max">
               {apyLabel} {apy}%
             </div>
-            <PercentInput balance={balance} price={token.usdPrice} onChange={setAmount} />
+            <PercentInput balance={balance} price={token.usdPrice} onChange={setAmount} max={percentBase} />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
               <HealthFactor value={newHf} />
               <Utilization value={newUtilization} />
@@ -197,13 +226,19 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             </div>
             <div className="modal-action pt-2">
               <button
-                className="btn btn-primary w-full flex justify-between"
-                onClick={() => {
-                  onConfirm?.(amount);
-                  onClose();
-                }}
+                className={`btn w-full flex justify-between ${txState === "success" ? "btn-success" : "btn-primary"}`}
+                onClick={handleConfirm}
+                disabled={txState === "pending"}
               >
-                <span>{action}</span>
+                <span>
+                  {txState === "pending" ? (
+                    <span className="loading loading-spinner"></span>
+                  ) : txState === "success" ? (
+                    "Close"
+                  ) : (
+                    action
+                  )}
+                </span>
                 <span className="flex items-center gap-1 text-xs">
                   <FaGasPump /> ${gasCostUsd.toFixed(2)}
                 </span>
@@ -212,10 +247,9 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
           </div>
         </div>
       </div>
-      <form method="dialog" className="modal-backdrop" onClick={onClose}>
+      <form method="dialog" className="modal-backdrop" onClick={handleClose}>
         <button>close</button>
       </form>
     </dialog>
   );
 };
-
