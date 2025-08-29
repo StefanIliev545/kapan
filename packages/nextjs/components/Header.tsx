@@ -18,6 +18,7 @@ import {
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { SwitchTheme } from "~~/components/SwitchTheme";
+import { ThemeSettings } from "~~/components/ThemeSettings";
 
 type HeaderMenuLink = {
   label: string;
@@ -360,6 +361,7 @@ export const Header = () => {
               </div>
               {/* Removed Stark faucet and FaucetButton from desktop header */}
             </motion.div>
+            <ThemeSettings />
           </div>
         </div>
       </div>
