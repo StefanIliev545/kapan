@@ -1,0 +1,21 @@
+name: Cairo CI
+
+on:
+  pull_request:
+    paths:
+      - '**/*.cairo'
+      - '**/Scarb.toml'
+      - '**/Scarb.lock'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Scarb build and Snforge tests
+        uses: devcontainers/ci@v0.3
+        with:
+          runCmd: |
+            cd packages/snfoundry/contracts
+            scarb build
+            snforge test
