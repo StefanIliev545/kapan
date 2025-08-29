@@ -3,15 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
-const themes = [
-  "light",
-  "dark",
-  "emerald",
-  "synthwave",
-  "retro",
-  "forest",
-  "valentine",
-];
+const themes = ["light", "synthwave", "emerald", "dark", "retro", "forest", "valentine"];
 
 export const SwitchTheme = ({ className }: { className?: string }) => {
   const { setTheme, theme } = useTheme();

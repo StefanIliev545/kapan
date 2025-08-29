@@ -1,10 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
-    "./utils/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./app/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}", "./utils/**/*.{js,ts,jsx,tsx}"],
   plugins: [require("daisyui")],
   darkTheme: "dark",
   darkMode: ["selector", "[data-theme='dark']"],
@@ -35,9 +31,9 @@ module.exports = {
           ".link:hover": { opacity: "0.8" },
         },
       },
-      // Refreshed dark theme with softer contrasts and vibrant accents
+      // Custom synthwave theme derived from the refreshed dark palette
       {
-        dark: {
+        synthwave: {
           // Muted indigo backdrop tones
           "base-100": "#1E1E2E", // main background
           "base-200": "#2A2A3C", // slightly lighter for surfaces
@@ -77,7 +73,7 @@ module.exports = {
       },
       // Additional DaisyUI themes for more choices
       "emerald",
-      "synthwave",
+      "dark",
       "retro",
       "forest",
       "valentine",
@@ -95,16 +91,16 @@ module.exports = {
     },
     extend: {
       boxShadow: { center: "0 0 12px -2px rgb(0 0 0 / 0.05)" },
-      animation: { 
+      animation: {
         "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "gradient-x": "gradient-x 8s ease infinite"
+        "gradient-x": "gradient-x 8s ease infinite",
       },
       keyframes: {
         "gradient-x": {
           "0%, 100%": { "background-position": "left center" },
-          "50%": { "background-position": "right center" }
-        }
-      }
+          "50%": { "background-position": "right center" },
+        },
+      },
     },
   },
 };
