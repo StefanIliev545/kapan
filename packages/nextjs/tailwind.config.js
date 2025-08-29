@@ -1,10 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
-    "./utils/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./app/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}", "./utils/**/*.{js,ts,jsx,tsx}"],
   plugins: [require("daisyui")],
   darkTheme: "dark",
   darkMode: ["selector", "[data-theme='dark']"],
@@ -35,36 +31,36 @@ module.exports = {
           ".link:hover": { opacity: "0.8" },
         },
       },
-      // Updated dark theme
+      // Custom synthwave theme derived from the refreshed dark palette
       {
-        dark: {
-          // A near‑black base for a striking backdrop:
-          "base-100": "#0D0D0D", // main background
-          "base-200": "#171717", // slightly lighter for surfaces
-          "base-300": "#1F1F1F", // even lighter accents
-          "base-content": "#F9FBFF", // light text for contrast
+        synthwave: {
+          // Muted indigo backdrop tones
+          "base-100": "#1E1E2E", // main background
+          "base-200": "#2A2A3C", // slightly lighter for surfaces
+          "base-300": "#3A3A4F", // even lighter accents
+          "base-content": "#E6E6EF", // light text for contrast
 
-          // Primary areas use a deep charcoal:
-          primary: "#1C1C1C",
-          "primary-content": "#F9FBFF",
+          // Cool blue primary elements
+          primary: "#7AA2F7",
+          "primary-content": "#1E1E2E",
 
-          // Secondary elements get a warm, dark bronze tone to break up the monotony:
-          secondary: "#2E2B2F",
-          "secondary-content": "#F9FBFF",
+          // Subtle purple secondary highlights
+          secondary: "#AD8EE6",
+          "secondary-content": "#1E1E2E",
 
-          // A bold gold accent for that crypto luxury vibe:
-          accent: "#F9A826",
-          "accent-content": "#1F1F1F",
+          // Pastel pink accents for focus
+          accent: "#F4B8E4",
+          "accent-content": "#1E1E2E",
 
-          // Neutral elements match the primary for consistency:
-          neutral: "#1C1C1C",
-          "neutral-content": "#F9FBFF",
+          // Slate neutrals for borders and UI chrome
+          neutral: "#414558",
+          "neutral-content": "#E6E6EF",
 
-          // Retain some dynamic colors:
-          info: "#0FF0FC",
-          success: "#3B82F6",
-          warning: "#FFCF72",
-          error: "#F97316",
+          // Supporting status colors
+          info: "#89DDFF",
+          success: "#A6E3A1",
+          warning: "#F9E2AF",
+          error: "#F28FAD",
 
           "--rounded-btn": "0.375rem",
           ".tooltip": {
@@ -75,6 +71,12 @@ module.exports = {
           ".link:hover": { opacity: "0.8" },
         },
       },
+      // Additional DaisyUI themes for more choices
+      "emerald",
+      "dark",
+      "retro",
+      "forest",
+      "valentine",
     ],
   },
   theme: {
@@ -89,16 +91,16 @@ module.exports = {
     },
     extend: {
       boxShadow: { center: "0 0 12px -2px rgb(0 0 0 / 0.05)" },
-      animation: { 
+      animation: {
         "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "gradient-x": "gradient-x 8s ease infinite"
+        "gradient-x": "gradient-x 8s ease infinite",
       },
       keyframes: {
         "gradient-x": {
           "0%, 100%": { "background-position": "left center" },
-          "50%": { "background-position": "right center" }
-        }
-      }
+          "50%": { "background-position": "right center" },
+        },
+      },
     },
   },
 };

@@ -17,6 +17,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { SwitchTheme } from "~~/components/SwitchTheme";
+import { ThemeSettings } from "~~/components/ThemeSettings";
 
 type HeaderMenuLink = {
   label: string;
@@ -298,7 +300,7 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Right section - Alpha badge and buttons */}
+          {/* Right section - Alpha badge, buttons and theme controls */}
           <div className="flex items-center gap-4">
             {/* Alpha badge */}
             <div className="hidden sm:block">
@@ -358,6 +360,10 @@ export const Header = () => {
               </div>
               {/* Removed Stark faucet and FaucetButton from desktop header */}
             </motion.div>
+            <div className="flex items-center gap-2">
+              <SwitchTheme />
+              <ThemeSettings />
+            </div>
           </div>
         </div>
       </div>
