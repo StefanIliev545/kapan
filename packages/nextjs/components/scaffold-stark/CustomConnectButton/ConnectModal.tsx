@@ -1,20 +1,11 @@
 import { useConnect } from "@starknet-react/core";
 import { type StarknetkitConnector, useStarknetkitConnectModal } from "starknetkit";
-import { useLocalStorage } from "usehooks-ts";
 
 const ConnectModal = () => {
   const { connect, connectors } = useConnect();
   const { starknetkitConnectModal } = useStarknetkitConnectModal({
     connectors: connectors as StarknetkitConnector[],
   });
-
-  const [_, setLastConnector] = useLocalStorage<{ id: string; ix?: number }>(
-    "lastUsedConnector",
-    { id: "" },
-    {
-      initializeWithValue: false,
-    },
-  );
 
   async function connectWallet() {
     const { connector } = await starknetkitConnectModal();
@@ -23,7 +14,11 @@ const ConnectModal = () => {
     }
 
     await connect({ connector });
-    setLastConnector({ id: connector.id });
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: connector.id }));
+      }
+    } catch {}
   }
 
   return (

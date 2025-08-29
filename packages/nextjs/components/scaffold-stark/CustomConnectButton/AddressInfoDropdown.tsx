@@ -7,7 +7,6 @@ import { useConnect, useDisconnect, useNetwork } from "@starknet-react/core";
 import { useTheme } from "next-themes";
 import CopyToClipboard from "react-copy-to-clipboard";
 import { createPortal } from "react-dom";
-import { useLocalStorage } from "usehooks-ts";
 import {
   ArrowLeftEndOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
@@ -61,18 +60,14 @@ export const AddressInfoDropdown = ({
     if (connector && connector instanceof BurnerConnector) {
       connector.burnerAccount = burnerAccounts[ix];
       connect({ connector });
-      setLastConnector({ id: connector.id, ix });
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: connector.id, ix }));
+        }
+      } catch {}
       setShowBurnerAccounts(false);
     }
   }
-
-  const [_, setLastConnector] = useLocalStorage<{ id: string; ix?: number }>(
-    "lastUsedConnector",
-    { id: "" },
-    {
-      initializeWithValue: false,
-    },
-  );
 
   return (
     <>
@@ -87,7 +82,7 @@ export const AddressInfoDropdown = ({
           <span className="text-sm font-medium truncate min-w-0">
             {isENS(displayName) ? displayName : profile?.name || address?.slice(0, 6) + "..." + address?.slice(-4)}
           </span>
-          <ChevronDownIcon className="h-4 w-4 text-base-content/70 flex-shrink-0" />
+          <ChevronDownIcon className="h-4 w-4 text-base-content/70" />
         </summary>
         <ul
           tabIndex={0}
@@ -97,14 +92,11 @@ export const AddressInfoDropdown = ({
           <li className={selectingNetwork ? "hidden" : ""}>
             {addressCopied ? (
               <div className="btn-sm !rounded-xl flex gap-3 py-3">
-                <CheckCircleIcon
-                  className="text-xl font-normal h-6 w-4 cursor-pointer ml-2 sm:ml-0"
-                  aria-hidden="true"
-                />
+                <CheckCircleIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
                 <span className=" whitespace-nowrap">Copy address</span>
               </div>
             ) : (
-              //@ts-ignore
+              // @ts-ignore
               <CopyToClipboard
                 text={address}
                 onCopy={() => {
@@ -115,10 +107,7 @@ export const AddressInfoDropdown = ({
                 }}
               >
                 <div className="btn-sm !rounded-xl flex gap-3 py-3">
-                  <DocumentDuplicateIcon
-                    className="text-xl font-normal h-6 w-4 cursor-pointer ml-2 sm:ml-0"
-                    aria-hidden="true"
-                  />
+                  <DocumentDuplicateIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
                   <span className=" whitespace-nowrap">Copy address</span>
                 </div>
               </CopyToClipboard>
@@ -134,12 +123,7 @@ export const AddressInfoDropdown = ({
             <li className={selectingNetwork ? "hidden" : ""}>
               <button className="menu-item btn-sm !rounded-xl flex gap-3 py-3" type="button">
                 <ArrowTopRightOnSquareIcon className="h-6 w-4 ml-2 sm:ml-0" />
-                <a
-                  target="_blank"
-                  href={blockExplorerAddressLink}
-                  rel="noopener noreferrer"
-                  className="whitespace-nowrap"
-                >
+                <a target="_blank" href={blockExplorerAddressLink} rel="noopener noreferrer" className="whitespace-nowrap">
                   View on Block Explorer
                 </a>
               </button>
@@ -171,15 +155,9 @@ export const AddressInfoDropdown = ({
                         <div className="flex justify-center items-center w-11/12">
                           <h2 className="text-lg text-center text-neutral m-0">Choose Account</h2>
                         </div>
-                        <button
-                          className="w-8 h-8 place-content-end rounded-full justify-center items-center flex"
-                          onClick={() => setShowBurnerAccounts(false)}
-                        >
+                        <button className="w-8 h-8 place-content-end rounded-full justify-center items-center flex" onClick={() => setShowBurnerAccounts(false)}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                            <path
-                              fill="currentColor"
-                              d="m6.4 18.308l-.708-.708l5.6-5.6l-5.6-5.6l.708-.708l5.6 5.6l5.6-5.6l.708.708l-5.6 5.6l5.6 5.6l-.708.708l-5.6-5.6z"
-                            />
+                            <path fill="currentColor" d="m6.4 18.308l-.708-.708l5.6-5.6l-5.6-5.6l.708-.708l5.6 5.6l5.6-5.6l.708.708l-5.6 5.6l5.6 5.6l-.708.708l-5.6-5.6z" />
                           </svg>
                         </button>
                       </div>
@@ -189,9 +167,7 @@ export const AddressInfoDropdown = ({
                             // eslint-disable-next-line react/jsx-key
                             <div key={burnerAcc.publicKey} className="w-full flex flex-col">
                               <button
-                                className={`${
-                                  isDarkMode ? "hover:bg-[#385183] border-[#385183]" : "hover:bg-gradient-light "
-                                } border rounded-md text-neutral py-[8px] pl-[10px] pr-16 flex items-center gap-4`}
+                                className={`${isDarkMode ? "hover:bg-[#385183] border-[#385183]" : "hover:bg-gradient-light "} border rounded-md text-neutral py-[8px] pl-[10px] pr-16 flex items-center gap-4`}
                                 onClick={e => handleConnectBurner(e, ix)}
                               >
                                 <BlockieAvatar address={burnerAcc.accountAddress} size={35}></BlockieAvatar>
@@ -225,11 +201,7 @@ export const AddressInfoDropdown = ({
             </li>
           ) : null} */}
           <li className={selectingNetwork ? "hidden" : ""}>
-            <button
-              className="menu-item text-secondary-content btn-sm !rounded-xl flex gap-3 py-3"
-              type="button"
-              onClick={() => disconnect()}
-            >
+            <button className="menu-item text-secondary-content btn-sm !rounded-xl flex gap-3 py-3" type="button" onClick={() => disconnect()}>
               <ArrowLeftEndOnRectangleIcon className="h-6 w-4 ml-2 sm:ml-0" /> <span>Disconnect</span>
             </button>
           </li>
