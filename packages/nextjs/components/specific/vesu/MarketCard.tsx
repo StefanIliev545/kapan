@@ -50,6 +50,7 @@ export const MarketCard: FC<MarketCardProps> = ({
             borrowRate={borrowRate}
             address={address}
             networkType={networkType}
+            protocol="vesu"
             labels="between"
           />
           <div>

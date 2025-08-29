@@ -50,6 +50,7 @@ export const MarketRow: FC<MarketRowProps> = ({
                 borrowRate={borrowRate}
                 address={address}
                 networkType={networkType}
+                protocol="vesu"
                 labels="center"
               />
             </div>
@@ -82,6 +83,7 @@ export const MarketRow: FC<MarketRowProps> = ({
             address={address}
             networkType={networkType}
             className="mb-3"
+            protocol="vesu"
             labels="center"
           />
           <div className="flex flex-wrap gap-3">
@@ -116,6 +118,7 @@ export const MarketRow: FC<MarketRowProps> = ({
             address={address}
             networkType={networkType}
             className="mb-3"
+            protocol="vesu"
             labels="center"
           />
           <div className="grid grid-cols-2 gap-2">

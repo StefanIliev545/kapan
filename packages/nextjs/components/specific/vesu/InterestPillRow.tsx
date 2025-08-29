@@ -4,16 +4,21 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatRate } from "~~/utils/protocols";
 
-export const RatePill: FC<{ current: string; optimal: string; color: string; logo: string; alt: string }> = ({
-  current,
-  optimal,
-  color,
-  logo,
-  alt,
-}) => (
+export const RatePill: FC<{
+  current: string;
+  optimal: string;
+  color: string;
+  logo: string;
+  alt: string;
+  sameProtocol?: boolean;
+}> = ({ current, optimal, color, logo, alt, sameProtocol = false }) => (
   <div className="flex rounded-full overflow-hidden shadow text-sm text-white">
     <span className={`px-3 py-1 ${color}`}>{current}</span>
-    <span className="px-3 py-1 flex items-center gap-1 bg-gradient-to-r from-fuchsia-500 to-purple-600 animate-pulse">
+    <span
+      className={`px-3 py-1 flex items-center gap-1 ${
+        sameProtocol ? color : "bg-gradient-to-r from-fuchsia-500 to-purple-600 animate-pulse"
+      }`}
+    >
       {optimal}
       <Image src={logo} alt={alt} width={16} height={16} className="rounded-md" />
     </span>
@@ -25,9 +30,18 @@ export const InterestPillRow: FC<{
   borrowRate: string;
   address: string;
   networkType: "evm" | "starknet";
+  protocol: string;
   className?: string;
   labels?: "between" | "center";
-}> = ({ supplyRate, borrowRate, address, networkType, className = "", labels = "between" }) => {
+}> = ({
+  supplyRate,
+  borrowRate,
+  address,
+  networkType,
+  protocol,
+  className = "",
+  labels = "between",
+}) => {
   const { data: optimalSupplyRateData } = useNetworkAwareReadContract({
     contractName: "OptimalInterestRateFinder",
     functionName: "findOptimalSupplyRate",
@@ -58,7 +72,7 @@ export const InterestPillRow: FC<{
     }
     optimalSupplyProtocol = proto;
     const divisor = networkType === "starknet" ? 1e16 : 1e8;
-    optimalSupplyRate = rate / divisor;
+    optimalSupplyRate = rate / divisor / 100;
   }
 
   let optimalBorrowProtocol = "";
@@ -75,11 +89,14 @@ export const InterestPillRow: FC<{
     }
     optimalBorrowProtocol = proto;
     const divisor = networkType === "starknet" ? 1e16 : 1e8;
-    optimalBorrowRate = rate / divisor;
+    optimalBorrowRate = rate / divisor / 100;
   }
 
   const supplyOptimalDisplay = formatRate(optimalSupplyRate);
   const borrowOptimalDisplay = formatRate(optimalBorrowRate);
+
+  const sameSupplyProtocol = optimalSupplyProtocol.toLowerCase() === protocol.toLowerCase();
+  const sameBorrowProtocol = optimalBorrowProtocol.toLowerCase() === protocol.toLowerCase();
 
   if (labels === "center") {
     return (
@@ -92,6 +109,7 @@ export const InterestPillRow: FC<{
             color="bg-lime-500"
             logo={tokenNameToLogo(optimalSupplyProtocol)}
             alt={optimalSupplyProtocol}
+            sameProtocol={sameSupplyProtocol}
           />
         </div>
         <div className="flex flex-col items-center space-y-1 flex-1">
@@ -102,6 +120,7 @@ export const InterestPillRow: FC<{
             color="bg-orange-500"
             logo={tokenNameToLogo(optimalBorrowProtocol)}
             alt={optimalBorrowProtocol}
+            sameProtocol={sameBorrowProtocol}
           />
         </div>
       </div>
@@ -121,6 +140,7 @@ export const InterestPillRow: FC<{
           color="bg-lime-500"
           logo={tokenNameToLogo(optimalSupplyProtocol)}
           alt={optimalSupplyProtocol}
+          sameProtocol={sameSupplyProtocol}
         />
         <RatePill
           current={borrowRate}
@@ -128,6 +148,7 @@ export const InterestPillRow: FC<{
           color="bg-orange-500"
           logo={tokenNameToLogo(optimalBorrowProtocol)}
           alt={optimalBorrowProtocol}
+          sameProtocol={sameBorrowProtocol}
         />
       </div>
     </div>
