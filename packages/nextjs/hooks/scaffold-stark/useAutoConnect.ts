@@ -1,5 +1,5 @@
 import { useReadLocalStorage } from "usehooks-ts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
@@ -34,30 +34,36 @@ export const useAutoConnect = (): void => {
     LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
   );
 
-  const { connect, connectors } = useConnect();
+  const { connectors } = useConnect();
+  const attemptedRef = useRef(false);
 
   useEffect(() => {
-    if (scaffoldConfig.walletAutoConnect) {
-      const currentTime = Date.now();
-      const ttlExpired =
-        currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
-      if (!ttlExpired) {
-        const connectorId = typeof savedConnector === 'string' ? savedConnector : savedConnector?.id;
-        const connector = connectors.find(
-          (conn) => conn.id === connectorId,
-        );
+    if (attemptedRef.current) return;
+    if (!scaffoldConfig.walletAutoConnect) return;
 
-        if (connector) {
-          (async () => {
-            try {
-              await (connector as any).connect?.({ showModal: false });
-            } catch {
-              // Fallback to standard connect which may show the wallet UI
-              await connect({ connector });
-            }
-          })();
-        }
-      }
+    const currentTime = Date.now();
+    const ttlExpired =
+      currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
+    if (ttlExpired) {
+      attemptedRef.current = true;
+      return;
     }
-  }, [connect, connectors, lastConnectionTime, savedConnector]);
+
+    const connectorId =
+      typeof savedConnector === "string" ? savedConnector : savedConnector?.id;
+    const connector = connectors.find(conn => conn.id === connectorId);
+
+    if (connector) {
+      attemptedRef.current = true;
+      (async () => {
+        try {
+          if (await connector.available?.()) {
+            await (connector as any).connect?.({ showModal: false });
+          }
+        } catch (err) {
+          console.debug("silent auto-connect failed", err);
+        }
+      })();
+    }
+  }, [connectors, lastConnectionTime, savedConnector]);
 };
