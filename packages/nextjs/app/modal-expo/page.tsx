@@ -15,7 +15,11 @@ const mock = {
   newHf: 2.1,
   utilization: 65,
   totalDebt: 400,
-  newTotalDebt: 450,
+  debtAfterBorrow: 450,
+  debtAfterRepay: 350,
+  totalSupply: 1000,
+  supplyAfterDeposit: 1050,
+  supplyAfterWithdraw: 950,
   gasCostUsd: 1.23,
 };
 
@@ -93,14 +97,22 @@ const LoanToValue = ({ value }: { value: number }) => (
   </div>
 );
 
-const DebtPill = ({ value }: { value: number }) => (
+const TokenPill = ({ value }: { value: number }) => (
   <div className="badge badge-outline gap-1">
     <Image src={mock.token.icon} alt={mock.token.name} width={12} height={12} />
     {format(value)}
   </div>
 );
 
-const LeftMetrics = ({ className = "" }: { className?: string }) => (
+const LeftMetrics = ({
+  metricLabel,
+  metricValue,
+  className = "",
+}: {
+  metricLabel: string;
+  metricValue: number;
+  className?: string;
+}) => (
   <div className={`w-full md:w-56 p-6 space-y-3 text-sm ${className}`}>
     <div className="font-semibold mb-2">Before</div>
     <div className="space-y-2 text-xs">
@@ -108,8 +120,8 @@ const LeftMetrics = ({ className = "" }: { className?: string }) => (
       <Utilization value={mock.utilization} />
       <LoanToValue value={mock.ltv} />
       <div className="flex items-center gap-2">
-        <span>Debt</span>
-        <DebtPill value={mock.totalDebt} />
+        <span>{metricLabel}</span>
+        <TokenPill value={metricValue} />
       </div>
     </div>
   </div>
@@ -119,9 +131,19 @@ type Operation = {
   action: string;
   apyLabel: string;
   apy: number;
+  metricLabel: string;
+  before: number;
+  after: number;
 };
 
-const OperationModal = ({ action, apyLabel, apy }: Operation) => {
+const OperationModal = ({
+  action,
+  apyLabel,
+  apy,
+  metricLabel,
+  before,
+  after,
+}: Operation) => {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -137,7 +159,11 @@ const OperationModal = ({ action, apyLabel, apy }: Operation) => {
       <dialog className={`modal ${open ? "modal-open" : ""}`}>
         <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
           <div className="flex flex-col md:flex-row">
-            <LeftMetrics className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300 space-y-4" />
+            <LeftMetrics
+              metricLabel={metricLabel}
+              metricValue={before}
+              className="bg-base-200 border-b md:border-b-0 md:border-r border-base-300 space-y-4"
+            />
             <div className="flex-1 p-6 space-y-4">
               <div className="flex items-center gap-2">
                 <Image src={mock.token.icon} alt={mock.token.name} width={32} height={32} />
@@ -154,8 +180,8 @@ const OperationModal = ({ action, apyLabel, apy }: Operation) => {
                 <Utilization value={mock.utilization} />
                 <LoanToValue value={mock.ltv - 10} />
                 <div className="flex items-center gap-2">
-                  <span>Total debt</span>
-                  <DebtPill value={mock.newTotalDebt} />
+                  <span>{metricLabel}</span>
+                  <TokenPill value={after} />
                 </div>
               </div>
               <div className="modal-action pt-2">
@@ -179,10 +205,38 @@ const OperationModal = ({ action, apyLabel, apy }: Operation) => {
 
 const ModalExpoPage = () => {
   const variants = [
-    { action: "Borrow", apyLabel: "Borrow APY", apy: mock.borrowApy },
-    { action: "Deposit", apyLabel: "Supply APY", apy: mock.supplyApy },
-    { action: "Withdraw", apyLabel: "Supply APY", apy: mock.supplyApy },
-    { action: "Repay", apyLabel: "Borrow APY", apy: mock.borrowApy },
+    {
+      action: "Borrow",
+      apyLabel: "Borrow APY",
+      apy: mock.borrowApy,
+      metricLabel: "Total debt",
+      before: mock.totalDebt,
+      after: mock.debtAfterBorrow,
+    },
+    {
+      action: "Deposit",
+      apyLabel: "Supply APY",
+      apy: mock.supplyApy,
+      metricLabel: "Total supplied",
+      before: mock.totalSupply,
+      after: mock.supplyAfterDeposit,
+    },
+    {
+      action: "Withdraw",
+      apyLabel: "Supply APY",
+      apy: mock.supplyApy,
+      metricLabel: "Total supplied",
+      before: mock.totalSupply,
+      after: mock.supplyAfterWithdraw,
+    },
+    {
+      action: "Repay",
+      apyLabel: "Borrow APY",
+      apy: mock.borrowApy,
+      metricLabel: "Total debt",
+      before: mock.totalDebt,
+      after: mock.debtAfterRepay,
+    },
   ];
   return (
     <div className="p-8 space-y-6">
