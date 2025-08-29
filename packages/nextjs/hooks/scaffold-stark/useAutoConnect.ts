@@ -1,6 +1,6 @@
 import { useReadLocalStorage } from "usehooks-ts";
 import { useEffect, useState } from "react";
-import { useConnect } from "@starknet-react/core";
+import { useAccount, useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 import { BurnerConnector, burnerAccounts } from "@scaffold-stark/stark-burner";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
@@ -8,6 +8,16 @@ import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
 /**
  * Automatically connect to a wallet/connector based on config and prior wallet
  */
+let hasTriedAutoConnect = false;
+
+/**
+ * Reset helper for tests to allow re-running auto-connect logic.
+ * @internal
+ */
+export const __resetAutoConnect = () => {
+  hasTriedAutoConnect = false;
+};
+
 export const useAutoConnect = (): void => {
   /**
    * The `useReadLocalStorage` hook from `usehooks-ts` attempts `JSON.parse` on the stored
@@ -36,22 +46,30 @@ export const useAutoConnect = (): void => {
   );
 
   const { connect, connectors } = useConnect();
+  const { status } = useAccount();
 
   useEffect(() => {
+    if (hasTriedAutoConnect || status !== "disconnected") return;
+
+    hasTriedAutoConnect = true;
+
     if (scaffoldConfig.walletAutoConnect) {
       const currentTime = Date.now();
       const ttlExpired =
         currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
       if (!ttlExpired) {
-        const connectorId = typeof savedConnector === 'string' ? savedConnector : savedConnector?.id;
+        const connectorId =
+          typeof savedConnector === "string"
+            ? savedConnector
+            : savedConnector?.id;
         const connector = connectors.find(
-          (conn) => conn.id === connectorId,
+          conn => conn.id === connectorId,
         );
 
         if (connector) {
           if (
             connector.id === "burner-wallet" &&
-            typeof savedConnector === 'object' &&
+            typeof savedConnector === "object" &&
             savedConnector?.ix !== undefined &&
             connector instanceof BurnerConnector
           ) {
@@ -61,5 +79,5 @@ export const useAutoConnect = (): void => {
         }
       }
     }
-  }, [connect, connectors, lastConnectionTime, savedConnector]);
+  }, [connect, connectors, lastConnectionTime, savedConnector, status]);
 };
