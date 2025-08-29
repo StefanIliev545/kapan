@@ -96,9 +96,9 @@ const useNostraData = (): MarketData[] => {
 
   return useMemo(() => {
     if (!assetInfos || !interestRates) return [];
-    const infos = assetInfos as any[];
-    const rates = interestRates as any[];
-    const priceArr = (prices as bigint[]) || [];
+    const infos = Array.from(assetInfos as unknown as any[]);
+    const rates = Array.from(interestRates as unknown as any[]);
+    const priceArr = Array.from((prices as bigint[]) || []);
     return infos.map((info, idx) => {
       const address = `0x${info[0].toString(16).padStart(64, "0")}`;
       const symbol = feltToString(info[1]);
