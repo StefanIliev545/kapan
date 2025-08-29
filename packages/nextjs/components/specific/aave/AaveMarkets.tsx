@@ -27,13 +27,14 @@ export const AaveMarkets: FC = () => {
       const supplyAPY = convertRateToAPY(token.supplyRate);
       const borrowAPY = convertRateToAPY(token.borrowRate);
       const price = Number(formatUnits(token.price, 8));
+      const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
       return {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
         supplyRate: `${supplyAPY.toFixed(2)}%`,
         borrowRate: `${borrowAPY.toFixed(2)}%`,
         price: price.toFixed(2),
-        utilization: "0",
+        utilization: utilization.toFixed(2),
         address: token.token,
         networkType: "evm",
         protocol: "aave",

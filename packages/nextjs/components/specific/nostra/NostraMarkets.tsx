@@ -2,7 +2,7 @@ import { FC, useMemo } from "react";
 import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { feltToString } from "~~/utils/protocols";
+import { feltToString, formatPrice } from "~~/utils/protocols";
 
 export const NostraMarkets: FC = () => {
   const { data: assetInfos } = useNetworkAwareReadContract({
@@ -44,14 +44,15 @@ export const NostraMarkets: FC = () => {
       const rate = rates[idx];
       const supplyAPY = Number(rate.lending_rate) / 1e16;
       const borrowAPR = Number(rate.borrowing_rate) / 1e16;
-      const tokenPrice = priceArr[idx] ? Number(priceArr[idx] / 10n ** 10n) : 0;
+      const utilization = borrowAPR > 0 ? (supplyAPY / borrowAPR) * 100 : 0;
+      const price = priceArr[idx] ? formatPrice(priceArr[idx]) : "0.00";
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
         supplyRate: `${supplyAPY.toFixed(2)}%`,
         borrowRate: `${borrowAPR.toFixed(2)}%`,
-        price: tokenPrice.toFixed(2),
-        utilization: "0",
+        price,
+        utilization: utilization.toFixed(2),
         address,
         networkType: "starknet",
         protocol: "nostra",

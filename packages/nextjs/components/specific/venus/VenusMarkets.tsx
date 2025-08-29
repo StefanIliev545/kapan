@@ -49,13 +49,14 @@ export const VenusMarkets: FC = () => {
         const supplyAPY = convertRateToAPY(supplyRates[i]);
         const borrowAPY = convertRateToAPY(borrowRates[i]);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
+        const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
         return {
           icon: logo,
           name: displayName,
           supplyRate: `${supplyAPY.toFixed(2)}%`,
           borrowRate: `${borrowAPY.toFixed(2)}%`,
           price: price.toFixed(2),
-          utilization: "0",
+          utilization: utilization.toFixed(2),
           address: token,
           networkType: "evm",
           protocol: "venus",
