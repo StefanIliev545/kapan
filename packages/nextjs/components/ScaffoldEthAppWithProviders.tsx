@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import {
   Connector,
-  ConnectorData,
   StarknetConfig,
   argent,
   braavos,
@@ -67,7 +66,9 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
 
   // Debug wrapper to trace connector method calls and suppress duplicate connects
   const connectedMap = useRef<Record<string, boolean>>({});
-  const connectedDataMap = useRef<Record<string, ConnectorData | undefined>>({});
+  const connectedDataMap = useRef<
+    Record<string, Awaited<ReturnType<Connector["connect"]>> | undefined>
+  >({});
   const wrapConnector = (connector: Connector): Connector => {
     const originalConnect = connector.connect.bind(connector);
     const originalAvailable = connector.available.bind(connector);
