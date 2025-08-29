@@ -70,10 +70,6 @@ const App: NextPage = () => {
     <div className="container mx-auto px-5">
       {/* Custom Call to Action with additional section */}
       <CallToAction sections={customSections} />
-
-      {/* Alpha Version Disclaimer */}
-      <AlphaWarning />
-
       {/* Network Filter */}
       <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 

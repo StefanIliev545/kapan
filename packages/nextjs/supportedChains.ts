@@ -23,7 +23,12 @@ const mainnetFork = {
       http: [`${rpcUrlDevnet}/rpc`],
     },
   },
-} as snchains.Chain;
+  paymasterRpcUrls: {
+    avnu: {
+      http: [rpcUrlDevnet],
+    },
+  },
+} as const satisfies snchains.Chain;
 
 const devnet = {
   ...snchains.devnet,
