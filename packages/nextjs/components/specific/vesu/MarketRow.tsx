@@ -1,9 +1,7 @@
 import { FC, useState } from "react";
 import Image from "next/image";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { feltToString } from "~~/utils/protocols";
+import { InterestPillRow } from "./InterestPillRow";
 
 type MarketRowProps = {
   icon: string;
@@ -16,85 +14,28 @@ type MarketRowProps = {
   networkType: "evm" | "starknet";
 };
 
-export const MarketRow: FC<MarketRowProps> = ({ 
-  icon, 
-  name, 
-  supplyRate, 
-  borrowRate, 
-  price, 
+export const MarketRow: FC<MarketRowProps> = ({
+  icon,
+  name,
+  supplyRate,
+  borrowRate,
+  price,
   utilization,
   address,
-  networkType
+  networkType,
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-
-  // Fetch optimal rates from the OptimalInterestRateFinder contract
-  const { data: optimalSupplyRateData } = useNetworkAwareReadContract({
-    contractName: "OptimalInterestRateFinder",
-    functionName: "findOptimalSupplyRate",
-    args: [address],
-    networkType,
-    refetchInterval: 10000,
-  });
-
-  const { data: optimalBorrowRateData } = useNetworkAwareReadContract({
-    contractName: "OptimalInterestRateFinder",
-    functionName: "findOptimalBorrowRate",
-    args: [address],
-    networkType,
-    refetchInterval: 10000,
-  });
-
-  let optimalSupplyProtocol = "";
-  let optimalSupplyRateDisplay = 0;
-  if (optimalSupplyRateData) {
-    let proto;
-    let rate;
-    if (networkType === "starknet") {
-      proto = feltToString(BigInt(optimalSupplyRateData?.[0]?.toString() || "0"));
-      rate = Number(optimalSupplyRateData?.[1]?.toString() || "0") / 1e8;
-    } else {
-      proto = optimalSupplyRateData?.[0]?.toString() || "";
-      rate = Number(optimalSupplyRateData?.[1]?.toString() || "0") / 1e8;
-    }
-    optimalSupplyProtocol = proto;
-    optimalSupplyRateDisplay = Number(rate) / 1e8;
-  }
-
-  let optimalBorrowProtocol = "";
-  let optimalBorrowRateDisplay = 0;
-  if (optimalBorrowRateData) {
-    let proto;
-    let rate;
-    if (networkType === "starknet") {
-      proto = feltToString(BigInt(optimalBorrowRateData?.[0]?.toString() || "0"));
-      rate = Number(optimalBorrowRateData?.[1]?.toString() || "0") / 1e8;
-    } else {
-      proto = optimalBorrowRateData?.[0]?.toString() || "";
-      rate = Number(optimalBorrowRateData?.[1]?.toString() || "0") / 1e8;
-    }
-    optimalBorrowProtocol = proto;
-    optimalBorrowRateDisplay = Number(rate) / 1e8;
-  }
-
-  const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
   return (
     <>
       <div className="p-4 hover:bg-base-200/50 rounded-lg transition-colors">
-        {/* Large screen view (lg+) - full flex row layout */}
+        {/* Large screen view */}
         <div className="hidden lg:flex items-center justify-between">
           <div className="flex items-center gap-3 w-1/5">
-            <Image
-              src={icon}
-              alt={name}
-              width={24}
-              height={24}
-              className="rounded-full"
-            />
+            <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
             <span className="font-medium">{name}</span>
           </div>
-          <div className="flex items-center justify-between w-4/5">
+          <div className="flex items-center flex-1">
             <div className="flex flex-col items-center w-1/5">
               <div className="text-sm text-base-content/70">Price</div>
               <div className="font-medium">${price}</div>
@@ -103,40 +44,18 @@ export const MarketRow: FC<MarketRowProps> = ({
               <div className="text-sm text-base-content/70">Utilization</div>
               <div className="font-medium">{utilization}%</div>
             </div>
-            <div className="flex flex-col items-center w-1/5">
-              <div className="text-sm text-base-content/70">Supply APY</div>
-              <div className="flex items-center gap-1">
-                <div className="font-medium text-success">{supplyRate}</div>
-                <div className="badge badge-sm flex items-center gap-1 px-2.5 py-2 bg-base-300/80 text-base-content">
-                  <span className="text-xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
-                  <Image
-                    src={getProtocolLogo(optimalSupplyProtocol)}
-                    alt={optimalSupplyProtocol}
-                    width={20}
-                    height={20}
-                    className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
-                  />
-                </div>
-              </div>
+            <div className="w-2/5">
+              <InterestPillRow
+                supplyRate={supplyRate}
+                borrowRate={borrowRate}
+                address={address}
+                networkType={networkType}
+                protocol="vesu"
+                labels="center"
+              />
             </div>
-            <div className="flex flex-col items-center w-1/5">
-              <div className="text-sm text-base-content/70">Borrow APR</div>
-              <div className="flex items-center gap-1">
-                <div className="font-medium text-error">{borrowRate}</div>
-                <div className="badge badge-sm flex items-center gap-1 px-2.5 py-2 bg-base-300/80 text-base-content">
-                  <span className="text-xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
-                  <Image
-                    src={getProtocolLogo(optimalBorrowProtocol)}
-                    alt={optimalBorrowProtocol}
-                    width={20}
-                    height={20}
-                    className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
-                  />
-                </div>
-              </div>
-            </div>
-            <button 
-              className="btn btn-sm btn-primary ml-4"
+            <button
+              className="btn btn-sm btn-primary ml-auto"
               onClick={() => setIsDepositModalOpen(true)}
             >
               Deposit
@@ -144,27 +63,29 @@ export const MarketRow: FC<MarketRowProps> = ({
           </div>
         </div>
 
-        {/* Medium screen view (md) - simplified row with wrapping */}
+        {/* Medium screen view */}
         <div className="hidden md:block lg:hidden">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Image
-                src={icon}
-                alt={name}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
+              <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{name}</span>
             </div>
-            <button 
+            <button
               className="btn btn-sm btn-primary"
               onClick={() => setIsDepositModalOpen(true)}
             >
               Deposit
             </button>
           </div>
-          
+          <InterestPillRow
+            supplyRate={supplyRate}
+            borrowRate={borrowRate}
+            address={address}
+            networkType={networkType}
+            className="mb-3"
+            protocol="vesu"
+            labels="center"
+          />
           <div className="flex flex-wrap gap-3">
             <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
               <div className="text-sm text-base-content/70">Price</div>
@@ -174,62 +95,32 @@ export const MarketRow: FC<MarketRowProps> = ({
               <div className="text-sm text-base-content/70">Utilization</div>
               <div className="font-medium">{utilization}%</div>
             </div>
-            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
-              <div className="text-sm text-base-content/70">Supply APY</div>
-              <div className="flex items-center gap-1">
-                <div className="font-medium text-success">{supplyRate}</div>
-                <div className="badge badge-sm flex items-center gap-1 px-2 py-1.5 bg-base-300/80 text-base-content">
-                  <span className="text-xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
-                  <Image
-                    src={getProtocolLogo(optimalSupplyProtocol)}
-                    alt={optimalSupplyProtocol}
-                    width={18}
-                    height={18}
-                    className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
-              <div className="text-sm text-base-content/70">Borrow APR</div>
-              <div className="flex items-center gap-1">
-                <div className="font-medium text-error">{borrowRate}</div>
-                <div className="badge badge-sm flex items-center gap-1 px-2 py-1.5 bg-base-300/80 text-base-content">
-                  <span className="text-xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
-                  <Image
-                    src={getProtocolLogo(optimalBorrowProtocol)}
-                    alt={optimalBorrowProtocol}
-                    width={18}
-                    height={18}
-                    className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Small screen view (sm and below) - 2-column grid */}
+        {/* Small screen view */}
         <div className="md:hidden">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Image
-                src={icon}
-                alt={name}
-                width={24}
-                height={24}
-                className="rounded-full"
-              />
+              <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{name}</span>
             </div>
-            <button 
+            <button
               className="btn btn-xs btn-primary"
               onClick={() => setIsDepositModalOpen(true)}
             >
               Deposit
             </button>
           </div>
-          
+          <InterestPillRow
+            supplyRate={supplyRate}
+            borrowRate={borrowRate}
+            address={address}
+            networkType={networkType}
+            className="mb-3"
+            protocol="vesu"
+            labels="center"
+          />
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-base-200/50 p-2 rounded-md">
               <div className="text-xs text-base-content/70">Price</div>
@@ -238,38 +129,6 @@ export const MarketRow: FC<MarketRowProps> = ({
             <div className="bg-base-200/50 p-2 rounded-md">
               <div className="text-xs text-base-content/70">Utilization</div>
               <div className="font-medium text-sm">{utilization}%</div>
-            </div>
-            <div className="bg-base-200/50 p-2 rounded-md">
-              <div className="text-xs text-base-content/70">Supply APY</div>
-              <div className="flex items-center gap-1">
-                <div className="font-medium text-sm text-success">{supplyRate}</div>
-                <div className="badge badge-xs flex items-center gap-0.5 px-1 py-1 bg-base-300/80 text-base-content">
-                  <span className="text-2xs">{optimalSupplyRateDisplay.toFixed(2)}%</span>
-                  <Image
-                    src={getProtocolLogo(optimalSupplyProtocol)}
-                    alt={optimalSupplyProtocol}
-                    width={12}
-                    height={12}
-                    className={`flex-shrink-0 ${optimalSupplyProtocol === "vesu" ? "" : "rounded-md"}`}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="bg-base-200/50 p-2 rounded-md">
-              <div className="text-xs text-base-content/70">Borrow APR</div>
-              <div className="flex items-center gap-1">
-                <div className="font-medium text-sm text-error">{borrowRate}</div>
-                <div className="badge badge-xs flex items-center gap-0.5 px-1 py-1 bg-base-300/80 text-base-content">
-                  <span className="text-2xs">{optimalBorrowRateDisplay.toFixed(2)}%</span>
-                  <Image
-                    src={getProtocolLogo(optimalBorrowProtocol)}
-                    alt={optimalBorrowProtocol}
-                    width={12}
-                    height={12}
-                    className={`flex-shrink-0 ${optimalBorrowProtocol === "vesu" ? "" : "rounded-md"}`}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -282,10 +141,10 @@ export const MarketRow: FC<MarketRowProps> = ({
           name,
           icon,
           address,
-          currentRate: parseFloat(supplyRate.replace('%', '')),
+          currentRate: parseFloat(supplyRate.replace("%", "")),
         }}
         protocolName="Vesu"
       />
     </>
   );
-}; 
+};
