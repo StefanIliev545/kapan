@@ -72,7 +72,10 @@ const useNostraData = (): MarketData[] => {
   });
 
   const tokenAddresses = useMemo(
-    () => (assetInfos ? (assetInfos as any[]).map(info => `0x${info[0].toString(16).padStart(64, "0")}`) : []),
+    () =>
+      assetInfos
+        ? Array.from(assetInfos as unknown as any[], info => `0x${info[0].toString(16).padStart(64, "0")}`)
+        : [],
     [assetInfos],
   );
 
