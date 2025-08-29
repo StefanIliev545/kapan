@@ -66,24 +66,33 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   // Debug wrapper to trace connector method calls that may trigger wallet popups
   const wrapConnector = (connector: Connector): Connector => {
     const originalConnect = connector.connect.bind(connector);
-    connector.connect = async (
-      ...args: Parameters<Connector["connect"]>
-    ) => {
-      console.debug(`[starknet connector] connect: ${connector.id}`);
-      const result = await originalConnect(...args);
-      console.debug(`[starknet connector] connect resolved: ${connector.id}`);
-      return result;
-    };
-
     const originalAvailable = connector.available.bind(connector);
-    connector.available = async (
-      ...args: Parameters<Connector["available"]>
-    ) => {
-      console.debug(`[starknet connector] available: ${connector.id}`);
-      return originalAvailable(...args);
-    };
 
-    return connector;
+    return new Proxy(connector, {
+      get(target, prop, receiver) {
+        if (prop === "connect") {
+          return async (
+            ...args: Parameters<Connector["connect"]>
+          ) => {
+            console.debug(`[starknet connector] connect: ${connector.id}`);
+            const result = await originalConnect(...args);
+            console.debug(
+              `[starknet connector] connect resolved: ${connector.id}`,
+            );
+            return result;
+          };
+        }
+        if (prop === "available") {
+          return async (
+            ...args: Parameters<Connector["available"]>
+          ) => {
+            console.debug(`[starknet connector] available: ${connector.id}`);
+            return originalAvailable(...args);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
   };
 
   const wrapped = useMemo(() => liveConnectors.map(wrapConnector), [liveConnectors]);

@@ -30,6 +30,7 @@ export const NostraProtocolView: FC = () => {
 
   // Determine the address to use for queries - use contract's own address as fallback
   const queryAddress = connectedAddress;
+  const enabled = !!connectedAddress;
 
   // Get user positions
   const { data: userPositions } = useNetworkAwareReadContract({
@@ -37,7 +38,8 @@ export const NostraProtocolView: FC = () => {
     contractName: "NostraGateway",
     functionName: "get_user_positions",
     args: [queryAddress],
-    refetchInterval: 10000,
+    refetchInterval: enabled ? 10000 : 0,
+    enabled,
   });
 
   // Memoize the unique contract addresses from user positions
@@ -58,6 +60,7 @@ export const NostraProtocolView: FC = () => {
     functionName: "get_interest_rates",
     args: [uniqueContractAddresses],
     refetchInterval: 0,
+    enabled,
   });
 
   const { tokenAddresses } = useMemo(() => {
@@ -73,6 +76,7 @@ export const NostraProtocolView: FC = () => {
     contractName: "UiHelper",
     functionName: "get_token_decimals",
     args: [tokenAddresses],
+    enabled,
   });
 
   const { data: tokenPrices } = useNetworkAwareReadContract({
@@ -80,6 +84,7 @@ export const NostraProtocolView: FC = () => {
     contractName: "UiHelper",
     functionName: "get_asset_prices",
     args: [tokenAddresses],
+    enabled,
   });
 
   const { tokenToDecimals, tokenToPrices } = useMemo(() => {

@@ -26,8 +26,9 @@ export const useNetworkAwareReadContract = <
   contractName,
   functionName,
   args,
+  enabled = true,
   ...readConfig
-}: ReadContractConfig<T, TContractName, TFunctionName>): Omit<ReturnType<typeof useReadContract>, "data"> & {
+}: ReadContractConfig<T, TContractName, TFunctionName> & { enabled?: boolean }): Omit<ReturnType<typeof useReadContract>, "data"> & {
   data: T extends "evm" 
     ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
     : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
@@ -40,7 +41,7 @@ export const useNetworkAwareReadContract = <
     ...readConfig,
     query: {
       ...readConfig.query,
-      enabled: networkType === "evm",
+      enabled: networkType === "evm" && enabled,
     },
   });
 
@@ -50,7 +51,7 @@ export const useNetworkAwareReadContract = <
     functionName: functionName as any,
     args: args as any,
     ...readConfig,
-    enabled: networkType === "starknet",
+    enabled: networkType === "starknet" && enabled,
   });
 
   // Return the appropriate result based on network type
