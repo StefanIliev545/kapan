@@ -2,6 +2,7 @@ import { Abi, useReadContract } from "@starknet-react/core";
 import { BlockNumber } from "starknet";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useStarkBlockNumber } from "./useBlockNumberContext";
+import { replacer } from "~~/utils/scaffold-stark/common";
 import {
   AbiFunctionOutputs,
   ContractAbi,
@@ -25,17 +26,19 @@ export const useScaffoldReadContract = <
 
   const { watch: watchConfig, ...restConfig } = readConfig as any;
 
+  const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : [];
+
   return useReadContract({
     functionName,
     address: deployedContract?.address,
     abi: deployedContract?.abi,
     watch: false,
-    args: args || [],
+    args: serializedArgs as typeof args,
     enabled: args && (!Array.isArray(args) || !args.some(arg => arg === undefined)),
     blockIdentifier:
-      (watchConfig && blockNumber !== undefined
+      watchConfig && blockNumber !== undefined
         ? (blockNumber as unknown as BlockNumber)
-        : ("pending" as BlockNumber)),
+        : ("pending" as BlockNumber),
     ...restConfig,
   }) as Omit<ReturnType<typeof useReadContract>, "data"> & {
     data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;

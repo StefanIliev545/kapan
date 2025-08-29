@@ -6,6 +6,7 @@ import { useReadContract } from "wagmi";
 import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
+import { replacer } from "~~/utils/scaffold-eth/common";
 import {
   AbiFunctionReturnType,
   ContractAbi,
@@ -41,12 +42,14 @@ export const useScaffoldReadContract = <
   const { query: queryOptions, watch, ...readContractConfig } = readConfig;
   const defaultWatch = watch ?? false;
 
+  const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : undefined;
+
   const readContractHookRes = useReadContract({
     chainId: selectedNetwork.id,
     functionName,
     address: deployedContract?.address,
     abi: deployedContract?.abi,
-    args,
+    args: serializedArgs as typeof args,
     ...(readContractConfig as any),
     query: {
       enabled: !Array.isArray(args) || !args.some(arg => arg === undefined),
