@@ -1,13 +1,13 @@
-import { FC, useState, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
+import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
+import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
+import { MovePositionModal } from "~~/components/modals/stark/MovePositionModal";
+import { RepayModalStark } from "~~/components/modals/stark/RepayModalStark";
+import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
+import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
+import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
-import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
-import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
-import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
-import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
-import { RepayModalStark } from "~~/components/modals/stark/RepayModalStark";
-import { MovePositionModal } from "~~/components/modals/stark/MovePositionModal";
-import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -98,9 +98,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
       ? Number(collateralMetadata.price.value) / 1e18
       : 0;
   const debtUsdPrice =
-    debtMetadata && debtMetadata.price && debtMetadata.price.is_valid
-      ? Number(debtMetadata.price.value) / 1e18
-      : 0;
+    debtMetadata && debtMetadata.price && debtMetadata.price.is_valid ? Number(debtMetadata.price.value) / 1e18 : 0;
 
   if (!collateralMetadata) {
     console.error("Collateral metadata not found for asset:", collateralAsset);
@@ -113,6 +111,8 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   // Format amounts with correct decimals
   const formattedCollateral = formatTokenAmount(collateralAmount, collateralMetadata.decimals);
   const formattedDebt = debtMetadata ? formatTokenAmount(nominalDebt, debtMetadata.decimals) : "0";
+  const collateralNum = parseFloat(formattedCollateral);
+  const debtNum = parseFloat(formattedDebt);
 
   // Calculate USD values - handle price scaling correctly
   const collateralValue =
@@ -149,15 +149,17 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   const ltv = collateralValue > 0n ? (debtValue * 100n) / collateralValue : 0n;
 
   // Create a pre-selected collateral for the move position modal - after all conditionals
-  const preSelectedCollateral: CollateralWithAmount[] = [{
-    token: collateralAsset,
-    symbol: collateralSymbol,
-    amount: BigInt(collateralAmount),
-    maxAmount: BigInt(collateralAmount),
-    decimals: Number(collateralMetadata.decimals),
-    supported: true,
-    inputValue: formattedCollateral
-  }];
+  const preSelectedCollateral: CollateralWithAmount[] = [
+    {
+      token: collateralAsset,
+      symbol: collateralSymbol,
+      amount: BigInt(collateralAmount),
+      maxAmount: BigInt(collateralAmount),
+      decimals: Number(collateralMetadata.decimals),
+      supported: true,
+      inputValue: formattedCollateral,
+    },
+  ];
 
   return (
     <>
@@ -179,11 +181,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <div className="grid grid-cols-2 gap-4">
             {/* Collateral Section */}
             <div className="space-y-2">
-              <div className="text-2xl font-bold">
-                ${(Number(collateralValue) / 1e18).toFixed(3)}
-              </div>
+              <div className="text-2xl font-bold">${(Number(collateralValue) / 1e18).toFixed(3)}</div>
               <div className="text-lg text-gray-500">
-                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(3) : formattedCollateral} {collateralSymbol}
+                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(3) : formattedCollateral}{" "}
+                {collateralSymbol}
               </div>
 
               <div className="divider my-1"></div>
@@ -211,9 +212,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="text-2xl font-bold">
-                    ${(Number(debtValue) / 1e18).toFixed(3)}
-                  </div>
+                  <div className="text-2xl font-bold">${(Number(debtValue) / 1e18).toFixed(3)}</div>
                   <div className="text-lg text-gray-500">
                     {debtSymbol === "ETH" ? parseFloat(formattedDebt).toFixed(3) : formattedDebt} {debtSymbol}
                   </div>
@@ -247,12 +246,11 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <div className="divider my-2"></div>
 
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-gray-500">Loan-to-value: <span className="font-medium">{Number(ltv).toFixed(2)}%</span></span>
+            <span className="text-sm text-gray-500">
+              Loan-to-value: <span className="font-medium">{Number(ltv).toFixed(2)}%</span>
+            </span>
             {nominalDebt !== "0" && (
-              <button 
-                className="btn btn-xs btn-outline btn-primary"
-                onClick={() => setIsMoveModalOpen(true)}
-              >
+              <button className="btn btn-xs btn-outline btn-primary" onClick={() => setIsMoveModalOpen(true)}>
                 Move Position
               </button>
             )}
@@ -260,13 +258,23 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex">
-              <button className="btn btn-xs btn-primary rounded-r-none px-2 w-16" onClick={() => setIsDepositModalOpen(true)}>Deposit</button>
-              <button className="btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16" onClick={() => setIsWithdrawModalOpen(true)}>Withdraw</button>
+              <button
+                className="btn btn-xs btn-primary rounded-r-none px-2 w-16"
+                onClick={() => setIsDepositModalOpen(true)}
+              >
+                Deposit
+              </button>
+              <button
+                className="btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16"
+                onClick={() => setIsWithdrawModalOpen(true)}
+              >
+                Withdraw
+              </button>
             </div>
             <div className="flex justify-end">
               <div className="flex">
-                <button 
-                  className="btn btn-xs btn-primary rounded-r-none px-2 w-16" 
+                <button
+                  className="btn btn-xs btn-primary rounded-r-none px-2 w-16"
                   onClick={() => {
                     if (nominalDebt === "0") {
                       setIsTokenSelectModalOpen(true);
@@ -277,7 +285,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 >
                   Borrow
                 </button>
-                <button 
+                <button
                   className={`btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16 ${nominalDebt === "0" ? "btn-disabled" : ""}`}
                   onClick={() => {
                     if (nominalDebt !== "0" && debtMetadata) {
@@ -302,12 +310,9 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
           usdPrice: collateralUsdPrice,
+          decimals: Number(collateralMetadata.decimals),
         }}
         protocolName="Vesu"
-        vesuContext={{
-          pool_id: 0n,
-          counterpart_token: debtAsset,
-        }}
       />
 
       <WithdrawModalStark
@@ -318,14 +323,12 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
-          protocolAmount: BigInt(collateralAmount),
           usdPrice: collateralUsdPrice,
+          decimals: Number(collateralMetadata.decimals),
         }}
         protocolName="Vesu"
-        vesuContext={{
-          pool_id: 0n,
-          counterpart_token: debtAsset,
-        }}
+        supplyBalance={BigInt(collateralAmount)}
+        vesuContext={{ poolId, counterpartToken: debtAsset }}
       />
 
       <TokenSelectModalStark
@@ -335,10 +338,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
         protocolName="Vesu"
         collateralAsset={collateralAsset}
         isVesu={true}
-        vesuContext={{
-          pool_id: 0n,
-          counterpart_token: collateralAsset,
-        }}
+        vesuContext={{ poolId, counterpartToken: collateralAsset }}
       />
 
       {debtMetadata && (
@@ -346,38 +346,32 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <BorrowModalStark
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
-          token={{
-            name: debtSymbol,
-            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-            address: debtAsset,
-            currentRate: debtRates.borrowAPR * 100,
-            usdPrice: debtUsdPrice,
-          }}
-          protocolName="Vesu"
-          supportedAssets={supportedAssets}
-          isVesu={true}
-          vesuContext={{
-              pool_id: 0n,
-              counterpart_token: collateralAsset,
+            token={{
+              name: debtSymbol,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+              address: debtAsset,
+              currentRate: debtRates.borrowAPR * 100,
+              usdPrice: debtUsdPrice,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
             }}
+            protocolName="Vesu"
+            vesuContext={{ poolId, counterpartToken: collateralAsset }}
           />
 
           <RepayModalStark
             isOpen={isRepayModalOpen}
             onClose={() => setIsRepayModalOpen(false)}
-          token={{
-            name: debtSymbol,
-            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-            address: debtAsset,
-            currentRate: debtRates.borrowAPR * 100,
-            protocolAmount: BigInt(nominalDebt),
-            usdPrice: debtUsdPrice,
-          }}
-          protocolName="Vesu"
-          vesuContext={{
-            pool_id: 0n,
-            counterpart_token: collateralAsset,
+            token={{
+              name: debtSymbol,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+              address: debtAsset,
+              currentRate: debtRates.borrowAPR * 100,
+              usdPrice: debtUsdPrice,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
             }}
+            protocolName="Vesu"
+            debtBalance={BigInt(nominalDebt)}
+            vesuContext={{ poolId, counterpartToken: collateralAsset }}
           />
 
           <MovePositionModal

@@ -10,9 +10,9 @@ import { MovePositionModal as MovePositionModalStark } from "./modals/stark/Move
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useWalletConnection } from "~~/hooks/useWalletConnection";
-import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useModal, useToggle } from "~~/hooks/useModal";
+import { useOptimalRate } from "~~/hooks/useOptimalRate";
+import { useWalletConnection } from "~~/hooks/useWalletConnection";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -42,6 +42,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const isExpanded = expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -309,6 +310,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
           />
@@ -321,9 +323,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
-              protocolAmount: tokenBalance,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
           />
           <MovePositionModalStark
             isOpen={moveModal.isOpen}
@@ -349,6 +352,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
           />
@@ -361,8 +365,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               address: tokenAddress,
               currentRate,
               usdPrice,
+              decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
           />
           <MovePositionModal
             isOpen={moveModal.isOpen}
