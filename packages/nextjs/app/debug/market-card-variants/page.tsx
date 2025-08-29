@@ -27,172 +27,69 @@ const Header: FC<{ button?: ReactNode }> = ({ button }) => (
   </div>
 );
 
-const Stat: FC<{ label: string; value: ReactNode }> = ({ label, value }) => (
-  <div>
-    <div className="text-base-content/70">{label}</div>
-    <div className="font-medium">{value}</div>
+const InterestPills: FC<{ supplyGradient: string; borrowGradient: string }> = ({ supplyGradient, borrowGradient }) => (
+  <div className="flex justify-center gap-2">
+    <span className={`px-3 py-1 rounded-full text-sm text-white shadow bg-gradient-to-r ${supplyGradient}`}>{base.supplyRate}</span>
+    <span className={`px-3 py-1 rounded-full text-sm text-white shadow flex items-center gap-1 bg-gradient-to-r ${borrowGradient}`}>
+      {base.borrowRate}
+      <Image src="/logos/vesu.svg" alt="vesu" width={16} height={16} />
+    </span>
   </div>
 );
 
-// Variant 1 - base card
-const VariantBase: FC = () => (
-  <CardShell className="bg-base-100 shadow-md">
-    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
+const PriceUtil: FC<{ progressClass: string }> = ({ progressClass }) => (
+  <div className="space-y-2">
+    <div className="flex items-baseline gap-2">
+      <span className="text-sm text-base-content/70">Price</span>
+      <span className="text-lg font-semibold">${base.price}</span>
     </div>
-  </CardShell>
-);
-
-// Variant 2 - gradient background
-const VariantGradient: FC = () => (
-  <CardShell className="text-white shadow-md bg-gradient-to-br from-indigo-500 to-fuchsia-600">
-    <Header button={<button className="btn btn-sm btn-circle bg-white text-black">+</button>} />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span>{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span>{base.borrowRate}</span>} />
-    </div>
-  </CardShell>
-);
-
-// Variant 3 - pill interest display
-const VariantPill: FC = () => (
-  <CardShell className="bg-base-100 shadow-md">
-    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <div className="flex justify-center">
-      <div className="flex overflow-hidden rounded-full text-sm shadow">
-        <span className="px-3 py-1 bg-base-200 text-success">{base.supplyRate}</span>
-        <span className="px-3 py-1 bg-gradient-to-r from-pink-500 to-purple-500 text-white flex items-center gap-1 animate-pulse">
-          {base.borrowRate}
-          <Image src="/logos/vesu.svg" alt="vesu" width={16} height={16} />
-        </span>
+    <div>
+      <div className="flex justify-between text-sm text-base-content/70">
+        <span>Utilization</span>
+        <span>{base.utilization}%</span>
       </div>
+      <progress className={`progress w-full ${progressClass}`} value={base.utilization} max="100"></progress>
     </div>
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-    </div>
-  </CardShell>
+  </div>
 );
 
-// Variant 4 - vertical stats
-const VariantVertical: FC = () => (
-  <CardShell className="bg-base-100 shadow-md">
-    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <div className="space-y-2 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
-    </div>
-  </CardShell>
-);
-
-// Variant 5 - heavy shadow
-const VariantShadow: FC = () => (
-  <CardShell className="bg-base-100 shadow-xl">
-    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
-    </div>
-  </CardShell>
-);
-
-// Variant 6 - glass effect
-const VariantGlass: FC = () => (
-  <CardShell className="bg-white/10 backdrop-blur border border-white/20 shadow-md">
-    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
-    </div>
-  </CardShell>
-);
-
-// Variant 7 - logo overlay
-const VariantOverlay: FC = () => (
+const VariantPurple: FC = () => (
   <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
     <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <Image
-      src={base.icon}
-      alt="overlay"
-      width={80}
-      height={80}
-      className="opacity-10 absolute -right-4 -bottom-4"
-    />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
-    </div>
+    <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
+    <InterestPills supplyGradient="from-green-400 to-emerald-600" borrowGradient="from-fuchsia-500 to-purple-600" />
+    <PriceUtil progressClass="progress-secondary" />
   </CardShell>
 );
 
-// Variant 8 - bordered card
-const VariantBorder: FC = () => (
-  <CardShell className="bg-base-100 shadow-md border border-purple-500">
+const VariantTeal: FC = () => (
+  <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
     <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
-    </div>
+    <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
+    <InterestPills supplyGradient="from-green-500 to-teal-600" borrowGradient="from-cyan-500 to-blue-600" />
+    <PriceUtil progressClass="progress-info" />
   </CardShell>
 );
 
-// Variant 9 - compact horizontal
-const VariantCompact: FC = () => (
-  <CardShell className="bg-base-100 shadow-md">
-    <div className="flex items-center gap-4">
-      <Image src={base.icon} alt={base.name} width={40} height={40} className="rounded-full" />
-      <div className="flex-1">
-        <h3 className="text-lg font-semibold">{base.name}</h3>
-        <div className="text-sm">${base.price} · {base.utilization}% util</div>
-        <div className="text-xs"><span className="text-success">{base.supplyRate}</span> / <span className="text-error">{base.borrowRate}</span></div>
-      </div>
-      <button className="btn btn-sm btn-primary btn-circle">+</button>
-    </div>
+const VariantSunset: FC = () => (
+  <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
+    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
+    <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
+    <InterestPills supplyGradient="from-lime-400 to-green-600" borrowGradient="from-orange-500 to-pink-600" />
+    <PriceUtil progressClass="progress-warning" />
   </CardShell>
 );
 
-// Variant 10 - floating action button
-const VariantFloating: FC = () => (
-  <CardShell className="bg-base-100 shadow-md relative">
-    <Header />
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <Stat label="Price" value={`$${base.price}`} />
-      <Stat label="Utilization" value={`${base.utilization}%`} />
-      <Stat label="Supply APY" value={<span className="text-success">{base.supplyRate}</span>} />
-      <Stat label="Borrow APR" value={<span className="text-error">{base.borrowRate}</span>} />
-    </div>
-    <button className="btn btn-primary btn-circle btn-sm absolute -bottom-3 -right-3">+</button>
+const VariantLime: FC = () => (
+  <CardShell className="relative bg-base-100 shadow-md overflow-hidden">
+    <Header button={<button className="btn btn-sm btn-primary btn-circle">+</button>} />
+    <Image src={base.icon} alt="overlay" width={120} height={120} className="absolute -right-8 -bottom-8 opacity-10" />
+    <InterestPills supplyGradient="from-green-400 to-lime-500" borrowGradient="from-purple-500 to-indigo-600" />
+    <PriceUtil progressClass="progress-success" />
   </CardShell>
 );
 
-const variants = [
-  VariantBase,
-  VariantGradient,
-  VariantPill,
-  VariantVertical,
-  VariantShadow,
-  VariantGlass,
-  VariantOverlay,
-  VariantBorder,
-  VariantCompact,
-  VariantFloating,
-];
+const variants = [VariantPurple, VariantTeal, VariantSunset, VariantLime];
 
 const MarketCardVariantsPage: FC = () => (
   <div className="grid gap-6 p-6 sm:grid-cols-2 lg:grid-cols-3">
