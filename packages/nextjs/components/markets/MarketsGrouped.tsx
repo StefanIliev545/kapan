@@ -98,7 +98,7 @@ const useNostraData = (): MarketData[] => {
     if (!assetInfos || !interestRates) return [];
     const infos = Array.from(assetInfos as unknown as any[]);
     const rates = Array.from(interestRates as unknown as any[]);
-    const priceArr = Array.from((prices as bigint[]) || []);
+    const priceArr = Array.from((prices as unknown as bigint[]) ?? []);
     return infos.map((info, idx) => {
       const address = `0x${info[0].toString(16).padStart(64, "0")}`;
       const symbol = feltToString(info[1]);
@@ -135,8 +135,8 @@ const useVenusData = (): MarketData[] => {
   });
   return useMemo(() => {
     if (!marketDetails || !ratesData) return [];
-    const [, tokens, symbols, , decimals] = marketDetails as any[];
-    const [prices, supplyRates, borrowRates] = ratesData as any[];
+    const [, tokens, symbols, , decimals] = marketDetails as unknown as any[];
+    const [prices, supplyRates, borrowRates] = ratesData as unknown as any[];
     return tokens
       .map((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return null;
@@ -170,7 +170,7 @@ const useVesuData = (): MarketData[] => {
   });
   return useMemo(() => {
     if (!supportedAssets) return [];
-    return (supportedAssets as ContractResponse).map(asset => {
+    return (supportedAssets as unknown as ContractResponse).map(asset => {
       const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
       const symbol = feltToString(asset.symbol);
       const { borrowAPR, supplyAPY } = toAnnualRates(
