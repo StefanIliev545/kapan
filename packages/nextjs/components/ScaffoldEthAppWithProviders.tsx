@@ -19,6 +19,7 @@ import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
+import { useAutoConnect } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
 import provider from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
@@ -63,7 +64,8 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   });
   const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
 
-  // Debug wrapper to trace connector method calls that may trigger wallet popups
+  // Debug wrapper to trace connector method calls and suppress duplicate connects
+  const connectedMap = useRef<Record<string, boolean>>({});
   const wrapConnector = (connector: Connector): Connector => {
     const originalConnect = connector.connect.bind(connector);
     const originalAvailable = connector.available.bind(connector);
@@ -74,8 +76,15 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
           return async (
             ...args: Parameters<Connector["connect"]>
           ) => {
+            if (connectedMap.current[connector.id]) {
+              console.debug(
+                `[starknet connector] connect skipped: ${connector.id}`,
+              );
+              return { account: (connector as any).account } as any;
+            }
             console.debug(`[starknet connector] connect: ${connector.id}`);
             const result = await originalConnect(...args);
+            connectedMap.current[connector.id] = true;
             console.debug(
               `[starknet connector] connect resolved: ${connector.id}`,
             );
@@ -105,18 +114,31 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const lastEnable: Record<string, number> = {};
+
     const patchWallet = (key: string) => {
       const wallet: any = (window as any)[key];
       if (wallet && !wallet.__kapan_patched) {
         if (typeof wallet.enable === "function") {
           const originalEnable = wallet.enable.bind(wallet);
           wallet.enable = async (...args: any[]) => {
-            if (wallet.isConnected) {
-              console.debug(`[starknet] enable skipped: already connected (${key})`);
+            const now = Date.now();
+            if (
+              wallet.isConnected ||
+              (lastEnable[key] && now - lastEnable[key] < 1000)
+            ) {
+              console.debug(
+                `[starknet] enable skipped: already connected (${key})`,
+              );
               return wallet;
             }
+            lastEnable[key] = now;
             console.debug(`[starknet] enable called (${key})`);
-            return originalEnable(...args);
+            try {
+              return await originalEnable({ ...(args[0] ?? {}), showModal: false });
+            } catch {
+              return originalEnable(...args);
+            }
           };
         }
         if (typeof wallet.request === "function") {
@@ -136,6 +158,10 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
 
     ["starknet", "braavos", "starknet_braavos"].forEach(patchWallet);
   }, []);
+  const AutoConnector = () => {
+    useAutoConnect();
+    return null;
+  };
 
   return (
     <StarknetConfig
@@ -143,8 +169,10 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       provider={provider}
       connectors={connectorsRef.current ?? []}
       explorer={starkscan}
-      autoConnect
+      // disable built-in autoConnect to avoid unwanted wallet popups
+      autoConnect={false}
     >
+      <AutoConnector />
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <ProgressBar height="3px" color="#2299dd" />

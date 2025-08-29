@@ -48,7 +48,14 @@ export const useAutoConnect = (): void => {
         );
 
         if (connector) {
-          connect({ connector });
+          (async () => {
+            try {
+              await (connector as any).connect?.({ showModal: false });
+            } catch {
+              // Fallback to standard connect which may show the wallet UI
+              await connect({ connector });
+            }
+          })();
         }
       }
     }
