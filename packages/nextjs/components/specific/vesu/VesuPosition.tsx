@@ -93,6 +93,15 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === debtAsset,
   );
 
+  const collateralUsdPrice =
+    collateralMetadata && collateralMetadata.price && collateralMetadata.price.is_valid
+      ? Number(collateralMetadata.price.value) / 1e18
+      : 0;
+  const debtUsdPrice =
+    debtMetadata && debtMetadata.price && debtMetadata.price.is_valid
+      ? Number(debtMetadata.price.value) / 1e18
+      : 0;
+
   if (!collateralMetadata) {
     console.error("Collateral metadata not found for asset:", collateralAsset);
     return null;
@@ -292,6 +301,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
+          usdPrice: collateralUsdPrice,
         }}
         protocolName="Vesu"
         vesuContext={{
@@ -309,6 +319,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           address: collateralAsset,
           currentRate: collateralRates.supplyAPY * 100,
           protocolAmount: BigInt(collateralAmount),
+          usdPrice: collateralUsdPrice,
         }}
         protocolName="Vesu"
         vesuContext={{
@@ -335,16 +346,17 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <BorrowModalStark
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
-            token={{
-              name: debtSymbol,
-              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-              address: debtAsset,
-              currentRate: debtRates.borrowAPR * 100,
-            }}
-            protocolName="Vesu"
-            supportedAssets={supportedAssets}
-            isVesu={true}
-            vesuContext={{
+          token={{
+            name: debtSymbol,
+            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+            address: debtAsset,
+            currentRate: debtRates.borrowAPR * 100,
+            usdPrice: debtUsdPrice,
+          }}
+          protocolName="Vesu"
+          supportedAssets={supportedAssets}
+          isVesu={true}
+          vesuContext={{
               pool_id: 0n,
               counterpart_token: collateralAsset,
             }}
@@ -353,17 +365,18 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <RepayModalStark
             isOpen={isRepayModalOpen}
             onClose={() => setIsRepayModalOpen(false)}
-            token={{
-              name: debtSymbol,
-              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-              address: debtAsset,
-              currentRate: debtRates.borrowAPR * 100,
-              protocolAmount: BigInt(nominalDebt),
-            }}
-            protocolName="Vesu"
-            vesuContext={{
-              pool_id: 0n,
-              counterpart_token: collateralAsset,
+          token={{
+            name: debtSymbol,
+            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+            address: debtAsset,
+            currentRate: debtRates.borrowAPR * 100,
+            protocolAmount: BigInt(nominalDebt),
+            usdPrice: debtUsdPrice,
+          }}
+          protocolName="Vesu"
+          vesuContext={{
+            pool_id: 0n,
+            counterpart_token: collateralAsset,
             }}
           />
 

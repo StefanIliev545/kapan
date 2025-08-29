@@ -428,11 +428,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           />
 
           {/* Deposit Modal for Starknet */}
-          {selectedSupplyToken && 
+          {selectedSupplyToken &&
             <DepositModalStark
               isOpen={isDepositModalOpen}
               onClose={handleCloseDepositModal}
-              token={selectedSupplyToken}
+              token={{
+                name: selectedSupplyToken.name,
+                icon: selectedSupplyToken.icon,
+                address: selectedSupplyToken.tokenAddress,
+                currentRate: selectedSupplyToken.currentRate,
+                usdPrice: selectedSupplyToken.tokenPrice
+                  ? Number(selectedSupplyToken.tokenPrice) / 1e8
+                  : 0,
+              }}
               protocolName={protocolName}
             />
           }
@@ -449,12 +457,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       icon: selectedToken.icon,
                       currentRate: selectedToken.currentRate,
                       address: selectedToken.tokenAddress,
+                      usdPrice: selectedToken.tokenPrice
+                        ? Number(selectedToken.tokenPrice) / 1e8
+                        : 0,
                     }
                   : {
                       name: borrowedPositions[0]?.name || "",
                       icon: borrowedPositions[0]?.icon || "",
                       currentRate: borrowedPositions[0]?.currentRate || 0,
                       address: borrowedPositions[0]?.tokenAddress || "",
+                      usdPrice: borrowedPositions[0]?.tokenPrice
+                        ? Number(borrowedPositions[0]?.tokenPrice) / 1e8
+                        : 0,
                     }
               }
               protocolName={protocolName}
@@ -493,12 +507,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       icon: selectedToken.icon,
                       address: selectedToken.tokenAddress,
                       currentRate: selectedToken.currentRate,
+                      usdPrice: selectedToken.tokenPrice
+                        ? Number(selectedToken.tokenPrice) / 1e8
+                        : 0,
                     }
                   : {
                       name: borrowedPositions[0]?.name || "",
                       icon: borrowedPositions[0]?.icon || "",
                       address: borrowedPositions[0]?.tokenAddress || "",
                       currentRate: borrowedPositions[0]?.currentRate || 0,
+                      usdPrice: borrowedPositions[0]?.tokenPrice
+                        ? Number(borrowedPositions[0]?.tokenPrice) / 1e8
+                        : 0,
                     }
               }
               protocolName={protocolName}
