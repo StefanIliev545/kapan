@@ -102,6 +102,41 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     connectorsRef.current = wrapped;
   }
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const patchWallet = (key: string) => {
+      const wallet: any = (window as any)[key];
+      if (wallet && !wallet.__kapan_patched) {
+        if (typeof wallet.enable === "function") {
+          const originalEnable = wallet.enable.bind(wallet);
+          wallet.enable = async (...args: any[]) => {
+            if (wallet.isConnected) {
+              console.debug(`[starknet] enable skipped: already connected (${key})`);
+              return wallet;
+            }
+            console.debug(`[starknet] enable called (${key})`);
+            return originalEnable(...args);
+          };
+        }
+        if (typeof wallet.request === "function") {
+          const originalRequest = wallet.request.bind(wallet);
+          wallet.request = async (...args: any[]) => {
+            try {
+              console.debug(`[starknet] request (${key})`, args[0]);
+            } catch (_) {
+              /* ignore */
+            }
+            return originalRequest(...args);
+          };
+        }
+        wallet.__kapan_patched = true;
+      }
+    };
+
+    ["starknet", "braavos", "starknet_braavos"].forEach(patchWallet);
+  }, []);
+
   return (
     <StarknetConfig
       chains={appChains}

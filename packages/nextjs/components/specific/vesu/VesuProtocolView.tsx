@@ -3,7 +3,7 @@ import Image from "next/image";
 import { MarketCard } from "./MarketCard";
 import { MarketRow } from "./MarketRow";
 import { VesuPosition } from "./VesuPosition";
-import { useAccount } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
 import { ListBulletIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
