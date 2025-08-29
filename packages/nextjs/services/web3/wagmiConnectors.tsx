@@ -34,6 +34,10 @@ declare global {
  * Returns wagmi connectors, initializing them only once.
  */
 export function getWagmiConnectors() {
+  if (typeof window === "undefined") {
+    return [] as ReturnType<typeof connectorsForWallets>;
+  }
+
   if (!globalThis.wagmiConnectors) {
     globalThis.wagmiConnectors = connectorsForWallets(
       [
