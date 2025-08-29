@@ -562,18 +562,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       },
     });
 
+    const instructions = [
+      {
+        protocol_name: lowerProtocolName,
+        instructions: [repayInstruction, ...withdrawInstructions],
+      },
+      {
+        protocol_name: destProtocolName,
+        instructions: [...depositInstructions, borrowInstruction],
+      },
+    ]
+
     // Complete set of instructions for execution
     const fullInstructionData = CallData.compile({
-      instructions: [
-        {
-          protocol_name: lowerProtocolName,
-          instructions: [repayInstruction, ...withdrawInstructions],
-        },
-        {
-          protocol_name: destProtocolName,
-          instructions: [...depositInstructions, borrowInstruction],
-        },
-      ],
+      instructions: instructions,
     });
 
     // Only withdraw and borrow instructions for authorization
@@ -594,7 +596,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return {
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
-      pairInstructions: [],
+      pairInstructions: instructions,
     };
   }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId]);
 
