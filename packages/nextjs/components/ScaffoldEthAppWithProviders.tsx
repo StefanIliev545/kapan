@@ -64,20 +64,26 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
 
   // Debug wrapper to trace connector method calls that may trigger wallet popups
-  const wrapConnector = (connector: Connector) => {
-    return {
-      ...connector,
-      connect: async (...args: Parameters<Connector["connect"]>) => {
-        console.debug(`[starknet connector] connect: ${connector.id}`);
-        const result = await connector.connect(...args);
-        console.debug(`[starknet connector] connect resolved: ${connector.id}`);
-        return result;
-      },
-      available: async (...args: Parameters<Connector["available"]>) => {
-        console.debug(`[starknet connector] available: ${connector.id}`);
-        return connector.available(...args);
-      },
-    } as Connector;
+  const wrapConnector = (connector: Connector): Connector => {
+    const originalConnect = connector.connect.bind(connector);
+    connector.connect = async (
+      ...args: Parameters<Connector["connect"]>
+    ) => {
+      console.debug(`[starknet connector] connect: ${connector.id}`);
+      const result = await originalConnect(...args);
+      console.debug(`[starknet connector] connect resolved: ${connector.id}`);
+      return result;
+    };
+
+    const originalAvailable = connector.available.bind(connector);
+    connector.available = async (
+      ...args: Parameters<Connector["available"]>
+    ) => {
+      console.debug(`[starknet connector] available: ${connector.id}`);
+      return originalAvailable(...args);
+    };
+
+    return connector;
   };
 
   const wrapped = useMemo(() => liveConnectors.map(wrapConnector), [liveConnectors]);
