@@ -65,16 +65,14 @@ export const useLendingAction = (
             });
             break;
         }
-        const instruction = CallData.compile({
-          instructions: [
-            {
-              protocol_name: protocolName.toLowerCase(),
-              instructions: [lendingInstruction],
-            },
-          ],
-        });
+        const baseInstruction = {
+          protocol_name: protocolName.toLowerCase(),
+          instructions: [lendingInstruction],
+        };
+        const fullInstruction = CallData.compile({ instructions: [baseInstruction] });
+        const authInstruction = CallData.compile({ instructions: [baseInstruction], rawSelectors: false });
         const contract = new Contract(routerGateway.abi, routerGateway.address, account);
-        const protocolInstructions = await contract.call("get_authorizations_for_instructions", [instruction]);
+        const protocolInstructions = await contract.call("get_authorizations_for_instructions", authInstruction);
         const authorizations: any[] = [];
         if (Array.isArray(protocolInstructions)) {
           for (const inst of protocolInstructions as any[]) {
@@ -90,7 +88,7 @@ export const useLendingAction = (
         authorizations.push({
           contractAddress: routerGateway.address,
           entrypoint: "process_protocol_instructions",
-          calldata: instruction,
+          calldata: fullInstruction,
         });
         await account.execute(authorizations);
         notification.success("Instruction sent");
