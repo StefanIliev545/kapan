@@ -86,7 +86,7 @@ p {
 /* Ensure ETH logos match other token icon sizes */
 img[src$="/logos/eth.svg"],
 img[src$="/logos/ethereum.svg"] {
-  width: 1rem;
-  height: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
   object-fit: contain;
 }
