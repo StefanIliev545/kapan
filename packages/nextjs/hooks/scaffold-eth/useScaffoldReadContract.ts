@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { QueryObserverResult, RefetchOptions, useQueryClient } from "@tanstack/react-query";
+import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 import type { ExtractAbiFunctionNames } from "abitype";
 import { ReadContractErrorType } from "viem";
 import { useReadContract } from "wagmi";
@@ -59,12 +59,11 @@ export const useScaffoldReadContract = <
     ) => Promise<QueryObserverResult<AbiFunctionReturnType<ContractAbi, TFunctionName>, ReadContractErrorType>>;
   };
 
-  const queryClient = useQueryClient();
   const blockNumber = useBlockNumberContext();
 
   useEffect(() => {
     if (defaultWatch && blockNumber !== undefined) {
-      queryClient.invalidateQueries({ queryKey: readContractHookRes.queryKey });
+      readContractHookRes.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blockNumber, defaultWatch]);

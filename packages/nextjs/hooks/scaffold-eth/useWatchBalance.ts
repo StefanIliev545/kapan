@@ -1,6 +1,4 @@
 import { useEffect } from "react";
-import { useTargetNetwork } from "./useTargetNetwork";
-import { useQueryClient } from "@tanstack/react-query";
 import { UseBalanceParameters, useBalance } from "wagmi";
 import { useBlockNumberContext } from "~~/hooks/scaffold-eth";
 
@@ -11,14 +9,12 @@ export const useWatchBalance = (
   useBalanceParameters: UseBalanceParameters,
   watch = false,
 ) => {
-  const { targetNetwork } = useTargetNetwork();
-  const queryClient = useQueryClient();
   const blockNumber = useBlockNumberContext();
-  const { queryKey, ...restUseBalanceReturn } = useBalance(useBalanceParameters);
+  const { refetch, ...restUseBalanceReturn } = useBalance(useBalanceParameters);
 
   useEffect(() => {
     if (watch && blockNumber !== undefined) {
-      queryClient.invalidateQueries({ queryKey });
+      refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blockNumber, watch]);
