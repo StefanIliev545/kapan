@@ -68,9 +68,6 @@ const App: NextPage = () => {
 
   return (
     <div className="container mx-auto px-5">
-      {/* Custom Call to Action with additional section */}
-      <CallToAction sections={customSections} />
-      {/* Network Filter */}
       <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 
       {/* Protocol Views */}
@@ -87,6 +84,8 @@ const App: NextPage = () => {
           <NostraProtocolView />
         </>
       )}
+      {/* Custom Call to Action with additional section */}
+      <CallToAction sections={customSections} />
     </div>
   );
 };

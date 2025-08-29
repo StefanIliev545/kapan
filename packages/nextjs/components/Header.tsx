@@ -232,11 +232,6 @@ export const Header = () => {
                           <HeaderMenuLinks />
                         </ul>
                         <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
-                          <div className="flex justify-center mb-3">
-                            <div className="bg-warning/90 text-warning-content px-4 py-1 rounded-full text-xs font-bold">
-                              ALPHA VERSION
-                            </div>
-                          </div>
                           <div className="flex flex-col space-y-2 items-stretch relative z-50">
                             <div className="flex items-center bg-base-200 rounded-[18px] shadow-md relative p-0.5">
                               <div className="relative flex-1 px-3 py-1.5">
@@ -331,9 +326,6 @@ export const Header = () => {
                   }}
                   style={{ filter: "blur(8px)" }}
                 />
-                <div className="relative bg-warning text-warning-content px-4 py-1.5 rounded-full text-xs font-bold border border-warning/20 z-10">
-                  ALPHA VERSION
-                </div>
               </motion.div>
             </div>
 
