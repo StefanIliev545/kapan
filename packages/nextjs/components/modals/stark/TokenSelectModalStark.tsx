@@ -151,6 +151,10 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
             address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
             currentRate: selectedToken.borrowAPR ? selectedToken.borrowAPR * 100 : 0,
+            usdPrice:
+              selectedToken.price && selectedToken.price.is_valid
+                ? Number(selectedToken.price.value) / 1e18
+                : 0,
           }}
           protocolName={protocolName}
           supportedAssets={tokens}

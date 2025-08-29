@@ -10,6 +10,7 @@ interface RepayModalStarkProps {
     address: string;
     currentRate: number;
     protocolAmount?: bigint;
+    usdPrice?: number;
   };
   protocolName: string;
   vesuContext?: {

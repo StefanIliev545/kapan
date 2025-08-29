@@ -12,6 +12,7 @@ interface BorrowModalStarkProps {
     icon: string;
     address: string;
     currentRate: number;
+    usdPrice?: number;
   };
   protocolName: string;
   supportedAssets?: TokenMetadata[];
