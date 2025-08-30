@@ -30,7 +30,7 @@ export const MarketRow: FC<MarketRowProps> = ({
 
   return (
     <>
-      <div className="p-4 hover:bg-base-200/50 rounded-lg transition-colors">
+      <div className="p-4 bg-base-100 hover:bg-base-200 rounded-lg transition-colors">
         {/* Large screen view */}
         <div className="hidden lg:flex items-center justify-between">
           <div className="flex items-center gap-3 w-1/5">

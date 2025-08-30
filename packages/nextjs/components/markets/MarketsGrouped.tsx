@@ -307,7 +307,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       </div>
       <div className="space-y-4">
         {filtered.map(group => (
-          <details key={group.name} className="collapse collapse-arrow">
+          <details key={group.name} className="collapse collapse-arrow bg-base-100 rounded-lg">
             <summary className="collapse-title p-0 list-none">
               <div className="flex items-center gap-4 p-4 bg-base-200 rounded-lg">
                 <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
@@ -334,7 +334,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
               {group.markets.map(m => (
                 <div
                   key={m.protocol + m.address}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-base-100"
+                  className="grid grid-cols-4 items-center gap-4 p-3 rounded-lg bg-base-100"
                 >
                   <div className="flex items-center gap-2">
                     <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
@@ -344,7 +344,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
                     <span className="capitalize">{protocolNames[m.protocol]}</span>
                   </div>
-                  <div className="ml-auto flex gap-4">
+                  <div className="justify-self-center">
                     <RatePill
                       variant="supply"
                       label="Supply Rate"
@@ -353,6 +353,8 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                       protocol={m.protocol}
                       showIcons={false}
                     />
+                  </div>
+                  <div className="justify-self-center">
                     <RatePill
                       variant="borrow"
                       label="Borrow Rate"
