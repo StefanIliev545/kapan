@@ -82,3 +82,11 @@ p {
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-out forwards;
 }
+
+/* Ensure ETH logos match other token icon sizes */
+img[src$="/logos/eth.svg"],
+img[src$="/logos/ethereum.svg"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}

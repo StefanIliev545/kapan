@@ -17,6 +17,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { SwitchTheme } from "~~/components/SwitchTheme";
+import { ThemeSettings } from "~~/components/ThemeSettings";
 
 type HeaderMenuLink = {
   label: string;
@@ -227,7 +229,7 @@ export const Header = () => {
                               />
                             </div>
                             <div>
-                              <div className="font-bold text-xl text-primary dark:text-accent">Kapan Finance</div>
+                              <div className="font-bold text-xl font-sans text-base-content">Kapan Finance</div>
                               <div className="text-xs text-base-content/60">Lending Made Easy</div>
                             </div>
                           </div>
@@ -289,7 +291,7 @@ export const Header = () => {
                   </div>
                 </div>
                 <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                  <div className="font-bold text-lg text-primary dark:text-accent">Kapan Finance</div>
+                  <div className="font-bold text-lg font-sans text-base-content">Kapan Finance</div>
                   <div className="text-[10px] text-base-content/60 -mt-1">Lending Made Easy</div>
                 </div>
               </div>
@@ -303,7 +305,7 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Right section - Alpha badge and buttons */}
+          {/* Right section - Alpha badge, buttons and theme controls */}
           <div className="flex items-center gap-4">
             {/* Alpha badge */}
             <div className="hidden sm:block">
@@ -363,6 +365,10 @@ export const Header = () => {
               </div>
               {/* Removed Stark faucet and FaucetButton from desktop header */}
             </motion.div>
+            <div className="flex items-center gap-2">
+              <SwitchTheme />
+              <ThemeSettings />
+            </div>
           </div>
         </div>
       </div>
