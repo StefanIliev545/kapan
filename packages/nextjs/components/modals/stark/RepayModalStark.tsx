@@ -34,6 +34,8 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   );
   const gasCostUsd = useGasEstimate("stark");
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
+  const bump = (debtBalance * 101n) / 100n;
+  const maxInput = balance < bump ? balance : bump;
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -47,6 +49,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
       before={before}
       balance={balance}
       percentBase={debtBalance}
+      max={maxInput}
       gasCostUsd={gasCostUsd}
       onConfirm={execute}
     />

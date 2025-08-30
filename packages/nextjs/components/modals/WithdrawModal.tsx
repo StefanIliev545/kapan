@@ -25,6 +25,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, 
   );
   const gasCostUsd = useGasEstimate("evm");
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
+  const maxInput = (supplyBalance * 101n) / 100n;
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -38,6 +39,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, 
       before={before}
       balance={supplyBalance}
       percentBase={supplyBalance}
+      max={maxInput}
       gasCostUsd={gasCostUsd}
       onConfirm={execute}
     />

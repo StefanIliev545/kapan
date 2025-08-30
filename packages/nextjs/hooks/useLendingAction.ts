@@ -35,12 +35,10 @@ export const useLendingAction = (
         let parsedAmount = parseUnits(amount, decimals);
         if (isMax) {
           if (action === "Repay") {
-            const limit = maxAmount !== undefined && maxAmount < walletBalance ? maxAmount : walletBalance;
-            const bumped = (parsedAmount * 101n) / 100n;
-            parsedAmount = bumped > limit ? limit : bumped;
+            const bumped = maxAmount !== undefined ? (maxAmount * 101n) / 100n : (parsedAmount * 101n) / 100n;
+            parsedAmount = bumped > walletBalance ? walletBalance : bumped;
           } else if (action === "Withdraw" && maxAmount !== undefined) {
-            const bumped = (parsedAmount * 101n) / 100n;
-            parsedAmount = bumped > maxAmount ? maxAmount : bumped;
+            parsedAmount = (maxAmount * 101n) / 100n;
           }
         }
         const basic = {
@@ -136,12 +134,10 @@ export const useLendingAction = (
     let parsed = parseUnits(amount, decimals);
     if (isMax) {
       if (action === "Repay") {
-        const limit = maxAmount !== undefined && maxAmount < walletBalance ? maxAmount : walletBalance;
-        const bumped = (parsed * 101n) / 100n;
-        parsed = bumped > limit ? limit : bumped;
+        const bumped = maxAmount !== undefined ? (maxAmount * 101n) / 100n : (parsed * 101n) / 100n;
+        parsed = bumped > walletBalance ? walletBalance : bumped;
       } else if (action === "Withdraw" && maxAmount !== undefined) {
-        const bumped = (parsed * 101n) / 100n;
-        parsed = bumped > maxAmount ? maxAmount : bumped;
+        parsed = (maxAmount * 101n) / 100n;
       }
     }
     await writeContractAsync({

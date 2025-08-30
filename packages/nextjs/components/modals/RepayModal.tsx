@@ -18,6 +18,8 @@ export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protoc
   const { execute } = useLendingAction("evm", "Repay", token.address, protocolName, decimals, undefined, debtBalance);
   const gasCostUsd = useGasEstimate("evm");
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
+  const bump = (debtBalance * 101n) / 100n;
+  const maxInput = walletBalance < bump ? walletBalance : bump;
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -31,6 +33,7 @@ export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protoc
       before={before}
       balance={walletBalance}
       percentBase={debtBalance}
+      max={maxInput}
       gasCostUsd={gasCostUsd}
       onConfirm={execute}
     />

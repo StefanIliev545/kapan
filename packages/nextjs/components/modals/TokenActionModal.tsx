@@ -24,6 +24,7 @@ export interface TokenActionModalProps {
   before: number;
   balance: bigint;
   percentBase?: bigint;
+  max?: bigint;
   gasCostUsd?: number;
   hf?: number;
   utilization?: number;
@@ -72,12 +73,13 @@ const PercentInput: FC<{
   decimals: number;
   price?: number;
   onChange: (v: string, isMax: boolean) => void;
+  percentBase?: bigint;
   max?: bigint;
-}> = ({ balance, decimals, price = 0, onChange, max }) => {
+}> = ({ balance, decimals, price = 0, onChange, percentBase, max }) => {
   const [amount, setAmount] = useState("");
   const [active, setActive] = useState<number | null>(null);
   const setPercent = (p: number) => {
-    const base = max ?? balance;
+    const base = percentBase ?? balance;
     const val = (base * BigInt(p)) / 100n;
     const formatted = formatUnits(val, decimals);
     setAmount(formatted);
@@ -91,11 +93,14 @@ const PercentInput: FC<{
     } catch {
       parsed = 0n;
     }
-    const base = max ?? balance;
+    const base = percentBase ?? balance;
+    const limit = max ?? base;
     let isMax = false;
-    if (parsed >= base) {
-      parsed = base;
-      val = formatUnits(base, decimals);
+    if (parsed >= limit) {
+      parsed = limit;
+      val = formatUnits(limit, decimals);
+      isMax = true;
+    } else if (parsed >= base) {
       isMax = true;
     }
     setAmount(val);
@@ -168,6 +173,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   before,
   balance,
   percentBase,
+  max,
   gasCostUsd = 0,
   hf = 1.9,
   utilization = 65,
@@ -243,11 +249,12 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               balance={balance}
               decimals={token.decimals || 18}
               price={token.usdPrice}
-              onChange={(val, max) => {
+              onChange={(val, maxed) => {
                 setAmount(val);
-                setIsMax(max);
+                setIsMax(maxed);
               }}
-              max={percentBase}
+              percentBase={percentBase}
+              max={max}
             />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
               <HealthFactor value={hf} />
