@@ -51,25 +51,13 @@ export function useAccount(): UseAccountResult {
       accountRef.current = account;
     }
   }, [account]);
-  const stableAccount = useMemo(() => {
-    const a = account ?? accountRef.current;
-    if (a && typeof (a as any).execute === "function") {
-      return a;
-    }
-    return undefined;
-  }, [account]);
+
+  const stableAccount = useMemo(() => account ?? accountRef.current, [account]);
 
   // Log status and address changes to help trace unexpected reconnects
   useEffect(() => {
     console.debug("useAccount", { status, address, hasAccount: !!account });
   }, [status, address, account]);
-
-  const correctedStatus = useMemo(() => {
-    if (status === "connected" && !stableAccount) {
-      return "connecting";
-    }
-    return status;
-  }, [status, stableAccount]);
 
   const [accountChainId, setAccountChainId] = useState<bigint>(0n);
 
@@ -107,37 +95,9 @@ export function useAccount(): UseAccountResult {
     }
   }, [stableAccount]);
 
-  const patchedAccount = useMemo(() => {
-    if (status === "connected" && address && !stableAccount) {
-      const provisionalAccount = {
-        address,
-        execute: async () => {
-          throw new Error(
-            "Wallet connection issue. Please refresh and reconnect.",
-          );
-        },
-        estimateInvokeFee: async () => {
-          throw new Error(
-            "Wallet connection issue. Please refresh and reconnect.",
-          );
-        },
-        getChainId: async () => {
-          return constants.StarknetChainId.SN_MAIN;
-        },
-        cairoVersion: "1",
-        signer: {},
-      };
-
-      return provisionalAccount as unknown as AccountInterface;
-    }
-
-    return stableAccount;
-  }, [status, address, stableAccount]);
-
   return {
     ...starknetAccount,
-    account: patchedAccount,
-    status: correctedStatus,
+    account: stableAccount,
     chainId: accountChainId,
     address: address ?? persistedAddress,
   } as UseAccountResult;
