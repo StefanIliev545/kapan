@@ -44,15 +44,37 @@ export function useAccount(): UseAccountResult {
     }
   }, [address]);
 
-  // Cache the account instance so re-renders don't trigger a fresh enable
+  // Cache the account instance so re-renders don't trigger a fresh enable.
+  // Some wallets expose `account` as an async function rather than a plain
+  // object. Resolve these cases and only store objects that actually implement
+  // `execute`.
   const accountRef = useRef<AccountInterface | undefined>();
+  const [resolvedAccount, setResolvedAccount] = useState<AccountInterface | undefined>();
+
   useEffect(() => {
-    if (account && typeof (account as any).execute === "function") {
-      accountRef.current = account;
-    }
+    const resolveAccount = async () => {
+      try {
+        if (typeof account === "function") {
+          const maybeAccount = await account();
+          if (maybeAccount && typeof (maybeAccount as any).execute === "function") {
+            accountRef.current = maybeAccount;
+            setResolvedAccount(maybeAccount);
+            return;
+          }
+        } else if (account && typeof (account as any).execute === "function") {
+          accountRef.current = account;
+          setResolvedAccount(account);
+          return;
+        }
+      } catch (err) {
+        console.warn("useAccount: account() threw", err);
+      }
+    };
+
+    resolveAccount();
   }, [account]);
 
-  const stableAccount = useMemo(() => account ?? accountRef.current, [account]);
+  const stableAccount = useMemo(() => resolvedAccount ?? accountRef.current, [resolvedAccount]);
 
   // Log status and address changes to help trace unexpected reconnects
   useEffect(() => {
