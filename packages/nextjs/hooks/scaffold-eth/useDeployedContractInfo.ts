@@ -10,6 +10,9 @@ import {
   contracts,
 } from "~~/utils/scaffold-eth/contract";
 
+// Cache deployment checks per chain + address to avoid spamming RPC nodes
+const deploymentStatusCache = new Map<string, ContractCodeStatus>();
+
 type DeployedContractData<TContractName extends ContractName> = {
   data: Contract<TContractName> | undefined;
   isLoading: boolean;
@@ -47,37 +50,44 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
   const { contractName, chainId } = finalConfig;
   const selectedNetwork = useSelectedNetwork(chainId);
   const deployedContract = contracts?.[selectedNetwork.id]?.[contractName as ContractName] as Contract<TContractName>;
-  const [status, setStatus] = useState<ContractCodeStatus>(ContractCodeStatus.LOADING);
+  const cacheKey = deployedContract ? `${selectedNetwork.id}-${deployedContract.address}` : undefined;
+  const cachedStatus = cacheKey ? deploymentStatusCache.get(cacheKey) : undefined;
+  const [status, setStatus] = useState<ContractCodeStatus>(
+    cachedStatus ?? ContractCodeStatus.LOADING,
+  );
   const publicClient = usePublicClient({ chainId: selectedNetwork.id });
 
   useEffect(() => {
     const checkContractDeployment = async () => {
+      if (!deployedContract || !cacheKey) {
+        setStatus(ContractCodeStatus.NOT_FOUND);
+        return;
+      }
+      if (!isMounted() || !publicClient) return;
+
+      const cached = deploymentStatusCache.get(cacheKey);
+      if (cached) {
+        setStatus(cached);
+        return;
+      }
+
       try {
-        if (!isMounted() || !publicClient) return;
-
-        if (!deployedContract) {
-          setStatus(ContractCodeStatus.NOT_FOUND);
-          return;
-        }
-
         const code = await publicClient.getBytecode({
           address: deployedContract.address,
         });
 
-        // If contract code is `0x` => no contract deployed on that address
-        if (code === "0x") {
-          setStatus(ContractCodeStatus.NOT_FOUND);
-          return;
-        }
-        setStatus(ContractCodeStatus.DEPLOYED);
+        const newStatus = code === "0x" ? ContractCodeStatus.NOT_FOUND : ContractCodeStatus.DEPLOYED;
+        deploymentStatusCache.set(cacheKey, newStatus);
+        setStatus(newStatus);
       } catch (e) {
         console.error(e);
+        deploymentStatusCache.set(cacheKey, ContractCodeStatus.NOT_FOUND);
         setStatus(ContractCodeStatus.NOT_FOUND);
       }
     };
 
     checkContractDeployment();
-  }, [isMounted, contractName, deployedContract, publicClient]);
+  }, [isMounted, cacheKey, deployedContract, publicClient]);
 
   return {
     data: status === ContractCodeStatus.DEPLOYED ? deployedContract : undefined,
