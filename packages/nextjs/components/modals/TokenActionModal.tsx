@@ -96,11 +96,11 @@ const PercentInput: FC<{
     const base = percentBase ?? balance;
     const limit = max ?? base;
     let isMax = false;
-    if (parsed >= limit) {
+    if (limit > 0n && parsed >= limit) {
       parsed = limit;
       val = formatUnits(limit, decimals);
       isMax = true;
-    } else if (parsed >= base) {
+    } else if (base > 0n && parsed >= base) {
       isMax = true;
     }
     setAmount(val);

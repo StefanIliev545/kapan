@@ -24,10 +24,12 @@ export const useLendingAction = (
   decimals?: number,
   vesuContext?: VesuContext,
   maxAmount?: bigint,
+  walletBalanceParam?: bigint,
 ) => {
   if (network === "stark") {
     const { address, account } = useStarkAccount();
-    const { balance: walletBalance = 0n } = useTokenBalance(tokenAddress, "stark");
+    const { balance: walletBalanceHook = 0n } = useTokenBalance(tokenAddress, "stark");
+    const walletBalance = walletBalanceParam ?? walletBalanceHook;
     const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
     const execute = async (amount: string, isMax = false) => {
       if (!address || !account || !decimals || !routerGateway) return;
@@ -35,10 +37,13 @@ export const useLendingAction = (
         let parsedAmount = parseUnits(amount, decimals);
         if (isMax) {
           if (action === "Repay") {
-            const bumped = maxAmount !== undefined ? (maxAmount * 101n) / 100n : (parsedAmount * 101n) / 100n;
+            const basis = maxAmount ?? parsedAmount;
+            const bumped = (basis * 101n) / 100n;
             parsedAmount = bumped > walletBalance ? walletBalance : bumped;
-          } else if (action === "Withdraw" && maxAmount !== undefined) {
-            parsedAmount = (maxAmount * 101n) / 100n;
+          } else if (action === "Withdraw") {
+            const basis = maxAmount ?? parsedAmount;
+            const bumped = (basis * 101n) / 100n;
+            parsedAmount = bumped;
           }
         }
         const basic = {
@@ -121,7 +126,8 @@ export const useLendingAction = (
   }
 
   const { address } = useEvmAccount();
-  const { balance: walletBalance = 0n } = useTokenBalance(tokenAddress, "evm");
+  const { balance: walletBalanceHook = 0n } = useTokenBalance(tokenAddress, "evm");
+  const walletBalance = walletBalanceParam ?? walletBalanceHook;
   const { writeContractAsync } = useEvmWrite({ contractName: "RouterGateway" });
   const fnMap: Record<Action, string> = {
     Borrow: "borrow",

@@ -31,6 +31,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
     decimals,
     vesuContext,
     debtBalance,
+    balance,
   );
   const gasCostUsd = useGasEstimate("stark");
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
