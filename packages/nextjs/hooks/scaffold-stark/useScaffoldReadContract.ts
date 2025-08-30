@@ -28,6 +28,11 @@ export const useScaffoldReadContract = <
 
   const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : [];
 
+  const blockIdentifier: BlockNumber =
+    watchConfig && blockNumber !== undefined
+      ? (Number(blockNumber) as BlockNumber)
+      : ("pending" as BlockNumber);
+
   return useReadContract({
     functionName,
     address: deployedContract?.address,
@@ -35,10 +40,7 @@ export const useScaffoldReadContract = <
     watch: false,
     args: serializedArgs as typeof args,
     enabled: args && (!Array.isArray(args) || !args.some(arg => arg === undefined)),
-    blockIdentifier:
-      watchConfig && blockNumber !== undefined
-        ? (blockNumber as unknown as BlockNumber)
-        : ("pending" as BlockNumber),
+    blockIdentifier,
     ...restConfig,
   }) as Omit<ReturnType<typeof useReadContract>, "data"> & {
     data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;

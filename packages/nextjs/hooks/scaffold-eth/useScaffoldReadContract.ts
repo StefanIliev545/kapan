@@ -39,8 +39,19 @@ export const useScaffoldReadContract = <
     chainId: selectedNetwork.id as AllowedChainIds,
   });
 
-  const { query: queryOptions, watch, ...readContractConfig } = readConfig;
+  const {
+    query: queryOptions,
+    watch,
+    blockNumber: blockNumberConfig,
+    blockTag,
+    ...restConfig
+  } = readConfig as any;
   const defaultWatch = watch ?? false;
+
+  const sanitizedBlockNumber =
+    typeof blockNumberConfig === "bigint" ? Number(blockNumberConfig) : blockNumberConfig;
+  const sanitizedBlockTag =
+    typeof blockTag === "bigint" ? blockTag.toString() : blockTag;
 
   const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : undefined;
 
@@ -50,7 +61,9 @@ export const useScaffoldReadContract = <
     address: deployedContract?.address,
     abi: deployedContract?.abi,
     args: serializedArgs as typeof args,
-    ...(readContractConfig as any),
+    blockNumber: sanitizedBlockNumber,
+    blockTag: sanitizedBlockTag,
+    ...(restConfig as any),
     query: {
       enabled: !Array.isArray(args) || !args.some(arg => arg === undefined),
       ...queryOptions,
