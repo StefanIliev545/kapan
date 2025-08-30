@@ -219,4 +219,13 @@ describe("useTransactor", () => {
       "Incorrect transaction passed to transactor",
     );
   });
+
+  it("should resolve function-based wallet clients", async () => {
+    const walletFn = vi.fn().mockResolvedValue(walletClientMock);
+    const { result } = renderHook(() => useTransactor(walletFn as any));
+
+    const txHash = await result.current(() => Promise.resolve("mock-tx-hash"));
+    expect(txHash).toBe("mock-tx-hash");
+    expect(walletFn).toHaveBeenCalled();
+  });
 });

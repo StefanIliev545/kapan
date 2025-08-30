@@ -38,9 +38,22 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
   }
 
   return async tx => {
-    if (!walletClient) {
+    // Some wallets expose the account as a function. Resolve it here to avoid
+    // "t.execute is not a function" runtime errors when the account hasn't been
+    // materialized yet.
+    if (typeof walletClient === "function") {
+      try {
+        walletClient = await (walletClient as any)();
+      } catch (err) {
+        notification.error("Cannot access account");
+        console.error("useTransactor: walletClient() threw", err);
+        return;
+      }
+    }
+
+    if (!walletClient || typeof (walletClient as any).execute !== "function") {
       notification.error("Cannot access account");
-      console.error("⚡️ ~ file: useTransactor.tsx ~ error");
+      console.error("useTransactor: walletClient missing execute", walletClient);
       return;
     }
 
