@@ -11,7 +11,7 @@ export interface MarketData {
   utilization: string;
   address: string;
   networkType: "evm" | "starknet";
-  protocol: string;
+  protocol: "aave" | "nostra" | "venus" | "vesu";
 }
 
 interface MarketsSectionProps {

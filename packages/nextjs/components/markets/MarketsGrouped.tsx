@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
@@ -195,64 +195,100 @@ const useVesuData = (): MarketData[] => {
   }, [supportedAssets]);
 };
 
-export const MarketsGrouped = () => {
+export const MarketsGrouped: FC<{ network: string; search: string }> = ({ network, search }) => {
   const aave = useAaveData();
   const nostra = useNostraData();
   const venus = useVenusData();
   const vesu = useVesuData();
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
 
+  const all = useMemo(() => {
+    if (network === "arbitrum") return [...aave, ...venus];
+    if (network === "starknet") return [...nostra, ...vesu];
+    return [...aave, ...nostra, ...venus, ...vesu];
+  }, [network, aave, nostra, venus, vesu]);
+
   const groups = useMemo(() => {
-    const all = [...aave, ...nostra, ...venus, ...vesu];
-    const map = new Map<string, { icon: string; markets: MarketData[] }>();
+    const map = new Map<
+      string,
+      { icon: string; markets: MarketData[]; bestSupply: number; bestBorrow: number }
+    >();
     all.forEach(m => {
+      const supply = parseFloat(m.supplyRate);
+      const borrow = parseFloat(m.borrowRate);
       const entry = map.get(m.name);
       if (entry) {
         entry.markets.push(m);
+        entry.bestSupply = Math.max(entry.bestSupply, supply);
+        entry.bestBorrow = Math.min(entry.bestBorrow, borrow);
       } else {
-        map.set(m.name, { icon: m.icon, markets: [m] });
+        map.set(m.name, {
+          icon: m.icon,
+          markets: [m],
+          bestSupply: supply,
+          bestBorrow: borrow,
+        });
       }
     });
-    return Array.from(map.entries()).map(([name, { icon, markets }]) => ({ name, icon, markets }));
-  }, [aave, nostra, venus, vesu]);
+    return Array.from(map.entries()).map(([name, value]) => ({ name, ...value }));
+  }, [all]);
 
   const sorted = useMemo(() => {
     return [...groups].sort((a, b) => {
-      const aMetric =
-        sortBy === "supply"
-          ? Math.max(...a.markets.map(m => parseFloat(m.supplyRate)))
-          : Math.min(...a.markets.map(m => parseFloat(m.borrowRate)));
-      const bMetric =
-        sortBy === "supply"
-          ? Math.max(...b.markets.map(m => parseFloat(m.supplyRate)))
-          : Math.min(...b.markets.map(m => parseFloat(m.borrowRate)));
+      const aMetric = sortBy === "supply" ? a.bestSupply : a.bestBorrow;
+      const bMetric = sortBy === "supply" ? b.bestSupply : b.bestBorrow;
       return sortBy === "supply" ? bMetric - aMetric : aMetric - bMetric;
     });
   }, [groups, sortBy]);
 
+  const filtered = useMemo(
+    () => sorted.filter(g => g.name.toLowerCase().includes(search.toLowerCase())),
+    [sorted, search],
+  );
+
+  const networkIcons: Record<"evm" | "starknet", string> = {
+    evm: "/logos/arb.svg",
+    starknet: "/logos/starknet.svg",
+  };
+
+  const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu", string> = {
+    aave: "/logos/aave.svg",
+    nostra: "/logos/nostra.svg",
+    venus: "/logos/venus.svg",
+    vesu: "/logos/vesu.svg",
+  };
+
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <div className="join">
-          <button
-            className={`btn btn-xs join-item ${sortBy === "supply" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setSortBy("supply")}
-          >
-            Supply
-          </button>
-          <button
-            className={`btn btn-xs join-item ${sortBy === "borrow" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setSortBy("borrow")}
-          >
-            Borrow
-          </button>
-        </div>
+      <div className="join">
+        <button
+          className={`btn btn-xs join-item ${sortBy === "supply" ? "btn-primary" : "btn-ghost"}`}
+          onClick={() => setSortBy("supply")}
+        >
+          Supply
+        </button>
+        <button
+          className={`btn btn-xs join-item ${sortBy === "borrow" ? "btn-primary" : "btn-ghost"}`}
+          onClick={() => setSortBy("borrow")}
+        >
+          Borrow
+        </button>
       </div>
-      {sorted.map(group => (
+      </div>
+      {filtered.map(group => (
         <details key={group.name} className="mb-2 collapse collapse-arrow bg-base-200">
           <summary className="collapse-title flex items-center gap-2 cursor-pointer">
             <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
             {group.name}
+            <div className="ml-auto flex gap-2">
+              <span className="badge badge-success badge-sm">
+                {group.bestSupply.toFixed(2)}%
+              </span>
+              <span className="badge badge-warning badge-sm">
+                {group.bestBorrow.toFixed(2)}%
+              </span>
+            </div>
           </summary>
           <div className="collapse-content">
             <div className="overflow-x-auto">
@@ -268,8 +304,25 @@ export const MarketsGrouped = () => {
                 <tbody>
                   {group.markets.map(m => (
                     <tr key={m.protocol + m.address}>
-                      <td className="capitalize">{m.protocol}</td>
-                      <td className="capitalize">{m.networkType}</td>
+                      <td className="capitalize">
+                        <div className="flex items-center gap-2">
+                          <Image
+                            src={protocolIcons[m.protocol]}
+                            alt={m.protocol}
+                            width={16}
+                            height={16}
+                          />
+                          {m.protocol}
+                        </div>
+                      </td>
+                      <td>
+                        <Image
+                          src={networkIcons[m.networkType]}
+                          alt={m.networkType}
+                          width={16}
+                          height={16}
+                        />
+                      </td>
                       <td>{m.supplyRate}</td>
                       <td>{m.borrowRate}</td>
                     </tr>

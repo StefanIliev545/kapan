@@ -10,6 +10,7 @@ import { VenusMarkets } from "~~/components/specific/venus/VenusMarkets";
 import { VesuMarkets, POOL_IDS, ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { LendingSidebar } from "~~/components/LendingSidebar";
+import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 
 const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
@@ -21,6 +22,7 @@ const MarketsPage: NextPage = () => {
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [search, setSearch] = useState("");
+  const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
 
   const { data: supportedAssets } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -43,40 +45,62 @@ const MarketsPage: NextPage = () => {
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
+            {groupMode === "protocol" && (
+              <div className="join">
+                <button
+                  className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                >
+                  <ListBulletIcon className="h-4 w-4" />
+                </button>
+                <button
+                  className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Grid view"
+                >
+                  <Squares2X2Icon className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             <div className="join">
               <button
-                className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setViewMode("list")}
-                aria-label="List view"
+                className={`btn btn-xs join-item ${groupMode === "token" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setGroupMode("token")}
               >
-                <ListBulletIcon className="h-4 w-4" />
+                Token
               </button>
               <button
-                className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setViewMode("grid")}
-                aria-label="Grid view"
+                className={`btn btn-xs join-item ${groupMode === "protocol" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setGroupMode("protocol")}
               >
-                <Squares2X2Icon className="h-4 w-4" />
+                Protocol
               </button>
             </div>
           </div>
         </div>
-        {selectedNetwork === "arbitrum" && (
+        {groupMode === "token" ? (
+          <MarketsGrouped network={selectedNetwork} search={search} />
+        ) : (
           <>
-            <AaveMarkets viewMode={viewMode} search={search} />
-            <VenusMarkets viewMode={viewMode} search={search} />
-          </>
-        )}
-        {selectedNetwork === "starknet" && (
-          <>
-            <VesuMarkets
-              selectedPoolId={selectedPoolId}
-              onPoolChange={setSelectedPoolId}
-              supportedAssets={supportedAssets as ContractResponse | undefined}
-              viewMode={viewMode}
-              search={search}
-            />
-            <NostraMarkets viewMode={viewMode} search={search} />
+            {selectedNetwork === "arbitrum" && (
+              <>
+                <AaveMarkets viewMode={viewMode} search={search} />
+                <VenusMarkets viewMode={viewMode} search={search} />
+              </>
+            )}
+            {selectedNetwork === "starknet" && (
+              <>
+                <VesuMarkets
+                  selectedPoolId={selectedPoolId}
+                  onPoolChange={setSelectedPoolId}
+                  supportedAssets={supportedAssets as ContractResponse | undefined}
+                  viewMode={viewMode}
+                  search={search}
+                />
+                <NostraMarkets viewMode={viewMode} search={search} />
+              </>
+            )}
           </>
         )}
       </div>
