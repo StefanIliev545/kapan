@@ -72,6 +72,8 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   const wrapConnector = (connector: Connector): Connector => {
     const originalConnect = connector.connect.bind(connector);
     const originalAvailable = connector.available.bind(connector);
+    const originalDisconnect = connector.disconnect?.bind(connector);
+    const originalAccount = (connector as any).account?.bind(connector);
 
     return new Proxy(connector, {
       get(target, prop, receiver) {
@@ -101,6 +103,42 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
           ) => {
             console.debug(`[starknet connector] available: ${connector.id}`);
             return originalAvailable(...args);
+          };
+        }
+        if (prop === "disconnect") {
+          return async (
+            ...args: Parameters<NonNullable<Connector["disconnect"]>>
+          ) => {
+            connectedMap.current[connector.id] = false;
+            connectedDataMap.current[connector.id] = undefined;
+            return originalDisconnect?.(...args);
+          };
+        }
+        if (prop === "account") {
+          return async (...args: any[]) => {
+            const cached = connectedDataMap.current[connector.id]?.account;
+            if (cached) {
+              console.debug(
+                `[starknet connector] account cache hit: ${connector.id}`,
+              );
+              return cached;
+            }
+            if (!originalAccount) return undefined;
+            try {
+              console.debug(`[starknet connector] account: ${connector.id}`);
+              const result = await originalAccount(...args);
+              connectedDataMap.current[connector.id] = {
+                ...(connectedDataMap.current[connector.id] || {}),
+                account: result,
+              } as any;
+              return result;
+            } catch (err) {
+              console.debug(
+                `[starknet connector] account error: ${connector.id}`,
+                err,
+              );
+              return undefined;
+            }
           };
         }
         return Reflect.get(target, prop, receiver);

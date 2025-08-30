@@ -25,6 +25,25 @@ export function useAccount(): UseAccountResult {
   const starknetAccount = useStarknetReactAccount();
   const { account, address, status } = starknetAccount;
 
+  // Persist the last known address to avoid reconnect prompts when wallets lock
+  const [persistedAddress, setPersistedAddress] = useState<`0x${string}` | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("lastStarknetAddress");
+    if (stored) {
+      setPersistedAddress(stored as `0x${string}`);
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (address) {
+      window.localStorage.setItem("lastStarknetAddress", address);
+      setPersistedAddress(address);
+    }
+  }, [address]);
+
   // Cache the account instance so re-renders don't trigger a fresh enable
   const accountRef = useRef<AccountInterface | undefined>();
   useEffect(() => {
@@ -114,5 +133,6 @@ export function useAccount(): UseAccountResult {
     account: patchedAccount,
     status: correctedStatus,
     chainId: accountChainId,
+    address: address ?? persistedAddress,
   } as UseAccountResult;
 }
