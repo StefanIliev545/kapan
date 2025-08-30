@@ -35,8 +35,14 @@ const MarketsPage: NextPage = () => {
     <div className="container mx-auto px-5 flex">
       <LendingSidebar />
       <div className="flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+        <div
+          className={`flex items-center mb-4 ${
+            groupMode === "protocol" ? "justify-between" : "justify-end"
+          }`}
+        >
+          {groupMode === "protocol" && (
+            <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+          )}
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -80,7 +86,7 @@ const MarketsPage: NextPage = () => {
           </div>
         </div>
         {groupMode === "token" ? (
-          <MarketsGrouped network={selectedNetwork} search={search} />
+          <MarketsGrouped search={search} />
         ) : (
           <>
             {selectedNetwork === "arbitrum" && (

@@ -18,6 +18,7 @@ import {
 } from "~~/utils/protocols";
 import { POOL_IDS, ContractResponse } from "../specific/vesu/VesuMarkets";
 import { MarketData } from "./MarketsSection";
+import { RatePill } from "./RatePill";
 
 // Helper: Aave rate conversion
 const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
@@ -195,38 +196,37 @@ const useVesuData = (): MarketData[] => {
   }, [supportedAssets]);
 };
 
-export const MarketsGrouped: FC<{ network: string; search: string }> = ({ network, search }) => {
+export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const aave = useAaveData();
   const nostra = useNostraData();
   const venus = useVenusData();
   const vesu = useVesuData();
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
 
-  const all = useMemo(() => {
-    if (network === "arbitrum") return [...aave, ...venus];
-    if (network === "starknet") return [...nostra, ...vesu];
-    return [...aave, ...nostra, ...venus, ...vesu];
-  }, [network, aave, nostra, venus, vesu]);
+  const all = useMemo(() => [...aave, ...nostra, ...venus, ...vesu], [aave, nostra, venus, vesu]);
 
   const groups = useMemo(() => {
     const map = new Map<
       string,
-      { icon: string; markets: MarketData[]; bestSupply: number; bestBorrow: number }
+      {
+        icon: string;
+        markets: MarketData[];
+        bestSupply: MarketData;
+        bestBorrow: MarketData;
+      }
     >();
     all.forEach(m => {
-      const supply = parseFloat(m.supplyRate);
-      const borrow = parseFloat(m.borrowRate);
       const entry = map.get(m.name);
       if (entry) {
         entry.markets.push(m);
-        entry.bestSupply = Math.max(entry.bestSupply, supply);
-        entry.bestBorrow = Math.min(entry.bestBorrow, borrow);
+        if (parseFloat(m.supplyRate) > parseFloat(entry.bestSupply.supplyRate)) entry.bestSupply = m;
+        if (parseFloat(m.borrowRate) < parseFloat(entry.bestBorrow.borrowRate)) entry.bestBorrow = m;
       } else {
         map.set(m.name, {
           icon: m.icon,
           markets: [m],
-          bestSupply: supply,
-          bestBorrow: borrow,
+          bestSupply: m,
+          bestBorrow: m,
         });
       }
     });
@@ -235,8 +235,14 @@ export const MarketsGrouped: FC<{ network: string; search: string }> = ({ networ
 
   const sorted = useMemo(() => {
     return [...groups].sort((a, b) => {
-      const aMetric = sortBy === "supply" ? a.bestSupply : a.bestBorrow;
-      const bMetric = sortBy === "supply" ? b.bestSupply : b.bestBorrow;
+      const aMetric =
+        sortBy === "supply"
+          ? parseFloat(a.bestSupply.supplyRate)
+          : parseFloat(a.bestBorrow.borrowRate);
+      const bMetric =
+        sortBy === "supply"
+          ? parseFloat(b.bestSupply.supplyRate)
+          : parseFloat(b.bestBorrow.borrowRate);
       return sortBy === "supply" ? bMetric - aMetric : aMetric - bMetric;
     });
   }, [groups, sortBy]);
@@ -278,16 +284,22 @@ export const MarketsGrouped: FC<{ network: string; search: string }> = ({ networ
       </div>
       {filtered.map(group => (
         <details key={group.name} className="mb-2 collapse collapse-arrow bg-base-200">
-          <summary className="collapse-title flex items-center gap-2 cursor-pointer">
+          <summary className="collapse-title flex flex-row items-center gap-2 cursor-pointer">
             <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
-            {group.name}
+            <span className="font-medium">{group.name}</span>
             <div className="ml-auto flex gap-2">
-              <span className="badge badge-success badge-sm">
-                {group.bestSupply.toFixed(2)}%
-              </span>
-              <span className="badge badge-warning badge-sm">
-                {group.bestBorrow.toFixed(2)}%
-              </span>
+              <RatePill
+                label="supply"
+                rate={group.bestSupply.supplyRate}
+                networkType={group.bestSupply.networkType}
+                protocol={group.bestSupply.protocol}
+              />
+              <RatePill
+                label="borrow"
+                rate={group.bestBorrow.borrowRate}
+                networkType={group.bestBorrow.networkType}
+                protocol={group.bestBorrow.protocol}
+              />
             </div>
           </summary>
           <div className="collapse-content">
