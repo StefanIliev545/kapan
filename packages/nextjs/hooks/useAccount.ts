@@ -47,11 +47,17 @@ export function useAccount(): UseAccountResult {
   // Cache the account instance so re-renders don't trigger a fresh enable
   const accountRef = useRef<AccountInterface | undefined>();
   useEffect(() => {
-    if (account) {
+    if (account && typeof (account as any).execute === "function") {
       accountRef.current = account;
     }
   }, [account]);
-  const stableAccount = account ?? accountRef.current;
+  const stableAccount = useMemo(() => {
+    const a = account ?? accountRef.current;
+    if (a && typeof (a as any).execute === "function") {
+      return a;
+    }
+    return undefined;
+  }, [account]);
 
   // Log status and address changes to help trace unexpected reconnects
   useEffect(() => {
