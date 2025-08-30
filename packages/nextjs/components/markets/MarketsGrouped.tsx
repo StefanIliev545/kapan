@@ -203,6 +203,15 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const vesu = useVesuData();
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
 
+  const aliases: Record<string, string> = {
+    usdt: "USDT",
+    "usd₮0": "USDT",
+    weth: "ETH",
+    eth: "ETH",
+  };
+
+  const canonicalName = (name: string) => aliases[name.toLowerCase()] || name;
+
   const all = useMemo(() => [...aave, ...nostra, ...venus, ...vesu], [aave, nostra, venus, vesu]);
 
   const groups = useMemo(() => {
@@ -216,14 +225,15 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       }
     >();
     all.forEach(m => {
-      const entry = map.get(m.name);
+      const key = canonicalName(m.name);
+      const entry = map.get(key);
       if (entry) {
         entry.markets.push(m);
         if (parseFloat(m.supplyRate) > parseFloat(entry.bestSupply.supplyRate)) entry.bestSupply = m;
         if (parseFloat(m.borrowRate) < parseFloat(entry.bestBorrow.borrowRate)) entry.bestBorrow = m;
       } else {
-        map.set(m.name, {
-          icon: m.icon,
+        map.set(key, {
+          icon: tokenNameToLogo(key.toLowerCase()),
           markets: [m],
           bestSupply: m,
           bestBorrow: m,
@@ -247,10 +257,11 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     });
   }, [groups, sortBy]);
 
-  const filtered = useMemo(
-    () => sorted.filter(g => g.name.toLowerCase().includes(search.toLowerCase())),
-    [sorted, search],
-  );
+  const filtered = useMemo(() => {
+    const lower = search.toLowerCase();
+    const canon = canonicalName(search).toLowerCase();
+    return sorted.filter(g => g.name.toLowerCase().includes(lower) || g.name.toLowerCase().includes(canon));
+  }, [sorted, search]);
 
   const networkIcons: Record<"evm" | "starknet", string> = {
     evm: "/logos/arb.svg",
@@ -288,7 +299,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             <div className="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
               <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{group.name}</span>
-              <div className="ml-auto flex gap-2">
+              <div className="ml-auto mr-8 flex gap-4">
                 <RatePill
                   label="supply"
                   rate={group.bestSupply.supplyRate}
@@ -313,7 +324,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                 <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
                 <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
                 <span className="capitalize">{m.protocol}</span>
-                <div className="ml-auto flex gap-2">
+                <div className="ml-auto flex gap-4">
                   <RatePill
                     label="supply"
                     rate={m.supplyRate}
