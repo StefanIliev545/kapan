@@ -267,81 +267,68 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   return (
     <div>
       <div className="flex justify-end mb-4">
-      <div className="join">
-        <button
-          className={`btn btn-xs join-item ${sortBy === "supply" ? "btn-primary" : "btn-ghost"}`}
-          onClick={() => setSortBy("supply")}
-        >
-          Supply
-        </button>
-        <button
-          className={`btn btn-xs join-item ${sortBy === "borrow" ? "btn-primary" : "btn-ghost"}`}
-          onClick={() => setSortBy("borrow")}
-        >
-          Borrow
-        </button>
-      </div>
+        <div className="join">
+          <button
+            className={`btn btn-xs join-item ${sortBy === "supply" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setSortBy("supply")}
+          >
+            Supply
+          </button>
+          <button
+            className={`btn btn-xs join-item ${sortBy === "borrow" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setSortBy("borrow")}
+          >
+            Borrow
+          </button>
+        </div>
       </div>
       {filtered.map(group => (
-        <details key={group.name} className="mb-2 collapse collapse-arrow bg-base-200">
-          <summary className="collapse-title flex flex-row items-center gap-2 cursor-pointer">
-            <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
-            <span className="font-medium">{group.name}</span>
-            <div className="ml-auto flex gap-2">
-              <RatePill
-                label="supply"
-                rate={group.bestSupply.supplyRate}
-                networkType={group.bestSupply.networkType}
-                protocol={group.bestSupply.protocol}
-              />
-              <RatePill
-                label="borrow"
-                rate={group.bestBorrow.borrowRate}
-                networkType={group.bestBorrow.networkType}
-                protocol={group.bestBorrow.protocol}
-              />
+        <details key={group.name} className="mb-2 collapse collapse-arrow">
+          <summary className="collapse-title p-0 list-none">
+            <div className="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
+              <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
+              <span className="font-medium">{group.name}</span>
+              <div className="ml-auto flex gap-2">
+                <RatePill
+                  label="supply"
+                  rate={group.bestSupply.supplyRate}
+                  networkType={group.bestSupply.networkType}
+                  protocol={group.bestSupply.protocol}
+                />
+                <RatePill
+                  label="borrow"
+                  rate={group.bestBorrow.borrowRate}
+                  networkType={group.bestBorrow.networkType}
+                  protocol={group.bestBorrow.protocol}
+                />
+              </div>
             </div>
           </summary>
-          <div className="collapse-content">
-            <div className="overflow-x-auto">
-              <table className="table table-compact w-full">
-                <thead>
-                  <tr>
-                    <th>Protocol</th>
-                    <th>Network</th>
-                    <th>Supply</th>
-                    <th>Borrow</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.markets.map(m => (
-                    <tr key={m.protocol + m.address}>
-                      <td className="capitalize">
-                        <div className="flex items-center gap-2">
-                          <Image
-                            src={protocolIcons[m.protocol]}
-                            alt={m.protocol}
-                            width={16}
-                            height={16}
-                          />
-                          {m.protocol}
-                        </div>
-                      </td>
-                      <td>
-                        <Image
-                          src={networkIcons[m.networkType]}
-                          alt={m.networkType}
-                          width={16}
-                          height={16}
-                        />
-                      </td>
-                      <td>{m.supplyRate}</td>
-                      <td>{m.borrowRate}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="collapse-content p-0 mt-2 space-y-2">
+            {group.markets.map(m => (
+              <div
+                key={m.protocol + m.address}
+                className="flex items-center gap-2 p-3 rounded-lg bg-base-100"
+              >
+                <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
+                <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
+                <span className="capitalize">{m.protocol}</span>
+                <div className="ml-auto flex gap-2">
+                  <RatePill
+                    label="supply"
+                    rate={m.supplyRate}
+                    networkType={m.networkType}
+                    protocol={m.protocol}
+                  />
+                  <RatePill
+                    label="borrow"
+                    rate={m.borrowRate}
+                    networkType={m.networkType}
+                    protocol={m.protocol}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </details>
       ))}
