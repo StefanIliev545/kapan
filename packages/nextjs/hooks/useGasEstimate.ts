@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { formatEther } from "viem";
 import { usePublicClient } from "wagmi";
 
-export const useGasEstimate = (network: "evm" | "stark", gasUnits: bigint = 200000n) => {
+export const useGasEstimate = (network: "evm" | "stark", txRequest?: any, fallbackUnits: bigint = 200000n) => {
   const publicClient = usePublicClient();
   const [usd, setUsd] = useState(0);
 
@@ -13,6 +13,7 @@ export const useGasEstimate = (network: "evm" | "stark", gasUnits: bigint = 2000
         return;
       }
       try {
+        const gasUnits = txRequest ? await publicClient.estimateGas(txRequest) : fallbackUnits;
         const [gasPrice, priceData] = await Promise.all([
           publicClient.getGasPrice(),
           fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd")
@@ -26,7 +27,7 @@ export const useGasEstimate = (network: "evm" | "stark", gasUnits: bigint = 2000
       }
     };
     fetchGas();
-  }, [publicClient, network, gasUnits]);
+  }, [publicClient, network, txRequest, fallbackUnits]);
 
   return usd;
 };

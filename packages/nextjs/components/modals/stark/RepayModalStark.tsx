@@ -1,7 +1,6 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { formatUnits } from "viem";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
@@ -33,7 +32,6 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
     debtBalance,
     balance,
   );
-  const gasCostUsd = useGasEstimate("stark");
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = balance < bump ? balance : bump;
@@ -51,7 +49,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
       balance={balance}
       percentBase={debtBalance}
       max={maxInput}
-      gasCostUsd={gasCostUsd}
+      network="stark"
       onConfirm={execute}
     />
   );

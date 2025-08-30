@@ -1,7 +1,6 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { useLendingAction } from "~~/hooks/useLendingAction";
 
 interface WithdrawModalProps {
@@ -14,7 +13,7 @@ interface WithdrawModalProps {
 
 export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, protocolName, supplyBalance }) => {
   const decimals = token.decimals;
-  const { execute } = useLendingAction(
+  const { execute, buildTx } = useLendingAction(
     "evm",
     "Withdraw",
     token.address,
@@ -23,7 +22,6 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, 
     undefined,
     supplyBalance,
   );
-  const gasCostUsd = useGasEstimate("evm");
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
   return (
@@ -40,7 +38,8 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, 
       balance={supplyBalance}
       percentBase={supplyBalance}
       max={maxInput}
-      gasCostUsd={gasCostUsd}
+      network="evm"
+      buildTx={buildTx}
       onConfirm={execute}
     />
   );

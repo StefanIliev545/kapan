@@ -2,6 +2,8 @@ import { FC, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
+import type { Network } from "~~/hooks/useTokenBalance";
 
 export interface TokenInfo {
   name: string;
@@ -25,7 +27,8 @@ export interface TokenActionModalProps {
   balance: bigint;
   percentBase?: bigint;
   max?: bigint;
-  gasCostUsd?: number;
+  network: Network;
+  buildTx?: (amount: string, isMax: boolean) => any;
   hf?: number;
   utilization?: number;
   ltv?: number;
@@ -33,6 +36,8 @@ export interface TokenActionModalProps {
 }
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
+
+const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
 const HealthFactor = ({ value }: { value: number }) => {
   const percent = Math.min(100, (value / 3) * 100);
@@ -131,10 +136,7 @@ const PercentInput: FC<{
           ))}
         </div>
       </div>
-      <div className="flex justify-between text-xs opacity-70 mt-1">
-        <span>≈ ${usd}</span>
-        <span>Balance: {format(Number(formatUnits(balance, decimals)))} </span>
-      </div>
+      <div className="text-xs opacity-70 mt-1 text-center">≈ ${usd}</div>
     </>
   );
 };
@@ -174,7 +176,8 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   balance,
   percentBase,
   max,
-  gasCostUsd = 0,
+  network,
+  buildTx,
   hf = 1.9,
   utilization = 65,
   ltv = 75,
@@ -183,6 +186,8 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
+  const txRequest = buildTx ? buildTx(amount, isMax) : undefined;
+  const gasCostUsd = useGasEstimate(network, txRequest);
 
   const parsed = parseFloat(amount || "0");
   const afterValue = (() => {
@@ -242,8 +247,11 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 {protocolName && <div className="text-xs opacity-70">{protocolName}</div>}
               </div>
             </div>
-            <div className="badge badge-outline text-xs w-max">
-              {apyLabel} {apy}%
+            <div className="flex items-center justify-between text-xs">
+              <span className="badge badge-outline">
+                {apyLabel} {formatApy(apy)}%
+              </span>
+              <span>Balance: {format(Number(formatUnits(balance, token.decimals || 18)))}</span>
             </div>
             <PercentInput
               balance={balance}

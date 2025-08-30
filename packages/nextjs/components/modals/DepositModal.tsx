@@ -1,6 +1,5 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
@@ -13,8 +12,7 @@ interface DepositModalProps {
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName }) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
-  const { execute } = useLendingAction("evm", "Deposit", token.address, protocolName, decimals);
-  const gasCostUsd = useGasEstimate("evm");
+  const { execute, buildTx } = useLendingAction("evm", "Deposit", token.address, protocolName, decimals);
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -27,7 +25,8 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       metricLabel="Total supplied"
       before={0}
       balance={balance}
-      gasCostUsd={gasCostUsd}
+      network="evm"
+      buildTx={buildTx}
       onConfirm={execute}
     />
   );

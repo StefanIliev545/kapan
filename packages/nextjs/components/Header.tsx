@@ -6,19 +6,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Bars3Icon,
-  BoltIcon,
-  CurrencyDollarIcon,
-  DocumentChartBarIcon,
-  SparklesIcon,
-  WalletIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
-import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
-import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { Bars3Icon, DocumentChartBarIcon, SparklesIcon, WalletIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
+import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { useOutsideClick } from "~~/hooks/scaffold-eth";
 
 type HeaderMenuLink = {
   label: string;
@@ -41,11 +33,6 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Info",
     href: "/info",
     icon: <DocumentChartBarIcon className="h-5 w-5" />,
-  },
-  {
-    label: "Modal Demos",
-    href: "/modal-expo",
-    icon: <BoltIcon className="h-5 w-5" />,
   },
 ];
 
@@ -347,13 +334,7 @@ export const Header = () => {
                 </div>
                 <div className="h-7 w-[1px] bg-base-300"></div>
                 <div className="px-3 py-1.5 opacity-70">
-                  <Image
-                    width={18}
-                    height={18}
-                    alt="Starknet Logo"
-                    className="dark:hidden"
-                    src="/logos/starknet.svg"
-                  />
+                  <Image width={18} height={18} alt="Starknet Logo" className="dark:hidden" src="/logos/starknet.svg" />
                   <Image
                     width={18}
                     height={18}

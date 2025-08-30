@@ -1,7 +1,6 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { formatUnits } from "viem";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 
 interface WithdrawModalStarkProps {
@@ -31,7 +30,6 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
     vesuContext,
     supplyBalance,
   );
-  const gasCostUsd = useGasEstimate("stark");
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
   return (
@@ -48,7 +46,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
       balance={supplyBalance}
       percentBase={supplyBalance}
       max={maxInput}
-      gasCostUsd={gasCostUsd}
+      network="stark"
       onConfirm={execute}
     />
   );

@@ -1,6 +1,5 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
@@ -15,7 +14,6 @@ interface BorrowModalStarkProps {
 export const BorrowModalStark: FC<BorrowModalStarkProps> = ({ isOpen, onClose, token, protocolName, vesuContext }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
   const { execute } = useLendingAction("stark", "Borrow", token.address, protocolName, decimals, vesuContext);
-  const gasCostUsd = useGasEstimate("stark");
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -28,7 +26,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({ isOpen, onClose, t
       metricLabel="Total debt"
       before={0}
       balance={balance}
-      gasCostUsd={gasCostUsd}
+      network="stark"
       onConfirm={execute}
     />
   );

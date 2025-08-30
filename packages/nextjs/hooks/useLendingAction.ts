@@ -4,7 +4,8 @@ import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, Contract, n
 import { parseUnits } from "viem";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useScaffoldWriteContract as useEvmWrite } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
+import { useDeployedContractInfo as useEthDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo as useStarkDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { feltToString } from "~~/utils/protocols";
 import { notification } from "~~/utils/scaffold-stark";
@@ -30,7 +31,7 @@ export const useLendingAction = (
     const { address, account } = useStarkAccount();
     const { balance: walletBalanceHook = 0n } = useTokenBalance(tokenAddress, "stark");
     const walletBalance = walletBalanceParam ?? walletBalanceHook;
-    const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
+    const { data: routerGateway } = useStarkDeployedContractInfo("RouterGateway");
     const execute = async (amount: string, isMax = false) => {
       if (!address || !account || !decimals || !routerGateway) return;
       try {
@@ -122,22 +123,23 @@ export const useLendingAction = (
         notification.error("Failed to send instruction");
       }
     };
-    return { execute };
+    return { execute, buildTx: undefined };
   }
 
   const { address } = useEvmAccount();
   const { balance: walletBalanceHook = 0n } = useTokenBalance(tokenAddress, "evm");
   const walletBalance = walletBalanceParam ?? walletBalanceHook;
   const { writeContractAsync } = useEvmWrite({ contractName: "RouterGateway" });
+  const { data: routerGateway } = useEthDeployedContractInfo({ contractName: "RouterGateway" });
   const fnMap: Record<Action, string> = {
     Borrow: "borrow",
     Deposit: "supply",
     Repay: "repay",
     Withdraw: "withdraw",
   };
-  const execute = async (amount: string, isMax = false) => {
-    if (!decimals || !address) return;
-    let parsed = parseUnits(amount, decimals);
+  const buildTx = (amount: string, isMax = false) => {
+    if (!decimals || !address || !routerGateway) return undefined;
+    let parsed = parseUnits(amount || "0", decimals);
     if (isMax) {
       if (action === "Repay") {
         const bumped = maxAmount !== undefined ? (maxAmount * 101n) / 100n : (parsed * 101n) / 100n;
@@ -146,10 +148,18 @@ export const useLendingAction = (
         parsed = (maxAmount * 101n) / 100n;
       }
     }
-    await writeContractAsync({
-      functionName: fnMap[action] as any,
-      args: [protocolName.toLowerCase(), tokenAddress, address, parsed] as any,
-    });
+    return {
+      address: routerGateway.address as `0x${string}`,
+      abi: routerGateway.abi,
+      functionName: fnMap[action],
+      args: [protocolName.toLowerCase(), tokenAddress, address, parsed] as const,
+    };
   };
-  return { execute };
+
+  const execute = async (amount: string, isMax = false) => {
+    const tx = buildTx(amount, isMax);
+    if (!tx) return;
+    await writeContractAsync(tx as any);
+  };
+  return { execute, buildTx };
 };
