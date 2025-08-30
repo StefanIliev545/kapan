@@ -28,7 +28,7 @@ type HeaderMenuLink = {
 
 export const menuLinks: HeaderMenuLink[] = [
   {
-    label: "Manage",
+    label: "Lending",
     href: "/app",
     icon: <WalletIcon className="h-5 w-5" />,
   },
