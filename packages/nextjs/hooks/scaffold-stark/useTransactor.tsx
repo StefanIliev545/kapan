@@ -31,7 +31,7 @@ const TxnNotification = ({ message, blockExplorerLink }: { message: string; bloc
  */
 export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc => {
   let walletClient = _walletClient;
-  const { account, address, status } = useAccount();
+  const { account, address, status, chainId: accountChainId } = useAccount();
   const { targetNetwork } = useTargetNetwork();
   if (walletClient === undefined && account) {
     walletClient = account;
@@ -47,7 +47,17 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
     let notificationId = null;
     let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
     try {
-      const networkId = await walletClient.getChainId();
+      let networkId: bigint | string | undefined;
+      if (typeof (walletClient as any).getChainId === "function") {
+        try {
+          networkId = await (walletClient as any).getChainId();
+        } catch (err) {
+          console.warn("useTransactor: getChainId threw", err);
+        }
+      }
+      if (!networkId && accountChainId) {
+        networkId = accountChainId;
+      }
       notificationId = notification.loading(<TxnNotification message="Awaiting for user confirmation" />);
       if (typeof tx === "function") {
         // Tx is already prepared by the caller

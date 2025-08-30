@@ -25,6 +25,7 @@ vi.mock("~~/hooks/useAccount", () => ({
     },
     address: "mock-address",
     status: "connected",
+    chainId: 1n,
   })),
 }));
 
@@ -47,6 +48,7 @@ describe("useTransactor", () => {
       account: walletClientMock,
       address: "mock-address",
       status: "connected",
+      chainId: 1n,
     });
 
     (useTargetNetwork as Mock).mockReturnValue({
@@ -139,6 +141,12 @@ describe("useTransactor", () => {
   it("should set blockExplorerTxURL to an empty string if networkId is falsy", async () => {
     const mockGetChainId = vi.fn().mockResolvedValue(null);
     (walletClientMock as any).getChainId = mockGetChainId;
+    (useAccount as Mock).mockReturnValue({
+      account: walletClientMock,
+      address: "mock-address",
+      status: "connected",
+      chainId: undefined,
+    });
 
     (getBlockExplorerTxLink as Mock).mockReturnValue("");
 
@@ -161,6 +169,34 @@ describe("useTransactor", () => {
       ? getBlockExplorerTxLink("mock-network", "mock-tx-hash")
       : "";
     expect(blockExplorerTxURL).toBe("");
+  });
+
+  it("should fall back to account chainId when getChainId is missing", async () => {
+    delete (walletClientMock as any).getChainId;
+    (useAccount as Mock).mockReturnValue({
+      account: walletClientMock,
+      address: "mock-address",
+      status: "connected",
+      chainId: 123n,
+    });
+
+    const { result } = renderHook(() =>
+      useTransactor(walletClientMock as AccountInterface),
+    );
+
+    const mockTx = vi
+      .fn()
+      .mockResolvedValue({ transaction_hash: "mock-tx-hash" });
+
+    await act(async () => {
+      const transactionHash = await result.current(mockTx);
+      expect(transactionHash).toBe("mock-tx-hash");
+    });
+
+    expect(getBlockExplorerTxLink).toHaveBeenCalledWith(
+      "mock-network",
+      "mock-tx-hash",
+    );
   });
 
   it("should handle string transaction results", async () => {
