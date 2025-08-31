@@ -3,14 +3,15 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { ListBulletIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { LendingSidebar } from "~~/components/LendingSidebar";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
+import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 import { AaveMarkets } from "~~/components/specific/aave/AaveMarkets";
+import { CompoundMarkets } from "~~/components/specific/compound/CompoundMarkets";
 import { NostraMarkets } from "~~/components/specific/nostra/NostraMarkets";
 import { VenusMarkets } from "~~/components/specific/venus/VenusMarkets";
-import { VesuMarkets, POOL_IDS, ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
+import { ContractResponse, POOL_IDS, VesuMarkets } from "~~/components/specific/vesu/VesuMarkets";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
-import { LendingSidebar } from "~~/components/LendingSidebar";
-import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 
 const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
@@ -35,11 +36,7 @@ const MarketsPage: NextPage = () => {
     <div className="container mx-auto px-5 flex">
       <LendingSidebar />
       <div className="flex-1">
-        <div
-          className={`flex items-center mb-4 ${
-            groupMode === "protocol" ? "justify-between" : "justify-end"
-          }`}
-        >
+        <div className={`flex items-center mb-4 ${groupMode === "protocol" ? "justify-between" : "justify-end"}`}>
           {groupMode === "protocol" && (
             <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
           )}
@@ -92,6 +89,7 @@ const MarketsPage: NextPage = () => {
             {selectedNetwork === "arbitrum" && (
               <>
                 <AaveMarkets viewMode={viewMode} search={search} />
+                <CompoundMarkets viewMode={viewMode} search={search} />
                 <VenusMarkets viewMode={viewMode} search={search} />
               </>
             )}

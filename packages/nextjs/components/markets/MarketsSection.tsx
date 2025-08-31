@@ -11,7 +11,7 @@ export interface MarketData {
   utilization: string;
   address: string;
   networkType: "evm" | "starknet";
-  protocol: "aave" | "nostra" | "venus" | "vesu";
+  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
 }
 
 interface MarketsSectionProps {
@@ -44,7 +44,9 @@ export const MarketsSection: FC<MarketsSectionProps> = ({ title, markets, viewMo
       <div className="card-body p-4">
         <h2 className="card-title text-lg mb-4">{title}</h2>
         {extra}
-        <div className={viewMode === "grid" ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" : "space-y-2"}>{marketItems}</div>
+        <div className={viewMode === "grid" ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" : "space-y-2"}>
+          {marketItems}
+        </div>
       </div>
     </div>
   );
