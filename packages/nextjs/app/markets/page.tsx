@@ -36,36 +36,8 @@ const MarketsPage: NextPage = () => {
     <div className="container mx-auto px-5 flex">
       <LendingSidebar />
       <div className="flex-1">
-        <div className={`flex items-center mb-4 ${groupMode === "protocol" ? "justify-between" : "justify-end"}`}>
-          {groupMode === "protocol" && (
-            <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search"
-              className="input input-bordered input-xs w-28"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            {groupMode === "protocol" && (
-              <div className="join">
-                <button
-                  className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => setViewMode("list")}
-                  aria-label="List view"
-                >
-                  <ListBulletIcon className="h-4 w-4" />
-                </button>
-                <button
-                  className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => setViewMode("grid")}
-                  aria-label="Grid view"
-                >
-                  <Squares2X2Icon className="h-4 w-4" />
-                </button>
-              </div>
-            )}
+        {(() => {
+          const groupButtons = (
             <div className="join">
               <button
                 className={`btn btn-xs join-item ${groupMode === "token" ? "btn-primary" : "btn-ghost"}`}
@@ -80,8 +52,59 @@ const MarketsPage: NextPage = () => {
                 Protocol
               </button>
             </div>
-          </div>
-        </div>
+          );
+
+          return (
+            <div
+              className={`mb-4 ${
+                groupMode === "protocol" ? "flex items-center justify-between" : "flex flex-col items-center gap-4"
+              }`}
+            >
+              {groupMode === "protocol" && (
+                <NetworkFilter
+                  networks={networkOptions}
+                  defaultNetwork="starknet"
+                  onNetworkChange={setSelectedNetwork}
+                />
+              )}
+              <div
+                className={`flex items-center gap-2 ${
+                  groupMode === "token" ? "w-full justify-center" : ""
+                }`}
+              >
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className={`input input-bordered ${
+                    groupMode === "protocol" ? "input-xs w-28" : "input-md w-full max-w-md text-center"
+                  }`}
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+                {groupMode === "protocol" && (
+                  <div className="join">
+                    <button
+                      className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => setViewMode("list")}
+                      aria-label="List view"
+                    >
+                      <ListBulletIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => setViewMode("grid")}
+                      aria-label="Grid view"
+                    >
+                      <Squares2X2Icon className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                {groupMode === "protocol" && groupButtons}
+              </div>
+              {groupMode === "token" && groupButtons}
+            </div>
+          );
+        })()}
         {groupMode === "token" ? (
           <MarketsGrouped search={search} />
         ) : (
