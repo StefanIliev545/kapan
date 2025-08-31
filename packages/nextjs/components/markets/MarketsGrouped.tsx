@@ -370,9 +370,9 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       </div>
       <div className="space-y-4">
         {filtered.map(group => (
-          <details key={group.name} className="collapse collapse-arrow bg-base-100 rounded-lg">
+          <details key={group.name} className="collapse collapse-arrow rounded-lg">
             <summary className="collapse-title p-0 list-none">
-              <div className="flex items-center gap-4 p-4 bg-base-200 rounded-lg">
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-base-100 border border-base-300 hover:bg-base-200 cursor-pointer">
                 <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
                 <span className="font-medium">{group.name}</span>
                 <div className="ml-auto mr-8 flex gap-4">

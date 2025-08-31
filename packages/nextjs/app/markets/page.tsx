@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { NextPage } from "next";
-import { ListBulletIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { LendingSidebar } from "~~/components/LendingSidebar";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
@@ -36,18 +36,23 @@ const MarketsPage: NextPage = () => {
     <div className="container mx-auto px-5 flex">
       <LendingSidebar />
       <div className="flex-1">
-        <div className={`flex items-center mb-4 ${groupMode === "protocol" ? "justify-between" : "justify-end"}`}>
+        <div className="flex items-center mb-4">
           {groupMode === "protocol" && (
             <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
           )}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search"
-              className="input input-bordered input-xs w-28"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+          <div className="flex-1 flex justify-center">
+            <div className="relative w-full max-w-md">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/50" />
+              <input
+                type="text"
+                placeholder="Search"
+                className="input input-bordered w-full rounded-full pl-10"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-4">
             {groupMode === "protocol" && (
               <div className="join">
                 <button
