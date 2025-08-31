@@ -209,8 +209,8 @@ mod RouterGateway {
                         let basic = *repay.basic;
                         let erc20 = IERC20Dispatcher { contract_address: basic.token };
                         let balance = erc20.balance_of(get_contract_address());
-                        if *balancesBefore.at(i) >= balance {
-                            let diff = *balancesBefore.at(i) - balance;
+                        if balance >= *balancesBefore.at(i) {
+                            let diff = balance - *balancesBefore.at(i);
                             balancesAfter.append(diff);
                         } else {
                             balancesAfter.append(0); // Prevent underflow for now
