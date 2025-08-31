@@ -2,23 +2,17 @@
 
 import { FC, useMemo, useState } from "react";
 import Image from "next/image";
-import { useAccount } from "wagmi";
-import { formatUnits } from "viem";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
-import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold-eth";
-import {
-  feltToString,
-  formatPrice,
-  formatRate,
-  formatUtilization,
-  toAnnualRates,
-} from "~~/utils/protocols";
-import { POOL_IDS, ContractResponse } from "../specific/vesu/VesuMarkets";
+import { ContractResponse, POOL_IDS } from "../specific/vesu/VesuMarkets";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
+import { formatUnits } from "viem";
+import { useAccount } from "wagmi";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 
 // Helper: Aave rate conversion
 const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
@@ -30,6 +24,13 @@ const convertVenusRate = (ratePerBlock: bigint): number => {
   const daysPerYear = 365;
   const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
   return (Math.pow(ratePerBlockNum * blocksPerDay + 1, daysPerYear - 1) - 1) * 100;
+};
+
+// Helper: Compound rate conversion
+const convertCompoundRate = (ratePerSecond: bigint): number => {
+  const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
+  const SCALE = 1e18;
+  return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
 };
 
 const useAaveData = (): MarketData[] => {
@@ -62,6 +63,68 @@ const useAaveData = (): MarketData[] => {
       } as MarketData;
     });
   }, [allTokensInfo]);
+};
+
+const useCompoundData = (): MarketData[] => {
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const { data: weth } = useDeployedContractInfo({ contractName: "eth" });
+  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC" });
+  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT" });
+  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe" });
+
+  const { data: wethData } = useNetworkAwareReadContract({
+    networkType: "evm",
+    contractName: "CompoundGateway",
+    functionName: "getCompoundData",
+    args: [weth?.address, ZERO_ADDRESS],
+  });
+  const { data: usdcData } = useNetworkAwareReadContract({
+    networkType: "evm",
+    contractName: "CompoundGateway",
+    functionName: "getCompoundData",
+    args: [usdc?.address, ZERO_ADDRESS],
+  });
+  const { data: usdtData } = useNetworkAwareReadContract({
+    networkType: "evm",
+    contractName: "CompoundGateway",
+    functionName: "getCompoundData",
+    args: [usdt?.address, ZERO_ADDRESS],
+  });
+  const { data: usdcEData } = useNetworkAwareReadContract({
+    networkType: "evm",
+    contractName: "CompoundGateway",
+    functionName: "getCompoundData",
+    args: [usdcE?.address, ZERO_ADDRESS],
+  });
+
+  return useMemo(() => {
+    const tokens = [
+      { symbol: "WETH", address: weth?.address, data: wethData },
+      { symbol: "USDC", address: usdc?.address, data: usdcData },
+      { symbol: "USDT", address: usdt?.address, data: usdtData },
+      { symbol: "USDC.e", address: usdcE?.address, data: usdcEData },
+    ];
+    return tokens
+      .filter(t => t.address && t.data)
+      .map(t => {
+        const [supplyRate, borrowRate, , , price] = t.data as any;
+        const supplyAPR = supplyRate ? convertCompoundRate(BigInt(supplyRate)) : 0;
+        const borrowAPR = borrowRate ? convertCompoundRate(BigInt(borrowRate)) : 0;
+        const priceNum = price ? Number(formatUnits(price, 8)) : 0;
+        const utilization = borrowAPR > 0 ? (supplyAPR / borrowAPR) * 100 : 0;
+        return {
+          icon: tokenNameToLogo(t.symbol),
+          name: t.symbol,
+          supplyRate: `${supplyAPR.toFixed(2)}%`,
+          borrowRate: `${borrowAPR.toFixed(2)}%`,
+          price: priceNum.toFixed(2),
+          utilization: utilization.toFixed(2),
+          address: t.address as string,
+          networkType: "evm",
+          protocol: "compound",
+        } as MarketData;
+      });
+  }, [weth?.address, usdc?.address, usdt?.address, usdcE?.address, wethData, usdcData, usdtData, usdcEData]);
 };
 
 const useNostraData = (): MarketData[] => {
@@ -198,6 +261,7 @@ const useVesuData = (): MarketData[] => {
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const aave = useAaveData();
+  const compound = useCompoundData();
   const nostra = useNostraData();
   const venus = useVenusData();
   const vesu = useVesuData();
@@ -212,7 +276,10 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
 
   const canonicalName = (name: string) => aliases[name.toLowerCase()] || name;
 
-  const all = useMemo(() => [...aave, ...nostra, ...venus, ...vesu], [aave, nostra, venus, vesu]);
+  const all = useMemo(
+    () => [...aave, ...compound, ...nostra, ...venus, ...vesu],
+    [aave, compound, nostra, venus, vesu],
+  );
 
   const groups = useMemo(() => {
     const map = new Map<
@@ -245,14 +312,8 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
 
   const sorted = useMemo(() => {
     return [...groups].sort((a, b) => {
-      const aMetric =
-        sortBy === "supply"
-          ? parseFloat(a.bestSupply.supplyRate)
-          : parseFloat(a.bestBorrow.borrowRate);
-      const bMetric =
-        sortBy === "supply"
-          ? parseFloat(b.bestSupply.supplyRate)
-          : parseFloat(b.bestBorrow.borrowRate);
+      const aMetric = sortBy === "supply" ? parseFloat(a.bestSupply.supplyRate) : parseFloat(a.bestBorrow.borrowRate);
+      const bMetric = sortBy === "supply" ? parseFloat(b.bestSupply.supplyRate) : parseFloat(b.bestBorrow.borrowRate);
       return sortBy === "supply" ? bMetric - aMetric : aMetric - bMetric;
     });
   }, [groups, sortBy]);
@@ -268,11 +329,12 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     starknet: "/logos/starknet.svg",
   };
 
-  const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu", string> = {
+  const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
     aave: "/logos/aave.svg",
     nostra: "/logos/nostra.svg",
     venus: "/logos/venus.svg",
     vesu: "/logos/vesu.svg",
+    compound: "/logos/compound.svg",
   };
 
   const networkNames: Record<"evm" | "starknet", string> = {
@@ -280,11 +342,12 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     starknet: "Starknet",
   };
 
-  const protocolNames: Record<"aave" | "nostra" | "venus" | "vesu", string> = {
+  const protocolNames: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
     aave: "Aave",
     nostra: "Nostra",
     venus: "Venus",
     vesu: "Vesu",
+    compound: "Compound",
   };
 
   return (
