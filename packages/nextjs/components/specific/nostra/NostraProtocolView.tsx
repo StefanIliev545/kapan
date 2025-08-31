@@ -127,28 +127,36 @@ export const NostraProtocolView: FC = () => {
       // Convert rates to APY/APR (rates are in RAY format - 1e27)
       const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e16 : 0; // Convert to percentage
       const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e16 : 0; // Convert to percentage
+
+      // Convert token amounts to numbers and multiply by USD price to get fiat value
+      const decimals = tokenToDecimals[underlying];
+      const tokenPrice = tokenToPrices[underlying] ?? 0n;
+      const tokenPriceNumber = Number(tokenPrice) / 1e8; // tokenPrice has 8 decimals of precision
+      const suppliedAmount = Number(formatUnits(collateralBalance, decimals));
+      const borrowedAmount = Number(formatUnits(debtBalance, decimals));
+
       // Add supply position
       supplied.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        balance: Number(formatUnits(collateralBalance, tokenToDecimals[underlying])), // Assuming 18 decimals
+        balance: suppliedAmount * tokenPriceNumber,
         tokenBalance: collateralBalance,
         currentRate: supplyAPY,
         tokenAddress: underlying,
-        tokenDecimals: tokenToDecimals[underlying],
-        tokenPrice: tokenToPrices[underlying] ?? 0,
+        tokenDecimals: decimals,
+        tokenPrice,
       });
 
       // Add borrow position
       borrowed.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        balance: -Number(formatUnits(debtBalance, tokenToDecimals[underlying])), // Negative balance for borrowed amount
+        balance: -borrowedAmount * tokenPriceNumber, // Negative balance for borrowed amount
         tokenBalance: debtBalance,
         currentRate: borrowAPR,
         tokenAddress: underlying,
-        tokenDecimals: tokenToDecimals[underlying],
-        tokenPrice: tokenToPrices[underlying] ?? 0,
+        tokenDecimals: decimals,
+        tokenPrice,
       });
     });
 
