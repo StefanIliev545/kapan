@@ -370,9 +370,9 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       </div>
       <div className="space-y-4">
         {filtered.map(group => (
-          <details key={group.name} className="collapse collapse-arrow bg-base-100 rounded-lg">
+          <details key={group.name} className="collapse collapse-arrow rounded-lg">
             <summary className="collapse-title p-0 list-none">
-              <div className="flex items-center gap-4 p-4 bg-base-200 rounded-lg">
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-base-100 border border-base-300 hover:bg-base-200 cursor-pointer">
                 <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
                 <span className="font-medium">{group.name}</span>
                 <div className="ml-auto mr-8 flex gap-4">
@@ -393,57 +393,42 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                 </div>
               </div>
             </summary>
-            <div className="collapse-content p-0 mt-2">
-              <div className="overflow-x-auto">
-                <table className="table table-sm w-full">
-                  <thead>
-                    <tr className="bg-base-200">
-                      <th>Network</th>
-                      <th>Protocol</th>
-                      <th className="text-center">Supply Rate</th>
-                      <th className="text-center">Borrow Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.markets.map(m => (
-                      <tr key={m.protocol + m.address} className="bg-base-100 hover:bg-base-200">
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
-                            <span>{networkNames[m.networkType]}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
-                            <span className="capitalize">{protocolNames[m.protocol]}</span>
-                          </div>
-                        </td>
-                        <td className="text-center">
-                          <RatePill
-                            variant="supply"
-                            label="Supply Rate"
-                            rate={m.supplyRate}
-                            networkType={m.networkType}
-                            protocol={m.protocol}
-                            showIcons={false}
-                          />
-                        </td>
-                        <td className="text-center">
-                          <RatePill
-                            variant="borrow"
-                            label="Borrow Rate"
-                            rate={m.borrowRate}
-                            networkType={m.networkType}
-                            protocol={m.protocol}
-                            showIcons={false}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="collapse-content p-0 mt-2 space-y-2">
+              {group.markets.map(m => (
+                <div
+                  key={m.protocol + m.address}
+                  className="grid grid-cols-4 items-center gap-4 p-3 rounded-lg bg-base-100"
+                >
+                  <div className="flex items-center gap-2">
+                    <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
+                    <span>{networkNames[m.networkType]}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
+                    <span className="capitalize">{protocolNames[m.protocol]}</span>
+                  </div>
+                  <div className="justify-self-center">
+                    <RatePill
+                      variant="supply"
+                      label="Supply Rate"
+                      rate={m.supplyRate}
+                      networkType={m.networkType}
+                      protocol={m.protocol}
+                      showIcons={false}
+                    />
+                  </div>
+                  <div className="justify-self-center">
+                    <RatePill
+                      variant="borrow"
+                      label="Borrow Rate"
+                      rate={m.borrowRate}
+                      networkType={m.networkType}
+                      protocol={m.protocol}
+                      showIcons={false}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </details>
         ))}
