@@ -37,6 +37,13 @@ export interface TokenActionModalProps {
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
+const formatUsd = (usd: number) => {
+  if (usd === 0) return "0.000";
+  if (usd < 0.01) return usd.toFixed(4);
+  if (usd < 1) return usd.toFixed(3);
+  return usd.toFixed(2);
+};
+
 const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
 const HealthFactor = ({ value }: { value: number }) => {
@@ -289,7 +296,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                   )}
                 </span>
                 <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump /> ${gasCostUsd < 0.01 ? gasCostUsd.toFixed(4) : gasCostUsd.toFixed(2)}
+                  <FaGasPump /> ${formatUsd(gasCostUsd)}
                 </span>
               </button>
             </div>
