@@ -57,10 +57,29 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     order: "alphabetical",
   });
   const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
+  const loggingConnectors = useMemo(
+    () =>
+      liveConnectors.map(connector =>
+        new Proxy(connector, {
+          get(target, prop, receiver) {
+            const value = Reflect.get(target, prop, receiver);
+            if (prop === "connect" && typeof value === "function") {
+              return async (...args: unknown[]) => {
+                console.log(`Connecting with ${target.id}`);
+                // eslint-disable-next-line @typescript-eslint/ban-types
+                return (value as Function).apply(target, args);
+              };
+            }
+            return value;
+          },
+        }) as typeof connector,
+      ),
+    [liveConnectors],
+  );
 
   const connectorsRef = useRef<typeof liveConnectors | null>(null);
-  if (!connectorsRef.current && liveConnectors?.length) {
-    connectorsRef.current = liveConnectors;
+  if (!connectorsRef.current && loggingConnectors?.length) {
+    connectorsRef.current = loggingConnectors;
   }
 
   return (
