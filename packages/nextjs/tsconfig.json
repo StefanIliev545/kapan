@@ -15,7 +15,12 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "~~/*": ["./*"]
+      "~~/*": ["./*"],
+      "wagmi": ["./services/web3/noopWagmi"],
+      "@rainbow-me/rainbowkit": ["./services/web3/noopRainbowKit"],
+      "@wagmi/core": ["./services/web3/noopWagmiCore"],
+      "wagmi/query": ["./services/web3/noopWagmiQuery"],
+      "wagmi/actions": ["./services/web3/noopWagmiActions"]
     },
     "plugins": [
       {
