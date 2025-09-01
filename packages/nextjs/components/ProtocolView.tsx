@@ -437,7 +437,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 value: BigInt(pos.tokenPrice || 0),
                 is_valid: true
               },
-              total_nominal_debt: BigInt(0),
+              total_nominal_debt: pos.tokenBalance ?? 0n,
               last_rate_accumulator: BigInt(0),
               reserve: BigInt(0),
               scale: BigInt(0),

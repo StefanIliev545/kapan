@@ -147,6 +147,12 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
             }}
             protocolName={protocolName}
+            currentDebt={
+              selectedToken.tokenBalance
+                ? Number(selectedToken.tokenBalance) /
+                    10 ** (selectedToken.tokenDecimals || 18)
+                : 0
+            }
             position={position}
           />
         ) : (
