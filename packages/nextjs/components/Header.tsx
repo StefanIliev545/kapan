@@ -18,8 +18,6 @@ import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
-import { SwitchTheme } from "~~/components/SwitchTheme";
-import { ThemeSettings } from "~~/components/ThemeSettings";
 
 type HeaderMenuLink = {
   label: string;
@@ -42,11 +40,6 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Info",
     href: "/info",
     icon: <DocumentChartBarIcon className="h-5 w-5" />,
-  },
-  {
-    label: "Modal Demos",
-    href: "/modal-expo",
-    icon: <BeakerIcon className="h-5 w-5" />,
   },
 ];
 
