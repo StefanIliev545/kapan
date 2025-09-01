@@ -7,7 +7,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
-import { WagmiProvider } from "wagmi";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
@@ -16,7 +15,6 @@ import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
 import { StarkBlockNumberProvider } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
 import provider from "~~/services/web3/provider";
-import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
@@ -71,21 +69,19 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       explorer={starkscan}
       autoConnect={false}
     >
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <BlockNumberProvider>
-            <StarkBlockNumberProvider>
-              <ProgressBar height="3px" color="#2299dd" />
-              <RainbowKitProvider
-                avatar={BlockieAvatar}
-                theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-              >
-                <ScaffoldEthApp>{children}</ScaffoldEthApp>
-              </RainbowKitProvider>
-            </StarkBlockNumberProvider>
-          </BlockNumberProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
+      <QueryClientProvider client={queryClient}>
+        <BlockNumberProvider>
+          <StarkBlockNumberProvider>
+            <ProgressBar height="3px" color="#2299dd" />
+            <RainbowKitProvider
+              avatar={BlockieAvatar}
+              theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+            >
+              <ScaffoldEthApp>{children}</ScaffoldEthApp>
+            </RainbowKitProvider>
+          </StarkBlockNumberProvider>
+        </BlockNumberProvider>
+      </QueryClientProvider>
     </StarknetConfig>
   );
 };
