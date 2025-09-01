@@ -1,22 +1,16 @@
 import { FC } from "react";
-import { BaseTokenModal } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "../TokenActionModal";
+import { formatUnits } from "viem";
+import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
 interface RepayModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
-  token: {
-    name: string;
-    icon: string;
-    address: string;
-    currentRate: number;
-    protocolAmount?: bigint;
-    usdPrice?: number;
-  };
+  token: TokenInfo;
   protocolName: string;
-  vesuContext?: {
-    pool_id: bigint;
-    counterpart_token: string;
-  };
+  debtBalance: bigint;
+  vesuContext?: VesuContext;
 }
 
 export const RepayModalStark: FC<RepayModalStarkProps> = ({
@@ -24,17 +18,39 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   onClose,
   token,
   protocolName,
+  debtBalance,
   vesuContext,
 }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { execute } = useLendingAction(
+    "stark",
+    "Repay",
+    token.address,
+    protocolName,
+    decimals,
+    vesuContext,
+    debtBalance,
+    balance,
+  );
+  const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
+  const bump = (debtBalance * 101n) / 100n;
+  const maxInput = balance < bump ? balance : bump;
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Repay"
       token={token}
       protocolName={protocolName}
-      actionType="repay"
-      actionLabel="Repay"
-      vesuContext={vesuContext}
+      apyLabel="Borrow APY"
+      apy={token.currentRate}
+      metricLabel="Total debt"
+      before={before}
+      balance={balance}
+      percentBase={debtBalance}
+      max={maxInput}
+      network="stark"
+      onConfirm={execute}
     />
   );
-}; 
+};

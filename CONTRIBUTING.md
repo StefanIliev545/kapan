@@ -36,6 +36,7 @@ Contributions are made via Issues and Pull Requests (PRs). A few general guideli
 - Contributions should only fix/add the functionality in the issue OR address style issues, not both.
 - If you're running into an error, please give context. Explain what you're trying to do and how to reproduce the error.
 - Please use the same formatting in the code repository. You can configure your IDE to do it by using the prettier / linting config files included in each package.
+- Avoid adding `eslint-config-prettier` as a dependency. The package has been hijacked and may contain malware.
 - If applicable, please edit the README.md file to reflect the changes.
 
 ### Issues

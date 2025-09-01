@@ -1,5 +1,7 @@
 import { FC } from "react";
-import { BaseTokenModal, TokenInfo } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "./TokenActionModal";
+import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -9,14 +11,23 @@ interface DepositModalProps {
 }
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "evm");
+  const { execute, buildTx } = useLendingAction("evm", "Deposit", token.address, protocolName, decimals);
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Deposit"
       token={token}
       protocolName={protocolName}
-      actionType="deposit"
-      actionLabel="Deposit"
+      apyLabel="Supply APY"
+      apy={token.currentRate}
+      metricLabel="Total supplied"
+      before={0}
+      balance={balance}
+      network="evm"
+      buildTx={buildTx}
+      onConfirm={execute}
     />
   );
 };

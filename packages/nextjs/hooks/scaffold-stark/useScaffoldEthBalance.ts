@@ -4,6 +4,7 @@ import { useReadContract } from "@starknet-react/core";
 import { BlockNumber } from "starknet";
 import { Abi } from "abi-wan-kanabi";
 import { formatUnits } from "ethers";
+import { useStarkBlockNumber } from "./useBlockNumberContext";
 
 type UseScaffoldEthBalanceProps = {
   address?: Address | string;
@@ -12,14 +13,16 @@ type UseScaffoldEthBalanceProps = {
 const useScaffoldEthBalance = ({ address }: UseScaffoldEthBalanceProps) => {
   const { data: deployedContract } = useDeployedContractInfo("Eth");
 
+  const blockNumber = useStarkBlockNumber();
+
   const { data, ...props } = useReadContract({
     functionName: "balance_of",
     address: deployedContract?.address,
     abi: deployedContract?.abi as Abi as any[],
-    watch: true,
+    watch: false,
     enabled: true,
     args: address ? [address] : [],
-    blockIdentifier: "pending" as BlockNumber,
+    blockIdentifier: (blockNumber as unknown as BlockNumber) ?? ("pending" as BlockNumber),
   });
 
   return {

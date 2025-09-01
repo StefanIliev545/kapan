@@ -11,6 +11,7 @@ import { CompoundProtocolView } from "~~/components/specific/compound/CompoundPr
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
 import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
 import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
+import { LendingSidebar } from "~~/components/LendingSidebar";
 // Define network options
 const networkOptions: NetworkOption[] = [
   {
@@ -67,25 +68,28 @@ const App: NextPage = () => {
   ];
 
   return (
-    <div className="container mx-auto px-5">
-      <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+    <div className="container mx-auto px-5 flex">
+      <LendingSidebar />
+      <div className="flex-1">
+        <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 
-      {/* Protocol Views */}
-      {selectedNetwork === "arbitrum" && (
-        <>
-          <AaveProtocolView />
-          <CompoundProtocolView />
-          <VenusProtocolView />
-        </>
-      )}
-      {selectedNetwork === "starknet" && (
-        <>
-          <VesuProtocolView />
-          <NostraProtocolView />
-        </>
-      )}
-      {/* Custom Call to Action with additional section */}
-      <CallToAction sections={customSections} />
+        {/* Protocol Views */}
+        {selectedNetwork === "arbitrum" && (
+          <>
+            <AaveProtocolView />
+            <CompoundProtocolView />
+            <VenusProtocolView />
+          </>
+        )}
+        {selectedNetwork === "starknet" && (
+          <>
+            <VesuProtocolView />
+            <NostraProtocolView />
+          </>
+        )}
+        {/* Custom Call to Action with additional section */}
+        <CallToAction sections={customSections} />
+      </div>
     </div>
   );
 };

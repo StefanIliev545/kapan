@@ -1,22 +1,15 @@
 import { FC } from "react";
-import { BaseTokenModal } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "../TokenActionModal";
+import { formatUnits } from "viem";
+import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 
 interface WithdrawModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
-  token: {
-    name: string;
-    icon: string;
-    address: string;
-    currentRate: number;
-    protocolAmount?: bigint;
-    usdPrice?: number;
-  };
+  token: TokenInfo;
   protocolName: string;
-  vesuContext?: {
-    pool_id: bigint;
-    counterpart_token: string;
-  };
+  supplyBalance: bigint;
+  vesuContext?: VesuContext;
 }
 
 export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
@@ -24,17 +17,37 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
   onClose,
   token,
   protocolName,
+  supplyBalance,
   vesuContext,
 }) => {
+  const decimals = token.decimals;
+  const { execute } = useLendingAction(
+    "stark",
+    "Withdraw",
+    token.address,
+    protocolName,
+    decimals,
+    vesuContext,
+    supplyBalance,
+  );
+  const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
+  const maxInput = (supplyBalance * 101n) / 100n;
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Withdraw"
       token={token}
       protocolName={protocolName}
-      actionType="withdraw"
-      actionLabel="Withdraw"
-      vesuContext={vesuContext}
+      apyLabel="Supply APY"
+      apy={token.currentRate}
+      metricLabel="Total supplied"
+      before={before}
+      balance={supplyBalance}
+      percentBase={supplyBalance}
+      max={maxInput}
+      network="stark"
+      onConfirm={execute}
     />
   );
-}; 
+};

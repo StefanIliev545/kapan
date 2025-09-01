@@ -1,39 +1,32 @@
 import { FC } from "react";
-import { BaseTokenModal } from "./BaseTokenModal";
+import { TokenActionModal, TokenInfo } from "../TokenActionModal";
+import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
 interface DepositModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
-  token: {
-    name: string;
-    icon: string;
-    address: string;
-    currentRate: number;
-    usdPrice?: number;
-  };
+  token: TokenInfo;
   protocolName: string;
-  vesuContext?: {
-    pool_id: bigint;
-    counterpart_token: string;
-  };
 }
 
-export const DepositModalStark: FC<DepositModalStarkProps> = ({
-  isOpen,
-  onClose,
-  token,
-  protocolName,
-  vesuContext,
-}) => {
+export const DepositModalStark: FC<DepositModalStarkProps> = ({ isOpen, onClose, token, protocolName }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { execute } = useLendingAction("stark", "Deposit", token.address, protocolName, decimals);
   return (
-    <BaseTokenModal
+    <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
+      action="Deposit"
       token={token}
       protocolName={protocolName}
-      actionType="deposit"
-      actionLabel="Deposit"
-      vesuContext={vesuContext}
+      apyLabel="Supply APY"
+      apy={token.currentRate}
+      metricLabel="Total supplied"
+      before={0}
+      balance={balance}
+      network="stark"
+      onConfirm={execute}
     />
   );
 };

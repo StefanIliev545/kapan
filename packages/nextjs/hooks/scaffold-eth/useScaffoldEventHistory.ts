@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Abi, AbiEvent, ExtractAbiEventNames } from "abitype";
 import { BlockNumber, GetLogsParameters } from "viem";
-import { Config, UsePublicClientReturnType, useBlockNumber, usePublicClient } from "wagmi";
-import { useSelectedNetwork } from "~~/hooks/scaffold-eth";
+import { Config, UsePublicClientReturnType, usePublicClient } from "wagmi";
+import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import { replacer } from "~~/utils/scaffold-eth/common";
@@ -81,7 +81,7 @@ export const useScaffoldEventHistory = <
   blockData,
   transactionData,
   receiptData,
-  watch,
+  watch = false,
   enabled = true,
 }: UseScaffoldEventHistoryConfig<TContractName, TEventName, TBlockData, TTransactionData, TReceiptData>) => {
   const selectedNetwork = useSelectedNetwork(chainId);
@@ -91,7 +91,7 @@ export const useScaffoldEventHistory = <
   });
   const [isFirstRender, setIsFirstRender] = useState(true);
 
-  const { data: blockNumber } = useBlockNumber({ watch: watch, chainId: selectedNetwork.id });
+  const blockNumber = useBlockNumberContext();
 
   const { data: deployedContractData } = useDeployedContractInfo({
     contractName,
