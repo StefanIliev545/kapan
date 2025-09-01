@@ -2,7 +2,6 @@
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { Contract } from "ethers";
 import { verifyContract } from "../utils/verification";
 
 /**
@@ -25,7 +24,8 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  const POOL_ADDRESSES_PROVIDER = process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
+  const POOL_ADDRESSES_PROVIDER =
+    process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
   const UI_POOL_DATA_PROVIDER = process.env.AAVE_UI_POOL_DATA_PROVIDER || "0x5c5228aC8BC1528482514aF3e27E692495148717";
   const REFERRAL_CODE = process.env.AAVE_REFERRAL_CODE || "0";
 
@@ -33,12 +33,7 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
 
   const aaveGateway = await deploy("AaveGateway", {
     from: deployer,
-    args: [
-      routerGateway.address,
-      POOL_ADDRESSES_PROVIDER,
-      UI_POOL_DATA_PROVIDER,
-      REFERRAL_CODE
-    ],
+    args: [routerGateway.address, POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER, REFERRAL_CODE],
     log: true,
     autoMine: true,
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
@@ -49,38 +44,34 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
   // Register with RouterGateway
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave", aaveGateway.address);
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave v3", aaveGateway.address);
-  
+
   // Also register with OptimalInterestRateFinder
   try {
     const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
     console.log(`Registering AaveGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
-    
+
     await execute(
-      "OptimalInterestRateFinder", 
-      { from: deployer, log: true }, 
-      "registerGateway", 
-      "aave", 
-      aaveGateway.address
+      "OptimalInterestRateFinder",
+      { from: deployer, log: true },
+      "registerGateway",
+      "aave",
+      aaveGateway.address,
     );
-    
+
     console.log("AaveGateway registered with OptimalInterestRateFinder");
   } catch (error) {
     console.warn("Failed to register with OptimalInterestRateFinder:", error);
   }
-  
+
   // Skip verification on local networks
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     // Verify the contract on Etherscan
-    await verifyContract(
-      hre,
-      aaveGateway.address,
-      [
-        routerGateway.address,
-        POOL_ADDRESSES_PROVIDER,
-        UI_POOL_DATA_PROVIDER,
-        REFERRAL_CODE
-      ]
-    );
+    await verifyContract(hre, aaveGateway.address, [
+      routerGateway.address,
+      POOL_ADDRESSES_PROVIDER,
+      UI_POOL_DATA_PROVIDER,
+      REFERRAL_CODE,
+    ]);
   }
 };
 

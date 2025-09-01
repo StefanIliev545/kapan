@@ -2,44 +2,41 @@ import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useLendingAction } from "~~/hooks/useLendingAction";
-import { useTokenBalance } from "~~/hooks/useTokenBalance";
 
-interface RepayModalProps {
+interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   token: TokenInfo;
   protocolName: string;
-  debtBalance: bigint;
+  supplyBalance: bigint;
 }
 
-export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName, debtBalance }) => {
-  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
+export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, protocolName, supplyBalance }) => {
+  const decimals = token.decimals;
   const { execute, buildTx } = useLendingAction(
     "evm",
-    "Repay",
+    "Withdraw",
     token.address,
     protocolName,
     decimals,
     undefined,
-    debtBalance,
-    walletBalance,
+    supplyBalance,
   );
-  const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
-  const bump = (debtBalance * 101n) / 100n;
-  const maxInput = walletBalance < bump ? walletBalance : bump;
+  const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
+  const maxInput = (supplyBalance * 101n) / 100n;
   return (
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
-      action="Repay"
+      action="Withdraw"
       token={token}
       protocolName={protocolName}
-      apyLabel="Borrow APY"
+      apyLabel="Supply APY"
       apy={token.currentRate}
-      metricLabel="Total debt"
+      metricLabel="Total supplied"
       before={before}
-      balance={walletBalance}
-      percentBase={debtBalance}
+      balance={supplyBalance}
+      percentBase={supplyBalance}
       max={maxInput}
       network="evm"
       buildTx={buildTx}
