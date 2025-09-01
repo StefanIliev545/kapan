@@ -2,6 +2,7 @@ import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useLendingAction } from "~~/hooks/useLendingAction";
+import { PositionManager } from "~~/utils/position";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -9,9 +10,17 @@ interface WithdrawModalProps {
   token: TokenInfo;
   protocolName: string;
   supplyBalance: bigint;
+  position?: PositionManager;
 }
 
-export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, protocolName, supplyBalance }) => {
+export const WithdrawModal: FC<WithdrawModalProps> = ({
+  isOpen,
+  onClose,
+  token,
+  protocolName,
+  supplyBalance,
+  position,
+}) => {
   const decimals = token.decimals;
   const { execute, buildTx } = useLendingAction(
     "evm",
@@ -40,6 +49,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({ isOpen, onClose, token, 
       max={maxInput}
       network="evm"
       buildTx={buildTx}
+      position={position}
       onConfirm={execute}
     />
   );

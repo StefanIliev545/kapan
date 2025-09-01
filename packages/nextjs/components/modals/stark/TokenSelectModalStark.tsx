@@ -5,6 +5,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { VesuContext } from "~~/hooks/useLendingAction";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
+import { PositionManager } from "~~/utils/position";
 
 interface TokenSelectModalStarkProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface TokenSelectModalStarkProps {
   collateralAsset?: string;
   isVesu?: boolean;
   vesuContext?: VesuContext;
+  position?: PositionManager;
 }
 
 export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
@@ -24,6 +26,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   collateralAsset,
   isVesu = false,
   vesuContext,
+  position,
 }) => {
   const [selectedToken, setSelectedToken] = useState<TokenMetadata | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
@@ -165,7 +168,13 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
               selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e18 : 0,
           }}
           protocolName={protocolName}
+          currentDebt={
+            selectedToken.total_nominal_debt
+              ? Number(selectedToken.total_nominal_debt) / 10 ** selectedToken.decimals
+              : 0
+          }
           vesuContext={vesuContext}
+          position={position}
         />
       )}
     </>

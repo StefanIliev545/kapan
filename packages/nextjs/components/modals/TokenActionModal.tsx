@@ -1,9 +1,10 @@
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
+import { PositionManager } from "~~/utils/position";
 
 export interface TokenInfo {
   name: string;
@@ -32,6 +33,7 @@ export interface TokenActionModalProps {
   hf?: number;
   utilization?: number;
   ltv?: number;
+  position?: PositionManager;
   onConfirm?: (amount: string, isMax?: boolean) => Promise<unknown> | void;
 }
 
@@ -47,13 +49,14 @@ const formatUsd = (usd: number) => {
 const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
 const HealthFactor = ({ value }: { value: number }) => {
-  const percent = Math.min(100, (value / 3) * 100);
-  const color = value > 2 ? "text-success" : value > 1.2 ? "text-warning" : "text-error";
+  const percent = Math.min(100, Math.max(0, ((value - 1) / 3) * 100));
+  const barColor = value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
+  const textColor = value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
   return (
     <div className="flex items-center gap-2 text-xs">
       <span>Health Factor</span>
-      <progress className="progress w-20" value={percent} max="100"></progress>
-      <span className={color}>{value.toFixed(2)}</span>
+      <progress className={`progress w-20 ${barColor}`} value={percent} max="100"></progress>
+      <span className={textColor}>{value.toFixed(2)}</span>
     </div>
   );
 };
@@ -62,14 +65,14 @@ const Utilization = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2 text-xs">
     <span>Utilization</span>
     <progress className="progress progress-primary w-20" value={value} max="100"></progress>
-    <span>{value}%</span>
+    <span>{value.toFixed(2)}%</span>
   </div>
 );
 
 const LoanToValue = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2 text-xs">
     <span>Loan to Value</span>
-    <span>{value}%</span>
+    <span>{value.toFixed(2)}%</span>
   </div>
 );
 
@@ -188,6 +191,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   hf = 1.9,
   utilization = 65,
   ltv = 75,
+  position,
   onConfirm,
 }) => {
   const [amount, setAmount] = useState("");
@@ -195,10 +199,29 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
   const txRequest = buildTx ? buildTx(amount, isMax) : undefined;
   const gasCostUsd = useGasEstimate(network, txRequest);
-  const effectiveMax = action === "Borrow" ? 0n : max;
-
   const parsed = parseFloat(amount || "0");
-  const afterValue = (() => {
+
+  const price = token.usdPrice || 0;
+  const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
+  const afterPosition = useMemo(() => beforePosition.apply(action, parsed * price), [beforePosition, action, parsed, price]);
+
+  const beforeHf = position ? beforePosition.healthFactor() : hf;
+  const beforeUtil = position ? beforePosition.utilization() : utilization;
+  const beforeLtv = position ? beforePosition.loanToValue() : ltv;
+  const afterHf = position ? afterPosition.healthFactor() : hf;
+  const afterUtil = position ? afterPosition.utilization() : utilization;
+  const afterLtv = position ? afterPosition.loanToValue() : ltv;
+
+  const effectiveMax = useMemo(() => {
+    if (action !== "Borrow" || !position || !token.usdPrice) return max;
+    const decimals = token.decimals || 18;
+    const freeUsd = position.freeBorrowUsd();
+    if (freeUsd <= 0 || token.usdPrice === 0) return 0n;
+    const amount = Math.floor((freeUsd / token.usdPrice) * 10 ** decimals);
+    return BigInt(amount);
+  }, [action, position, token.usdPrice, token.decimals, max]);
+
+  const afterValue = useMemo(() => {
     switch (action) {
       case "Borrow":
       case "Deposit":
@@ -209,7 +232,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
       default:
         return before;
     }
-  })();
+  }, [action, before, parsed]);
 
   const handleClose = () => {
     setAmount("");
@@ -238,9 +261,9 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
       <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <LeftMetrics
-            hf={hf}
-            utilization={utilization}
-            ltv={ltv}
+            hf={beforeHf}
+            utilization={beforeUtil}
+            ltv={beforeLtv}
             metricLabel={metricLabel}
             metricValue={before}
             token={token}
@@ -269,13 +292,13 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 setAmount(val);
                 setIsMax(maxed);
               }}
-              percentBase={percentBase}
+              percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
             />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-              <HealthFactor value={hf} />
-              <Utilization value={utilization} />
-              <LoanToValue value={ltv} />
+              <HealthFactor value={afterHf} />
+              <Utilization value={afterUtil} />
+              <LoanToValue value={afterLtv} />
               <div className="flex items-center gap-2">
                 <span>{metricLabel}</span>
                 <TokenPill value={afterValue} icon={token.icon} name={token.name} />

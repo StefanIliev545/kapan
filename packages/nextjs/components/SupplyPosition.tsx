@@ -6,6 +6,7 @@ import { DepositModal } from "./modals/DepositModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
+import { PositionManager } from "~~/utils/position";
 import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
@@ -17,6 +18,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
   afterInfoContent?: React.ReactNode;
   networkType: "evm" | "starknet";
+  position?: PositionManager;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -31,6 +33,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   tokenDecimals,
   afterInfoContent,
   networkType,
+  position,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -290,6 +293,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            position={position}
           />
           <WithdrawModalStark
             isOpen={withdrawModal.isOpen}
@@ -304,6 +308,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             }}
             protocolName={protocolName}
             supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            position={position}
           />
         </>
       ) : (
@@ -320,6 +325,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            position={position}
           />
         </>
       )}

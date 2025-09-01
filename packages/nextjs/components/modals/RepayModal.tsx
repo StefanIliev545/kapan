@@ -3,6 +3,7 @@ import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { PositionManager } from "~~/utils/position";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -10,9 +11,17 @@ interface RepayModalProps {
   token: TokenInfo;
   protocolName: string;
   debtBalance: bigint;
+  position?: PositionManager;
 }
 
-export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protocolName, debtBalance }) => {
+export const RepayModal: FC<RepayModalProps> = ({
+  isOpen,
+  onClose,
+  token,
+  protocolName,
+  debtBalance,
+  position,
+}) => {
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
   const { execute, buildTx } = useLendingAction(
     "evm",
@@ -43,6 +52,7 @@ export const RepayModal: FC<RepayModalProps> = ({ isOpen, onClose, token, protoc
       max={maxInput}
       network="evm"
       buildTx={buildTx}
+      position={position}
       onConfirm={execute}
     />
   );

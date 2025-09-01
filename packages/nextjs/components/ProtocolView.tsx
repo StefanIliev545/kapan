@@ -7,6 +7,7 @@ import { BorrowModal } from "./modals/BorrowModal";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
+import { PositionManager } from "~~/utils/position";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 
 export interface ProtocolPosition {
@@ -109,12 +110,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return totalSupplied + totalCollateral - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
 
-  // Calculate utilization percentage
+  // Calculate utilization percentage, using collateral values if no supplied positions exist
   const utilizationPercentage = useMemo(() => {
-    const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
+    const suppliedTotal = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
+    const collateralTotal = borrowedPositions.reduce((acc, pos) => acc + (pos.collateralValue || 0), 0);
+    const totalSupplied = suppliedTotal > 0 ? suppliedTotal : collateralTotal;
     const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
     return totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
   }, [suppliedPositions, borrowedPositions]);
+
+  const positionManager = useMemo(
+    () => PositionManager.fromPositions(suppliedPositions, borrowedPositions),
+    [suppliedPositions, borrowedPositions],
+  );
 
   // Format currency with sign.
   const formatCurrency = (amount: number) => {
@@ -282,7 +290,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <div className=" pt-2 space-y-3">
                   {filteredSuppliedPositions.map((position, index) => (
                     <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
-                      <SupplyPosition {...position} protocolName={protocolName} networkType={networkType} />
+                      <SupplyPosition
+                        {...position}
+                        protocolName={protocolName}
+                        networkType={networkType}
+                        position={positionManager}
+                      />
                     </div>
                   ))}
 
@@ -318,7 +331,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <div className="pt-2 space-y-3">
                   {filteredBorrowedPositions.map((position, index) => (
                     <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
-                      <BorrowPosition {...position} protocolName={protocolName} networkType={networkType} />
+                      <BorrowPosition
+                        {...position}
+                        protocolName={protocolName}
+                        networkType={networkType}
+                        position={positionManager}
+                      />
                     </div>
                   ))}
                   
@@ -419,7 +437,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 value: BigInt(pos.tokenPrice || 0),
                 is_valid: true
               },
-              total_nominal_debt: BigInt(0),
+              total_nominal_debt: pos.tokenBalance ?? 0n,
               last_rate_accumulator: BigInt(0),
               reserve: BigInt(0),
               scale: BigInt(0),
@@ -427,6 +445,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               supplyAPY: pos.currentRate * 0.7  // Approximate supply APY as 70% of borrow APR
             }))}
             protocolName={protocolName}
+            position={positionManager}
           />
 
           {/* Deposit Modal for Starknet */}
@@ -441,14 +460,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 currentRate: selectedSupplyToken.currentRate,
                 usdPrice: selectedSupplyToken.tokenPrice
                   ? Number(selectedSupplyToken.tokenPrice) / 1e8
-                  : 0,
+                : 0,
               }}
               protocolName={protocolName}
+              position={positionManager}
             />
           }
 
           {/* Borrow Modal for Starknet */}
-          {isTokenBorrowModalOpen && 
+          {isTokenBorrowModalOpen &&
             <BorrowModalStark
               isOpen={isTokenBorrowModalOpen}
               onClose={handleCloseBorrowModal}
@@ -474,6 +494,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     }
               }
               protocolName={protocolName}
+              currentDebt={
+                selectedToken
+                  ? Number(selectedToken.tokenBalance) /
+                      10 ** (selectedToken.tokenDecimals || 18)
+                  : borrowedPositions[0]
+                  ? Number(borrowedPositions[0].tokenBalance) /
+                    10 ** (borrowedPositions[0].tokenDecimals || 18)
+                  : 0
+              }
+              position={positionManager}
             />
           }
         </>
@@ -486,6 +516,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             tokens={allSupplyPositions}
             protocolName={protocolName}
             isBorrow={false}
+            position={positionManager}
           />
 
           {/* Token Select Modal for Borrow - EVM */}
@@ -495,6 +526,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             tokens={allBorrowPositions}
             protocolName={protocolName}
             isBorrow={true}
+            position={positionManager}
           />
 
           {/* Borrow Modal - EVM */}
@@ -524,6 +556,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     }
               }
               protocolName={protocolName}
+              currentDebt={
+                selectedToken
+                  ? Number(selectedToken.tokenBalance) /
+                      10 ** (selectedToken.tokenDecimals || 18)
+                  : borrowedPositions[0]
+                  ? Number(borrowedPositions[0].tokenBalance) /
+                    10 ** (borrowedPositions[0].tokenDecimals || 18)
+                  : 0
+              }
+              position={positionManager}
             />
           )}
         </>

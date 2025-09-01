@@ -3,6 +3,7 @@ import Image from "next/image";
 import { DepositModal } from "./DepositModal";
 import { BorrowModal } from "./BorrowModal";
 import { ProtocolPosition } from "../ProtocolView";
+import { PositionManager } from "~~/utils/position";
 
 interface TokenSelectModalProps {
   isOpen: boolean;
@@ -10,14 +11,16 @@ interface TokenSelectModalProps {
   tokens: ProtocolPosition[];
   protocolName: string;
   isBorrow?: boolean;
+  position?: PositionManager;
 }
 
-export const TokenSelectModal: FC<TokenSelectModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  tokens, 
+export const TokenSelectModal: FC<TokenSelectModalProps> = ({
+  isOpen,
+  onClose,
+  tokens,
   protocolName,
-  isBorrow = false 
+  isBorrow = false,
+  position,
 }) => {
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
@@ -144,6 +147,13 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
             }}
             protocolName={protocolName}
+            currentDebt={
+              selectedToken.tokenBalance
+                ? Number(selectedToken.tokenBalance) /
+                    10 ** (selectedToken.tokenDecimals || 18)
+                : 0
+            }
+            position={position}
           />
         ) : (
           <DepositModal
@@ -157,6 +167,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
             }}
             protocolName={protocolName}
+            position={position}
           />
         )
       )}
