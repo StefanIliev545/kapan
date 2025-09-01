@@ -49,6 +49,12 @@ export const useAutoConnect = (): void => {
 
         if (connector) {
           connect({ connector });
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(
+              LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
+              currentTime.toString(),
+            );
+          }
         }
       }
     }
