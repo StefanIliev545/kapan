@@ -40,12 +40,7 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Info",
     href: "/info",
     icon: <DocumentChartBarIcon className="h-5 w-5" />,
-  },
-  {
-    label: "Modal Demos",
-    href: "/modal-expo",
-    icon: <BeakerIcon className="h-5 w-5" />,
-  },
+  }
 ];
 
 export const HeaderMenuLinks = () => {
