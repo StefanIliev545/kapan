@@ -316,6 +316,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            currentDebt={debtAmount}
             position={position}
           />
           <RepayModalStark
@@ -360,6 +361,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            currentDebt={debtAmount}
             position={position}
           />
           <RepayModal

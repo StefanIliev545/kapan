@@ -9,10 +9,18 @@ interface BorrowModalProps {
   onClose: () => void;
   token: TokenInfo;
   protocolName: string;
+  currentDebt: number;
   position?: PositionManager;
 }
 
-export const BorrowModal: FC<BorrowModalProps> = ({ isOpen, onClose, token, protocolName, position }) => {
+export const BorrowModal: FC<BorrowModalProps> = ({
+  isOpen,
+  onClose,
+  token,
+  protocolName,
+  currentDebt,
+  position,
+}) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
   const { execute, buildTx } = useLendingAction("evm", "Borrow", token.address, protocolName, decimals);
   return (
@@ -25,7 +33,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({ isOpen, onClose, token, prot
       apyLabel="Borrow APY"
       apy={token.currentRate}
       metricLabel="Total debt"
-      before={0}
+      before={currentDebt}
       balance={balance}
       network="evm"
       buildTx={buildTx}

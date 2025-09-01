@@ -10,6 +10,7 @@ interface BorrowModalStarkProps {
   token: TokenInfo;
   protocolName: string;
   vesuContext?: VesuContext;
+  currentDebt: number;
   position?: PositionManager;
 }
 
@@ -19,6 +20,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
   token,
   protocolName,
   vesuContext,
+  currentDebt,
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
@@ -33,7 +35,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
       apyLabel="Borrow APY"
       apy={token.currentRate}
       metricLabel="Total debt"
-      before={0}
+      before={currentDebt}
       balance={balance}
       network="stark"
       position={position}

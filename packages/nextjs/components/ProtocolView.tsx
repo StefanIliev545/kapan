@@ -110,9 +110,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return totalSupplied + totalCollateral - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
 
-  // Calculate utilization percentage
+  // Calculate utilization percentage, using collateral values if no supplied positions exist
   const utilizationPercentage = useMemo(() => {
-    const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
+    const suppliedTotal = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
+    const collateralTotal = borrowedPositions.reduce((acc, pos) => acc + (pos.collateralValue || 0), 0);
+    const totalSupplied = suppliedTotal > 0 ? suppliedTotal : collateralTotal;
     const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
     return totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
   }, [suppliedPositions, borrowedPositions]);
@@ -466,7 +468,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           }
 
           {/* Borrow Modal for Starknet */}
-          {isTokenBorrowModalOpen && 
+          {isTokenBorrowModalOpen &&
             <BorrowModalStark
               isOpen={isTokenBorrowModalOpen}
               onClose={handleCloseBorrowModal}
@@ -492,6 +494,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     }
               }
               protocolName={protocolName}
+              currentDebt={
+                selectedToken
+                  ? Number(selectedToken.tokenBalance) /
+                      10 ** (selectedToken.tokenDecimals || 18)
+                  : borrowedPositions[0]
+                  ? Number(borrowedPositions[0].tokenBalance) /
+                    10 ** (borrowedPositions[0].tokenDecimals || 18)
+                  : 0
+              }
               position={positionManager}
             />
           }
@@ -545,6 +556,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     }
               }
               protocolName={protocolName}
+              currentDebt={
+                selectedToken
+                  ? Number(selectedToken.tokenBalance) /
+                      10 ** (selectedToken.tokenDecimals || 18)
+                  : borrowedPositions[0]
+                  ? Number(borrowedPositions[0].tokenBalance) /
+                    10 ** (borrowedPositions[0].tokenDecimals || 18)
+                  : 0
+              }
               position={positionManager}
             />
           )}
