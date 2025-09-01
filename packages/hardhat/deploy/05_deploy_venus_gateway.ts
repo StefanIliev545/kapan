@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../utils/verification";
+import { VENUS_CONFIG } from "../utils/addressMappings";
 
 /**
  * Deploys the Venus Gateway contract using the deployer account and
@@ -24,10 +25,17 @@ const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
+  const network = hre.network.name as keyof typeof VENUS_CONFIG;
+  const venusAddresses = VENUS_CONFIG[network];
+  if (!venusAddresses?.enabled) {
+    console.log(`Venus not enabled on network ${network}, skipping deployment`);
+    return;
+  }
+
   // Venus Unitroller (Comptroller Proxy) on BNB Chain
   // This is the main entry point to the Venus Protocol
-  const VENUS_COMPTROLLER = process.env.VENUS_COMPTROLLER!;
-  const VENUS_ORACLE = process.env.VENUS_ORACLE!;
+  const VENUS_COMPTROLLER = process.env.VENUS_COMPTROLLER || venusAddresses.comptroller;
+  const VENUS_ORACLE = process.env.VENUS_ORACLE || venusAddresses.oracle;
   // Get the router gateway address from previous deployment
   const routerGateway = await get("RouterGateway");
 
@@ -88,4 +96,4 @@ export default deployVenusGateway;
 // e.g. yarn deploy --tags VenusGateway
 deployVenusGateway.tags = ["VenusGateway"];
 // Now depends on OptimalInterestRateFinder as well
-deployVenusGateway.dependencies = ["RouterGateway", "OptimalInterestRateFinder"]; 
+deployVenusGateway.dependencies = ["RouterGateway", "OptimalInterestRateFinder"];
