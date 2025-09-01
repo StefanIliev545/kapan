@@ -175,10 +175,15 @@ mod NostraGateway {
             }
 
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
+
+            let balance_before = underlying_token.balance_of(get_contract_address());
             assert(underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
             assert(underlying_token.approve(debt, amount), 'approve failed');
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
             debt_token.burn(user, amount);
+            let balance_after = underlying_token.balance_of(get_contract_address());
+            let leftover = balance_after - balance_before;
+            assert(underlying_token.transfer(get_caller_address(), leftover), 'transfer failed');
         }
 
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {

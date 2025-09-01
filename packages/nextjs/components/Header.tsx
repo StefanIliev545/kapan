@@ -11,6 +11,8 @@ import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { SwitchTheme } from "~~/components/SwitchTheme";
+import { ThemeSettings } from "~~/components/ThemeSettings";
 
 type HeaderMenuLink = {
   label: string;
@@ -20,7 +22,7 @@ type HeaderMenuLink = {
 
 export const menuLinks: HeaderMenuLink[] = [
   {
-    label: "Manage",
+    label: "Lending",
     href: "/app",
     icon: <WalletIcon className="h-5 w-5" />,
   },
