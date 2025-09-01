@@ -7,6 +7,7 @@ import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectMod
 import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
 import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { PositionManager } from "~~/utils/position";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
 
 // Constants
@@ -100,6 +101,23 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   const debtUsdPrice =
     debtMetadata && debtMetadata.price && debtMetadata.price.is_valid ? Number(debtMetadata.price.value) / 1e18 : 0;
 
+  // Calculate USD values - handle price scaling correctly
+  const collateralValue = collateralMetadata
+    ? (BigInt(collateralAmount) * collateralMetadata.price.value) / 10n ** BigInt(collateralMetadata.decimals)
+    : 0n;
+  const debtValue = debtMetadata
+    ? (BigInt(nominalDebt) * debtMetadata.price.value) / 10n ** BigInt(debtMetadata.decimals)
+    : 0n;
+
+  const position = useMemo(
+    () =>
+      new PositionManager(
+        Number(collateralValue) / 1e18,
+        Number(debtValue) / 1e18,
+      ),
+    [collateralValue, debtValue],
+  );
+
   if (!collateralMetadata) {
     console.error("Collateral metadata not found for asset:", collateralAsset);
     return null;
@@ -113,13 +131,6 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   const formattedDebt = debtMetadata ? formatTokenAmount(nominalDebt, debtMetadata.decimals) : "0";
   const collateralNum = parseFloat(formattedCollateral);
   const debtNum = parseFloat(formattedDebt);
-
-  // Calculate USD values - handle price scaling correctly
-  const collateralValue =
-    (BigInt(collateralAmount) * collateralMetadata.price.value) / 10n ** BigInt(collateralMetadata.decimals);
-  const debtValue = debtMetadata
-    ? (BigInt(nominalDebt) * debtMetadata.price.value) / 10n ** BigInt(debtMetadata.decimals)
-    : 0n;
 
   // Calculate rates for both assets
   const collateralRates = calculateRates(
@@ -315,6 +326,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           decimals: Number(collateralMetadata.decimals),
         }}
         protocolName="Vesu"
+        position={position}
       />
 
       <WithdrawModalStark
@@ -331,6 +343,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
         protocolName="Vesu"
         supplyBalance={BigInt(collateralAmount)}
         vesuContext={{ poolId, counterpartToken: debtAsset }}
+        position={position}
       />
 
       <TokenSelectModalStark
@@ -348,18 +361,19 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <BorrowModalStark
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
-            token={{
-              name: debtSymbol,
-              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-              address: debtAsset,
-              currentRate: debtRates.borrowAPR * 100,
-              usdPrice: debtUsdPrice,
-              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-            }}
-            protocolName="Vesu"
-            currentDebt={debtNum}
-            vesuContext={{ poolId, counterpartToken: collateralAsset }}
-          />
+          token={{
+            name: debtSymbol,
+            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+            address: debtAsset,
+            currentRate: debtRates.borrowAPR * 100,
+            usdPrice: debtUsdPrice,
+            decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+          }}
+          protocolName="Vesu"
+          currentDebt={debtNum}
+          vesuContext={{ poolId, counterpartToken: collateralAsset }}
+          position={position}
+        />
 
           <RepayModalStark
             isOpen={isRepayModalOpen}
@@ -375,6 +389,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             protocolName="Vesu"
             debtBalance={BigInt(nominalDebt)}
             vesuContext={{ poolId, counterpartToken: collateralAsset }}
+            position={position}
           />
 
           <MovePositionModal
