@@ -195,6 +195,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
   const txRequest = buildTx ? buildTx(amount, isMax) : undefined;
   const gasCostUsd = useGasEstimate(network, txRequest);
+  const effectiveMax = action === "Borrow" ? 0n : max;
 
   const parsed = parseFloat(amount || "0");
   const afterValue = (() => {
@@ -269,7 +270,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 setIsMax(maxed);
               }}
               percentBase={percentBase}
-              max={max}
+              max={effectiveMax}
             />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
               <HealthFactor value={hf} />
