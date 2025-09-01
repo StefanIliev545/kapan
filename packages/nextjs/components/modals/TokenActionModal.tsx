@@ -49,13 +49,14 @@ const formatUsd = (usd: number) => {
 const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
 const HealthFactor = ({ value }: { value: number }) => {
-  const percent = Math.min(100, (value / 3) * 100);
-  const color = value > 2 ? "text-success" : value > 1.2 ? "text-warning" : "text-error";
+  const percent = Math.min(100, Math.max(0, ((value - 1) / 3) * 100));
+  const barColor = value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
+  const textColor = value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
   return (
     <div className="flex items-center gap-2 text-xs">
       <span>Health Factor</span>
-      <progress className="progress w-20" value={percent} max="100"></progress>
-      <span className={color}>{value.toFixed(2)}</span>
+      <progress className={`progress w-20 ${barColor}`} value={percent} max="100"></progress>
+      <span className={textColor}>{value.toFixed(2)}</span>
     </div>
   );
 };
@@ -64,14 +65,14 @@ const Utilization = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2 text-xs">
     <span>Utilization</span>
     <progress className="progress progress-primary w-20" value={value} max="100"></progress>
-    <span>{value}%</span>
+    <span>{value.toFixed(2)}%</span>
   </div>
 );
 
 const LoanToValue = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2 text-xs">
     <span>Loan to Value</span>
-    <span>{value}%</span>
+    <span>{value.toFixed(2)}%</span>
   </div>
 );
 
@@ -291,7 +292,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 setAmount(val);
                 setIsMax(maxed);
               }}
-              percentBase={percentBase}
+              percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
             />
             <div className="grid grid-cols-2 gap-2 text-xs pt-2">
