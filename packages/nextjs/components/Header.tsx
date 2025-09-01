@@ -11,8 +11,6 @@ import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
-import { SwitchTheme } from "~~/components/SwitchTheme";
-import { ThemeSettings } from "~~/components/ThemeSettings";
 
 type HeaderMenuLink = {
   label: string;
