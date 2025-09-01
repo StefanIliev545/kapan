@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { QueryObserverResult, RefetchOptions, useQueryClient } from "@tanstack/react-query";
+import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 import type { ExtractAbiFunctionNames } from "abitype";
 import { ReadContractErrorType } from "viem";
-import { useBlockNumber, useReadContract } from "wagmi";
-import { useSelectedNetwork } from "~~/hooks/scaffold-eth";
+import { useReadContract } from "wagmi";
+import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
+import { replacer } from "~~/utils/scaffold-eth/common";
 import {
   AbiFunctionReturnType,
   ContractAbi,
@@ -38,17 +39,31 @@ export const useScaffoldReadContract = <
     chainId: selectedNetwork.id as AllowedChainIds,
   });
 
-  const { query: queryOptions, watch, ...readContractConfig } = readConfig;
-  // set watch to true by default
-  const defaultWatch = watch ?? true;
+  const {
+    query: queryOptions,
+    watch,
+    blockNumber: blockNumberConfig,
+    blockTag,
+    ...restConfig
+  } = readConfig as any;
+  const defaultWatch = watch ?? false;
+
+  const sanitizedBlockNumber =
+    typeof blockNumberConfig === "bigint" ? Number(blockNumberConfig) : blockNumberConfig;
+  const sanitizedBlockTag =
+    typeof blockTag === "bigint" ? blockTag.toString() : blockTag;
+
+  const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : undefined;
 
   const readContractHookRes = useReadContract({
     chainId: selectedNetwork.id,
     functionName,
     address: deployedContract?.address,
     abi: deployedContract?.abi,
-    args,
-    ...(readContractConfig as any),
+    args: serializedArgs as typeof args,
+    blockNumber: sanitizedBlockNumber,
+    blockTag: sanitizedBlockTag,
+    ...(restConfig as any),
     query: {
       enabled: !Array.isArray(args) || !args.some(arg => arg === undefined),
       ...queryOptions,
@@ -60,21 +75,14 @@ export const useScaffoldReadContract = <
     ) => Promise<QueryObserverResult<AbiFunctionReturnType<ContractAbi, TFunctionName>, ReadContractErrorType>>;
   };
 
-  const queryClient = useQueryClient();
-  const { data: blockNumber } = useBlockNumber({
-    watch: defaultWatch,
-    chainId: selectedNetwork.id,
-    query: {
-      enabled: defaultWatch,
-    },
-  });
+  const blockNumber = useBlockNumberContext();
 
   useEffect(() => {
-    if (defaultWatch) {
-      queryClient.invalidateQueries({ queryKey: readContractHookRes.queryKey });
+    if (defaultWatch && blockNumber !== undefined) {
+      readContractHookRes.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockNumber]);
+  }, [blockNumber, defaultWatch]);
 
   return readContractHookRes;
 };

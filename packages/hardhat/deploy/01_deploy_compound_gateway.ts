@@ -2,7 +2,6 @@
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { Contract } from "ethers";
 import { verifyContract } from "../utils/verification";
 
 /**
@@ -33,7 +32,9 @@ const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntim
   const WETH_ADDRESS = process.env.WETH_ADDRESS || "0x0000000000000000000000000000000000000000";
   const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED || "0x0000000000000000000000000000000000000000";
 
-  const COMET_ADDRESSES = [USDC_COMET, USDT_COMET, USDC_E_COMET, WETH_COMET].filter((address) => address !== "0x0000000000000000000000000000000000000000");
+  const COMET_ADDRESSES = [USDC_COMET, USDT_COMET, USDC_E_COMET, WETH_COMET].filter(
+    address => address !== "0x0000000000000000000000000000000000000000",
+  );
 
   const routerGateway = await get("RouterGateway");
 
@@ -52,46 +53,39 @@ const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntim
 
   console.log(`CompoundGateway deployed to: ${compoundGateway.address}`);
 
-  await hre.deployments.execute("CompoundGateway", { from: deployer }, "overrideFeed",
-    WETH_ADDRESS,
-    WETH_PRICE_FEED,
-  );
+  await hre.deployments.execute("CompoundGateway", { from: deployer }, "overrideFeed", WETH_ADDRESS, WETH_PRICE_FEED);
 
   // Register the gateway with the router
   await execute("RouterGateway", { from: deployer }, "addGateway", "compound", compoundGateway.address);
   await execute("RouterGateway", { from: deployer }, "addGateway", "compound v3", compoundGateway.address);
-  
+
   // Also register the gateway with the OptimalInterestRateFinder
   try {
     const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
     console.log(`Registering CompoundGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
-    
+
     await execute(
-      "OptimalInterestRateFinder", 
-      { from: deployer, log: true }, 
-      "registerGateway", 
-      "compound", 
-      compoundGateway.address
+      "OptimalInterestRateFinder",
+      { from: deployer, log: true },
+      "registerGateway",
+      "compound",
+      compoundGateway.address,
     );
-    
+
     console.log("CompoundGateway registered with OptimalInterestRateFinder");
   } catch (error) {
     console.warn("Failed to register with OptimalInterestRateFinder:", error);
   }
-  
+
   // Skip verification on local networks
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     // Verify the contract on Etherscan
-    await verifyContract(
-      hre,
-      compoundGateway.address,
-      [
-        routerGateway.address,
-        COMET_ADDRESSES,
-        CHAINLINK_FEED,
-        deployer
-      ]
-    );
+    await verifyContract(hre, compoundGateway.address, [
+      routerGateway.address,
+      COMET_ADDRESSES,
+      CHAINLINK_FEED,
+      deployer,
+    ]);
   }
 };
 

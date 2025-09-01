@@ -1,12 +1,10 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { Contract, BigNumberish, HDNodeWallet } from "ethers";
+import { HDNodeWallet } from "ethers";
 import { RouterGateway, CompoundGateway, IERC20 } from "../typechain-types";
 
 // Skip the entire test suite if not running on forked network
-const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" 
-  ? describe 
-  : describe.skip;
+const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" ? describe : describe.skip;
 
 // Real addresses on Arbitrum
 const RICH_ACCOUNT = ethers.getAddress("0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D"); // Rich USDC holder
@@ -31,22 +29,22 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
       method: "hardhat_impersonateAccount",
       params: [RICH_ACCOUNT],
     });
-    
+
     richSigner = await ethers.getSigner(RICH_ACCOUNT);
     // Connect to tokens
     usdc = (await ethers.getContractAt(
-        "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-        USDC_ADDRESS
+      "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
+      USDC_ADDRESS,
     )) as unknown as IERC20;
     weth = (await ethers.getContractAt(
-        "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-        WETH_ADDRESS
+      "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
+      WETH_ADDRESS,
     )) as unknown as IERC20;
-  
+
     // Transfer some USDC from rich account to our test user
     const transferAmount = ethers.parseUnits("2000", 6); // 2000 USDC
     await usdc.connect(richSigner).transfer(await user.getAddress(), transferAmount);
-  
+
     // Verify the user received the USDC
     const userBalance = await usdc.balanceOf(await user.getAddress());
     expect(userBalance).to.equal(transferAmount);
@@ -58,27 +56,25 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
     const balance = await ethers.provider.getBalance(await user.getAddress());
     expect(balance).to.equal(ethers.parseEther("1"));
 
-
     // Deploy RouterGateway
     const balancerV3Vault = process.env.BALANCER_VAULT3 || ethers.ZeroAddress;
     const balancerV2Vault = process.env.BALANCER_VAULT2 || ethers.ZeroAddress;
-    router = await ethers.deployContract("RouterGateway", [
-      balancerV3Vault,
-      balancerV2Vault,
-      await user.getAddress()
-    ],richSigner) as RouterGateway;
+    router = (await ethers.deployContract(
+      "RouterGateway",
+      [balancerV3Vault, balancerV2Vault, await user.getAddress()],
+      richSigner,
+    )) as RouterGateway;
     await router.waitForDeployment();
 
     // Deploy CompoundGateway
     const comet = process.env.COMPOUND_USDC_COMET || ethers.ZeroAddress;
     const wethComet = process.env.COMPOUND_WETH_COMET || ethers.ZeroAddress;
     const priceFeed = process.env.CHAINLINK_FEED_REGISTRY || ethers.ZeroAddress;
-    compoundGateway = await ethers.deployContract("CompoundGateway", [
-      await router.getAddress(),
-      [comet, wethComet],
-      priceFeed,
-      await user.getAddress()
-    ],richSigner) as CompoundGateway;
+    compoundGateway = (await ethers.deployContract(
+      "CompoundGateway",
+      [await router.getAddress(), [comet, wethComet], priceFeed, await user.getAddress()],
+      richSigner,
+    )) as CompoundGateway;
     await compoundGateway.waitForDeployment();
 
     // Register the CompoundGateway
@@ -122,10 +118,12 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
     const userAddress = await user.getAddress();
 
     // Get and execute the required approvals for borrowing
-    const [approvals, data] = await compoundGateway.getEncodedCollateralApprovals(WETH_ADDRESS, [{
-      token: WETH_ADDRESS,
-      amount: borrowAmount
-    }]);
+    const [approvals, data] = await compoundGateway.getEncodedCollateralApprovals(WETH_ADDRESS, [
+      {
+        token: WETH_ADDRESS,
+        amount: borrowAmount,
+      },
+    ]);
 
     // Execute the approval transaction
     await user.sendTransaction({
@@ -143,7 +141,7 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
     const finalWethBalance = await weth.balanceOf(userAddress);
     expect(finalWethBalance).to.be.closeTo(
       initialWethBalance + borrowAmount,
-      ethers.parseUnits("0.0001", 18) // Allow for small rounding differences
+      ethers.parseUnits("0.0001", 18), // Allow for small rounding differences
     );
   });
 
@@ -165,7 +163,7 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
     const finalBorrowBalance = await compoundGateway.getBorrowBalance(WETH_ADDRESS, userAddress);
     expect(finalBorrowBalance).to.be.closeTo(
       initialBorrowBalance - repayAmount,
-      ethers.parseUnits("0.0001", 18) // Allow for small rounding differences
+      ethers.parseUnits("0.0001", 18), // Allow for small rounding differences
     );
   });
 });

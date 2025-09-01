@@ -25,19 +25,30 @@ const wallets = [
     : []),
 ];
 
-/**
- * wagmi connectors for the wagmi context
- */
-export const wagmiConnectors = connectorsForWallets(
-  [
-    {
-      groupName: "Supported Wallets",
-      wallets,
-    },
-  ],
+declare global {
+  // eslint-disable-next-line no-var
+  var wagmiConnectors: ReturnType<typeof connectorsForWallets> | undefined;
+}
 
-  {
-    appName: "scaffold-eth-2",
-    projectId: scaffoldConfig.walletConnectProjectId,
-  },
-);
+/**
+ * Returns wagmi connectors, initializing them only once.
+ */
+export function getWagmiConnectors() {
+  if (typeof window === "undefined") {
+    return [] as ReturnType<typeof connectorsForWallets>;
+  }
+
+  if (!globalThis.wagmiConnectors) {
+    globalThis.wagmiConnectors = connectorsForWallets(
+      [
+        {
+          groupName: "Supported Wallets",
+          wallets,
+        },
+      ],
+      { appName: "scaffold-eth-2", projectId: scaffoldConfig.walletConnectProjectId },
+    );
+  }
+
+  return globalThis.wagmiConnectors;
+}

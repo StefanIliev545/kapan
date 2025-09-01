@@ -5,34 +5,53 @@ import { useTheme } from "next-themes";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 
 export const SwitchTheme = ({ className }: { className?: string }) => {
-  const { setTheme, resolvedTheme } = useTheme();
+  const { setTheme, theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-
-  const isDarkMode = resolvedTheme === "dark";
-
-  const handleToggle = () => {
-    setTheme(isDarkMode ? "light" : "dark");
-  };
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const lightTheme =
+    typeof window !== "undefined"
+      ? localStorage.getItem("lightTheme") ?? "light"
+      : "light";
+  const darkTheme =
+    typeof window !== "undefined"
+      ? localStorage.getItem("darkTheme") ?? "synthwave"
+      : "synthwave";
+
+  useEffect(() => {
+    if (mounted && theme === "system" && resolvedTheme) {
+      const preferred = resolvedTheme === "dark" ? darkTheme : lightTheme;
+      setTheme(preferred);
+      localStorage.setItem("theme", preferred);
+    }
+  }, [mounted, theme, resolvedTheme, darkTheme, lightTheme, setTheme]);
+
   if (!mounted) return null;
 
+  const currentTheme = theme === "system" ? resolvedTheme : theme;
+  const isDark = currentTheme === darkTheme;
+
+  const toggleTheme = () => {
+    const next = isDark ? lightTheme : darkTheme;
+    setTheme(next);
+    localStorage.setItem("theme", next);
+  };
+
   return (
-    <div className={`flex space-x-2 h-8 items-center justify-center text-sm ${className}`}>
-      <input
-        id="theme-toggle"
-        type="checkbox"
-        className="toggle toggle-primary bg-primary hover:bg-primary border-primary"
-        onChange={handleToggle}
-        checked={isDarkMode}
-      />
-      <label htmlFor="theme-toggle" className={`swap swap-rotate ${!isDarkMode ? "swap-active" : ""}`}>
-        <SunIcon className="swap-on h-5 w-5" />
-        <MoonIcon className="swap-off h-5 w-5" />
-      </label>
-    </div>
+    <button
+      aria-label="Toggle theme"
+      onClick={toggleTheme}
+      className={`btn btn-ghost btn-circle ${className ?? ""}`}
+    >
+      {isDark ? (
+        <SunIcon className="h-5 w-5" />
+      ) : (
+        <MoonIcon className="h-5 w-5" />
+      )}
+    </button>
   );
 };
+

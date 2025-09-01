@@ -1,12 +1,10 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { Contract, BigNumberish, HDNodeWallet } from "ethers";
+import { HDNodeWallet } from "ethers";
 import { RouterGateway, AaveGateway, IERC20 } from "../typechain-types";
 
 // Skip the entire test suite if not running on forked network
-const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" 
-  ? describe 
-  : describe.skip;
+const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" ? describe : describe.skip;
 
 // Real addresses on Arbitrum
 const RICH_ACCOUNT = ethers.getAddress("0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D"); // Rich USDC holder
@@ -36,11 +34,11 @@ runOnlyOnFork("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :fork
     // Connect to tokens
     usdc = (await ethers.getContractAt(
       "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-      USDC_ADDRESS
+      USDC_ADDRESS,
     )) as unknown as IERC20;
     weth = (await ethers.getContractAt(
       "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-      WETH_ADDRESS
+      WETH_ADDRESS,
     )) as unknown as IERC20;
 
     // Transfer some USDC from rich account to our test user
@@ -56,24 +54,23 @@ runOnlyOnFork("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :fork
     // Deploy RouterGateway
     const balancerV3Vault = process.env.BALANCER_VAULT3 || ethers.ZeroAddress;
     const balancerV2Vault = process.env.BALANCER_VAULT2 || ethers.ZeroAddress;
-    router = await ethers.deployContract("RouterGateway", [
-      balancerV3Vault,
-      balancerV2Vault,
-      await user.getAddress()
-    ], richSigner) as RouterGateway;
+    router = (await ethers.deployContract(
+      "RouterGateway",
+      [balancerV3Vault, balancerV2Vault, await user.getAddress()],
+      richSigner,
+    )) as RouterGateway;
     await router.waitForDeployment();
 
     // Deploy AaveGateway
     const poolAddressesProvider = process.env.AAVE_POOL_ADDRESSES_PROVIDER || ethers.ZeroAddress;
     const uiPoolDataProvider = process.env.AAVE_UI_POOL_DATA_PROVIDER || ethers.ZeroAddress;
     const referralCode = Number(process.env.AAVE_REFERRAL_CODE || "0");
-    
-    aaveGateway = await ethers.deployContract("AaveGateway", [
-      await router.getAddress(),
-      poolAddressesProvider,
-      uiPoolDataProvider,
-      referralCode
-    ], richSigner) as AaveGateway;
+
+    aaveGateway = (await ethers.deployContract(
+      "AaveGateway",
+      [await router.getAddress(), poolAddressesProvider, uiPoolDataProvider, referralCode],
+      richSigner,
+    )) as AaveGateway;
     await aaveGateway.waitForDeployment();
 
     // Register the AaveGateway
@@ -132,7 +129,7 @@ runOnlyOnFork("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :fork
     const finalWethBalance = await weth.balanceOf(userAddress);
     expect(finalWethBalance).to.be.closeTo(
       initialWethBalance + borrowAmount,
-      ethers.parseUnits("0.0001", 18) // Allow for small rounding differences
+      ethers.parseUnits("0.0001", 18), // Allow for small rounding differences
     );
   });
 
@@ -154,7 +151,7 @@ runOnlyOnFork("AaveGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :fork
     const finalBorrowBalance = await aaveGateway.getBorrowBalance(WETH_ADDRESS, userAddress);
     expect(finalBorrowBalance).to.be.closeTo(
       initialBorrowBalance - repayAmount,
-      ethers.parseUnits("0.0001", 18) // Allow for small rounding differences
+      ethers.parseUnits("0.0001", 18), // Allow for small rounding differences
     );
   });
-}); 
+});
