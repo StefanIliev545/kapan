@@ -4,6 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { Contract } from "ethers";
 import { verifyContract } from "../utils/verification";
+import { AAVE_V3_CONFIG } from "../utils/addressMappings";
 
 /**
  * Deploys the Aave Gateway contract using the deployer account and
@@ -25,9 +26,18 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  const POOL_ADDRESSES_PROVIDER = process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
-  const UI_POOL_DATA_PROVIDER = process.env.AAVE_UI_POOL_DATA_PROVIDER || "0x5c5228aC8BC1528482514aF3e27E692495148717";
-  const REFERRAL_CODE = process.env.AAVE_REFERRAL_CODE || "0";
+  const network = hre.network.name as keyof typeof AAVE_V3_CONFIG;
+  const cfg = AAVE_V3_CONFIG[network];
+  if (!cfg?.enabled) {
+    console.log(`Aave not enabled on network ${network}, skipping deployment`);
+    return;
+  }
+
+  const POOL_ADDRESSES_PROVIDER =
+    process.env.AAVE_POOL_ADDRESSES_PROVIDER || cfg.poolAddressesProvider || "0x0000000000000000000000000000000000000000";
+  const UI_POOL_DATA_PROVIDER =
+    process.env.AAVE_UI_POOL_DATA_PROVIDER || cfg.uiPoolDataProvider || "0x0000000000000000000000000000000000000000";
+  const REFERRAL_CODE = process.env.AAVE_REFERRAL_CODE || (cfg.referralCode ?? "0");
 
   const routerGateway = await get("RouterGateway");
 

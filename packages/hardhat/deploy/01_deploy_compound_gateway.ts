@@ -4,6 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { Contract } from "ethers";
 import { verifyContract } from "../utils/verification";
+import { COMPOUND_CONFIG } from "../utils/addressMappings";
 
 /**
  * Deploys the Compound Gateway contract using the deployer account,
@@ -25,15 +26,22 @@ const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntim
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  const USDC_COMET = process.env.COMPOUND_USDC_COMET || "0x0000000000000000000000000000000000000000";
-  const USDT_COMET = process.env.COMPOUND_USDT_COMET || "0x0000000000000000000000000000000000000000";
-  const USDC_E_COMET = process.env.COMPOUND_USDC_E_COMET || "0x0000000000000000000000000000000000000000";
-  const WETH_COMET = process.env.COMPOUND_WETH_COMET || "0x0000000000000000000000000000000000000000";
-  const CHAINLINK_FEED = process.env.CHAINLINK_FEED_REGISTRY || "0x0000000000000000000000000000000000000000";
-  const WETH_ADDRESS = process.env.WETH_ADDRESS || "0x0000000000000000000000000000000000000000";
-  const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED || "0x0000000000000000000000000000000000000000";
+  const network = hre.network.name as keyof typeof COMPOUND_CONFIG;
+  const cfg = COMPOUND_CONFIG[network];
+  if (!cfg?.enabled) {
+    console.log(`Compound not enabled on network ${network}, skipping deployment`);
+    return;
+  }
 
-  const COMET_ADDRESSES = [USDC_COMET, USDT_COMET, USDC_E_COMET, WETH_COMET].filter((address) => address !== "0x0000000000000000000000000000000000000000");
+  const [USDC_COMET = "0x0000000000000000000000000000000000000000", USDT_COMET = "0x0000000000000000000000000000000000000000", USDC_E_COMET = "0x0000000000000000000000000000000000000000", WETH_COMET = "0x0000000000000000000000000000000000000000"] =
+    cfg.comets;
+  const CHAINLINK_FEED = process.env.CHAINLINK_FEED_REGISTRY || cfg.chainlinkFeedRegistry || "0x0000000000000000000000000000000000000000";
+  const WETH_ADDRESS = process.env.WETH_ADDRESS || cfg.weth || "0x0000000000000000000000000000000000000000";
+  const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED || cfg.wethPriceFeed || "0x0000000000000000000000000000000000000000";
+
+  const COMET_ADDRESSES = [USDC_COMET, USDT_COMET, USDC_E_COMET, WETH_COMET].filter(
+    (address) => address !== "0x0000000000000000000000000000000000000000"
+  );
 
   const routerGateway = await get("RouterGateway");
 
