@@ -65,6 +65,7 @@
     "playwright": "^1.51.1"
   },
   "resolutions": {
+    "eslint-config-prettier": "0.0.0",
     "react": "~18.3.1",
     "react-dom": "~18.3.1"
   }
