@@ -2,6 +2,7 @@ import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { PositionManager } from "~~/utils/position";
 
 interface BorrowModalStarkProps {
   isOpen: boolean;
@@ -9,9 +10,17 @@ interface BorrowModalStarkProps {
   token: TokenInfo;
   protocolName: string;
   vesuContext?: VesuContext;
+  position?: PositionManager;
 }
 
-export const BorrowModalStark: FC<BorrowModalStarkProps> = ({ isOpen, onClose, token, protocolName, vesuContext }) => {
+export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
+  isOpen,
+  onClose,
+  token,
+  protocolName,
+  vesuContext,
+  position,
+}) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
   const { execute } = useLendingAction("stark", "Borrow", token.address, protocolName, decimals, vesuContext);
   return (
@@ -27,6 +36,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({ isOpen, onClose, t
       before={0}
       balance={balance}
       network="stark"
+      position={position}
       onConfirm={execute}
     />
   );

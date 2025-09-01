@@ -3,6 +3,7 @@ import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { formatUnits } from "viem";
 import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { PositionManager } from "~~/utils/position";
 
 interface RepayModalStarkProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface RepayModalStarkProps {
   protocolName: string;
   debtBalance: bigint;
   vesuContext?: VesuContext;
+  position?: PositionManager;
 }
 
 export const RepayModalStark: FC<RepayModalStarkProps> = ({
@@ -20,6 +22,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   protocolName,
   debtBalance,
   vesuContext,
+  position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
   const { execute } = useLendingAction(
@@ -50,6 +53,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
       percentBase={debtBalance}
       max={maxInput}
       network="stark"
+      position={position}
       onConfirm={execute}
     />
   );

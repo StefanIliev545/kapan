@@ -2,6 +2,7 @@ import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { formatUnits } from "viem";
 import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
+import { PositionManager } from "~~/utils/position";
 
 interface WithdrawModalStarkProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface WithdrawModalStarkProps {
   protocolName: string;
   supplyBalance: bigint;
   vesuContext?: VesuContext;
+  position?: PositionManager;
 }
 
 export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
@@ -19,6 +21,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
   protocolName,
   supplyBalance,
   vesuContext,
+  position,
 }) => {
   const decimals = token.decimals;
   const { execute } = useLendingAction(
@@ -47,6 +50,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
       percentBase={supplyBalance}
       max={maxInput}
       network="stark"
+      position={position}
       onConfirm={execute}
     />
   );
