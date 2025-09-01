@@ -357,6 +357,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
             }}
             protocolName="Vesu"
+            currentDebt={debtNum}
             vesuContext={{ poolId, counterpartToken: collateralAsset }}
           />
 
