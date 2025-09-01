@@ -13,13 +13,14 @@ import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
 import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
-import { StarkBlockNumberProvider } from "~~/hooks/scaffold-stark";
+import { StarkBlockNumberProvider, useAutoConnect } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
 import provider from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
+  useAutoConnect();
 
   return (
     <>

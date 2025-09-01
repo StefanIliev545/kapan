@@ -1,5 +1,6 @@
 import { useConnect } from "@starknet-react/core";
 import { type StarknetkitConnector, useStarknetkitConnectModal } from "starknetkit";
+import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
 
 const ConnectModal = () => {
   const { connect, connectors } = useConnect();
@@ -17,6 +18,10 @@ const ConnectModal = () => {
     try {
       if (typeof window !== "undefined") {
         window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: connector.id }));
+        window.localStorage.setItem(
+          LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
+          Date.now().toString(),
+        );
       }
     } catch {}
   }
