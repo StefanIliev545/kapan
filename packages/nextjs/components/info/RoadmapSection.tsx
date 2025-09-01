@@ -30,7 +30,7 @@ interface RoadmapPhase {
 const cardVariants = {
   hidden: { opacity: 0, y: 50 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, type: "spring", stiffness: 100 } },
-};
+} as const;
 
 const featureVariants: Variants = {
   hidden: { opacity: 0, x: -20 },
