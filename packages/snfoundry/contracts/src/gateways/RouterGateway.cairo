@@ -74,15 +74,28 @@ mod RouterGateway {
 
         // @dev - Internal function that translates redeposit and reborrow to normal borrow and deposit instructions as
         // those instructions only have a meaning here in the router during the flash loan process.
-        fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, balanceDiffs: Span<u256>) -> Span<LendingInstruction> {
+        fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, previous_instruction_span: Span<LendingInstruction>, balanceDiffs: Span<u256>) -> Span<LendingInstruction> {
             let mut remappedInstructions = array![];
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Reborrow(reborrow) => {
+                        let target_instruction = previous_instruction_span.at(*reborrow.target_instruction_index);
+                        let repay_amount = match target_instruction {
+                            LendingInstruction::Repay(repay) => {
+                                let basic = *repay.basic;
+                                basic.amount
+                            },
+                            _ => {
+                                panic!("reborrow-target-not-repay")
+                            }
+                        };
+                        let leftover = *balanceDiffs.at(*reborrow.target_instruction_index);
+                        assert(repay_amount >= leftover, 'reborrow-underflow');
+                        let needed_amount = repay_amount - leftover;
                         remappedInstructions.append(LendingInstruction::Borrow(Borrow {
                             basic: BasicInstruction {
                                 token: *reborrow.token,
-                                amount: *balanceDiffs.at(*reborrow.target_instruction_index),
+                                amount: needed_amount,
                                 user: *reborrow.user,
                             },
                             context: *reborrow.context,
@@ -273,7 +286,8 @@ mod RouterGateway {
                 // Apply remapping (for redeposit/reborrow) using diffs from the previous protocol
                 let mut instructions_span = *protocol_instruction.instructions;
                 if previous_protocol_diffs.len() != 0 {
-                    instructions_span = self.remap_instructions(instructions_span, previous_protocol_diffs);
+                    let previous_instruction_span = *instructions.at(i-1).instructions;
+                    instructions_span = self.remap_instructions(instructions_span, previous_instruction_span, previous_protocol_diffs);
                 }
 
                 // Process all instructions for this protocol at once
