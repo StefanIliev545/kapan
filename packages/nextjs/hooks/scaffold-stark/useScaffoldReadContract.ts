@@ -24,7 +24,7 @@ export const useScaffoldReadContract = <
   const { data: deployedContract } = useDeployedContractInfo(contractName);
   const blockNumber = useStarkBlockNumber();
 
-  const { watch: watchConfig, ...restConfig } = readConfig as any;
+  const { watch: watchConfig, query: queryOptions, ...restConfig } = readConfig as any;
 
   const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : [];
 
@@ -42,6 +42,7 @@ export const useScaffoldReadContract = <
     enabled: args && (!Array.isArray(args) || !args.some(arg => arg === undefined)),
     blockIdentifier,
     ...restConfig,
+    query: { keepPreviousData: true, ...(queryOptions || {}) },
   }) as Omit<ReturnType<typeof useReadContract>, "data"> & {
     data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;
   };
