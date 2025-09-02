@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { FC } from "react";
+import Image from "next/image";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatRate } from "~~/utils/protocols";
@@ -33,15 +33,7 @@ export const InterestPillRow: FC<{
   protocol: string;
   className?: string;
   labels?: "between" | "center";
-}> = ({
-  supplyRate,
-  borrowRate,
-  address,
-  networkType,
-  protocol,
-  className = "",
-  labels = "between",
-}) => {
+}> = ({ supplyRate, borrowRate, address, networkType, protocol, className = "", labels = "between" }) => {
   const { data: optimalSupplyRateData } = useNetworkAwareReadContract({
     contractName: "OptimalInterestRateFinder",
     functionName: "findOptimalSupplyRate",
@@ -92,11 +84,20 @@ export const InterestPillRow: FC<{
     optimalBorrowRate = rate / divisor / 100;
   }
 
-  const supplyOptimalDisplay = formatRate(optimalSupplyRate);
-  const borrowOptimalDisplay = formatRate(optimalBorrowRate);
+  const hasOptimalSupply = optimalSupplyRate > 0;
+  const hasOptimalBorrow = optimalBorrowRate > 0;
 
-  const sameSupplyProtocol = optimalSupplyProtocol.toLowerCase() === protocol.toLowerCase();
-  const sameBorrowProtocol = optimalBorrowProtocol.toLowerCase() === protocol.toLowerCase();
+  const supplyOptimalDisplay = hasOptimalSupply ? formatRate(optimalSupplyRate) : supplyRate;
+  const borrowOptimalDisplay = hasOptimalBorrow ? formatRate(optimalBorrowRate) : borrowRate;
+
+  const sameSupplyProtocol = hasOptimalSupply ? optimalSupplyProtocol.toLowerCase() === protocol.toLowerCase() : true;
+  const sameBorrowProtocol = hasOptimalBorrow ? optimalBorrowProtocol.toLowerCase() === protocol.toLowerCase() : true;
+
+  const supplyLogo = tokenNameToLogo(hasOptimalSupply ? optimalSupplyProtocol : protocol);
+  const borrowLogo = tokenNameToLogo(hasOptimalBorrow ? optimalBorrowProtocol : protocol);
+
+  const supplyAlt = hasOptimalSupply ? optimalSupplyProtocol : protocol;
+  const borrowAlt = hasOptimalBorrow ? optimalBorrowProtocol : protocol;
 
   if (labels === "center") {
     return (
@@ -107,8 +108,8 @@ export const InterestPillRow: FC<{
             current={supplyRate}
             optimal={supplyOptimalDisplay}
             color="bg-lime-500"
-            logo={tokenNameToLogo(optimalSupplyProtocol)}
-            alt={optimalSupplyProtocol}
+            logo={supplyLogo}
+            alt={supplyAlt}
             sameProtocol={sameSupplyProtocol}
           />
         </div>
@@ -118,8 +119,8 @@ export const InterestPillRow: FC<{
             current={borrowRate}
             optimal={borrowOptimalDisplay}
             color="bg-orange-500"
-            logo={tokenNameToLogo(optimalBorrowProtocol)}
-            alt={optimalBorrowProtocol}
+            logo={borrowLogo}
+            alt={borrowAlt}
             sameProtocol={sameBorrowProtocol}
           />
         </div>
@@ -138,16 +139,16 @@ export const InterestPillRow: FC<{
           current={supplyRate}
           optimal={supplyOptimalDisplay}
           color="bg-lime-500"
-          logo={tokenNameToLogo(optimalSupplyProtocol)}
-          alt={optimalSupplyProtocol}
+          logo={supplyLogo}
+          alt={supplyAlt}
           sameProtocol={sameSupplyProtocol}
         />
         <RatePill
           current={borrowRate}
           optimal={borrowOptimalDisplay}
           color="bg-orange-500"
-          logo={tokenNameToLogo(optimalBorrowProtocol)}
-          alt={optimalBorrowProtocol}
+          logo={borrowLogo}
+          alt={borrowAlt}
           sameProtocol={sameBorrowProtocol}
         />
       </div>
