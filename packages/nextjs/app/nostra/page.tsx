@@ -1,8 +1,18 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import NostraProtocolView from "~~/components/specific/nostra/NostraProtocolView";
+import {
+  RocketLaunchIcon,
+  Squares2X2Icon,
+  TableCellsIcon,
+  ChartBarIcon,
+  ViewColumnsIcon,
+  PaintBrushIcon,
+  ArrowUpCircleIcon,
+  ArrowDownCircleIcon,
+} from "@heroicons/react/24/outline";
 
 interface MockPosition {
   icon: string;
@@ -20,15 +30,33 @@ const mockPositions: MockPosition[] = [
 ];
 
 const CardVariant: React.FC = () => (
-  <div className="grid gap-4 md:grid-cols-3">
+  <div className="grid gap-6 md:grid-cols-3">
     {mockPositions.map(pos => (
-      <div key={pos.token} className="card bg-base-200 shadow-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Image src={pos.icon} alt={pos.token} width={24} height={24} />
-          <span className="font-semibold">{pos.token}</span>
+      <div key={pos.token} className="card bg-base-100 shadow-xl">
+        <figure className="px-4 pt-4">
+          <Image
+            src={pos.icon}
+            alt={pos.token}
+            width={48}
+            height={48}
+            className="rounded-xl"
+          />
+        </figure>
+        <div className="card-body">
+          <h2 className="card-title mb-2">{pos.token}</h2>
+          <div className="flex justify-between text-sm">
+            <span className="opacity-70">Supplied</span>
+            <span className="font-medium">{pos.supplied}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="opacity-70">Borrowed</span>
+            <span className="font-medium">{pos.borrowed}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="badge badge-success gap-1">APY {pos.apy}%</span>
+            <span className="badge badge-warning gap-1">APR {pos.apr}%</span>
+          </div>
         </div>
-        <div className="text-sm">Supplied: {pos.supplied} ({pos.apy}% APY)</div>
-        <div className="text-sm">Borrowed: {pos.borrowed} ({pos.apr}% APR)</div>
       </div>
     ))}
   </div>
@@ -36,7 +64,7 @@ const CardVariant: React.FC = () => (
 
 const TableVariant: React.FC = () => (
   <div className="overflow-x-auto">
-    <table className="table">
+    <table className="table table-zebra">
       <thead>
         <tr>
           <th>Asset</th>
@@ -70,10 +98,16 @@ const MinimalVariant: React.FC = () => {
   return (
     <div className="stats shadow">
       <div className="stat">
+        <div className="stat-figure text-secondary">
+          <ArrowUpCircleIcon className="w-6 h-6" />
+        </div>
         <div className="stat-title">Total Supplied</div>
         <div className="stat-value">{totalSupplied}</div>
       </div>
       <div className="stat">
+        <div className="stat-figure text-primary">
+          <ArrowDownCircleIcon className="w-6 h-6" />
+        </div>
         <div className="stat-title">Total Borrowed</div>
         <div className="stat-value">{totalBorrowed}</div>
       </div>
@@ -83,24 +117,30 @@ const MinimalVariant: React.FC = () => {
 
 const SplitVariant: React.FC = () => (
   <div className="grid gap-6 md:grid-cols-2">
-    <div>
-      <h3 className="font-semibold mb-2">Supplied</h3>
+    <div className="bg-base-200 rounded-xl p-4">
+      <h3 className="font-semibold mb-3">Supplied</h3>
       <ul className="space-y-2">
         {mockPositions.map(pos => (
-          <li key={pos.token} className="flex items-center gap-2">
-            <Image src={pos.icon} alt={pos.token} width={20} height={20} />
-            {pos.token}: {pos.supplied}
+          <li key={pos.token} className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Image src={pos.icon} alt={pos.token} width={20} height={20} />
+              {pos.token}
+            </span>
+            <span className="font-medium">{pos.supplied}</span>
           </li>
         ))}
       </ul>
     </div>
-    <div>
-      <h3 className="font-semibold mb-2">Borrowed</h3>
+    <div className="bg-base-200 rounded-xl p-4">
+      <h3 className="font-semibold mb-3">Borrowed</h3>
       <ul className="space-y-2">
         {mockPositions.map(pos => (
-          <li key={pos.token} className="flex items-center gap-2">
-            <Image src={pos.icon} alt={pos.token} width={20} height={20} />
-            {pos.token}: {pos.borrowed}
+          <li key={pos.token} className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Image src={pos.icon} alt={pos.token} width={20} height={20} />
+              {pos.token}
+            </span>
+            <span className="font-medium">{pos.borrowed}</span>
           </li>
         ))}
       </ul>
@@ -109,11 +149,17 @@ const SplitVariant: React.FC = () => (
 );
 
 const GradientVariant: React.FC = () => (
-  <div className="rounded-xl bg-gradient-to-br from-primary to-secondary p-6 text-white space-y-4">
+  <div className="rounded-xl bg-gradient-to-br from-primary to-secondary p-6 text-white">
     {mockPositions.map(pos => (
-      <div key={pos.token} className="flex justify-between">
-        <span>{pos.token}</span>
-        <span>
+      <div
+        key={pos.token}
+        className="flex items-center justify-between py-2 border-b border-white/20 last:border-b-0"
+      >
+        <span className="flex items-center gap-2">
+          <Image src={pos.icon} alt={pos.token} width={20} height={20} />
+          {pos.token}
+        </span>
+        <span className="text-sm">
           {pos.supplied} / {pos.borrowed}
         </span>
       </div>
@@ -121,33 +167,41 @@ const GradientVariant: React.FC = () => (
   </div>
 );
 
+const variants = [
+  { id: "original", label: "Original", icon: RocketLaunchIcon, component: <NostraProtocolView /> },
+  { id: "card", label: "Card", icon: Squares2X2Icon, component: <CardVariant /> },
+  { id: "table", label: "Table", icon: TableCellsIcon, component: <TableVariant /> },
+  { id: "minimal", label: "Minimal", icon: ChartBarIcon, component: <MinimalVariant /> },
+  { id: "split", label: "Split", icon: ViewColumnsIcon, component: <SplitVariant /> },
+  { id: "gradient", label: "Gradient", icon: PaintBrushIcon, component: <GradientVariant /> },
+];
+
 const NostraVariantsPage: React.FC = () => {
+  const [active, setActive] = useState("original");
+
+  const activeVariant = variants.find(v => v.id === active);
+
   return (
-    <div className="container mx-auto space-y-16 p-4">
-      <section>
-        <h1 className="mb-4 text-3xl font-bold">Original Nostra Protocol View</h1>
-        <NostraProtocolView />
-      </section>
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">Variant: Card Layout</h2>
-        <CardVariant />
-      </section>
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">Variant: Table Overview</h2>
-        <TableVariant />
-      </section>
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">Variant: Minimal Stats</h2>
-        <MinimalVariant />
-      </section>
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">Variant: Split Columns</h2>
-        <SplitVariant />
-      </section>
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">Variant: Gradient Panel</h2>
-        <GradientVariant />
-      </section>
+    <div className="container mx-auto p-4">
+      <div role="tablist" className="tabs tabs-bordered flex flex-wrap gap-2">
+        {variants.map(v => {
+          const Icon = v.icon;
+          return (
+            <button
+              key={v.id}
+              role="tab"
+              onClick={() => setActive(v.id)}
+              className={`tab flex items-center gap-2 ${active === v.id ? "tab-active" : ""}`}
+            >
+              <Icon className="w-4 h-4" />
+              {v.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-8 space-y-8">
+        {activeVariant?.component}
+      </div>
     </div>
   );
 };
