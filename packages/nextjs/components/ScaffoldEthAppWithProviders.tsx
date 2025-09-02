@@ -9,6 +9,7 @@ import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
 import { WagmiProvider } from "wagmi";
 import { Footer } from "~~/components/Footer";
+import FloatingSocials from "~~/components/FloatingSocials";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
@@ -29,6 +30,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
         <main className="relative flex flex-col flex-1">{children}</main>
         <Footer />
       </div>
+      <FloatingSocials />
       <Toaster />
     </>
   );

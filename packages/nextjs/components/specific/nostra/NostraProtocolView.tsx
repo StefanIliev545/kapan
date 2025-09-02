@@ -1,12 +1,10 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString } from "~~/utils/protocols";
-import { ContractName } from "~~/utils/scaffold-stark/contract";
 
 type UserPositionTuple = {
   0: bigint; // underlying token address
@@ -26,7 +24,7 @@ type InterestState = {
 export const NostraProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll, setForceShowAll] = useState(false);
+  const [forceShowAll] = useState(false);
 
   // Determine the address to use for queries - use contract's own address as fallback
   const queryAddress = connectedAddress;
