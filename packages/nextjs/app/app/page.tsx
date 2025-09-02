@@ -69,7 +69,9 @@ const App: NextPage = () => {
 
   return (
     <div className="container mx-auto px-5 flex">
-      <LendingSidebar />
+      <div className="hidden lg:block">
+        <LendingSidebar />
+      </div>
       <div className="flex-1">
         <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 

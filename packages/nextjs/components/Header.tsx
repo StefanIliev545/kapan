@@ -12,6 +12,7 @@ import {
   DocumentChartBarIcon,
   SparklesIcon,
   WalletIcon,
+  BanknotesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
@@ -43,12 +44,21 @@ export const menuLinks: HeaderMenuLink[] = [
   }
 ];
 
-export const HeaderMenuLinks = () => {
+const mobileOnlyLinks: HeaderMenuLink[] = [
+  {
+    label: "Markets",
+    href: "/markets",
+    icon: <BanknotesIcon className="h-5 w-5" />,
+  },
+];
+
+export const HeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
   const pathname = usePathname();
+  const links = isMobile ? [...menuLinks, ...mobileOnlyLinks] : menuLinks;
 
   return (
     <>
-      {menuLinks.map(({ label, href, icon }, index) => {
+      {links.map(({ label, href, icon }, index) => {
         const isActive = pathname === href;
         return (
           <motion.li
@@ -229,7 +239,7 @@ export const Header = () => {
                           </div>
                         </div>
                         <ul className="space-y-2">
-                          <HeaderMenuLinks />
+                          <HeaderMenuLinks isMobile />
                         </ul>
                         <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
                           <div className="flex flex-col space-y-2 items-stretch relative z-50">
