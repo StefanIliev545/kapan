@@ -10,7 +10,7 @@ const LicensePage = () => {
     <div className="container mx-auto px-4 py-8 prose">
       <h1>License</h1>
       <p>
-        The software and information provided by Kapan Finance are offered on an "as is" and "as available" basis
+        The software and information provided by Kapan Finance are offered on an &quot;as is&quot; and &quot;as available&quot; basis
         without warranties of any kind, either express or implied. This includes but is not limited to implied
         warranties of merchantability, fitness for a particular purpose, and noninfringement.
       </p>
