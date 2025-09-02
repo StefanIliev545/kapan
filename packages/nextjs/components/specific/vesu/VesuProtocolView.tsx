@@ -160,7 +160,7 @@ export const VesuProtocolView: FC = () => {
                 </div>
               ) : null}
             </div>
-            <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "animate-pulse" : ""}`}>
+            <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "" : ""}`}>
               {positionRows?.length ? (
                 positionRows
               ) : (
