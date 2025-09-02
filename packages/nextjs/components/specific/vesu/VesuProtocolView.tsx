@@ -27,14 +27,14 @@ export const VesuProtocolView: FC = () => {
   }
 
   // Paginated user positions reads
-  const { data: userPositionsPart1, error: positionsError1 } = useScaffoldReadContract({
+  const { data: userPositionsPart1, error: positionsError1, isFetching: isFetching1 } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     args: [userAddress || "0x0", selectedPoolId, 0n, 3n],
     watch: true,
     refetchInterval: 5000,
   });
-  const { data: userPositionsPart2, error: positionsError2 } = useScaffoldReadContract({
+  const { data: userPositionsPart2, error: positionsError2, isFetching: isFetching2 } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     args: [userAddress || "0x0", selectedPoolId, 3n, 10n],
@@ -54,6 +54,8 @@ export const VesuProtocolView: FC = () => {
     const p2 = (userPositionsPart2 as unknown as PositionTuple[]) || [];
     return [...p1, ...p2];
   }, [userPositionsPart1, userPositionsPart2]);
+
+  const isUpdating = isFetching1 || isFetching2;
 
   const positionRows = useMemo(() => {
     if (!mergedUserPositions || !supportedAssets) return null;
@@ -158,7 +160,7 @@ export const VesuProtocolView: FC = () => {
                 </div>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-4 justify-start">
+            <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "animate-pulse" : ""}`}>
               {positionRows?.length ? (
                 positionRows
               ) : (
