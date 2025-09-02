@@ -590,7 +590,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           instructions: [borrowInstruction],
         },
       ],
-      rawSelectors: false,
     });
 
     return {
@@ -611,7 +610,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
     contractName: "RouterGateway" as const,
     functionName: "get_authorizations_for_instructions" as const,
-    args: [authInstruction],
+    args: [authInstruction, false],
     enabled: !!authInstruction && isOpen,
     refetchInterval: 1000,
   } as any);
