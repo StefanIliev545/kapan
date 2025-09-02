@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { FC, useMemo, useState } from "react";
 import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
@@ -14,11 +15,6 @@ import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protoco
 const YEAR_IN_SECONDS = 31536000; // 365 days
 const SCALE = 10n ** 18n;
 
-type PositionData = {
-  collateral_shares: bigint;
-  nominal_debt: bigint;
-};
-
 interface VesuPositionProps {
   collateralAsset: string;
   debtAsset: string;
@@ -30,25 +26,6 @@ interface VesuPositionProps {
   poolId: bigint;
 }
 
-// Helper: Format BigInt values with a provided number of decimals (for display)
-const formatBigInt = (value: bigint, decimals: number): string => {
-  try {
-    const divisor = BigInt(10) ** BigInt(decimals);
-    const whole = value / divisor;
-    const fractional = value % divisor;
-
-    if (fractional === 0n) {
-      return whole.toString();
-    }
-
-    const numDecimals = Number(decimals);
-    const fractionalStr = fractional.toString().padStart(numDecimals, "0");
-    return `${whole}.${fractionalStr}`;
-  } catch (error) {
-    console.error("Error formatting BigInt:", error);
-    return "0";
-  }
-};
 
 // Helper: Calculate rates based on protocol data (returns numbers)
 const calculateRates = (
@@ -72,7 +49,7 @@ const calculateRates = (
 export const VesuPosition: FC<VesuPositionProps> = ({
   collateralAsset,
   debtAsset,
-  collateralShares,
+  collateralShares: _collateralShares,
   collateralAmount,
   nominalDebt,
   isVtoken,
@@ -129,7 +106,6 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   // Format amounts with correct decimals
   const formattedCollateral = formatTokenAmount(collateralAmount, collateralMetadata.decimals);
   const formattedDebt = debtMetadata ? formatTokenAmount(nominalDebt, debtMetadata.decimals) : "0";
-  const collateralNum = parseFloat(formattedCollateral);
   const debtNum = parseFloat(formattedDebt);
 
   // Calculate rates for both assets
@@ -178,13 +154,25 @@ export const VesuPosition: FC<VesuPositionProps> = ({
         <div className="card-body p-4">
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
-              <img src={tokenNameToLogo(collateralSymbol.toLowerCase())} alt={collateralSymbol} className="w-6 h-6" />
+              <Image
+                src={tokenNameToLogo(collateralSymbol.toLowerCase())}
+                alt={collateralSymbol}
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
               <span className="font-medium">{collateralSymbol}</span>
               {isVtoken && <span className="badge badge-sm badge-primary">vToken</span>}
             </div>
             {nominalDebt !== "0" && (
               <div className="flex items-center gap-2">
-                <img src={tokenNameToLogo(debtSymbol.toLowerCase())} alt={debtSymbol} className="w-6 h-6" />
+                <Image
+                  src={tokenNameToLogo(debtSymbol.toLowerCase())}
+                  alt={debtSymbol}
+                  width={24}
+                  height={24}
+                  className="w-6 h-6"
+                />
                 <span className="font-medium">{debtSymbol}</span>
               </div>
             )}

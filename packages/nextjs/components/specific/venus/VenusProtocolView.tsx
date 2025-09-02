@@ -28,7 +28,7 @@ import { FC, useMemo, useState, useEffect } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
-import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -38,7 +38,6 @@ type VenusSupplyPosition = SupplyPositionProps;
 
 export const VenusProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
-  const { data: venusGatewayContract } = useScaffoldContract({ contractName: "VenusGateway" });
   
   // Get Comptroller address from VenusGateway
   const { data: comptrollerAddress } = useScaffoldReadContract({
@@ -140,22 +139,20 @@ export const VenusProtocolView: FC = () => {
   });
 
   // Combine all the data to create supply and borrow positions
-  const { suppliedPositions, borrowedPositions, isLoading } = useMemo(() => {
+  const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: VenusSupplyPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
-    
+
     // Check if we have all the required data
     if (!vTokenAddresses || !marketDetails || !ratesData || (connectedAddress && (!userBalances || !collateralStatus))) {
-      return { 
-        suppliedPositions: supplied, 
-        borrowedPositions: borrowed, 
-        isLoading: isLoadingVTokens || isLoadingMarketDetails || isLoadingRates || 
-                  (connectedAddress && (isLoadingBalances || isLoadingCollateral))
+      return {
+        suppliedPositions: supplied,
+        borrowedPositions: borrowed,
       };
     }
     
     // Destructure arrays from tuple responses
-    const [vTokens, tokens, symbols, names, decimals, prices] = marketDetails;
+    const [vTokens, tokens, symbols, , decimals, prices] = marketDetails;
     const [, supplyRates, borrowRates] = ratesData;
     
     // Process data to create positions
@@ -164,7 +161,6 @@ export const VenusProtocolView: FC = () => {
       const symbol = symbols[i];
       const decimal = decimals[i];
       const tokenAddress = tokens[i];
-      const name = names[i];
       
       // Skip tokens with no underlying (like vBNB potentially)
       if (tokenAddress === "0x0000000000000000000000000000000000000000") {
@@ -246,12 +242,11 @@ export const VenusProtocolView: FC = () => {
       });
     }
     
-    return { 
-      suppliedPositions: supplied, 
+    return {
+      suppliedPositions: supplied,
       borrowedPositions: borrowed,
-      isLoading: false
     };
-  }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress]);
+  }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress, getTokenDisplay]);
 
   // Get LTV (Loan-to-Value) for Venus
   // In Venus Protocol, this is typically around 50-75% depending on the asset
