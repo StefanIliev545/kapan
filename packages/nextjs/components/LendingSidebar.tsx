@@ -13,7 +13,7 @@ export const LendingSidebar = () => {
 
   return (
     <aside className="group w-16 hover:w-40 transition-all duration-300 overflow-hidden mr-4">
-      <ul className="menu bg-base-200 rounded-box p-2">
+      <ul className="menu bg-base-200 rounded-box py-2 pr-2 pl-0">
         {links.map(({ href, label, icon: Icon }) => (
           <li key={href}>
             <Link
