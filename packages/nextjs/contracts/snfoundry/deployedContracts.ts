@@ -345,7 +345,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -1045,7 +1045,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -1816,7 +1816,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -1918,7 +1918,7 @@ const contracts = {
   mainnet: {
     RouterGateway: {
       address:
-        "0x2acc8f0107ed48602de9d54dd6c7ab81dc3dbe359c5c5acfb698216392bfceb",
+        "0x6a17ec8b2066e197cd1388b7f7c98c8bdd2ffb9ccac5d1c4f96c2c633cbda2f",
       abi: [
         {
           type: "impl",
@@ -2231,7 +2231,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -2327,11 +2327,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x74430aadee37290c5f8dd854a207eabccdf78b26784bbdfe043eae9f8e93f26",
+        "0xec95e64c377dc48517019c865fae1f15db5f15139095d1eea85ed2256a8b3c",
     },
     VesuGateway: {
       address:
-        "0x11e3c441481558bb4152c950b93a6a56902da6cb50fa5b77603cd7e2840690",
+        "0x16be939614c567ee2a2d32c0d3e64a5a35b98d7113fe390a43a28ce61d890d0",
       abi: [
         {
           type: "impl",
@@ -2656,7 +2656,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -3082,7 +3082,7 @@ const contracts = {
     },
     NostraGateway: {
       address:
-        "0x6541e5f4c401788ad3edbdd1c9e8ae408c2141898f8d3c96b3fbe7bf340eb44",
+        "0x6f827340c9363cde9e24f356ce5db2f9e5de4a43e59e96cecbd7c28b2f2f006",
       abi: [
         {
           type: "impl",
@@ -3356,7 +3356,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -3692,11 +3692,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x2faa075de9f5f5d17e4aa03a3f1e5f756fe7ec0a178bb382a6b3bcede79b0a9",
+        "0x31969e70a817e1cf2ae05490223f26c74ad11683e5755c7241bfab207910140",
     },
     OptimalInterestRateFinder: {
       address:
-        "0xfaf596bdbd834960bb8c0a3ac7830c957c69b6a123e0ac82f06994949a5571",
+        "0x57770c441268d02696af8fbc2d5f591fe3a9077688d8dfaeba505a090957472",
       abi: [
         {
           type: "impl",
@@ -3814,7 +3814,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x40fe1dd7eb3565847fea9b58d190e208e3d8eb43ac45c41f3285d44e0215e5a",
+        "0x58b6056c9fe6f6fdb88c2566f249d6545be832234b401c2874c283e623cd632",
       abi: [
         {
           type: "impl",
@@ -4240,7 +4240,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -4665,7 +4665,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -5365,7 +5365,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
