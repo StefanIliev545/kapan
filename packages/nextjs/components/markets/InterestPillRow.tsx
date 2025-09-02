@@ -12,7 +12,7 @@ export const RatePill: FC<{
   alt: string;
   sameProtocol?: boolean;
 }> = ({ current, optimal, color, logo, alt, sameProtocol = false }) => (
-  <div className="flex rounded-full overflow-hidden shadow text-sm text-white">
+  <div className="flex rounded-lg overflow-hidden shadow text-sm text-white">
     <span className={`px-3 py-1 ${color}`}>{current}</span>
     <span
       className={`px-3 py-1 flex items-center gap-1 ${

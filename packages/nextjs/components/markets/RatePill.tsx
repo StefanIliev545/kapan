@@ -26,7 +26,7 @@ const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", s
 export const RatePill: FC<RatePillProps> = ({ variant, label, rate, networkType, protocol, showIcons = true }) => {
   const color = variant === "supply" ? "bg-success text-success-content" : "bg-warning text-warning-content";
   return (
-    <div className="flex items-center rounded-full border border-base-300 text-sm overflow-hidden bg-base-100">
+    <div className="flex items-center rounded-lg border border-base-300 text-sm overflow-hidden bg-base-100">
       <span className={`px-3 py-1 ${color}`}>{label}</span>
       <span className="px-3 py-1 flex items-center gap-2">
         {rate}
