@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
-import { useLendingAction } from "~~/hooks/useLendingAction";
+import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 
@@ -9,12 +9,20 @@ interface DepositModalStarkProps {
   onClose: () => void;
   token: TokenInfo;
   protocolName: string;
+  vesuContext?: VesuContext;
   position?: PositionManager;
 }
 
-export const DepositModalStark: FC<DepositModalStarkProps> = ({ isOpen, onClose, token, protocolName, position }) => {
+export const DepositModalStark: FC<DepositModalStarkProps> = ({
+  isOpen,
+  onClose,
+  token,
+  protocolName,
+  vesuContext,
+  position,
+}) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
-  const { execute } = useLendingAction("stark", "Deposit", token.address, protocolName, decimals);
+  const { execute } = useLendingAction("stark", "Deposit", token.address, protocolName, decimals, vesuContext);
   return (
     <TokenActionModal
       isOpen={isOpen}
