@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
@@ -14,30 +14,11 @@ export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
 
-  // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll, setForceShowAll] = useState(false);
+  const isWalletConnected = !!connectedAddress;
+  const forceShowAll = !isWalletConnected;
 
   // Determine the address to use for queries
   const queryAddress = connectedAddress || ZERO_ADDRESS;
-
-  // Update forceShowAll when wallet connection status changes with a delay
-  useEffect(() => {
-    // If wallet is connected, immediately set forceShowAll to false
-    if (connectedAddress) {
-      setForceShowAll(false);
-      return;
-    }
-
-    // If wallet is not connected, wait a bit before forcing show all
-    // This gives time for wallet to connect during initial page load
-    const timeout = setTimeout(() => {
-      if (!connectedAddress) {
-        setForceShowAll(true);
-      }
-    }, 2500); // Wait 1.5 seconds before deciding wallet is not connected
-
-    return () => clearTimeout(timeout);
-  }, [connectedAddress]);
 
   // Load token contracts via useScaffoldContract.
   const { data: usdc } = useScaffoldContract({ contractName: "USDC", walletClient });
@@ -207,6 +188,16 @@ export const CompoundProtocolView: FC = () => {
     usdcEDecimals,
   ]);
 
+  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
+  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
+
+  const filteredSuppliedPositions = isWalletConnected
+    ? suppliedPositions
+    : suppliedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+  const filteredBorrowedPositions = isWalletConnected
+    ? borrowedPositions
+    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+
   // Hardcode current LTV (or fetch from contract if needed).
   const currentLtv = 75;
 
@@ -217,8 +208,8 @@ export const CompoundProtocolView: FC = () => {
         protocolIcon="/logos/compound.svg"
         ltv={currentLtv}
         maxLtv={90}
-        suppliedPositions={suppliedPositions}
-        borrowedPositions={borrowedPositions}
+        suppliedPositions={filteredSuppliedPositions}
+        borrowedPositions={filteredBorrowedPositions}
         hideUtilization={true}
         forceShowAll={forceShowAll}
         networkType="evm"

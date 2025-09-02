@@ -24,7 +24,7 @@
  * 4. Allow users to supply, borrow, repay, and migrate debt between protocols
  */
 
-import { FC, useMemo, useState, useEffect } from "react";
+import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
@@ -38,34 +38,15 @@ type VenusSupplyPosition = SupplyPositionProps;
 
 export const VenusProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
-  
+ 
   // Get Comptroller address from VenusGateway
   const { data: comptrollerAddress } = useScaffoldReadContract({
     contractName: "VenusGateway",
     functionName: "comptroller",
   });
-  
-  // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll, setForceShowAll] = useState(false);
-  
-  // Update forceShowAll when wallet connection status changes with a delay
-  useEffect(() => {
-    // If wallet is connected, immediately set forceShowAll to false
-    if (connectedAddress) {
-      setForceShowAll(false);
-      return;
-    }
-    
-    // If wallet is not connected, wait a bit before forcing show all
-    // This gives time for wallet to connect during initial page load
-    const timeout = setTimeout(() => {
-      if (!connectedAddress) {
-        setForceShowAll(true);
-      }
-    }, 2500); // Wait 2.5 seconds before deciding wallet is not connected
-    
-    return () => clearTimeout(timeout);
-  }, [connectedAddress]);
+
+  const isWalletConnected = !!connectedAddress;
+  const forceShowAll = !isWalletConnected;
 
   // Helper: Convert Venus rates to APY percentage
   // Venus uses rates per block, so we need to convert to annual rates
@@ -248,6 +229,16 @@ export const VenusProtocolView: FC = () => {
     };
   }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress, getTokenDisplay]);
 
+  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
+  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
+
+  const filteredSuppliedPositions = isWalletConnected
+    ? (suppliedPositions as SupplyPositionProps[])
+    : (suppliedPositions as SupplyPositionProps[]).filter(p => tokenFilter.includes(sanitize(p.name)));
+  const filteredBorrowedPositions = isWalletConnected
+    ? borrowedPositions
+    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+
   // Get LTV (Loan-to-Value) for Venus
   // In Venus Protocol, this is typically around 50-75% depending on the asset
   // We'll use a fixed value here for simplicity
@@ -260,12 +251,12 @@ export const VenusProtocolView: FC = () => {
       protocolIcon="/logos/venus.svg"
       ltv={ltv}
       maxLtv={maxLtv}
-      suppliedPositions={suppliedPositions as SupplyPositionProps[]}
-      borrowedPositions={borrowedPositions}
+      suppliedPositions={filteredSuppliedPositions}
+      borrowedPositions={filteredBorrowedPositions}
       forceShowAll={forceShowAll}
       networkType="evm"
     />
   );
 };
 
-export default VenusProtocolView; 
+export default VenusProtocolView;
