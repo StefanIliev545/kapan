@@ -4,11 +4,78 @@ import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const useCollateralValue = (baseToken?: string, userAddress?: string) => {
+  const { data: collateralData } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getDepositedCollaterals",
+    args: [baseToken, userAddress],
+    query: {
+      enabled: !!baseToken && !!userAddress,
+    },
+  });
+
+  const collateralAddresses = useMemo(
+    () => (collateralData?.[0] as string[] | undefined) || [],
+    [collateralData],
+  );
+
+  const { data: collateralPrices } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrices",
+    args: [baseToken, collateralAddresses],
+    query: {
+      enabled: !!baseToken && collateralAddresses.length > 0,
+    },
+  });
+
+  const { data: collateralDecimals } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "getDecimals",
+    args: [collateralAddresses],
+    query: {
+      enabled: collateralAddresses.length > 0,
+    },
+  });
+
+  const { data: baseTokenPrice } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrice",
+    args: [baseToken],
+    query: {
+      enabled: !!baseToken,
+    },
+  });
+
+  return useMemo(() => {
+    if (!collateralData || !baseTokenPrice) return 0;
+
+    const addresses = collateralData[0] as string[];
+    const balances = collateralData[1] as bigint[];
+
+    let total = 0;
+
+    for (let i = 0; i < addresses.length; i++) {
+      const balanceRaw = balances[i];
+      const decimals =
+        collateralDecimals && i < collateralDecimals.length ? Number(collateralDecimals[i]) : 18;
+      const balance = Number(formatUnits(balanceRaw, decimals));
+      const collateralPrice = collateralPrices && i < collateralPrices.length ? collateralPrices[i] : 0n;
+      if (collateralPrice > 0n && baseTokenPrice > 0n) {
+        const scaleFactor = 10n ** 8n;
+        const usdPrice = (collateralPrice * baseTokenPrice) / scaleFactor;
+        total += balance * Number(formatUnits(usdPrice, 8));
+      }
+    }
+
+    return total;
+  }, [collateralData, collateralPrices, collateralDecimals, baseTokenPrice]);
+};
 
 export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
@@ -81,6 +148,12 @@ export const CompoundProtocolView: FC = () => {
     functionName: "decimals",
   });
 
+  // Fetch total collateral value for each market
+  const wethCollateralValue = useCollateralValue(wethAddress, queryAddress);
+  const usdcCollateralValue = useCollateralValue(usdcAddress, queryAddress);
+  const usdtCollateralValue = useCollateralValue(usdtAddress, queryAddress);
+  const usdcECollateralValue = useCollateralValue(usdcEAddress, queryAddress);
+
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
     const SECONDS_PER_YEAR = 60 * 60 * 24 * 365; // as a number
@@ -98,6 +171,7 @@ export const CompoundProtocolView: FC = () => {
       tokenAddress: string | undefined,
       compoundData: any,
       decimalsRaw: any,
+      collateralValue: number,
     ) => {
       if (!tokenAddress || !compoundData || !decimalsRaw) return;
       const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price, priceScale] = compoundData;
@@ -117,8 +191,7 @@ export const CompoundProtocolView: FC = () => {
         name: tokenName,
         // Set negative balance if there's debt, otherwise zero balance
         balance: borrowBalanceRaw && borrowBalanceRaw > 0n ? -usdBorrowBalance : 0,
-        // Store collateral value as a custom property
-        collateralValue: 0, // This is now calculated inside the CollateralView
+        collateralValue,
         tokenBalance: borrowBalanceRaw || 0n,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
@@ -126,11 +199,7 @@ export const CompoundProtocolView: FC = () => {
         tokenDecimals: decimals,
         tokenSymbol: tokenName,
         collateralView: (
-          <CompoundCollateralView
-            baseToken={tokenAddress}
-            baseTokenDecimals={decimals}
-            compoundData={compoundData}
-          />
+          <CompoundCollateralView baseToken={tokenAddress} baseTokenDecimals={decimals} compoundData={compoundData} />
         ),
       });
 
@@ -147,30 +216,10 @@ export const CompoundProtocolView: FC = () => {
       });
     };
 
-    computePosition(
-      "WETH",
-      wethAddress,
-      wethCompoundData,
-      wethDecimals,
-    );
-    computePosition(
-      "USDC",
-      usdcAddress,
-      usdcCompoundData,
-      usdcDecimals,
-    );
-    computePosition(
-      "USDT",
-      usdtAddress,
-      usdtCompoundData,
-      usdtDecimals,
-    );
-    computePosition(
-      "USDC.e",
-      usdcEAddress,
-      usdcECompoundData,
-      usdcEDecimals,
-    );
+    computePosition("WETH", wethAddress, wethCompoundData, wethDecimals, wethCollateralValue);
+    computePosition("USDC", usdcAddress, usdcCompoundData, usdcDecimals, usdcCollateralValue);
+    computePosition("USDT", usdtAddress, usdtCompoundData, usdtDecimals, usdtCollateralValue);
+    computePosition("USDC.e", usdcEAddress, usdcECompoundData, usdcEDecimals, usdcECollateralValue);
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
   }, [
@@ -186,6 +235,10 @@ export const CompoundProtocolView: FC = () => {
     usdcEAddress,
     usdcECompoundData,
     usdcEDecimals,
+    wethCollateralValue,
+    usdcCollateralValue,
+    usdtCollateralValue,
+    usdcECollateralValue,
   ]);
 
   const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
