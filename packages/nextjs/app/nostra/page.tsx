@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import NostraProtocolView from "~~/components/specific/nostra/NostraProtocolView";
+import useNostraProtocolData from "~~/components/specific/nostra/useNostraProtocolData";
+import { SupplyPosition } from "~~/components/SupplyPosition";
+import { BorrowPosition } from "~~/components/BorrowPosition";
+import { PositionManager } from "~~/utils/position";
 import {
   RocketLaunchIcon,
   Squares2X2Icon,
@@ -10,181 +14,188 @@ import {
   ChartBarIcon,
   ViewColumnsIcon,
   PaintBrushIcon,
-  ArrowUpCircleIcon,
-  ArrowDownCircleIcon,
 } from "@heroicons/react/24/outline";
 
-interface MockPosition {
-  icon: string;
-  token: string;
-  supplied: number;
-  apy: number;
-  borrowed: number;
-  apr: number;
+interface VariantProps {
+  supplied: ReturnType<typeof useNostraProtocolData>["suppliedPositions"];
+  borrowed: ReturnType<typeof useNostraProtocolData>["borrowedPositions"];
+  position: PositionManager;
 }
 
-const mockPositions: MockPosition[] = [
-  { icon: "/logos/eth.svg", token: "ETH", supplied: 1.2, apy: 2.1, borrowed: 0.4, apr: 3.2 },
-  { icon: "/logos/usdc.svg", token: "USDC", supplied: 1000, apy: 1.5, borrowed: 500, apr: 4.0 },
-  { icon: "/logos/dai.svg", token: "DAI", supplied: 500, apy: 1.8, borrowed: 150, apr: 3.5 },
-];
-
-const CardVariant: React.FC = () => (
-  <div className="grid gap-6 md:grid-cols-3">
-    {mockPositions.map(pos => (
-      <div key={pos.token} className="card bg-base-100 shadow-xl">
-        <figure className="px-4 pt-4">
-          <Image
-            src={pos.icon}
-            alt={pos.token}
-            width={48}
-            height={48}
-            className="rounded-xl"
-          />
-        </figure>
-        <div className="card-body">
-          <h2 className="card-title mb-2">{pos.token}</h2>
-          <div className="flex justify-between text-sm">
-            <span className="opacity-70">Supplied</span>
-            <span className="font-medium">{pos.supplied}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="opacity-70">Borrowed</span>
-            <span className="font-medium">{pos.borrowed}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className="badge badge-success gap-1">APY {pos.apy}%</span>
-            <span className="badge badge-warning gap-1">APR {pos.apr}%</span>
-          </div>
+const CardVariant: React.FC<VariantProps> = ({ supplied, borrowed, position }) => (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="card bg-base-100 shadow-md">
+      <div className="card-body p-4">
+        <h3 className="card-title mb-2">Supplied</h3>
+        <div className="space-y-2">
+          {supplied.map((p, i) => (
+            <SupplyPosition key={`s-${p.tokenAddress}-${i}`} {...p} protocolName="Nostra" networkType="starknet" position={position} />
+          ))}
         </div>
       </div>
-    ))}
+    </div>
+    <div className="card bg-base-100 shadow-md">
+      <div className="card-body p-4">
+        <h3 className="card-title mb-2">Borrowed</h3>
+        <div className="space-y-2">
+          {borrowed.map((p, i) => (
+            <BorrowPosition key={`b-${p.tokenAddress}-${i}`} {...p} protocolName="Nostra" networkType="starknet" position={position} />
+          ))}
+        </div>
+      </div>
+    </div>
   </div>
 );
 
-const TableVariant: React.FC = () => (
-  <div className="overflow-x-auto">
-    <table className="table table-zebra">
-      <thead>
-        <tr>
-          <th>Asset</th>
-          <th>Supplied</th>
-          <th>Borrowed</th>
-          <th>APY</th>
-          <th>APR</th>
-        </tr>
-      </thead>
-      <tbody>
-        {mockPositions.map(pos => (
-          <tr key={pos.token}>
-            <td className="flex items-center gap-2">
-              <Image src={pos.icon} alt={pos.token} width={20} height={20} />
-              {pos.token}
-            </td>
-            <td>{pos.supplied}</td>
-            <td>{pos.borrowed}</td>
-            <td>{pos.apy}%</td>
-            <td>{pos.apr}%</td>
+const TableVariant: React.FC<VariantProps> = ({ supplied, borrowed }) => (
+  <div className="space-y-8">
+    <div className="overflow-x-auto">
+      <h3 className="font-semibold mb-2">Supplied</h3>
+      <table className="table table-zebra">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Balance</th>
+            <th>APY</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {supplied.map((p, i) => (
+            <tr key={`ts-${p.tokenAddress}-${i}`}>
+              <td className="flex items-center gap-2">
+                <Image src={p.icon} alt={p.name} width={20} height={20} />
+                {p.name}
+              </td>
+              <td>{p.balance.toFixed(2)}</td>
+              <td>{p.currentRate.toFixed(2)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <div className="overflow-x-auto">
+      <h3 className="font-semibold mb-2">Borrowed</h3>
+      <table className="table table-zebra">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Balance</th>
+            <th>APR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {borrowed.map((p, i) => (
+            <tr key={`tb-${p.tokenAddress}-${i}`}>
+              <td className="flex items-center gap-2">
+                <Image src={p.icon} alt={p.name} width={20} height={20} />
+                {p.name}
+              </td>
+              <td>{p.balance.toFixed(2)}</td>
+              <td>{p.currentRate.toFixed(2)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </div>
 );
 
-const MinimalVariant: React.FC = () => {
-  const totalSupplied = mockPositions.reduce((acc, p) => acc + p.supplied, 0);
-  const totalBorrowed = mockPositions.reduce((acc, p) => acc + p.borrowed, 0);
+const MinimalVariant: React.FC<VariantProps> = ({ supplied, borrowed }) => {
+  const totalSupplied = supplied.reduce((acc, p) => acc + p.balance, 0);
+  const totalBorrowed = borrowed.reduce((acc, p) => acc + Math.abs(p.balance), 0);
   return (
-    <div className="stats shadow">
-      <div className="stat">
-        <div className="stat-figure text-secondary">
-          <ArrowUpCircleIcon className="w-6 h-6" />
+    <div className="space-y-4">
+      <div className="stats shadow">
+        <div className="stat">
+          <div className="stat-title">Total Supplied</div>
+          <div className="stat-value">{totalSupplied.toFixed(2)}</div>
         </div>
-        <div className="stat-title">Total Supplied</div>
-        <div className="stat-value">{totalSupplied}</div>
-      </div>
-      <div className="stat">
-        <div className="stat-figure text-primary">
-          <ArrowDownCircleIcon className="w-6 h-6" />
+        <div className="stat">
+          <div className="stat-title">Total Borrowed</div>
+          <div className="stat-value">{totalBorrowed.toFixed(2)}</div>
         </div>
-        <div className="stat-title">Total Borrowed</div>
-        <div className="stat-value">{totalBorrowed}</div>
       </div>
     </div>
   );
 };
 
-const SplitVariant: React.FC = () => (
+const SplitVariant: React.FC<VariantProps> = ({ supplied, borrowed, position }) => (
   <div className="grid gap-6 md:grid-cols-2">
-    <div className="bg-base-200 rounded-xl p-4">
-      <h3 className="font-semibold mb-3">Supplied</h3>
-      <ul className="space-y-2">
-        {mockPositions.map(pos => (
-          <li key={pos.token} className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Image src={pos.icon} alt={pos.token} width={20} height={20} />
-              {pos.token}
-            </span>
-            <span className="font-medium">{pos.supplied}</span>
-          </li>
+    <div>
+      <h3 className="font-semibold mb-2">Supplied</h3>
+      <div className="space-y-2">
+        {supplied.map((p, i) => (
+          <SupplyPosition key={`ss-${p.tokenAddress}-${i}`} {...p} protocolName="Nostra" networkType="starknet" position={position} />
         ))}
-      </ul>
-    </div>
-    <div className="bg-base-200 rounded-xl p-4">
-      <h3 className="font-semibold mb-3">Borrowed</h3>
-      <ul className="space-y-2">
-        {mockPositions.map(pos => (
-          <li key={pos.token} className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Image src={pos.icon} alt={pos.token} width={20} height={20} />
-              {pos.token}
-            </span>
-            <span className="font-medium">{pos.borrowed}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  </div>
-);
-
-const GradientVariant: React.FC = () => (
-  <div className="rounded-xl bg-gradient-to-br from-primary to-secondary p-6 text-white">
-    {mockPositions.map(pos => (
-      <div
-        key={pos.token}
-        className="flex items-center justify-between py-2 border-b border-white/20 last:border-b-0"
-      >
-        <span className="flex items-center gap-2">
-          <Image src={pos.icon} alt={pos.token} width={20} height={20} />
-          {pos.token}
-        </span>
-        <span className="text-sm">
-          {pos.supplied} / {pos.borrowed}
-        </span>
       </div>
-    ))}
+    </div>
+    <div>
+      <h3 className="font-semibold mb-2">Borrowed</h3>
+      <div className="space-y-2">
+        {borrowed.map((p, i) => (
+          <BorrowPosition key={`bb-${p.tokenAddress}-${i}`} {...p} protocolName="Nostra" networkType="starknet" position={position} />
+        ))}
+      </div>
+    </div>
   </div>
 );
 
-const variants = [
-  { id: "original", label: "Original", icon: RocketLaunchIcon, component: <NostraProtocolView /> },
-  { id: "card", label: "Card", icon: Squares2X2Icon, component: <CardVariant /> },
-  { id: "table", label: "Table", icon: TableCellsIcon, component: <TableVariant /> },
-  { id: "minimal", label: "Minimal", icon: ChartBarIcon, component: <MinimalVariant /> },
-  { id: "split", label: "Split", icon: ViewColumnsIcon, component: <SplitVariant /> },
-  { id: "gradient", label: "Gradient", icon: PaintBrushIcon, component: <GradientVariant /> },
-];
+const GradientVariant: React.FC<VariantProps> = ({ supplied, borrowed, position }) => (
+  <div className="p-6 rounded-xl bg-gradient-to-br from-primary to-secondary text-white">
+    <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-2">
+        {supplied.map((p, i) => (
+          <SupplyPosition key={`gs-${p.tokenAddress}-${i}`} {...p} protocolName="Nostra" networkType="starknet" position={position} />
+        ))}
+      </div>
+      <div className="space-y-2">
+        {borrowed.map((p, i) => (
+          <BorrowPosition key={`gb-${p.tokenAddress}-${i}`} {...p} protocolName="Nostra" networkType="starknet" position={position} />
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 const NostraVariantsPage: React.FC = () => {
+  const { suppliedPositions, borrowedPositions } = useNostraProtocolData();
   const [active, setActive] = useState("original");
 
-  const activeVariant = variants.find(v => v.id === active);
+  const position = useMemo(
+    () => PositionManager.fromPositions(suppliedPositions, borrowedPositions),
+    [suppliedPositions, borrowedPositions],
+  );
+
+  const shared = { supplied: suppliedPositions, borrowed: borrowedPositions, position };
+
+  const activeComponent = () => {
+    switch (active) {
+      case "card":
+        return <CardVariant {...shared} />;
+      case "table":
+        return <TableVariant {...shared} />;
+      case "minimal":
+        return <MinimalVariant {...shared} />;
+      case "split":
+        return <SplitVariant {...shared} />;
+      case "gradient":
+        return <GradientVariant {...shared} />;
+      default:
+        return <NostraProtocolView />;
+    }
+  };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 space-y-6">
       <div role="tablist" className="tabs tabs-bordered flex flex-wrap gap-2">
-        {variants.map(v => {
+        {[
+          { id: "original", label: "Original", icon: RocketLaunchIcon },
+          { id: "card", label: "Card", icon: Squares2X2Icon },
+          { id: "table", label: "Table", icon: TableCellsIcon },
+          { id: "minimal", label: "Minimal", icon: ChartBarIcon },
+          { id: "split", label: "Split", icon: ViewColumnsIcon },
+          { id: "gradient", label: "Gradient", icon: PaintBrushIcon },
+        ].map(v => {
           const Icon = v.icon;
           return (
             <button
@@ -199,12 +210,9 @@ const NostraVariantsPage: React.FC = () => {
           );
         })}
       </div>
-      <div className="mt-8 space-y-8">
-        {activeVariant?.component}
-      </div>
+      {activeComponent()}
     </div>
   );
 };
 
 export default NostraVariantsPage;
-
