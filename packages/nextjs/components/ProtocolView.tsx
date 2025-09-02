@@ -221,7 +221,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col hide-scrollbar p-4 space-y-4">
+    <div className="w-full flex flex-col hide-scrollbar p-4 space-y-4">
       {/* Protocol Header Card - Enhanced with subtle effects */}
       <div className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
         <div className="card-body p-4">
