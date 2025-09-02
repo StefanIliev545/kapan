@@ -345,7 +345,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -1045,7 +1045,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -1816,7 +1816,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -2231,7 +2231,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -2656,7 +2656,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -3356,7 +3356,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -4240,7 +4240,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -4665,7 +4665,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",
@@ -5365,7 +5365,7 @@ const contracts = {
                   type: "core::array::Span::<(core::starknet::contract_address::ContractAddress, core::felt252, core::array::Array::<core::felt252>)>",
                 },
               ],
-              state_mutability: "external",
+              state_mutability: "view",
             },
             {
               type: "function",

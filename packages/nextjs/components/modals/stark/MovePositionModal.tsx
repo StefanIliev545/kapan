@@ -29,6 +29,7 @@ import {
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
+import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -116,6 +117,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
+  const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
+  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
 
   const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
     protocolName: fromProtocol as "Vesu" | "Nostra",
@@ -207,9 +210,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const isLoadingCollaterals =
     !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
   // Construct instruction based on current state
-  const { fullInstruction, authInstruction, pairInstructions } = useMemo(() => {
+  const { fullInstruction, authInstruction, authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
-      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, pairInstructions: [] };
+      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, authInstructions: [], authCalldataKey: "", pairInstructions: [] };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
@@ -429,35 +432,40 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         instructions: instructions.flat(),
       });
 
+      const filteredForAuth = instructions.flat().map(protocolInstruction => {
+        const filteredInstructions = protocolInstruction.instructions.filter(instruction => {
+          if (instruction.activeVariant() === "Withdraw" || instruction.activeVariant() === "Reborrow") {
+            return true;
+          }
+          return false;
+        });
+        return { protocol_name: protocolInstruction.protocol_name, instructions: filteredInstructions };
+      });
+
       const authInstructionData = CallData.compile({
-        instructions: instructions.flat().map(protocolInstruction => {
-          const filteredInstructions = protocolInstruction.instructions.filter(instruction => {
-            if (instruction.activeVariant() === "Withdraw" || instruction.activeVariant() === "Reborrow") {
-              return true;
-            }
-            return false;
-          });
-          return { protocol_name: protocolInstruction.protocol_name, instructions: filteredInstructions };
-        }),
+        instructions: filteredForAuth,
         rawSelectors: false,
       });
 
       return {
         fullInstruction: fullInstructionData,
         authInstruction: authInstructionData,
+        authInstructions: filteredForAuth,
+        authCalldataKey: JSON.stringify(authInstructionData),
         pairInstructions: instructions,
       };
     };
 
     // If target protocol is Vesu and we have multiple collaterals, use proportional allocation
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 1) {
-      return (
-        generateVesuInstructions() || {
-          fullInstruction: { instructions: [] },
-          authInstruction: { instructions: [] },
-          pairInstructions: [],
-        }
-      );
+      const result = generateVesuInstructions() || {
+        fullInstruction: { instructions: [] },
+        authInstruction: { instructions: [] },
+        authInstructions: [],
+        authCalldataKey: "",
+        pairInstructions: [],
+      };
+      return result;
     }
 
     // Otherwise, use the original approach for other protocols or single collateral
@@ -578,24 +586,33 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       instructions: instructions,
     });
 
+    const authInstructions = [
+      {
+        protocol_name: lowerProtocolName,
+        instructions: [...withdrawInstructions],
+      },
+      
+      {
+        protocol_name: destProtocolName,
+        instructions: [borrowInstruction],
+      },
+    ];
+    if (isOpen) {
+      console.log("authInstructions", authInstructions);
+      console.log("fullInstructions", instructions);
+    }
+    
     // Only withdraw and borrow instructions for authorization
     const authInstructionData = CallData.compile({
-      instructions: [
-        {
-          protocol_name: lowerProtocolName,
-          instructions: [...withdrawInstructions],
-        },
-        {
-          protocol_name: destProtocolName,
-          instructions: [borrowInstruction],
-        },
-      ],
+      instructions: authInstructions,
       rawSelectors: false,
     });
 
     return {
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
+      authInstructions: authInstructions,
+      authCalldataKey: JSON.stringify(authInstructionData),
       // Wrap instructions in an array so that callers always
       // receive a list of instruction pairs. This ensures we
       // execute a single move_debt call when moving between
@@ -604,41 +621,38 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       // several collaterals).
       pairInstructions: [instructions],
     };
-  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId]);
+  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId, isOpen]);
 
   // Get authorizations for the instructions
-
-  const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
-    contractName: "RouterGateway" as const,
-    functionName: "get_authorizations_for_instructions" as const,
-    args: [authInstruction],
-    enabled: isOpen && pairInstructions.length > 0,
-    refetchInterval: 1000,
-  } as any);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAuths = async () => {
+      try {
+        if (!isOpen || !isAuthReady || !authInstructions || (Array.isArray(authInstructions) && authInstructions.length === 0) || !authCalldataKey) {
+          setFetchedAuthorizations([]);
+          return;
+        }
+        const auths = await getAuthorizations(authInstructions as any);
+        if (!cancelled) setFetchedAuthorizations(auths);
+      } catch (e) {
+        if (!cancelled) setFetchedAuthorizations([]);
+        if (isOpen) {
+          console.log("authInstructions", authInstructions);
+          console.log("error", e);
+        }
+      }
+    };
+    fetchAuths();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isAuthReady, getAuthorizations, authCalldataKey]);
   
-  if (protocolInstructionsError) {
-    console.log("authInstruction", authInstruction);
-    console.log("error", protocolInstructionsError);
-  }
-
   // Construct calls based on current state
   const calls = useMemo(() => {
     if (!pairInstructions || pairInstructions.length === 0) return [];
 
-    const authorizations = [];
-    if (protocolInstructions) {
-      // Use explicit type for instruction
-      const instructionsArray = protocolInstructions as unknown as [bigint, bigint, bigint[]][];
-      for (const instruction of instructionsArray) {
-        const address = num.toHexString(instruction[0]);
-        const entrypoint = feltToString(instruction[1]);
-        authorizations.push({
-          contractAddress: address,
-          entrypoint: entrypoint,
-          calldata: (instruction[2] as bigint[]).map(f => num.toHexString(f)),
-        });
-      }
-    }
+    const authorizations = fetchedAuthorizations ?? [];
 
     return [
       ...(authorizations as any),
@@ -650,7 +664,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         }
       }),
     ];
-  }, [fullInstruction, protocolInstructions, pairInstructions]);
+  }, [fetchedAuthorizations, pairInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
