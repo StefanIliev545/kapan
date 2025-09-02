@@ -4582,8 +4582,8 @@ __metadata:
     "@starknet-io/get-starknet": ^4.0.7
     "@starknet-io/get-starknet-core": ^4.0.7
     "@starknet-io/types-js": ^0.8.1
-    "@starknet-react/chains": ^4.0.4
-    "@starknet-react/core": ^4.0.4
+    "@starknet-react/chains": ^5.0.1
+    "@starknet-react/core": ^5.0.1
     "@starknet-react/typescript-config": ^0.0.2
     "@tanstack/react-query": ^5.72.2
     "@testing-library/dom": ^10.4.0
@@ -4892,19 +4892,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@starknet-react/chains@npm:^4.0.4":
-  version: 4.0.4
-  resolution: "@starknet-react/chains@npm:4.0.4"
-  checksum: 4967cd83e515bb85946dad32a864f39ba8cc4ac4e64350e31c9555f9b6304d1fb6f041db627ed76fda1f183bffecec241a61db2cedac67e3766fea3eab1075b6
+"@starknet-react/chains@npm:^5.0.1":
+  version: 5.0.1
+  resolution: "@starknet-react/chains@npm:5.0.1"
+  checksum: 6f8e4a98e25b4f0402d6f1328010098f9ebb4cfbf791fa9f9eb070704bee3fd691beb8915158c23cb88c630b03f8c3403e0f15c17a2f6760486e5112674ae0d3
   languageName: node
   linkType: hard
 
-"@starknet-react/core@npm:^4.0.4":
-  version: 4.0.4
-  resolution: "@starknet-react/core@npm:4.0.4"
+"@starknet-react/core@npm:^5.0.1":
+  version: 5.0.1
+  resolution: "@starknet-react/core@npm:5.0.1"
   dependencies:
     "@starknet-io/types-js": ^0.7.10
-    "@starknet-react/chains": ^4.0.4
+    "@starknet-react/chains": ^5.0.1
     "@tanstack/react-query": ^5.25.0
     abi-wan-kanabi: ^2.2.4
     eventemitter3: ^5.0.1
@@ -4913,8 +4913,8 @@ __metadata:
   peerDependencies:
     get-starknet-core: ^4.0.0
     react: ^18.0
-    starknet: ^7.6.4
-  checksum: ba4edc1eba93a68e321b354af942d2721914994c32d951307708a14fd930437c224849c0bb6df536d239aa746ed3ac4c787032f57815e80dc705f30967f9e0b9
+    starknet: ^8.1.2
+  checksum: 47bfec581b03a9f6f692510107aa55f59557dce5e336b532210371d8294303e5b8d6cd9fc1f9f678746341414a274023e9313148d608861c8d5c5f8cab96eac5
   languageName: node
   linkType: hard
 
