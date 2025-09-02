@@ -1,7 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { useRef } from "react";
 import Image from "next/image";
-import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
 import {
   FiAlertTriangle,
@@ -27,6 +26,7 @@ import {
   useScaffoldReadContract,
 } from "~~/hooks/scaffold-stark";
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
+import { useAccount } from "~~/hooks/useAccount";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
 
@@ -209,7 +209,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   // Construct instruction based on current state
   const { fullInstruction, authInstruction, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
-      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, pairInstructions: [] };
+      return { fullInstruction: undefined, authInstruction: undefined, pairInstructions: [] };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
@@ -571,7 +571,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         protocol_name: destProtocolName,
         instructions: [...depositInstructions, borrowInstruction],
       },
-    ]
+    ];
 
     // Complete set of instructions for execution
     const fullInstructionData = CallData.compile({
@@ -590,6 +590,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           instructions: [borrowInstruction],
         },
       ],
+      rawSelectors: false,
     });
 
     return {
@@ -603,21 +604,35 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       // several collaterals).
       pairInstructions: [instructions],
     };
-  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId]);
+  }, [
+    amount,
+    userAddress,
+    routerGateway?.address,
+    position.decimals,
+    position.tokenAddress,
+    fromProtocol,
+    selectedProtocol,
+    selectedCollateralsWithAmounts,
+    isAmountMaxClicked,
+    tokenToPrices,
+    maxClickedCollaterals,
+    currentPoolId,
+    selectedPoolId,
+  ]);
 
   // Get authorizations for the instructions
 
   const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
     contractName: "RouterGateway" as const,
     functionName: "get_authorizations_for_instructions" as const,
-    args: [authInstruction, false],
-    enabled: !!authInstruction && isOpen,
+    args: authInstruction ? [authInstruction, false] : undefined,
+    enabled: (authInstruction?.length ?? 0) > 0 && isOpen,
     refetchInterval: 1000,
   } as any);
 
   // Construct calls based on current state
   const calls = useMemo(() => {
-    if (!fullInstruction) return [];
+    if (!fullInstruction || pairInstructions.length === 0) return [];
 
     const authorizations = [];
     if (protocolInstructions) {
@@ -641,7 +656,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           contractName: "RouterGateway" as const,
           functionName: "move_debt" as const,
           args: CallData.compile({ instructions: instructions }),
-        }
+        };
       }),
     ];
   }, [fullInstruction, protocolInstructions, pairInstructions]);
