@@ -612,13 +612,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     contractName: "RouterGateway" as const,
     functionName: "get_authorizations_for_instructions" as const,
     args: [authInstruction],
-    enabled: !!authInstruction && isOpen,
+    enabled: isOpen && pairInstructions.length > 0,
     refetchInterval: 1000,
   } as any);
 
   // Construct calls based on current state
   const calls = useMemo(() => {
-    if (!fullInstruction) return [];
+    if (!pairInstructions || pairInstructions.length === 0) return [];
 
     const authorizations = [];
     if (protocolInstructions) {
