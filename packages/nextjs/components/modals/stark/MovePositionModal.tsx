@@ -615,6 +615,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     enabled: isOpen && pairInstructions.length > 0,
     refetchInterval: 1000,
   } as any);
+  
+  if (protocolInstructionsError) {
+    console.log("authInstruction", authInstruction);
+    console.log("error", protocolInstructionsError);
+  }
 
   // Construct calls based on current state
   const calls = useMemo(() => {
