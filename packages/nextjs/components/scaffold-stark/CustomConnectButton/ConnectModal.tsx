@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import { type StarknetkitConnector, useStarknetkitConnectModal } from "starknetkit";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
@@ -8,31 +9,37 @@ const ConnectModal = () => {
     connectors: connectors as StarknetkitConnector[],
   });
 
-  async function connectWallet() {
-    const { connector } = await starknetkitConnectModal();
-    if (!connector) {
-      return;
-    }
+  const [isConnecting, setIsConnecting] = useState(false);
 
-    await connect({ connector });
+  async function connectWallet() {
+    setIsConnecting(true);
     try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: connector.id }));
-        window.localStorage.setItem(
-          LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
-          Date.now().toString(),
-        );
+      const { connector } = await starknetkitConnectModal();
+      if (!connector) {
+        return;
       }
-    } catch {}
+
+      await connect({ connector });
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: connector.id }));
+          window.localStorage.setItem(LAST_CONNECTED_TIME_LOCALSTORAGE_KEY, Date.now().toString());
+        }
+      } catch {}
+    } finally {
+      setIsConnecting(false);
+    }
   }
 
   return (
-    <div
+    <button
       onClick={connectWallet}
-      className="text-sm font-semibold text-primary dark:text-accent hover:opacity-80 transition-opacity duration-200 cursor-pointer whitespace-nowrap"
+      disabled={isConnecting}
+      className="flex items-center gap-2 text-sm font-semibold text-primary dark:text-accent hover:opacity-80 transition-opacity duration-200 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
     >
-      Connect Starknet
-    </div>
+      {isConnecting && <span className="loading loading-spinner loading-xs"></span>}
+      <span>Connect Starknet</span>
+    </button>
   );
 };
 
