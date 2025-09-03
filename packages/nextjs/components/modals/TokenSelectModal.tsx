@@ -3,6 +3,7 @@ import Image from "next/image";
 import { DepositModal } from "./DepositModal";
 import { BorrowModal } from "./BorrowModal";
 import { ProtocolPosition } from "../ProtocolView";
+import { PositionManager } from "~~/utils/position";
 
 interface TokenSelectModalProps {
   isOpen: boolean;
@@ -10,14 +11,16 @@ interface TokenSelectModalProps {
   tokens: ProtocolPosition[];
   protocolName: string;
   isBorrow?: boolean;
+  position?: PositionManager;
 }
 
-export const TokenSelectModal: FC<TokenSelectModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  tokens, 
+export const TokenSelectModal: FC<TokenSelectModalProps> = ({
+  isOpen,
+  onClose,
+  tokens,
   protocolName,
-  isBorrow = false 
+  isBorrow = false,
+  position,
 }) => {
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
@@ -67,17 +70,13 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
                 {tokens.map((token, index) => (
                   <div 
                     key={token.tokenAddress} 
-                    className={`bg-base-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 
+                    className={`token-fade bg-base-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 
                       ${hoveredToken === token.tokenAddress ? 'shadow-lg bg-base-300 scale-105 border-primary' : 'shadow-md hover:shadow-lg border-transparent'}
                       border transform hover:scale-105`}
                     onClick={() => handleSelectToken(token)}
                     onMouseEnter={() => handleTokenHover(token.tokenAddress)}
                     onMouseLeave={() => handleTokenHover(null)}
-                    style={{ 
-                      animationDelay: `${index * 50}ms`,
-                      animation: 'fadeIn 0.3s ease-in-out forwards',
-                      opacity: 0
-                    }}
+                    style={{ ['--stagger' as any]: `${index * 50}ms` }}
                   >
                     <div className="avatar mb-3">
                       <div className={`w-16 h-16 rounded-full bg-base-100 p-1 ring-2 
@@ -119,6 +118,14 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
                 transform: translateY(0);
               }
             }
+            .token-fade {
+              opacity: 0;
+              animation-name: fadeIn;
+              animation-duration: 0.3s;
+              animation-timing-function: ease-in-out;
+              animation-fill-mode: forwards;
+              animation-delay: var(--stagger, 0ms);
+            }
           `}</style>
         </div>
         <form method="dialog" className="modal-backdrop" onClick={handleDone}>
@@ -137,8 +144,16 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               icon: selectedToken.icon,
               currentRate: selectedToken.currentRate,
               address: selectedToken.tokenAddress,
+              usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
             }}
             protocolName={protocolName}
+            currentDebt={
+              selectedToken.tokenBalance
+                ? Number(selectedToken.tokenBalance) /
+                    10 ** (selectedToken.tokenDecimals || 18)
+                : 0
+            }
+            position={position}
           />
         ) : (
           <DepositModal
@@ -149,8 +164,10 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               icon: selectedToken.icon,
               currentRate: selectedToken.currentRate,
               address: selectedToken.tokenAddress,
+              usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
             }}
             protocolName={protocolName}
+            position={position}
           />
         )
       )}

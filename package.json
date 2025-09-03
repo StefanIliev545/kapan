@@ -8,6 +8,12 @@
     ]
   },
   "scripts": {
+    "snchain": "yarn workspace @ss-2/snfoundry chain",
+    "sndeploy": "yarn workspace @ss-2/snfoundry deploy",
+    "sndeploy:clear": "yarn workspace @ss-2/snfoundry deploy:clear",
+    "sndeploy:no-reset": "yarn workspace @ss-2/snfoundry deploy --no-reset",
+    "sntest": "yarn workspace @ss-2/snfoundry test",
+    "sncompile": "yarn workspace @ss-2/snfoundry compile",
     "account": "yarn hardhat:account",
     "account:generate": "yarn workspace @se-2/hardhat account:generate",
     "account:import": "yarn workspace @se-2/hardhat account:import",
@@ -32,7 +38,7 @@
     "hardhat:test": "yarn workspace @se-2/hardhat test",
     "hardhat:verify": "yarn workspace @se-2/hardhat verify",
     "postinstall": "husky install",
-    "lint": "yarn nextjs:lint && yarn hardhat:lint",
+    "lint": "yarn next:lint && yarn hardhat:lint",
     "next:build": "yarn workspace @se-2/nextjs build",
     "next:check-types": "yarn workspace @se-2/nextjs check-types",
     "next:format": "yarn workspace @se-2/nextjs format",
@@ -47,11 +53,20 @@
     "verify": "yarn hardhat:verify"
   },
   "devDependencies": {
+    "cursor-tools": "latest",
     "husky": "~8.0.3",
     "lint-staged": "~13.2.2"
   },
   "packageManager": "yarn@3.2.3",
   "engines": {
     "node": ">=18.18.0"
+  },
+  "dependencies": {
+    "playwright": "^1.51.1"
+  },
+  "resolutions": {
+    "eslint-config-prettier": "0.0.0",
+    "react": "~18.3.1",
+    "react-dom": "~18.3.1"
   }
 }

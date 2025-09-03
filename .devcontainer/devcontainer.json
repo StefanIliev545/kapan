@@ -1,9 +1,11 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/alpine
 {
-	"name": "Alpine",
+	"name": "Kapan Starknet",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:debian-12",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
 	"features": {
 		"ghcr.io/devcontainers/features/node:1": {}
 	},
@@ -18,13 +20,14 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"NomicFoundation.hardhat-solidity"
+				"NomicFoundation.hardhat-solidity",
+				"StarkWare.cairo1",
+				"tamasfe.even-better-toml"
 			]
 		}
-	}
-
+	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "uname -a",
+	"postCreateCommand": "echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc",
 
 	// Configure tool-specific properties.
 	// "customizations": {},

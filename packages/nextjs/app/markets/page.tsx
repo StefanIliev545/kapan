@@ -1,0 +1,122 @@
+"use client";
+
+import { useState } from "react";
+import type { NextPage } from "next";
+import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { LendingSidebar } from "~~/components/LendingSidebar";
+import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
+import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
+import { AaveMarkets } from "~~/components/specific/aave/AaveMarkets";
+import { CompoundMarkets } from "~~/components/specific/compound/CompoundMarkets";
+import { NostraMarkets } from "~~/components/specific/nostra/NostraMarkets";
+import { VenusMarkets } from "~~/components/specific/venus/VenusMarkets";
+import { ContractResponse, POOL_IDS, VesuMarkets } from "~~/components/specific/vesu/VesuMarkets";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+
+const networkOptions: NetworkOption[] = [
+  { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
+  { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
+];
+
+const MarketsPage: NextPage = () => {
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
+  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [search, setSearch] = useState("");
+  const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
+
+  const { data: supportedAssets } = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_assets_ui",
+    args: [selectedPoolId],
+    refetchInterval: 0,
+  });
+
+  return (
+    <div className="container mx-auto px-5 flex">
+      <div className="hidden lg:block">
+        <LendingSidebar />
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center mb-4">
+          {groupMode === "protocol" && (
+            <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+          )}
+          <div className="flex-1 flex justify-center">
+            <div className="relative w-full max-w-md">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/50" />
+              <input
+                type="text"
+                placeholder="Search"
+                className="input input-bordered w-full rounded-full pl-10"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-4">
+            {groupMode === "protocol" && (
+              <div className="join">
+                <button
+                  className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                >
+                  <ListBulletIcon className="h-4 w-4" />
+                </button>
+                <button
+                  className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Grid view"
+                >
+                  <Squares2X2Icon className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            <div className="join">
+              <button
+                className={`btn btn-xs join-item ${groupMode === "token" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setGroupMode("token")}
+              >
+                Token
+              </button>
+              <button
+                className={`btn btn-xs join-item ${groupMode === "protocol" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setGroupMode("protocol")}
+              >
+                Protocol
+              </button>
+            </div>
+          </div>
+        </div>
+        {groupMode === "token" ? (
+          <MarketsGrouped search={search} />
+        ) : (
+          <>
+            {selectedNetwork === "arbitrum" && (
+              <>
+                <AaveMarkets viewMode={viewMode} search={search} />
+                <CompoundMarkets viewMode={viewMode} search={search} />
+                <VenusMarkets viewMode={viewMode} search={search} />
+              </>
+            )}
+            {selectedNetwork === "starknet" && (
+              <>
+                <VesuMarkets
+                  selectedPoolId={selectedPoolId}
+                  onPoolChange={setSelectedPoolId}
+                  supportedAssets={supportedAssets as ContractResponse | undefined}
+                  viewMode={viewMode}
+                  search={search}
+                />
+                <NostraMarkets viewMode={viewMode} search={search} />
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MarketsPage;

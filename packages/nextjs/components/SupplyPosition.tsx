@@ -1,18 +1,24 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 import Image from "next/image";
-import { useAccount } from "wagmi";
+import { FiatBalance } from "./FiatBalance";
+import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
-import { FiInfo, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { DepositModalStark } from "./modals/stark/DepositModalStark";
+import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
+import { PositionManager } from "~~/utils/position";
+import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { ProtocolPosition } from "./ProtocolView";
-import { FiatBalance } from "./FiatBalance";
+import { useModal, useToggle } from "~~/hooks/useModal";
+import { useOptimalRate } from "~~/hooks/useOptimalRate";
+import { useWalletConnection } from "~~/hooks/useWalletConnection";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
   afterInfoContent?: React.ReactNode;
+  networkType: "evm" | "starknet";
+  position?: PositionManager;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -26,32 +32,32 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   tokenPrice,
   tokenDecimals,
   afterInfoContent,
+  networkType,
+  position,
 }) => {
-  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Get wallet connection status
-  const { address: userAddress } = useAccount();
-  const isWalletConnected = !!userAddress;
+  const moveModal = useModal();
+  const depositModal = useModal();
+  const withdrawModal = useModal();
+  const expanded = useToggle();
+  const isExpanded = expanded.isOpen;
+
+  const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const supplyAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
+
+  // Get wallet connection status for both networks
+  const { evm, starknet } = useWalletConnection();
+  const address = networkType === "evm" ? evm.address : starknet.address;
+  const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance
   const hasBalance = tokenBalance > 0;
 
-  // Fetch optimal rate from the OptimalInterestRateFinder contract
-  const { data: optimalRateData } = useScaffoldReadContract({
-    contractName: "OptimalInterestRateFinder",
-    functionName: "findOptimalSupplyRate",
-    args: [tokenAddress],
+  // Fetch optimal rate
+  const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
+    networkType,
+    tokenAddress,
+    type: "supply",
   });
-
-  let optimalProtocol = "";
-  let optimalRateDisplay = 0;
-  if (optimalRateData) {
-    const [proto, rate] = optimalRateData;
-    optimalProtocol = proto;
-    optimalRateDisplay = Number(rate) / 1e8;
-  }
 
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
@@ -64,17 +70,17 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest('.dropdown')) {
+    if ((e.target as HTMLElement).closest(".dropdown")) {
       return;
     }
-    setIsExpanded(prev => !prev);
+    expanded.toggle();
   };
 
   return (
     <>
       {/* Outer container - clickable to expand/collapse */}
-      <div 
-        className={`w-full p-3 rounded-md ${isExpanded ? 'bg-base-300' : 'bg-base-200'} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
+      <div
+        className={`w-full p-3 rounded-md ${isExpanded ? "bg-base-300" : "bg-base-200"} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -84,9 +90,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
             <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
+            <div
+              className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
+              onClick={e => e.stopPropagation()}
+            >
               <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                <FiInfo 
+                <FiInfo
                   className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
                   aria-hidden="true"
                 />
@@ -114,13 +123,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 </div>
               </div>
             </div>
-            
+
             {/* Render additional content after the info button if provided */}
-            {afterInfoContent && (
-              <div onClick={e => e.stopPropagation()}>
-                {afterInfoContent}
-              </div>
-            )}
+            {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
           </div>
 
           {/* Stats: Rates */}
@@ -128,9 +133,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
               <div className="text-sm font-medium h-6 line-clamp-1">
-                <FiatBalance 
+                <FiatBalance
                   tokenAddress={tokenAddress}
-                  rawValue={typeof tokenBalance === 'bigint' ? tokenBalance : BigInt(tokenBalance || 0)}
+                  rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
                   price={tokenPrice}
                   decimals={tokenDecimals}
                   tokenSymbol={name}
@@ -139,9 +144,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </div>
             </div>
             <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">
-                APY
-              </div>
+              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
                 {currentRate.toFixed(2)}%
               </div>
@@ -155,9 +158,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 <Image
                   src={getProtocolLogo(optimalProtocol)}
                   alt={optimalProtocol}
-                  width={16}
-                  height={16}
-                  className="flex-shrink-0 rounded-full ml-1"
+                  width={optimalProtocol == "vesu" ? 35 : 16}
+                  height={optimalProtocol == "vesu" ? 35 : 16}
+                  className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
             </div>
@@ -165,7 +168,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
           {/* Expand Indicator */}
           <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? 'bg-primary/20' : 'bg-base-300/50'} transition-colors duration-200`}>
+            <div
+              className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"} transition-colors duration-200`}
+            >
               {isExpanded ? (
                 <FiChevronUp className="w-4 h-4 text-primary" />
               ) : (
@@ -180,9 +185,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Mobile layout - full width buttons stacked vertically */}
             <div className="flex flex-col gap-2 md:hidden">
-              <button 
+              <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={() => setIsDepositModalOpen(true)}
+                onClick={depositModal.open}
                 disabled={!isWalletConnected}
                 title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
               >
@@ -192,9 +197,31 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={() => setIsMoveModalOpen(true)}
-                disabled={true || !isWalletConnected}
-                title={!isWalletConnected ? "Connect wallet to move supply" : "Moving supply positions is not yet implemented"}
+                onClick={withdrawModal.open}
+                disabled={!isWalletConnected || !hasBalance}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to withdraw"
+                    : !hasBalance
+                      ? "No balance to withdraw"
+                      : "Withdraw tokens"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <span>Withdraw</span>
+                </div>
+              </button>
+              <button
+                className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                onClick={moveModal.open}
+                disabled={!isWalletConnected || !hasBalance}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move supply"
+                    : !hasBalance
+                      ? "No balance to move"
+                      : "Move supply to another protocol"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Move</span>
@@ -203,10 +230,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             </div>
 
             {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className="hidden md:grid grid-cols-2 gap-3">
-              <button 
+            <div className="hidden md:grid grid-cols-3 gap-3">
+              <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={() => setIsDepositModalOpen(true)}
+                onClick={depositModal.open}
                 disabled={!isWalletConnected}
                 title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
               >
@@ -216,9 +243,31 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </button>
               <button
                 className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={() => setIsMoveModalOpen(true)}
-                disabled={true || !isWalletConnected}
-                title={!isWalletConnected ? "Connect wallet to move supply" : "Moving supply positions is not yet implemented"}
+                onClick={withdrawModal.open}
+                disabled={!isWalletConnected || !hasBalance}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to withdraw"
+                    : !hasBalance
+                      ? "No balance to withdraw"
+                      : "Withdraw tokens"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <span>Withdraw</span>
+                </div>
+              </button>
+              <button
+                className="btn btn-sm btn-outline flex justify-center items-center"
+                onClick={moveModal.open}
+                disabled={!isWalletConnected || !hasBalance}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move supply"
+                    : !hasBalance
+                      ? "No balance to move"
+                      : "Move supply to another protocol"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Move</span>
@@ -230,24 +279,71 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       </div>
 
       {/* Modals */}
+      {networkType === "starknet" ? (
+        <>
+          <DepositModalStark
+            isOpen={depositModal.isOpen}
+            onClose={depositModal.close}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              usdPrice,
+              decimals: tokenDecimals || 18,
+            }}
+            protocolName={protocolName}
+            position={position}
+          />
+          <WithdrawModalStark
+            isOpen={withdrawModal.isOpen}
+            onClose={withdrawModal.close}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              usdPrice,
+              decimals: tokenDecimals || 18,
+            }}
+            protocolName={protocolName}
+            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            position={position}
+          />
+        </>
+      ) : (
+        <>
+          <DepositModal
+            isOpen={depositModal.isOpen}
+            onClose={depositModal.close}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              usdPrice,
+              decimals: tokenDecimals || 18,
+            }}
+            protocolName={protocolName}
+            position={position}
+          />
+        </>
+      )}
+
       <MoveSupplyModal
-        isOpen={isMoveModalOpen}
-        onClose={() => setIsMoveModalOpen(false)}
+        isOpen={moveModal.isOpen}
+        onClose={moveModal.close}
         token={{
           name,
           icon,
-          currentRate,
           address: tokenAddress,
+          currentRate,
+          rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
+          decimals: tokenDecimals,
+          price: tokenPrice,
         }}
         fromProtocol={protocolName}
       />
-
-      <DepositModal
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        token={{ name, icon, currentRate, address: tokenAddress }}
-        protocolName={protocolName}
-      />
     </>
   );
-}; 
+};

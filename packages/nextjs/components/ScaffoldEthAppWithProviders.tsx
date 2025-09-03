@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
+import { StarknetConfig, argent, braavos, starkscan, useInjectedConnectors } from "@starknet-react/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
 import { WagmiProvider } from "wagmi";
 import { Footer } from "~~/components/Footer";
+import FloatingSocials from "~~/components/FloatingSocials";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
+import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
+import { StarkBlockNumberProvider, useAutoConnect } from "~~/hooks/scaffold-stark";
+import { appChains } from "~~/services/web3/connectors";
+import provider from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
+  useAutoConnect();
 
   return (
     <>
@@ -23,6 +30,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
         <main className="relative flex flex-col flex-1">{children}</main>
         <Footer />
       </div>
+      <FloatingSocials />
       <Toaster />
     </>
   );
@@ -46,17 +54,41 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     setMounted(true);
   }, []);
 
+  const injected = useInjectedConnectors({
+    recommended: [argent(), braavos()],
+    includeRecommended: "onlyIfNoConnectors",
+    order: "alphabetical",
+  });
+  const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
+
+  const connectorsRef = useRef<typeof liveConnectors | null>(null);
+  if (!connectorsRef.current && liveConnectors?.length) {
+    connectorsRef.current = liveConnectors;
+  }
+
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <ProgressBar height="3px" color="#2299dd" />
-        <RainbowKitProvider
-          avatar={BlockieAvatar}
-          theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-        >
-          <ScaffoldEthApp>{children}</ScaffoldEthApp>
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <StarknetConfig
+      chains={appChains}
+      provider={provider}
+      connectors={connectorsRef.current ?? []}
+      explorer={starkscan}
+      autoConnect={false}
+    >
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <BlockNumberProvider>
+            <StarkBlockNumberProvider>
+              <ProgressBar height="3px" color="#2299dd" />
+              <RainbowKitProvider
+                avatar={BlockieAvatar}
+                theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+              >
+                <ScaffoldEthApp>{children}</ScaffoldEthApp>
+              </RainbowKitProvider>
+            </StarkBlockNumberProvider>
+          </BlockNumberProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </StarknetConfig>
   );
 };

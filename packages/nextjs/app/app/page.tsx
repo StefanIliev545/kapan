@@ -1,23 +1,46 @@
 "use client";
 
-import type { NextPage } from "next";
+import { useState } from "react";
 import Image from "next/image";
+import type { NextPage } from "next";
+import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
+import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
+import AlphaWarning from "~~/components/home/AlphaWarning";
 import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
-import AlphaWarning from "~~/components/home/AlphaWarning";
-import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
+import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
+import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
+import { LendingSidebar } from "~~/components/LendingSidebar";
+// Define network options
+const networkOptions: NetworkOption[] = [
+  {
+    id: "starknet",
+    name: "Starknet",
+    logo: "/logos/starknet.svg",
+  },
+  {
+    id: "arbitrum",
+    name: "Arbitrum",
+    logo: "/logos/arb.svg",
+  },
+];
 
 // Custom icon for demonstration purposes
 const DiscordIcon = () => (
-  <div className="bg-indigo-600 p-1 rounded-full mr-2 flex items-center justify-center">
-    <svg width="10" height="10" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg" className="brightness-150 invert">
-      <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z" fill="white"/>
-    </svg>
+  <div className="w-5 h-5 relative">
+    <Image
+      src="/logos/discord.svg"
+      alt="Discord"
+      fill
+      className="object-contain"
+    />
   </div>
 );
 
 const App: NextPage = () => {
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
+
   // Example of customizing the CallToAction component
   const customSections: CallToActionSectionProps[] = [
     {
@@ -28,10 +51,10 @@ const App: NextPage = () => {
       // Using the default TwitterIcon from the component
     },
     {
-      title: "🌱 Fund via Gitcoin",
-      description: "We're part of Gitcoin GG23 OSS round — even a small donation goes a long way!",
-      buttonText: "Support on Gitcoin",
-      buttonLink: "https://explorer.gitcoin.co/#/round/42161/867/4",
+      title: "🌱 Fund via Giveth",
+      description: "We strive to provide everything for free, but we need your help to keep going!",
+      buttonText: "Support on Giveth",
+      buttonLink: "https://giveth.io/project/kapan-finance-defi-lending-management-protocol",
       // Using the default GitcoinIcon from the component
     },
     {
@@ -40,22 +63,35 @@ const App: NextPage = () => {
       buttonText: "Join Discord",
       buttonLink: "https://discord.gg/Vjk6NhkxGv",
       emoji: "💬 ",
-      icon: <DiscordIcon />
-    }
+      icon: <DiscordIcon />,
+    },
   ];
 
   return (
-    <div className="container mx-auto px-5">
-      {/* Custom Call to Action with additional section */}
-      <CallToAction 
-        sections={customSections}
-      />
-      
-      {/* Alpha Version Disclaimer */}
-      <AlphaWarning />
-      <AaveProtocolView />
-      <CompoundProtocolView />
-      <VenusProtocolView />
+    <div className="container mx-auto px-5 flex">
+      <div className="hidden lg:block">
+        <LendingSidebar />
+      </div>
+      <div className="flex-1">
+        <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+
+        {/* Protocol Views */}
+        {selectedNetwork === "arbitrum" && (
+          <>
+            <AaveProtocolView />
+            <CompoundProtocolView />
+            <VenusProtocolView />
+          </>
+        )}
+        {selectedNetwork === "starknet" && (
+          <>
+            <VesuProtocolView />
+            <NostraProtocolView />
+          </>
+        )}
+        {/* Custom Call to Action with additional section */}
+        <CallToAction sections={customSections} />
+      </div>
     </div>
   );
 };

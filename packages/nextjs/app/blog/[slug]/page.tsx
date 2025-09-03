@@ -16,21 +16,19 @@ const mdxComponents = {
   a: (props: any) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
 };
 
-export default function BlogPostPage({ params }: { params: { slug: string } }) {
-  // Get post data on the server
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   try {
-    const post = getPostData(params.slug);
+    const { slug } = await params;
+    const post = getPostData(slug);
     const allPosts = getSortedPostsData();
     const relatedPosts = allPosts
-      .filter(p => p.slug !== params.slug)
+      .filter(p => p.slug !== slug)
       .slice(0, 3);
     
-    // Render the MDX content on the server
     const content = post.content ? (
       <MDXRemote source={post.content} components={mdxComponents} />
     ) : null;
     
-    // Pass the data to the client component
     return <BlogPostContent post={post} relatedPosts={relatedPosts} content={content} />;
   } catch (error) {
     console.error("Error loading post:", error);

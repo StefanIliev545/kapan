@@ -1,0 +1,74 @@
+"use client";
+
+// @refresh reset
+import { useEffect, useMemo, useState } from "react";
+import { Balance } from "../Balance";
+import { AddressInfoDropdown } from "./AddressInfoDropdown";
+import { AddressQRCodeModal } from "./AddressQRCodeModal";
+import ConnectModal from "./ConnectModal";
+import { WrongNetworkDropdown } from "./WrongNetworkDropdown";
+import { Address } from "@starknet-react/chains";
+import { useConnect, useNetwork } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
+import { useTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
+import { getBlockExplorerAddressLink } from "~~/utils/scaffold-stark";
+
+/**
+ * Custom Connect Button (watch balance + custom design)
+ */
+export const CustomConnectButton = () => {
+  const { connector } = useConnect();
+  const { targetNetwork } = useTargetNetwork();
+  const { account, status, address: accountAddress } = useAccount();
+  const { chain } = useNetwork();
+
+  const [accountChainId, setAccountChainId] = useState<bigint>(0n);
+
+  const blockExplorerAddressLink = useMemo(() => {
+    return accountAddress && getBlockExplorerAddressLink(targetNetwork, accountAddress);
+  }, [accountAddress, targetNetwork]);
+
+  // effect to derive chain id from useNetwork() when connected
+  useEffect(() => {
+    if (status !== "connected" || !chain?.id) return;
+    try {
+      setAccountChainId(BigInt(chain.id.toString()));
+    } catch {
+      setAccountChainId(0n);
+    }
+  }, [status, chain?.id]);
+
+  useEffect(() => {
+    const handleChainChange = (event: { chainId?: bigint }) => {
+      const { chainId } = event;
+      if (chainId && chainId !== accountChainId) {
+        setAccountChainId(chainId);
+      }
+    };
+    connector?.on("change", handleChainChange);
+    return () => {
+      connector?.off("change", handleChainChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connector]);
+
+  if (status !== "connected" || accountChainId === 0n || !accountAddress) return <ConnectModal />;
+
+  if (accountChainId !== targetNetwork.id) {
+    return <WrongNetworkDropdown />;
+  }
+
+  return (
+    <>
+      <div className="flex items-center">
+        <AddressInfoDropdown
+          address={accountAddress as Address}
+          displayName={""}
+          ensAvatar={""}
+          blockExplorerAddressLink={blockExplorerAddressLink}
+        />
+        <AddressQRCodeModal address={accountAddress as Address} modalId="qrcode-modal" />
+      </div>
+    </>
+  );
+};

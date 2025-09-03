@@ -378,6 +378,56 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice Move supplied assets from one protocol to another
+     * @param user The user address whose supply is being moved
+     * @param collaterals Array of collateral tokens and amounts to move
+     * @param fromProtocol The source protocol name
+     * @param toProtocol The destination protocol name
+     */
+    function moveSupply(
+        address user,
+        IGateway.Collateral[] memory collaterals,
+        string calldata fromProtocol,
+        string calldata toProtocol
+    ) external nonReentrant {
+        require(user == msg.sender, "User must be the caller");
+        
+        // Get the gateways for both protocols
+        IGateway fromGateway = gateways[fromProtocol];
+        IGateway toGateway = gateways[toProtocol];
+        
+        require(address(fromGateway) != address(0), "From protocol not supported");
+        require(address(toGateway) != address(0), "To protocol not supported");
+        // Iterate through each collateral and move it
+        for (uint256 i = 0; i < collaterals.length; i++) {
+            IGateway.Collateral memory collateral = collaterals[i];
+
+            // If amount is 0, move all available balance for this collateral
+            if (collateral.amount == 0) {
+                collateral.amount = fromGateway.getBalance(collateral.token, user);
+                require(collateral.amount > 0, "No balance to move");
+            }
+
+            // Step 1: Withdraw collateral from source protocol
+            // We use withdrawCollateral as it allows withdrawing supplied assets
+            // The market parameter is not used in most protocols, so we pass token as both market and collateral
+            (address receivedToken, uint256 receivedAmount) = fromGateway.withdrawCollateral(
+                collateral.token,
+                collateral.token,
+                user,
+                collateral.amount
+            );
+
+            // Step 2: Deposit the received tokens to target protocol
+            // Approve the target gateway to spend the tokens
+            IERC20(receivedToken).approve(address(toGateway), receivedAmount);
+
+            // Deposit to the target protocol
+            toGateway.deposit(receivedToken, user, receivedAmount);
+        }
+    }
+
     function getPossibleCollaterals(
         address token, 
         string calldata protocolName, 
@@ -444,6 +494,35 @@ contract RouterGateway is Ownable, ReentrancyGuard {
         require(address(toGateway) != address(0), "Protocol not supported");
         
         return toGateway.getEncodedDebtApproval(debtToken, debtAmount, user);
+    }
+
+    /**
+     * @notice Check if a token can be moved from one protocol to another
+     * @param fromProtocol The name of the source protocol
+     * @param toProtocol The name of the target protocol
+     * @param token The token to check
+     * @param user The user address
+     * @return canMove Whether the token can be moved between protocols
+     * @return fromBalance The user's balance in the source protocol
+     */
+    function canMoveSupply(
+        string calldata fromProtocol,
+        string calldata toProtocol,
+        address token,
+        address user
+    ) external view returns (bool canMove, uint256 fromBalance) {
+        IGateway fromGateway = gateways[fromProtocol];
+        IGateway toGateway = gateways[toProtocol];
+        
+        if (address(fromGateway) == address(0) || address(toGateway) == address(0)) {
+            return (false, 0);
+        }
+        
+        // Check if user has a balance in the source protocol
+        fromBalance = fromGateway.getBalance(token, user);
+        
+        // Both protocols must support the token
+        return (fromBalance > 0, fromBalance);
     }
 
     /**

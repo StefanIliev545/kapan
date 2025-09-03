@@ -1,10 +1,10 @@
-import { FC, ReactNode, useState, useEffect } from "react";
+import { FC, ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
+import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWalletClient, useWriteContract } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
-import { FiCheck, FiAlertTriangle, FiArrowRight, FiDollarSign } from "react-icons/fi";
 
 // Common token shape used across modals
 export interface TokenInfo {
@@ -12,6 +12,7 @@ export interface TokenInfo {
   icon: string;
   currentRate: number;
   address: string;
+  usdPrice?: number;
 }
 
 // Different action types supported
@@ -82,10 +83,11 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
   const formattedBalance = balance && decimals ? formatUnits(balance as bigint, decimals as number) : "0";
 
-  // Calculate USD value
+  // Calculate USD value using token price if available
   const getUsdValue = () => {
     if (!amount || isNaN(Number(amount))) return "0.00";
-    return formatDisplayNumber(Number(amount) * token.currentRate);
+    const price = token.usdPrice ?? 0;
+    return formatDisplayNumber(Number(amount) * price);
   };
 
   // Reset the state when the modal is closed
@@ -121,10 +123,10 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       setIsLoading(true);
       setError(null);
       setStep("approving");
-      
+
       const parsedAmount = parseUnits(amount, decimals as number);
       const lowerProtocolName = protocolName.toLowerCase();
-      
+
       // Step 1: Token approval (different for borrow vs deposit/repay)
       if (actionType === "borrow") {
         // For borrowing, we need to get encoded debt approval
@@ -164,7 +166,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             functionName: "approve",
             args: [routerGateway.address, parsedAmount],
           });
-          
+
           console.log("Approve tx sent:", approveTx);
           await publicClient.waitForTransactionReceipt({ hash: approveTx as `0x${string}` });
           console.log("Approve tx confirmed");
@@ -175,25 +177,25 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           return;
         }
       }
-      
+
       setStep("approved");
       setStep("executing");
-      
+
       // Step 2: Execute the actual operation
       const functionName = getRouterFunctionName(actionType);
-      
+
       try {
         const actionTx = await writeRouterAsync({
           functionName,
           args: [lowerProtocolName, token.address, userAddress, parsedAmount],
         });
-        
+
         console.log(`${actionType} tx sent:`, actionTx);
         await publicClient.waitForTransactionReceipt({ hash: actionTx as `0x${string}` });
         console.log(`${actionType} tx confirmed`);
-        
+
         setStep("done");
-        
+
         // Close modal after a short delay on success
         setTimeout(() => onClose(), 2000);
       } catch (err) {
@@ -220,15 +222,15 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           return "Processing...";
       }
     }
-    
+
     if (step === "approved") {
       return `Confirm ${actionLabel || actionType}`;
     }
-    
+
     if (step === "done") {
       return "Done!";
     }
-    
+
     return actionLabel || actionType;
   };
 
@@ -256,11 +258,11 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
   // Format number with thousands separators for display
   const formatDisplayNumber = (value: string | number) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value;
+    const num = typeof value === "string" ? parseFloat(value) : value;
     if (isNaN(num)) return "0.00";
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 6
+      maximumFractionDigits: 6,
     }).format(num);
   };
 
@@ -270,30 +272,25 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         {/* Header with gradient background */}
         <div className="relative p-6 bg-gradient-to-r from-base-200 to-base-300">
           <div className="absolute top-4 right-4">
-            <button 
-              className="btn btn-sm btn-circle btn-ghost" 
+            <button
+              className="btn btn-sm btn-circle btn-ghost"
               onClick={onClose}
               disabled={isLoading && step !== "done"}
             >
               ✕
             </button>
           </div>
-          
+
           <div className="flex items-center gap-3">
+            <div> EVM </div>
             <div className="avatar">
               <div className="w-14 h-14 rounded-full ring-2 ring-base-content/5 p-1 bg-base-100 shadow-md">
-                <Image 
-                  src={token.icon} 
-                  alt={token.name} 
-                  width={48} 
-                  height={48} 
-                  className="rounded-full"
-                />
+                <Image src={token.icon} alt={token.name} width={48} height={48} className="rounded-full" />
               </div>
             </div>
             <div>
               <h3 className="text-2xl font-bold flex items-center gap-2">
-                <span className={getActionColor()}>{actionLabel || actionType}</span> 
+                <span className={getActionColor()}>{actionLabel || actionType}</span>
                 <span className="text-base-content">{token.name}</span>
               </h3>
               <div className="text-sm opacity-70">{protocolName}</div>
@@ -315,11 +312,14 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
               </div>
               {(actionType === "deposit" || actionType === "repay") && (
                 <div className="text-sm text-base-content/70">
-                  Balance: <span className="font-medium">{formatDisplayNumber(formattedBalance)} {token.name}</span>
+                  Balance:{" "}
+                  <span className="font-medium">
+                    {formatDisplayNumber(formattedBalance)} {token.name}
+                  </span>
                 </div>
               )}
             </div>
-            
+
             <div className="relative">
               <input
                 type="number"
@@ -330,9 +330,9 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                 disabled={isLoading || step !== "idle"}
                 max={actionType === "borrow" ? undefined : formattedBalance}
               />
-              
+
               {(actionType === "deposit" || actionType === "repay") && (
-                <button 
+                <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
                   onClick={() => setAmount(formattedBalance)}
                   disabled={isLoading || step !== "idle"}
@@ -346,16 +346,12 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           {/* Interest rate info */}
           <div className="p-4 bg-base-200 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="text-base-content/70">
-                {actionType === "deposit" ? "Supply" : "Borrow"} APY:
-              </span>
-              <span className="font-bold text-lg">
-                {token.currentRate.toFixed(2)}%
-              </span>
+              <span className="text-base-content/70">{actionType === "deposit" ? "Supply" : "Borrow"} APY:</span>
+              <span className="font-bold text-lg">{token.currentRate.toFixed(2)}%</span>
             </div>
             <div className="mt-1 text-xs text-base-content/60">
-              {actionType === "deposit" 
-                ? "The estimated annual yield based on current market conditions." 
+              {actionType === "deposit"
+                ? "The estimated annual yield based on current market conditions."
                 : "The estimated annual cost of borrowing based on current market conditions."}
             </div>
           </div>
@@ -366,34 +362,49 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           {/* Transaction Flow Visual Steps */}
           <div className="flex items-center w-full relative py-5">
             {/* Step 1: Approve */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
-              step === "idle" ? "bg-base-300 text-base-content/50" : 
-              step === "approving" ? "bg-primary animate-pulse text-primary-content" : 
-              "bg-success text-success-content"
-            }`}>
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
+                step === "idle"
+                  ? "bg-base-300 text-base-content/50"
+                  : step === "approving"
+                    ? "bg-primary animate-pulse text-primary-content"
+                    : "bg-success text-success-content"
+              }`}
+            >
               {step === "idle" ? "1" : step === "approving" ? "1" : <FiCheck className="w-5 h-5" />}
             </div>
-            
+
             {/* Connecting Line */}
-            <div className={`flex-1 h-1 transition-all duration-500 ${
-              step === "idle" ? "bg-base-300" : 
-              step === "approving" ? "bg-primary/40" : 
-              "bg-success"
-            }`}></div>
-            
+            <div
+              className={`flex-1 h-1 transition-all duration-500 ${
+                step === "idle" ? "bg-base-300" : step === "approving" ? "bg-primary/40" : "bg-success"
+              }`}
+            ></div>
+
             {/* Step 2: Execute Action */}
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
-              step === "idle" || step === "approving" ? "bg-base-300 text-base-content/50" : 
-              step === "executing" ? "bg-primary animate-pulse text-primary-content" : 
-              step === "done" ? "bg-success text-success-content" :
-              "bg-primary text-primary-content"
-            }`}>
-              {step === "idle" || step === "approving" ? "2" : 
-               step === "executing" ? "2" : 
-               step === "done" ? <FiCheck className="w-5 h-5" /> : "2"}
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300 ${
+                step === "idle" || step === "approving"
+                  ? "bg-base-300 text-base-content/50"
+                  : step === "executing"
+                    ? "bg-primary animate-pulse text-primary-content"
+                    : step === "done"
+                      ? "bg-success text-success-content"
+                      : "bg-primary text-primary-content"
+              }`}
+            >
+              {step === "idle" || step === "approving" ? (
+                "2"
+              ) : step === "executing" ? (
+                "2"
+              ) : step === "done" ? (
+                <FiCheck className="w-5 h-5" />
+              ) : (
+                "2"
+              )}
             </div>
           </div>
-          
+
           {/* Step labels */}
           <div className="flex justify-between text-sm px-1">
             <div className="text-center max-w-[120px]">
@@ -403,9 +414,11 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
             <div className="text-center max-w-[120px]">
               <p className="font-medium">{actionLabel || actionType}</p>
               <p className="text-xs text-base-content/70">
-                {actionType === "deposit" ? `Supply ${token.name} to ${protocolName}` : 
-                 actionType === "borrow" ? `Borrow ${token.name} from ${protocolName}` :
-                 `Repay ${token.name} to ${protocolName}`}
+                {actionType === "deposit"
+                  ? `Supply ${token.name} to ${protocolName}`
+                  : actionType === "borrow"
+                    ? `Borrow ${token.name} from ${protocolName}`
+                    : `Repay ${token.name} to ${protocolName}`}
               </p>
             </div>
           </div>
@@ -421,10 +434,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           {/* Action buttons */}
           <div className="pt-4 flex flex-col gap-3">
             {step === "done" ? (
-              <button
-                className="btn btn-success btn-lg w-full gap-2 h-14"
-                onClick={onClose}
-              >
+              <button className="btn btn-success btn-lg w-full gap-2 h-14" onClick={onClose}>
                 <FiCheck className="w-5 h-5" /> Transaction Complete
               </button>
             ) : (
@@ -432,10 +442,10 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                 className={`btn ${getActionButtonClass()} btn-lg w-full h-14 transition-all duration-300 ${isLoading ? "animate-pulse" : ""}`}
                 onClick={handleAction}
                 disabled={
-                  isLoading || 
-                  !amount || 
-                  !userAddress || 
-                  Number(amount) <= 0 || 
+                  isLoading ||
+                  !amount ||
+                  !userAddress ||
+                  Number(amount) <= 0 ||
                   (step !== "idle" && step !== "approved")
                 }
               >
@@ -444,21 +454,21 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
                 {!isLoading && step === "idle" && <FiArrowRight className="w-5 h-5 ml-1" />}
               </button>
             )}
-            
+
             {step !== "done" && (
-              <button 
-                className="btn btn-ghost btn-sm w-full" 
-                onClick={onClose} 
-                disabled={isLoading}
-              >
+              <button className="btn btn-ghost btn-sm w-full" onClick={onClose} disabled={isLoading}>
                 Cancel
               </button>
             )}
           </div>
         </div>
       </div>
-      
-      <form method="dialog" className="modal-backdrop backdrop-blur-sm bg-black/20" onClick={isLoading ? undefined : onClose}>
+
+      <form
+        method="dialog"
+        className="modal-backdrop backdrop-blur-sm bg-black/20"
+        onClick={isLoading ? undefined : onClose}
+      >
         <button disabled={isLoading}>close</button>
       </form>
     </dialog>

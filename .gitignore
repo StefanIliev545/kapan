@@ -12,6 +12,8 @@ node_modules
 # eslint
 .eslintcache
 
+.starknet_accounts
+
 # misc
 .DS_Store
 

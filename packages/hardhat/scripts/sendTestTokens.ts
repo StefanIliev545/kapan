@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 import { ERC20ABI } from "../../nextjs/contracts/externalContracts";
-import { formatUnits, parseUnits, parseEther, hexToRlp } from "viem";
+import { parseUnits, parseEther } from "viem";
 
 const RICH_ACCOUNT = "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D";
 
@@ -9,16 +9,6 @@ const TOKENS = {
   USDC: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
   USDT: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
   USDCe: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
-};
-
-const WETH = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
-
-// Amount to send for each token (in token decimals)
-const AMOUNTS = {
-  USDC: "1000000000", // 1000 USDC (6 decimals)
-  USDT: "1000000000", // 1000 USDT (6 decimals)
-  USDCe: "1000000000", // 1000 USDCe (6 decimals)
-  WETH: "1000000000000000000", // 1 WETH (18 decimals)
 };
 
 async function main() {
@@ -55,7 +45,7 @@ async function main() {
 
     await signer.sendTransaction({
       to: address,
-      value: parseEther("1.0")
+      value: parseEther("1.0"),
     });
     console.log(`✓ Sent 1 ETH`);
   }
@@ -69,4 +59,4 @@ main()
   .catch(error => {
     console.error(error);
     process.exit(1);
-  }); 
+  });

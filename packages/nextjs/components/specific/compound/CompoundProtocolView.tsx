@@ -1,42 +1,91 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { formatUnits } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const useCollateralValue = (baseToken?: string, userAddress?: string) => {
+  const { data: collateralData } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getDepositedCollaterals",
+    args: [baseToken, userAddress],
+    query: {
+      enabled: !!baseToken && !!userAddress,
+    },
+  });
+
+  const collateralAddresses = useMemo(
+    () => (collateralData?.[0] as string[] | undefined) || [],
+    [collateralData],
+  );
+
+  const { data: collateralPrices } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrices",
+    args: [baseToken, collateralAddresses],
+    query: {
+      enabled: !!baseToken && collateralAddresses.length > 0,
+    },
+  });
+
+  const { data: collateralDecimals } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "getDecimals",
+    args: [collateralAddresses],
+    query: {
+      enabled: collateralAddresses.length > 0,
+    },
+  });
+
+  const { data: baseTokenPrice } = useScaffoldReadContract({
+    contractName: "CompoundGateway",
+    functionName: "getPrice",
+    args: [baseToken],
+    query: {
+      enabled: !!baseToken,
+    },
+  });
+
+  return useMemo(() => {
+    if (!collateralData || !baseTokenPrice) return 0;
+
+    const addresses = collateralData[0] as string[];
+    const balances = collateralData[1] as bigint[];
+
+    let total = 0;
+
+    for (let i = 0; i < addresses.length; i++) {
+      const balanceRaw = balances[i];
+      const decimals =
+        collateralDecimals && i < collateralDecimals.length ? Number(collateralDecimals[i]) : 18;
+      const balance = Number(formatUnits(balanceRaw, decimals));
+      const collateralPrice = collateralPrices && i < collateralPrices.length ? collateralPrices[i] : 0n;
+      if (collateralPrice > 0n && baseTokenPrice > 0n) {
+        const scaleFactor = 10n ** 8n;
+        const usdPrice = (collateralPrice * baseTokenPrice) / scaleFactor;
+        total += balance * Number(formatUnits(usdPrice, 8));
+      }
+    }
+
+    return total;
+  }, [collateralData, collateralPrices, collateralDecimals, baseTokenPrice]);
+};
 
 export const CompoundProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
 
-  // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll, setForceShowAll] = useState(false);
+  const isWalletConnected = !!connectedAddress;
+  const forceShowAll = !isWalletConnected;
 
   // Determine the address to use for queries
   const queryAddress = connectedAddress || ZERO_ADDRESS;
-
-  // Update forceShowAll when wallet connection status changes with a delay
-  useEffect(() => {
-    // If wallet is connected, immediately set forceShowAll to false
-    if (connectedAddress) {
-      setForceShowAll(false);
-      return;
-    }
-
-    // If wallet is not connected, wait a bit before forcing show all
-    // This gives time for wallet to connect during initial page load
-    const timeout = setTimeout(() => {
-      if (!connectedAddress) {
-        setForceShowAll(true);
-      }
-    }, 2500); // Wait 1.5 seconds before deciding wallet is not connected
-
-    return () => clearTimeout(timeout);
-  }, [connectedAddress]);
 
   // Load token contracts via useScaffoldContract.
   const { data: usdc } = useScaffoldContract({ contractName: "USDC", walletClient });
@@ -52,44 +101,58 @@ export const CompoundProtocolView: FC = () => {
 
   // For each token, call the aggregated getCompoundData function.
   // getCompoundData returns a tuple: [supplyRate, borrowRate, balance, borrowBalance]
-  const { data: wethCompoundData } = useScaffoldReadContract({
+  const { data: wethCompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [wethAddress, queryAddress],
   });
-  const { data: usdcCompoundData } = useScaffoldReadContract({
+  const { data: usdcCompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [usdcAddress, queryAddress],
   });
-  const { data: usdtCompoundData } = useScaffoldReadContract({
+  const { data: usdtCompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [usdtAddress, queryAddress],
   });
-  const { data: usdcECompoundData } = useScaffoldReadContract({
+  const { data: usdcECompoundData } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "CompoundGateway",
     functionName: "getCompoundData",
     args: [usdcEAddress, queryAddress],
   });
 
   // Fetch decimals for each token.
-  const { data: wethDecimals } = useScaffoldReadContract({
+  const { data: wethDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "eth",
     functionName: "decimals",
   });
-  const { data: usdcDecimals } = useScaffoldReadContract({
+  const { data: usdcDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "USDC",
     functionName: "decimals",
   });
-  const { data: usdtDecimals } = useScaffoldReadContract({
+  const { data: usdtDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "USDT",
     functionName: "decimals",
   });
-  const { data: usdcEDecimals } = useScaffoldReadContract({
+  const { data: usdcEDecimals } = useNetworkAwareReadContract({
+    networkType: "evm",
     contractName: "USDCe",
     functionName: "decimals",
   });
+
+  // Fetch total collateral value for each market
+  const wethCollateralValue = useCollateralValue(wethAddress, queryAddress);
+  const usdcCollateralValue = useCollateralValue(usdcAddress, queryAddress);
+  const usdtCollateralValue = useCollateralValue(usdtAddress, queryAddress);
+  const usdcECollateralValue = useCollateralValue(usdcEAddress, queryAddress);
 
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
@@ -108,6 +171,7 @@ export const CompoundProtocolView: FC = () => {
       tokenAddress: string | undefined,
       compoundData: any,
       decimalsRaw: any,
+      collateralValue: number,
     ) => {
       if (!tokenAddress || !compoundData || !decimalsRaw) return;
       const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price, priceScale] = compoundData;
@@ -127,8 +191,7 @@ export const CompoundProtocolView: FC = () => {
         name: tokenName,
         // Set negative balance if there's debt, otherwise zero balance
         balance: borrowBalanceRaw && borrowBalanceRaw > 0n ? -usdBorrowBalance : 0,
-        // Store collateral value as a custom property
-        collateralValue: 0, // This is now calculated inside the CollateralView
+        collateralValue,
         tokenBalance: borrowBalanceRaw || 0n,
         currentRate: borrowAPR,
         tokenAddress: tokenAddress,
@@ -136,11 +199,7 @@ export const CompoundProtocolView: FC = () => {
         tokenDecimals: decimals,
         tokenSymbol: tokenName,
         collateralView: (
-          <CompoundCollateralView
-            baseToken={tokenAddress}
-            baseTokenDecimals={decimals}
-            compoundData={compoundData}
-          />
+          <CompoundCollateralView baseToken={tokenAddress} baseTokenDecimals={decimals} compoundData={compoundData} />
         ),
       });
 
@@ -157,30 +216,10 @@ export const CompoundProtocolView: FC = () => {
       });
     };
 
-    computePosition(
-      "WETH",
-      wethAddress,
-      wethCompoundData,
-      wethDecimals,
-    );
-    computePosition(
-      "USDC",
-      usdcAddress,
-      usdcCompoundData,
-      usdcDecimals,
-    );
-    computePosition(
-      "USDT",
-      usdtAddress,
-      usdtCompoundData,
-      usdtDecimals,
-    );
-    computePosition(
-      "USDC.e",
-      usdcEAddress,
-      usdcECompoundData,
-      usdcEDecimals,
-    );
+    computePosition("WETH", wethAddress, wethCompoundData, wethDecimals, wethCollateralValue);
+    computePosition("USDC", usdcAddress, usdcCompoundData, usdcDecimals, usdcCollateralValue);
+    computePosition("USDT", usdtAddress, usdtCompoundData, usdtDecimals, usdtCollateralValue);
+    computePosition("USDC.e", usdcEAddress, usdcECompoundData, usdcEDecimals, usdcECollateralValue);
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
   }, [
@@ -196,7 +235,21 @@ export const CompoundProtocolView: FC = () => {
     usdcEAddress,
     usdcECompoundData,
     usdcEDecimals,
+    wethCollateralValue,
+    usdcCollateralValue,
+    usdtCollateralValue,
+    usdcECollateralValue,
   ]);
+
+  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
+  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
+
+  const filteredSuppliedPositions = isWalletConnected
+    ? suppliedPositions
+    : suppliedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+  const filteredBorrowedPositions = isWalletConnected
+    ? borrowedPositions
+    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
 
   // Hardcode current LTV (or fetch from contract if needed).
   const currentLtv = 75;
@@ -208,10 +261,11 @@ export const CompoundProtocolView: FC = () => {
         protocolIcon="/logos/compound.svg"
         ltv={currentLtv}
         maxLtv={90}
-        suppliedPositions={suppliedPositions}
-        borrowedPositions={borrowedPositions}
+        suppliedPositions={filteredSuppliedPositions}
+        borrowedPositions={filteredBorrowedPositions}
         hideUtilization={true}
         forceShowAll={forceShowAll}
+        networkType="evm"
       />
     </div>
   );

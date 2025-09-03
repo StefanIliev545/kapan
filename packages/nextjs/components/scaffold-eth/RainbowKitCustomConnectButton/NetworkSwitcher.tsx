@@ -64,13 +64,12 @@ export const NetworkSwitcher = () => {
   const networkLogo = getNetworkLogo(chain);
   
   return (
-    <div ref={dropdownRef} className="relative mr-2">
-      <button 
-        className="btn btn-sm btn-circle btn-secondary relative overflow-hidden"
+    <div ref={dropdownRef} className="relative flex-1">
+      <div 
+        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200 py-1"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Switch Network"
       >
-        <div className="absolute inset-0 opacity-20" style={{ backgroundColor: networkColor }}></div>
         <div className="relative w-5 h-5">
           <Image 
             src={networkLogo} 
@@ -79,12 +78,11 @@ export const NetworkSwitcher = () => {
             className="object-contain"
           />
         </div>
+        <span className="text-sm font-medium">{chain.name}</span>
         {allowedNetworks.length > 1 && (
-          <div className="absolute -bottom-1 -right-1 bg-base-100 rounded-full shadow border border-base-300">
-            <ChevronDownIcon className="h-3 w-3 text-primary" />
-          </div>
+          <ChevronDownIcon className="h-4 w-4 text-base-content/70" />
         )}
-      </button>
+      </div>
       
       {isOpen && allowedNetworks.length > 1 && (
         <div className="absolute right-0 mt-2 py-2 w-48 bg-base-200 rounded-box shadow-lg z-50 overflow-hidden">

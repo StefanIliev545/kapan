@@ -10,7 +10,7 @@ type ChainAttributes = {
 };
 
 export type ChainWithAttributes = chains.Chain & Partial<ChainAttributes>;
-export type AllowedChainIds = (typeof scaffoldConfig.targetNetworks)[number]["id"];
+export type AllowedChainIds = (typeof scaffoldConfig.targetEVMNetworks)[number]["id"];
 
 // Mapping of chainId to RPC chain name an format followed by alchemy and infura
 export const RPC_CHAIN_NAMES: Record<number, string> = {
@@ -138,7 +138,7 @@ export function getBlockExplorerAddressLink(network: chains.Chain, address: stri
  * @returns targetNetworks array containing networks configured in scaffold.config including extra network metadata
  */
 export function getTargetNetworks(): ChainWithAttributes[] {
-  return scaffoldConfig.targetNetworks.map(targetNetwork => ({
+  return scaffoldConfig.targetEVMNetworks.map(targetNetwork => ({
     ...targetNetwork,
     ...NETWORKS_EXTRA_DATA[targetNetwork.id],
   }));

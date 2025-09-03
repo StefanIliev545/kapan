@@ -9,6 +9,7 @@ import Header from "~~/components/info/Header";
 import HowItWorksSection from "~~/components/info/HowItWorksSection";
 import RevolutionSection from "~~/components/info/RevolutionSection";
 import RoadmapSection from "~~/components/info/RoadmapSection";
+import AuditSection from "~~/components/info/AuditSection";
 
 const InfoPage = () => {
   return (
@@ -19,6 +20,7 @@ const InfoPage = () => {
       <BenefitsSection />
       <RoadmapSection />
       <ContractsSection />
+      <AuditSection />
       <RevolutionSection />
       <Footer />
     </div>

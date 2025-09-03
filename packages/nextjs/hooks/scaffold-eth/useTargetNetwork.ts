@@ -10,11 +10,11 @@ import { NETWORKS_EXTRA_DATA } from "~~/utils/scaffold-eth";
  */
 export function useTargetNetwork(): { targetNetwork: ChainWithAttributes } {
   const { chain } = useAccount();
-  const targetNetwork = useGlobalState(({ targetNetwork }) => targetNetwork);
-  const setTargetNetwork = useGlobalState(({ setTargetNetwork }) => setTargetNetwork);
+  const targetNetwork = useGlobalState(({ targetEVMNetwork }) => targetEVMNetwork);
+  const setTargetNetwork = useGlobalState(({ setTargetEVMNetwork }) => setTargetEVMNetwork);
 
   useEffect(() => {
-    const newSelectedNetwork = scaffoldConfig.targetNetworks.find(targetNetwork => targetNetwork.id === chain?.id);
+    const newSelectedNetwork = scaffoldConfig.targetEVMNetworks.find(targetNetwork => targetNetwork.id === chain?.id);
     if (newSelectedNetwork && newSelectedNetwork.id !== targetNetwork.id) {
       setTargetNetwork(newSelectedNetwork);
     }
