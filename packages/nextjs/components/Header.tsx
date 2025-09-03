@@ -7,12 +7,12 @@ import { usePathname } from "next/navigation";
 import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  BanknotesIcon,
   Bars3Icon,
   BeakerIcon,
   DocumentChartBarIcon,
   SparklesIcon,
   WalletIcon,
-  BanknotesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
@@ -41,7 +41,7 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Info",
     href: "/info",
     icon: <DocumentChartBarIcon className="h-5 w-5" />,
-  }
+  },
 ];
 
 const mobileOnlyLinks: HeaderMenuLink[] = [
@@ -157,7 +157,8 @@ export const Header = () => {
   }, [pathname]);
 
   return (
-    <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
+    <>
+      <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
       {/* Background with gradient border */}
       <div
         className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
@@ -371,5 +372,16 @@ export const Header = () => {
         </div>
       </div>
     </div>
+    <div className="w-full bg-primary/5 dark:bg-accent/5 text-base-content/70 text-center text-xs py-1">
+      <Link
+        href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:text-primary dark:hover:text-accent"
+      >
+        Starknet Audit by Codespect
+      </Link>
+    </div>
+    </>
   );
 };
