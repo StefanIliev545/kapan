@@ -372,9 +372,14 @@ export const Header = () => {
         </div>
       </div>
     </div>
-    <div className="bg-base-200 dark:bg-base-300/60 text-base-content/70 text-center text-xs py-1">
-      <Link href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" target="_blank" rel="noopener noreferrer">
-        starknet audit by codespect
+    <div className="w-full bg-primary/5 dark:bg-accent/5 text-base-content/70 text-center text-xs py-1">
+      <Link
+        href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:text-primary dark:hover:text-accent"
+      >
+        Starknet Audit by Codespect
       </Link>
     </div>
     </>
