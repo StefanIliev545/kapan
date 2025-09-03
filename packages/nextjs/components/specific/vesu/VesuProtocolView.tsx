@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { useAccount } from "@starknet-react/core";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { VesuMarkets, POOL_IDS, ContractResponse } from "./VesuMarkets";
@@ -57,9 +57,18 @@ export const VesuProtocolView: FC = () => {
 
   const isUpdating = isFetching1 || isFetching2;
 
+  // Keep previous positions while new data is loading to avoid UI flicker
+  const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
+
+  useEffect(() => {
+    if (!isUpdating) {
+      setCachedPositions(mergedUserPositions);
+    }
+  }, [mergedUserPositions, isUpdating]);
+
   const positionRows = useMemo(() => {
-    if (!mergedUserPositions || !supportedAssets) return null;
-    const positions = mergedUserPositions as unknown as PositionTuple[];
+    if (!supportedAssets) return null;
+    const positions = cachedPositions as unknown as PositionTuple[];
 
     return positions?.map((position, index) => {
       const collateralAsset = `0x${position[0].toString(16).padStart(64, "0")}`;
@@ -94,7 +103,7 @@ export const VesuProtocolView: FC = () => {
         />
       );
     });
-  }, [mergedUserPositions, supportedAssets, selectedPoolId]);
+  }, [cachedPositions, supportedAssets, selectedPoolId]);
 
   if (assetsError) {
     console.error("Error fetching supported assets:", assetsError);
