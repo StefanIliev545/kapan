@@ -157,7 +157,8 @@ export const Header = () => {
   }, [pathname]);
 
   return (
-    <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
+    <>
+      <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
       {/* Background with gradient border */}
       <div
         className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
@@ -370,11 +371,12 @@ export const Header = () => {
           </div>
         </div>
       </div>
-      <div className="bg-base-200 dark:bg-base-300/60 text-base-content/70 text-center text-xs py-1">
-        <Link href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" target="_blank" rel="noopener noreferrer">
-          Codespect Audit
-        </Link>
-      </div>
     </div>
+    <div className="bg-base-200 dark:bg-base-300/60 text-base-content/70 text-center text-xs py-1">
+      <Link href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" target="_blank" rel="noopener noreferrer">
+        starknet audit by codespect
+      </Link>
+    </div>
+    </>
   );
 };
