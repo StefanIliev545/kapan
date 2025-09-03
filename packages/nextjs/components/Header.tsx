@@ -7,12 +7,12 @@ import { usePathname } from "next/navigation";
 import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  BanknotesIcon,
   Bars3Icon,
   BeakerIcon,
   DocumentChartBarIcon,
   SparklesIcon,
   WalletIcon,
-  BanknotesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
@@ -41,7 +41,7 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Info",
     href: "/info",
     icon: <DocumentChartBarIcon className="h-5 w-5" />,
-  }
+  },
 ];
 
 const mobileOnlyLinks: HeaderMenuLink[] = [
@@ -369,6 +369,11 @@ export const Header = () => {
             </div>
           </div>
         </div>
+      </div>
+      <div className="bg-base-200 dark:bg-base-300/60 text-base-content/70 text-center text-xs py-1">
+        <Link href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" target="_blank" rel="noopener noreferrer">
+          Codespect Audit
+        </Link>
       </div>
     </div>
   );
