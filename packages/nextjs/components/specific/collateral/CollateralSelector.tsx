@@ -204,6 +204,7 @@ interface CollateralSelectorProps {
   marketToken: string;
   onCollateralSelectionChange: (collaterals: CollateralWithAmount[]) => void;
   onMaxClick?: (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => void;
+  hideAmounts?: boolean;
 }
 
 export const CollateralSelector: FC<CollateralSelectorProps> = ({
@@ -213,6 +214,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   marketToken,
   onCollateralSelectionChange,
   onMaxClick,
+  hideAmounts = false,
 }) => {
   // Store selected collaterals with amounts
   const [selectedCollaterals, setSelectedCollaterals] = useState<CollateralWithAmount[]>([]);
@@ -438,13 +440,8 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center">
+      <div className="space-y-1">
         <label className="text-sm font-medium text-base-content/80">Select Collateral to Move</label>
-        {selectedProtocol && (
-          <span className="text-xs bg-base-200/60 py-1 px-2 rounded-md text-base-content/60">
-            Grayed out = not supported in {selectedProtocol} or zero balance
-          </span>
-        )}
       </div>
 
       {isLoading ? (
@@ -466,10 +463,18 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   className={`
                     btn h-auto py-2 px-3 normal-case flex items-center gap-2 min-w-0
                     ${isCollateralSelected(collateral.address) ? "btn-primary" : "btn-outline bg-base-100"}
-                    ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                    ${isDisabled ? "opacity-50 cursor-not-allowed tooltip" : ""}
                   `}
                   disabled={isDisabled}
-                  title={hasZeroBalance ? "Zero balance" : !collateral.supported ? "Not supported in target protocol" : ""}
+                  data-tip={
+                    isDisabled
+                      ? hasZeroBalance
+                        ? "Zero balance"
+                        : !collateral.supported
+                          ? `Not supported in ${selectedProtocol}`
+                          : ""
+                      : undefined
+                  }
                 >
                   <div className="w-6 h-6 relative flex-shrink-0">
                     <Image
@@ -499,9 +504,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       )}
 
       {/* Vertical list of selected collaterals with amount inputs */}
-      {selectedCollaterals.length > 0 && (
+      {!hideAmounts && selectedCollaterals.length > 0 && (
         <div className="mt-4 space-y-2">
-          <label className="text-sm font-medium text-base-content/80">Collateral Transfer Amounts</label>
+          <label className="block text-lg font-semibold text-center">Collateral</label>
           <div className="bg-base-200/40 p-4 rounded-lg space-y-3">
             {selectedCollaterals.map((collateral) => {
               // Format human-readable amount for display
