@@ -827,7 +827,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-2xl max-h-[100vh] h-[90vh] p-0 overflow-hidden flex flex-col">
+      <div className="modal-box bg-base-100 w-full max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
         {/* Header with gradient background, reduced height */}
         <div className="relative p-3 bg-gradient-to-r from-base-200 to-base-300">
           <div className="absolute top-2 right-2">
@@ -888,20 +888,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         </div>
 
         {/* Main content area - scrollable with NO button inside */}
-        <div className="p-2 space-y-3 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* FROM SECTION */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-base-content/80">From</label>
-              <div className="bg-base-200/60 py-2 px-3 rounded-lg flex items-center gap-2 h-[40px]">
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-base-content/80">From</label>
+              <div className="flex items-center gap-3 h-12 border-b-2 border-base-300 px-1">
                 <Image
                   src={getProtocolLogo(fromProtocol)}
                   alt={fromProtocol}
-                  width={20}
-                  height={20}
-                  className="rounded-full min-w-[20px]"
+                  width={32}
+                  height={32}
+                  className="rounded-full min-w-[32px]"
                 />
-                <span className="truncate font-medium text-sm">{fromProtocol}</span>
+                <span className="truncate font-semibold text-lg">{fromProtocol}</span>
               </div>
               {position.type === "borrow" && (
                 isLoadingCollaterals ? (
@@ -924,13 +924,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* AMOUNTS SECTION */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-medium text-base-content/80 flex items-center gap-1">
+                <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
                   Debt Amount
                   {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
                 </label>
-                <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
+                <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                   <span className="text-base-content/70">Available:</span>
                   <span className="font-medium ml-1">{getFormattedBalance} {position.name}</span>
                 </div>
@@ -938,14 +938,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               <div className="relative">
                 <input
                   type="text"
-                  className="input input-bordered w-full pr-20 h-10 text-base focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="input input-bordered w-full pr-20 h-14 text-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   placeholder="0.00"
                   value={amount}
                   onChange={handleAmountChange}
                   disabled={loading || step !== "idle"}
                 />
                 <button
-                  className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-xs btn-outline h-7"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
                   onClick={handleMaxClick}
                   disabled={loading || step !== "idle"}
                 >
@@ -970,24 +970,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* TO SECTION */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-base-content/80">To</label>
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
-                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
+                  className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between cursor-pointer h-12"
                 >
-                  <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
+                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
                     {selectedProtocol ? (
                       <>
                         <Image
                           src={getProtocolLogo(selectedProtocol)}
                           alt={selectedProtocol}
-                          width={20}
-                          height={20}
-                          className="rounded-full min-w-[20px]"
+                          width={32}
+                          height={32}
+                          className="rounded-full min-w-[32px]"
                         />
-                        <span className="truncate font-medium text-sm">{selectedProtocol}</span>
+                        <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
                       </>
                     ) : (
                       <span className="text-base-content/50">Select protocol</span>
@@ -1005,15 +1005,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu"))
                     .map(protocol => (
                       <li key={protocol.name}>
-                        <button className="flex items-center gap-2 py-1" onClick={() => handleProtocolSelection(protocol.name)}>
+                        <button className="flex items-center gap-3 py-2" onClick={() => handleProtocolSelection(protocol.name)}>
                           <Image
                             src={getProtocolLogo(protocol.name)}
                             alt={protocol.name}
-                            width={20}
-                            height={20}
-                            className="rounded-full min-w-[20px]"
+                            width={32}
+                            height={32}
+                            className="rounded-full min-w-[32px]"
                           />
-                          <span className="truncate text-sm">{protocol.name}</span>
+                          <span className="truncate text-lg">{protocol.name}</span>
                         </button>
                       </li>
                     ))}
@@ -1021,11 +1021,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               </div>
 
               {selectedProtocol === "Vesu" && (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-medium text-base-content/80">Target Pool</label>
+                    <label className="text-sm font-medium text-base-content/80">Target Pool</label>
                     {fromProtocol === "Vesu" && (
-                      <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
+                      <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                         <span className="text-base-content/70">Current Pool:</span>
                         <span className="font-medium ml-1">{currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}</span>
                       </div>
@@ -1034,12 +1034,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   <div className="dropdown w-full">
                     <div
                       tabIndex={0}
-                      className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
+                      className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between cursor-pointer h-12"
                     >
-                      <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
+                      <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
                         {Object.entries(POOL_IDS).map(([name, id]) =>
                           id === selectedPoolId ? (
-                            <span key={name} className="truncate font-medium text-sm">
+                            <span key={name} className="truncate font-semibold text-lg">
                               {name}
                             </span>
                           ) : null,
@@ -1057,16 +1057,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                         .filter(([_, id]) => fromProtocol !== "Vesu" || id !== currentPoolId)
                         .map(([name, id]) => (
                           <li key={name}>
-                            <button className="flex items-center gap-2 py-1" onClick={() => setSelectedPoolId(id)}>
-                              {name === "Genesis" && <Image src="/logos/vesu.svg" alt="Vesu" width={20} height={20} className="rounded-full min-w-[20px]" />}
-                              {name === "Re7 USDC" && <Image src="/logos/re7.svg" alt="Re7" width={20} height={20} className="rounded-full min-w-[20px]" />}
+                            <button className="flex items-center gap-3 py-2" onClick={() => setSelectedPoolId(id)}>
+                              {name === "Genesis" && <Image src="/logos/vesu.svg" alt="Vesu" width={32} height={32} className="rounded-full min-w-[32px]" />}
+                              {name === "Re7 USDC" && <Image src="/logos/re7.svg" alt="Re7" width={32} height={32} className="rounded-full min-w-[32px]" />}
                               {name === "Alterscope wstETH" && (
                                 <>
-                                  <Image src="/logos/alterscope_symbol_black.svg" alt="Alterscope" width={20} height={20} className="rounded-full min-w-[20px] dark:hidden" />
-                                  <Image src="/logos/alterscope_symbol_white.svg" alt="Alterscope" width={20} height={20} className="rounded-full min-w-[20px] hidden dark:block" />
+                                  <Image src="/logos/alterscope_symbol_black.svg" alt="Alterscope" width={32} height={32} className="rounded-full min-w-[32px] dark:hidden" />
+                                  <Image src="/logos/alterscope_symbol_white.svg" alt="Alterscope" width={32} height={32} className="rounded-full min-w-[32px] hidden dark:block" />
                                 </>
                               )}
-                              <span className="truncate text-sm">{name}</span>
+                              <span className="truncate text-lg">{name}</span>
                             </button>
                           </li>
                         ))}

@@ -312,7 +312,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-2xl p-0 overflow-hidden">
+      <div className="modal-box bg-base-100 w-full max-w-5xl p-0 overflow-hidden">
         {/* Header with gradient background */}
         <div className="relative p-6 bg-gradient-to-r from-base-200 to-base-300">
           <div className="absolute top-4 right-4">
@@ -373,21 +373,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         </div>
 
         {/* Main content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* FROM SECTION */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-base-content/80">From</label>
-              <div className="bg-base-200/60 py-3 px-4 rounded-lg flex items-center gap-3 h-[52px]">
+              <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
                 <Image
                   src={getProtocolLogo(fromProtocol)}
                   alt={fromProtocol}
-                  width={24}
-                  height={24}
-                  className="rounded-full min-w-[24px]"
+                  width={32}
+                  height={32}
+                  className="rounded-full min-w-[32px]"
                 />
-                <span className="truncate font-medium">{fromProtocol}</span>
+                <span className="truncate font-semibold text-lg">{fromProtocol}</span>
               </div>
             </div>
             {position.type === "borrow" && (
@@ -403,7 +403,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* AMOUNTS SECTION */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
@@ -445,25 +445,25 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* TO SECTION */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
-                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-3 px-4 rounded-lg flex items-center justify-between cursor-pointer h-[52px]"
+                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
                 >
-                  <div className="flex items-center gap-3 w-[calc(100%-24px)] overflow-hidden">
+                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
                     {selectedProtocol ? (
                       <>
                         <Image
                           src={getProtocolLogo(selectedProtocol)}
                           alt={selectedProtocol}
-                          width={24}
-                          height={24}
-                          className="rounded-full min-w-[24px]"
+                          width={32}
+                          height={32}
+                          className="rounded-full min-w-[32px]"
                         />
-                        <span className="truncate font-medium">{selectedProtocol}</span>
+                        <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
                       </>
                     ) : (
                       <span className="text-base-content/50">Select protocol</span>
@@ -488,11 +488,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                           <Image
                             src={getProtocolLogo(protocol.name)}
                             alt={protocol.name}
-                            width={24}
-                            height={24}
-                            className="rounded-full min-w-[24px]"
+                            width={32}
+                            height={32}
+                            className="rounded-full min-w-[32px]"
                           />
-                          <span className="truncate">{protocol.name}</span>
+                          <span className="truncate text-lg">{protocol.name}</span>
                         </button>
                       </li>
                     ))}
@@ -505,17 +505,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
-                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-3 px-4 rounded-lg flex items-center justify-between cursor-pointer h-[52px]"
+                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
                 >
-                  <div className="flex items-center gap-3 w-[calc(100%-24px)] overflow-hidden">
+                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
                     <Image
                       src={selectedFlashLoanProvider.icon}
                       alt={selectedFlashLoanProvider.name}
-                      width={24}
-                      height={24}
-                      className="rounded-full min-w-[24px]"
+                      width={32}
+                      height={32}
+                      className="rounded-full min-w-[32px]"
                     />
-                    <span className="truncate font-medium">{selectedFlashLoanProvider.name}</span>
+                    <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
                     {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
                   </div>
                   <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -535,11 +535,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                         <Image
                           src={provider.icon}
                           alt={provider.name}
-                          width={24}
-                          height={24}
-                          className="rounded-full min-w-[24px]"
+                          width={32}
+                          height={32}
+                          className="rounded-full min-w-[32px]"
                         />
-                        <span className="truncate">{provider.name}</span>
+                        <span className="truncate text-lg">{provider.name}</span>
                       </button>
                     </li>
                   ))}
