@@ -935,17 +935,28 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   <span className="font-medium ml-1">{getFormattedBalance} {position.name}</span>
                 </div>
               </div>
-              <div className="relative">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-32 shrink-0">
+                  <div className="w-6 h-6 relative">
+                    <Image
+                      src={tokenNameToLogo(position.name)}
+                      alt={position.name}
+                      fill
+                      className="rounded-full object-contain"
+                    />
+                  </div>
+                  <span className="truncate font-medium">{position.name}</span>
+                </div>
                 <input
                   type="text"
-                  className="input input-bordered w-full pr-20 h-14 text-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="flex-1 border-b-2 border-base-300 focus:border-primary bg-transparent px-2 h-14 text-lg text-right"
                   placeholder="0.00"
                   value={amount}
                   onChange={handleAmountChange}
                   disabled={loading || step !== "idle"}
                 />
                 <button
-                  className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
+                  className="text-xs font-medium px-2 py-1"
                   onClick={handleMaxClick}
                   disabled={loading || step !== "idle"}
                 >
@@ -1020,6 +1031,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </ul>
               </div>
 
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 relative">
+                  <Image
+                    src={tokenNameToLogo(position.name)}
+                    alt={position.name}
+                    fill
+                    className="rounded-full object-contain"
+                  />
+                </div>
+                <span className="font-medium">{position.name}</span>
+              </div>
+
               {selectedProtocol === "Vesu" && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center mb-1">
@@ -1088,12 +1111,27 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                           className="rounded-full"
                         />
                         <span>{c.symbol}</span>
+                        <span>
+                          {Number(formatUnits(c.amount, c.decimals)).toLocaleString(undefined, {
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
                       </div>
-                      <span>
-                        {Number(formatUnits(c.amount, c.decimals)).toLocaleString(undefined, { maximumFractionDigits: 2 })} /
-                        {" "}
-                        {Number(amount || "0").toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <Image
+                          src={tokenNameToLogo(position.name)}
+                          alt={position.name}
+                          width={16}
+                          height={16}
+                          className="rounded-full"
+                        />
+                        <span>{position.name}</span>
+                        <span>
+                          {Number(amount || "0").toLocaleString(undefined, {
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

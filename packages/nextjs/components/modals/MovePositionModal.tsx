@@ -417,17 +417,28 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                   </span>
                 </div>
               </div>
-              <div className="relative">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-32 shrink-0">
+                  <div className="w-6 h-6 relative">
+                    <Image
+                      src={tokenNameToLogo(position.name)}
+                      alt={position.name}
+                      fill
+                      className="rounded-full object-contain"
+                    />
+                  </div>
+                  <span className="truncate font-medium">{position.name}</span>
+                </div>
                 <input
                   type="text"
-                  className="input input-bordered w-full pr-20 h-14 text-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="flex-1 border-b-2 border-base-300 focus:border-primary bg-transparent px-2 h-14 text-lg text-right"
                   placeholder="0.00"
                   value={amount}
                   onChange={handleAmountChange}
                   disabled={loading || step !== "idle"}
                 />
                 <button
-                  className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
+                  className="text-xs font-medium px-2 py-1"
                   onClick={handleSetMaxAmount}
                   disabled={loading || step !== "idle"}
                 >
@@ -498,6 +509,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                     ))}
                 </ul>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 relative">
+                <Image
+                  src={tokenNameToLogo(position.name)}
+                  alt={position.name}
+                  fill
+                  className="rounded-full object-contain"
+                />
+              </div>
+              <span className="font-medium">{position.name}</span>
             </div>
 
             <div>
