@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -23,11 +23,16 @@ type InterestState = {
 
 export const NostraProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
-  // State to track if we should force showing all assets when wallet is not connected
-  const [forceShowAll] = useState(false);
+  // Use zero address when wallet is not connected
+  const queryAddress = connectedAddress ? BigInt(connectedAddress) : 0n;
 
-  // Determine the address to use for queries - use contract's own address as fallback
-  const queryAddress = connectedAddress;
+  // Fetch all supported assets to display even when the user is not connected
+  const { data: assetInfos } = useNetworkAwareReadContract({
+    networkType: "starknet",
+    contractName: "NostraGateway",
+    functionName: "get_supported_assets_info",
+    args: [0n],
+  });
 
   // Get user positions
   const { data: userPositions } = useNetworkAwareReadContract({
@@ -38,15 +43,30 @@ export const NostraProtocolView: FC = () => {
     refetchInterval: 10000,
   });
 
-  // Memoize the unique contract addresses from user positions
-  const uniqueContractAddresses = useMemo(() => {
-    if (!userPositions) return [];
+  // Map asset info to addresses and symbols
+  const { tokenAddresses, symbolMap } = useMemo(() => {
+    if (!assetInfos) return { tokenAddresses: [], symbolMap: {} };
+    const infos = assetInfos as unknown as any[];
+    const tokenAddresses = infos.map(info => `0x${info[0].toString(16).padStart(64, "0")}`);
+    const symbolMap = infos.reduce(
+      (acc, info) => {
+        acc[`0x${info[0].toString(16).padStart(64, "0")}`] = feltToString(info[1]);
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+    return { tokenAddresses, symbolMap };
+  }, [assetInfos]);
 
+  // Build a map of user positions keyed by token address
+  const userPositionMap = useMemo(() => {
+    if (!userPositions) return {} as Record<string, UserPositionTuple>;
     const positions = userPositions as unknown as UserPositionTuple[];
-    const addresses = positions.map(position => `0x${position[0].toString(16).padStart(64, "0")}`);
-
-    // Remove duplicates and filter out empty/invalid addresses
-    return [...new Set(addresses)].filter(addr => addr && addr !== "0x0");
+    return positions.reduce((acc, position) => {
+      const addr = `0x${position[0].toString(16).padStart(64, "0")}`;
+      acc[addr] = position;
+      return acc;
+    }, {} as Record<string, UserPositionTuple>);
   }, [userPositions]);
 
   // Get interest rates for all supported assets
@@ -54,17 +74,9 @@ export const NostraProtocolView: FC = () => {
     networkType: "starknet",
     contractName: "NostraGateway",
     functionName: "get_interest_rates",
-    args: [uniqueContractAddresses],
+    args: [tokenAddresses],
     refetchInterval: 0,
   });
-
-  const { tokenAddresses } = useMemo(() => {
-    if (!userPositions) return { tokenAddresses: [] };
-    const positions = userPositions as unknown as UserPositionTuple[];
-
-    const tokenAddresses = positions?.map(position => `0x${position[0].toString(16).padStart(64, "0")}`);
-    return { tokenAddresses };
-  }, [userPositions]);
 
   const { data: tokenDecimals } = useNetworkAwareReadContract({
     networkType: "starknet",
@@ -102,29 +114,22 @@ export const NostraProtocolView: FC = () => {
     return { tokenToDecimals, tokenToPrices };
   }, [tokenDecimals, tokenAddresses, tokenPrices]);
 
-  // Aggregate positions by iterating over the returned tokens
+  // Aggregate positions by iterating over all supported tokens
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
+    const rates = interestRates as unknown as InterestState[] | undefined;
 
-    if (!userPositions) {
-      return { suppliedPositions: supplied, borrowedPositions: borrowed };
-    }
-
-    // Process each position
-    const positions = userPositions as unknown as UserPositionTuple[];
-    const rates = interestRates as unknown as InterestState[];
-
-    positions.forEach((position, index) => {
-      const underlying = `0x${position[0].toString(16).padStart(64, "0")}`;
-      const symbol = feltToString(position[1]);
-      const debtBalance = position[2];
-      const collateralBalance = position[3];
+    tokenAddresses.forEach((underlying, index) => {
+      const position = userPositionMap[underlying];
+      const debtBalance = position ? position[2] : 0n;
+      const collateralBalance = position ? position[3] : 0n;
+      const symbol = symbolMap[underlying];
       const interestRate = rates?.[index];
 
       // Convert rates to APY/APR (rates are in RAY format - 1e27)
-      const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e16 : 0; // Convert to percentage
-      const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e16 : 0; // Convert to percentage
+      const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e16 : 0;
+      const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e16 : 0;
 
       // Convert token amounts to numbers and multiply by USD price to get fiat value
       const decimals = tokenToDecimals[underlying];
@@ -133,7 +138,6 @@ export const NostraProtocolView: FC = () => {
       const suppliedAmount = Number(formatUnits(collateralBalance, decimals));
       const borrowedAmount = Number(formatUnits(debtBalance, decimals));
 
-      // Add supply position
       supplied.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
@@ -145,11 +149,10 @@ export const NostraProtocolView: FC = () => {
         tokenPrice,
       });
 
-      // Add borrow position
       borrowed.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        balance: -borrowedAmount * tokenPriceNumber, // Negative balance for borrowed amount
+        balance: -borrowedAmount * tokenPriceNumber,
         tokenBalance: debtBalance,
         currentRate: borrowAPR,
         tokenAddress: underlying,
@@ -159,7 +162,7 @@ export const NostraProtocolView: FC = () => {
     });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
-  }, [userPositions, interestRates, tokenToDecimals, tokenToPrices]);
+  }, [tokenAddresses, userPositionMap, symbolMap, interestRates, tokenToDecimals, tokenToPrices]);
 
   return (
     <ProtocolView
@@ -169,7 +172,6 @@ export const NostraProtocolView: FC = () => {
       maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
-      forceShowAll={forceShowAll}
       networkType="starknet"
     />
   );
