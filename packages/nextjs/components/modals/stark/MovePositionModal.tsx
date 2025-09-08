@@ -891,7 +891,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* FROM SECTION */}
-            <div className="space-y-3 md:col-span-2">
+            <div className="space-y-3 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-12 border-b-2 border-base-300 px-1">
                 <Image
@@ -924,7 +924,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* AMOUNTS SECTION */}
-            <div className="space-y-3 md:col-span-7">
+            <div className="space-y-3 md:col-span-6">
               <div className="flex justify-between items-center mb-1">
                 <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
                   Debt Amount
@@ -1076,11 +1076,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               )}
 
               {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0 && (
-                <div className="bg-base-200/40 p-2 rounded">
+                <div className="bg-base-200/40 p-2 rounded space-y-1">
                   {selectedCollateralsWithAmounts.map(c => (
-                    <div key={c.token} className="flex justify-between text-xs">
-                      <span>{c.symbol}</span>
-                      <span>{formatUnits(c.amount, c.decimals)} / {amount || "0"}</span>
+                    <div key={c.token} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1">
+                        <Image
+                          src={tokenNameToLogo(c.symbol)}
+                          alt={c.symbol}
+                          width={16}
+                          height={16}
+                          className="rounded-full"
+                        />
+                        <span>{c.symbol}</span>
+                      </div>
+                      <span>
+                        {Number(formatUnits(c.amount, c.decimals)).toLocaleString(undefined, { maximumFractionDigits: 2 })} /
+                        {" "}
+                        {Number(amount || "0").toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                   ))}
                 </div>
