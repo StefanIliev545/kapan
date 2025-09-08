@@ -8,7 +8,6 @@ import {
   FiArrowRight,
   FiArrowRightCircle,
   FiCheck,
-  FiDollarSign,
   FiLock,
   FiMinusCircle,
   FiPlusCircle,
@@ -206,6 +205,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       ),
     };
   }, [tokenPrices, collateralsForSelector, tokenAddress]);
+
+  const debtUsdValue = useMemo(() => {
+    if (!amount) return 0;
+    const price = tokenToPrices[tokenAddress.toLowerCase()];
+    const usdPerToken = price ? Number(formatUnits(price, 8)) : 0;
+    return parseFloat(amount) * usdPerToken;
+  }, [amount, tokenToPrices, tokenAddress]);
+
+  const totalCollateralUsd = useMemo(
+    () =>
+      selectedCollateralsWithAmounts.reduce((sum, c) => {
+        const price = tokenToPrices[c.token.toLowerCase()];
+        const normalized = Number(formatUnits(c.amount, c.decimals));
+        const usd = price ? normalized * Number(formatUnits(price, 8)) : 0;
+        return sum + usd;
+      }, 0),
+    [selectedCollateralsWithAmounts, tokenToPrices],
+  );
 
   // Spinner only before first successful data render
   const isLoadingCollaterals =
@@ -1031,6 +1048,57 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   )}
                 </>
               )}
+              {error && (
+                <div className="alert alert-error shadow-lg">
+                  <FiAlertTriangle className="w-6 h-6" />
+                  <div className="text-sm flex-1">{error}</div>
+                </div>
+              )}
+
+              <div className="flex justify-between text-sm text-base-content/70">
+                <span>Debt Value: ${formatDisplayNumber(debtUsdValue)}</span>
+                {position.type === "borrow" && (
+                  <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>
+                )}
+              </div>
+
+              <div className="pt-5 flex flex-col gap-3 mt-2">
+                {step === "done" ? (
+                  <button className="btn btn-success btn-lg w-full gap-2 h-14 shadow-md" onClick={onClose}>
+                    <FiCheck className="w-5 h-5" /> Position Moved Successfully
+                  </button>
+                ) : (
+                  <button
+                    className={`btn ${actionButtonClass} btn-lg w-full h-14 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
+                    onClick={handleMovePosition}
+                    disabled={
+                      loading ||
+                      !selectedProtocol ||
+                      !amount ||
+                      !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
+                      step !== "idle" ||
+                      (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId)
+                    }
+                  >
+                    {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                    {actionButtonText}
+                    {!loading &&
+                      step === "idle" &&
+                      (position.type === "supply" ? (
+                        <FiTrendingUp className="w-5 h-5 ml-1" />
+                      ) : (
+                        <FiArrowRight className="w-5 h-5 ml-1" />
+                      ))}
+                  </button>
+                )}
+
+                {step !== "done" && (
+                  <button className="btn btn-ghost btn-sm w-full hover:bg-base-200" onClick={onClose} disabled={loading}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+
             </div>
 
             {/* TO SECTION */}
@@ -1192,39 +1260,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
           </div>
 
-          {/* Error message */}
-          {error && (
-            <div className="alert alert-error shadow-lg">
-              <FiAlertTriangle className="w-6 h-6" />
-              <div className="text-sm flex-1">{error}</div>
-            </div>
-          )}
-        </div>
-
-        {/* Button positioned at the bottom of the modal, outside the scrollable area */}
-        <div className="p-4 border-t border-base-200 bg-base-100">
-          <button
-            className={`btn ${actionButtonClass} btn-md w-full h-12 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
-            onClick={handleMovePosition}
-            disabled={
-              loading ||
-              !selectedProtocol ||
-              !amount ||
-              !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-              step !== "idle" ||
-              (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId) // Prevent same pool selection
-            }
-          >
-            {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-            {actionButtonText}
-            {!loading &&
-              step === "idle" &&
-              (position.type === "supply" ? (
-                <FiTrendingUp className="w-5 h-5 ml-1" />
-              ) : (
-                <FiArrowRight className="w-5 h-5 ml-1" />
-              ))}
-          </button>
         </div>
       </div>
 

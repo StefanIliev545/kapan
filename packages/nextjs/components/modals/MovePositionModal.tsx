@@ -5,7 +5,6 @@ import {
   FiArrowRight,
   FiArrowRightCircle,
   FiCheck,
-  FiDollarSign,
   FiLock,
   FiMinusCircle,
   FiPlusCircle,
@@ -50,16 +49,6 @@ const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
 ] as const;
 
 // Extend the collateral type with rawBalance
-type CollateralType = {
-  symbol: string;
-  balance: number;
-  address: string;
-  decimals: number;
-  rawBalance: bigint; // Not optional - rawBalance is always provided by useCollaterals
-  selected: boolean;
-  supported: boolean;
-};
-
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
   const { address: userAddress } = useAccount();
   const protocols = [
@@ -115,6 +104,26 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       },
     );
   }, [fetchedCollaterals, supportedCollaterals]);
+
+  // Fetch USD prices for debt token and selected collaterals
+  const { data: tokenPrices } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "get_asset_prices",
+    args: [[...collateralsForSelector.map(c => c.address), position.tokenAddress]],
+    query: { enabled: isOpen },
+  });
+
+  const { tokenToPrices } = useMemo(() => {
+    if (!tokenPrices) return { tokenToPrices: {} as Record<string, bigint> };
+    const prices = tokenPrices as unknown as bigint[];
+    const addresses = [...collateralsForSelector.map(c => c.address), position.tokenAddress];
+    return {
+      tokenToPrices: prices.reduce((acc, price, index) => {
+        acc[addresses[index].toLowerCase()] = price / 10n ** 10n;
+        return acc;
+      }, {} as Record<string, bigint>),
+    };
+  }, [tokenPrices, collateralsForSelector, position.tokenAddress]);
 
   // Move debt hook.
   const { moveDebt } = useMoveDebtScaffold();
@@ -217,6 +226,26 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     }).format(num);
   };
 
+  const debtUsdValue = useMemo(() => {
+    if (!amount) return 0;
+    const price = tokenToPrices[position.tokenAddress.toLowerCase()];
+    const usdPerToken = price
+      ? Number(formatUnits(price, 8))
+      : position.balance / parseFloat(formattedTokenBalance || "1");
+    return parseFloat(amount) * usdPerToken;
+  }, [amount, tokenToPrices, position.tokenAddress, position.balance, formattedTokenBalance]);
+
+  const totalCollateralUsd = useMemo(
+    () =>
+      selectedCollateralsWithAmounts.reduce((sum, c) => {
+        const price = tokenToPrices[c.token.toLowerCase()];
+        const normalized = Number(formatUnits(c.amount, c.decimals));
+        const usd = price ? normalized * Number(formatUnits(price, 8)) : 0;
+        return sum + usd;
+      }, 0),
+    [selectedCollateralsWithAmounts, tokenToPrices],
+  );
+
   const handleSetMaxAmount = () => {
     setAmount(formattedTokenBalance);
     setIsRepayingAll(true);
@@ -298,11 +327,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       return "btn-success";
     }
     return "btn-primary";
-  };
-
-  // Get the selected protocol icon
-  const getSelectedProtocolIcon = () => {
-    return protocols.find(p => p.name === selectedProtocol)?.name || "";
   };
 
   // Handler for collateral selection and amount changes
@@ -453,6 +477,67 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 selectedProtocol={selectedProtocol}
               />
             )}
+
+            {error && (
+              <div className="alert alert-error shadow-lg">
+                <FiAlertTriangle className="w-6 h-6" />
+                <div className="text-sm flex-1">{error}</div>
+              </div>
+            )}
+
+            <div className="flex justify-between text-sm text-base-content/70">
+              <span>Debt Value: ${formatDisplayNumber(debtUsdValue)}</span>
+              {position.type === "borrow" && (
+                <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>
+              )}
+            </div>
+
+            <div className="pt-5 flex flex-col gap-3 mt-2">
+              {step === "done" ? (
+                <button className="btn btn-success btn-lg w-full gap-2 h-14 shadow-md" onClick={onClose}>
+                  <FiCheck className="w-5 h-5" /> Position Moved Successfully
+                </button>
+              ) : (
+                <>
+                  {(() => {
+                    const isDisabled =
+                      loading ||
+                      !selectedProtocol ||
+                      !amount ||
+                      !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
+                      !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
+                      hasProviderSufficientBalance === false ||
+                      step !== "idle";
+
+                    return (
+                      <button
+                        className={`btn ${getActionButtonClass()} btn-lg w-full h-14 transition-all duration-300 shadow-md ${
+                          loading ? "animate-pulse" : ""
+                        }`}
+                        onClick={handleMoveDebt}
+                        disabled={isDisabled}
+                      >
+                        {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                        {getActionButtonText()}
+                        {!loading &&
+                          step === "idle" &&
+                          (position.type === "supply" ? (
+                            <FiTrendingUp className="w-5 h-5 ml-1" />
+                          ) : (
+                            <FiArrowRight className="w-5 h-5 ml-1" />
+                          ))}
+                      </button>
+                    );
+                  })()}
+                </>
+              )}
+
+              {step !== "done" && (
+                <button className="btn btn-ghost btn-sm w-full hover:bg-base-200" onClick={onClose} disabled={loading}>
+                  Cancel
+                </button>
+              )}
+            </div>
           </div>
 
           {/* TO SECTION */}
@@ -591,62 +676,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             )}
           </div>
         </div>
+      </div>
 
-          {/* Error message */}
-          {error && (
-            <div className="alert alert-error shadow-lg">
-              <FiAlertTriangle className="w-6 h-6" />
-              <div className="text-sm flex-1">{error}</div>
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="pt-5 flex flex-col gap-3 mt-2">
-            {step === "done" ? (
-              <button className="btn btn-success btn-lg w-full gap-2 h-14 shadow-md" onClick={onClose}>
-                <FiCheck className="w-5 h-5" /> Position Moved Successfully
-              </button>
-            ) : (
-              <>
-                {/* Check if we can move the position */}
-                {(() => {
-                  const isDisabled =
-                    loading ||
-                    !selectedProtocol ||
-                    !amount ||
-                    !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
-                    !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-                    hasProviderSufficientBalance === false ||
-                    step !== "idle";
-
-                  return (
-                    <button
-                      className={`btn ${getActionButtonClass()} btn-lg w-full h-14 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
-                      onClick={handleMoveDebt}
-                      disabled={isDisabled}
-                    >
-                      {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                      {getActionButtonText()}
-                      {!loading &&
-                        step === "idle" &&
-                        (position.type === "supply" ? (
-                          <FiTrendingUp className="w-5 h-5 ml-1" />
-                        ) : (
-                          <FiArrowRight className="w-5 h-5 ml-1" />
-                        ))}
-                    </button>
-                  );
-                })()}
-              </>
-            )}
-
-            {step !== "done" && (
-              <button className="btn btn-ghost btn-sm w-full hover:bg-base-200" onClick={onClose} disabled={loading}>
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
       </div>
 
       <form
