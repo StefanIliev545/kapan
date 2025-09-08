@@ -15,6 +15,7 @@ import { useAccount, useReadContract } from "wagmi";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { getProtocolLogo } from "~~/utils/protocol";
@@ -105,8 +106,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     );
   }, [fetchedCollaterals, supportedCollaterals]);
 
-  // Fetch USD prices for debt token and selected collaterals
-  const { data: tokenPrices } = useScaffoldReadContract({
+  // Fetch USD prices for debt token and selected collaterals using Starknet helper
+  const { data: tokenPrices } = useNetworkAwareReadContract({
+    networkType: "starknet",
     contractName: "UiHelper",
     functionName: "get_asset_prices",
     args: [[...collateralsForSelector.map(c => c.address), position.tokenAddress]],
