@@ -374,9 +374,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
         {/* Main content */}
         <div className="p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* FROM SECTION */}
-          <div className="space-y-3">
+          <div className="space-y-3 md:col-span-2">
             <div>
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
@@ -403,7 +403,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* AMOUNTS SECTION */}
-          <div className="space-y-3">
+          <div className="space-y-3 md:col-span-7">
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
@@ -445,7 +445,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* TO SECTION */}
-          <div className="space-y-3">
+          <div className="space-y-3 md:col-span-3">
             <div>
               <label className="text-sm font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">

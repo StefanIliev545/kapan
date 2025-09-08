@@ -42,54 +42,48 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({ collaterals, onC
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-base-content/80">Collateral Transfer Amounts</label>
-      <div className="bg-base-200/40 p-4 rounded-lg space-y-3">
+      <div className="space-y-4 max-h-48 overflow-y-auto pr-1">
         {collaterals.map(c => {
           const displayAmount = c.inputValue ?? (c.amount === 0n ? "" : formatUnits(c.amount, c.decimals));
-          const maxAmountStr = formatUnits(c.maxAmount, c.decimals);
-          const maxAmount = parseUnits(maxAmountStr, c.decimals);
           const isSupported = c.supported;
           return (
-            <div key={c.token} className={`flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}>
-              <div className="flex items-center gap-2 w-[160px] flex-shrink-0">
-                <div className="w-7 h-7 relative flex-shrink-0">
-                  <Image src={tokenNameToLogo(c.symbol)} alt={c.symbol} fill className={`rounded-full object-contain ${!isSupported ? 'grayscale' : ''}`}/>
-                </div>
-                <div className="flex flex-col overflow-hidden">
-                  <span className="font-medium truncate">{c.symbol}</span>
-                  <span className="text-xs text-base-content/60">Available: {maxAmountStr}</span>
-                  {!isSupported && (
-                    <span className="text-xs text-error/80">Not supported in {selectedProtocol}</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 transition-all ${!isSupported ? 'opacity-50' : ''}`}>
-                  <input
-                    type="text"
-                    value={displayAmount}
-                    onChange={e => handleAmountChange(c.token, e.target.value, c.decimals)}
-                    className="flex-1 bg-transparent border-none focus:outline-none px-3 py-2 h-10 text-base-content"
-                    placeholder="0.00"
-                    disabled={!isSupported}
+            <div
+              key={c.token}
+              className={`flex items-center gap-2 ${!isSupported ? 'opacity-60' : ''}`}
+            >
+              <div className="flex items-center gap-2 w-32 shrink-0">
+                <div className="w-6 h-6 relative">
+                  <Image
+                    src={tokenNameToLogo(c.symbol)}
+                    alt={c.symbol}
+                    fill
+                    className={`rounded-full object-contain ${!isSupported ? 'grayscale' : ''}`}
                   />
-                  <button
-                    className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white rounded ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={() => handleSetMax(c.token, c.maxAmount, c.decimals)}
-                    disabled={!isSupported}
-                  >
-                    MAX
-                  </button>
                 </div>
+                <span className="truncate font-medium">{c.symbol}</span>
               </div>
-              <div className="flex-shrink-0">
-                <button
-                  className="btn btn-ghost btn-sm text-base-content/70 p-1 h-8 w-8 flex items-center justify-center hover:bg-error/10 hover:text-error"
-                  onClick={() => handleRemove(c.token)}
-                  title="Remove collateral"
-                >
-                  <FiX className="w-4 h-4" />
-                </button>
-              </div>
+              <input
+                type="text"
+                value={displayAmount}
+                onChange={e => handleAmountChange(c.token, e.target.value, c.decimals)}
+                className="flex-1 border-b-2 border-base-300 focus:border-primary bg-transparent px-2 py-1 text-right"
+                placeholder="0.00"
+                disabled={!isSupported}
+              />
+              <button
+                className={`text-xs font-medium px-2 py-1 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => handleSetMax(c.token, c.maxAmount, c.decimals)}
+                disabled={!isSupported}
+              >
+                MAX
+              </button>
+              <button
+                className="text-base-content/70 p-1 h-6 w-6 flex items-center justify-center hover:text-error"
+                onClick={() => handleRemove(c.token)}
+                title="Remove collateral"
+              >
+                <FiX className="w-4 h-4" />
+              </button>
             </div>
           );
         })}

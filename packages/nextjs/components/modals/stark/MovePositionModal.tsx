@@ -889,9 +889,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
         {/* Main content area - scrollable with NO button inside */}
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* FROM SECTION */}
-            <div className="space-y-3">
+            <div className="space-y-3 md:col-span-2">
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-12 border-b-2 border-base-300 px-1">
                 <Image
@@ -924,7 +924,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* AMOUNTS SECTION */}
-            <div className="space-y-3">
+            <div className="space-y-3 md:col-span-7">
               <div className="flex justify-between items-center mb-1">
                 <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
                   Debt Amount
@@ -970,7 +970,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* TO SECTION */}
-            <div className="space-y-3">
+            <div className="space-y-3 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">
                 <div
