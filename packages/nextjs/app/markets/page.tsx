@@ -20,15 +20,16 @@ const networkOptions: NetworkOption[] = [
 
 const MarketsPage: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
-  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [search, setSearch] = useState("");
   const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
 
+  const poolId = POOL_IDS["Genesis"];
+
   const { data: supportedAssets } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
-    args: [selectedPoolId],
+    args: [poolId],
     refetchInterval: 0,
   });
 
@@ -103,8 +104,6 @@ const MarketsPage: NextPage = () => {
             {selectedNetwork === "starknet" && (
               <>
                 <VesuMarkets
-                  selectedPoolId={selectedPoolId}
-                  onPoolChange={setSelectedPoolId}
                   supportedAssets={supportedAssets as ContractResponse | undefined}
                   viewMode={viewMode}
                   search={search}

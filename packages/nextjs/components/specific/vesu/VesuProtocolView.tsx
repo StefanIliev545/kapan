@@ -13,12 +13,12 @@ type PositionTuple = {
 
 export const VesuProtocolView: FC = () => {
   const { address: userAddress } = useAccount();
-  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
+  const poolId = POOL_IDS["Genesis"];
 
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
-    args: [selectedPoolId],
+    args: [poolId],
     refetchInterval: 0,
   });
 
@@ -30,14 +30,14 @@ export const VesuProtocolView: FC = () => {
   const { data: userPositionsPart1, error: positionsError1, isFetching: isFetching1 } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
-    args: [userAddress || "0x0", selectedPoolId, 0n, 3n],
+    args: [userAddress || "0x0", poolId, 0n, 3n],
     watch: true,
     refetchInterval: 5000,
   });
   const { data: userPositionsPart2, error: positionsError2, isFetching: isFetching2 } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
-    args: [userAddress || "0x0", selectedPoolId, 3n, 10n],
+    args: [userAddress || "0x0", poolId, 3n, 10n],
     watch: true,
     refetchInterval: 5000,
   });
@@ -99,11 +99,11 @@ export const VesuProtocolView: FC = () => {
           nominalDebt={positionData.nominal_debt.toString()}
           isVtoken={positionData.is_vtoken}
           supportedAssets={assetsWithRates as unknown as TokenMetadata[]}
-          poolId={selectedPoolId}
+          poolId={poolId}
         />
       );
     });
-  }, [cachedPositions, supportedAssets, selectedPoolId]);
+  }, [cachedPositions, supportedAssets, poolId]);
 
   if (assetsError) {
     console.error("Error fetching supported assets:", assetsError);
@@ -113,8 +113,6 @@ export const VesuProtocolView: FC = () => {
   return (
     <div className="space-y-4">
       <VesuMarkets
-        selectedPoolId={selectedPoolId}
-        onPoolChange={setSelectedPoolId}
         supportedAssets={supportedAssets as ContractResponse | undefined}
         viewMode="grid"
         search=""
