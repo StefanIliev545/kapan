@@ -17,6 +17,7 @@ import {
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
+import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
@@ -888,28 +889,89 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
         {/* Main content area - scrollable with NO button inside */}
         <div className="p-2 space-y-3 flex-1 overflow-y-auto">
-          {/* Protocol Selection Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* From Protocol */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-base-content/80">From Protocol</label>
-              <div className="bg-base-200/60 py-2 px-3 rounded-lg flex items-center justify-between h-[40px]">
-                <div className="flex items-center gap-2 truncate">
-                  <Image
-                    src={getProtocolLogo(fromProtocol)}
-                    alt={fromProtocol}
-                    width={20}
-                    height={20}
-                    className="rounded-full min-w-[20px]"
-                  />
-                  <span className="truncate font-medium text-sm">{fromProtocol}</span>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* FROM SECTION */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-base-content/80">From</label>
+              <div className="bg-base-200/60 py-2 px-3 rounded-lg flex items-center gap-2 h-[40px]">
+                <Image
+                  src={getProtocolLogo(fromProtocol)}
+                  alt={fromProtocol}
+                  width={20}
+                  height={20}
+                  className="rounded-full min-w-[20px]"
+                />
+                <span className="truncate font-medium text-sm">{fromProtocol}</span>
               </div>
+              {position.type === "borrow" && (
+                isLoadingCollaterals ? (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <span className="loading loading-spinner loading-md mb-2"></span>
+                    <span className="text-base-content/70 text-xs">Loading collaterals...</span>
+                  </div>
+                ) : (
+                  <CollateralSelector
+                    collaterals={collateralsForSelector}
+                    isLoading={false}
+                    selectedProtocol={selectedProtocol}
+                    onCollateralSelectionChange={handleCollateralSelectionChange}
+                    marketToken={position.tokenAddress}
+                    onMaxClick={handleCollateralMaxClick}
+                    hideAmounts
+                  />
+                )
+              )}
             </div>
 
-            {/* To Protocol */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-base-content/80">To Protocol</label>
+            {/* AMOUNTS SECTION */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-medium text-base-content/80 flex items-center gap-1">
+                  Debt Amount
+                  {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
+                </label>
+                <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
+                  <span className="text-base-content/70">Available:</span>
+                  <span className="font-medium ml-1">{getFormattedBalance} {position.name}</span>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="input input-bordered w-full pr-20 h-10 text-base focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  disabled={loading || step !== "idle"}
+                />
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-xs btn-outline h-7"
+                  onClick={handleMaxClick}
+                  disabled={loading || step !== "idle"}
+                >
+                  MAX
+                </button>
+              </div>
+              {position.type === "borrow" && (
+                <>
+                  <CollateralAmounts
+                    collaterals={selectedCollateralsWithAmounts}
+                    onChange={setSelectedCollateralsWithAmounts}
+                    selectedProtocol={selectedProtocol}
+                  />
+                  {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
+                    <div className="text-xs text-base-content/70 mt-2 p-2 bg-info/10 rounded">
+                      <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this
+                      collateral cannot be changed.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* TO SECTION */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
@@ -943,10 +1005,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu"))
                     .map(protocol => (
                       <li key={protocol.name}>
-                        <button
-                          className="flex items-center gap-2 py-1"
-                          onClick={() => handleProtocolSelection(protocol.name)}
-                        >
+                        <button className="flex items-center gap-2 py-1" onClick={() => handleProtocolSelection(protocol.name)}>
                           <Image
                             src={getProtocolLogo(protocol.name)}
                             alt={protocol.name}
@@ -960,160 +1019,74 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     ))}
                 </ul>
               </div>
-            </div>
-          </div>
 
-          {/* Add Pool Selection for Vesu to Vesu */}
-          {selectedProtocol === "Vesu" && (
-            <div className="space-y-1">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-medium text-base-content/80">Target Pool</label>
-                {fromProtocol === "Vesu" && (
-                  <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
-                    <span className="text-base-content/70">Current Pool:</span>
-                    <span className="font-medium ml-1">
-                      {currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="dropdown w-full">
-                <div
-                  tabIndex={0}
-                  className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
-                >
-                  <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
-                    {Object.entries(POOL_IDS).map(
-                      ([name, id]) =>
-                        id === selectedPoolId && (
-                          <span key={name} className="truncate font-medium text-sm">
-                            {name}
-                          </span>
-                        ),
+              {selectedProtocol === "Vesu" && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-medium text-base-content/80">Target Pool</label>
+                    {fromProtocol === "Vesu" && (
+                      <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
+                        <span className="text-base-content/70">Current Pool:</span>
+                        <span className="font-medium ml-1">{currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}</span>
+                      </div>
                     )}
                   </div>
-                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <div className="dropdown w-full">
+                    <div
+                      tabIndex={0}
+                      className="bg-base-200/60 hover:bg-base-200 transition-colors py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer h-[40px]"
+                    >
+                      <div className="flex items-center gap-2 w-[calc(100%-24px)] overflow-hidden">
+                        {Object.entries(POOL_IDS).map(([name, id]) =>
+                          id === selectedPoolId ? (
+                            <span key={name} className="truncate font-medium text-sm">
+                              {name}
+                            </span>
+                          ) : null,
+                        )}
+                      </div>
+                      <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    <ul
+                      tabIndex={0}
+                      className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                    >
+                      {Object.entries(POOL_IDS)
+                        .filter(([_, id]) => fromProtocol !== "Vesu" || id !== currentPoolId)
+                        .map(([name, id]) => (
+                          <li key={name}>
+                            <button className="flex items-center gap-2 py-1" onClick={() => setSelectedPoolId(id)}>
+                              {name === "Genesis" && <Image src="/logos/vesu.svg" alt="Vesu" width={20} height={20} className="rounded-full min-w-[20px]" />}
+                              {name === "Re7 USDC" && <Image src="/logos/re7.svg" alt="Re7" width={20} height={20} className="rounded-full min-w-[20px]" />}
+                              {name === "Alterscope wstETH" && (
+                                <>
+                                  <Image src="/logos/alterscope_symbol_black.svg" alt="Alterscope" width={20} height={20} className="rounded-full min-w-[20px] dark:hidden" />
+                                  <Image src="/logos/alterscope_symbol_white.svg" alt="Alterscope" width={20} height={20} className="rounded-full min-w-[20px] hidden dark:block" />
+                                </>
+                              )}
+                              <span className="truncate text-sm">{name}</span>
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
                 </div>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                >
-                  {Object.entries(POOL_IDS)
-                    .filter(([_, id]) => fromProtocol !== "Vesu" || id !== currentPoolId) // Only filter out current pool if source is Vesu
-                    .map(([name, id]) => (
-                      <li key={name}>
-                        <button className="flex items-center gap-2 py-1" onClick={() => setSelectedPoolId(id)}>
-                          {name === "Genesis" && (
-                            <Image
-                              src="/logos/vesu.svg"
-                              alt="Vesu"
-                              width={20}
-                              height={20}
-                              className="rounded-full min-w-[20px]"
-                            />
-                          )}
-                          {name === "Re7 USDC" && (
-                            <Image
-                              src="/logos/re7.svg"
-                              alt="Re7"
-                              width={20}
-                              height={20}
-                              className="rounded-full min-w-[20px]"
-                            />
-                          )}
-                          {name === "Alterscope wstETH" && (
-                            <>
-                              <Image
-                                src="/logos/alterscope_symbol_black.svg"
-                                alt="Alterscope"
-                                width={20}
-                                height={20}
-                                className="rounded-full min-w-[20px] dark:hidden"
-                              />
-                              <Image
-                                src="/logos/alterscope_symbol_white.svg"
-                                alt="Alterscope"
-                                width={20}
-                                height={20}
-                                className="rounded-full min-w-[20px] hidden dark:block"
-                              />
-                            </>
-                          )}
-                          <span className="truncate text-sm">{name}</span>
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Amount Input */}
-          <div className="space-y-1">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-medium text-base-content/80 flex items-center gap-1">
-                Amount
-                {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
-              </label>
-              <div className="text-xs bg-base-200/60 py-1 px-2 rounded-lg flex items-center">
-                <span className="text-base-content/70">Available:</span>
-                <span className="font-medium ml-1">
-                  {getFormattedBalance} {position.name}
-                </span>
-              </div>
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                className="input input-bordered w-full pr-20 h-10 text-base focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                placeholder="0.00"
-                value={amount}
-                onChange={handleAmountChange}
-                disabled={loading || step !== "idle"}
-              />
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-xs btn-outline h-7"
-                onClick={handleMaxClick}
-                disabled={loading || step !== "idle"}
-              >
-                MAX
-              </button>
+              {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0 && (
+                <div className="bg-base-200/40 p-2 rounded">
+                  {selectedCollateralsWithAmounts.map(c => (
+                    <div key={c.token} className="flex justify-between text-xs">
+                      <span>{c.symbol}</span>
+                      <span>{formatUnits(c.amount, c.decimals)} / {amount || "0"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Loading state for collaterals */}
-          {position.type === "borrow" && isLoadingCollaterals ? (
-            <div className="flex flex-col items-center justify-center min-h-[30vh] py-8">
-              <span className="loading loading-spinner loading-md mb-3"></span>
-              <span className="text-base-content/70">Loading collaterals...</span>
-            </div>
-          ) : position.type === "borrow" && collateralsForSelector.length > 0 ? (
-            <div className="max-h-[60vh] overflow-y-auto">
-              <div className="space-y-1">
-                <CollateralSelector
-                  collaterals={collateralsForSelector}
-                  isLoading={false}
-                  selectedProtocol={selectedProtocol}
-                  onCollateralSelectionChange={handleCollateralSelectionChange}
-                  marketToken={position.tokenAddress}
-                  onMaxClick={handleCollateralMaxClick}
-                />
-
-                {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
-                  <div className="text-xs text-base-content/70 mt-2 p-2 bg-info/10 rounded">
-                    <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this
-                    collateral cannot be changed.
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : position.type === "borrow" ? (
-            <div className="alert alert-info shadow-sm">
-              <div className="text-sm">No collaterals available with balance greater than 0.</div>
-            </div>
-          ) : null}
 
           {/* Error message */}
           {error && (

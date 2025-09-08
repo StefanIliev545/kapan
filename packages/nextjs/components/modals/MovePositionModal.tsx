@@ -20,6 +20,7 @@ import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
+import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -373,28 +374,80 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
         {/* Main content */}
         <div className="p-6 space-y-6">
-          {/* Protocol Selection Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {/* From Protocol */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-base-content/80">From Protocol</label>
-              <div className="bg-base-200/60 py-3 px-4 rounded-lg flex items-center justify-between h-[52px]">
-                <div className="flex items-center gap-3 truncate">
-                  <Image
-                    src={getProtocolLogo(fromProtocol)}
-                    alt={fromProtocol}
-                    width={24}
-                    height={24}
-                    className="rounded-full min-w-[24px]"
-                  />
-                  <span className="truncate font-medium">{fromProtocol}</span>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* FROM SECTION */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-base-content/80">From</label>
+              <div className="bg-base-200/60 py-3 px-4 rounded-lg flex items-center gap-3 h-[52px]">
+                <Image
+                  src={getProtocolLogo(fromProtocol)}
+                  alt={fromProtocol}
+                  width={24}
+                  height={24}
+                  className="rounded-full min-w-[24px]"
+                />
+                <span className="truncate font-medium">{fromProtocol}</span>
               </div>
             </div>
+            {position.type === "borrow" && (
+              <CollateralSelector
+                collaterals={collateralsForSelector}
+                isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
+                selectedProtocol={selectedProtocol}
+                onCollateralSelectionChange={handleCollateralSelectionChange}
+                marketToken={position.tokenAddress}
+                hideAmounts
+              />
+            )}
+          </div>
 
-            {/* To Protocol */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-base-content/80">To Protocol</label>
+          {/* AMOUNTS SECTION */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
+                  Debt Amount
+                  {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
+                </label>
+                <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
+                  <span className="text-base-content/70">Available:</span>
+                  <span className="font-medium ml-1">
+                    {formatDisplayNumber(formattedTokenBalance)} {position.name}
+                  </span>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="input input-bordered w-full pr-20 h-14 text-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  disabled={loading || step !== "idle"}
+                />
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
+                  onClick={handleSetMaxAmount}
+                  disabled={loading || step !== "idle"}
+                >
+                  MAX
+                </button>
+              </div>
+            </div>
+            {position.type === "borrow" && (
+              <CollateralAmounts
+                collaterals={selectedCollateralsWithAmounts}
+                onChange={setSelectedCollateralsWithAmounts}
+                selectedProtocol={selectedProtocol}
+              />
+            )}
+          </div>
+
+          {/* TO SECTION */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
@@ -447,8 +500,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               </div>
             </div>
 
-            {/* Flash Loan Provider */}
-            <div className="space-y-2">
+            <div>
               <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
               <div className="dropdown w-full">
                 <div
@@ -494,72 +546,28 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 </ul>
               </div>
             </div>
-          </div>
 
-          {/* Flash Loan Provider Status */}
-          {hasProviderSufficientBalance !== null && amount && (
-            <div
-              className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
-                hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
-              }`}
-            >
-              {hasProviderSufficientBalance ? (
-                <>
-                  <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this
-                  transaction.
-                </>
-              ) : (
-                <>
-                  <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
-                  flash loan.
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Amount Input */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
-                Amount
-                {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
-              </label>
-              <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
-                <span className="text-base-content/70">Available:</span>
-                <span className="font-medium ml-1">
-                  {formatDisplayNumber(formattedTokenBalance)} {position.name}
-                </span>
-              </div>
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                className="input input-bordered w-full pr-20 h-14 text-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                placeholder="0.00"
-                value={amount}
-                onChange={handleAmountChange}
-                disabled={loading || step !== "idle"}
-              />
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-outline h-8"
-                onClick={handleSetMaxAmount}
-                disabled={loading || step !== "idle"}
+            {hasProviderSufficientBalance !== null && amount && (
+              <div
+                className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
+                  hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
+                }`}
               >
-                MAX
-              </button>
-            </div>
+                {hasProviderSufficientBalance ? (
+                  <>
+                    <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this
+                    transaction.
+                  </>
+                ) : (
+                  <>
+                    <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
+                    flash loan.
+                  </>
+                )}
+              </div>
+            )}
           </div>
-
-          {/* Collateral Selection - Using the new component */}
-          {position.type === "borrow" && (
-            <CollateralSelector
-              collaterals={collateralsForSelector}
-              isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
-              selectedProtocol={selectedProtocol}
-              onCollateralSelectionChange={handleCollateralSelectionChange}
-              marketToken={position.tokenAddress}
-            />
-          )}
+        </div>
 
           {/* Error message */}
           {error && (

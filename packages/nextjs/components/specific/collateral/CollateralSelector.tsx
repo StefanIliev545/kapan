@@ -204,6 +204,7 @@ interface CollateralSelectorProps {
   marketToken: string;
   onCollateralSelectionChange: (collaterals: CollateralWithAmount[]) => void;
   onMaxClick?: (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => void;
+  hideAmounts?: boolean;
 }
 
 export const CollateralSelector: FC<CollateralSelectorProps> = ({
@@ -213,6 +214,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   marketToken,
   onCollateralSelectionChange,
   onMaxClick,
+  hideAmounts = false,
 }) => {
   // Store selected collaterals with amounts
   const [selectedCollaterals, setSelectedCollaterals] = useState<CollateralWithAmount[]>([]);
@@ -499,7 +501,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       )}
 
       {/* Vertical list of selected collaterals with amount inputs */}
-      {selectedCollaterals.length > 0 && (
+      {!hideAmounts && selectedCollaterals.length > 0 && (
         <div className="mt-4 space-y-2">
           <label className="text-sm font-medium text-base-content/80">Collateral Transfer Amounts</label>
           <div className="bg-base-200/40 p-4 rounded-lg space-y-3">
