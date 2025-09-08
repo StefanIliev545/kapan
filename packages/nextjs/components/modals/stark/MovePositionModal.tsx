@@ -896,8 +896,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] p-6 overflow-y-auto">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] p-6 overflow-y-auto rounded-none">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
             {/* FROM SECTION */}
             <div className="space-y-3 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">From</label>
@@ -933,14 +933,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
             {/* AMOUNTS SECTION */}
             <div className="space-y-3 md:col-span-6">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-sm font-medium text-base-content/80 flex items-center gap-1">
-                  Debt Amount
-                  {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
+              <div className="text-center mb-2">
+                <label className="block text-lg font-semibold flex items-center justify-center gap-1">
+                  Debt
+                  {position.type === "supply" && (
+                    <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />
+                  )}
                 </label>
-                <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
-                  <span className="text-base-content/70">Available:</span>
-                  <span className="font-medium ml-1">{getFormattedBalance} {position.name}</span>
+                <div className="text-xs text-base-content/60">
+                  Available: {getFormattedBalance} {position.name}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1006,7 +1007,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* TO SECTION */}
-            <div className="space-y-3 md:col-span-3">
+            <div className="flex flex-col space-y-3 md:col-span-3 h-full">
               <label className="text-sm font-medium text-base-content/80">To</label>
               <div className="dropdown w-full">
                 <div
@@ -1162,7 +1163,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </div>
               )}
 
-              <div className="pt-5">
+              <div className="pt-5 mt-auto">
                 <button
                   className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
                     loading ? "animate-pulse" : ""

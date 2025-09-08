@@ -50,7 +50,7 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-base-content/80">Collateral Transfer Amounts</label>
+      <label className="block text-lg font-semibold text-center">Collateral</label>
       <div className="space-y-4 max-h-48 overflow-y-auto pr-1">
         {collaterals.map(c => {
           const displayAmount = c.inputValue ?? (c.amount === 0n ? "" : formatUnits(c.amount, c.decimals));
