@@ -34,6 +34,7 @@ interface ProtocolViewProps {
   hideUtilization?: boolean;
   forceShowAll?: boolean; // If true, always show all assets regardless of showAll toggle
   networkType: "evm" | "starknet"; // Specify which network this protocol view is for
+  disableMoveSupply?: boolean;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -65,6 +66,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   hideUtilization = false,
   forceShowAll = false,
   networkType,
+  disableMoveSupply = false,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -295,6 +297,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         protocolName={protocolName}
                         networkType={networkType}
                         position={positionManager}
+                        disableMove={disableMoveSupply}
                       />
                     </div>
                   ))}

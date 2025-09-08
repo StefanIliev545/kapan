@@ -19,6 +19,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   afterInfoContent?: React.ReactNode;
   networkType: "evm" | "starknet";
   position?: PositionManager;
+  disableMove?: boolean;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -34,6 +35,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   afterInfoContent,
   networkType,
   position,
+  disableMove = false,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -211,22 +213,24 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   <span>Withdraw</span>
                 </div>
               </button>
-              <button
-                className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={moveModal.open}
-                disabled={!isWalletConnected || !hasBalance}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to move supply"
-                    : !hasBalance
-                      ? "No balance to move"
-                      : "Move supply to another protocol"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Move</span>
-                </div>
-              </button>
+              {!disableMove && (
+                <button
+                  className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                  onClick={moveModal.open}
+                  disabled={!isWalletConnected || !hasBalance}
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to move supply"
+                      : !hasBalance
+                        ? "No balance to move"
+                        : "Move supply to another protocol"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <span>Move</span>
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* Desktop layout - evenly distributed buttons in a row */}
@@ -257,22 +261,24 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   <span>Withdraw</span>
                 </div>
               </button>
-              <button
-                className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={moveModal.open}
-                disabled={!isWalletConnected || !hasBalance}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to move supply"
-                    : !hasBalance
-                      ? "No balance to move"
-                      : "Move supply to another protocol"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Move</span>
-                </div>
-              </button>
+              {!disableMove && (
+                <button
+                  className="btn btn-sm btn-outline flex justify-center items-center"
+                  onClick={moveModal.open}
+                  disabled={!isWalletConnected || !hasBalance}
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to move supply"
+                      : !hasBalance
+                        ? "No balance to move"
+                        : "Move supply to another protocol"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <span>Move</span>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -330,20 +336,22 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         </>
       )}
 
-      <MoveSupplyModal
-        isOpen={moveModal.isOpen}
-        onClose={moveModal.close}
-        token={{
-          name,
-          icon,
-          address: tokenAddress,
-          currentRate,
-          rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
-          decimals: tokenDecimals,
-          price: tokenPrice,
-        }}
-        fromProtocol={protocolName}
-      />
+      {!disableMove && (
+        <MoveSupplyModal
+          isOpen={moveModal.isOpen}
+          onClose={moveModal.close}
+          token={{
+            name,
+            icon,
+            address: tokenAddress,
+            currentRate,
+            rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
+            decimals: tokenDecimals,
+            price: tokenPrice,
+          }}
+          fromProtocol={protocolName}
+        />
+      )}
     </>
   );
 };

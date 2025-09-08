@@ -171,6 +171,7 @@ export const NostraProtocolView: FC = () => {
       borrowedPositions={borrowedPositions}
       forceShowAll={forceShowAll}
       networkType="starknet"
+      disableMoveSupply
     />
   );
 };
