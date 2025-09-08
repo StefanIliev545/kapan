@@ -40,8 +40,6 @@ type MoveStep = "idle" | "executing" | "done";
 // Define pool IDs
 const POOL_IDS = {
   Genesis: 0n,
-  "Re7 USDC": 3592370751539490711610556844458488648008775713878064059760995781404350938653n,
-  "Alterscope wstETH": 2612229586214495842527551768232431476062656055007024497123940017576986139174n,
 } as const;
 
 // Helper function to get pool name from ID
@@ -1102,14 +1100,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                         .map(([name, id]) => (
                           <li key={name}>
                             <button className="flex items-center gap-3 py-2" onClick={() => setSelectedPoolId(id)}>
-                              {name === "Genesis" && <Image src="/logos/vesu.svg" alt="Vesu" width={32} height={32} className="rounded-full min-w-[32px]" />}
-                              {name === "Re7 USDC" && <Image src="/logos/re7.svg" alt="Re7" width={32} height={32} className="rounded-full min-w-[32px]" />}
-                              {name === "Alterscope wstETH" && (
-                                <>
-                                  <Image src="/logos/alterscope_symbol_black.svg" alt="Alterscope" width={32} height={32} className="rounded-full min-w-[32px] dark:hidden" />
-                                  <Image src="/logos/alterscope_symbol_white.svg" alt="Alterscope" width={32} height={32} className="rounded-full min-w-[32px] hidden dark:block" />
-                                </>
-                              )}
+                              <Image
+                                src="/logos/vesu.svg"
+                                alt="Vesu"
+                                width={32}
+                                height={32}
+                                className="rounded-full min-w-[32px]"
+                              />
                               <span className="truncate text-lg">{name}</span>
                             </button>
                           </li>

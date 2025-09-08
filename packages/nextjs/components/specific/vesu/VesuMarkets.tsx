@@ -1,5 +1,4 @@
 import { FC, useMemo } from "react";
-import Image from "next/image";
 import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import {
@@ -12,8 +11,6 @@ import {
 
 export const POOL_IDS = {
   Genesis: 2198503327643286920898110335698706244522220458610657370981979460625005526824n,
-  "Re7 USDC": 3592370751539490711610556844458488648008775713878064059760995781404350938653n,
-  "Alterscope wstETH": 2612229586214495842527551768232431476062656055007024497123940017576986139174n,
 } as const;
 
 export type ContractResponse = {
@@ -31,20 +28,12 @@ export type ContractResponse = {
 }[];
 
 interface VesuMarketsProps {
-  selectedPoolId: bigint;
-  onPoolChange: (id: bigint) => void;
   supportedAssets?: ContractResponse;
   viewMode: "list" | "grid";
   search: string;
 }
 
-export const VesuMarkets: FC<VesuMarketsProps> = ({
-  selectedPoolId,
-  onPoolChange,
-  supportedAssets,
-  viewMode,
-  search,
-}) => {
+export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, search }) => {
 
   const markets: MarketData[] = useMemo(() => {
     if (!supportedAssets) return [];
@@ -72,46 +61,7 @@ export const VesuMarkets: FC<VesuMarketsProps> = ({
     });
   }, [supportedAssets]);
 
-  const poolTabs = (
-    <div className="tabs tabs-boxed mb-4">
-      <button
-        className={`tab ${selectedPoolId === POOL_IDS["Genesis"] ? "tab-active" : ""}`}
-        onClick={() => onPoolChange(POOL_IDS["Genesis"])}
-      >
-        <Image src="/logos/vesu.svg" alt="Vesu" width={20} height={20} className="rounded-full min-w-[20px]" />
-        Genesis
-      </button>
-      <button
-        className={`tab ${selectedPoolId === POOL_IDS["Re7 USDC"] ? "tab-active" : ""}`}
-        onClick={() => onPoolChange(POOL_IDS["Re7 USDC"])}
-      >
-        <Image src="/logos/re7.svg" alt="Re7" width={20} height={20} className="rounded-full min-w-[20px]" />
-        Re7 USDC
-      </button>
-      <button
-        className={`tab ${selectedPoolId === POOL_IDS["Alterscope wstETH"] ? "tab-active" : ""}`}
-        onClick={() => onPoolChange(POOL_IDS["Alterscope wstETH"])}
-      >
-        <Image
-          src="/logos/alterscope_symbol_black.svg"
-          alt="Alterscope"
-          width={20}
-          height={20}
-          className="rounded-full min-w-[20px] dark:hidden"
-        />
-        <Image
-          src="/logos/alterscope_symbol_white.svg"
-          alt="Alterscope"
-          width={20}
-          height={20}
-          className="rounded-full min-w-[20px] hidden dark:block"
-        />
-        Alterscope wstETH
-      </button>
-    </div>
-  );
-
-  return <MarketsSection title="Vesu Markets" markets={markets} extra={poolTabs} viewMode={viewMode} search={search} />;
+  return <MarketsSection title="Vesu Markets" markets={markets} viewMode={viewMode} search={search} />;
 };
 
 export default VesuMarkets;
