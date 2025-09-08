@@ -101,9 +101,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
-  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>(
-    preSelectedCollaterals || [],
-  );
+  const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] =
+    useState<CollateralWithAmount[]>([]);
   const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
@@ -746,7 +745,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   // Initialize selected collaterals when preselected ones are provided
   useEffect(() => {
     if (isOpen && preSelectedCollaterals && preSelectedCollaterals.length > 0) {
-      setSelectedCollateralsWithAmounts(preSelectedCollaterals);
+      setSelectedCollateralsWithAmounts(
+        preSelectedCollaterals.map(c => ({ ...c, amount: 0n, inputValue: "" })),
+      );
     }
   }, [isOpen, preSelectedCollaterals]);
 
@@ -1007,72 +1008,66 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </div>
 
             {/* TO SECTION */}
-            <div className="flex flex-col space-y-3 md:col-span-3 h-full">
-              <label className="text-sm font-medium text-base-content/80">To</label>
-              <div className="dropdown w-full">
-                <div
-                  tabIndex={0}
-                  className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between cursor-pointer h-12"
-                >
-                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                    {selectedProtocol ? (
-                      <>
-                        <Image
-                          src={getProtocolLogo(selectedProtocol)}
-                          alt={selectedProtocol}
-                          width={32}
-                          height={32}
-                          className="rounded-full min-w-[32px]"
-                        />
-                        <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
-                      </>
-                    ) : (
-                      <span className="text-base-content/50">Select protocol</span>
-                    )}
+            <div className="flex flex-col md:col-span-3 h-full">
+              <div className="space-y-3 flex-1">
+                <div>
+                  <label className="text-sm font-medium text-base-content/80">To</label>
+                  <div className="dropdown w-full">
+                    <div
+                      tabIndex={0}
+                      className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between cursor-pointer h-12"
+                    >
+                      <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                        {selectedProtocol ? (
+                          <>
+                            <Image
+                              src={getProtocolLogo(selectedProtocol)}
+                              alt={selectedProtocol}
+                              width={32}
+                              height={32}
+                              className="rounded-full min-w-[32px]"
+                            />
+                            <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
+                          </>
+                        ) : (
+                          <span className="text-base-content/50">Select protocol</span>
+                        )}
+                      </div>
+                      <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    <ul
+                      tabIndex={0}
+                      className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                    >
+                      {protocols
+                        .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu"))
+                        .map(protocol => (
+                          <li key={protocol.name}>
+                            <button
+                              className="flex items-center gap-3 py-2"
+                              onClick={() => handleProtocolSelection(protocol.name)}
+                            >
+                              <Image
+                                src={getProtocolLogo(protocol.name)}
+                                alt={protocol.name}
+                                width={32}
+                                height={32}
+                                className="rounded-full min-w-[32px]"
+                              />
+                              <span className="truncate text-lg">{protocol.name}</span>
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
                   </div>
-                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
                 </div>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                >
-                  {protocols
-                    .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu"))
-                    .map(protocol => (
-                      <li key={protocol.name}>
-                        <button className="flex items-center gap-3 py-2" onClick={() => handleProtocolSelection(protocol.name)}>
-                          <Image
-                            src={getProtocolLogo(protocol.name)}
-                            alt={protocol.name}
-                            width={32}
-                            height={32}
-                            className="rounded-full min-w-[32px]"
-                          />
-                          <span className="truncate text-lg">{protocol.name}</span>
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 relative">
-                  <Image
-                    src={tokenNameToLogo(position.name)}
-                    alt={position.name}
-                    fill
-                    className="rounded-full object-contain"
-                  />
-                </div>
-                <span className="font-medium">{position.name}</span>
-              </div>
-
-              {selectedProtocol === "Vesu" && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-sm font-medium text-base-content/80">Target Pool</label>
+                {selectedProtocol === "Vesu" && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm font-medium text-base-content/80">Target Pool</label>
                     {fromProtocol === "Vesu" && (
                       <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                         <span className="text-base-content/70">Current Pool:</span>
@@ -1124,44 +1119,45 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </div>
               )}
 
-              {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && vesuPairings.length > 0 && (
-                <div className="bg-base-200/40 p-2 rounded space-y-1">
-                  {vesuPairings.map(p => (
-                    <div key={p.token} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1">
-                        <Image
-                          src={tokenNameToLogo(p.symbol)}
-                          alt={p.symbol}
-                          width={16}
-                          height={16}
-                          className="rounded-full"
-                        />
-                        <span>{p.symbol}</span>
-                        <span>
-                          {Number(formatUnits(p.amount, p.decimals)).toLocaleString(undefined, {
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
+                {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && vesuPairings.length > 0 && (
+                  <div className="bg-base-200/40 p-2 rounded space-y-1">
+                    {vesuPairings.map(p => (
+                      <div key={p.token} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1">
+                          <Image
+                            src={tokenNameToLogo(p.symbol)}
+                            alt={p.symbol}
+                            width={16}
+                            height={16}
+                            className="rounded-full"
+                          />
+                          <span>{p.symbol}</span>
+                          <span>
+                            {Number(formatUnits(p.amount, p.decimals)).toLocaleString(undefined, {
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Image
+                            src={tokenNameToLogo(position.name)}
+                            alt={position.name}
+                            width={16}
+                            height={16}
+                            className="rounded-full"
+                          />
+                          <span>{position.name}</span>
+                          <span>
+                            {Number(formatUnits(p.debtAmount, position.decimals)).toLocaleString(undefined, {
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Image
-                          src={tokenNameToLogo(position.name)}
-                          alt={position.name}
-                          width={16}
-                          height={16}
-                          className="rounded-full"
-                        />
-                        <span>{position.name}</span>
-                        <span>
-                          {Number(formatUnits(p.debtAmount, position.decimals)).toLocaleString(undefined, {
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="pt-5 mt-auto">
                 <button

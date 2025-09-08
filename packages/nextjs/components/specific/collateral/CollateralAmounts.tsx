@@ -1,6 +1,5 @@
 import React, { FC } from "react";
 import Image from "next/image";
-import { FiX } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import type { CollateralWithAmount } from "./CollateralSelector";
@@ -39,11 +38,6 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
     );
     onChange(updated);
     onMaxClick?.(token, true);
-  };
-
-  const handleRemove = (token: string) => {
-    onChange(collaterals.filter(c => c.token !== token));
-    onMaxClick?.(token, false);
   };
 
   if (collaterals.length === 0) return null;
@@ -85,13 +79,6 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
                 disabled={!isSupported}
               >
                 MAX
-              </button>
-              <button
-                className="text-base-content/70 p-1 h-6 w-6 flex items-center justify-center hover:text-error"
-                onClick={() => handleRemove(c.token)}
-                title="Remove collateral"
-              >
-                <FiX className="w-4 h-4" />
               </button>
             </div>
           );

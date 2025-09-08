@@ -438,138 +438,128 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* TO SECTION */}
-          <div className="flex flex-col space-y-3 md:col-span-3 h-full">
-            <div>
-              <label className="text-sm font-medium text-base-content/80">To</label>
-              <div className="dropdown w-full">
-                <div
-                  tabIndex={0}
-                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
-                >
-                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                    {selectedProtocol ? (
-                      <>
-                        <Image
-                          src={getProtocolLogo(selectedProtocol)}
-                          alt={selectedProtocol}
-                          width={32}
-                          height={32}
-                          className="rounded-full min-w-[32px]"
-                        />
-                        <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
-                      </>
-                    ) : (
-                      <span className="text-base-content/50">Select protocol</span>
-                    )}
-                  </div>
-                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                >
-                  {protocols
-                    .filter(p => p.name !== fromProtocol)
-                    .map(protocol => (
-                      <li key={protocol.name}>
-                        <button
-                          className="flex items-center gap-3 py-2"
-                          onClick={() => setSelectedProtocol(protocol.name)}
-                        >
+          <div className="flex flex-col md:col-span-3 h-full">
+            <div className="space-y-3 flex-1">
+              <div>
+                <label className="text-sm font-medium text-base-content/80">To</label>
+                <div className="dropdown w-full">
+                  <div
+                    tabIndex={0}
+                    className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
+                  >
+                    <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                      {selectedProtocol ? (
+                        <>
                           <Image
-                            src={getProtocolLogo(protocol.name)}
-                            alt={protocol.name}
+                            src={getProtocolLogo(selectedProtocol)}
+                            alt={selectedProtocol}
                             width={32}
                             height={32}
                             className="rounded-full min-w-[32px]"
                           />
-                          <span className="truncate text-lg">{protocol.name}</span>
+                          <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
+                        </>
+                      ) : (
+                        <span className="text-base-content/50">Select protocol</span>
+                      )}
+                    </div>
+                    <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                  <ul
+                    tabIndex={0}
+                    className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                  >
+                    {protocols
+                      .filter(p => p.name !== fromProtocol)
+                      .map(protocol => (
+                        <li key={protocol.name}>
+                          <button
+                            className="flex items-center gap-3 py-2"
+                            onClick={() => setSelectedProtocol(protocol.name)}
+                          >
+                            <Image
+                              src={getProtocolLogo(protocol.name)}
+                              alt={protocol.name}
+                              width={32}
+                              height={32}
+                              className="rounded-full min-w-[32px]"
+                            />
+                            <span className="truncate text-lg">{protocol.name}</span>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
+                <div className="dropdown w-full">
+                  <div
+                    tabIndex={0}
+                    className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
+                  >
+                    <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                      <Image
+                        src={selectedFlashLoanProvider.icon}
+                        alt={selectedFlashLoanProvider.name}
+                        width={32}
+                        height={32}
+                        className="rounded-full min-w-[32px]"
+                      />
+                      <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
+                      {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
+                    </div>
+                    <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                  <ul
+                    tabIndex={0}
+                    className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                  >
+                    {FLASH_LOAN_PROVIDERS.map(provider => (
+                      <li key={provider.name}>
+                        <button
+                          className="flex items-center gap-3 py-2"
+                          onClick={() => setSelectedFlashLoanProvider(provider)}
+                        >
+                          <Image
+                            src={provider.icon}
+                            alt={provider.name}
+                            width={32}
+                            height={32}
+                            className="rounded-full min-w-[32px]"
+                          />
+                          <span className="truncate text-lg">{provider.name}</span>
                         </button>
                       </li>
                     ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 relative">
-                <Image
-                  src={tokenNameToLogo(position.name)}
-                  alt={position.name}
-                  fill
-                  className="rounded-full object-contain"
-                />
-              </div>
-              <span className="font-medium">{position.name}</span>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
-              <div className="dropdown w-full">
-                <div
-                  tabIndex={0}
-                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
-                >
-                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                    <Image
-                      src={selectedFlashLoanProvider.icon}
-                      alt={selectedFlashLoanProvider.name}
-                      width={32}
-                      height={32}
-                      className="rounded-full min-w-[32px]"
-                    />
-                    <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
-                    {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
-                  </div>
-                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  </ul>
                 </div>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                >
-                  {FLASH_LOAN_PROVIDERS.map(provider => (
-                    <li key={provider.name}>
-                      <button
-                        className="flex items-center gap-3 py-2"
-                        onClick={() => setSelectedFlashLoanProvider(provider)}
-                      >
-                        <Image
-                          src={provider.icon}
-                          alt={provider.name}
-                          width={32}
-                          height={32}
-                          className="rounded-full min-w-[32px]"
-                        />
-                        <span className="truncate text-lg">{provider.name}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               </div>
-            </div>
 
-            {hasProviderSufficientBalance !== null && amount && (
-              <div
-                className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
-                  hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
-                }`}
-              >
-                {hasProviderSufficientBalance ? (
-                  <>
-                    <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this transaction.
-                  </>
-                ) : (
-                  <>
-                    <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
-                    flash loan.
-                  </>
-                )}
-              </div>
-            )}
+              {hasProviderSufficientBalance !== null && amount && (
+                <div
+                  className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
+                    hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
+                  }`}
+                >
+                  {hasProviderSufficientBalance ? (
+                    <>
+                      <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this transaction.
+                    </>
+                  ) : (
+                    <>
+                      <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
+                      flash loan.
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="pt-5 mt-auto">
               <button
