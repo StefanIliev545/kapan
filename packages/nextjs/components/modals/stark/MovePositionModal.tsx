@@ -624,6 +624,56 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     };
   }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId, isOpen]);
 
+  const vesuPairings = useMemo(() => {
+    if (
+      fromProtocol !== "Nostra" ||
+      selectedProtocol !== "Vesu" ||
+      !amount ||
+      selectedCollateralsWithAmounts.length === 0
+    ) {
+      return [] as (CollateralWithAmount & { debtAmount: bigint })[];
+    }
+
+    try {
+      const tokenDecimals = position.decimals ?? 18;
+      const parsedAmount = parseUnits(amount, tokenDecimals);
+
+      const collateralUsdValues = selectedCollateralsWithAmounts.map(collateral => {
+        const tokenDecimals = collateral.decimals || 18;
+        const normalizedAmount = Number(formatUnits(collateral.amount, tokenDecimals));
+        const tokenPrice = tokenToPrices[collateral.token.toLowerCase()];
+
+        let usdValue = normalizedAmount;
+        if (tokenPrice) {
+          usdValue = normalizedAmount * Number(formatUnits(tokenPrice, 8));
+        }
+
+        return {
+          ...collateral,
+          usdValue,
+        };
+      });
+
+      const totalUsdValue = collateralUsdValues.reduce((sum, c) => sum + c.usdValue, 0);
+
+      const allocations = collateralUsdValues.map(collateral => {
+        const proportionBps = totalUsdValue > 0 ? Math.floor((collateral.usdValue / totalUsdValue) * 10000) : 0;
+        const debtAmount = totalUsdValue > 0 ? (parsedAmount * BigInt(proportionBps)) / BigInt(10000) : 0n;
+        return { ...collateral, debtAmount };
+      });
+
+      const allocatedSum = allocations.reduce((sum, a) => sum + a.debtAmount, 0n);
+      const remainder = parsedAmount - allocatedSum;
+      if (remainder > 0n && allocations.length > 0) {
+        allocations[0].debtAmount += remainder;
+      }
+
+      return allocations;
+    } catch {
+      return [] as (CollateralWithAmount & { debtAmount: bigint })[];
+    }
+  }, [fromProtocol, selectedProtocol, amount, selectedCollateralsWithAmounts, tokenToPrices, position.decimals]);
+
   // Get authorizations for the instructions
   useEffect(() => {
     let cancelled = false;
@@ -1098,21 +1148,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </div>
               )}
 
-              {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0 && (
+              {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && vesuPairings.length > 0 && (
                 <div className="bg-base-200/40 p-2 rounded space-y-1">
-                  {selectedCollateralsWithAmounts.map(c => (
-                    <div key={c.token} className="flex items-center justify-between text-xs">
+                  {vesuPairings.map(p => (
+                    <div key={p.token} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1">
                         <Image
-                          src={tokenNameToLogo(c.symbol)}
-                          alt={c.symbol}
+                          src={tokenNameToLogo(p.symbol)}
+                          alt={p.symbol}
                           width={16}
                           height={16}
                           className="rounded-full"
                         />
-                        <span>{c.symbol}</span>
+                        <span>{p.symbol}</span>
                         <span>
-                          {Number(formatUnits(c.amount, c.decimals)).toLocaleString(undefined, {
+                          {Number(formatUnits(p.amount, p.decimals)).toLocaleString(undefined, {
                             maximumFractionDigits: 2,
                           })}
                         </span>
@@ -1127,7 +1177,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                         />
                         <span>{position.name}</span>
                         <span>
-                          {Number(amount || "0").toLocaleString(undefined, {
+                          {Number(formatUnits(p.debtAmount, position.decimals)).toLocaleString(undefined, {
                             maximumFractionDigits: 2,
                           })}
                         </span>
