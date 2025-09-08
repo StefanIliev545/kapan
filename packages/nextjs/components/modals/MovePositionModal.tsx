@@ -1,15 +1,7 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import {
-  FiAlertTriangle,
-  FiArrowRight,
-  FiArrowRightCircle,
-  FiCheck,
-  FiLock,
-  FiMinusCircle,
-  FiPlusCircle,
-  FiTrendingUp,
-} from "react-icons/fi";
+import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
+import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -18,6 +10,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -129,6 +122,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   // Move debt hook.
   const { moveDebt } = useMoveDebtScaffold();
+  const gasCostUsd = useGasEstimate("evm");
 
   // Read on-chain borrow balance.
   const { data: tokenBalance } = useScaffoldReadContract({
@@ -320,7 +314,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       return "Done!";
     }
 
-    return "Move Position";
+    return "Migrate";
   };
 
   // Get action button class based on current step
@@ -336,70 +330,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     setSelectedCollateralsWithAmounts(collaterals);
   };
 
+  const isActionDisabled =
+    loading ||
+    !selectedProtocol ||
+    !amount ||
+    !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
+    !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
+    hasProviderSufficientBalance === false ||
+    step !== "idle";
+
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 w-full max-w-5xl p-0 overflow-hidden">
-        {/* Header with gradient background */}
-        <div className="relative p-6 bg-gradient-to-r from-base-200 to-base-300">
-          <div className="absolute top-4 right-4">
-            <button className="btn btn-sm btn-circle btn-ghost" onClick={onClose} disabled={loading && step !== "done"}>
-              ✕
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="relative flex items-center justify-center">
-              <div className="avatar">
-                <div className="w-14 h-14 rounded-full ring-2 ring-base-content/5 p-1 bg-base-100 shadow-md">
-                  <Image
-                    src={tokenNameToLogo(position.name)}
-                    alt={position.name}
-                    width={48}
-                    height={48}
-                    className="rounded-full"
-                  />
-                </div>
-              </div>
-              <div className="absolute -right-2 -bottom-2 bg-base-100 rounded-full p-0.5 shadow-md">
-                {position.type === "borrow" ? (
-                  <FiArrowRightCircle className="text-primary w-6 h-6" />
-                ) : (
-                  <FiTrendingUp className="text-emerald-500 w-6 h-6" />
-                )}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold flex items-center gap-2">
-                <span
-                  className={`font-extrabold bg-gradient-to-r ${
-                    position.type === "borrow"
-                      ? "from-purple-500 via-primary to-blue-500 bg-clip-text text-transparent dark:from-purple-300 dark:via-primary-300 dark:to-blue-300"
-                      : "from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent dark:from-emerald-300 dark:via-teal-300 dark:to-cyan-300"
-                  }`}
-                >
-                  Move {position.type === "supply" ? "Supply" : "Debt"}
-                </span>
-                <span className="text-base-content">{position.name}</span>
-              </h3>
-              <div className="text-sm opacity-70 flex items-center gap-1">
-                {position.type === "borrow" ? (
-                  <>
-                    <FiMinusCircle className="w-4 h-4 text-primary" />
-                    <span>Moving debt from {fromProtocol} to another protocol</span>
-                  </>
-                ) : (
-                  <>
-                    <FiPlusCircle className="w-4 h-4 text-emerald-500" />
-                    <span>Moving supply from {fromProtocol} to another protocol</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div className="p-4 space-y-4">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] p-6 rounded-none">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* FROM SECTION */}
           <div className="space-y-3 md:col-span-3">
@@ -494,52 +436,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               )}
             </div>
 
-            <div className="pt-5 flex flex-col gap-3 mt-2">
-              {step === "done" ? (
-                <button className="btn btn-success btn-lg w-full gap-2 h-14 shadow-md" onClick={onClose}>
-                  <FiCheck className="w-5 h-5" /> Position Moved Successfully
-                </button>
-              ) : (
-                <>
-                  {(() => {
-                    const isDisabled =
-                      loading ||
-                      !selectedProtocol ||
-                      !amount ||
-                      !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
-                      !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-                      hasProviderSufficientBalance === false ||
-                      step !== "idle";
-
-                    return (
-                      <button
-                        className={`btn ${getActionButtonClass()} btn-lg w-full h-14 transition-all duration-300 shadow-md ${
-                          loading ? "animate-pulse" : ""
-                        }`}
-                        onClick={handleMoveDebt}
-                        disabled={isDisabled}
-                      >
-                        {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                        {getActionButtonText()}
-                        {!loading &&
-                          step === "idle" &&
-                          (position.type === "supply" ? (
-                            <FiTrendingUp className="w-5 h-5 ml-1" />
-                          ) : (
-                            <FiArrowRight className="w-5 h-5 ml-1" />
-                          ))}
-                      </button>
-                    );
-                  })()}
-                </>
-              )}
-
-              {step !== "done" && (
-                <button className="btn btn-ghost btn-sm w-full hover:bg-base-200" onClick={onClose} disabled={loading}>
-                  Cancel
-                </button>
-              )}
-            </div>
           </div>
 
           {/* TO SECTION */}
@@ -665,8 +561,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               >
                 {hasProviderSufficientBalance ? (
                   <>
-                    <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this
-                    transaction.
+                    <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this transaction.
                   </>
                 ) : (
                   <>
@@ -676,10 +571,26 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 )}
               </div>
             )}
+
+            <div className="pt-5">
+              <button
+                className={`btn ${getActionButtonClass()} btn-lg w-full h-14 flex justify-between shadow-md ${
+                  loading ? "animate-pulse" : ""
+                }`}
+                onClick={step === "done" ? onClose : handleMoveDebt}
+                disabled={step === "done" ? false : isActionDisabled}
+              >
+                <span>
+                  {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                  {getActionButtonText()}
+                </span>
+                <span className="flex items-center gap-1 text-xs">
+                  <FaGasPump /> ${formatDisplayNumber(gasCostUsd)}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
       </div>
 
       <form

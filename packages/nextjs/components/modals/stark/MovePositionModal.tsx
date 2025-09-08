@@ -3,16 +3,8 @@ import { useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
-import {
-  FiAlertTriangle,
-  FiArrowRight,
-  FiArrowRightCircle,
-  FiCheck,
-  FiLock,
-  FiMinusCircle,
-  FiPlusCircle,
-  FiTrendingUp,
-} from "react-icons/fi";
+import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
+import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
@@ -21,6 +13,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import {
   useDeployedContractInfo,
   useScaffoldMultiWriteContract,
@@ -115,6 +108,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
+  const gasCostUsd = useGasEstimate("stark");
 
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
@@ -871,7 +865,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       return "Done!";
     }
 
-    return "Move Position";
+    return "Migrate";
   }, [loading, step]);
 
   // Get action button class based on current step
@@ -892,71 +886,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
   }, [balance, decimals]);
 
+  const isActionDisabled =
+    loading ||
+    !selectedProtocol ||
+    !amount ||
+    !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
+    step !== "idle" ||
+    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId);
+
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 w-full max-w-5xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
-        {/* Header with gradient background, reduced height */}
-        <div className="relative p-3 bg-gradient-to-r from-base-200 to-base-300">
-          <div className="absolute top-2 right-2">
-            <button className="btn btn-xs btn-circle btn-ghost" onClick={onClose} disabled={loading && step !== "done"}>
-              ✕
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center">
-              <div className="avatar">
-                <div className="w-10 h-10 rounded-full ring-2 ring-base-content/5 p-1 bg-base-100 shadow-md">
-                  <Image
-                    src={tokenNameToLogo(position.name)}
-                    alt={position.name}
-                    width={40}
-                    height={40}
-                    className="rounded-full"
-                  />
-                </div>
-              </div>
-              <div className="absolute -right-1 -bottom-1 bg-base-100 rounded-full p-0.5 shadow-md">
-                {position.type === "borrow" ? (
-                  <FiArrowRightCircle className="text-primary w-5 h-5" />
-                ) : (
-                  <FiTrendingUp className="text-emerald-500 w-5 h-5" />
-                )}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <span
-                  className={`font-extrabold bg-gradient-to-r ${
-                    position.type === "borrow"
-                      ? "from-purple-500 via-primary to-blue-500 bg-clip-text text-transparent dark:from-purple-300 dark:via-primary-300 dark:to-blue-300"
-                      : "from-emerald-500 via-teal-500 to-cyan-500 bg-clip-text text-transparent dark:from-emerald-300 dark:via-teal-300 dark:to-cyan-300"
-                  }`}
-                >
-                  Move {position.type === "supply" ? "Supply" : "Debt"}
-                </span>
-                <span className="text-base-content">{position.name}</span>
-              </h3>
-              <div className="text-xs opacity-70 flex items-center gap-1">
-                {position.type === "borrow" ? (
-                  <>
-                    <FiMinusCircle className="w-4 h-4 text-primary" />
-                    <span>Moving debt from {fromProtocol} to another protocol</span>
-                  </>
-                ) : (
-                  <>
-                    <FiPlusCircle className="w-4 h-4 text-emerald-500" />
-                    <span>Moving supply from {fromProtocol} to another protocol</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main content area - scrollable with NO button inside */}
-        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] p-6 overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* FROM SECTION */}
             <div className="space-y-3 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">From</label>
@@ -1059,43 +1000,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 <span>Debt Value: ${formatDisplayNumber(debtUsdValue)}</span>
                 {position.type === "borrow" && (
                   <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>
-                )}
-              </div>
-
-              <div className="pt-5 flex flex-col gap-3 mt-2">
-                {step === "done" ? (
-                  <button className="btn btn-success btn-lg w-full gap-2 h-14 shadow-md" onClick={onClose}>
-                    <FiCheck className="w-5 h-5" /> Position Moved Successfully
-                  </button>
-                ) : (
-                  <button
-                    className={`btn ${actionButtonClass} btn-lg w-full h-14 transition-all duration-300 shadow-md ${loading ? "animate-pulse" : ""}`}
-                    onClick={handleMovePosition}
-                    disabled={
-                      loading ||
-                      !selectedProtocol ||
-                      !amount ||
-                      !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-                      step !== "idle" ||
-                      (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId)
-                    }
-                  >
-                    {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                    {actionButtonText}
-                    {!loading &&
-                      step === "idle" &&
-                      (position.type === "supply" ? (
-                        <FiTrendingUp className="w-5 h-5 ml-1" />
-                      ) : (
-                        <FiArrowRight className="w-5 h-5 ml-1" />
-                      ))}
-                  </button>
-                )}
-
-                {step !== "done" && (
-                  <button className="btn btn-ghost btn-sm w-full hover:bg-base-200" onClick={onClose} disabled={loading}>
-                    Cancel
-                  </button>
                 )}
               </div>
 
@@ -1257,10 +1161,26 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   ))}
                 </div>
               )}
+
+              <div className="pt-5">
+                <button
+                  className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
+                    loading ? "animate-pulse" : ""
+                  }`}
+                  onClick={step === "done" ? onClose : handleMovePosition}
+                  disabled={step === "done" ? false : isActionDisabled}
+                >
+                  <span>
+                    {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                    {actionButtonText}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs">
+                    <FaGasPump /> ${formatDisplayNumber(gasCostUsd)}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
-
-        </div>
       </div>
 
       <form
