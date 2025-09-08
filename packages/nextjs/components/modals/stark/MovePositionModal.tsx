@@ -1019,6 +1019,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     collaterals={selectedCollateralsWithAmounts}
                     onChange={setSelectedCollateralsWithAmounts}
                     selectedProtocol={selectedProtocol}
+                    onMaxClick={(token, isMax) =>
+                      setMaxClickedCollaterals(prev => ({ ...prev, [token]: isMax }))
+                    }
                   />
                   {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
                     <div className="text-xs text-base-content/70 mt-2 p-2 bg-info/10 rounded">

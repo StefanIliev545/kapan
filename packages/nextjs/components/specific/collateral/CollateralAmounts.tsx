@@ -9,9 +9,15 @@ interface CollateralAmountsProps {
   collaterals: CollateralWithAmount[];
   onChange: (updated: CollateralWithAmount[]) => void;
   selectedProtocol?: string;
+  onMaxClick?: (token: string, isMax: boolean) => void;
 }
 
-export const CollateralAmounts: FC<CollateralAmountsProps> = ({ collaterals, onChange, selectedProtocol }) => {
+export const CollateralAmounts: FC<CollateralAmountsProps> = ({
+  collaterals,
+  onChange,
+  selectedProtocol,
+  onMaxClick,
+}) => {
   const handleAmountChange = (token: string, amountStr: string, decimals: number) => {
     const updated = collaterals.map(c => {
       if (c.token !== token) return c;
@@ -23,6 +29,7 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({ collaterals, onC
       }
     });
     onChange(updated);
+    onMaxClick?.(token, false);
   };
 
   const handleSetMax = (token: string, maxAmount: bigint, decimals: number) => {
@@ -31,10 +38,12 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({ collaterals, onC
       c.token === token ? { ...c, amount: maxAmount, inputValue: maxStr } : c,
     );
     onChange(updated);
+    onMaxClick?.(token, true);
   };
 
   const handleRemove = (token: string) => {
     onChange(collaterals.filter(c => c.token !== token));
+    onMaxClick?.(token, false);
   };
 
   if (collaterals.length === 0) return null;
