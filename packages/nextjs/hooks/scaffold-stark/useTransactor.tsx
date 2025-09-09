@@ -76,6 +76,11 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
         <TxnNotification message="Waiting for transaction to complete." blockExplorerLink={blockExplorerTxURL} />,
       );
 
+      await walletClient.waitForTransaction(transactionHash, {
+        retryInterval: 1000,
+        successStates: ["ACCEPTED_ON_L2", "ACCEPTED_ON_L1", "PENDING"],
+      });
+
       notification.remove(notificationId);
 
       notification.success(
