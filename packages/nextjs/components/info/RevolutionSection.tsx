@@ -99,9 +99,9 @@ const RevolutionSection = () => {
         className="mt-12 text-center max-w-3xl mx-auto bg-base-100 p-6 rounded-lg shadow-sm border border-base-300/50"
       >
         <p className="text-lg text-base-content">
-          Whether you&apos;re looking to move your <span className="text-accent font-medium">Aave debt position</span> to <span className="text-accent font-medium">Compound</span> for 
-          better rates, or optimize your borrowing strategy across multiple protocols, Kapan&apos;s atomic debt migration 
-          provides a seamless, secure solution for Web3 lending optimization.
+          Whether you&apos;re looking to move your <span className="text-accent font-medium">Vesu debt position</span> to <span className="text-accent font-medium">Nostra</span> for better rates,
+          or optimize across platforms like Aave and Compound, Kapan&apos;s atomic debt migration provides a seamless,
+          secure solution for Web3 lending optimization.
         </p>
       </motion.div>
     </section>

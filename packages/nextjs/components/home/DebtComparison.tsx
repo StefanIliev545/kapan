@@ -26,7 +26,7 @@ const AnimatedValue = ({ children, className }: { children: React.ReactNode; cla
 
 const DebtComparison = () => {
   const tokenData = useTokenData();
-  const [starknetRate, setStarknetRate] = useState(0);
+  const [nostraRate, setNostraRate] = useState(0);
 
   useEffect(() => {
     const fetchRate = async () => {
@@ -42,7 +42,7 @@ const DebtComparison = () => {
           )
           .sort((a: any, b: any) => (b.apyBaseBorrow ?? 0) - (a.apyBaseBorrow ?? 0));
         if (pools.length) {
-          setStarknetRate(pools[0].apyBaseBorrow ?? 0);
+          setNostraRate(pools[0].apyBaseBorrow ?? 0);
         }
       } catch (e) {
         console.error(e);
@@ -52,23 +52,29 @@ const DebtComparison = () => {
   }, [tokenData.symbol]);
 
   // Find rates from all supported protocols
+  const vesuProtocol = tokenData.protocols.find(p => p.name === "Vesu");
   const aaveProtocol = tokenData.protocols.find(p => p.name === "Aave V3");
   const compoundProtocol = tokenData.protocols.find(p => p.name === "Compound V3");
   const venusProtocol = tokenData.protocols.find(p => p.name === "Venus");
   
+  const vesuRate = vesuProtocol?.rate || 0;
   const aaveRate = aaveProtocol?.rate || 0;
   const compoundRate = compoundProtocol?.rate || 0;
   const venusRate = venusProtocol?.rate || 0;
 
   // Find the protocol with the highest rate
-  const ratesByProtocol = [
+  const ratesByProtocol = [] as { name: string; rate: number; logo: string }[];
+  if (vesuRate > 0) {
+    ratesByProtocol.push({ name: "Vesu", rate: vesuRate, logo: "/logos/vesu.svg" });
+  }
+  if (nostraRate > 0) {
+    ratesByProtocol.push({ name: "Nostra", rate: nostraRate, logo: "/logos/nostra.svg" });
+  }
+  ratesByProtocol.push(
     { name: "Aave", rate: aaveRate, logo: "/logos/aave.svg" },
     { name: "Compound", rate: compoundRate, logo: "/logos/compound.svg" },
     { name: "Venus", rate: venusRate, logo: "/logos/venus.svg" },
-  ];
-  if (starknetRate > 0) {
-    ratesByProtocol.push({ name: "Nostra", rate: starknetRate, logo: "/logos/nostra.svg" });
-  }
+  );
 
   // Sort protocols by rate (highest first)
   const sortedProtocols = [...ratesByProtocol].sort((a, b) => b.rate - a.rate);
@@ -78,7 +84,7 @@ const DebtComparison = () => {
   const lowestRateProtocol = sortedProtocols[sortedProtocols.length - 1];
 
   const getNetworkInfo = (protocolName: string) => {
-    if (protocolName === "Nostra") {
+    if (protocolName === "Nostra" || protocolName === "Vesu") {
       return { logo: "/logos/starknet.svg", name: "Starknet" };
     }
     return { logo: "/logos/arb.svg", name: "Arbitrum" };

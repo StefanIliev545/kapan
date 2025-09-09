@@ -69,6 +69,36 @@ const HowItWorksSection = () => {
                 <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
                   <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
                     <Image
+                      src="/logos/vesu.svg"
+                      alt="Vesu lending protocol"
+                      fill
+                      className="object-contain p-1"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-base-content">Vesu</h4>
+                    <p className="text-sm text-base-content/70">Starknet native lending platform</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
+                    <Image
+                      src="/logos/nostra.svg"
+                      alt="Nostra lending protocol"
+                      fill
+                      className="object-contain p-1"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-base-content">Nostra</h4>
+                    <p className="text-sm text-base-content/70">Starknet borrowing marketplace</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
+                    <Image
                       src="/logos/aave.svg"
                       alt="Aave V3 lending protocol"
                       fill
@@ -80,7 +110,7 @@ const HowItWorksSection = () => {
                     <p className="text-sm text-base-content/70">Leading DeFi lending protocol</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
                   <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
                     <Image
@@ -95,7 +125,7 @@ const HowItWorksSection = () => {
                     <p className="text-sm text-base-content/70">Efficient DeFi borrowing platform</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
                   <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
                     <Image
@@ -135,14 +165,14 @@ const HowItWorksSection = () => {
               </div>
               
               <p className="mb-6 text-base-content/80">
-                Our <span className="text-accent font-medium">atomic debt migration</span> technology lets you move loan positions between protocols 
-                like <span className="text-primary">Aave</span> and <span className="text-primary">Compound</span> without requiring upfront capital, powered by flash loans:
+                Our <span className="text-accent font-medium">atomic debt migration</span> technology lets you move loan positions between protocols
+                like <span className="text-primary">Vesu</span>, <span className="text-primary">Nostra</span>, <span className="text-primary">Aave</span>, and <span className="text-primary">Compound</span> without requiring upfront capital, powered by flash loans:
               </p>
               
               <div className="space-y-4">
                 <StepItem number={1} text="Flash loan obtains the required debt repayment amount" />
-                <StepItem number={2} text="Existing loan is repaid in the source protocol (e.g., Aave)" />
-                <StepItem number={3} text="Collateral is transferred to the target protocol (e.g., Compound)" />
+                <StepItem number={2} text="Existing loan is repaid in the source protocol (e.g., Vesu)" />
+                <StepItem number={3} text="Collateral is transferred to the target protocol (e.g., Nostra)" />
                 <StepItem number={4} text="New loan is opened in the target protocol at better rates" />
                 <StepItem number={5} text="Flash loan is repaid from the new position" />
               </div>

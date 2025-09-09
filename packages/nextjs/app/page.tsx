@@ -7,6 +7,8 @@ import TransactionFeed from "../components/TransactionFeed";
 import HeroSection from "../components/home/HeroSection";
 import HowItWorks from "../components/home/HowItWorks";
 import ProtocolStats from "../components/home/ProtocolStats";
+import BenefitsSection from "~~/components/info/BenefitsSection";
+import RoadmapSection from "~~/components/info/RoadmapSection";
 
 /**
  * Home Page Component
@@ -46,6 +48,10 @@ const Home: NextPage = () => {
 
         {/* Protocol stats */}
         <ProtocolStats />
+
+        {/* Benefits and roadmap */}
+        <BenefitsSection />
+        <RoadmapSection />
       </main>
     </div>
   );

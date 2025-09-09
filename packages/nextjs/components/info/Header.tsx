@@ -38,11 +38,19 @@ const Header = () => {
             <p className="text-xl text-center mb-8 text-base-content">
               Kapan is a decentralized lending aggregator enabling seamless interaction with multiple lending protocols 
               through a single interface. Our revolutionary <strong className="text-accent">atomic debt migration</strong> technology 
-              allows borrowers to efficiently move loans between protocols like <strong className="text-primary dark:text-accent">Aave</strong> and <strong className="text-primary dark:text-accent">Compound</strong> to 
+              allows borrowers to efficiently move loans between protocols like <strong className="text-primary dark:text-accent">Vesu</strong>, <strong className="text-primary dark:text-accent">Nostra</strong>, <strong className="text-primary dark:text-accent">Aave</strong> and <strong className="text-primary dark:text-accent">Compound</strong> to
               optimize interest rates and improve capital efficiency.
             </p>
 
             <div className="flex flex-wrap justify-center gap-6 mt-8">
+              <div className="flex items-center gap-2 bg-base-300/50 dark:bg-base-300/30 px-4 py-2 rounded-lg">
+                <Image src="/logos/vesu.svg" alt="Vesu Protocol" width={24} height={24} className="rounded-full" />
+                <span className="font-medium text-base-content">Vesu Support</span>
+              </div>
+              <div className="flex items-center gap-2 bg-base-300/50 dark:bg-base-300/30 px-4 py-2 rounded-lg">
+                <Image src="/logos/nostra.svg" alt="Nostra Protocol" width={24} height={24} className="rounded-full" />
+                <span className="font-medium text-base-content">Nostra Support</span>
+              </div>
               <div className="flex items-center gap-2 bg-base-300/50 dark:bg-base-300/30 px-4 py-2 rounded-lg">
                 <Image src="/logos/aave.svg" alt="Aave Protocol" width={24} height={24} className="rounded-full" />
                 <span className="font-medium text-base-content">Aave Support</span>
