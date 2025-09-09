@@ -927,10 +927,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[600px] p-6 overflow-y-auto rounded-none">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[560px] p-6 overflow-y-auto rounded-none">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-full">
             {/* FROM SECTION */}
-            <div className="space-y-4 md:col-span-3">
+            <div className="space-y-6 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-12 border-b-2 border-base-300 px-1">
                 <Image
@@ -949,22 +949,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     <span className="text-base-content/70 text-xs">Loading collaterals...</span>
                   </div>
                 ) : (
-                  <CollateralSelector
-                    collaterals={collateralsForSelector}
-                    isLoading={false}
-                    selectedProtocol={selectedProtocol}
-                    onCollateralSelectionChange={handleCollateralSelectionChange}
-                    marketToken={position.tokenAddress}
-                    onMaxClick={handleCollateralMaxClick}
-                    hideAmounts
-                    initialSelectedCollaterals={selectedCollateralsWithAmounts}
-                  />
+                  <div className="mt-6">
+                    <CollateralSelector
+                      collaterals={collateralsForSelector}
+                      isLoading={false}
+                      selectedProtocol={selectedProtocol}
+                      onCollateralSelectionChange={handleCollateralSelectionChange}
+                      marketToken={position.tokenAddress}
+                      onMaxClick={handleCollateralMaxClick}
+                      hideAmounts
+                      initialSelectedCollaterals={selectedCollateralsWithAmounts}
+                    />
+                  </div>
                 )
               )}
             </div>
 
             {/* AMOUNTS SECTION */}
-            <div className="space-y-4 md:col-span-6">
+            <div className="space-y-6 md:col-span-6">
               <div className="text-center mb-2">
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
                   Debt
@@ -1040,7 +1042,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
             {/* TO SECTION */}
             <div className="flex flex-col md:col-span-3 h-full">
-              <div className="space-y-4 flex-1">
+              <div className="space-y-6 flex-1">
                 <div>
                   <label className="text-sm font-medium text-base-content/80">To</label>
                   <div className="dropdown w-full">

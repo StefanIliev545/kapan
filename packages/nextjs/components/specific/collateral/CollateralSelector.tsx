@@ -464,17 +464,17 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
         </div>
       ) : sortedCollaterals.length > 0 ? (
         <div className="bg-base-200/30 p-4 rounded-lg">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="space-y-2">
             {sortedCollaterals.map(collateral => {
               const hasZeroBalance = collateral.rawBalance <= 0n;
               const isDisabled = !collateral.supported || hasZeroBalance;
-              
+
               return (
                 <button
                   key={collateral.address}
                   onClick={() => handleCollateralToggle(collateral)}
                   className={`
-                    btn h-auto py-2 px-3 normal-case flex items-center gap-2 min-w-0
+                    btn btn-block h-auto py-2 px-3 normal-case flex items-center gap-2 justify-start
                     ${isCollateralSelected(collateral.address) ? "btn-primary" : "btn-outline bg-base-100"}
                     ${isDisabled ? "opacity-50 cursor-not-allowed tooltip" : ""}
                   `}

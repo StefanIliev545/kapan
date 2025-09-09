@@ -339,10 +339,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[600px] p-6 rounded-none">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[560px] p-6 rounded-none flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-full flex-grow">
           {/* FROM SECTION */}
-          <div className="space-y-4 md:col-span-3">
+          <div className="space-y-6 md:col-span-3">
             <div>
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
@@ -357,19 +357,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               </div>
             </div>
             {position.type === "borrow" && (
-              <CollateralSelector
-                collaterals={collateralsForSelector}
-                isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
-                selectedProtocol={selectedProtocol}
-                onCollateralSelectionChange={handleCollateralSelectionChange}
-                marketToken={position.tokenAddress}
-                hideAmounts
-              />
+              <div className="mt-6">
+                <CollateralSelector
+                  collaterals={collateralsForSelector}
+                  isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
+                  selectedProtocol={selectedProtocol}
+                  onCollateralSelectionChange={handleCollateralSelectionChange}
+                  marketToken={position.tokenAddress}
+                  hideAmounts
+                />
+              </div>
             )}
           </div>
 
           {/* AMOUNTS SECTION */}
-          <div className="space-y-4 md:col-span-6">
+          <div className="space-y-6 md:col-span-6">
             <div>
               <div className="text-center mb-2">
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
@@ -436,13 +438,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* TO SECTION */}
-          <div className="flex flex-col md:col-span-3 h-full">
-            <div className="space-y-4 flex-1">
-              <div>
-                <label className="text-sm font-medium text-base-content/80">To</label>
-                <div className="dropdown w-full">
-                  <div
-                    tabIndex={0}
+          <div className="space-y-6 md:col-span-3">
+            <div>
+              <label className="text-sm font-medium text-base-content/80">To</label>
+              <div className="dropdown w-full">
+                <div
+                  tabIndex={0}
                     className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
                   >
                     <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
@@ -558,25 +559,23 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 </div>
               )}
             </div>
-
-            <div className="pt-5 mt-auto">
-              <button
-                className={`btn ${getActionButtonClass()} btn-lg w-full h-14 flex justify-between shadow-md ${
-                  loading ? "animate-pulse" : ""
-                }`}
-                onClick={step === "done" ? onClose : handleMoveDebt}
-                disabled={step === "done" ? false : isActionDisabled}
-              >
-                <span>
-                  {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                  {getActionButtonText()}
-                </span>
-                <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump className="text-gray-400" />
-                </span>
-              </button>
-            </div>
           </div>
+        <div className="flex justify-end pt-6">
+          <button
+            className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${
+              loading ? "animate-pulse" : ""
+            }`}
+            onClick={step === "done" ? onClose : handleMoveDebt}
+            disabled={step === "done" ? false : isActionDisabled}
+          >
+            <span>
+              {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+              {getActionButtonText()}
+            </span>
+            <span className="flex items-center gap-1 text-xs">
+              <FaGasPump className="text-gray-400" />
+            </span>
+          </button>
         </div>
       </div>
 
