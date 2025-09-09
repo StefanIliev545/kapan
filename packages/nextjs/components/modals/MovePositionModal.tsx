@@ -339,10 +339,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] p-6 rounded-none">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[600px] p-6 rounded-none">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
           {/* FROM SECTION */}
-          <div className="space-y-3 md:col-span-3">
+          <div className="space-y-4 md:col-span-3">
             <div>
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
@@ -369,7 +369,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           </div>
 
           {/* AMOUNTS SECTION */}
-          <div className="space-y-3 md:col-span-6">
+          <div className="space-y-4 md:col-span-6">
             <div>
               <div className="text-center mb-2">
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
@@ -437,7 +437,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
           {/* TO SECTION */}
           <div className="flex flex-col md:col-span-3 h-full">
-            <div className="space-y-3 flex-1">
+            <div className="space-y-4 flex-1">
               <div>
                 <label className="text-sm font-medium text-base-content/80">To</label>
                 <div className="dropdown w-full">
