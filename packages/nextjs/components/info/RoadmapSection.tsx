@@ -53,6 +53,8 @@ const enhanceWithProtocolLogos = (text: string) => {
     "Morpho Labs": "morpho.svg", // Using ETH for now
     "Spark Protocol": "spark.svg", // Using DAI for now
     "Venus Protocol": "venus.svg", // Using USDC for now
+    Vesu: "vesu.svg",
+    Nostra: "nostra.svg",
     Arbitrum: "arb.svg",
     Optimism: "optimism.svg", // Using ETH for now as placeholder
     Polygon: "eth.svg", // Using ETH for now as placeholder
@@ -234,11 +236,31 @@ const RoadmapSection = () => {
       description:
         "Core features supporting basic lending operations and atomic debt migration across Aave V3, Compound V3, and Venus Protocol.",
       features: ["Supply Assets", "Repay Loans", "Atomic Debt Migration", "Cross-Protocol Rate Comparison"],
-      isActive: true,
       icon: <RocketLaunchIcon className="w-5 h-5" />,
     },
     {
       phase: 2,
+      title: "Starknet Deployment",
+      description: "Deployment on Starknet with full support for Vesu and Nostra lending protocols.",
+      features: [
+        "Starknet Contracts",
+        "Vesu Support",
+        "Nostra Support",
+        "Cross-Protocol Rate Comparison",
+      ],
+      isActive: true,
+      icon: <GlobeAltIcon className="w-5 h-5" />,
+    },
+    {
+      phase: 3,
+      title: "Additional Protocol Integrations",
+      description:
+        "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
+      features: ["Euler Finance", "Morpho Labs"],
+      icon: <BuildingLibraryIcon className="w-5 h-5" />,
+    },
+    {
+      phase: 4,
       title: "Advanced DeFi Loan Management",
       description: "Enhanced debt management with smart routing and cross-protocol collateral operations.",
       features: [
@@ -250,15 +272,7 @@ const RoadmapSection = () => {
       icon: <ArrowsPointingOutIcon className="w-5 h-5" />,
     },
     {
-      phase: 3,
-      title: "Web3 Lending Protocol Expansion",
-      description:
-        "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
-      features: ["Euler Finance", "Morpho Labs"],
-      icon: <BuildingLibraryIcon className="w-5 h-5" />,
-    },
-    {
-      phase: 4,
+      phase: 5,
       title: "DeFi Loan Rate Optimization",
       description:
         "Implementing sophisticated algorithms for finding and automatically executing the most profitable Web3 loan refinancing strategies.",
@@ -271,7 +285,7 @@ const RoadmapSection = () => {
       icon: <ChartBarIcon className="w-5 h-5" />,
     },
     {
-      phase: 5,
+      phase: 6,
       title: "Cross-chain Web3 Debt Migration & Advanced Features",
       description:
         "Expanding atomic debt migration to multiple blockchain networks and implementing advanced DeFi portfolio management features.",
