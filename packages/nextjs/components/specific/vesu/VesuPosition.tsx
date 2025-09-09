@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { FC, useMemo, useState } from "react";
+import Image from "next/image";
 import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
 import { MovePositionModal } from "~~/components/modals/stark/MovePositionModal";
@@ -25,7 +25,6 @@ interface VesuPositionProps {
   supportedAssets: TokenMetadata[];
   poolId: bigint;
 }
-
 
 // Helper: Calculate rates based on protocol data (returns numbers)
 const calculateRates = (
@@ -87,11 +86,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     : 0n;
 
   const position = useMemo(
-    () =>
-      new PositionManager(
-        Number(collateralValue) / 1e18,
-        Number(debtValue) / 1e18,
-      ),
+    () => new PositionManager(Number(collateralValue) / 1e18, Number(debtValue) / 1e18),
     [collateralValue, debtValue],
   );
 
@@ -196,9 +191,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-end">
-                  <span className="text-sm font-medium">
-                    ${(Number(monthlyYield) / 1e18).toFixed(3)} per month
-                  </span>
+                  <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(3)} per month</span>
                 </div>
               </div>
             </div>
@@ -234,9 +227,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                       <span className="text-sm font-medium text-error">{(debtRates.borrowAPR * 100).toFixed(3)}%</span>
                     </div>
                     <div className="flex justify-end">
-                      <span className="text-sm font-medium">
-                        ${(Number(monthlyCost) / 1e18).toFixed(3)} per month
-                      </span>
+                      <span className="text-sm font-medium">${(Number(monthlyCost) / 1e18).toFixed(3)} per month</span>
                     </div>
                   </>
                 )}
@@ -343,6 +334,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
         collateralAsset={collateralAsset}
         isVesu={true}
         vesuContext={{ poolId, counterpartToken: collateralAsset }}
+        position={position}
       />
 
       {debtMetadata && (
@@ -350,19 +342,19 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <BorrowModalStark
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
-          token={{
-            name: debtSymbol,
-            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-            address: debtAsset,
-            currentRate: debtRates.borrowAPR * 100,
-            usdPrice: debtUsdPrice,
-            decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-          }}
-          protocolName="Vesu"
-          currentDebt={debtNum}
-          vesuContext={{ poolId, counterpartToken: collateralAsset }}
-          position={position}
-        />
+            token={{
+              name: debtSymbol,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+              address: debtAsset,
+              currentRate: debtRates.borrowAPR * 100,
+              usdPrice: debtUsdPrice,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+            }}
+            protocolName="Vesu"
+            currentDebt={debtNum}
+            vesuContext={{ poolId, counterpartToken: collateralAsset }}
+            position={position}
+          />
 
           <RepayModalStark
             isOpen={isRepayModalOpen}
