@@ -106,10 +106,10 @@ const TransactionFeed = () => {
       {/* Apply very subtle blur effect to this container */}
       <div 
         className="min-h-screen bg-base-100 bg-opacity-40"
-        style={{ 
-          filter: 'blur(5px)', 
-          WebkitFilter: 'blur(5px)',
-          backdropFilter: 'blur(5px)'
+        style={{
+          filter: 'blur(15px)',
+          WebkitFilter: 'blur(15px)',
+          backdropFilter: 'blur(15px)'
         }}
       >
         <table className="table table-xs table-zebra w-full">

@@ -234,23 +234,30 @@ const RoadmapSection = () => {
       description:
         "Core features supporting basic lending operations and atomic debt migration across Aave V3, Compound V3, and Venus Protocol.",
       features: ["Supply Assets", "Repay Loans", "Atomic Debt Migration", "Cross-Protocol Rate Comparison"],
-      isActive: true,
       icon: <RocketLaunchIcon className="w-5 h-5" />,
     },
     {
       phase: 2,
-      title: "Advanced DeFi Loan Management",
-      description: "Enhanced debt management with smart routing and cross-protocol collateral operations.",
+      title: "Starknet Deployment",
+      description: "Launch on Starknet with full Vesu and Nostra support.",
+      features: ["Full Vesu Support", "Full Nostra Support"],
+      isActive: true,
+      icon: <GlobeAltIcon className="w-5 h-5" />,
+    },
+    {
+      phase: 3,
+      title: "Advanced Position Management",
+      description: "Automation features for proactive loan management across protocols.",
       features: [
+        "Automatic Stop Loss Liquidations",
+        "Closing Positions",
+        "Debt Switching",
         "Collateral Switching",
-        "Smart Debt Migration Routing",
-        "Cross-Protocol Collateral Detection",
-        "Multi-step Position Refinancing",
       ],
       icon: <ArrowsPointingOutIcon className="w-5 h-5" />,
     },
     {
-      phase: 3,
+      phase: 4,
       title: "Web3 Lending Protocol Expansion",
       description:
         "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
@@ -258,7 +265,7 @@ const RoadmapSection = () => {
       icon: <BuildingLibraryIcon className="w-5 h-5" />,
     },
     {
-      phase: 4,
+      phase: 5,
       title: "DeFi Loan Rate Optimization",
       description:
         "Implementing sophisticated algorithms for finding and automatically executing the most profitable Web3 loan refinancing strategies.",
@@ -271,7 +278,7 @@ const RoadmapSection = () => {
       icon: <ChartBarIcon className="w-5 h-5" />,
     },
     {
-      phase: 5,
+      phase: 6,
       title: "Cross-chain Web3 Debt Migration & Advanced Features",
       description:
         "Expanding atomic debt migration to multiple blockchain networks and implementing advanced DeFi portfolio management features.",

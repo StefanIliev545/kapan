@@ -2,6 +2,8 @@ import type { NextPage } from "next";
 import HeroSection from "../components/home/HeroSection";
 import HowItWorks from "../components/home/HowItWorks";
 import ProtocolStats from "../components/home/ProtocolStats";
+import BenefitsSection from "~~/components/info/BenefitsSection";
+import RoadmapSection from "~~/components/info/RoadmapSection";
 import TransactionFeed from "../components/TransactionFeed.client";
 
 /**
@@ -23,6 +25,10 @@ const Home: NextPage = () => {
 
         {/* Protocol stats */}
         <ProtocolStats />
+
+        {/* Benefits and roadmap */}
+        <BenefitsSection />
+        <RoadmapSection />
       </main>
     </div>
   );
