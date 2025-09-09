@@ -131,7 +131,17 @@ const enhanceWithProtocolLogos = (text: string, useFullLogos: boolean) => {
   return <>{parts}</>;
 };
 
-const Feature = ({ text, index, icon }: { text: string; index: number; icon?: React.ReactNode }) => (
+const Feature = ({
+  text,
+  index,
+  icon,
+  useFullLogos,
+}: {
+  text: string;
+  index: number;
+  icon?: React.ReactNode;
+  useFullLogos: boolean;
+}) => (
   <motion.li custom={index} variants={featureVariants} initial="hidden" animate="visible" className="py-2">
     <div className="flex items-center gap-3">
       <div className="p-1.5 rounded-lg bg-accent/10">
@@ -142,7 +152,15 @@ const Feature = ({ text, index, icon }: { text: string; index: number; icon?: Re
   </motion.li>
 );
 
-const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => {
+const PhaseCard = ({
+  phase,
+  index,
+  useFullLogos,
+}: {
+  phase: RoadmapPhase;
+  index: number;
+  useFullLogos: boolean;
+}) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.2 });
 
@@ -229,7 +247,13 @@ const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => 
         {/* Features with icons */}
         <motion.ul className="space-y-0.5 text-sm">
           {phase.features.map((feature, idx) => (
-            <Feature key={idx} text={feature} index={idx} icon={iconMap[feature] || undefined} />
+            <Feature
+              key={idx}
+              text={feature}
+              index={idx}
+              icon={iconMap[feature] || undefined}
+              useFullLogos={useFullLogos}
+            />
           ))}
         </motion.ul>
       </div>
@@ -393,7 +417,7 @@ const RoadmapSection = ({ useFullLogos = false }: RoadmapSectionProps) => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {roadmapPhases.map((phase, index) => (
-            <PhaseCard key={index} phase={phase} index={index} />
+            <PhaseCard key={index} phase={phase} index={index} useFullLogos={useFullLogos} />
           ))}
         </div>
       </div>
