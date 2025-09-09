@@ -7,9 +7,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
+import { Fordefi } from "starknetkit/fordefi";
+import { Keplr } from "starknetkit/keplr";
+import { MetaMask } from "starknetkit/metamask";
 import { WagmiProvider } from "wagmi";
-import { Footer } from "~~/components/Footer";
 import FloatingSocials from "~~/components/FloatingSocials";
+import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
@@ -55,7 +58,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
   }, []);
 
   const injected = useInjectedConnectors({
-    recommended: [argent(), braavos()],
+    recommended: [argent(), braavos(), new MetaMask(), new Keplr(), new Fordefi()],
     includeRecommended: "onlyIfNoConnectors",
     order: "alphabetical",
   });
