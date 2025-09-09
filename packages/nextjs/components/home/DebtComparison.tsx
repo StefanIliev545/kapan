@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -26,6 +26,26 @@ const AnimatedValue = ({ children, className }: { children: React.ReactNode; cla
 
 const DebtComparison = () => {
   const tokenData = useTokenData();
+  const [starknetRate, setStarknetRate] = useState(0);
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const res = await fetch("https://yields.llama.fi/pools");
+        const data = await res.json();
+        const pools = data.data.filter(
+          (p: any) => p.chain === "Starknet" && p.symbol.toUpperCase() === tokenData.symbol.toUpperCase(),
+        );
+        if (pools.length) {
+          const highest = pools.sort((a: any, b: any) => b.apy - a.apy)[0];
+          setStarknetRate(highest.apy);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchRate();
+  }, [tokenData.symbol]);
 
   // Find rates from all supported protocols
   const aaveProtocol = tokenData.protocols.find(p => p.name === "Aave V3");
@@ -40,8 +60,11 @@ const DebtComparison = () => {
   const ratesByProtocol = [
     { name: "Aave", rate: aaveRate, logo: "/logos/aave.svg" },
     { name: "Compound", rate: compoundRate, logo: "/logos/compound.svg" },
-    { name: "Venus", rate: venusRate, logo: "/logos/venus.svg" }
+    { name: "Venus", rate: venusRate, logo: "/logos/venus.svg" },
   ];
+  if (starknetRate > 0) {
+    ratesByProtocol.push({ name: "Nostra", rate: starknetRate, logo: "/logos/nostra.svg" });
+  }
 
   // Sort protocols by rate (highest first)
   const sortedProtocols = [...ratesByProtocol].sort((a, b) => b.rate - a.rate);
@@ -49,6 +72,14 @@ const DebtComparison = () => {
   // Get highest and lowest rate protocols
   const highestRateProtocol = sortedProtocols[0];
   const lowestRateProtocol = sortedProtocols[sortedProtocols.length - 1];
+
+  const getNetworkInfo = (protocolName: string) => {
+    if (protocolName === "Nostra") {
+      return { logo: "/logos/starknet.svg", name: "Starknet" };
+    }
+    return { logo: "/logos/arb.svg", name: "Arbitrum" };
+  };
+  const networkInfo = getNetworkInfo(highestRateProtocol.name);
   
   // Calculate savings 
   const higherRate = highestRateProtocol.rate;
@@ -119,9 +150,9 @@ const DebtComparison = () => {
               <AnimatedValue>{highestRateProtocol.name}</AnimatedValue>
               <span>on</span>
               <div className="w-4 h-4 relative">
-                <Image src="/logos/arb.svg" alt="Arbitrum" fill className="object-contain" />
+                <Image src={networkInfo.logo} alt={networkInfo.name} fill className="object-contain" />
               </div>
-              <span>Arbitrum:</span>
+              <span>{networkInfo.name}:</span>
             </div>
             <div className="inline-flex items-center">
               <AnimatedValue className="text-xl font-bold whitespace-nowrap">

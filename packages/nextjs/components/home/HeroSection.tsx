@@ -13,7 +13,10 @@ const HeroSection = () => {
               <h1 className="text-4xl font-bold mb-2">Optimize Your DeFi Debt</h1>
               <h2 className="text-2xl mb-4">Move debts between lending protocols seamlessly</h2>
               <p className="py-2 text-lg">
-                Our protocol enables users to optimize their borrowing costs by easily moving debt positions 
+                Now supporting Starknet alongside your favorite chains.
+              </p>
+              <p className="py-2 text-lg">
+                Our protocol enables users to optimize their borrowing costs by easily moving debt positions
                 between DeFi lending platforms like Aave and Compound.
               </p>
               <p className="py-2 text-lg">
@@ -39,7 +42,7 @@ const HeroSection = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                  <div className="badge badge-outline">Alpha</div>
+                  <div className="badge badge-outline">Starknet Live</div>
                   <div className="flex gap-2">
                     <div className="avatar">
                       <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
@@ -49,6 +52,11 @@ const HeroSection = () => {
                     <div className="avatar">
                       <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
                         <Image src="/logos/compound.svg" alt="Compound" width={24} height={24} />
+                      </div>
+                    </div>
+                    <div className="avatar">
+                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+                        <Image src="/logos/starknet.svg" alt="Starknet" width={24} height={24} />
                       </div>
                     </div>
                   </div>

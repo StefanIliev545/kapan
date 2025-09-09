@@ -39,12 +39,17 @@ const ProtocolStats = () => {
 
             <div className="stat">
               <div className="stat-figure text-primary dark:text-accent">
-                <div className="w-10 h-10 rounded-lg bg-base-200 dark:bg-base-300/50 flex items-center justify-center">
-                  <Image src="/logos/arb.svg" alt="Arbitrum Logo" width={24} height={24} />
+                <div className="flex gap-2">
+                  <div className="w-10 h-10 rounded-lg bg-base-200 dark:bg-base-300/50 flex items-center justify-center">
+                    <Image src="/logos/arb.svg" alt="Arbitrum Logo" width={24} height={24} />
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-base-200 dark:bg-base-300/50 flex items-center justify-center">
+                    <Image src="/logos/starknet.svg" alt="Starknet Logo" width={24} height={24} />
+                  </div>
                 </div>
               </div>
-              <div className="stat-title text-base-content/70">Supported Chain</div>
-              <div className="stat-value text-primary dark:text-accent">Arbitrum</div>
+              <div className="stat-title text-base-content/70">Supported Chains</div>
+              <div className="stat-value text-primary dark:text-accent">Arbitrum & Starknet</div>
             </div>
           </div>
         </div>

@@ -14,8 +14,8 @@ const fetchMockData = async (): Promise<MockData> => {
     potentialSavings: 71223,
     totalSavedToDate: 156432,
     activeBorrowersCount: 283,
-    supportedChains: ['Arbitrum', 'Ethereum'],
-    supportedProtocols: ['Aave', 'Compound'],
+    supportedChains: ['Arbitrum', 'Ethereum', 'Starknet'],
+    supportedProtocols: ['Aave', 'Compound', 'Nostra'],
     timestamp: new Date()
   };
   

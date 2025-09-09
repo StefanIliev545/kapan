@@ -2,14 +2,11 @@
 
 import type { NextPage } from "next";
 import { useMemo } from "react";
-import Image from "next/image";
 import { useMockData } from "../services/mockData";
 import TransactionFeed from "../components/TransactionFeed";
 import HeroSection from "../components/home/HeroSection";
-import AlphaWarning from "../components/home/AlphaWarning";
 import HowItWorks from "../components/home/HowItWorks";
 import ProtocolStats from "../components/home/ProtocolStats";
-import ComingSoon from "../components/home/ComingSoon";
 
 /**
  * Home Page Component
@@ -44,17 +41,11 @@ const Home: NextPage = () => {
         {/* Hero section */}
         <HeroSection />
         
-        {/* Alpha warning */}
-        <AlphaWarning />
-        
         {/* How it works */}
         <HowItWorks />
-        
+
         {/* Protocol stats */}
         <ProtocolStats />
-        
-        {/* Coming soon */}
-        <ComingSoon />
       </main>
     </div>
   );
