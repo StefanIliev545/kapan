@@ -1,8 +1,8 @@
-import { FC, useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount } from "~~/hooks/useAccount";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
-import { VesuMarkets, POOL_IDS, ContractResponse } from "./VesuMarkets";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ContractResponse, POOL_IDS, VesuMarkets } from "./VesuMarkets";
 import { VesuPosition } from "./VesuPosition";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+import { useAccount } from "~~/hooks/useAccount";
 import { PositionData, TokenMetadata, formatTokenAmount, toAnnualRates } from "~~/utils/protocols";
 
 type PositionTuple = {
@@ -12,8 +12,11 @@ type PositionTuple = {
 };
 
 export const VesuProtocolView: FC = () => {
-  const { address: userAddress, status } = useAccount();
+  const { address: userAddress } = useAccount();
   const poolId = POOL_IDS["Genesis"];
+
+  const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
+  const refetchCounter = useRef(0);
 
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -37,7 +40,7 @@ export const VesuProtocolView: FC = () => {
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 0n, 3n],
     watch: true,
-    refetchInterval: 5000,
+    refetchInterval: positionsRefetchInterval,
   });
   const {
     data: userPositionsPart2,
@@ -49,7 +52,7 @@ export const VesuProtocolView: FC = () => {
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 3n, 10n],
     watch: true,
-    refetchInterval: 5000,
+    refetchInterval: positionsRefetchInterval,
   });
 
   if (positionsError1) {
@@ -64,6 +67,19 @@ export const VesuProtocolView: FC = () => {
     const p2 = (userPositionsPart2 as unknown as PositionTuple[]) || [];
     return [...p1, ...p2];
   }, [userPositionsPart1, userPositionsPart2]);
+
+  useEffect(() => {
+    if (!userAddress) return;
+    refetchCounter.current += 1;
+    if (refetchCounter.current >= 4) {
+      setPositionsRefetchInterval(15000);
+    }
+  }, [mergedUserPositions, userAddress]);
+
+  useEffect(() => {
+    refetchCounter.current = 0;
+    setPositionsRefetchInterval(2000);
+  }, [userAddress]);
 
   const isUpdating = isFetching1 || isFetching2;
 
@@ -146,11 +162,7 @@ export const VesuProtocolView: FC = () => {
 
   return (
     <div className="w-full flex flex-col p-4 space-y-4">
-      <VesuMarkets
-        supportedAssets={supportedAssets as ContractResponse | undefined}
-        viewMode="grid"
-        search=""
-      />
+      <VesuMarkets supportedAssets={supportedAssets as ContractResponse | undefined} viewMode="grid" search="" />
 
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
@@ -206,9 +218,7 @@ export const VesuProtocolView: FC = () => {
                 <span className="loading loading-spinner" />
               </div>
             ) : !userAddress ? (
-              <div className="text-center py-4 text-gray-500 w-full">
-                Connect your Starknet wallet to view
-              </div>
+              <div className="text-center py-4 text-gray-500 w-full">Connect your Starknet wallet to view</div>
             ) : positionRows?.length ? (
               positionRows
             ) : (
