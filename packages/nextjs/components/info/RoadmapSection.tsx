@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useRef } from "react";
 import Image from "next/image";
 import { type TargetAndTransition, type Variants, motion, useInView } from "framer-motion";
