@@ -338,8 +338,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     step !== "idle";
 
   return (
-    <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[560px] p-6 rounded-none flex flex-col">
+    <dialog className={`modal ${isOpen ? "modal-open" : ""}`}> 
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[360px] p-6 rounded-none flex flex-col">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-full flex-grow">
           {/* FROM SECTION */}
           <div className="space-y-6 md:col-span-3">
@@ -560,7 +560,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               )}
             </div>
           </div>
-        <div className="flex justify-end pt-6">
+        <div className="flex justify-end pt-6 mt-auto">
           <button
             className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${
               loading ? "animate-pulse" : ""

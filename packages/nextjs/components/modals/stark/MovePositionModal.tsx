@@ -927,8 +927,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[560px] p-6 overflow-y-auto rounded-none">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-full">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[360px] p-6 rounded-none flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 flex-grow overflow-y-auto">
             {/* FROM SECTION */}
             <div className="space-y-6 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">From</label>
@@ -976,8 +976,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </label>
                 <div className="text-xs text-base-content/60">
                   Available: {getFormattedBalance} {position.name}
-                </div>
-              </div>
+        </div>
+      </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 w-32 shrink-0">
                   <div className="w-6 h-6 relative">
@@ -1191,30 +1191,30 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 )}
               </div>
 
-              <div className="pt-5 mt-auto">
-                <button
-                  className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
-                    loading ? "animate-pulse" : ""
-                  }`}
-                  onClick={step === "done" ? onClose : handleMovePosition}
-                  disabled={step === "done" ? false : isActionDisabled}
-                >
-                  <span>
-                    {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                    {actionButtonText}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump className="text-gray-400" />
-                    {feeLoading && feeNative === null ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : feeError ? null : feeNative !== null ? (
-                      <span>{feeNative.toFixed(4)} STRK</span>
-                    ) : null}
-                  </span>
-                </button>
-              </div>
             </div>
           </div>
+        <div className="flex justify-end pt-5 mt-auto">
+          <button
+            className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
+              loading ? "animate-pulse" : ""
+            }`}
+            onClick={step === "done" ? onClose : handleMovePosition}
+            disabled={step === "done" ? false : isActionDisabled}
+          >
+            <span>
+              {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+              {actionButtonText}
+            </span>
+            <span className="flex items-center gap-1 text-xs">
+              <FaGasPump className="text-gray-400" />
+              {feeLoading && feeNative === null ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : feeError ? null : feeNative !== null ? (
+                <span>{feeNative.toFixed(4)} STRK</span>
+              ) : null}
+            </span>
+          </button>
+        </div>
       </div>
 
       <form
