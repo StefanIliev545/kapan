@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import DebtComparison from "./DebtComparison";
+import DebtComparison from "./DebtComparison.client";
 
 const HeroSection = () => {
   return (
@@ -79,4 +79,4 @@ const HeroSection = () => {
   );
 };
 
-export default HeroSection; 
+export default HeroSection;
