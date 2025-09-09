@@ -2,7 +2,6 @@ import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 
@@ -39,12 +38,6 @@ export interface TokenActionModalProps {
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
-const formatUsd = (usd: number) => {
-  if (usd === 0) return "0.000";
-  if (usd < 0.01) return usd.toFixed(4);
-  if (usd < 1) return usd.toFixed(3);
-  return usd.toFixed(2);
-};
 
 const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
@@ -186,8 +179,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   balance,
   percentBase,
   max,
-  network,
-  buildTx,
   hf = 1.9,
   utilization = 65,
   ltv = 75,
@@ -197,8 +188,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
-  const txRequest = buildTx ? buildTx(amount, isMax) : undefined;
-  const gasCostUsd = useGasEstimate(network, txRequest);
   const parsed = parseFloat(amount || "0");
 
   const price = token.usdPrice || 0;
@@ -320,7 +309,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                   )}
                 </span>
                 <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump /> ${formatUsd(gasCostUsd)}
+                  <FaGasPump className="text-gray-400" />
                 </span>
               </button>
             </div>

@@ -10,7 +10,6 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -122,7 +121,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   // Move debt hook.
   const { moveDebt } = useMoveDebtScaffold();
-  const gasCostUsd = useGasEstimate("evm");
 
   // Read on-chain borrow balance.
   const { data: tokenBalance } = useScaffoldReadContract({
@@ -574,7 +572,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                   {getActionButtonText()}
                 </span>
                 <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump /> ${formatDisplayNumber(gasCostUsd)}
+                  <FaGasPump className="text-gray-400" />
                 </span>
               </button>
             </div>
