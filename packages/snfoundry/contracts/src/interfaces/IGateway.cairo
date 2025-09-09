@@ -52,6 +52,17 @@ pub struct Reborrow {
 }
 
 #[derive(Drop, Serde, Copy)]
+pub struct Swap {
+    pub token_in: ContractAddress,
+    pub token_out: ContractAddress,
+    pub exact_out: u256,
+    pub max_in: u256,
+    pub slippage_bps: u16,
+    pub recipient: ContractAddress,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
 pub enum LendingInstruction {
     Deposit: Deposit,
     Borrow: Borrow,
@@ -59,6 +70,7 @@ pub enum LendingInstruction {
     Withdraw: Withdraw,
     Redeposit: Redeposit,
     Reborrow: Reborrow,
+    Swap: Swap,
 }
 
 #[starknet::interface]

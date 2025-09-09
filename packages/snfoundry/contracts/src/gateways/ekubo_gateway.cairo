@@ -2,26 +2,12 @@ use core::array::{Array, ArrayTrait, Span};
 use core::num::traits::Zero;
 use core::traits::{Into, TryInto};
 use core::result::ResultTrait;
+use core::option::Option;
 use core::integer::i256;
 use starknet::ContractAddress;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use crate::interfaces::ekubo::{ICoreDispatcher, ICoreDispatcherTrait, PoolKey, SwapParameters, Delta, ILocker};
-
-#[starknet::interface]
-pub trait IEkuboGateway<TContractState> {
-    fn execute(ref self: TContractState, instruction: Array<felt252>, ctx: felt252) -> Array<felt252>;
-}
-
-#[derive(Drop, Serde)]
-pub struct SwapInstruction {
-    pub token_in: ContractAddress,
-    pub token_out: ContractAddress,
-    pub exact_out: u256,
-    pub max_in: u256,
-    pub slippage_bps: u16,
-    pub recipient: ContractAddress,
-    pub extra: felt252,
-}
+use crate::interfaces::IGateway::{LendingInstruction, Swap, ILendingInstructionProcessor, ILendingInstructionProcessorTrait, Repay};
 
 #[derive(Drop, Serde)]
 struct SwapData {
@@ -44,6 +30,7 @@ struct SwapResult {
 mod EkuboGateway {
     use super::*;
     use starknet::{get_caller_address};
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
     #[storage]
     struct Storage {
@@ -55,28 +42,29 @@ mod EkuboGateway {
         self.core.write(core);
     }
 
-    #[external(v0)]
-    impl IEkuboGatewayImpl of super::IEkuboGateway<ContractState> {
-        fn execute(ref self: ContractState, instruction: Array<felt252>, ctx: felt252) -> Array<felt252> {
-            let mut span = instruction.span();
-            let instr = SwapInstruction::deserialize(ref span).unwrap();
+    #[generate_trait]
+    impl InternalFunctions of InternalFunctionsTrait {
+        fn execute_swap(ref self: ContractState, swap: @Swap) {
+            let swap = *swap;
 
-            let token_in_felt: felt252 = instr.token_in.into();
-            let token_out_felt: felt252 = instr.token_out.into();
-            let (token0, token1) = if token_in_felt < token_out_felt {
-                (instr.token_in, instr.token_out)
+            let token_in_felt: felt252 = swap.token_in.into();
+            let token_out_felt: felt252 = swap.token_out.into();
+            let token_in_u256: u256 = token_in_felt.try_into().unwrap();
+            let token_out_u256: u256 = token_out_felt.try_into().unwrap();
+            let (token0, token1) = if token_in_u256 < token_out_u256 {
+                (swap.token_in, swap.token_out)
             } else {
-                (instr.token_out, instr.token_in)
+                (swap.token_out, swap.token_in)
             };
-            let is_token1 = instr.token_out == token1;
+            let is_token1 = swap.token_out == token1;
 
             let swap_data = SwapData {
                 pool_key: PoolKey { token0, token1 },
-                exact_out: instr.exact_out,
-                max_in: instr.max_in,
-                recipient: instr.recipient,
-                token_in: instr.token_in,
-                token_out: instr.token_out,
+                exact_out: swap.exact_out,
+                max_in: swap.max_in,
+                recipient: swap.recipient,
+                token_in: swap.token_in,
+                token_out: swap.token_out,
                 is_token1,
             };
 
@@ -87,19 +75,38 @@ mod EkuboGateway {
             let result = core.lock(call_data.span());
 
             let mut res_span = result.span();
-            let swap_result = SwapResult::deserialize(ref res_span).unwrap();
+            let swap_result = match Serde::deserialize(ref res_span) {
+                Option::Some(x) => x,
+                Option::None => panic!("deserialize"),
+            };
 
-            if swap_result.amount_in < instr.max_in {
-                let leftover = instr.max_in - swap_result.amount_in;
+            if swap_result.amount_in < swap.max_in {
+                let leftover = swap.max_in - swap_result.amount_in;
                 if leftover != Zero::zero() {
-                    let erc20 = IERC20Dispatcher { contract_address: instr.token_in };
+                    let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
                     assert(erc20.transfer(get_caller_address(), leftover), 'transfer failed');
                 }
             }
+        }
+    }
 
-            let mut ret = array![];
-            Serde::serialize(@swap_result, ref ret);
-            ret
+    #[abi(embed_v0)]
+    impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
+        fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
+            for instruction in instructions {
+                if let LendingInstruction::Swap(swap) = instruction {
+                    self.execute_swap(swap);
+                }
+            }
+        }
+
+        fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {
+            let authorizations = array![];
+            authorizations.span()
+        }
+
+        fn get_flash_loan_amount(ref self: ContractState, repay: Repay) -> u256 {
+            0
         }
     }
 
@@ -108,25 +115,30 @@ mod EkuboGateway {
         fn locked(ref self: ContractState, id: u32, data: Span<felt252>) -> Array<felt252> {
             assert(get_caller_address() == self.core.read(), 'unauthorized');
             let mut span = data;
-            let swap_data = SwapData::deserialize(ref span).unwrap();
+            let swap_data = match Serde::deserialize(ref span) {
+                Option::Some(x) => x,
+                Option::None => panic!("deserialize"),
+            };
 
             let core = ICoreDispatcher { contract_address: self.core.read() };
 
-            let exact_out_i256: i256 = swap_data.exact_out.try_into().unwrap();
+            let SwapData { pool_key, exact_out, max_in, recipient, token_in, token_out, is_token1 } = swap_data;
+
+            let exact_out_i256: i256 = exact_out.try_into().unwrap();
             let neg_amount = -exact_out_i256;
             let params = SwapParameters {
                 amount: neg_amount,
-                is_token1: swap_data.is_token1,
+                is_token1,
                 sqrt_ratio_limit: 0,
                 skip_ahead: false,
             };
 
-            let delta = core.swap(swap_data.pool_key, params);
+            let delta = core.swap(pool_key, params);
 
             let mut amount_in: u256 = 0;
             let mut amount_out: u256 = 0;
 
-            if swap_data.is_token1 {
+            if is_token1 {
                 // token_out is token1
                 amount_out = (-delta.amount1).try_into().unwrap();
                 amount_in = delta.amount0.try_into().unwrap();
@@ -135,14 +147,14 @@ mod EkuboGateway {
                 amount_in = delta.amount1.try_into().unwrap();
             }
 
-            assert(amount_out >= swap_data.exact_out, 'insufficient-output');
-            assert(amount_in <= swap_data.max_in, 'slippage');
+            assert(amount_out >= exact_out, 'insufficient-output');
+            assert(amount_in <= max_in, 'slippage');
 
-            core.withdraw(swap_data.token_out, swap_data.recipient, amount_out);
+            core.withdraw(token_out, recipient, amount_out);
 
-            let erc20 = IERC20Dispatcher { contract_address: swap_data.token_in };
+            let erc20 = IERC20Dispatcher { contract_address: token_in };
             assert(erc20.approve(self.core.read(), amount_in), 'approve failed');
-            core.pay(swap_data.token_in);
+            core.pay(token_in);
 
             let result = SwapResult { amount_in, amount_out };
             let mut ret = array![];

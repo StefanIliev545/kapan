@@ -3,18 +3,19 @@ use core::bool;
 use core::traits::Into;
 use core::integer::BoundedInt;
 use starknet::{ContractAddress};
-use crate::interfaces::IGateway::{
-    LendingInstruction,
-    Deposit, 
-    Withdraw, 
-    Borrow, 
-    Repay, 
-    Reborrow,
-    Redeposit,
-    BasicInstruction,
-    ILendingInstructionProcessorDispatcher,
-    ILendingInstructionProcessorDispatcherTrait
-};
+    use crate::interfaces::IGateway::{
+        LendingInstruction,
+        Deposit,
+        Withdraw,
+        Borrow,
+        Repay,
+        Reborrow,
+        Redeposit,
+        Swap,
+        BasicInstruction,
+        ILendingInstructionProcessorDispatcher,
+        ILendingInstructionProcessorDispatcherTrait
+    };
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 
 #[derive(Drop, Serde, Copy)]
@@ -149,6 +150,12 @@ mod RouterGateway {
                         let balance = erc20.balance_of(get_contract_address());
                         balancesBefore.append(balance);
                     },
+                    LendingInstruction::Swap(swap) => {
+                        let swap = *swap;
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        let balance = erc20.balance_of(get_contract_address());
+                        balancesBefore.append(balance);
+                    },
                     _ => {}
                 }
                 i += 1;
@@ -177,6 +184,14 @@ mod RouterGateway {
                             amount = BoundedInt::max();
                         }
                         assert(erc20.approve(gateway, amount), 'approve failed');
+                    },
+                    LendingInstruction::Swap(swap) => {
+                        let swap = *swap;
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        if should_transfer {
+                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), swap.max_in), 'transfer failed');
+                        }
+                        assert(erc20.approve(gateway, swap.max_in), 'approve failed');
                     },
                     _ => {}
                 }
@@ -232,6 +247,17 @@ mod RouterGateway {
                             erc20.approve(gateway, 0);
                         }
                     },
+                    LendingInstruction::Swap(swap) => {
+                        let swap = *swap;
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        let balance = erc20.balance_of(get_contract_address());
+                        if balance >= *balancesBefore.at(i) {
+                            let diff = balance - *balancesBefore.at(i);
+                            balancesAfter.append(diff);
+                        } else {
+                            balancesAfter.append(0);
+                        }
+                    },
                     LendingInstruction::Deposit(deposit) => {
                         balancesAfter.append(0);
                     },
@@ -262,6 +288,14 @@ mod RouterGateway {
                             if *diff != 0 {
                                 let erc20 = IERC20Dispatcher { contract_address: basic.token };
                                 assert(erc20.transfer(basic.user, *diff), 'transfer failed');
+                            }
+                        },
+                        LendingInstruction::Swap(swap) => {
+                            let diff = balancesAfter.at(i);
+                            if *diff != 0 {
+                                let swap = *swap;
+                                let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                                assert(erc20.transfer(get_caller_address(), *diff), 'transfer failed');
                             }
                         },
                         _ => {}
