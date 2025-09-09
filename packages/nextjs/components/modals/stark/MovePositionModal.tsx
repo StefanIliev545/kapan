@@ -741,9 +741,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   // Initialize selected collaterals when preselected ones are provided
   useEffect(() => {
     if (isOpen && preSelectedCollaterals && preSelectedCollaterals.length > 0) {
-      setSelectedCollateralsWithAmounts(
-        preSelectedCollaterals.map(c => ({ ...c, amount: 0n, inputValue: "" })),
-      );
+      setSelectedCollateralsWithAmounts(prev => {
+        if (prev.length === 0) {
+          return preSelectedCollaterals.map(c => ({ ...c, amount: 0n, inputValue: "" }));
+        }
+
+        const existing = new Map(prev.map(c => [c.token.toLowerCase(), c]));
+        const merged = preSelectedCollaterals.map(c => {
+          const key = c.token.toLowerCase();
+          return existing.get(key) || { ...c, amount: 0n, inputValue: "" };
+        });
+        const others = prev.filter(
+          c => !preSelectedCollaterals.some(p => p.token.toLowerCase() === c.token.toLowerCase()),
+        );
+        return [...merged, ...others];
+      });
     }
   }, [isOpen, preSelectedCollaterals]);
 
@@ -923,6 +935,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     marketToken={position.tokenAddress}
                     onMaxClick={handleCollateralMaxClick}
                     hideAmounts
+                    initialSelectedCollaterals={selectedCollateralsWithAmounts}
                   />
                 )
               )}

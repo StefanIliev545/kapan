@@ -205,6 +205,7 @@ interface CollateralSelectorProps {
   onCollateralSelectionChange: (collaterals: CollateralWithAmount[]) => void;
   onMaxClick?: (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => void;
   hideAmounts?: boolean;
+  initialSelectedCollaterals?: CollateralWithAmount[];
 }
 
 export const CollateralSelector: FC<CollateralSelectorProps> = ({
@@ -215,9 +216,21 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   onCollateralSelectionChange,
   onMaxClick,
   hideAmounts = false,
+  initialSelectedCollaterals,
 }) => {
   // Store selected collaterals with amounts
   const [selectedCollaterals, setSelectedCollaterals] = useState<CollateralWithAmount[]>([]);
+
+  useEffect(() => {
+    if (
+      initialSelectedCollaterals &&
+      initialSelectedCollaterals.length > 0 &&
+      selectedCollaterals.length === 0
+    ) {
+      setSelectedCollaterals(initialSelectedCollaterals);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelectedCollaterals]);
   
   // For the token switcher dropdown
   const [switcherOpen, setSwitcherOpen] = useState(false);
