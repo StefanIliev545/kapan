@@ -76,11 +76,6 @@ export const VesuProtocolView: FC = () => {
     }
   }, [mergedUserPositions, userAddress]);
 
-  useEffect(() => {
-    refetchCounter.current = 0;
-    setPositionsRefetchInterval(2000);
-  }, [userAddress]);
-
   const isUpdating = isFetching1 || isFetching2;
 
   const refetchPositions = useCallback(() => {
@@ -93,6 +88,15 @@ export const VesuProtocolView: FC = () => {
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
 
   useEffect(() => {
+    refetchCounter.current = 0;
+    setPositionsRefetchInterval(2000);
+    setCachedPositions([]);
+    if (userAddress) {
+      refetchPositions();
+    }
+  }, [userAddress, refetchPositions]);
+
+  useEffect(() => {
     if (!userAddress) {
       setCachedPositions([]);
       return;
@@ -101,12 +105,6 @@ export const VesuProtocolView: FC = () => {
       setCachedPositions(mergedUserPositions);
     }
   }, [mergedUserPositions, isUpdating, userAddress]);
-
-  useEffect(() => {
-    if (userAddress) {
-      refetchPositions();
-    }
-  }, [userAddress, refetchPositions]);
 
   useEffect(() => {
     const handler = () => refetchPositions();
@@ -213,7 +211,7 @@ export const VesuProtocolView: FC = () => {
             ) : null}
           </div>
           <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "" : ""}`}>
-            {status === "connecting" ? (
+            {status === "connecting" || (userAddress && isUpdating) ? (
               <div className="text-center py-4 w-full">
                 <span className="loading loading-spinner" />
               </div>
