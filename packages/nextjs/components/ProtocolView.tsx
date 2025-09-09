@@ -83,11 +83,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     tokenPrice?: bigint;
   } | null>(null);
 
-  // Update showAll when forceShowAll prop changes
+  // Sync showAll with forceShowAll prop; reset when wallet connects
   useEffect(() => {
-    if (forceShowAll) {
-      setShowAll(true);
-    }
+    setShowAll(forceShowAll);
   }, [forceShowAll]);
 
   // Calculate net balance.
