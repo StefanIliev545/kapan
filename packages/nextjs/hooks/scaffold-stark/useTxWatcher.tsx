@@ -30,19 +30,29 @@ export const TxWatcherProvider = ({ children }: { children: React.ReactNode }) =
       for (const item of Array.from(items.current.values())) {
         try {
           const receipt = await provider.getTransactionReceipt(item.hash);
-          const status = receipt.status?.toUpperCase() || "";
+          const statusRaw =
+            (receipt as any).finality_status ||
+            (receipt as any).status ||
+            (receipt as any).statusReceipt ||
+            "";
+          const status = statusRaw.toString().toUpperCase();
+
           if (
             item.state === "SUBMITTED" &&
-            (status.includes("PENDING") || status.includes("PRE_CONFIRMED"))
+            (status.includes("PENDING") ||
+              status.includes("PRE_CONFIRMED") ||
+              status.includes("RECEIVED"))
           ) {
             item.state = "PRE_CONFIRMED";
             await refetchPending(item.tags);
           }
+
           if (status.includes("ACCEPTED_ON_L2") || status.includes("ACCEPTED_ON_L1")) {
             item.state = "ACCEPTED";
             await refetchFinal(item.tags);
             items.current.delete(item.hash);
           }
+
           if (status.includes("REJECTED")) {
             item.state = "REJECTED";
             await refetchFinal(item.tags);
