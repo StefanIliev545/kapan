@@ -4,27 +4,39 @@ import { useState } from "react";
 import type { NextPage } from "next";
 import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import dynamic from "next/dynamic";
+import Spinner from "~~/components/common/Spinner";
 import { LendingSidebar } from "~~/components/LendingSidebar";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 import { ContractResponse, POOL_IDS } from "~~/components/specific/vesu/VesuMarkets";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 
+const MarketLoader = () => (
+  <div className="flex justify-center py-10">
+    <Spinner size="loading-lg" />
+  </div>
+);
+
 // Lazily load large protocol specific market components to reduce the initial bundle size
 const AaveMarkets = dynamic(() => import("~~/components/specific/aave/AaveMarkets"), {
   ssr: false,
+  loading: () => <MarketLoader />,
 });
 const CompoundMarkets = dynamic(() => import("~~/components/specific/compound/CompoundMarkets"), {
   ssr: false,
+  loading: () => <MarketLoader />,
 });
 const VenusMarkets = dynamic(() => import("~~/components/specific/venus/VenusMarkets"), {
   ssr: false,
+  loading: () => <MarketLoader />,
 });
 const VesuMarkets = dynamic(() => import("~~/components/specific/vesu/VesuMarkets"), {
   ssr: false,
+  loading: () => <MarketLoader />,
 });
 const NostraMarkets = dynamic(() => import("~~/components/specific/nostra/NostraMarkets"), {
   ssr: false,
+  loading: () => <MarketLoader />,
 });
 
 const networkOptions: NetworkOption[] = [
