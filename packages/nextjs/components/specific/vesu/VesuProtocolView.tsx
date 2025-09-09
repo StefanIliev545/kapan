@@ -86,11 +86,13 @@ export const VesuProtocolView: FC = () => {
 
   // Keep previous positions while new data is loading to avoid UI flicker
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
     refetchCounter.current = 0;
     setPositionsRefetchInterval(2000);
     setCachedPositions([]);
+    setHasLoadedOnce(false);
     if (userAddress) {
       refetchPositions();
     }
@@ -103,6 +105,7 @@ export const VesuProtocolView: FC = () => {
     }
     if (!isUpdating) {
       setCachedPositions(mergedUserPositions);
+      setHasLoadedOnce(true);
     }
   }, [mergedUserPositions, isUpdating, userAddress]);
 
@@ -211,7 +214,7 @@ export const VesuProtocolView: FC = () => {
             ) : null}
           </div>
           <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "" : ""}`}>
-            {status === "connecting" || (userAddress && isUpdating) ? (
+            {status === "connecting" || (userAddress && !hasLoadedOnce) ? (
               <div className="text-center py-4 w-full">
                 <span className="loading loading-spinner" />
               </div>
