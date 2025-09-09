@@ -17,7 +17,7 @@ const HeroSection = () => {
               </p>
               <p className="py-2 text-lg">
                 Our protocol enables users to optimize their borrowing costs by easily moving debt positions
-                between DeFi lending platforms like Aave and Compound.
+                between DeFi lending platforms like Vesu, Nostra, Aave, and Compound.
               </p>
               <p className="py-2 text-lg">
                 With a single transaction, users can take advantage of interest rate differences and save on borrowing costs.
@@ -44,6 +44,16 @@ const HeroSection = () => {
                 <div className="flex items-center gap-4">
                   <div className="badge badge-outline">Starknet Live</div>
                   <div className="flex gap-2">
+                    <div className="avatar">
+                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+                        <Image src="/logos/vesu.svg" alt="Vesu" width={24} height={24} />
+                      </div>
+                    </div>
+                    <div className="avatar">
+                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+                        <Image src="/logos/nostra.svg" alt="Nostra" width={24} height={24} />
+                      </div>
+                    </div>
                     <div className="avatar">
                       <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
                         <Image src="/logos/aave.svg" alt="Aave" width={24} height={24} />
