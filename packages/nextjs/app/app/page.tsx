@@ -5,7 +5,6 @@ import Image from "next/image";
 import type { NextPage } from "next";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
-import AlphaWarning from "~~/components/home/AlphaWarning";
 import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
@@ -74,6 +73,12 @@ const App: NextPage = () => {
       </div>
       <div className="flex-1">
         <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+
+        {selectedNetwork === "arbitrum" && (
+          <div className="my-4 text-sm text-warning">
+            Arbitrum support is experimental and pre-audit.
+          </div>
+        )}
 
         {/* Protocol Views */}
         {selectedNetwork === "arbitrum" && (
