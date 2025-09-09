@@ -1,7 +1,17 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import DebtComparison from "./DebtComparison";
+import dynamic from "next/dynamic";
+import Spinner from "../common/Spinner";
+
+const DebtComparison = dynamic(() => import("./DebtComparison"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex justify-center py-8">
+      <Spinner size="loading-lg" />
+    </div>
+  ),
+});
 
 const HeroSection = () => {
   return (
@@ -79,4 +89,4 @@ const HeroSection = () => {
   );
 };
 
-export default HeroSection; 
+export default HeroSection;
