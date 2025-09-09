@@ -33,12 +33,16 @@ const DebtComparison = () => {
       try {
         const res = await fetch("https://yields.llama.fi/pools");
         const data = await res.json();
-        const pools = data.data.filter(
-          (p: any) => p.chain === "Starknet" && p.symbol.toUpperCase() === tokenData.symbol.toUpperCase(),
-        );
+        const pools = data.data
+          .filter(
+            (p: any) =>
+              p.chain === "Starknet" &&
+              p.symbol.toUpperCase() === tokenData.symbol.toUpperCase() &&
+              p.apyBaseBorrow !== undefined,
+          )
+          .sort((a: any, b: any) => (b.apyBaseBorrow ?? 0) - (a.apyBaseBorrow ?? 0));
         if (pools.length) {
-          const highest = pools.sort((a: any, b: any) => b.apy - a.apy)[0];
-          setStarknetRate(highest.apy);
+          setStarknetRate(pools[0].apyBaseBorrow ?? 0);
         }
       } catch (e) {
         console.error(e);
