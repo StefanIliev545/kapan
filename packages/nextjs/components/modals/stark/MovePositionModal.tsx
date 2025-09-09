@@ -7,7 +7,6 @@ import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
-import { FeeEstimate } from "~~/components/FeeEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -1191,13 +1190,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               </div>
 
               <div className="pt-5 mt-auto">
-                <FeeEstimate
-                  loading={feeLoading}
-                  error={feeError}
-                  feeNative={feeNative}
-                  feeUsd={feeUsd}
-                  unit="STRK"
-                />
                 <button
                   className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
                     loading ? "animate-pulse" : ""
@@ -1211,6 +1203,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   </span>
                   <span className="flex items-center gap-1 text-xs">
                     <FaGasPump className="text-gray-400" />
+                    {feeLoading && feeNative === null ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : feeError ? null : feeNative !== null ? (
+                      <span>
+                        ~{feeNative.toFixed(6)} STRK
+                        {feeUsd !== null ? ` ($${feeUsd.toFixed(2)})` : ""}
+                      </span>
+                    ) : null}
                   </span>
                 </button>
               </div>
