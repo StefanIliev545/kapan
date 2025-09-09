@@ -168,14 +168,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
               selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e18 : 0,
           }}
           protocolName={protocolName}
-          currentDebt={
-            selectedToken.total_nominal_debt
-              ? Number(
-                  selectedToken.total_nominal_debt /
-                    10n ** BigInt(selectedToken.decimals),
-                )
-              : 0
-          }
+          currentDebt={0}
           vesuContext={vesuContext}
           position={position}
         />
