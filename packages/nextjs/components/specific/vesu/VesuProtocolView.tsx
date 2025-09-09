@@ -12,7 +12,7 @@ type PositionTuple = {
 };
 
 export const VesuProtocolView: FC = () => {
-  const { address: userAddress } = useAccount();
+  const { address: userAddress, status } = useAccount();
   const poolId = POOL_IDS["Genesis"];
 
   const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
@@ -71,7 +71,7 @@ export const VesuProtocolView: FC = () => {
   useEffect(() => {
     if (!userAddress) return;
     refetchCounter.current += 1;
-    if (refetchCounter.current >= 4) {
+    if (refetchCounter.current >= 3) {
       setPositionsRefetchInterval(15000);
     }
   }, [mergedUserPositions, userAddress]);
