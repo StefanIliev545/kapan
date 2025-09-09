@@ -184,7 +184,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               <div className="divider my-1"></div>
 
               <div className="space-y-1">
-                <div className="flex justify-between">
+                <div className="flex justify-between w-full gap-1">
                   <span className="text-sm text-gray-500">Supply APY</span>
                   <span className="text-sm font-medium text-success">
                     {(collateralRates.supplyAPY * 100).toFixed(3)}%
@@ -216,13 +216,13 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
               <div className="space-y-1">
                 {nominalDebt === "0" ? (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between w-full gap-1">
                     <span className="text-sm text-gray-400">No debt</span>
                     <span className="text-sm font-medium text-gray-400">-</span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between w-full gap-1">
                       <span className="text-sm text-gray-500">Borrow APR</span>
                       <span className="text-sm font-medium text-error">{(debtRates.borrowAPR * 100).toFixed(3)}%</span>
                     </div>
