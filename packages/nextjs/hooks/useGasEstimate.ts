@@ -26,6 +26,7 @@ export function useGasEstimate(opts: {
   const [feeUsd, setFeeUsd] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
+  const prevKey = useRef<string | null>(null);
 
   const ethPrice = useGlobalState(state => state.nativeCurrencyPrice);
   const strkPrice = useGlobalState(state => state.strkCurrencyPrice);
@@ -41,6 +42,9 @@ export function useGasEstimate(opts: {
     async (acct: Account, calls: Call | Call[]) => {
       setLoading(true);
       setError(null);
+      setFeeWei(null);
+      setFeeNative(null);
+      setFeeUsd(null);
       try {
         const callArray = Array.isArray(calls) ? calls : [calls];
         const res =
@@ -69,9 +73,6 @@ export function useGasEstimate(opts: {
       } catch (e) {
         console.error("Fee estimation failed:", e);
         setError("Fee estimation unavailable");
-        setFeeWei(null);
-        setFeeNative(null);
-        setFeeUsd(null);
       } finally {
         setLoading(false);
       }
@@ -82,7 +83,15 @@ export function useGasEstimate(opts: {
   const refresh = useCallback(async () => {
     if (!account) return;
     const calls = await buildCalls();
-    if (!calls) return;
+    if (!calls) {
+      prevKey.current = null;
+      return;
+    }
+    const key = `${account.address}:${JSON.stringify(
+      calls,
+      (_, v) => (typeof v === "bigint" ? v.toString() : v),
+    )}`;
+    prevKey.current = key;
     await doEstimate(account as Account, calls);
   }, [account, buildCalls, doEstimate]);
 
@@ -96,13 +105,20 @@ export function useGasEstimate(opts: {
         setFeeNative(null);
         setFeeUsd(null);
         setError(null);
+        prevKey.current = null;
         return;
       }
+      const key = `${account.address}:${JSON.stringify(
+        calls,
+        (_, v) => (typeof v === "bigint" ? v.toString() : v),
+      )}`;
+      if (prevKey.current === key) return;
+      prevKey.current = key;
       await doEstimate(account as Account, calls);
     }, debounceMs) as unknown as number;
 
     return clearTimer;
-  }, [enabled, account, buildCalls, doEstimate, debounceMs]);
+  }, [enabled, account?.address, buildCalls, doEstimate, debounceMs]);
 
   return { loading, error, feeWei, feeNative, feeUsd, refresh };
 }

@@ -5,7 +5,6 @@ import { formatUnits, parseUnits } from "viem";
 import type { Network } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
-import { FeeEstimate } from "~~/components/FeeEstimate";
 import type { Call } from "starknet";
 
 export interface TokenInfo {
@@ -313,15 +312,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 <TokenPill value={afterValue} icon={token.icon} name={token.name} />
               </div>
             </div>
-            {network === "stark" && (
-              <FeeEstimate
-                loading={feeLoading}
-                error={feeError}
-                feeNative={feeNative}
-                feeUsd={feeUsd}
-                unit="STRK"
-              />
-            )}
             <div className="modal-action pt-2">
               <button
                 className={`btn w-full flex justify-between ${txState === "success" ? "btn-success" : "btn-primary"}`}
@@ -337,9 +327,19 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                     action
                   )}
                 </span>
-                <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump className="text-gray-400" />
-                </span>
+                {network === "stark" && (
+                  <span className="flex items-center gap-1 text-xs">
+                    <FaGasPump className="text-gray-400" />
+                    {feeLoading && feeNative === null ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : feeError ? null : feeNative !== null ? (
+                      <span>
+                        ~{feeNative.toFixed(6)} STRK
+                        {feeUsd !== null ? ` ($${feeUsd.toFixed(2)})` : ""}
+                      </span>
+                    ) : null}
+                  </span>
+                )}
               </button>
             </div>
           </div>
