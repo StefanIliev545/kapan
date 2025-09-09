@@ -78,7 +78,7 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
 
       await walletClient.waitForTransaction(transactionHash, {
         retryInterval: 1000,
-        successStates: ["ACCEPTED_ON_L2", "ACCEPTED_ON_L1", "PENDING"],
+        successStates: ["ACCEPTED_ON_L2", "ACCEPTED_ON_L1"],
       });
 
       notification.remove(notificationId);

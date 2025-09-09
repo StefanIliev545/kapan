@@ -157,6 +157,7 @@ export type UseScaffoldWriteConfig<
   TFunctionName extends ExtractAbiFunctionNamesScaffold<ContractAbi<TContractName>, "external">,
 > = {
   contractName: TContractName;
+  watchTags?: string[];
 } & IsContractDeclarationMissing<
   Partial<UseSendTransactionProps> & {
     functionName: string;
