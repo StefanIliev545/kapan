@@ -84,6 +84,10 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
           icon: "🎉",
         },
       );
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("txCompleted"));
+      }
     } catch (error: any) {
       if (notificationId) {
         notification.remove(notificationId);

@@ -6,6 +6,7 @@ import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -13,7 +14,6 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import {
   useDeployedContractInfo,
   useScaffoldMultiWriteContract,
@@ -105,7 +105,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
-  const gasCostUsd = useGasEstimate("stark");
 
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
@@ -727,6 +726,27 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
+  const estimateCalls = useMemo(() => {
+    if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
+      return null;
+    const authorizations = fetchedAuthorizations ?? [];
+    const moveCalls = pairInstructions.map(instructions => ({
+      contractAddress: routerGateway.address,
+      entrypoint: "move_debt",
+      calldata: CallData.compile({ instructions }),
+    }));
+    return [
+      ...(authorizations as any),
+      ...moveCalls,
+    ];
+  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
+
+  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
+    enabled: isOpen,
+    buildCalls: () => estimateCalls ?? null,
+    currency: "STRK",
+  });
+
   // Reset the modal state when opening/closing
   useEffect(() => {
     if (!isOpen) {
@@ -743,9 +763,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   // Initialize selected collaterals when preselected ones are provided
   useEffect(() => {
     if (isOpen && preSelectedCollaterals && preSelectedCollaterals.length > 0) {
-      setSelectedCollateralsWithAmounts(
-        preSelectedCollaterals.map(c => ({ ...c, amount: 0n, inputValue: "" })),
-      );
+      setSelectedCollateralsWithAmounts(prev => {
+        if (prev.length === 0) {
+          return preSelectedCollaterals.map(c => ({ ...c, amount: 0n, inputValue: "" }));
+        }
+
+        const existing = new Map(prev.map(c => [c.token.toLowerCase(), c]));
+        const merged = preSelectedCollaterals.map(c => {
+          const key = c.token.toLowerCase();
+          return existing.get(key) || { ...c, amount: 0n, inputValue: "" };
+        });
+        const others = prev.filter(
+          c => !preSelectedCollaterals.some(p => p.token.toLowerCase() === c.token.toLowerCase()),
+        );
+        return [...merged, ...others];
+      });
     }
   }, [isOpen, preSelectedCollaterals]);
 
@@ -925,6 +957,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     marketToken={position.tokenAddress}
                     onMaxClick={handleCollateralMaxClick}
                     hideAmounts
+                    initialSelectedCollaterals={selectedCollateralsWithAmounts}
                   />
                 )
               )}
@@ -1169,7 +1202,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     {actionButtonText}
                   </span>
                   <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump /> ${formatDisplayNumber(gasCostUsd)}
+                    <FaGasPump className="text-gray-400" />
+                    {feeLoading && feeNative === null ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : feeError ? null : feeNative !== null ? (
+                      <span>{feeNative.toFixed(4)} STRK</span>
+                    ) : null}
                   </span>
                 </button>
               </div>

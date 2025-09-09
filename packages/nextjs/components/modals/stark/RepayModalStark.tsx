@@ -25,7 +25,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
-  const { execute } = useLendingAction(
+  const { execute, buildCalls } = useLendingAction(
     "stark",
     "Repay",
     token.address,
@@ -53,6 +53,7 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
       percentBase={debtBalance}
       max={maxInput}
       network="stark"
+      buildCalls={buildCalls}
       position={position}
       onConfirm={execute}
     />

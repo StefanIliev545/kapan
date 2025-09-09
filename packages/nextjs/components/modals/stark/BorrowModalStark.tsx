@@ -24,7 +24,14 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
-  const { execute } = useLendingAction("stark", "Borrow", token.address, protocolName, decimals, vesuContext);
+  const { execute, buildCalls } = useLendingAction(
+    "stark",
+    "Borrow",
+    token.address,
+    protocolName,
+    decimals,
+    vesuContext,
+  );
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -38,6 +45,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
       before={currentDebt}
       balance={balance}
       network="stark"
+      buildCalls={buildCalls}
       position={position}
       onConfirm={execute}
     />

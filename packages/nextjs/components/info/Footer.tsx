@@ -1,7 +1,7 @@
 import React from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowTopRightOnSquareIcon, DocumentTextIcon, CodeBracketIcon } from "@heroicons/react/24/outline";
+import Button from "~~/components/common/Button";
 
 const Footer = () => {
   return (
@@ -31,15 +31,16 @@ const Footer = () => {
           whileHover={{ scale: 1.05 }}
           className="w-full max-w-xs"
         >
-          <Link 
-            href="https://github.com/stefaniliev545/kapan" 
-            target="_blank" 
-            className="btn btn-primary w-full group flex items-center justify-center gap-2"
+          <Button
+            href="https://github.com/stefaniliev545/kapan"
+            target="_blank"
+            className="w-full group flex items-center justify-center gap-2"
+            variant="primary"
           >
             <CodeBracketIcon className="h-5 w-5 transition-transform group-hover:rotate-12" />
             <span>View on GitHub</span>
             <ArrowTopRightOnSquareIcon className="h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-          </Link>
+          </Button>
         </motion.div>
         
         <motion.div 
@@ -50,13 +51,14 @@ const Footer = () => {
           whileHover={{ scale: 1.05 }}
           className="w-full max-w-xs"
         >
-          <Link 
-            href="/docs" 
-            className="btn btn-outline w-full group flex items-center justify-center gap-2"
+          <Button
+            href="/docs"
+            className="w-full group flex items-center justify-center gap-2"
+            variant="outline"
           >
             <DocumentTextIcon className="h-5 w-5 transition-transform group-hover:rotate-12" />
             <span>DeFi Debt Migration Documentation</span>
-          </Link>
+          </Button>
         </motion.div>
       </div>
       

@@ -172,6 +172,7 @@ export const NostraProtocolView: FC = () => {
       maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
+      forceShowAll={!connectedAddress}
       networkType="starknet"
       disableMoveSupply
     />

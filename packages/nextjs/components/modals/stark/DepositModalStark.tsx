@@ -22,7 +22,14 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark");
-  const { execute } = useLendingAction("stark", "Deposit", token.address, protocolName, decimals, vesuContext);
+  const { execute, buildCalls } = useLendingAction(
+    "stark",
+    "Deposit",
+    token.address,
+    protocolName,
+    decimals,
+    vesuContext,
+  );
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -36,6 +43,7 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
       before={0}
       balance={balance}
       network="stark"
+      buildCalls={buildCalls}
       position={position}
       onConfirm={execute}
     />

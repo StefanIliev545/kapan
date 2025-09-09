@@ -1,10 +1,11 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
+import type { Call } from "starknet";
 
 export interface TokenInfo {
   name: string;
@@ -30,6 +31,10 @@ export interface TokenActionModalProps {
   max?: bigint;
   network: Network;
   buildTx?: (amount: string, isMax: boolean) => any;
+  buildCalls?: (
+    amount: string,
+    isMax: boolean,
+  ) => Promise<Call | Call[] | null | undefined> | Call | Call[] | null | undefined;
   hf?: number;
   utilization?: number;
   ltv?: number;
@@ -39,12 +44,6 @@ export interface TokenActionModalProps {
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
-const formatUsd = (usd: number) => {
-  if (usd === 0) return "0.000";
-  if (usd < 0.01) return usd.toFixed(4);
-  if (usd < 1) return usd.toFixed(3);
-  return usd.toFixed(2);
-};
 
 const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
@@ -187,18 +186,16 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   percentBase,
   max,
   network,
-  buildTx,
   hf = 1.9,
   utilization = 65,
   ltv = 75,
   position,
+  buildCalls,
   onConfirm,
 }) => {
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
-  const txRequest = buildTx ? buildTx(amount, isMax) : undefined;
-  const gasCostUsd = useGasEstimate(network, txRequest);
   const parsed = parseFloat(amount || "0");
 
   const price = token.usdPrice || 0;
@@ -233,6 +230,17 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
         return before;
     }
   }, [action, before, parsed]);
+
+  const buildCallsForEstimate = useCallback(() => {
+    if (!buildCalls) return null;
+    return buildCalls(amount, isMax);
+  }, [buildCalls, amount, isMax]);
+
+  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
+    enabled: isOpen && network === "stark",
+    buildCalls: buildCallsForEstimate,
+    currency: "STRK",
+  });
 
   const handleClose = () => {
     setAmount("");
@@ -319,9 +327,16 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                     action
                   )}
                 </span>
-                <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump /> ${formatUsd(gasCostUsd)}
-                </span>
+                {network === "stark" && (
+                  <span className="flex items-center gap-1 text-xs">
+                    <FaGasPump className="text-gray-400" />
+                    {feeLoading && feeNative === null ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : feeError ? null : feeNative !== null ? (
+                      <span>{feeNative.toFixed(4)} STRK</span>
+                    ) : null}
+                  </span>
+                )}
               </button>
             </div>
           </div>

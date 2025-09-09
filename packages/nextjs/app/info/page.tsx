@@ -10,11 +10,13 @@ import HowItWorksSection from "~~/components/info/HowItWorksSection";
 import RevolutionSection from "~~/components/info/RevolutionSection";
 import RoadmapSection from "~~/components/info/RoadmapSection";
 import AuditSection from "~~/components/info/AuditSection";
+import KeyFeaturesSection from "~~/components/info/KeyFeaturesSection";
 
 const InfoPage = () => {
   return (
     <div className="container mx-auto px-5 py-8">
       <Header />
+      <KeyFeaturesSection />
       <FeaturesSection />
       <HowItWorksSection />
       <BenefitsSection />
