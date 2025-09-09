@@ -11,7 +11,11 @@ const debounce = <T extends (...args: any[]) => void>(fn: T, ms = 300) => {
 export const refetchPending = debounce(async (tags: string[]) => {
   await Promise.all(
     tags.map(tag =>
-      queryClient.refetchQueries({ queryKey: [tag], exact: false, meta: { blockId: "pending" } }),
+      queryClient.refetchQueries({
+        queryKey: [tag],
+        exact: false,
+        predicate: query => (query.meta as any)?.blockId === "pending",
+      }),
     ),
   );
 });
