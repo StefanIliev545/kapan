@@ -1,9 +1,11 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
 import type { Network } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
+import type { Call } from "starknet";
 
 export interface TokenInfo {
   name: string;
@@ -29,6 +31,10 @@ export interface TokenActionModalProps {
   max?: bigint;
   network: Network;
   buildTx?: (amount: string, isMax: boolean) => any;
+  buildCalls?: (
+    amount: string,
+    isMax: boolean,
+  ) => Promise<Call | Call[] | null | undefined> | Call | Call[] | null | undefined;
   hf?: number;
   utilization?: number;
   ltv?: number;
@@ -179,10 +185,12 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   balance,
   percentBase,
   max,
+  network,
   hf = 1.9,
   utilization = 65,
   ltv = 75,
   position,
+  buildCalls,
   onConfirm,
 }) => {
   const [amount, setAmount] = useState("");
@@ -222,6 +230,17 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
         return before;
     }
   }, [action, before, parsed]);
+
+  const buildCallsForEstimate = useCallback(() => {
+    if (!buildCalls) return null;
+    return buildCalls(amount, isMax);
+  }, [buildCalls, amount, isMax]);
+
+  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
+    enabled: isOpen && network === "stark",
+    buildCalls: buildCallsForEstimate,
+    currency: "STRK",
+  });
 
   const handleClose = () => {
     setAmount("");
@@ -308,9 +327,16 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                     action
                   )}
                 </span>
-                <span className="flex items-center gap-1 text-xs">
-                  <FaGasPump className="text-gray-400" />
-                </span>
+                {network === "stark" && (
+                  <span className="flex items-center gap-1 text-xs">
+                    <FaGasPump className="text-gray-400" />
+                    {feeLoading && feeNative === null ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : feeError ? null : feeNative !== null ? (
+                      <span>{feeNative.toFixed(4)} STRK</span>
+                    ) : null}
+                  </span>
+                )}
               </button>
             </div>
           </div>

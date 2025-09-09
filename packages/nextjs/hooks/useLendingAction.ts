@@ -1,6 +1,15 @@
 import type { Network } from "./useTokenBalance";
 import { useTokenBalance } from "./useTokenBalance";
-import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, Contract, num, uint256 } from "starknet";
+import {
+  CairoCustomEnum,
+  CairoOption,
+  CairoOptionVariant,
+  CallData,
+  Contract,
+  num,
+  uint256,
+  Call,
+} from "starknet";
 import { parseUnits } from "viem";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useScaffoldWriteContract as useEvmWrite } from "~~/hooks/scaffold-eth";
@@ -32,8 +41,9 @@ export const useLendingAction = (
     const { balance: walletBalanceHook = 0n } = useTokenBalance(tokenAddress, "stark");
     const walletBalance = walletBalanceParam ?? walletBalanceHook;
     const { data: routerGateway } = useStarkDeployedContractInfo("RouterGateway");
-    const execute = async (amount: string, isMax = false) => {
-      if (!address || !account || !decimals || !routerGateway) return;
+
+    const buildCalls = async (amount: string, isMax = false): Promise<Call[] | null> => {
+      if (!address || !account || !decimals || !routerGateway) return null;
       try {
         let parsedAmount = parseUnits(amount, decimals);
         if (isMax) {
@@ -98,8 +108,11 @@ export const useLendingAction = (
         const fullInstruction = CallData.compile({ instructions: [baseInstruction] });
         const authInstruction = CallData.compile({ instructions: [baseInstruction], rawSelectors: false });
         const contract = new Contract(routerGateway.abi, routerGateway.address, account);
-        const protocolInstructions = await contract.call("get_authorizations_for_instructions", authInstruction);
-        const authorizations: any[] = [];
+        const protocolInstructions = await contract.call(
+          "get_authorizations_for_instructions",
+          authInstruction,
+        );
+        const authorizations: Call[] = [];
         if (Array.isArray(protocolInstructions)) {
           for (const inst of protocolInstructions as any[]) {
             const addr = num.toHexString(inst[0]);
@@ -116,14 +129,27 @@ export const useLendingAction = (
           entrypoint: "process_protocol_instructions",
           calldata: fullInstruction,
         });
-        await account.execute(authorizations);
+        return authorizations;
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    };
+
+    const execute = async (amount: string, isMax = false) => {
+      if (!account) return;
+      try {
+        const calls = await buildCalls(amount, isMax);
+        if (!calls) return;
+        await account.execute(calls);
         notification.success("Instruction sent");
       } catch (e) {
         console.error(e);
         notification.error("Failed to send instruction");
       }
     };
-    return { execute, buildTx: undefined };
+
+    return { execute, buildTx: undefined, buildCalls };
   }
 
   const { address } = useEvmAccount();

@@ -6,6 +6,7 @@ import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -725,6 +726,27 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
+  const estimateCalls = useMemo(() => {
+    if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
+      return null;
+    const authorizations = fetchedAuthorizations ?? [];
+    const moveCalls = pairInstructions.map(instructions => ({
+      contractAddress: routerGateway.address,
+      entrypoint: "move_debt",
+      calldata: CallData.compile({ instructions }),
+    }));
+    return [
+      ...(authorizations as any),
+      ...moveCalls,
+    ];
+  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
+
+  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
+    enabled: isOpen,
+    buildCalls: () => estimateCalls ?? null,
+    currency: "STRK",
+  });
+
   // Reset the modal state when opening/closing
   useEffect(() => {
     if (!isOpen) {
@@ -1181,6 +1203,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   </span>
                   <span className="flex items-center gap-1 text-xs">
                     <FaGasPump className="text-gray-400" />
+                    {feeLoading && feeNative === null ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : feeError ? null : feeNative !== null ? (
+                      <span>{feeNative.toFixed(4)} STRK</span>
+                    ) : null}
                   </span>
                 </button>
               </div>
