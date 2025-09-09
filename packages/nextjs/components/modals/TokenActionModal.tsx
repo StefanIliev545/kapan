@@ -236,7 +236,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     return buildCalls(amount, isMax);
   }, [buildCalls, amount, isMax]);
 
-  const { loading: feeLoading, error: feeError, feeNative, feeUsd } = useGasEstimate({
+  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
     enabled: isOpen && network === "stark",
     buildCalls: buildCallsForEstimate,
     currency: "STRK",
@@ -333,10 +333,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                     {feeLoading && feeNative === null ? (
                       <span className="loading loading-spinner loading-xs" />
                     ) : feeError ? null : feeNative !== null ? (
-                      <span>
-                        ~{feeNative.toFixed(6)} STRK
-                        {feeUsd !== null ? ` ($${feeUsd.toFixed(2)})` : ""}
-                      </span>
+                      <span>{feeNative.toFixed(4)} STRK</span>
                     ) : null}
                   </span>
                 )}
