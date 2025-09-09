@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { SparklesIcon, ArrowPathIcon, BanknotesIcon, ShieldCheckIcon, ArrowTrendingUpIcon } from "@heroicons/react/24/outline";
+import VesuLogo from "../assets/VesuLogo";
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -102,7 +103,7 @@ const RevolutionSection = () => {
         <p className="text-lg text-base-content">
           Whether you&apos;re looking to move your
           <span className="inline-flex items-center gap-1 text-accent font-medium">
-            <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+            <VesuLogo width={16} height={16} />
             Vesu debt position
           </span>
           to

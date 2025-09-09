@@ -1,5 +1,6 @@
 import { FC } from "react";
 import Image from "next/image";
+import VesuLogo from "../assets/VesuLogo";
 
 interface RatePillProps {
   variant: "supply" | "borrow";
@@ -33,7 +34,11 @@ export const RatePill: FC<RatePillProps> = ({ variant, label, rate, networkType,
         {showIcons && (
           <>
             <Image src={networkIcons[networkType]} alt={networkType} width={16} height={16} />
-            <Image src={protocolIcons[protocol]} alt={protocol} width={16} height={16} />
+            {protocol === "vesu" ? (
+              <VesuLogo width={16} height={16} />
+            ) : (
+              <Image src={protocolIcons[protocol]} alt={protocol} width={16} height={16} />
+            )}
           </>
         )}
       </span>

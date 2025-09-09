@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import Image from "next/image";
+import VesuLogo from "../assets/VesuLogo";
 import { type TargetAndTransition, type Variants, motion, useInView } from "framer-motion";
 import {
   ArrowPathIcon,
@@ -57,6 +58,8 @@ const enhanceWithProtocolLogos = (text: string) => {
     Optimism: "optimism.svg", // Using ETH for now as placeholder
     Polygon: "eth.svg", // Using ETH for now as placeholder
     Base: "base.svg", // Using ETH for now as placeholder
+    Vesu: "vesu.svg",
+    Nostra: "nostra.svg",
   };
 
   // Split the text by protocol mentions and create an array of React components
@@ -92,12 +95,16 @@ const enhanceWithProtocolLogos = (text: string) => {
     // Add the protocol mention with logo
     const protocol = earliestMatch.protocol;
     const logo = protocolMatches[protocol as keyof typeof protocolMatches];
+    const logoElement =
+      protocol === "Vesu" ? (
+        <VesuLogo width={16} height={16} className="object-contain" />
+      ) : (
+        <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />
+      );
 
     parts.push(
       <span key={`${protocol}-${lastIndex}`} className="inline-flex items-center align-baseline">
-        <span className="inline-flex items-center justify-center w-4 h-4 mr-1 relative align-middle">
-          <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />
-        </span>
+        <span className="inline-flex items-center justify-center w-4 h-4 mr-1 relative align-middle">{logoElement}</span>
         <span className="align-baseline">{protocol}</span>
       </span>,
     );

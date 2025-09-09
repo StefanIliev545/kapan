@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import VesuLogo from "../assets/VesuLogo";
 import { BoltIcon, ShieldCheckIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 
 const StepItem = ({ number, children }: { number: number; children: React.ReactNode }) => (
@@ -68,12 +69,7 @@ const HowItWorksSection = () => {
               <div className="space-y-4">
                 <div className="flex items-center gap-4 p-4 bg-base-200 rounded-xl transition-all hover:shadow-md">
                   <div className="relative w-10 h-10 rounded-full overflow-hidden bg-base-300 p-1 flex items-center justify-center">
-                    <Image
-                      src="/logos/vesu.svg"
-                      alt="Vesu lending protocol"
-                      fill
-                      className="object-contain p-1"
-                    />
+                    <VesuLogo width={32} height={32} className="object-contain p-1" />
                   </div>
                   <div>
                     <h4 className="font-medium text-base-content">Vesu</h4>
@@ -168,7 +164,7 @@ const HowItWorksSection = () => {
                 Our <span className="text-accent font-medium">atomic debt migration</span> technology lets you move loan positions between protocols
                 like
                 <span className="inline-flex items-center gap-1 text-primary">
-                  <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                  <VesuLogo width={16} height={16} />
                   Vesu
                 </span>
                 ,
@@ -184,7 +180,7 @@ const HowItWorksSection = () => {
                 <StepItem number={2}>
                   Existing loan is repaid in the source protocol (e.g.,
                   <span className="inline-flex items-center gap-1 ml-1">
-                    <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                    <VesuLogo width={16} height={16} />
                     Vesu
                   </span>
                   )

@@ -1,6 +1,7 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { useRef } from "react";
 import Image from "next/image";
+import VesuLogo from "../../assets/VesuLogo";
 import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
@@ -1100,13 +1101,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                         .map(([name, id]) => (
                           <li key={name}>
                             <button className="flex items-center gap-3 py-2" onClick={() => setSelectedPoolId(id)}>
-                              <Image
-                                src="/logos/vesu.svg"
-                                alt="Vesu"
-                                width={32}
-                                height={32}
-                                className="rounded-full min-w-[32px]"
-                              />
+                              <VesuLogo width={32} height={32} className="rounded-full min-w-[32px]" />
                               <span className="truncate text-lg">{name}</span>
                             </button>
                           </li>

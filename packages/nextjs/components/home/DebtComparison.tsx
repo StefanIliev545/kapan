@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import VesuLogo from "../assets/VesuLogo";
 import { FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useTokenData } from "~~/hooks/useTokenData";
@@ -148,12 +149,16 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image
-                      src={highestRateProtocol.logo}
-                      alt={highestRateProtocol.name}
-                      fill
-                      className="object-contain"
-                    />
+                    {highestRateProtocol.name === "Vesu" ? (
+                      <VesuLogo width={20} height={20} className="object-contain" />
+                    ) : (
+                      <Image
+                        src={highestRateProtocol.logo}
+                        alt={highestRateProtocol.name}
+                        fill
+                        className="object-contain"
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -189,12 +194,16 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image
-                      src={highestRateProtocol.logo}
-                      alt={highestRateProtocol.name}
-                      width={24}
-                      height={24}
-                    />
+                    {highestRateProtocol.name === "Vesu" ? (
+                      <VesuLogo width={24} height={24} />
+                    ) : (
+                      <Image
+                        src={highestRateProtocol.logo}
+                        alt={highestRateProtocol.name}
+                        width={24}
+                        height={24}
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -232,12 +241,16 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image
-                      src={lowestRateProtocol.logo}
-                      alt={lowestRateProtocol.name}
-                      width={24}
-                      height={24}
-                    />
+                    {lowestRateProtocol.name === "Vesu" ? (
+                      <VesuLogo width={24} height={24} />
+                    ) : (
+                      <Image
+                        src={lowestRateProtocol.logo}
+                        alt={lowestRateProtocol.name}
+                        width={24}
+                        height={24}
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>

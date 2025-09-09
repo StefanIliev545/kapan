@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import VesuLogo from "../assets/VesuLogo";
 
 const Header = () => {
   return (
@@ -40,7 +41,7 @@ const Header = () => {
               through a single interface. Our revolutionary <strong className="text-accent">atomic debt migration</strong> technology
               allows borrowers to efficiently move loans between protocols like
               <strong className="inline-flex items-center gap-1 text-primary dark:text-accent">
-                <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                <VesuLogo width={16} height={16} />
                 Vesu
               </strong>,
               <strong className="inline-flex items-center gap-1 text-primary dark:text-accent">
@@ -52,7 +53,7 @@ const Header = () => {
 
             <div className="flex flex-wrap justify-center gap-6 mt-8">
               <div className="flex items-center gap-2 bg-base-300/50 dark:bg-base-300/30 px-4 py-2 rounded-lg">
-                <Image src="/logos/vesu.svg" alt="Vesu Protocol" width={24} height={24} className="rounded-full" />
+                <VesuLogo width={24} height={24} className="rounded-full" />
                 <span className="font-medium text-base-content">Vesu Support</span>
               </div>
               <div className="flex items-center gap-2 bg-base-300/50 dark:bg-base-300/30 px-4 py-2 rounded-lg">
