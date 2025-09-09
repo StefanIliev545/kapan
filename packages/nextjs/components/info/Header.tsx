@@ -36,9 +36,17 @@ const Header = () => {
           
           <div className="prose prose-lg max-w-none dark:prose-invert">
             <p className="text-xl text-center mb-8 text-base-content">
-              Kapan is a decentralized lending aggregator enabling seamless interaction with multiple lending protocols 
-              through a single interface. Our revolutionary <strong className="text-accent">atomic debt migration</strong> technology 
-              allows borrowers to efficiently move loans between protocols like <strong className="text-primary dark:text-accent">Vesu</strong>, <strong className="text-primary dark:text-accent">Nostra</strong>, <strong className="text-primary dark:text-accent">Aave</strong> and <strong className="text-primary dark:text-accent">Compound</strong> to
+              Kapan is a decentralized lending aggregator enabling seamless interaction with multiple lending protocols
+              through a single interface. Our revolutionary <strong className="text-accent">atomic debt migration</strong> technology
+              allows borrowers to efficiently move loans between protocols like
+              <strong className="inline-flex items-center gap-1 text-primary dark:text-accent">
+                <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                Vesu
+              </strong>,
+              <strong className="inline-flex items-center gap-1 text-primary dark:text-accent">
+                <Image src="/logos/nostra.svg" alt="Nostra" width={16} height={16} />
+                Nostra
+              </strong>, <strong className="text-primary dark:text-accent">Aave</strong> and <strong className="text-primary dark:text-accent">Compound</strong> to
               optimize interest rates and improve capital efficiency.
             </p>
 

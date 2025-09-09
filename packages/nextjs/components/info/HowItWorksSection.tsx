@@ -3,8 +3,8 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { BoltIcon, ShieldCheckIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 
-const StepItem = ({ number, text }: { number: number; text: string }) => (
-  <motion.div 
+const StepItem = ({ number, children }: { number: number; children: React.ReactNode }) => (
+  <motion.div
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
@@ -14,7 +14,7 @@ const StepItem = ({ number, text }: { number: number; text: string }) => (
     <div className="bg-gradient-to-r from-primary to-accent p-3 rounded-full w-10 h-10 flex items-center justify-center text-base-100 font-medium">
       {number}
     </div>
-    <span className="text-base-content/90">{text}</span>
+    <span className="text-base-content/90">{children}</span>
   </motion.div>
 );
 
@@ -166,15 +166,39 @@ const HowItWorksSection = () => {
               
               <p className="mb-6 text-base-content/80">
                 Our <span className="text-accent font-medium">atomic debt migration</span> technology lets you move loan positions between protocols
-                like <span className="text-primary">Vesu</span>, <span className="text-primary">Nostra</span>, <span className="text-primary">Aave</span>, and <span className="text-primary">Compound</span> without requiring upfront capital, powered by flash loans:
+                like
+                <span className="inline-flex items-center gap-1 text-primary">
+                  <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                  Vesu
+                </span>
+                ,
+                <span className="inline-flex items-center gap-1 text-primary">
+                  <Image src="/logos/nostra.svg" alt="Nostra" width={16} height={16} />
+                  Nostra
+                </span>
+                , <span className="text-primary">Aave</span>, and <span className="text-primary">Compound</span> without requiring upfront capital, powered by flash loans:
               </p>
               
               <div className="space-y-4">
-                <StepItem number={1} text="Flash loan obtains the required debt repayment amount" />
-                <StepItem number={2} text="Existing loan is repaid in the source protocol (e.g., Vesu)" />
-                <StepItem number={3} text="Collateral is transferred to the target protocol (e.g., Nostra)" />
-                <StepItem number={4} text="New loan is opened in the target protocol at better rates" />
-                <StepItem number={5} text="Flash loan is repaid from the new position" />
+                <StepItem number={1}>Flash loan obtains the required debt repayment amount</StepItem>
+                <StepItem number={2}>
+                  Existing loan is repaid in the source protocol (e.g.,
+                  <span className="inline-flex items-center gap-1 ml-1">
+                    <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                    Vesu
+                  </span>
+                  )
+                </StepItem>
+                <StepItem number={3}>
+                  Collateral is transferred to the target protocol (e.g.,
+                  <span className="inline-flex items-center gap-1 ml-1">
+                    <Image src="/logos/nostra.svg" alt="Nostra" width={16} height={16} />
+                    Nostra
+                  </span>
+                  )
+                </StepItem>
+                <StepItem number={4}>New loan is opened in the target protocol at better rates</StepItem>
+                <StepItem number={5}>Flash loan is repaid from the new position</StepItem>
               </div>
               
               <div className="flex items-center gap-2 mt-6 text-sm text-base-content/70 border-t border-base-300 pt-4">

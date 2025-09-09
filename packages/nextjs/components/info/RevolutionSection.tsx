@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { SparklesIcon, ArrowPathIcon, BanknotesIcon, ShieldCheckIcon, ArrowTrendingUpIcon } from "@heroicons/react/24/outline";
 
@@ -99,8 +100,17 @@ const RevolutionSection = () => {
         className="mt-12 text-center max-w-3xl mx-auto bg-base-100 p-6 rounded-lg shadow-sm border border-base-300/50"
       >
         <p className="text-lg text-base-content">
-          Whether you&apos;re looking to move your <span className="text-accent font-medium">Vesu debt position</span> to <span className="text-accent font-medium">Nostra</span> for better rates,
-          or optimize across platforms like Aave and Compound, Kapan&apos;s atomic debt migration provides a seamless,
+          Whether you&apos;re looking to move your
+          <span className="inline-flex items-center gap-1 text-accent font-medium">
+            <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+            Vesu debt position
+          </span>
+          to
+          <span className="inline-flex items-center gap-1 text-accent font-medium">
+            <Image src="/logos/nostra.svg" alt="Nostra" width={16} height={16} />
+            Nostra
+          </span>
+          for better rates, or optimize across platforms like Aave and Compound, Kapan&apos;s atomic debt migration provides a seamless,
           secure solution for Web3 lending optimization.
         </p>
       </motion.div>

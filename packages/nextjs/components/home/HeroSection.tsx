@@ -17,7 +17,17 @@ const HeroSection = () => {
               </p>
               <p className="py-2 text-lg">
                 Our protocol enables users to optimize their borrowing costs by easily moving debt positions
-                between DeFi lending platforms like Vesu, Nostra, Aave, and Compound.
+                between DeFi lending platforms like
+                <span className="inline-flex items-center gap-1 ml-1">
+                  <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} />
+                  Vesu
+                </span>
+                ,
+                <span className="inline-flex items-center gap-1">
+                  <Image src="/logos/nostra.svg" alt="Nostra" width={16} height={16} />
+                  Nostra
+                </span>
+                , Aave, and Compound.
               </p>
               <p className="py-2 text-lg">
                 With a single transaction, users can take advantage of interest rate differences and save on borrowing costs.
