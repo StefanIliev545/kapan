@@ -72,7 +72,7 @@ export const VesuProtocolView: FC = () => {
     if (!userAddress) return;
     refetchCounter.current += 1;
     if (refetchCounter.current >= 3) {
-      setPositionsRefetchInterval(15000);
+      setPositionsRefetchInterval(5000);
     }
   }, [mergedUserPositions, userAddress]);
 
