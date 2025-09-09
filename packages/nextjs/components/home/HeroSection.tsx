@@ -2,7 +2,8 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import DebtComparison from "./DebtComparison";
-import VesuLogo from "../assets/VesuLogo";
+import VesuFullLogo from "../assets/VesuFullLogo";
+import NostraFullLogo from "../assets/NostraFullLogo";
 
 const HeroSection = () => {
   return (
@@ -46,13 +47,13 @@ const HeroSection = () => {
                   <div className="badge badge-outline">Starknet Live</div>
                   <div className="flex gap-2">
                     <div className="avatar">
-                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
-                        <VesuLogo width={24} height={24} />
+                      <div className="rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+                        <VesuFullLogo width={100} height={24} />
                       </div>
                     </div>
                     <div className="avatar">
-                      <div className="w-8 rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
-                        <Image src="/logos/nostra.svg" alt="Nostra" width={24} height={24} />
+                      <div className="rounded-lg bg-base-100 p-1 shadow-sm border border-base-300">
+                        <NostraFullLogo width={100} height={24} />
                       </div>
                     </div>
                     <div className="avatar">

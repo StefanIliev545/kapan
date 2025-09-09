@@ -51,7 +51,7 @@ const Home: NextPage = () => {
 
         {/* Benefits and roadmap */}
         <BenefitsSection />
-        <RoadmapSection />
+        <RoadmapSection useFullLogos />
       </main>
     </div>
   );

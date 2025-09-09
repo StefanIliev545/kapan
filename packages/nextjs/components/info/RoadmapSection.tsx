@@ -1,6 +1,8 @@
 import React, { useRef } from "react";
 import Image from "next/image";
 import VesuLogo from "../assets/VesuLogo";
+import VesuFullLogo from "../assets/VesuFullLogo";
+import NostraFullLogo from "../assets/NostraFullLogo";
 import { type TargetAndTransition, type Variants, motion, useInView } from "framer-motion";
 import {
   ArrowPathIcon,
@@ -43,7 +45,7 @@ const featureVariants: Variants = {
 };
 
 // Helper to render protocol logos within text when mentioned
-const enhanceWithProtocolLogos = (text: string) => {
+const enhanceWithProtocolLogos = (text: string, useFullLogos: boolean) => {
   // Check for mentions of protocols and wrap them with their logos
   const protocolMatches = {
     "Aave V3": "aave.svg",
@@ -95,17 +97,29 @@ const enhanceWithProtocolLogos = (text: string) => {
     // Add the protocol mention with logo
     const protocol = earliestMatch.protocol;
     const logo = protocolMatches[protocol as keyof typeof protocolMatches];
-    const logoElement =
-      protocol === "Vesu" ? (
-        <VesuLogo width={16} height={16} className="object-contain" />
-      ) : (
-        <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />
-      );
+    let logoElement: React.ReactNode;
+    if (useFullLogos && protocol === "Vesu") {
+      logoElement = <VesuFullLogo width={64} height={16} className="object-contain" />;
+    } else if (useFullLogos && protocol === "Nostra") {
+      logoElement = <NostraFullLogo width={64} height={16} className="object-contain" />;
+    } else if (protocol === "Vesu") {
+      logoElement = <VesuLogo width={16} height={16} className="object-contain" />;
+    } else {
+      logoElement = <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />;
+    }
 
     parts.push(
       <span key={`${protocol}-${lastIndex}`} className="inline-flex items-center align-baseline">
-        <span className="inline-flex items-center justify-center w-4 h-4 mr-1 relative align-middle">{logoElement}</span>
-        <span className="align-baseline">{protocol}</span>
+        <span
+          className={`inline-flex items-center justify-center mr-1 relative align-middle ${
+            useFullLogos && (protocol === "Vesu" || protocol === "Nostra") ? "w-16 h-4" : "w-4 h-4"
+          }`}
+        >
+          {logoElement}
+        </span>
+        {useFullLogos && (protocol === "Vesu" || protocol === "Nostra") ? null : (
+          <span className="align-baseline">{protocol}</span>
+        )}
       </span>,
     );
 
@@ -123,7 +137,7 @@ const Feature = ({ text, index, icon }: { text: string; index: number; icon?: Re
       <div className="p-1.5 rounded-lg bg-accent/10">
         {icon || <ChevronDoubleRightIcon className="w-3.5 h-3.5 text-accent" />}
       </div>
-      <span className="text-base-content/90">{enhanceWithProtocolLogos(text)}</span>
+      <span className="text-base-content/90">{enhanceWithProtocolLogos(text, useFullLogos)}</span>
     </div>
   </motion.li>
 );
@@ -210,7 +224,7 @@ const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => 
         </div>
 
         {/* Description with enhanced text */}
-        <div className="mb-5 text-base-content/80 text-sm">{enhanceWithProtocolLogos(phase.description)}</div>
+        <div className="mb-5 text-base-content/80 text-sm">{enhanceWithProtocolLogos(phase.description, useFullLogos)}</div>
 
         {/* Features with icons */}
         <motion.ul className="space-y-0.5 text-sm">
@@ -230,7 +244,11 @@ const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => 
   );
 };
 
-const RoadmapSection = () => {
+interface RoadmapSectionProps {
+  useFullLogos?: boolean;
+}
+
+const RoadmapSection = ({ useFullLogos = false }: RoadmapSectionProps) => {
   const titleRef = useRef(null);
   const isInViewTitle = useInView(titleRef, { once: true });
 
