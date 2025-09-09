@@ -58,7 +58,11 @@ export const MarketCard: FC<MarketCardProps> = ({
               <span>Utilization</span>
               <span>{utilization}%</span>
             </div>
-            <progress className="progress w-full progress-info" value={utilization} max="100"></progress>
+            <progress
+              className="progress w-full progress-info"
+              value={parseFloat(utilization)}
+              max={100}
+            ></progress>
           </div>
         </div>
       </div>
