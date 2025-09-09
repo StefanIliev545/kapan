@@ -88,6 +88,10 @@ export const useTransactor = (_walletClient?: WalletClient): TransactionFunc => 
         },
       );
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("txCompleted"));
+      }
+
       if (options?.onBlockConfirmation) options.onBlockConfirmation(transactionReceipt);
     } catch (error: any) {
       if (notificationId) {

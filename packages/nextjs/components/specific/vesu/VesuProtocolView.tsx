@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "~~/hooks/useAccount";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { VesuMarkets, POOL_IDS, ContractResponse } from "./VesuMarkets";
@@ -27,14 +27,24 @@ export const VesuProtocolView: FC = () => {
   }
 
   // Paginated user positions reads
-  const { data: userPositionsPart1, error: positionsError1, isFetching: isFetching1 } = useScaffoldReadContract({
+  const {
+    data: userPositionsPart1,
+    error: positionsError1,
+    isFetching: isFetching1,
+    refetch: refetchPositionsPart1,
+  } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 0n, 3n],
     watch: true,
     refetchInterval: 5000,
   });
-  const { data: userPositionsPart2, error: positionsError2, isFetching: isFetching2 } = useScaffoldReadContract({
+  const {
+    data: userPositionsPart2,
+    error: positionsError2,
+    isFetching: isFetching2,
+    refetch: refetchPositionsPart2,
+  } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 3n, 10n],
@@ -57,6 +67,12 @@ export const VesuProtocolView: FC = () => {
 
   const isUpdating = isFetching1 || isFetching2;
 
+  const refetchPositions = useCallback(() => {
+    if (!userAddress) return;
+    refetchPositionsPart1();
+    refetchPositionsPart2();
+  }, [userAddress, refetchPositionsPart1, refetchPositionsPart2]);
+
   // Keep previous positions while new data is loading to avoid UI flicker
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
 
@@ -69,6 +85,20 @@ export const VesuProtocolView: FC = () => {
       setCachedPositions(mergedUserPositions);
     }
   }, [mergedUserPositions, isUpdating, userAddress]);
+
+  useEffect(() => {
+    if (userAddress) {
+      refetchPositions();
+    }
+  }, [userAddress, refetchPositions]);
+
+  useEffect(() => {
+    const handler = () => refetchPositions();
+    window.addEventListener("txCompleted", handler);
+    return () => {
+      window.removeEventListener("txCompleted", handler);
+    };
+  }, [refetchPositions]);
 
   const positionRows = useMemo(() => {
     if (!supportedAssets) return null;
