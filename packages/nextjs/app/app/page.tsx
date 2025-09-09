@@ -67,7 +67,7 @@ const App: NextPage = () => {
   ];
 
   return (
-    <div className="container mx-auto px-5 flex">
+    <div className="container mx-auto flex p-0">
       <div className="hidden lg:block">
         <LendingSidebar />
       </div>
