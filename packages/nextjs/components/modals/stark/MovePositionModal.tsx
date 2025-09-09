@@ -13,7 +13,6 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import {
   useDeployedContractInfo,
   useScaffoldMultiWriteContract,
@@ -105,7 +104,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
-  const gasCostUsd = useGasEstimate("stark");
 
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
@@ -1169,7 +1167,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     {actionButtonText}
                   </span>
                   <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump /> ${formatDisplayNumber(gasCostUsd)}
+                    <FaGasPump className="text-gray-400" />
                   </span>
                 </button>
               </div>
