@@ -2,6 +2,7 @@
 
 import { FC, useMemo, useState } from "react";
 import Image from "next/image";
+import VesuLogo from "../assets/VesuLogo";
 import { ContractResponse, POOL_IDS } from "../specific/vesu/VesuMarkets";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
@@ -404,7 +405,11 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     <span>{networkNames[m.networkType]}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
+                    {m.protocol === "vesu" ? (
+                      <VesuLogo width={16} height={16} />
+                    ) : (
+                      <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
+                    )}
                     <span className="capitalize">{protocolNames[m.protocol]}</span>
                   </div>
                   <div className="justify-self-center">

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import VesuFullLogo from "../assets/VesuFullLogo";
+import NostraFullLogo from "../assets/NostraFullLogo";
 import { FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useTokenData } from "~~/hooks/useTokenData";
@@ -26,7 +28,7 @@ const AnimatedValue = ({ children, className }: { children: React.ReactNode; cla
 
 const DebtComparison = () => {
   const tokenData = useTokenData();
-  const [starknetRate, setStarknetRate] = useState(0);
+  const [nostraRate, setNostraRate] = useState(0);
 
   useEffect(() => {
     const fetchRate = async () => {
@@ -42,7 +44,7 @@ const DebtComparison = () => {
           )
           .sort((a: any, b: any) => (b.apyBaseBorrow ?? 0) - (a.apyBaseBorrow ?? 0));
         if (pools.length) {
-          setStarknetRate(pools[0].apyBaseBorrow ?? 0);
+          setNostraRate(pools[0].apyBaseBorrow ?? 0);
         }
       } catch (e) {
         console.error(e);
@@ -52,23 +54,29 @@ const DebtComparison = () => {
   }, [tokenData.symbol]);
 
   // Find rates from all supported protocols
+  const vesuProtocol = tokenData.protocols.find(p => p.name === "Vesu");
   const aaveProtocol = tokenData.protocols.find(p => p.name === "Aave V3");
   const compoundProtocol = tokenData.protocols.find(p => p.name === "Compound V3");
   const venusProtocol = tokenData.protocols.find(p => p.name === "Venus");
   
+  const vesuRate = vesuProtocol?.rate || 0;
   const aaveRate = aaveProtocol?.rate || 0;
   const compoundRate = compoundProtocol?.rate || 0;
   const venusRate = venusProtocol?.rate || 0;
 
   // Find the protocol with the highest rate
-  const ratesByProtocol = [
+  const ratesByProtocol = [] as { name: string; rate: number; logo: string }[];
+  if (vesuRate > 0) {
+    ratesByProtocol.push({ name: "Vesu", rate: vesuRate, logo: "/logos/vesu_full.svg" });
+  }
+  if (nostraRate > 0) {
+    ratesByProtocol.push({ name: "Nostra", rate: nostraRate, logo: "/logos/nostra_full.svg" });
+  }
+  ratesByProtocol.push(
     { name: "Aave", rate: aaveRate, logo: "/logos/aave.svg" },
     { name: "Compound", rate: compoundRate, logo: "/logos/compound.svg" },
     { name: "Venus", rate: venusRate, logo: "/logos/venus.svg" },
-  ];
-  if (starknetRate > 0) {
-    ratesByProtocol.push({ name: "Nostra", rate: starknetRate, logo: "/logos/nostra.svg" });
-  }
+  );
 
   // Sort protocols by rate (highest first)
   const sortedProtocols = [...ratesByProtocol].sort((a, b) => b.rate - a.rate);
@@ -78,7 +86,7 @@ const DebtComparison = () => {
   const lowestRateProtocol = sortedProtocols[sortedProtocols.length - 1];
 
   const getNetworkInfo = (protocolName: string) => {
-    if (protocolName === "Nostra") {
+    if (protocolName === "Nostra" || protocolName === "Vesu") {
       return { logo: "/logos/starknet.svg", name: "Starknet" };
     }
     return { logo: "/logos/arb.svg", name: "Arbitrum" };
@@ -132,7 +140,9 @@ const DebtComparison = () => {
               <span>debt on</span>
             </div>
             <div className="inline-flex items-center gap-2 whitespace-nowrap">
-              <div className="w-5 h-5 relative">
+              <div
+                className={`relative ${["Vesu", "Nostra"].includes(highestRateProtocol.name) ? "w-20" : "w-5"} h-5`}
+              >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={highestRateProtocol.name.toLowerCase()}
@@ -142,16 +152,24 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image
-                      src={highestRateProtocol.logo}
-                      alt={highestRateProtocol.name}
-                      fill
-                      className="object-contain"
-                    />
+                    {highestRateProtocol.name === "Vesu" ? (
+                      <VesuFullLogo width={80} height={20} className="object-contain" />
+                    ) : highestRateProtocol.name === "Nostra" ? (
+                      <NostraFullLogo width={80} height={20} className="object-contain" />
+                    ) : (
+                      <Image
+                        src={highestRateProtocol.logo}
+                        alt={highestRateProtocol.name}
+                        fill
+                        className="object-contain"
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <AnimatedValue>{highestRateProtocol.name}</AnimatedValue>
+              {["Vesu", "Nostra"].includes(highestRateProtocol.name) ? null : (
+                <AnimatedValue>{highestRateProtocol.name}</AnimatedValue>
+              )}
               <span>on</span>
               <div className="w-4 h-4 relative">
                 <Image src={networkInfo.logo} alt={networkInfo.name} fill className="object-contain" />
@@ -173,7 +191,7 @@ const DebtComparison = () => {
         <div className="card bg-base-200 dark:bg-base-300/30 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="avatar">
-              <div className="w-8 h-8 rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
+              <div className="rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={highestRateProtocol.name.toLowerCase()}
@@ -183,19 +201,25 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image
-                      src={highestRateProtocol.logo}
-                      alt={highestRateProtocol.name}
-                      width={24}
-                      height={24}
-                    />
+                    {highestRateProtocol.name === "Vesu" ? (
+                      <VesuFullLogo width={96} height={24} />
+                    ) : highestRateProtocol.name === "Nostra" ? (
+                      <NostraFullLogo width={96} height={24} />
+                    ) : (
+                      <Image
+                        src={highestRateProtocol.logo}
+                        alt={highestRateProtocol.name}
+                        width={24}
+                        height={24}
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
             <div>
               <AnimatedValue className="font-semibold text-base-content">
-                Currently on {highestRateProtocol.name}
+                {`Currently on${["Vesu", "Nostra"].includes(highestRateProtocol.name) ? "" : ` ${highestRateProtocol.name}`}`}
               </AnimatedValue>
               <div className="text-sm text-base-content/70">Variable Rate</div>
             </div>
@@ -216,7 +240,7 @@ const DebtComparison = () => {
         <div className="card bg-base-200 dark:bg-base-300/30 p-4 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="avatar">
-              <div className="w-8 h-8 rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
+              <div className="rounded-lg bg-base-100 dark:bg-base-300 p-1 shadow-sm border border-base-300 dark:border-base-content/10">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={lowestRateProtocol.name.toLowerCase()}
@@ -226,19 +250,25 @@ const DebtComparison = () => {
                     transition={{ duration: 0.3 }}
                     className="w-full h-full"
                   >
-                    <Image
-                      src={lowestRateProtocol.logo}
-                      alt={lowestRateProtocol.name}
-                      width={24}
-                      height={24}
-                    />
+                    {lowestRateProtocol.name === "Vesu" ? (
+                      <VesuFullLogo width={96} height={24} />
+                    ) : lowestRateProtocol.name === "Nostra" ? (
+                      <NostraFullLogo width={96} height={24} />
+                    ) : (
+                      <Image
+                        src={lowestRateProtocol.logo}
+                        alt={lowestRateProtocol.name}
+                        width={24}
+                        height={24}
+                      />
+                    )}
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
             <div>
               <AnimatedValue className="font-semibold text-base-content">
-                Available on {lowestRateProtocol.name}
+                {`Available on${["Vesu", "Nostra"].includes(lowestRateProtocol.name) ? "" : ` ${lowestRateProtocol.name}`}`}
               </AnimatedValue>
               <div className="text-sm text-base-content/70">Variable Rate</div>
             </div>

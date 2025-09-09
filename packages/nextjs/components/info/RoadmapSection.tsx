@@ -1,5 +1,8 @@
 import React, { useRef } from "react";
 import Image from "next/image";
+import VesuLogo from "../assets/VesuLogo";
+import VesuFullLogo from "../assets/VesuFullLogo";
+import NostraFullLogo from "../assets/NostraFullLogo";
 import { type TargetAndTransition, type Variants, motion, useInView } from "framer-motion";
 import {
   ArrowPathIcon,
@@ -42,7 +45,7 @@ const featureVariants: Variants = {
 };
 
 // Helper to render protocol logos within text when mentioned
-const enhanceWithProtocolLogos = (text: string) => {
+const enhanceWithProtocolLogos = (text: string, useFullLogos: boolean) => {
   // Check for mentions of protocols and wrap them with their logos
   const protocolMatches = {
     "Aave V3": "aave.svg",
@@ -57,6 +60,8 @@ const enhanceWithProtocolLogos = (text: string) => {
     Optimism: "optimism.svg", // Using ETH for now as placeholder
     Polygon: "eth.svg", // Using ETH for now as placeholder
     Base: "base.svg", // Using ETH for now as placeholder
+    Vesu: "vesu.svg",
+    Nostra: "nostra.svg",
   };
 
   // Split the text by protocol mentions and create an array of React components
@@ -92,13 +97,29 @@ const enhanceWithProtocolLogos = (text: string) => {
     // Add the protocol mention with logo
     const protocol = earliestMatch.protocol;
     const logo = protocolMatches[protocol as keyof typeof protocolMatches];
+    let logoElement: React.ReactNode;
+    if (useFullLogos && protocol === "Vesu") {
+      logoElement = <VesuFullLogo width={64} height={16} className="object-contain" />;
+    } else if (useFullLogos && protocol === "Nostra") {
+      logoElement = <NostraFullLogo width={64} height={16} className="object-contain" />;
+    } else if (protocol === "Vesu") {
+      logoElement = <VesuLogo width={16} height={16} className="object-contain" />;
+    } else {
+      logoElement = <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />;
+    }
 
     parts.push(
       <span key={`${protocol}-${lastIndex}`} className="inline-flex items-center align-baseline">
-        <span className="inline-flex items-center justify-center w-4 h-4 mr-1 relative align-middle">
-          <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />
+        <span
+          className={`inline-flex items-center justify-center mr-1 relative align-middle ${
+            useFullLogos && (protocol === "Vesu" || protocol === "Nostra") ? "w-16 h-4" : "w-4 h-4"
+          }`}
+        >
+          {logoElement}
         </span>
-        <span className="align-baseline">{protocol}</span>
+        {useFullLogos && (protocol === "Vesu" || protocol === "Nostra") ? null : (
+          <span className="align-baseline">{protocol}</span>
+        )}
       </span>,
     );
 
@@ -110,18 +131,36 @@ const enhanceWithProtocolLogos = (text: string) => {
   return <>{parts}</>;
 };
 
-const Feature = ({ text, index, icon }: { text: string; index: number; icon?: React.ReactNode }) => (
+const Feature = ({
+  text,
+  index,
+  icon,
+  useFullLogos,
+}: {
+  text: string;
+  index: number;
+  icon?: React.ReactNode;
+  useFullLogos: boolean;
+}) => (
   <motion.li custom={index} variants={featureVariants} initial="hidden" animate="visible" className="py-2">
     <div className="flex items-center gap-3">
       <div className="p-1.5 rounded-lg bg-accent/10">
         {icon || <ChevronDoubleRightIcon className="w-3.5 h-3.5 text-accent" />}
       </div>
-      <span className="text-base-content/90">{enhanceWithProtocolLogos(text)}</span>
+      <span className="text-base-content/90">{enhanceWithProtocolLogos(text, useFullLogos)}</span>
     </div>
   </motion.li>
 );
 
-const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => {
+const PhaseCard = ({
+  phase,
+  index,
+  useFullLogos,
+}: {
+  phase: RoadmapPhase;
+  index: number;
+  useFullLogos: boolean;
+}) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.2 });
 
@@ -203,12 +242,18 @@ const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => 
         </div>
 
         {/* Description with enhanced text */}
-        <div className="mb-5 text-base-content/80 text-sm">{enhanceWithProtocolLogos(phase.description)}</div>
+        <div className="mb-5 text-base-content/80 text-sm">{enhanceWithProtocolLogos(phase.description, useFullLogos)}</div>
 
         {/* Features with icons */}
         <motion.ul className="space-y-0.5 text-sm">
           {phase.features.map((feature, idx) => (
-            <Feature key={idx} text={feature} index={idx} icon={iconMap[feature] || undefined} />
+            <Feature
+              key={idx}
+              text={feature}
+              index={idx}
+              icon={iconMap[feature] || undefined}
+              useFullLogos={useFullLogos}
+            />
           ))}
         </motion.ul>
       </div>
@@ -223,7 +268,11 @@ const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => 
   );
 };
 
-const RoadmapSection = () => {
+interface RoadmapSectionProps {
+  useFullLogos?: boolean;
+}
+
+const RoadmapSection = ({ useFullLogos = false }: RoadmapSectionProps) => {
   const titleRef = useRef(null);
   const isInViewTitle = useInView(titleRef, { once: true });
 
@@ -234,23 +283,30 @@ const RoadmapSection = () => {
       description:
         "Core features supporting basic lending operations and atomic debt migration across Aave V3, Compound V3, and Venus Protocol.",
       features: ["Supply Assets", "Repay Loans", "Atomic Debt Migration", "Cross-Protocol Rate Comparison"],
-      isActive: true,
       icon: <RocketLaunchIcon className="w-5 h-5" />,
     },
     {
       phase: 2,
-      title: "Advanced DeFi Loan Management",
-      description: "Enhanced debt management with smart routing and cross-protocol collateral operations.",
+      title: "Starknet Deployment",
+      description: "Launch on Starknet with full Vesu and Nostra support.",
+      features: ["Full Vesu Support", "Full Nostra Support"],
+      isActive: true,
+      icon: <GlobeAltIcon className="w-5 h-5" />,
+    },
+    {
+      phase: 3,
+      title: "Advanced Position Management",
+      description: "Automation features for proactive loan management across protocols.",
       features: [
+        "Automatic Stop Loss Liquidations",
+        "Closing Positions",
+        "Debt Switching",
         "Collateral Switching",
-        "Smart Debt Migration Routing",
-        "Cross-Protocol Collateral Detection",
-        "Multi-step Position Refinancing",
       ],
       icon: <ArrowsPointingOutIcon className="w-5 h-5" />,
     },
     {
-      phase: 3,
+      phase: 4,
       title: "Web3 Lending Protocol Expansion",
       description:
         "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
@@ -258,7 +314,7 @@ const RoadmapSection = () => {
       icon: <BuildingLibraryIcon className="w-5 h-5" />,
     },
     {
-      phase: 4,
+      phase: 5,
       title: "DeFi Loan Rate Optimization",
       description:
         "Implementing sophisticated algorithms for finding and automatically executing the most profitable Web3 loan refinancing strategies.",
@@ -271,7 +327,7 @@ const RoadmapSection = () => {
       icon: <ChartBarIcon className="w-5 h-5" />,
     },
     {
-      phase: 5,
+      phase: 6,
       title: "Cross-chain Web3 Debt Migration & Advanced Features",
       description:
         "Expanding atomic debt migration to multiple blockchain networks and implementing advanced DeFi portfolio management features.",
@@ -361,7 +417,7 @@ const RoadmapSection = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {roadmapPhases.map((phase, index) => (
-            <PhaseCard key={index} phase={phase} index={index} />
+            <PhaseCard key={index} phase={phase} index={index} useFullLogos={useFullLogos} />
           ))}
         </div>
       </div>
