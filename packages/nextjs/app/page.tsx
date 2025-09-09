@@ -1,13 +1,8 @@
 import type { NextPage } from "next";
-import dynamic from "next/dynamic";
 import HeroSection from "../components/home/HeroSection";
 import HowItWorks from "../components/home/HowItWorks";
 import ProtocolStats from "../components/home/ProtocolStats";
-
-const TransactionFeed = dynamic(() => import("../components/TransactionFeed"), {
-  ssr: false,
-  loading: () => null,
-});
+import TransactionFeed from "../components/TransactionFeed.client";
 
 /**
  * Home Page Component
