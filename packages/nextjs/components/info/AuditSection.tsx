@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
-import Link from "next/link";
+import Button from "~~/components/common/Button";
 
 const AuditSection = () => {
   return (
@@ -21,14 +21,14 @@ const AuditSection = () => {
         <p className="text-base-content/80 max-w-2xl mx-auto mb-6">
           Our protocol has undergone a comprehensive review by Codespect.
         </p>
-        <Link
+        <Button
           href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-primary"
+          variant="primary"
         >
           View Audit Report
-        </Link>
+        </Button>
       </motion.div>
     </section>
   );

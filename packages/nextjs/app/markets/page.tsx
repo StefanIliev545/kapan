@@ -3,15 +3,29 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import dynamic from "next/dynamic";
 import { LendingSidebar } from "~~/components/LendingSidebar";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
-import { AaveMarkets } from "~~/components/specific/aave/AaveMarkets";
-import { CompoundMarkets } from "~~/components/specific/compound/CompoundMarkets";
-import { NostraMarkets } from "~~/components/specific/nostra/NostraMarkets";
-import { VenusMarkets } from "~~/components/specific/venus/VenusMarkets";
-import { ContractResponse, POOL_IDS, VesuMarkets } from "~~/components/specific/vesu/VesuMarkets";
+import { ContractResponse, POOL_IDS } from "~~/components/specific/vesu/VesuMarkets";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+
+// Lazily load large protocol specific market components to reduce the initial bundle size
+const AaveMarkets = dynamic(() => import("~~/components/specific/aave/AaveMarkets"), {
+  ssr: false,
+});
+const CompoundMarkets = dynamic(() => import("~~/components/specific/compound/CompoundMarkets"), {
+  ssr: false,
+});
+const VenusMarkets = dynamic(() => import("~~/components/specific/venus/VenusMarkets"), {
+  ssr: false,
+});
+const VesuMarkets = dynamic(() => import("~~/components/specific/vesu/VesuMarkets"), {
+  ssr: false,
+});
+const NostraMarkets = dynamic(() => import("~~/components/specific/nostra/NostraMarkets"), {
+  ssr: false,
+});
 
 const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
