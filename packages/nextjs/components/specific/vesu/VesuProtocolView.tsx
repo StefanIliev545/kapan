@@ -1,5 +1,5 @@
-import { FC, useEffect, useMemo, useState } from "react";
-import { useAccount } from "@starknet-react/core";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { useAccount } from "~~/hooks/useAccount";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { VesuMarkets, POOL_IDS, ContractResponse } from "./VesuMarkets";
 import { VesuPosition } from "./VesuPosition";
@@ -12,7 +12,7 @@ type PositionTuple = {
 };
 
 export const VesuProtocolView: FC = () => {
-  const { address: userAddress } = useAccount();
+  const { address: userAddress, status } = useAccount();
   const poolId = POOL_IDS["Genesis"];
 
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
@@ -27,17 +27,27 @@ export const VesuProtocolView: FC = () => {
   }
 
   // Paginated user positions reads
-  const { data: userPositionsPart1, error: positionsError1, isFetching: isFetching1 } = useScaffoldReadContract({
+  const {
+    data: userPositionsPart1,
+    error: positionsError1,
+    isFetching: isFetching1,
+    refetch: refetchPositionsPart1,
+  } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
-    args: [userAddress || "0x0", poolId, 0n, 3n],
+    args: [userAddress, poolId, 0n, 3n],
     watch: true,
     refetchInterval: 5000,
   });
-  const { data: userPositionsPart2, error: positionsError2, isFetching: isFetching2 } = useScaffoldReadContract({
+  const {
+    data: userPositionsPart2,
+    error: positionsError2,
+    isFetching: isFetching2,
+    refetch: refetchPositionsPart2,
+  } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
-    args: [userAddress || "0x0", poolId, 3n, 10n],
+    args: [userAddress, poolId, 3n, 10n],
     watch: true,
     refetchInterval: 5000,
   });
@@ -57,14 +67,38 @@ export const VesuProtocolView: FC = () => {
 
   const isUpdating = isFetching1 || isFetching2;
 
+  const refetchPositions = useCallback(() => {
+    if (!userAddress) return;
+    refetchPositionsPart1();
+    refetchPositionsPart2();
+  }, [userAddress, refetchPositionsPart1, refetchPositionsPart2]);
+
   // Keep previous positions while new data is loading to avoid UI flicker
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
 
   useEffect(() => {
+    if (!userAddress) {
+      setCachedPositions([]);
+      return;
+    }
     if (!isUpdating) {
       setCachedPositions(mergedUserPositions);
     }
-  }, [mergedUserPositions, isUpdating]);
+  }, [mergedUserPositions, isUpdating, userAddress]);
+
+  useEffect(() => {
+    if (userAddress) {
+      refetchPositions();
+    }
+  }, [userAddress, refetchPositions]);
+
+  useEffect(() => {
+    const handler = () => refetchPositions();
+    window.addEventListener("txCompleted", handler);
+    return () => {
+      window.removeEventListener("txCompleted", handler);
+    };
+  }, [refetchPositions]);
 
   const positionRows = useMemo(() => {
     if (!supportedAssets) return null;
@@ -111,72 +145,78 @@ export const VesuProtocolView: FC = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="w-full flex flex-col p-4 space-y-4">
       <VesuMarkets
         supportedAssets={supportedAssets as ContractResponse | undefined}
         viewMode="grid"
         search=""
       />
 
-      {userAddress && (
-        <div className="card bg-base-100 shadow-md">
-          <div className="card-body p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="card-title text-lg">Your Positions</h2>
-              {positionRows?.length ? (
-                <div className="text-right">
-                  <div className="text-sm text-gray-500">Total Net Balance</div>
-                  <div className="text-xl font-bold">
-                    $
-                    {positionRows
-                      .reduce((total, position) => {
-                        const collateralMetadata = position.props.supportedAssets.find(
-                          (asset: TokenMetadata) =>
-                            `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` ===
-                            position.props.collateralAsset,
-                        );
-                        const debtMetadata = position.props.supportedAssets.find(
-                          (asset: TokenMetadata) =>
-                            `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === position.props.debtAsset,
-                        );
+      <div className="card bg-base-100 shadow-md">
+        <div className="card-body p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="card-title text-lg">Your Positions</h2>
+            {userAddress && positionRows?.length ? (
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Total Net Balance</div>
+                <div className="text-xl font-bold">
+                  $
+                  {positionRows
+                    .reduce((total, position) => {
+                      const collateralMetadata = position.props.supportedAssets.find(
+                        (asset: TokenMetadata) =>
+                          `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` ===
+                          position.props.collateralAsset,
+                      );
+                      const debtMetadata = position.props.supportedAssets.find(
+                        (asset: TokenMetadata) =>
+                          `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === position.props.debtAsset,
+                      );
 
-                        if (!collateralMetadata) return total;
+                      if (!collateralMetadata) return total;
 
-                        const collateralAmtNum = parseFloat(
-                          formatTokenAmount(position.props.collateralAmount, collateralMetadata.decimals),
-                        );
-                        const collateralPriceNum = parseFloat(
-                          formatTokenAmount(collateralMetadata.price.value.toString(), 18),
-                        );
-                        const collateralValue = collateralAmtNum * collateralPriceNum;
+                      const collateralAmtNum = parseFloat(
+                        formatTokenAmount(position.props.collateralAmount, collateralMetadata.decimals),
+                      );
+                      const collateralPriceNum = parseFloat(
+                        formatTokenAmount(collateralMetadata.price.value.toString(), 18),
+                      );
+                      const collateralValue = collateralAmtNum * collateralPriceNum;
 
-                        let debtValue = 0;
-                        if (position.props.nominalDebt !== "0" && debtMetadata) {
-                          const debtAmtNum = parseFloat(formatTokenAmount(position.props.nominalDebt, 18));
-                          const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata.price.value.toString(), 18));
-                          debtValue = debtAmtNum * debtPriceNum;
-                        }
+                      let debtValue = 0;
+                      if (position.props.nominalDebt !== "0" && debtMetadata) {
+                        const debtAmtNum = parseFloat(formatTokenAmount(position.props.nominalDebt, 18));
+                        const debtPriceNum = parseFloat(formatTokenAmount(debtMetadata.price.value.toString(), 18));
+                        debtValue = debtAmtNum * debtPriceNum;
+                      }
 
-                        return total + (collateralValue - debtValue);
-                      }, 0)
-                      .toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                  </div>
+                      return total + (collateralValue - debtValue);
+                    }, 0)
+                    .toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                 </div>
-              ) : null}
-            </div>
-            <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "" : ""}`}>
-              {positionRows?.length ? (
-                positionRows
-              ) : (
-                <div className="text-center py-4 text-gray-500 w-full">No positions found</div>
-              )}
-            </div>
+              </div>
+            ) : null}
+          </div>
+          <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "" : ""}`}>
+            {status === "connecting" ? (
+              <div className="text-center py-4 w-full">
+                <span className="loading loading-spinner" />
+              </div>
+            ) : !userAddress ? (
+              <div className="text-center py-4 text-gray-500 w-full">
+                Connect your Starknet wallet to view
+              </div>
+            ) : positionRows?.length ? (
+              positionRows
+            ) : (
+              <div className="text-center py-4 text-gray-500 w-full">No positions found</div>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
