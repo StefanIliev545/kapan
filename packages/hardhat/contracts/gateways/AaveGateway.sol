@@ -51,17 +51,27 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
     function withdrawCollateral(address, address token, address user, uint256 amount) external override onlyRouter returns (address, uint256) {
         address aToken = getAToken(token);
         IERC20 atoken = IERC20(aToken);
-        
-        require(atoken.balanceOf(user) >= amount, "Insufficient balance of atokens");
+
+        uint256 userBal = atoken.balanceOf(user);
+        uint256 withdrawAmount = amount;
+        if (withdrawAmount == type(uint256).max || withdrawAmount > userBal) {
+            withdrawAmount = userBal;
+        }
         uint256 allowance = atoken.allowance(user, address(this));
-        require(allowance >= amount, "Insufficient allowance");
-        atoken.transferFrom(user, address(this), amount);
+        if (withdrawAmount > allowance) {
+            withdrawAmount = allowance;
+        }
+        if (withdrawAmount == 0) {
+            return (token, 0);
+        }
+
+        atoken.transferFrom(user, address(this), withdrawAmount);
 
         address underlying = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
-        IPool(poolAddressesProvider.getPool()).withdraw(underlying, amount, address(this));
+        IPool(poolAddressesProvider.getPool()).withdraw(underlying, withdrawAmount, address(this));
 
-        IERC20(underlying).safeTransfer(msg.sender, amount);
-        return (underlying, amount);
+        IERC20(underlying).safeTransfer(msg.sender, withdrawAmount);
+        return (underlying, withdrawAmount);
     }
 
     function borrow(address token, address user, uint256 amount) external override onlyRouterOrSelf(user) nonReentrant {
@@ -71,19 +81,29 @@ contract AaveGateway is IGateway, ProtocolGateway, ReentrancyGuard {
         (, address variableDebtToken, bool found) = _getReserveAddresses(token);
         require(found && variableDebtToken != address(0), "Token is not a valid debt token");
         uint256 allowance = DebtToken(variableDebtToken).borrowAllowance(user, address(this));
-        require(allowance >= amount, "Insufficient borrow allowance");
+        uint256 borrowAmount = amount;
+        if (borrowAmount == type(uint256).max || borrowAmount > allowance) {
+            borrowAmount = allowance;
+        }
+        if (borrowAmount == 0) {
+            return;
+        }
 
-        IPool(poolAddress).borrow(token, amount, 2, REFERRAL_CODE, user);
-        IERC20(token).safeTransfer(msg.sender, amount);
+        IPool(poolAddress).borrow(token, borrowAmount, 2, REFERRAL_CODE, user);
+        IERC20(token).safeTransfer(msg.sender, borrowAmount);
     }
 
     function repay(address token, address user, uint256 amount) external override nonReentrant {
         address poolAddress = poolAddressesProvider.getPool();
         require(poolAddress != address(0), "Pool address not set");
-    
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(poolAddress, amount);
-        IPool(poolAddress).repay(token, amount, 2, user);
+
+        uint256 repayAmount = amount;
+        if (repayAmount == type(uint256).max) {
+            repayAmount = getBorrowBalance(token, user);
+        }
+        IERC20(token).safeTransferFrom(msg.sender, address(this), repayAmount);
+        IERC20(token).approve(poolAddress, repayAmount);
+        IPool(poolAddress).repay(token, repayAmount, 2, user);
     }
 
     struct TokenInfo {

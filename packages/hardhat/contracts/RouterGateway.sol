@@ -20,6 +20,30 @@ interface IFlashLoanProvider {
     ) external;
 }
 
+enum InstructionType {
+    Deposit,
+    Withdraw,
+    Borrow,
+    Repay
+}
+
+struct BasicInstruction {
+    address token;
+    uint256 amount;
+    address user;
+}
+
+struct LendingInstruction {
+    InstructionType instructionType;
+    BasicInstruction basic;
+    bytes context;
+}
+
+struct ProtocolInstruction {
+    string protocolName;
+    LendingInstruction[] instructions;
+}
+
 contract RouterGateway is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -39,6 +63,62 @@ contract RouterGateway is Ownable, ReentrancyGuard {
 
     function addGateway(string calldata protocolName, address gateway) external onlyOwner {
         gateways[protocolName] = IGateway(gateway);
+    }
+
+    function processProtocolInstructions(ProtocolInstruction[] calldata protocolInstructions) external nonReentrant {
+        for (uint256 i = 0; i < protocolInstructions.length; i++) {
+            IGateway gateway = gateways[protocolInstructions[i].protocolName];
+            require(address(gateway) != address(0), "Protocol not supported");
+            for (uint256 j = 0; j < protocolInstructions[i].instructions.length; j++) {
+                LendingInstruction calldata inst = protocolInstructions[i].instructions[j];
+                BasicInstruction calldata basic = inst.basic;
+                if (inst.instructionType == InstructionType.Deposit) {
+                    uint256 balance = IERC20(basic.token).balanceOf(msg.sender);
+                    uint256 allowance = IERC20(basic.token).allowance(msg.sender, address(this));
+                    uint256 amount = basic.amount;
+                    if (amount == type(uint256).max) amount = balance;
+                    if (amount > balance) amount = balance;
+                    if (amount > allowance) amount = allowance;
+                    if (amount > 0) {
+                        IERC20(basic.token).safeTransferFrom(msg.sender, address(this), amount);
+                        IERC20(basic.token).approve(address(gateway), amount);
+                        gateway.deposit(basic.token, basic.user, amount);
+                    }
+                } else if (inst.instructionType == InstructionType.Repay) {
+                    uint256 balance = IERC20(basic.token).balanceOf(msg.sender);
+                    uint256 allowance = IERC20(basic.token).allowance(msg.sender, address(this));
+                    uint256 debt = gateway.getBorrowBalance(basic.token, basic.user);
+                    uint256 amount = basic.amount;
+                    if (amount == type(uint256).max) amount = debt;
+                    if (amount > debt) amount = debt;
+                    if (amount > balance) amount = balance;
+                    if (amount > allowance) amount = allowance;
+                    if (amount > 0) {
+                        IERC20(basic.token).safeTransferFrom(msg.sender, address(this), amount);
+                        IERC20(basic.token).approve(address(gateway), amount);
+                        gateway.repay(basic.token, basic.user, amount);
+                    }
+                } else if (inst.instructionType == InstructionType.Borrow) {
+                    uint256 amount = basic.amount;
+                    gateway.borrow(basic.token, basic.user, amount);
+                    IERC20(basic.token).safeTransfer(basic.user, amount);
+                } else if (inst.instructionType == InstructionType.Withdraw) {
+                    uint256 balance = gateway.getBalance(basic.token, basic.user);
+                    uint256 amount = basic.amount;
+                    if (amount == type(uint256).max) amount = balance;
+                    if (amount > balance) amount = balance;
+                    if (amount > 0) {
+                        (address underlying, uint256 received) = gateway.withdrawCollateral(
+                            basic.token,
+                            basic.token,
+                            basic.user,
+                            amount
+                        );
+                        IERC20(underlying).safeTransfer(basic.user, received);
+                    }
+                }
+            }
+        }
     }
 
     function supplyWithPermit(
