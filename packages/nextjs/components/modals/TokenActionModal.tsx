@@ -1,9 +1,12 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { formatUnits, parseUnits } from "viem";
 import type { Network } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
+import { FeeEstimate } from "~~/components/FeeEstimate";
+import type { Call } from "starknet";
 
 export interface TokenInfo {
   name: string;
@@ -29,6 +32,10 @@ export interface TokenActionModalProps {
   max?: bigint;
   network: Network;
   buildTx?: (amount: string, isMax: boolean) => any;
+  buildCalls?: (
+    amount: string,
+    isMax: boolean,
+  ) => Promise<Call | Call[] | null | undefined> | Call | Call[] | null | undefined;
   hf?: number;
   utilization?: number;
   ltv?: number;
@@ -179,10 +186,12 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   balance,
   percentBase,
   max,
+  network,
   hf = 1.9,
   utilization = 65,
   ltv = 75,
   position,
+  buildCalls,
   onConfirm,
 }) => {
   const [amount, setAmount] = useState("");
@@ -222,6 +231,17 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
         return before;
     }
   }, [action, before, parsed]);
+
+  const buildCallsForEstimate = useCallback(() => {
+    if (!buildCalls) return null;
+    return buildCalls(amount, isMax);
+  }, [buildCalls, amount, isMax]);
+
+  const { loading: feeLoading, error: feeError, feeNative, feeUsd } = useGasEstimate({
+    enabled: isOpen && network === "stark",
+    buildCalls: buildCallsForEstimate,
+    currency: "STRK",
+  });
 
   const handleClose = () => {
     setAmount("");
@@ -293,6 +313,15 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 <TokenPill value={afterValue} icon={token.icon} name={token.name} />
               </div>
             </div>
+            {network === "stark" && (
+              <FeeEstimate
+                loading={feeLoading}
+                error={feeError}
+                feeNative={feeNative}
+                feeUsd={feeUsd}
+                unit="STRK"
+              />
+            )}
             <div className="modal-action pt-2">
               <button
                 className={`btn w-full flex justify-between ${txState === "success" ? "btn-success" : "btn-primary"}`}

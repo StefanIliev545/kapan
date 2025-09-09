@@ -24,7 +24,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
   position,
 }) => {
   const decimals = token.decimals;
-  const { execute } = useLendingAction(
+  const { execute, buildCalls } = useLendingAction(
     "stark",
     "Withdraw",
     token.address,
@@ -50,6 +50,7 @@ export const WithdrawModalStark: FC<WithdrawModalStarkProps> = ({
       percentBase={supplyBalance}
       max={maxInput}
       network="stark"
+      buildCalls={buildCalls}
       position={position}
       onConfirm={execute}
     />

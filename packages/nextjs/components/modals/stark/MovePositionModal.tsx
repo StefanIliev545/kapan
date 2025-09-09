@@ -6,6 +6,8 @@ import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
+import { FeeEstimate } from "~~/components/FeeEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -725,6 +727,27 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
+  const estimateCalls = useMemo(() => {
+    if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
+      return null;
+    const authorizations = fetchedAuthorizations ?? [];
+    const moveCalls = pairInstructions.map(instructions => ({
+      contractAddress: routerGateway.address,
+      entrypoint: "move_debt",
+      calldata: CallData.compile({ instructions }),
+    }));
+    return [
+      ...(authorizations as any),
+      ...moveCalls,
+    ];
+  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
+
+  const { loading: feeLoading, error: feeError, feeNative, feeUsd } = useGasEstimate({
+    enabled: isOpen,
+    buildCalls: () => estimateCalls ?? null,
+    currency: "STRK",
+  });
+
   // Reset the modal state when opening/closing
   useEffect(() => {
     if (!isOpen) {
@@ -1168,6 +1191,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               </div>
 
               <div className="pt-5 mt-auto">
+                <FeeEstimate
+                  loading={feeLoading}
+                  error={feeError}
+                  feeNative={feeNative}
+                  feeUsd={feeUsd}
+                  unit="STRK"
+                />
                 <button
                   className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
                     loading ? "animate-pulse" : ""
