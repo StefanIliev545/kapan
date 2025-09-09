@@ -80,10 +80,8 @@ export const formatPrice = (price: bigint): string => {
 export const formatUtilization = (utilization: bigint): string => {
   // Convert utilization to percentage with 2 decimal places
   const utilizationNum = (Number(utilization) / 1e18) * 100; // Assuming utilization is in wei
-  return utilizationNum.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  // Use toFixed to avoid locale-specific separators which break progress bars
+  return utilizationNum.toFixed(2);
 };
 
 // Common types
