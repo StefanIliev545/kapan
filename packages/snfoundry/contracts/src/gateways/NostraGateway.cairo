@@ -113,7 +113,7 @@ mod NostraGateway {
 
         // @dev - pull the underlying collateral from a user. Requires permission from the user to this contract.
         // caller is restricted to router or the user in the instruction as this is an outbound flow.
-        fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
+        fn withdraw(ref self: ContractState, withdraw: @Withdraw) -> u256 {
             let withdraw = *withdraw;
             let underlying = withdraw.basic.token;
             let mut amount = withdraw.basic.amount;
@@ -131,6 +131,7 @@ mod NostraGateway {
             let collateral = LentDebtTokenABIDispatcher { contract_address: chosen_collateral };
             collateral.transfer_from(user, get_contract_address(), amount);
             collateral.burn(get_contract_address(), get_caller_address(), amount);
+            amount
         }
 
         // @dev - mint the debt token and transfer the underlying to caller.
@@ -149,12 +150,7 @@ mod NostraGateway {
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
 
-            let balance_before = underlying_token.balance_of(get_contract_address());
             debt_token.mint(user, amount);
-            let balance_after = underlying_token.balance_of(get_contract_address());
-            assert(balance_after > balance_before, 'mint failed');
-
-            assert(underlying_token.balance_of(get_contract_address()) >= amount, 'insufficient balance');
             assert(underlying_token.transfer(get_caller_address(), amount), 'transfer failed');
         }
 
@@ -169,22 +165,19 @@ mod NostraGateway {
             let debt = self.underlying_to_ndebt.read(underlying);
             assert(debt != Zero::zero(), 'not-token');
 
-            if repay.repay_all {
-                let debt_token_erc20 = IERC20Dispatcher { contract_address: debt };
-                let debt_balance = debt_token_erc20.balance_of(user);
-                amount = debt_balance;
-            }
+            let debt_token_erc20 = IERC20Dispatcher { contract_address: debt };
+            let debt_balance = debt_token_erc20.balance_of(user);
+            let to_repay = if amount > debt_balance { debt_balance } else { amount };
 
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
-
-            let balance_before = underlying_token.balance_of(get_contract_address());
             assert(underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
-            assert(underlying_token.approve(debt, amount), 'approve failed');
+            assert(underlying_token.approve(debt, to_repay), 'approve failed');
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
-            debt_token.burn(user, amount);
-            let balance_after = underlying_token.balance_of(get_contract_address());
-            let leftover = balance_after - balance_before;
-            assert(underlying_token.transfer(get_caller_address(), leftover), 'transfer failed');
+            debt_token.burn(user, to_repay);
+            if amount > to_repay {
+                let refund = amount - to_repay;
+                assert(underlying_token.transfer(get_caller_address(), refund), 'transfer failed');
+            }
         }
 
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
@@ -206,37 +199,30 @@ mod NostraGateway {
                     LendingInstruction::Deposit(instruction) => {
                         self.deposit(instruction);
                         let token = instruction.basic.token;
-                        let balance = IERC20Dispatcher { contract_address: token }
-                            .balance_of(get_caller_address());
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance });
+                        outs.append(InstructionOutput { token, balance: 0 });
                         results.append(outs.span());
                     },
                     LendingInstruction::Withdraw(instruction) => {
-                        self.withdraw(instruction);
+                        let amount = self.withdraw(instruction);
                         let token = instruction.basic.token;
-                        let balance = IERC20Dispatcher { contract_address: token }
-                            .balance_of(get_caller_address());
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance });
+                        outs.append(InstructionOutput { token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Borrow(instruction) => {
                         self.borrow(instruction);
                         let token = instruction.basic.token;
-                        let balance = IERC20Dispatcher { contract_address: token }
-                            .balance_of(get_caller_address());
+                        let amount = instruction.basic.amount;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance });
+                        outs.append(InstructionOutput { token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Repay(instruction) => {
                         self.repay(instruction);
                         let token = instruction.basic.token;
-                        let balance = IERC20Dispatcher { contract_address: token }
-                            .balance_of(get_caller_address());
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance });
+                        outs.append(InstructionOutput { token, balance: 0 });
                         results.append(outs.span());
                     },
                     _ => {}
