@@ -164,10 +164,10 @@ fn test_ekubo_swap_eth_usdc() {
     router.add_gateway('ekubo', context.ekubo_gateway_address);
     
     // ETH (ERC20 on Starknet)
-    let eth: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+    let eth: ContractAddress = ETH_ADDRESS();
     
     // USDC (ERC20 on Starknet) - Updated address
-    let usdc: ContractAddress = contract_address_const::<0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8>();
+    let usdc: ContractAddress = USDC_ADDRESS();
     
     // Canonical order: token0 = lower address, token1 = higher address
     // Here USDC < ETH, so:
@@ -204,6 +204,12 @@ fn test_ekubo_swap_eth_usdc() {
     
     // Approve tokens before swap
     let eth_erc20 = IERC20Dispatcher { contract_address: eth };
+    // Record balances before swap
+    let eth_balance_before = eth_erc20.balance_of(USER_ADDRESS());
+    let usdc_erc20 = IERC20Dispatcher { contract_address: usdc };
+    let usdc_balance_before = usdc_erc20.balance_of(USER_ADDRESS());
+    println!("ETH balance before swap: {:?}", eth_balance_before);
+    println!("USDC balance before swap: {:?}", usdc_balance_before);
     cheat_caller_address(eth, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     eth_erc20.approve(context.router_address, 2000000000000000000); // 2 ETH max
     
@@ -223,9 +229,24 @@ fn test_ekubo_swap_eth_usdc() {
     
     // Check balances
     let eth_balance_after = eth_erc20.balance_of(USER_ADDRESS());
-    let usdc_erc20 = IERC20Dispatcher { contract_address: usdc };
     let usdc_balance_after = usdc_erc20.balance_of(USER_ADDRESS());
     
     println!("ETH balance after swap: {:?}", eth_balance_after);
     println!("USDC balance after swap: {:?}", usdc_balance_after);
+    
+    // Ensure balances moved in the correct direction
+    assert(eth_balance_after < eth_balance_before, 'ETH balance should decrease');
+    let eth_spent = eth_balance_before - eth_balance_after;
+    assert(eth_spent > 0, 'ETH spent must be > 0');
+    assert(eth_spent <= 2000000000000000000, 'ETH spent exceeds max_in');
+    let usdc_gained = usdc_balance_after - usdc_balance_before;
+    // Human-readable summary (split integer.fractional using decimals)
+    let scale_eth = 1000000000000000000;
+    let scale_usdc = 1000000;
+    let eth_int = eth_spent / scale_eth;
+    let eth_frac = eth_spent % scale_eth;
+    let usdc_int = usdc_gained / scale_usdc;
+    let usdc_frac = usdc_gained % scale_usdc;
+    println!("Swap: ETH {:?}.{:?} -> USDC {:?}.{:?}", eth_int, eth_frac, usdc_int, usdc_frac);
+    assert(usdc_balance_after == usdc_balance_before + 2000000000, 'USDC balance should increase');
 }
