@@ -398,6 +398,9 @@ mod RouterGateway {
                         LendingInstruction::Redeposit(redeposit) => {
                             redeposit.user
                         },
+                        LendingInstruction::Swap(_) => {
+                            continue;
+                        },
                         _ => {
                             panic!("bad-instruction-order")
                         }

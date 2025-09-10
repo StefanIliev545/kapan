@@ -1,6 +1,6 @@
 use core::array::{Array, ArrayTrait, Span};
 use core::traits::{Into, TryInto};
-use core::integer::{i128, u128};
+use core::integer::u128;
 use starknet::ContractAddress;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use crate::interfaces::IGateway::{LendingInstruction, Swap, ILendingInstructionProcessor, Repay};
@@ -34,7 +34,6 @@ struct SwapResult {
 #[starknet::contract]
 pub mod EkuboGateway {
     use super::*;
-    use ekubo::types::i129;
 use starknet::{get_caller_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
@@ -64,14 +63,27 @@ use starknet::{get_caller_address};
                 (swap.token_out, swap.token_in)
             };
 
+            // Extract pool parameters from context if provided
+            let (fee, tick_spacing, extension) = if let Option::Some(context_data) = swap.context {
+                // Deserialize pool parameters from context
+                let mut context_span = context_data;
+                let fee: u128 = Serde::deserialize(ref context_span).unwrap();
+                let tick_spacing: u128 = Serde::deserialize(ref context_span).unwrap();
+                let extension: ContractAddress = Serde::deserialize(ref context_span).unwrap();
+                (fee, tick_spacing, extension)
+            } else {
+                // Default values if no context provided
+                (170141183460469235273462165868118016, 1000, starknet::contract_address_const::<0>())
+            };
+
             // Create swap data for callback
             let swap_data = SwapData {
                 pool_key: PoolKey { 
                     token0, 
                     token1,
-                    fee: 0, // Default fee - should be provided in real usage
-                    tick_spacing: 0, // Default tick spacing - should be provided in real usage
-                    extension: starknet::contract_address_const::<0>(), // No extension
+                    fee,
+                    tick_spacing,
+                    extension,
                 },
                 exact_out: swap.exact_out,
                 max_in: swap.max_in,
@@ -130,7 +142,7 @@ use starknet::{get_caller_address};
             let SwapData { pool_key, exact_out, max_in, recipient, token_in, token_out, is_token1 } = swap_data;
 
             let exact_out_u128: u128 = exact_out.try_into().unwrap();
-            let neg_amount = i129_new(exact_out_u128, false);
+            let neg_amount = i129_new(exact_out_u128, true);
             let params = SwapParameters {
                 amount: neg_amount,
                 is_token1,
@@ -140,20 +152,12 @@ use starknet::{get_caller_address};
 
             let delta = core.swap(pool_key, params);
 
-            let mut amount_in: u128 = 0;
-            let mut amount_out: u128 = 0;
-
-            if is_token1 {
-                let out_u128: u128 = (-delta.amount1).try_into().unwrap();
-                amount_out = out_u128.into();
-                let in_u128: u128 = delta.amount0.try_into().unwrap();
-                amount_in = in_u128.into();
-            } else {
-                let out_u128: u128 = (-delta.amount0).try_into().unwrap();
-                amount_out = out_u128.into();
-                let in_u128: u128 = delta.amount1.try_into().unwrap();
-                amount_in = in_u128.into();
-            }
+            let (out_i, in_i) = if is_token1 { (delta.amount1, delta.amount0) } else { (delta.amount0, delta.amount1) };
+            assert(out_i.sign, 'expected-negative-out');     // negative => owed to you
+            assert(!in_i.sign, 'expected-positive-in');      // positive => you owe core
+            let amount_out: u128 = out_i.mag;
+            let amount_in:  u128 = in_i.mag;
+            
 
             assert(amount_out >= exact_out_u128, 'insufficient-output');
             assert(amount_in.into() <= max_in, 'slippage');
@@ -161,7 +165,7 @@ use starknet::{get_caller_address};
             core.withdraw(token_out, recipient, amount_out);
 
             let erc20 = IERC20Dispatcher { contract_address: token_in };
-            assert(erc20.approve(self.core.read().contract_address, amount_in.into()), 'approve failed');
+            erc20.approve(self.core.read().contract_address, amount_in.into());
             core.pay(token_in);
 
             let result = SwapResult { delta };
