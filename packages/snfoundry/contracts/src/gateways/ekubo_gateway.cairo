@@ -1,13 +1,10 @@
 use core::array::{Array, ArrayTrait, Span};
-use core::num::traits::Zero;
 use core::traits::{Into, TryInto};
-use core::result::ResultTrait;
-use core::option::Option;
-use core::integer::i256;
+use core::integer::{i128, u128};
 use starknet::ContractAddress;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-use crate::interfaces::ekubo::{ICoreDispatcher, ICoreDispatcherTrait, PoolKey, SwapParameters, Delta, ILocker};
-use crate::interfaces::IGateway::{LendingInstruction, Swap, ILendingInstructionProcessor, ILendingInstructionProcessorTrait, Repay};
+use crate::interfaces::ekubo::{ICoreDispatcher, ICoreDispatcherTrait, PoolKey, SwapParameters, ILocker};
+use crate::interfaces::IGateway::{LendingInstruction, Swap, ILendingInstructionProcessor, Repay};
 
 #[derive(Drop, Serde)]
 struct SwapData {
@@ -72,21 +69,7 @@ mod EkuboGateway {
             Serde::serialize(@swap_data, ref call_data);
 
             let core = ICoreDispatcher { contract_address: self.core.read() };
-            let result = core.lock(call_data.span());
-
-            let mut res_span = result.span();
-            let swap_result = match Serde::deserialize(ref res_span) {
-                Option::Some(x) => x,
-                Option::None => panic!("deserialize"),
-            };
-
-            if swap_result.amount_in < swap.max_in {
-                let leftover = swap.max_in - swap_result.amount_in;
-                if leftover != Zero::zero() {
-                    let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
-                    assert(erc20.transfer(get_caller_address(), leftover), 'transfer failed');
-                }
-            }
+            let _result = core.lock(call_data.span());
         }
     }
 
@@ -110,7 +93,7 @@ mod EkuboGateway {
         }
     }
 
-    #[external]
+    #[external(v0)]
     impl LockerImpl of ILocker<ContractState> {
         fn locked(ref self: ContractState, id: u32, data: Span<felt252>) -> Array<felt252> {
             assert(get_caller_address() == self.core.read(), 'unauthorized');
@@ -124,8 +107,9 @@ mod EkuboGateway {
 
             let SwapData { pool_key, exact_out, max_in, recipient, token_in, token_out, is_token1 } = swap_data;
 
-            let exact_out_i256: i256 = exact_out.try_into().unwrap();
-            let neg_amount = -exact_out_i256;
+            let exact_out_u128: u128 = exact_out.try_into().unwrap();
+            let exact_out_i128: i128 = exact_out_u128.try_into().unwrap();
+            let neg_amount = -exact_out_i128;
             let params = SwapParameters {
                 amount: neg_amount,
                 is_token1,
@@ -139,12 +123,15 @@ mod EkuboGateway {
             let mut amount_out: u256 = 0;
 
             if is_token1 {
-                // token_out is token1
-                amount_out = (-delta.amount1).try_into().unwrap();
-                amount_in = delta.amount0.try_into().unwrap();
+                let out_u128: u128 = (-delta.amount1).try_into().unwrap();
+                amount_out = out_u128.into();
+                let in_u128: u128 = delta.amount0.try_into().unwrap();
+                amount_in = in_u128.into();
             } else {
-                amount_out = (-delta.amount0).try_into().unwrap();
-                amount_in = delta.amount1.try_into().unwrap();
+                let out_u128: u128 = (-delta.amount0).try_into().unwrap();
+                amount_out = out_u128.into();
+                let in_u128: u128 = delta.amount1.try_into().unwrap();
+                amount_in = in_u128.into();
             }
 
             assert(amount_out >= exact_out, 'insufficient-output');

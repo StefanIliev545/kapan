@@ -14,7 +14,7 @@ alexandria_math = "0.4.0"
 
 [dev-dependencies]
 openzeppelin_utils = "1.0.0"
-snforge_std = "0.45.0"
+snforge_std = "0.49.0"
 
 [[target.starknet-contract]]
 casm = true

@@ -1,11 +1,10 @@
 use core::array::Span;
-use core::integer::i256;
-use core::integer::u128;
+use core::integer::{i128, u128};
 use core::bool;
 use starknet::contract_address::ContractAddress;
 use core::array::Array;
 
-#[derive(Drop, Serde, Copy, PartialEq, Eq)]
+#[derive(Drop, Serde, Copy, PartialEq)]
 pub struct PoolKey {
     pub token0: ContractAddress,
     pub token1: ContractAddress,
@@ -13,7 +12,7 @@ pub struct PoolKey {
 
 #[derive(Drop, Serde, Copy)]
 pub struct SwapParameters {
-    pub amount: i256,
+    pub amount: i128,
     pub is_token1: bool,
     pub sqrt_ratio_limit: u128,
     pub skip_ahead: bool,
@@ -21,8 +20,8 @@ pub struct SwapParameters {
 
 #[derive(Drop, Serde, Copy)]
 pub struct Delta {
-    pub amount0: i256,
-    pub amount1: i256,
+    pub amount0: i128,
+    pub amount1: i128,
 }
 
 #[starknet::interface]
