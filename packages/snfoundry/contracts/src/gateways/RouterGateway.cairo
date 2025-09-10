@@ -13,6 +13,7 @@ use starknet::{ContractAddress};
         Redeposit,
         Swap,
         BasicInstruction,
+        InstructionOutput,
         ILendingInstructionProcessorDispatcher,
         ILendingInstructionProcessorDispatcherTrait
     };
@@ -27,7 +28,10 @@ pub struct ProtocolInstructions {
 #[starknet::interface]
 pub trait RouterGatewayTrait<TContractState> {
     fn add_gateway(ref self: TContractState, protocol_name: felt252, gateway: ContractAddress);
-    fn process_protocol_instructions(ref self: TContractState, instructions: Span<ProtocolInstructions>);
+    fn process_protocol_instructions(
+        ref self: TContractState,
+        instructions: Span<ProtocolInstructions>
+    ) -> Span<Span<InstructionOutput>>;
     fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<ProtocolInstructions>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)>;
     fn move_debt(ref self: TContractState, instructions: Span<ProtocolInstructions>);
 }
@@ -309,9 +313,14 @@ mod RouterGateway {
 
         // @dev - the core logic loop of the router. It goes protocol by protocol, giving approvals and transfering from caller
         // before forwarding to the concrete protocol's gateway. Then it looks at balance diffs and transfers back to the user.
-        fn process_protocol_instructions_internal(ref self: ContractState, instructions: Span<ProtocolInstructions>, should_transfer: bool) {
+        fn process_protocol_instructions_internal(
+            ref self: ContractState,
+            instructions: Span<ProtocolInstructions>,
+            should_transfer: bool
+        ) -> Span<Span<InstructionOutput>> {
             let mut i: usize = 0;
             let mut previous_protocol_diffs = array![].span();
+            let mut all_outputs = array![];
             while i != instructions.len() {
                 let protocol_instruction = instructions.at(i);
                 let gateway = self.gateways.read(*protocol_instruction.protocol_name);
@@ -327,11 +336,15 @@ mod RouterGateway {
                 // Process all instructions for this protocol at once
                 let balances_before = self.before_send_instructions(gateway, instructions_span, should_transfer);
                 let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
-                dispatcher.process_instructions(instructions_span);
+                let gateway_outputs = dispatcher.process_instructions(instructions_span);
                 let diffs = self.after_send_instructions(gateway, instructions_span, balances_before, should_transfer);
+                for output_set in gateway_outputs {
+                    all_outputs.append(*output_set);
+                }
                 previous_protocol_diffs = diffs;
                 i += 1;
             }
+            all_outputs.span()
         }
 
 
@@ -486,9 +499,12 @@ mod RouterGateway {
 
         // @dev - entrypoint for all processing of logic. Allows bundling multiple operations in one single call,
         // like deposit and borrow for example. 
-        fn process_protocol_instructions(ref self: ContractState, instructions: Span<ProtocolInstructions>) {
+        fn process_protocol_instructions(
+            ref self: ContractState,
+            instructions: Span<ProtocolInstructions>
+        ) -> Span<Span<InstructionOutput>> {
             self.ensure_user_matches_caller(instructions);
-            self.process_protocol_instructions_internal(instructions, true);
+            self.process_protocol_instructions_internal(instructions, true)
         }
 
         // @dev - view function that returns encoded calls which are used to give approval for the operations desired in the instructions.
@@ -606,7 +622,7 @@ mod RouterGateway {
             }
             
 
-            self.process_protocol_instructions_internal(remadeProtocolInstructions.span(), false); //no outside transfer, we do it in place
+            let _ = self.process_protocol_instructions_internal(remadeProtocolInstructions.span(), false); //no outside transfer, we do it in place
 
             // settle flash loan
             let erc20 = IERC20Dispatcher { contract_address: asset };

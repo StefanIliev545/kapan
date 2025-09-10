@@ -23,6 +23,7 @@ mod NostraGateway {
     use crate::interfaces::IGateway::{
         ILendingInstructionProcessor,
         LendingInstruction,
+        InstructionOutput,
     };
     use crate::interfaces::IGateway::{Deposit, Withdraw, Borrow, Repay};
     use crate::interfaces::nostra::{
@@ -194,25 +195,54 @@ mod NostraGateway {
     
 
     #[abi(embed_v0)]
-    impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {        
-        fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
+    impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
+        fn process_instructions(
+            ref self: ContractState,
+            instructions: Span<LendingInstruction>
+        ) -> Span<Span<InstructionOutput>> {
+            let mut results = array![];
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Deposit(instruction) => {
                         self.deposit(instruction);
+                        let token = instruction.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Withdraw(instruction) => {
                         self.withdraw(instruction);
+                        let token = instruction.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Borrow(instruction) => {
                         self.borrow(instruction);
+                        let token = instruction.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Repay(instruction) => {
                         self.repay(instruction);
+                        let token = instruction.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
                     _ => {}
                 }
             }
+            results.span()
         }
 
         // @dev - encodes approvals for depositing into nostra or approvals for minting borrow tokens on behalf of the user by THIS contract.

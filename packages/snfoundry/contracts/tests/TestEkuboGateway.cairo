@@ -223,7 +223,7 @@ fn test_ekubo_swap_eth_usdc() {
     
     // Execute the swap
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     
     println!("ETH to USDC swap completed successfully!");
     

@@ -93,7 +93,13 @@ mod VesuGateway {
     };
     use starknet::{contract_address_const, get_caller_address, get_contract_address};
     use crate::interfaces::IGateway::{
-        Borrow, Deposit, ILendingInstructionProcessor, LendingInstruction, Repay, Withdraw,
+        Borrow,
+        Deposit,
+        ILendingInstructionProcessor,
+        LendingInstruction,
+        Repay,
+        Withdraw,
+        InstructionOutput,
     };
     use crate::interfaces::vesu::{
         IDefaultExtensionCLDispatcher, IDefaultExtensionCLDispatcherTrait, IERC4626Dispatcher,
@@ -484,26 +490,55 @@ mod VesuGateway {
 
     #[abi(embed_v0)]
     impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
-        fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
+        fn process_instructions(
+            ref self: ContractState,
+            instructions: Span<LendingInstruction>
+        ) -> Span<Span<InstructionOutput>> {
             let mut i: usize = 0;
+            let mut results = array![];
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit_params) => {
                         self.deposit(deposit_params);
+                        let token = *deposit_params.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Withdraw(withdraw_params) => {
                         self.withdraw(withdraw_params);
+                        let token = *withdraw_params.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
-                    LendingInstruction::Borrow(borrow_params) => { 
-                        self.borrow(borrow_params); 
+                    LendingInstruction::Borrow(borrow_params) => {
+                        self.borrow(borrow_params);
+                        let token = *borrow_params.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
-                    LendingInstruction::Repay(repay_params) => { 
-                        self.repay(repay_params); 
+                    LendingInstruction::Repay(repay_params) => {
+                        self.repay(repay_params);
+                        let token = *repay_params.basic.token;
+                        let balance = IERC20Dispatcher { contract_address: token }
+                            .balance_of(get_caller_address());
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance });
+                        results.append(outs.span());
                     },
                     _ => {}
                 }
                 i += 1;
             }
+            results.span()
         }
 
         // @dev - helper function that returns encoded calls which are either approvals for tokens or approval in vesu for 

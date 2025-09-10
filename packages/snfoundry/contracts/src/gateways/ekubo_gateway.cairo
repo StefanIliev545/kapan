@@ -3,7 +3,13 @@ use core::traits::{Into, TryInto};
 use core::integer::u128;
 use starknet::ContractAddress;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-use crate::interfaces::IGateway::{LendingInstruction, Swap, ILendingInstructionProcessor, Repay};
+use crate::interfaces::IGateway::{
+    LendingInstruction,
+    Swap,
+    ILendingInstructionProcessor,
+    Repay,
+    InstructionOutput,
+};
 use ekubo::interfaces::core::{ICoreDispatcher, ICoreDispatcherTrait, SwapParameters};
 use ekubo::interfaces::core::ILocker;
 use ekubo::types::keys::PoolKey;
@@ -120,12 +126,27 @@ use starknet::{get_caller_address, get_contract_address};
 
     #[abi(embed_v0)]
     impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
-        fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
+        fn process_instructions(
+            ref self: ContractState,
+            instructions: Span<LendingInstruction>
+        ) -> Span<Span<InstructionOutput>> {
+            let mut results = array![];
             for instruction in instructions {
                 if let LendingInstruction::Swap(swap) = instruction {
                     let _result = self.execute_swap(swap);
+                    let in_token = swap.token_in;
+                    let out_token = swap.token_out;
+                    let in_balance = IERC20Dispatcher { contract_address: in_token }
+                        .balance_of(get_caller_address());
+                    let out_balance = IERC20Dispatcher { contract_address: out_token }
+                        .balance_of(get_caller_address());
+                    let mut outs = array![];
+                    outs.append(InstructionOutput { token: in_token, balance: in_balance });
+                    outs.append(InstructionOutput { token: out_token, balance: out_balance });
+                    results.append(outs.span());
                 }
             }
+            results.span()
         }
 
         fn get_authorizations_for_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)> {

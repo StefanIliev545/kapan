@@ -8,6 +8,12 @@ pub struct BasicInstruction {
 }
 
 #[derive(Drop, Serde, Copy)]
+pub struct InstructionOutput {
+    pub token: ContractAddress,
+    pub balance: u256,
+}
+
+#[derive(Drop, Serde, Copy)]
 pub struct Deposit {
     pub basic: BasicInstruction,
     pub context: Option<Span<felt252>>,
@@ -75,7 +81,10 @@ pub enum LendingInstruction {
 
 #[starknet::interface]
 pub trait ILendingInstructionProcessor<TContractState> {
-    fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
+    fn process_instructions(
+        ref self: TContractState,
+        instructions: Span<LendingInstruction>
+    ) -> Span<Span<InstructionOutput>>;
     fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)>;
     fn get_flash_loan_amount(ref self: TContractState, repay: Repay) -> u256;
 }
