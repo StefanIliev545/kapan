@@ -3,8 +3,17 @@ use core::traits::{Into, TryInto};
 use core::integer::{i128, u128};
 use starknet::ContractAddress;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-use crate::interfaces::ekubo::{ICoreDispatcher, ICoreDispatcherTrait, PoolKey, SwapParameters, ILocker};
 use crate::interfaces::IGateway::{LendingInstruction, Swap, ILendingInstructionProcessor, Repay};
+use ekubo::interfaces::core::{ICoreDispatcher, ICoreDispatcherTrait, SwapParameters};
+use ekubo::interfaces::core::ILocker;
+use ekubo::types::keys::PoolKey;
+use ekubo::types::delta::Delta;
+use ekubo::types::i129::{i129};
+
+
+fn i129_new(mag: u128, sign: bool) -> i129 {
+    i129 { mag, sign: sign & (mag != 0) }
+}
 
 #[derive(Drop, Serde)]
 struct SwapData {
@@ -17,33 +26,34 @@ struct SwapData {
     pub is_token1: bool,
 }
 
-#[derive(Drop, Serde)]
+#[derive(Copy, Drop, Serde)]
 struct SwapResult {
-    pub amount_in: u256,
-    pub amount_out: u256,
+    pub delta: Delta,
 }
 
 #[starknet::contract]
-mod EkuboGateway {
+pub mod EkuboGateway {
     use super::*;
-    use starknet::{get_caller_address};
+    use ekubo::types::i129;
+use starknet::{get_caller_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
     #[storage]
     struct Storage {
-        core: ContractAddress,
+        core: ICoreDispatcher,
     }
 
     #[constructor]
     fn constructor(ref self: ContractState, core: ContractAddress) {
-        self.core.write(core);
+        self.core.write(ICoreDispatcher { contract_address: core });
     }
 
     #[generate_trait]
     impl InternalFunctions of InternalFunctionsTrait {
-        fn execute_swap(ref self: ContractState, swap: @Swap) {
+        fn execute_swap(ref self: ContractState, swap: @Swap) -> SwapResult {
             let swap = *swap;
 
+            // Determine token0 and token1 (token0 should be lower address)
             let token_in_felt: felt252 = swap.token_in.into();
             let token_out_felt: felt252 = swap.token_out.into();
             let token_in_u256: u256 = token_in_felt.try_into().unwrap();
@@ -53,23 +63,35 @@ mod EkuboGateway {
             } else {
                 (swap.token_out, swap.token_in)
             };
-            let is_token1 = swap.token_out == token1;
 
+            // Create swap data for callback
             let swap_data = SwapData {
-                pool_key: PoolKey { token0, token1 },
+                pool_key: PoolKey { 
+                    token0, 
+                    token1,
+                    fee: 0, // Default fee - should be provided in real usage
+                    tick_spacing: 0, // Default tick spacing - should be provided in real usage
+                    extension: starknet::contract_address_const::<0>(), // No extension
+                },
                 exact_out: swap.exact_out,
                 max_in: swap.max_in,
                 recipient: swap.recipient,
                 token_in: swap.token_in,
                 token_out: swap.token_out,
-                is_token1,
+                is_token1: swap.token_out == token1,
             };
 
+            // Serialize swap data for the lock call
             let mut call_data = array![];
             Serde::serialize(@swap_data, ref call_data);
 
-            let core = ICoreDispatcher { contract_address: self.core.read() };
-            let _result = core.lock(call_data.span());
+            // Call core.lock which will trigger our locked callback
+            let result_data = self.core.read().lock(call_data.span());
+            
+            // Deserialize the result
+            let mut result_span = result_data;
+            let swap_result: SwapResult = Serde::deserialize(ref result_span).unwrap();
+            swap_result
         }
     }
 
@@ -78,7 +100,7 @@ mod EkuboGateway {
         fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
             for instruction in instructions {
                 if let LendingInstruction::Swap(swap) = instruction {
-                    self.execute_swap(swap);
+                    let _result = self.execute_swap(swap);
                 }
             }
         }
@@ -93,34 +115,33 @@ mod EkuboGateway {
         }
     }
 
-    #[external(v0)]
+    #[abi(embed_v0)]
     impl LockerImpl of ILocker<ContractState> {
-        fn locked(ref self: ContractState, id: u32, data: Span<felt252>) -> Array<felt252> {
-            assert(get_caller_address() == self.core.read(), 'unauthorized');
+        fn locked(ref self: ContractState, id: u32, data: Span<felt252>) -> Span<felt252> {
+            assert(get_caller_address() == self.core.read().contract_address, 'unauthorized');
             let mut span = data;
             let swap_data = match Serde::deserialize(ref span) {
                 Option::Some(x) => x,
                 Option::None => panic!("deserialize"),
             };
 
-            let core = ICoreDispatcher { contract_address: self.core.read() };
+            let core = ICoreDispatcher { contract_address: self.core.read().contract_address };
 
             let SwapData { pool_key, exact_out, max_in, recipient, token_in, token_out, is_token1 } = swap_data;
 
             let exact_out_u128: u128 = exact_out.try_into().unwrap();
-            let exact_out_i128: i128 = exact_out_u128.try_into().unwrap();
-            let neg_amount = -exact_out_i128;
+            let neg_amount = i129_new(exact_out_u128, false);
             let params = SwapParameters {
                 amount: neg_amount,
                 is_token1,
                 sqrt_ratio_limit: 0,
-                skip_ahead: false,
+                skip_ahead: 0,
             };
 
             let delta = core.swap(pool_key, params);
 
-            let mut amount_in: u256 = 0;
-            let mut amount_out: u256 = 0;
+            let mut amount_in: u128 = 0;
+            let mut amount_out: u128 = 0;
 
             if is_token1 {
                 let out_u128: u128 = (-delta.amount1).try_into().unwrap();
@@ -134,19 +155,20 @@ mod EkuboGateway {
                 amount_in = in_u128.into();
             }
 
-            assert(amount_out >= exact_out, 'insufficient-output');
-            assert(amount_in <= max_in, 'slippage');
+            assert(amount_out >= exact_out_u128, 'insufficient-output');
+            assert(amount_in.into() <= max_in, 'slippage');
 
             core.withdraw(token_out, recipient, amount_out);
 
             let erc20 = IERC20Dispatcher { contract_address: token_in };
-            assert(erc20.approve(self.core.read(), amount_in), 'approve failed');
+            assert(erc20.approve(self.core.read().contract_address, amount_in.into()), 'approve failed');
             core.pay(token_in);
 
-            let result = SwapResult { amount_in, amount_out };
+            let result = SwapResult { delta };
             let mut ret = array![];
             Serde::serialize(@result, ref ret);
-            ret
+            
+            ret.span()
         }
     }
 }

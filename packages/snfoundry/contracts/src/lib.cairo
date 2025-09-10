@@ -3,7 +3,6 @@ pub mod interfaces {
     pub mod vesu;
     pub mod vesu_data;
     pub mod nostra;
-    pub mod ekubo;
 }
 pub mod gateways {
     pub mod vesu_gateway;
