@@ -109,7 +109,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                       <div
                         className={`badge ${hoveredToken === address ? "badge-primary" : "badge-outline"} p-3 font-medium`}
                       >
-                        {token.borrowAPR ? (token.borrowAPR * 100).toFixed(2) : "0.00"}% APR
+                        {token.borrowAPR !== undefined ? token.borrowAPR.toFixed(2) : "0.00"}% APR
                       </div>
                     </div>
                   );
@@ -163,9 +163,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             name: feltToString(selectedToken.symbol),
             icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
             address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
-            currentRate: selectedToken.borrowAPR ? selectedToken.borrowAPR * 100 : 0,
+            currentRate: selectedToken.borrowAPR ?? 0,
             usdPrice:
-              selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e18 : 0,
+              selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e8 : 0,
           }}
           protocolName={protocolName}
           currentDebt={0}
