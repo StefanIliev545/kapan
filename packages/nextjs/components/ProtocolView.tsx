@@ -433,7 +433,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               decimals: pos.tokenDecimals || 18,
               rate_accumulator: BigInt(0),
               utilization: BigInt(0),
-              fee_rate: BigInt(Math.floor(pos.currentRate * 1e18 / (365 * 24 * 60 * 60))), // Convert APR to per-second rate
+              fee_rate: BigInt(
+                Math.floor((pos.currentRate / 100) * 1e18 / (365 * 24 * 60 * 60)),
+              ), // Convert APR percentage to per-second rate
               price: {
                 value: BigInt(pos.tokenPrice || 0),
                 is_valid: true
