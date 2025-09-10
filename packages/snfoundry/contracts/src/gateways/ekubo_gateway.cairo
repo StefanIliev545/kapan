@@ -34,7 +34,7 @@ struct SwapResult {
 #[starknet::contract]
 pub mod EkuboGateway {
     use super::*;
-use starknet::{get_caller_address};
+use starknet::{get_caller_address, get_contract_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
     #[storage]
@@ -76,6 +76,10 @@ use starknet::{get_caller_address};
                 (170141183460469235273462165868118016, 1000, starknet::contract_address_const::<0>())
             };
 
+            // Transfer max_in tokens from caller to this contract
+            let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), swap.max_in), 'transfer failed');
+
             // Create swap data for callback
             let swap_data = SwapData {
                 pool_key: PoolKey { 
@@ -103,6 +107,13 @@ use starknet::{get_caller_address};
             // Deserialize the result
             let mut result_span = result_data;
             let swap_result: SwapResult = Serde::deserialize(ref result_span).unwrap();
+            
+            // Refund any leftover token_in back to the caller
+            let current_balance = erc20.balance_of(get_contract_address());
+            if current_balance > 0 {
+                assert(erc20.transfer(get_caller_address(), current_balance), 'refund failed');
+            }
+            
             swap_result
         }
     }
@@ -143,14 +154,30 @@ use starknet::{get_caller_address};
 
             let exact_out_u128: u128 = exact_out.try_into().unwrap();
             let neg_amount = i129_new(exact_out_u128, true);
+
+            // Ekubo's documented bounds for sqrt_ratio_limit
+            const MIN_SQRT_RATIO: u256 = 18446748437148339061;
+            const MAX_SQRT_RATIO: u256 = 6277100250585753475930931601400621808602321654880405518632;
+
+            // Direction comes from the token the POOL receives (token_in)
+            let token_in_is_token0 = token_in == pool_key.token0;
+
+            // If pool receives token0 → limit must be GREATER than current → use MAX
+            // If pool receives token1 → limit must be LESS than current   → use MIN
+            let sqrt_limit: u256 = if !token_in_is_token0 { MAX_SQRT_RATIO } else { MIN_SQRT_RATIO };
+
+            // (Optional safety) Ensure your is_token1 flag matches pool orientation of the *output*
+            assert(is_token1 == (token_out == pool_key.token1), 'is_token1-mismatch');
+
             let params = SwapParameters {
                 amount: neg_amount,
                 is_token1,
-                sqrt_ratio_limit: 0,
+                sqrt_ratio_limit: sqrt_limit,
                 skip_ahead: 0,
             };
 
             let delta = core.swap(pool_key, params);
+            println!("Swapped");
 
             let (out_i, in_i) = if is_token1 { (delta.amount1, delta.amount0) } else { (delta.amount0, delta.amount1) };
             assert(out_i.sign, 'expected-negative-out');     // negative => owed to you
@@ -163,10 +190,12 @@ use starknet::{get_caller_address};
             assert(amount_in.into() <= max_in, 'slippage');
 
             core.withdraw(token_out, recipient, amount_out);
+            println!("Withdrawn");
 
             let erc20 = IERC20Dispatcher { contract_address: token_in };
             erc20.approve(self.core.read().contract_address, amount_in.into());
             core.pay(token_in);
+            println!("Paid");
 
             let result = SwapResult { delta };
             let mut ret = array![];
