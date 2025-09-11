@@ -167,9 +167,9 @@ const useNostraData = (): MarketData[] => {
       const address = `0x${info[0].toString(16).padStart(64, "0")}`;
       const symbol = feltToString(info[1]);
       const rate = rates[idx];
-      // Rates are provided in RAY (1e27); divide by 1e25 to obtain percentage values
-      const supplyAPY = Number(rate.lending_rate) / 1e25;
-      const borrowAPR = Number(rate.borrowing_rate) / 1e25;
+      // Rates are provided in WAD (1e18); divide by 1e16 to obtain percentage values
+      const supplyAPY = Number(rate.lending_rate) / 1e16;
+      const borrowAPR = Number(rate.borrowing_rate) / 1e16;
       const utilization = borrowAPR > 0 ? (supplyAPY / borrowAPR) * 100 : 0;
       const price = priceArr[idx] ? formatPrice(priceArr[idx]) : "0.00";
       return {
