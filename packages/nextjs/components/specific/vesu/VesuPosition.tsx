@@ -415,6 +415,8 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
               icon: tokenNameToLogo(debtSymbol.toLowerCase()),
             }}
+            collateralBalance={BigInt(collateralAmount)}
+            debtBalance={BigInt(nominalDebt)}
             poolId={poolId}
           />
         </>

@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { BaseModal } from "../BaseModal";
 import {
   CairoCustomEnum,
@@ -11,6 +12,7 @@ import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { useLendingAuthorizations } from "~~/hooks/useLendingAuthorizations";
 import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
+import { formatTokenAmount } from "~~/utils/protocols";
 
 interface TokenInfo {
   name: string;
@@ -24,6 +26,8 @@ interface ClosePositionModalProps {
   onClose: () => void;
   collateral: TokenInfo;
   debt: TokenInfo;
+  collateralBalance: bigint;
+  debtBalance: bigint;
   poolId: bigint;
 }
 
@@ -32,6 +36,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   onClose,
   collateral,
   debt,
+  collateralBalance,
+  debtBalance,
   poolId,
 }) => {
   const { address } = useStarkAccount();
@@ -52,11 +58,13 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       [poolId, debt.address],
     );
 
+    const repayAmount = debtBalance > 0n ? debtBalance : 1n;
+
     const repayInstruction = new CairoCustomEnum({
       Deposit: undefined,
       Borrow: undefined,
       Repay: {
-        basic: { token: debt.address, amount: uint256.bnToUint256(1n), user: address },
+        basic: { token: debt.address, amount: uint256.bnToUint256(repayAmount), user: address },
         repay_all: true,
         context: repayContext,
       },
@@ -73,7 +81,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       Borrow: undefined,
       Repay: undefined,
       Withdraw: {
-        basic: { token: collateral.address, amount: uint256.bnToUint256(0n), user: address },
+        basic: { token: collateral.address, amount: uint256.bnToUint256(collateralBalance), user: address },
         withdraw_all: true,
         context: withdrawContext,
       },
@@ -107,7 +115,14 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       { protocol_name: "vesu", instructions: [repayInstruction, withdrawInstruction] },
       { protocol_name: "ekubo", instructions: [reswapInstruction] },
     ];
-  }, [address, collateral.address, debt.address, poolId]);
+  }, [
+    address,
+    collateral.address,
+    debt.address,
+    poolId,
+    collateralBalance,
+    debtBalance,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,10 +169,48 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     }
   };
 
+  const formattedCollateral = formatTokenAmount(
+    collateralBalance.toString(),
+    collateral.decimals,
+  );
+  const formattedDebt = formatTokenAmount(debtBalance.toString(), debt.decimals);
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md">
       <div className="p-6 space-y-4">
         <h3 className="text-lg font-bold">Close Position</h3>
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col items-start">
+            <div className="flex items-center gap-2">
+              <Image
+                src={collateral.icon}
+                alt={collateral.name}
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="font-medium">{collateral.name}</span>
+            </div>
+            <span className="text-sm text-gray-500">
+              {formattedCollateral} {collateral.name}
+            </span>
+          </div>
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2">
+              <Image
+                src={debt.icon}
+                alt={debt.name}
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="font-medium">{debt.name}</span>
+            </div>
+            <span className="text-sm text-gray-500">
+              {formattedDebt} {debt.name}
+            </span>
+          </div>
+        </div>
         <p className="text-sm">
           Repay your {debt.name} debt using {collateral.name} collateral via Ekubo swap.
         </p>
