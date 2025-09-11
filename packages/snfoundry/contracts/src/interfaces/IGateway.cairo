@@ -80,6 +80,18 @@ pub struct Swap {
 }
 
 #[derive(Drop, Serde, Copy)]
+pub struct SwapExactIn {
+    pub token_in: ContractAddress,
+    pub token_out: ContractAddress,
+    pub exact_in: u256,
+    pub min_out: u256,
+    pub user: ContractAddress,
+    pub should_pay_out: bool,
+    pub should_pay_in: bool,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
 pub enum LendingInstruction {
     Deposit: Deposit,
     Borrow: Borrow,
@@ -88,6 +100,7 @@ pub enum LendingInstruction {
     Redeposit: Redeposit,
     Reborrow: Reborrow,
     Swap: Swap,
+    SwapExactIn: SwapExactIn,
     Reswap: Reswap,
 }
 

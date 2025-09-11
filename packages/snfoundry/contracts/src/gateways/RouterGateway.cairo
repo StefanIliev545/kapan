@@ -12,6 +12,7 @@ use starknet::{ContractAddress};
         Reborrow,
         Redeposit,
         Swap,
+        SwapExactIn,
         Reswap,
         BasicInstruction,
         InstructionOutput,
@@ -172,6 +173,14 @@ mod RouterGateway {
                         }
                         assert(erc20.approve(gateway, swap.max_in), 'approve failed');
                     },
+                    LendingInstruction::SwapExactIn(swap) => {
+                        let swap = *swap;
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        if should_transfer {
+                            assert(erc20.transfer_from(get_caller_address(), get_contract_address(), swap.exact_in), 'transfer failed');
+                        }
+                        assert(erc20.approve(gateway, swap.exact_in), 'approve failed');
+                    },
                     _ => {}
                 }
                 i += 1;
@@ -223,7 +232,27 @@ mod RouterGateway {
                     let swap = *swap;
                     let input = *gateway_outputs.at(i).at(0);
                     let output = *gateway_outputs.at(i).at(1);
-                    
+
+                    println!("output.balance: {}", output.balance);
+                    println!("swap.should_pay_out: {}", swap.should_pay_out);
+                    if output.balance != 0 && swap.should_pay_out {
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_out };
+                        println!("transfer output.balance: {}", output.balance);
+                        assert(erc20.transfer(swap.user, output.balance), 'transfer failed');
+                    }
+                    println!("input.balance: {}", input.balance);
+                    println!("swap.should_pay_in: {}", swap.should_pay_in);
+                    if input.balance != 0 && swap.should_pay_in {
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        println!("transfer input.balance: {}", input.balance);
+                        assert(erc20.transfer(swap.user, input.balance), 'transfer failed');
+                    }
+                }
+                if let LendingInstruction::SwapExactIn(swap) = instructions.at(i) {
+                    let swap = *swap;
+                    let input = *gateway_outputs.at(i).at(0);
+                    let output = *gateway_outputs.at(i).at(1);
+
                     println!("output.balance: {}", output.balance);
                     println!("swap.should_pay_out: {}", swap.should_pay_out);
                     if output.balance != 0 && swap.should_pay_out {
@@ -342,6 +371,9 @@ mod RouterGateway {
                             redeposit.user
                         },
                         LendingInstruction::Swap(swap) => {
+                            swap.user
+                        },
+                        LendingInstruction::SwapExactIn(swap) => {
                             swap.user
                         },
                         LendingInstruction::Reswap(reswap) => {

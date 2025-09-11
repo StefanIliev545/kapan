@@ -7,6 +7,7 @@ use kapan::gateways::RouterGateway::{
 use kapan::interfaces::IGateway::{
     LendingInstruction,
     Swap,
+    SwapExactIn,
     Deposit,
     Borrow,
     Repay,
@@ -296,6 +297,74 @@ fn test_ekubo_swap_eth_usdc() {
     let usdc_frac = usdc_gained % scale_usdc;
     println!("Swap: ETH {:?}.{:?} -> USDC {:?}.{:?}", eth_int, eth_frac, usdc_int, usdc_frac);
     assert(usdc_balance_after == usdc_balance_before + 2000000000, 'USDC balance should increase');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_ekubo_swap_exact_in() {
+    let context = setup_ekubo_test_context();
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('ekubo', context.ekubo_gateway_address);
+
+    let eth: ContractAddress = ETH_ADDRESS();
+    let usdc: ContractAddress = USDC_ADDRESS();
+
+    let pool_key = PoolKey {
+        token0: usdc,
+        token1: eth,
+        fee: 170141183460469235273462165868118016,
+        tick_spacing: 1000,
+        extension: starknet::contract_address_const::<0>(),
+    };
+
+    let mut pool_context = array![];
+    pool_context.append_serde(pool_key.fee);
+    pool_context.append_serde(pool_key.tick_spacing);
+    pool_context.append_serde(pool_key.extension);
+
+    let swap = SwapExactIn {
+        token_in: eth,
+        token_out: usdc,
+        exact_in: 1000000000000000000, // 1 ETH
+        min_out: 1000000000, // 1000 USDC
+        user: USER_ADDRESS(),
+        should_pay_out: true,
+        should_pay_in: true,
+        context: Option::Some(pool_context.span()),
+    };
+
+    let eth_erc20 = IERC20Dispatcher { contract_address: eth };
+    let usdc_erc20 = IERC20Dispatcher { contract_address: usdc };
+    let eth_balance_before = eth_erc20.balance_of(USER_ADDRESS());
+    let usdc_balance_before = usdc_erc20.balance_of(USER_ADDRESS());
+    cheat_caller_address(eth, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    eth_erc20.approve(context.router_address, 1000000000000000000);
+
+    let mut protocol_instructions = array![];
+    protocol_instructions.append(ProtocolInstructions {
+        protocol_name: 'ekubo',
+        instructions: array![LendingInstruction::SwapExactIn(swap)].span(),
+    });
+
+    let authorizations = context.router_dispatcher.get_authorizations_for_instructions(protocol_instructions.span(), true);
+    for authorization in authorizations {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let _ = call_contract_syscall(*token, *selector, call_data.span());
+    }
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+
+    let eth_balance_after = eth_erc20.balance_of(USER_ADDRESS());
+    let usdc_balance_after = usdc_erc20.balance_of(USER_ADDRESS());
+
+    let eth_spent = eth_balance_before - eth_balance_after;
+    assert(eth_spent <= 1000000000000000000, 'ETH spent exceeds exact_in');
+    let usdc_gained = usdc_balance_after - usdc_balance_before;
+    assert(usdc_gained >= 1000000000, 'USDC output below min');
 }
 
 #[test]
