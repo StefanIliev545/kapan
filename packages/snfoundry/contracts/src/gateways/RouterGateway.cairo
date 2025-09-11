@@ -79,7 +79,7 @@ mod RouterGateway {
 
         // @dev - Internal function that translates redeposit and reborrow to normal borrow and deposit instructions as
         // those instructions only have a meaning here in the router during the flash loan process.
-        fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, previous_instruction_span: Span<LendingInstruction>, balanceDiffs: Span<u256>) -> Span<LendingInstruction> {
+        fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, previous_instruction_span: Span<LendingInstruction>, gateway_outputs: Span<Span<InstructionOutput>>) -> Span<LendingInstruction> {
             let mut remappedInstructions = array![];
             for instruction in instructions {
                 match instruction {
@@ -94,9 +94,11 @@ mod RouterGateway {
                                 panic!("reborrow-target-not-repay")
                             }
                         };
-                        let leftover = *balanceDiffs.at(*reborrow.target_instruction_index);
-                        assert(repay_amount >= leftover, 'reborrow-underflow');
-                        let needed_amount = repay_amount - leftover;
+                        // Get the output from the target instruction (repay output is what was repaid)
+                        let target_outputs = *gateway_outputs.at(*reborrow.target_instruction_index);
+                        let repaid_amount = *target_outputs.at(0).balance; // Repay output is what was repaid
+                        assert(repay_amount >= repaid_amount, 'reborrow-underflow');
+                        let needed_amount = repay_amount - repaid_amount;
                         remappedInstructions.append(LendingInstruction::Borrow(Borrow {
                             basic: BasicInstruction {
                                 token: *reborrow.token,
@@ -107,10 +109,13 @@ mod RouterGateway {
                         }));
                     },
                     LendingInstruction::Redeposit(redeposit) => {
+                        // Get the output from the target instruction (withdraw output is what came out)
+                        let target_outputs = *gateway_outputs.at(*redeposit.target_instruction_index);
+                        let withdrawn_amount = *target_outputs.at(0).balance; // Withdraw output is what came out
                         remappedInstructions.append(LendingInstruction::Deposit(Deposit {
                             basic: BasicInstruction {
                                 token: *redeposit.token,
-                                amount: *balanceDiffs.at(*redeposit.target_instruction_index),
+                                amount: withdrawn_amount,
                                 user: *redeposit.user,
                             },
                             context: *redeposit.context,
@@ -319,18 +324,18 @@ mod RouterGateway {
             should_transfer: bool
         ) -> Span<Span<InstructionOutput>> {
             let mut i: usize = 0;
-            let mut previous_protocol_diffs = array![].span();
+            let mut previous_protocol_outputs = array![].span();
             let mut all_outputs = array![];
             while i != instructions.len() {
                 let protocol_instruction = instructions.at(i);
                 let gateway = self.gateways.read(*protocol_instruction.protocol_name);
                 assert(!gateway.is_zero(), 'Gateway not supported');
 
-                // Apply remapping (for redeposit/reborrow) using diffs from the previous protocol
+                // Apply remapping (for redeposit/reborrow) using outputs from the previous protocol
                 let mut instructions_span = *protocol_instruction.instructions;
-                if previous_protocol_diffs.len() != 0 {
+                if previous_protocol_outputs.len() != 0 {
                     let previous_instruction_span = *instructions.at(i-1).instructions;
-                    instructions_span = self.remap_instructions(instructions_span, previous_instruction_span, previous_protocol_diffs);
+                    instructions_span = self.remap_instructions(instructions_span, previous_instruction_span, previous_protocol_outputs);
                 }
 
                 // Process all instructions for this protocol at once
@@ -341,7 +346,7 @@ mod RouterGateway {
                 for output_set in gateway_outputs {
                     all_outputs.append(*output_set);
                 }
-                previous_protocol_diffs = diffs;
+                previous_protocol_outputs = gateway_outputs;
                 i += 1;
             }
             all_outputs.span()
