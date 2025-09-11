@@ -86,9 +86,10 @@ mod RouterGateway {
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Reborrow(reborrow) => {
-                        // Get the outputs from the target instruction (repay now returns two outputs: repaid_amount, refund_amount)
-                        let target_outputs = *gateway_outputs.at(*reborrow.target_instruction_index);
-                        let repaid_amount = *target_outputs.at(0).balance; // First output is what was repaid
+                        // Get the outputs from the target pointer
+                        let ptr = *reborrow.target_output;
+                        let target_outputs = *gateway_outputs.at(ptr.instruction_index);
+                        let repaid_amount = *target_outputs.at(ptr.output_index).balance;
                         remappedInstructions.append(LendingInstruction::Borrow(Borrow {
                             basic: BasicInstruction {
                                 token: *reborrow.token,
@@ -99,9 +100,10 @@ mod RouterGateway {
                         }));
                     },
                     LendingInstruction::Redeposit(redeposit) => {
-                        // Get the output from the target instruction (withdraw output is what came out)
-                        let target_outputs = *gateway_outputs.at(*redeposit.target_instruction_index);
-                        let withdrawn_amount = *target_outputs.at(0).balance; // Withdraw output is what came out
+                        // Get the output from the target pointer
+                        let ptr = *redeposit.target_output;
+                        let target_outputs = *gateway_outputs.at(ptr.instruction_index);
+                        let withdrawn_amount = *target_outputs.at(ptr.output_index).balance;
                         println!("withdrawn_amount: {}", withdrawn_amount);
                         remappedInstructions.append(LendingInstruction::Deposit(Deposit {
                             basic: BasicInstruction {
@@ -113,14 +115,16 @@ mod RouterGateway {
                         }));
                     },
                     LendingInstruction::Reswap(reswap) => {
-                        // Get the outputs from the target instructions (swap outputs)
-                        let exact_out_outputs = *gateway_outputs.at(*reswap.exact_out_index);
-                        let max_in_outputs = *gateway_outputs.at(*reswap.max_in_index);
-                        let exact_out_amount = *exact_out_outputs.at(0).balance; // First output is exact_out
-                        let max_in_amount = *max_in_outputs.at(0).balance; // First output is max_in
+                        // Get the outputs from the target pointers
+                        let exact_ptr = *reswap.exact_out;
+                        let max_in_ptr = *reswap.max_in;
+                        let exact_out_outputs = *gateway_outputs.at(exact_ptr.instruction_index);
+                        let max_in_outputs = *gateway_outputs.at(max_in_ptr.instruction_index);
+                        let exact_out_amount = *exact_out_outputs.at(exact_ptr.output_index).balance;
+                        let max_in_amount = *max_in_outputs.at(max_in_ptr.output_index).balance;
                         remappedInstructions.append(LendingInstruction::Swap(Swap {
-                            token_in: *max_in_outputs.at(0).token,
-                            token_out: *exact_out_outputs.at(0).token,
+                            token_in: *max_in_outputs.at(max_in_ptr.output_index).token,
+                            token_out: *exact_out_outputs.at(exact_ptr.output_index).token,
                             exact_out: exact_out_amount,
                             max_in: max_in_amount,
                             context: *reswap.context,

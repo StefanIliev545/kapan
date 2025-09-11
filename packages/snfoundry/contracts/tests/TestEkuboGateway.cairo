@@ -8,6 +8,7 @@ use kapan::interfaces::IGateway::{
     LendingInstruction,
     Swap,
     SwapExactIn,
+    OutputPointer,
     Deposit,
     Borrow,
     Repay,
@@ -505,8 +506,8 @@ fn test_create_position_and_move_debt_with_reswap() {
     
     // Ekubo instructions: reswap using the outputs from vesu instructions
     let reswap_instruction = LendingInstruction::Reswap(Reswap {
-        exact_out_index: 0, // Points to the withdraw instruction (index 0)
-        max_in_index: 1,    // Points to the repay instruction (index 1)
+        exact_out: OutputPointer { instruction_index: 0, output_index: 0 },
+        max_in: OutputPointer { instruction_index: 1, output_index: 0 },
         user: USER_ADDRESS(),
         should_pay_out: false, // close position so repay flash loan
         should_pay_in: true,
@@ -632,22 +633,21 @@ fn test_move_debt_reswap_and_redeposit_kept_in_router() {
     });
 
     // Swap using Ekubo: reference previous protocol outputs via indexes
-    // exact_out_index = 0 (withdraw ETH), max_in_index = 1 (repay USDC)
+    // exact_out = (withdraw ETH output 0), max_in = (repay USDC output 0)
     let reswap_instruction = LendingInstruction::Reswap(Reswap {
-        exact_out_index: 0,
-        max_in_index: 1,
+        exact_out: OutputPointer { instruction_index: 0, output_index: 0 },
+        max_in: OutputPointer { instruction_index: 1, output_index: 0 },
         user: USER_ADDRESS(),
         should_pay_out: false,
         should_pay_in: false,
         context: Option::None,
     });
 
-    // Redeposit using the swap outputs. Target the swap instruction index in the global outputs list:
-    // 0 -> withdraw, 1 -> repay, 2 -> swap
+    // Redeposit using the swap output pointer (global order: 0 withdraw, 1 repay, 2 swap)
     let redeposit_from_swap = LendingInstruction::Redeposit(Redeposit {
         token: ETH_ADDRESS(),
         user: USER_ADDRESS(),
-        target_instruction_index: 2,
+        target_output: OutputPointer { instruction_index: 2, output_index: 0 },
         context: Option::None,
     });
 

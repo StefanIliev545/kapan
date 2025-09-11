@@ -19,6 +19,7 @@ use kapan::interfaces::IGateway::{
     BasicInstruction,
     Reborrow,
     Redeposit,
+    OutputPointer,
 };
 use kapan::gateways::RouterGateway::{
     ProtocolInstructions,
@@ -416,7 +417,6 @@ fn test_vesu() {
 } 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
@@ -496,13 +496,13 @@ fn test_move_debt() {
 
     let vesu_deposit = Redeposit {
         token: ETH_ADDRESS(),
-        target_instruction_index: 1,
+        target_output: OutputPointer { instruction_index: 1, output_index: 0 },
         user: USER_ADDRESS(),
         context: Option::None,
     };
     let vesu_borrow = Reborrow {
         token: USDC_ADDRESS(),
-        target_instruction_index: 0,
+        target_output: OutputPointer { instruction_index: 0, output_index: 0 },
         approval_amount: 200000000, // 200 USDC
         user: USER_ADDRESS(),
         context: Option::Some(vesu_context.span()),
@@ -619,14 +619,14 @@ fn test_move_debt_reverse() {
 
     let vesu_deposit = Redeposit {
         token: ETH_ADDRESS(),
-        target_instruction_index: 1,
+        target_output: OutputPointer { instruction_index: 1, output_index: 0 },
         user: USER_ADDRESS(),
         context: Option::None,
     };
     
     let vesu_borrow = Reborrow {
         token: USDC_ADDRESS(),
-        target_instruction_index: 0,
+        target_output: OutputPointer { instruction_index: 0, output_index: 0 },
         approval_amount: 200010000, // 200 USDC + margin
         user: USER_ADDRESS(),
         context: Option::None,
