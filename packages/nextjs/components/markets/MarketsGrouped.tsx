@@ -395,6 +395,13 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
               </div>
             </summary>
             <div className="collapse-content p-0 mt-2 space-y-2">
+              <div className="grid grid-cols-5 gap-4 p-3 text-xs font-medium uppercase text-base-content/60">
+                <span>Network</span>
+                <span>Protocol</span>
+                <span className="justify-self-center">Utilization</span>
+                <span className="justify-self-center">Supply Rate</span>
+                <span className="justify-self-center">Borrow Rate</span>
+              </div>
               {group.markets.map(m => (
                 <div
                   key={m.protocol + m.address}
@@ -408,27 +415,9 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
                     <span className="capitalize">{protocolNames[m.protocol]}</span>
                   </div>
-                  <div className="justify-self-center">
-                    <RatePill
-                      variant="supply"
-                      label="Supply Rate"
-                      rate={m.supplyRate}
-                      networkType={m.networkType}
-                      protocol={m.protocol}
-                      showIcons={false}
-                    />
-                  </div>
-                  <div className="justify-self-center">
-                    <RatePill
-                      variant="borrow"
-                      label="Borrow Rate"
-                      rate={m.borrowRate}
-                      networkType={m.networkType}
-                      protocol={m.protocol}
-                      showIcons={false}
-                    />
-                  </div>
                   <div className="justify-self-center font-medium">{m.utilization}%</div>
+                  <div className="justify-self-center">{m.supplyRate}</div>
+                  <div className="justify-self-center">{m.borrowRate}</div>
                 </div>
               ))}
             </div>
