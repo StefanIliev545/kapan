@@ -79,7 +79,7 @@ mod RouterGateway {
 
         // @dev - Internal function that translates redeposit and reborrow to normal borrow and deposit instructions as
         // those instructions only have a meaning here in the router during the flash loan process.
-        fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, previous_instruction_span: Span<LendingInstruction>, gateway_outputs: Span<Span<InstructionOutput>>) -> Span<LendingInstruction> {
+        fn remap_instructions(ref self: ContractState, instructions: Span<LendingInstruction>, gateway_outputs: Span<Span<InstructionOutput>>) -> Span<LendingInstruction> {
             let mut remappedInstructions = array![];
             for instruction in instructions {
                 match instruction {
@@ -217,7 +217,6 @@ mod RouterGateway {
             should_transfer: bool
         ) -> Span<Span<InstructionOutput>> {
             let mut i: usize = 0;
-            let mut previous_protocol_outputs = array![].span();
             let mut all_outputs = array![];
             while i != instructions.len() {
                 let protocol_instruction = instructions.at(i);
@@ -226,23 +225,19 @@ mod RouterGateway {
 
                 // Apply remapping (for redeposit/reborrow) using outputs from the previous protocol
                 let mut instructions_span = *protocol_instruction.instructions;
-                if previous_protocol_outputs.len() != 0 {
-                    let previous_instruction_span = *instructions.at(i-1).instructions;
-                    instructions_span = self.remap_instructions(instructions_span, previous_instruction_span, previous_protocol_outputs);
+                if all_outputs.len() != 0 {
+                    instructions_span = self.remap_instructions(instructions_span, all_outputs.span());
                 }
 
                 // Process all instructions for this protocol at once
                 self.before_send_instructions(gateway, instructions_span, should_transfer);
-                let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
-                println!("Processing instructions for gateway: {:?}", gateway);
-                let gateway_outputs = dispatcher.process_instructions(instructions_span);
-                println!("processed");
+                let gateway_outputs = ILendingInstructionProcessorDispatcher { 
+                    contract_address: gateway 
+                }.process_instructions(instructions_span);
                 self.after_send_instructions(gateway, instructions_span, gateway_outputs, should_transfer);
-                println!("after send instructions");
                 for output_set in gateway_outputs {
                     all_outputs.append(*output_set);
                 }
-                previous_protocol_outputs = gateway_outputs;
                 i += 1;
             }
             all_outputs.span()
