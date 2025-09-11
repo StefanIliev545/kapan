@@ -127,10 +127,10 @@ export const NostraProtocolView: FC = () => {
       const symbol = symbolMap[underlying];
       const interestRate = rates?.[index];
 
-      // Convert rates from RAY (1e27) to percentage values
-      // Divide by 1e25 to account for the 1e2 factor when converting to percent
-      const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e25 : 0;
-      const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e25 : 0;
+      // Convert rates from WAD (1e18) to percentage values
+      // Divide by 1e16 to account for the 1e2 factor when converting to percent
+      const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e16 : 0;
+      const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e16 : 0;
 
       // Convert token amounts to numbers and multiply by USD price to get fiat value
       const decimals = tokenToDecimals[underlying];
