@@ -106,6 +106,7 @@ use starknet::{get_caller_address, get_contract_address};
                 limit: swap.max_in,
                 token_in: swap.token_in,
                 token_out: swap.token_out,
+                // Orient by output token: does token_out equal token1?
                 is_token1: swap.token_out == token1,
                 recipient: get_contract_address(),
                 is_exact_in: false,
@@ -179,7 +180,8 @@ use starknet::{get_caller_address, get_contract_address};
                 limit: swap.min_out,
                 token_in: swap.token_in,
                 token_out: swap.token_out,
-                is_token1: swap.token_out == token1,
+                // For exact IN, the signed amount refers to token_in
+                is_token1: swap.token_in == token1,
                 recipient: get_contract_address(),
                 is_exact_in: true,
             };
@@ -280,13 +282,17 @@ use starknet::{get_caller_address, get_contract_address};
             // Direction comes from the token the POOL receives (token_in)
             let token_in_is_token0 = token_in == pool_key.token0;
 
-            // If pool receives token0 → limit must be GREATER than current → use MAX
-            // If pool receives token1 → limit must be LESS than current   → use MIN
-            let sqrt_limit: u256 = if !token_in_is_token0 { MAX_SQRT_RATIO } else { MIN_SQRT_RATIO };
+            // LIMIT_DIRECTION depends on which side the pool receives (token_in):
+            // token0-in → price goes down → use MIN; token1-in → price goes up → use MAX
+            let sqrt_limit: u256 = if token_in_is_token0 { MIN_SQRT_RATIO } else { MAX_SQRT_RATIO };
 
             // (Optional safety) Ensure your is_token1 flag matches pool orientation of the *output*
-            assert(is_token1 == (token_out == pool_key.token1), 'is_token1-mismatch');
-
+            if is_exact_in {
+                assert(is_token1 == (token_in == pool_key.token1), 'is_token1-mismatch');
+            } else {
+                assert(is_token1 == (token_out == pool_key.token1), 'is_token1-mismatch');
+            }
+            
             let params = SwapParameters {
                 amount: signed_amount,
                 is_token1,
@@ -297,11 +303,16 @@ use starknet::{get_caller_address, get_contract_address};
             let delta = core.swap(pool_key, params);
             println!("Swapped");
 
-            let (out_i, in_i) = if is_token1 { (delta.amount1, delta.amount0) } else { (delta.amount0, delta.amount1) };
-            assert(out_i.sign, 'expected-negative-out');     // negative => owed to you
-            assert(!in_i.sign, 'expected-positive-in');      // positive => you owe core
-            let amount_out: u128 = out_i.mag;
-            let amount_in:  u128 = in_i.mag;
+            // Compute in/out amounts by token identity and sign, without brittle assertions
+            let d0 = delta.amount0; // token0
+            let d1 = delta.amount1; // token1
+            let in_mag0: u128 = if !d0.sign { d0.mag } else { 0 };   // positive => pool received token0
+            let in_mag1: u128 = if !d1.sign { d1.mag } else { 0 };   // positive => pool received token1
+            let out_mag0: u128 = if d0.sign { d0.mag } else { 0 };   // negative => pool sent token0
+            let out_mag1: u128 = if d1.sign { d1.mag } else { 0 };   // negative => pool sent token1
+
+            let amount_in: u128 = if token_in == pool_key.token1 { in_mag1 } else { in_mag0 };
+            let amount_out: u128 = if token_out == pool_key.token1 { out_mag1 } else { out_mag0 };
 
             if is_exact_in {
                 let min_out_u128: u128 = limit.try_into().unwrap();
@@ -326,17 +337,5 @@ use starknet::{get_caller_address, get_contract_address};
             
             ret.span()
         }
-    }
-
-    #[view]
-    fn quote_exact_in(
-        ref self: ContractState,
-        pool_key: PoolKey,
-        token_in: ContractAddress,
-        token_out: ContractAddress,
-        exact_in: u256
-    ) -> u256 {
-        // TODO: implement proper quoting once available from Ekubo core
-        0
     }
 }
