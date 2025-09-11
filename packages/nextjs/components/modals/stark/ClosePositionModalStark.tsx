@@ -56,7 +56,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       Deposit: undefined,
       Borrow: undefined,
       Repay: {
-        basic: { token: debt.address, amount: uint256.bnToUint256(0n), user: address },
+        basic: { token: debt.address, amount: uint256.bnToUint256(1n), user: address },
         repay_all: true,
         context: repayContext,
       },
