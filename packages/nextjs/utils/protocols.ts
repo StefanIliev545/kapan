@@ -41,10 +41,10 @@ export const toAnnualRates = (
 };
 
 // Formatting functions
-export const formatRate = (rate: number): string => {
+export const formatRate = (rate: number, dropLeadingZero = true): string => {
   const percentage = rate * 100;
   const digits = rate < 0.01 ? 3 : 2;
-  return `${formatPercentage(percentage, digits)}%`;
+  return `${formatPercentage(percentage, digits, dropLeadingZero)}%`;
 };
 
 export const formatTokenAmount = (amount: string, decimals: number): string => {
