@@ -7,6 +7,7 @@ import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { useMoveSupply } from "~~/hooks/kapan/moveSupply";
 import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
+import formatPercentage from "~~/utils/formatPercentage";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { notification } from "~~/utils/scaffold-eth";
 
@@ -75,7 +76,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const normalizeProtocolName = (protocol: string): string =>
     protocol.toLowerCase().replace(/\s+/g, "").replace(/v\d+/i, "");
 
-  const formatRate = (rate: number): string => `${rate.toFixed(2)}%`;
+  const formatRate = (rate: number): string => `${formatPercentage(rate)}%`;
 
   const formatInputValue = (value: bigint): string => {
     const decimals = token.decimals || 18;

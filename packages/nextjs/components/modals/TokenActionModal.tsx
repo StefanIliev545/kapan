@@ -1,11 +1,12 @@
 import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
-import { formatUnits, parseUnits } from "viem";
-import type { Network } from "~~/hooks/useTokenBalance";
-import { PositionManager } from "~~/utils/position";
-import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Call } from "starknet";
+import { formatUnits, parseUnits } from "viem";
+import { useGasEstimate } from "~~/hooks/useGasEstimate";
+import type { Network } from "~~/hooks/useTokenBalance";
+import formatPercentage from "~~/utils/formatPercentage";
+import { PositionManager } from "~~/utils/position";
 
 export interface TokenInfo {
   name: string;
@@ -44,7 +45,6 @@ export interface TokenActionModalProps {
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
-
 const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
 
 const HealthFactor = ({ value }: { value: number }) => {
@@ -64,14 +64,14 @@ const Utilization = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2 text-xs">
     <span>Utilization</span>
     <progress className="progress progress-primary w-20" value={value} max="100"></progress>
-    <span>{value.toFixed(2)}%</span>
+    <span>{formatPercentage(value)}%</span>
   </div>
 );
 
 const LoanToValue = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2 text-xs">
     <span>Loan to Value</span>
-    <span>{value.toFixed(2)}%</span>
+    <span>{formatPercentage(value)}%</span>
   </div>
 );
 
@@ -200,7 +200,10 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
 
   const price = token.usdPrice || 0;
   const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
-  const afterPosition = useMemo(() => beforePosition.apply(action, parsed * price), [beforePosition, action, parsed, price]);
+  const afterPosition = useMemo(
+    () => beforePosition.apply(action, parsed * price),
+    [beforePosition, action, parsed, price],
+  );
 
   const beforeHf = position ? beforePosition.healthFactor() : hf;
   const beforeUtil = position ? beforePosition.utilization() : utilization;
@@ -236,7 +239,11 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     return buildCalls(amount, isMax);
   }, [buildCalls, amount, isMax]);
 
-  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
+  const {
+    loading: feeLoading,
+    error: feeError,
+    feeNative,
+  } = useGasEstimate({
     enabled: isOpen && network === "stark",
     buildCalls: buildCallsForEstimate,
     currency: "STRK",

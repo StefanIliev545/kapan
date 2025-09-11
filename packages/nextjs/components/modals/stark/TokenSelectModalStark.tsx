@@ -3,9 +3,10 @@ import Image from "next/image";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { VesuContext } from "~~/hooks/useLendingAction";
+import formatPercentage from "~~/utils/formatPercentage";
+import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
-import { PositionManager } from "~~/utils/position";
 
 interface TokenSelectModalStarkProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                       <div
                         className={`badge ${hoveredToken === address ? "badge-primary" : "badge-outline"} p-3 font-medium`}
                       >
-                        {token.borrowAPR !== undefined ? token.borrowAPR.toFixed(2) : "0.00"}% APR
+                        {formatPercentage(token.borrowAPR ?? 0)}% APR
                       </div>
                     </div>
                   );
@@ -164,8 +165,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
             address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
             currentRate: selectedToken.borrowAPR ?? 0,
-            usdPrice:
-              selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e8 : 0,
+            usdPrice: selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e8 : 0,
           }}
           protocolName={protocolName}
           currentDebt={0}

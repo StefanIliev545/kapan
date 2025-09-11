@@ -5,6 +5,7 @@ import { formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWalletClient, useWriteContract } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // Common token shape used across modals
 export interface TokenInfo {
@@ -347,7 +348,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           <div className="p-4 bg-base-200 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-base-content/70">{actionType === "deposit" ? "Supply" : "Borrow"} APY:</span>
-              <span className="font-bold text-lg">{token.currentRate.toFixed(2)}%</span>
+              <span className="font-bold text-lg">{formatPercentage(token.currentRate)}%</span>
             </div>
             <div className="mt-1 text-xs text-base-content/60">
               {actionType === "deposit"
