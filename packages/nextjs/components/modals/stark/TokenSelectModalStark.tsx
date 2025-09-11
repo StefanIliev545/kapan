@@ -110,7 +110,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                       <div
                         className={`badge ${hoveredToken === address ? "badge-primary" : "badge-outline"} p-3 font-medium`}
                       >
-                        {formatPercentage(token.borrowAPR ?? 0)}% APR
+                        {formatPercentage(token.borrowAPR ?? 0, 2, false)}% APR
                       </div>
                     </div>
                   );
