@@ -398,7 +398,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
               {group.markets.map(m => (
                 <div
                   key={m.protocol + m.address}
-                  className="grid grid-cols-4 items-center gap-4 p-3 rounded-lg bg-base-100"
+                  className="grid grid-cols-5 items-center gap-4 p-3 rounded-lg bg-base-100"
                 >
                   <div className="flex items-center gap-2">
                     <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
@@ -428,6 +428,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                       showIcons={false}
                     />
                   </div>
+                  <div className="justify-self-center font-medium">{m.utilization}%</div>
                 </div>
               ))}
             </div>
