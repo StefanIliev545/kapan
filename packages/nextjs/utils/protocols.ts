@@ -1,3 +1,5 @@
+import formatPercentage from "./formatPercentage";
+
 // Constants
 export const YEAR_IN_SECONDS = 31536000; // 365 days
 export const SCALE = 10n ** 18n;
@@ -40,10 +42,9 @@ export const toAnnualRates = (
 
 // Formatting functions
 export const formatRate = (rate: number): string => {
-  if (rate < 0.01) {
-    return `${(rate * 100).toFixed(3)}%`;
-  }
-  return `${(rate * 100).toFixed(2)}%`;
+  const percentage = rate * 100;
+  const digits = rate < 0.01 ? 3 : 2;
+  return `${formatPercentage(percentage, digits)}%`;
 };
 
 export const formatTokenAmount = (amount: string, decimals: number): string => {

@@ -4,6 +4,7 @@ import { MarketData, MarketsSection } from "~~/components/markets/MarketsSection
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // Helper to convert Compound's per-second rate to APR percentage
 const convertRateToAPR = (ratePerSecond: bigint): number => {
@@ -69,8 +70,8 @@ export const CompoundMarkets: FC<CompoundMarketsProps> = ({ viewMode, search }) 
         return {
           icon: tokenNameToLogo(t.symbol),
           name: t.symbol,
-          supplyRate: `${supplyAPR.toFixed(2)}%`,
-          borrowRate: `${borrowAPR.toFixed(2)}%`,
+          supplyRate: `${formatPercentage(supplyAPR)}%`,
+          borrowRate: `${formatPercentage(borrowAPR)}%`,
           price: priceFormatted,
           utilization: utilization.toFixed(2),
           address: t.address as string,
