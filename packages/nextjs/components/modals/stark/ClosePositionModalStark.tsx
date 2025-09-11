@@ -17,38 +17,27 @@ import {
 import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
 
-const EKUBO_TIERS = [
-  {
-    feePercent: 0.01,
-    precisionPercent: 0.002,
-    fee: 34028236692093846346337460743176821n,
-    tickSpacing: 20,
-  },
-  {
-    feePercent: 0.05,
-    precisionPercent: 0.1,
-    fee: 170141183460469231731687303715884105n,
-    tickSpacing: 1000,
-  },
-  {
-    feePercent: 0.3,
-    precisionPercent: 0.6,
-    fee: 1020847100762815390390123822295304634n,
-    tickSpacing: 3000,
-  },
-  {
-    feePercent: 1,
-    precisionPercent: 2,
-    fee: 3402823669209384634633746074317682114n,
-    tickSpacing: 10000,
-  },
-  {
-    feePercent: 5,
-    precisionPercent: 10,
-    fee: 17014118346046923173168730371588410572n,
-    tickSpacing: 50000,
-  },
+interface EkuboTier {
+  feePercent: number;
+  precisionPercent: number;
+  feeNumerator: number;
+  feeDenominator: number;
+  tickSpacing: number;
+}
+
+const EKUBO_TIERS: EkuboTier[] = [
+  { feePercent: 0.01, precisionPercent: 0.002, feeNumerator: 1, feeDenominator: 100, tickSpacing: 20 },
+  { feePercent: 0.05, precisionPercent: 0.1, feeNumerator: 5, feeDenominator: 100, tickSpacing: 1000 },
+  { feePercent: 0.3, precisionPercent: 0.6, feeNumerator: 3, feeDenominator: 10, tickSpacing: 3000 },
+  { feePercent: 1, precisionPercent: 2, feeNumerator: 1, feeDenominator: 1, tickSpacing: 10000 },
+  { feePercent: 5, precisionPercent: 10, feeNumerator: 5, feeDenominator: 1, tickSpacing: 50000 },
 ];
+
+const FEE_SCALE = 2n ** 128n;
+
+const feePercentToFelt = (tier: EkuboTier): bigint =>
+  (BigInt(tier.feeNumerator) * FEE_SCALE) /
+  (BigInt(tier.feeDenominator) * 100n);
 
 interface TokenInfo {
   name: string;
@@ -85,20 +74,25 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
 
   const defaultTier = EKUBO_TIERS[1];
   const [chosenTier, setChosenTier] = useState(defaultTier);
+  const [isAutoSelecting, setIsAutoSelecting] = useState(true);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   const [withdrawAfterClose, setWithdrawAfterClose] = useState(true);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!isOpen || !ekuboGateway) return;
+    if (!isOpen || !ekuboGateway || !isAutoSelecting) return;
+    let cancelled = false;
     const simulate = async () => {
+      setIsSimulating(true);
       let bestTier = defaultTier;
       let bestAmount = 0n;
       for (const tier of EKUBO_TIERS) {
+        if (cancelled) break;
         try {
           const context = new CairoOption(
             CairoOptionVariant.Some,
-            [tier.fee, BigInt(tier.tickSpacing), 0n],
+            [feePercentToFelt(tier), BigInt(tier.tickSpacing), 0n],
           );
           const swapInstruction = new CairoCustomEnum({
             Deposit: undefined,
@@ -137,9 +131,17 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
           console.error("tier simulation failed", e);
         }
       }
-      setChosenTier(bestTier);
+      if (!cancelled) {
+        setChosenTier(bestTier);
+        setIsSimulating(false);
+        setIsAutoSelecting(false);
+      }
     };
     simulate();
+    return () => {
+      cancelled = true;
+      setIsSimulating(false);
+    };
   }, [
     isOpen,
     ekuboGateway,
@@ -147,6 +149,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     debt.address,
     collateralBalance,
     address,
+    isAutoSelecting,
   ]);
 
   const protocolInstructions = useMemo(() => {
@@ -212,7 +215,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         should_pay_in: true,
         context: new CairoOption(
           CairoOptionVariant.Some,
-          [chosenTier.fee, BigInt(chosenTier.tickSpacing), 0n],
+          [feePercentToFelt(chosenTier), BigInt(chosenTier.tickSpacing), 0n],
         ),
       },
     });
@@ -321,11 +324,28 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         <p className="text-sm">
           Repay your {debt.name} debt using {collateral.name} collateral via Ekubo swap.
         </p>
-        {chosenTier && (
-          <p className="text-sm">
-            Best tier: {chosenTier.feePercent}% fee / {chosenTier.precisionPercent}% precision
-          </p>
-        )}
+        <div className="text-sm flex items-center gap-2">
+          <span>Ekubo tier:</span>
+          <select
+            className="select select-bordered select-sm"
+            value={chosenTier.tickSpacing}
+            onChange={e => {
+              const tier = EKUBO_TIERS.find(t => t.tickSpacing === Number(e.target.value));
+              if (tier) {
+                setIsAutoSelecting(false);
+                setIsSimulating(false);
+                setChosenTier(tier);
+              }
+            }}
+          >
+            {EKUBO_TIERS.map(t => (
+              <option key={t.tickSpacing} value={t.tickSpacing}>
+                {t.feePercent}% fee / {t.precisionPercent}% precision
+              </option>
+            ))}
+          </select>
+          {isSimulating && <span className="loading loading-spinner loading-sm" />}
+        </div>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
