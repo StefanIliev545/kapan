@@ -26,10 +26,10 @@ struct SwapData {
     pub pool_key: PoolKey,
     pub exact_out: u256,
     pub max_in: u256,
-    pub recipient: ContractAddress,
     pub token_in: ContractAddress,
     pub token_out: ContractAddress,
     pub is_token1: bool,
+    pub recipient: ContractAddress,
 }
 
 #[derive(Copy, Drop, Serde)]
@@ -55,7 +55,7 @@ use starknet::{get_caller_address, get_contract_address};
 
     #[generate_trait]
     impl InternalFunctions of InternalFunctionsTrait {
-        fn execute_swap(ref self: ContractState, swap: @Swap) -> SwapResult {
+        fn execute_swap(ref self: ContractState, swap: @Swap) -> (u256, u256) {
             let swap = *swap;
 
             // Determine token0 and token1 (token0 should be lower address)
@@ -97,10 +97,10 @@ use starknet::{get_caller_address, get_contract_address};
                 },
                 exact_out: swap.exact_out,
                 max_in: swap.max_in,
-                recipient: swap.recipient,
                 token_in: swap.token_in,
                 token_out: swap.token_out,
                 is_token1: swap.token_out == token1,
+                recipient: get_contract_address(),
             };
 
             // Serialize swap data for the lock call
@@ -108,19 +108,23 @@ use starknet::{get_caller_address, get_contract_address};
             Serde::serialize(@swap_data, ref call_data);
 
             // Call core.lock which will trigger our locked callback
-            let result_data = self.core.read().lock(call_data.span());
+            self.core.read().lock(call_data.span());
             
             // Deserialize the result
-            let mut result_span = result_data;
-            let swap_result: SwapResult = Serde::deserialize(ref result_span).unwrap();
             
             // Refund any leftover token_in back to the caller
-            let current_balance = erc20.balance_of(get_contract_address());
-            if current_balance > 0 {
-                assert(erc20.transfer(get_caller_address(), current_balance), 'refund failed');
+            let in_balance = erc20.balance_of(get_contract_address());
+            if in_balance > 0 {
+                assert(erc20.transfer(get_caller_address(), in_balance), 'refund failed');
+            }
+
+            let outErc20 = IERC20Dispatcher { contract_address: swap.token_out };
+            let out_balance = outErc20.balance_of(get_contract_address());
+            if out_balance > 0 {
+                assert(outErc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
             
-            swap_result
+            (in_balance, out_balance)
         }
     }
 
@@ -133,13 +137,9 @@ use starknet::{get_caller_address, get_contract_address};
             let mut results = array![];
             for instruction in instructions {
                 if let LendingInstruction::Swap(swap) = instruction {
-                    let _result = self.execute_swap(swap);
+                    let (in_balance, out_balance) = self.execute_swap(swap);
                     let in_token = *swap.token_in;
                     let out_token = *swap.token_out;
-                    let in_balance = IERC20Dispatcher { contract_address: in_token }
-                        .balance_of(get_caller_address());
-                    let out_balance = IERC20Dispatcher { contract_address: out_token }
-                        .balance_of(get_caller_address());
                     let mut outs = array![];
                     outs.append(InstructionOutput { token: in_token, balance: in_balance });
                     outs.append(InstructionOutput { token: out_token, balance: out_balance });

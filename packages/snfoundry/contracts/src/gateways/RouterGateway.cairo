@@ -12,6 +12,7 @@ use starknet::{ContractAddress};
         Reborrow,
         Redeposit,
         Swap,
+        Reswap,
         BasicInstruction,
         InstructionOutput,
         ILendingInstructionProcessorDispatcher,
@@ -109,6 +110,23 @@ mod RouterGateway {
                             context: *redeposit.context,
                         }));
                     },
+                    LendingInstruction::Reswap(reswap) => {
+                        // Get the outputs from the target instructions (swap outputs)
+                        let exact_out_outputs = *gateway_outputs.at(*reswap.exact_out_index);
+                        let max_in_outputs = *gateway_outputs.at(*reswap.max_in_index);
+                        let exact_out_amount = *exact_out_outputs.at(0).balance; // First output is exact_out
+                        let max_in_amount = *max_in_outputs.at(0).balance; // First output is max_in
+                        remappedInstructions.append(LendingInstruction::Swap(Swap {
+                            token_in: *max_in_outputs.at(0).token,
+                            token_out: *exact_out_outputs.at(0).token,
+                            exact_out: exact_out_amount,
+                            max_in: max_in_amount,
+                            context: *reswap.context,
+                            user: *reswap.user,
+                            should_pay_out: *reswap.should_pay_out,
+                            should_pay_in: *reswap.should_pay_in,
+                        }));
+                    },
                     _ => {
                         remappedInstructions.append(*instruction);
                     }
@@ -196,10 +214,15 @@ mod RouterGateway {
                         },
                         LendingInstruction::Swap(swap) => {
                             let swap = *swap;
-                            let output = *gateway_outputs.at(i).at(0);
-                            if output.balance != 0 {
+                            let input = *gateway_outputs.at(i).at(0);
+                            let output = *gateway_outputs.at(i).at(1);
+                            if output.balance != 0 && swap.should_pay_out {
+                                let erc20 = IERC20Dispatcher { contract_address: swap.token_out };
+                                assert(erc20.transfer(swap.user, output.balance), 'transfer failed');
+                            }
+                            if input.balance != 0 && swap.should_pay_in {
                                 let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
-                                assert(erc20.transfer(get_caller_address(), output.balance), 'transfer failed');
+                                assert(erc20.transfer(swap.user, input.balance), 'transfer failed');
                             }
                         },
                         _ => {}
@@ -307,8 +330,11 @@ mod RouterGateway {
                         LendingInstruction::Redeposit(redeposit) => {
                             redeposit.user
                         },
-                        LendingInstruction::Swap(_) => {
-                            continue;
+                        LendingInstruction::Swap(swap) => {
+                            swap.user
+                        },
+                        LendingInstruction::Reswap(reswap) => {
+                            reswap.user
                         },
                         _ => {
                             panic!("bad-instruction-order")
