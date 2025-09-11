@@ -43,8 +43,8 @@ export const MarketRow: FC<MarketRowProps> = ({
               <div className="font-medium">${price}</div>
             </div>
             <div className="flex flex-col items-center w-1/5">
-              <div className="text-sm text-base-content/70">Utilization</div>
-              <div className="font-medium">{utilization}%</div>
+              <div className="text-sm text-base-content/70 mb-1">Utilization</div>
+              <span className="font-medium">{utilization}%</span>
             </div>
             <div className="w-2/5">
               <InterestPillRow
@@ -98,8 +98,8 @@ export const MarketRow: FC<MarketRowProps> = ({
               <div className="font-medium">${price}</div>
             </div>
             <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
-              <div className="text-sm text-base-content/70">Utilization</div>
-              <div className="font-medium">{utilization}%</div>
+              <div className="text-sm text-base-content/70 mb-1">Utilization</div>
+              <span className="font-medium">{utilization}%</span>
             </div>
           </div>
         </div>
@@ -135,8 +135,8 @@ export const MarketRow: FC<MarketRowProps> = ({
               <div className="font-medium text-sm">${price}</div>
             </div>
             <div className="bg-base-200/50 p-2 rounded-md">
-              <div className="text-xs text-base-content/70">Utilization</div>
-              <div className="font-medium text-sm">{utilization}%</div>
+              <div className="text-xs text-base-content/70 mb-1">Utilization</div>
+              <span className="font-medium text-sm">{utilization}%</span>
             </div>
           </div>
         </div>
