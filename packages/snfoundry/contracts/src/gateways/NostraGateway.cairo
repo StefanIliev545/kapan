@@ -136,7 +136,7 @@ mod NostraGateway {
 
         // @dev - mint the debt token and transfer the underlying to caller.
         // caller is restricted to router or the user in the instruction as this is an outbound flow.
-        fn borrow(ref self: ContractState, borrow: @Borrow) {
+        fn borrow(ref self: ContractState, borrow: @Borrow) -> u256 {
             let borrow = *borrow;
             let underlying = borrow.basic.token;
             let amount = borrow.basic.amount;
@@ -150,13 +150,18 @@ mod NostraGateway {
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
 
+            let balance_before = underlying_token.balance_of(get_contract_address());
             debt_token.mint(user, amount);
+            let balance_after = underlying_token.balance_of(get_contract_address());
+
             assert(underlying_token.transfer(get_caller_address(), amount), 'transfer failed');
+            let diff = balance_after - balance_before;
+            diff
         }
 
         // @dev - burns the debt token amounts by transfering the underlying.
         // caller not restricted as this is inbound flow.
-        fn repay(ref self: ContractState, repay: @Repay) {
+        fn repay(ref self: ContractState, repay: @Repay) -> u256 {
             let repay = *repay;
             let underlying = repay.basic.token;
             let mut amount = repay.basic.amount;
@@ -178,6 +183,7 @@ mod NostraGateway {
                 let refund = amount - to_repay;
                 assert(underlying_token.transfer(get_caller_address(), refund), 'transfer failed');
             }
+            to_repay
         }
 
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
@@ -200,29 +206,28 @@ mod NostraGateway {
                         self.deposit(instruction);
                         let token = instruction.basic.token;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: 0 });
+                        outs.append(InstructionOutput { token: *token, balance: 0 });
                         results.append(outs.span());
                     },
                     LendingInstruction::Withdraw(instruction) => {
                         let amount = self.withdraw(instruction);
                         let token = instruction.basic.token;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: amount });
+                        outs.append(InstructionOutput { token: *token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Borrow(instruction) => {
-                        self.borrow(instruction);
+                        let amount = self.borrow(instruction);
                         let token = instruction.basic.token;
-                        let amount = instruction.basic.amount;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: amount });
+                        outs.append(InstructionOutput { token: *token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Repay(instruction) => {
-                        self.repay(instruction);
+                        let amount = self.repay(instruction);
                         let token = instruction.basic.token;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: 0 });
+                        outs.append(InstructionOutput { token: *token, balance: 0 });
                         results.append(outs.span());
                     },
                     _ => {}

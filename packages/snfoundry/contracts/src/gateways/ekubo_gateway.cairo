@@ -134,8 +134,8 @@ use starknet::{get_caller_address, get_contract_address};
             for instruction in instructions {
                 if let LendingInstruction::Swap(swap) = instruction {
                     let _result = self.execute_swap(swap);
-                    let in_token = swap.token_in;
-                    let out_token = swap.token_out;
+                    let in_token = *swap.token_in;
+                    let out_token = *swap.token_out;
                     let in_balance = IERC20Dispatcher { contract_address: in_token }
                         .balance_of(get_caller_address());
                     let out_balance = IERC20Dispatcher { contract_address: out_token }

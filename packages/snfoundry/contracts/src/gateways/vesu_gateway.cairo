@@ -334,7 +334,7 @@ mod VesuGateway {
             singleton_dispatcher.modify_position(modify_params)
         }
 
-        fn borrow(ref self: ContractState, instruction: @Borrow) {
+        fn borrow(ref self: ContractState, instruction: @Borrow) -> u256 {
             let basic = *instruction.basic;
             let context = *instruction.context;
             self.assert_router_or_user(basic.user);
@@ -358,10 +358,11 @@ mod VesuGateway {
             let erc20 = IERC20Dispatcher { contract_address: debt_asset };
             let result = erc20.transfer(get_caller_address(), basic.amount);
             assert(result, Errors::TRANSFER_FAILED);
+            basic.amount
         }
 
 
-        fn repay(ref self: ContractState, instruction: @Repay) {
+        fn repay(ref self: ContractState, instruction: @Repay) -> u256 {
             let basic = *instruction.basic;
             let context = *instruction.context;
             assert(context.is_some(), 'Context is required for repay');
@@ -396,6 +397,7 @@ mod VesuGateway {
                 let refund = basic.amount - to_repay;
                 assert(erc20.transfer(get_caller_address(), refund), 'transfer failed');
             }
+            to_repay
         }
 
         // @dev - This calls vesu to modify a position. Positions in vesu are marked by collateral/debt pairs,
@@ -516,18 +518,17 @@ mod VesuGateway {
                         results.append(outs.span());
                     },
                     LendingInstruction::Borrow(borrow_params) => {
-                        self.borrow(borrow_params);
+                        let amount = self.borrow(borrow_params);
                         let token = *borrow_params.basic.token;
-                        let amount = borrow_params.basic.amount;
                         let mut outs = array![];
                         outs.append(InstructionOutput { token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Repay(repay_params) => {
-                        self.repay(repay_params);
+                        let amount = self.repay(repay_params);
                         let token = *repay_params.basic.token;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: 0 });
+                        outs.append(InstructionOutput { token, balance: amount });
                         results.append(outs.span());
                     },
                     _ => {}
