@@ -124,14 +124,12 @@ use starknet::{get_caller_address, get_contract_address};
             // Refund any leftover token_in back to the caller
             let in_balance = erc20.balance_of(get_contract_address());
             if in_balance > 0 {
-                println!("refund in_balance: {}", in_balance);
                 assert(erc20.transfer(get_caller_address(), in_balance), 'refund failed');
             }
 
             let outErc20 = IERC20Dispatcher { contract_address: swap.token_out };
             let out_balance = outErc20.balance_of(get_contract_address());
             if out_balance > 0 {
-                println!("refund out_balance: {}", out_balance);
                 assert(outErc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
             
@@ -196,14 +194,12 @@ use starknet::{get_caller_address, get_contract_address};
             // Refund any leftover token_in back to the caller
             let in_balance = erc20.balance_of(get_contract_address());
             if in_balance > 0 {
-                println!("refund in_balance: {}", in_balance);
                 assert(erc20.transfer(get_caller_address(), in_balance), 'refund failed');
             }
 
             let outErc20 = IERC20Dispatcher { contract_address: swap.token_out };
             let out_balance = outErc20.balance_of(get_contract_address());
             if out_balance > 0 {
-                println!("refund out_balance: {}", out_balance);
                 assert(outErc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
 
@@ -301,7 +297,7 @@ use starknet::{get_caller_address, get_contract_address};
             };
 
             let delta = core.swap(pool_key, params);
-            println!("Swapped");
+            
 
             // Compute in/out amounts by token identity and sign, without brittle assertions
             let d0 = delta.amount0; // token0
@@ -324,12 +320,10 @@ use starknet::{get_caller_address, get_contract_address};
             }
 
             core.withdraw(token_out, recipient, amount_out);
-            println!("Withdrawn");
 
             let erc20 = IERC20Dispatcher { contract_address: token_in };
             erc20.approve(self.core.read().contract_address, amount_in.into());
             core.pay(token_in);
-            println!("Paid");
 
             let result = SwapResult { delta };
             let mut ret = array![];
