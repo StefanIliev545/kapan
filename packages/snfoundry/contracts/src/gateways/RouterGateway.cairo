@@ -182,9 +182,9 @@ mod RouterGateway {
             gateway_outputs: Span<Span<InstructionOutput>>,
             should_transfer: bool
         ) {
-            if should_transfer {
-                let mut i: usize = 0;
-                while i != instructions.len() {
+            let mut i: usize = 0;
+            while i != instructions.len() {
+                if should_transfer {
                     match instructions.at(i) {
                         LendingInstruction::Borrow(borrow) => {
                             let basic = *borrow.basic;
@@ -212,23 +212,25 @@ mod RouterGateway {
                                 erc20.approve(gateway, 0);
                             }
                         },
-                        LendingInstruction::Swap(swap) => {
-                            let swap = *swap;
-                            let input = *gateway_outputs.at(i).at(0);
-                            let output = *gateway_outputs.at(i).at(1);
-                            if output.balance != 0 && swap.should_pay_out {
-                                let erc20 = IERC20Dispatcher { contract_address: swap.token_out };
-                                assert(erc20.transfer(swap.user, output.balance), 'transfer failed');
-                            }
-                            if input.balance != 0 && swap.should_pay_in {
-                                let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
-                                assert(erc20.transfer(swap.user, input.balance), 'transfer failed');
-                            }
-                        },
                         _ => {}
                     }
-                    i += 1;
                 }
+                if let LendingInstruction::Swap(swap) = instructions.at(i) {
+                    let swap = *swap;
+                    let input = *gateway_outputs.at(i).at(0);
+                    let output = *gateway_outputs.at(i).at(1);
+                    if output.balance != 0 && swap.should_pay_out {
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_out };
+                        assert(erc20.transfer(swap.user, output.balance), 'transfer failed');
+                    }
+                    println!("input.balance: {}", input.balance);
+                    println!("swap.should_pay_in: {}", swap.should_pay_in);
+                    if input.balance != 0 && swap.should_pay_in {
+                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        assert(erc20.transfer(swap.user, input.balance), 'transfer failed');
+                    }
+                }
+                i += 1;
             }
         }
 
