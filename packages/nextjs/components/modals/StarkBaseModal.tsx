@@ -1,6 +1,7 @@
 import { FC, ReactNode } from "react";
 import { BaseModal } from "./BaseModal";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-stark/useScaffoldWriteContract";
+import { useTxWatcher } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 
 interface VesuContext {
@@ -53,10 +54,14 @@ export const StarkBaseModal: FC<StarkBaseModalProps> = ({
       },
     }))],
   });
+  const { addTx } = useTxWatcher();
 
   const handleSubmit = async () => {
     try {
-      await sendAsync();
+      const hash = await sendAsync();
+      if (hash) {
+        addTx(hash, ["positions", "balances", "markets"]);
+      }
       notification.success("Instructions processed successfully");
       onClose();
     } catch (error) {

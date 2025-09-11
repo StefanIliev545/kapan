@@ -18,6 +18,7 @@ import { useDeployedContractInfo as useStarkDeployedContractInfo } from "~~/hook
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { feltToString } from "~~/utils/protocols";
 import { notification } from "~~/utils/scaffold-stark";
+import { useTxWatcher } from "~~/hooks/scaffold-stark";
 
 export type Action = "Borrow" | "Deposit" | "Withdraw" | "Repay";
 
@@ -38,6 +39,7 @@ export const useLendingAction = (
 ) => {
   if (network === "stark") {
     const { address, account } = useStarkAccount();
+    const { addTx } = useTxWatcher();
     const { balance: walletBalanceHook = 0n } = useTokenBalance(tokenAddress, "stark");
     const walletBalance = walletBalanceParam ?? walletBalanceHook;
     const { data: routerGateway } = useStarkDeployedContractInfo("RouterGateway");
@@ -141,7 +143,8 @@ export const useLendingAction = (
       try {
         const calls = await buildCalls(amount, isMax);
         if (!calls) return;
-        await account.execute(calls);
+        const res = await account.execute(calls);
+        addTx(res.transaction_hash, ["positions", "balances", "markets"]);
         notification.success("Instruction sent");
       } catch (e) {
         console.error(e);
