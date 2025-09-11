@@ -6,6 +6,7 @@ import { MovePositionModal } from "~~/components/modals/stark/MovePositionModal"
 import { RepayModalStark } from "~~/components/modals/stark/RepayModalStark";
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
+import { ClosePositionModalStark } from "~~/components/modals/stark/ClosePositionModalStark";
 import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -62,6 +63,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
 
   // Find metadata for both assets
   const collateralMetadata = supportedAssets.find(
@@ -170,6 +172,12 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                   className="w-6 h-6"
                 />
                 <span className="font-medium">{debtSymbol}</span>
+                <button
+                  className="btn btn-circle btn-ghost btn-xs"
+                  onClick={() => setIsCloseModalOpen(true)}
+                >
+                  ✕
+                </button>
               </div>
             )}
           </div>
@@ -390,6 +398,24 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             }}
             preSelectedCollaterals={preSelectedCollateral}
             disableCollateralSelection={true}
+          />
+
+          <ClosePositionModalStark
+            isOpen={isCloseModalOpen}
+            onClose={() => setIsCloseModalOpen(false)}
+            collateral={{
+              name: collateralSymbol,
+              address: collateralAsset,
+              decimals: Number(collateralMetadata.decimals),
+              icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+            }}
+            debt={{
+              name: debtSymbol,
+              address: debtAsset,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+            }}
+            poolId={poolId}
           />
         </>
       )}
