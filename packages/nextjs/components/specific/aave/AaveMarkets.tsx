@@ -5,6 +5,7 @@ import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // Helper: Convert Aave RAY (1e27) rates to APY percentage
 const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
@@ -36,8 +37,8 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search }) => {
       return {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
-        supplyRate: `${supplyAPY.toFixed(2)}%`,
-        borrowRate: `${borrowAPY.toFixed(2)}%`,
+        supplyRate: `${formatPercentage(supplyAPY)}%`,
+        borrowRate: `${formatPercentage(borrowAPY)}%`,
         price: price.toFixed(2),
         utilization: utilization.toFixed(2),
         address: token.token,

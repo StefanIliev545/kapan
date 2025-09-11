@@ -8,12 +8,13 @@ import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
-import { PositionManager } from "~~/utils/position";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
+import formatPercentage from "~~/utils/formatPercentage";
+import { PositionManager } from "~~/utils/position";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -170,14 +171,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
-                {currentRate.toFixed(2)}%
+                {formatPercentage(currentRate)}%
               </div>
             </div>
             <div className="px-2">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APR</div>
               <div className="font-medium flex items-center h-6">
                 <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {optimalRateDisplay.toFixed(2)}%
+                  {formatPercentage(optimalRateDisplay)}%
                 </span>
                 <Image
                   src={getProtocolLogo(optimalProtocol)}

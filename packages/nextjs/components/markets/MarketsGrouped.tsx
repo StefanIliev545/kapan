@@ -13,6 +13,7 @@ import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // Helper: Aave rate conversion
 const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
@@ -53,8 +54,8 @@ const useAaveData = (): MarketData[] => {
       return {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
-        supplyRate: `${supplyAPY.toFixed(2)}%`,
-        borrowRate: `${borrowAPY.toFixed(2)}%`,
+        supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+        borrowRate: `${formatPercentage(borrowAPY, 2, false)}%`,
         price: price.toFixed(2),
         utilization: utilization.toFixed(2),
         address: token.token,
@@ -115,8 +116,8 @@ const useCompoundData = (): MarketData[] => {
         return {
           icon: tokenNameToLogo(t.symbol),
           name: t.symbol,
-          supplyRate: `${supplyAPR.toFixed(2)}%`,
-          borrowRate: `${borrowAPR.toFixed(2)}%`,
+          supplyRate: `${formatPercentage(supplyAPR, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
           price: priceNum.toFixed(2),
           utilization: utilization.toFixed(2),
           address: t.address as string,
@@ -175,8 +176,8 @@ const useNostraData = (): MarketData[] => {
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        supplyRate: `${supplyAPY.toFixed(2)}%`,
-        borrowRate: `${borrowAPR.toFixed(2)}%`,
+        supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+        borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
         price,
         utilization: utilization.toFixed(2),
         address,
@@ -212,8 +213,8 @@ const useVenusData = (): MarketData[] => {
         return {
           icon: tokenNameToLogo(symbols[i]),
           name: symbols[i],
-          supplyRate: `${supplyAPY.toFixed(2)}%`,
-          borrowRate: `${borrowAPY.toFixed(2)}%`,
+          supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowAPY, 2, false)}%`,
           price: price.toFixed(2),
           utilization: utilization.toFixed(2),
           address: token,
@@ -248,8 +249,8 @@ const useVesuData = (): MarketData[] => {
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        supplyRate: formatRate(supplyAPY),
-        borrowRate: formatRate(borrowAPR),
+        supplyRate: formatRate(supplyAPY, false),
+        borrowRate: formatRate(borrowAPR, false),
         price: formatPrice(asset.price.value),
         utilization: formatUtilization(asset.utilization),
         address,

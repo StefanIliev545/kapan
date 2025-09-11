@@ -3,6 +3,7 @@ import { formatUnits } from "viem";
 import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // Convert Venus per-block rates to APY percentage
 const convertRateToAPY = (ratePerBlock: bigint): number => {
@@ -58,8 +59,8 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search }) => {
         return {
           icon: logo,
           name: displayName,
-          supplyRate: `${supplyAPY.toFixed(2)}%`,
-          borrowRate: `${borrowAPY.toFixed(2)}%`,
+          supplyRate: `${formatPercentage(supplyAPY)}%`,
+          borrowRate: `${formatPercentage(borrowAPY)}%`,
           price: price.toFixed(2),
           utilization: utilization.toFixed(2),
           address: token,

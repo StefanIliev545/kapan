@@ -3,6 +3,7 @@ import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatPrice } from "~~/utils/protocols";
+import formatPercentage from "~~/utils/formatPercentage";
 
 interface NostraMarketsProps {
   viewMode: "list" | "grid";
@@ -55,8 +56,8 @@ export const NostraMarkets: FC<NostraMarketsProps> = ({ viewMode, search }) => {
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        supplyRate: `${supplyAPY.toFixed(2)}%`,
-        borrowRate: `${borrowAPR.toFixed(2)}%`,
+        supplyRate: `${formatPercentage(supplyAPY)}%`,
+        borrowRate: `${formatPercentage(borrowAPR)}%`,
         price,
         utilization: utilization.toFixed(2),
         address,
