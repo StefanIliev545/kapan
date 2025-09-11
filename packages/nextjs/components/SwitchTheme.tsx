@@ -18,8 +18,8 @@ export const SwitchTheme = ({ className }: { className?: string }) => {
       : "light";
   const darkTheme =
     typeof window !== "undefined"
-      ? localStorage.getItem("darkTheme") ?? "synthwave"
-      : "synthwave";
+      ? localStorage.getItem("darkTheme") ?? "dark"
+      : "dark";
 
   useEffect(() => {
     if (mounted && theme === "system" && resolvedTheme) {
