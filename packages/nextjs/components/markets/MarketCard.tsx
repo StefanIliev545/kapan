@@ -13,6 +13,7 @@ export type MarketCardProps = {
   address: string;
   networkType: "evm" | "starknet";
   protocol: string;
+  allowDeposit?: boolean;
 };
 
 export const MarketCard: FC<MarketCardProps> = ({
@@ -25,6 +26,7 @@ export const MarketCard: FC<MarketCardProps> = ({
   address,
   networkType,
   protocol,
+  allowDeposit = false,
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
@@ -38,13 +40,12 @@ export const MarketCard: FC<MarketCardProps> = ({
               <h3 className="text-lg font-semibold">{name}</h3>
               <span className="text-sm text-base-content/70">${price}</span>
             </div>
-            {networkType === "starknet" && (
+            {allowDeposit && networkType === "starknet" && (
               <button
-                className="btn btn-sm btn-primary btn-circle ml-auto"
+                className="btn btn-sm btn-primary ml-auto"
                 onClick={() => setIsDepositModalOpen(true)}
-                aria-label="Deposit"
               >
-                +
+                Deposit
               </button>
             )}
           </div>
@@ -71,7 +72,7 @@ export const MarketCard: FC<MarketCardProps> = ({
         </div>
       </div>
 
-      {networkType === "starknet" && (
+      {allowDeposit && networkType === "starknet" && (
         <DepositModalStark
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}

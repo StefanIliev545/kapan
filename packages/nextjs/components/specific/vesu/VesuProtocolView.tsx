@@ -163,7 +163,12 @@ export const VesuProtocolView: FC = () => {
 
   return (
     <div className="w-full flex flex-col p-4 space-y-4">
-      <VesuMarkets supportedAssets={supportedAssets as ContractResponse | undefined} viewMode="grid" search="" />
+      <VesuMarkets
+        supportedAssets={supportedAssets as ContractResponse | undefined}
+        viewMode="grid"
+        search=""
+        allowDeposit
+      />
 
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">

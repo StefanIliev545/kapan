@@ -12,6 +12,7 @@ export interface MarketData {
   address: string;
   networkType: "evm" | "starknet";
   protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
+  allowDeposit?: boolean;
 }
 
 interface MarketsSectionProps {
