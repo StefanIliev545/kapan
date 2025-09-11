@@ -10,11 +10,11 @@ export const ThemeSettings = ({ className }: { className?: string }) => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [lightTheme, setLightTheme] = useState("light");
-  const [darkTheme, setDarkTheme] = useState("synthwave");
+  const [darkTheme, setDarkTheme] = useState("dark");
 
   useEffect(() => {
     const storedLight = localStorage.getItem("lightTheme") ?? "light";
-    const storedDark = localStorage.getItem("darkTheme") ?? "synthwave";
+    const storedDark = localStorage.getItem("darkTheme") ?? "dark";
     setLightTheme(storedLight);
     setDarkTheme(storedDark);
     setMounted(true);
