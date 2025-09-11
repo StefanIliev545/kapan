@@ -214,6 +214,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -222,8 +230,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -244,8 +252,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -914,6 +922,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -922,8 +938,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -944,8 +960,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -1645,6 +1661,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -1653,8 +1677,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -1675,8 +1699,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -2060,6 +2084,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -2068,8 +2100,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -2090,8 +2122,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -2525,6 +2557,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -2533,8 +2573,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -2555,8 +2595,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -3225,6 +3265,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -3233,8 +3281,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -3255,8 +3303,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -4069,6 +4117,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -4077,8 +4133,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -4099,8 +4155,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -4534,6 +4590,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -4542,8 +4606,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -4564,8 +4628,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
@@ -5234,6 +5298,14 @@ const contracts = {
           ],
         },
         {
+        type: "struct",
+        name: "kapan::interfaces::IGateway::OutputPointer",
+        members: [
+          { name: "instruction_index", type: "core::integer::u32" },
+          { name: "output_index", type: "core::integer::u32" },
+        ],
+      },
+      {
           type: "struct",
           name: "kapan::interfaces::IGateway::Redeposit",
           members: [
@@ -5242,8 +5314,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "user",
@@ -5264,8 +5336,8 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "target_instruction_index",
-              type: "core::integer::u32",
+              name: "target_output_pointer",
+              type: "kapan::interfaces::IGateway::OutputPointer",
             },
             {
               name: "approval_amount",
