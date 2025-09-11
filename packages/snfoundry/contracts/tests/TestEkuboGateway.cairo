@@ -12,6 +12,7 @@ use kapan::interfaces::IGateway::{
     Repay,
     Withdraw,
     Reswap,
+    Redeposit,
     BasicInstruction,
 };
 use ekubo::types::keys::PoolKey;
@@ -29,6 +30,8 @@ use snforge_std::{
 };
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use openzeppelin::utils::serde::SerializedAppend;
+use core::num::traits::Zero;
+use kapan::gateways::vesu_gateway::{IVesuViewerDispatcher, IVesuViewerDispatcherTrait};
 
 // Ekubo Core contract address provided by user
 fn EKUBO_CORE_ADDRESS() -> ContractAddress {
@@ -494,4 +497,121 @@ fn test_create_position_and_move_debt_with_reswap() {
     println!("- Position closed: repaid all USDC debt and withdrew all ETH collateral");
     println!("- Reswap executed: converted withdrawn ETH to USDC via Ekubo");
     println!("- Final result: received collateral with no active positions");
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_move_debt_reswap_and_redeposit_kept_in_router() {
+    println!("Setting up test context with Router and Vesu (redeposit flow)");
+    let context = setup_ekubo_test_context();
+
+    // Register both gateways with router
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('ekubo', context.ekubo_gateway_address);
+    router.add_gateway('vesu', context.vesu_gateway_address);
+
+    // 1) Create initial position: deposit 1 ETH collateral and borrow 200 USDC
+    use kapan::gateways::vesu_gateway::VesuContext;
+    let mut vesu_eth_context = array![];
+    VesuContext { pool_id: 0, position_counterpart_token: ETH_ADDRESS() }.serialize(ref vesu_eth_context);
+    let mut vesu_usdc_context = array![];
+    VesuContext { pool_id: 0, position_counterpart_token: USDC_ADDRESS() }.serialize(ref vesu_usdc_context);
+
+    let create_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'vesu',
+            instructions: array![
+                LendingInstruction::Deposit(Deposit {
+                    basic: BasicInstruction { token: ETH_ADDRESS(), amount: 1000000000000000000, user: USER_ADDRESS() }, // 1 ETH
+                    context: Option::None,
+                }),
+                LendingInstruction::Borrow(Borrow {
+                    basic: BasicInstruction { token: USDC_ADDRESS(), amount: 200000000, user: USER_ADDRESS() }, // 200 USDC
+                    context: Option::Some(vesu_eth_context.span()),
+                }),
+            ].span(),
+        }
+    ];
+
+    // Approvals for the create_instructions
+    let create_auth = context.router_dispatcher.get_authorizations_for_instructions(create_instructions.span(), true);
+    for authorization in create_auth {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'create auth call failed');
+    };
+
+    // Execute creation
+    println!("Executing creation");
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let _ = context.router_dispatcher.process_protocol_instructions(create_instructions.span());
+    println!("Creation completed successfully!");
+
+    // 2) Build move_debt with reswap (both swap transfers disabled) and then redeposit the swap result
+    // Order vesu ops as: Withdraw first, then Repay, so indexes align: 0 -> withdraw, 1 -> repay
+    let withdraw_all_eth = LendingInstruction::Withdraw(Withdraw {
+        basic: BasicInstruction { token: ETH_ADDRESS(), amount: 1000000000000000000, user: USER_ADDRESS() },
+        withdraw_all: true,
+        context: Option::Some(vesu_usdc_context.span()),
+    });
+    let repay_all_usdc = LendingInstruction::Repay(Repay {
+        basic: BasicInstruction { token: USDC_ADDRESS(), amount: 200000000, user: USER_ADDRESS() },
+        repay_all: true,
+        context: Option::Some(vesu_eth_context.span()),
+    });
+
+    // Swap using Ekubo: reference previous protocol outputs via indexes
+    // exact_out_index = 0 (withdraw ETH), max_in_index = 1 (repay USDC)
+    let reswap_instruction = LendingInstruction::Reswap(Reswap {
+        exact_out_index: 0,
+        max_in_index: 1,
+        user: USER_ADDRESS(),
+        should_pay_out: false,
+        should_pay_in: false,
+        context: Option::None,
+    });
+
+    // Redeposit using the swap outputs. Target the swap instruction index in the global outputs list:
+    // 0 -> withdraw, 1 -> repay, 2 -> swap
+    let redeposit_from_swap = LendingInstruction::Redeposit(Redeposit {
+        token: ETH_ADDRESS(),
+        user: USER_ADDRESS(),
+        target_instruction_index: 2,
+        context: Option::None,
+    });
+
+    let mut md_instructions = array![];
+    md_instructions.append(ProtocolInstructions { protocol_name: 'vesu', instructions: array![repay_all_usdc, withdraw_all_eth].span() });
+    md_instructions.append(ProtocolInstructions { protocol_name: 'ekubo', instructions: array![reswap_instruction].span() });
+    md_instructions.append(ProtocolInstructions { protocol_name: 'vesu', instructions: array![redeposit_from_swap].span() });
+
+    // Authorizations (user approvals) for the whole sequence
+    let md_auth = context.router_dispatcher.get_authorizations_for_instructions(md_instructions.span(), true);
+    for authorization in md_auth {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'move_debt auth call failed');
+    };
+
+    // Execute move_debt (flashloan path keeps internal transfers)
+    println!("Executing move_debt");
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.move_debt(md_instructions.span());
+    println!("Move debt completed successfully!");
+
+    // 3) Verify there is an active zero-debt position (collateral) for USDC
+    let viewer = IVesuViewerDispatcher { contract_address: context.vesu_gateway_address };
+    let positions = viewer.get_all_positions(USER_ADDRESS(), 0);
+
+    let mut found_zero_debt_usdc = false;
+    for pos in positions {
+        let (collateral_asset, debt_asset, with_amounts) = pos;
+        if collateral_asset == ETH_ADDRESS() && debt_asset == Zero::zero() && with_amounts.nominal_debt == 0 && with_amounts.collateral_shares > 0 {
+            found_zero_debt_usdc = true;
+        }
+    };
+    assert(found_zero_debt_usdc, 'expected-zero-debt');
 }

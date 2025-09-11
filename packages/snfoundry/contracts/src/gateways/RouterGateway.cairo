@@ -101,6 +101,7 @@ mod RouterGateway {
                         // Get the output from the target instruction (withdraw output is what came out)
                         let target_outputs = *gateway_outputs.at(*redeposit.target_instruction_index);
                         let withdrawn_amount = *target_outputs.at(0).balance; // Withdraw output is what came out
+                        println!("withdrawn_amount: {}", withdrawn_amount);
                         remappedInstructions.append(LendingInstruction::Deposit(Deposit {
                             basic: BasicInstruction {
                                 token: *redeposit.token,
@@ -146,6 +147,9 @@ mod RouterGateway {
                         if should_transfer {
                             assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
                         }
+                        println!("deposit - approve basic.amount: {}", basic.amount);
+                        let balance = erc20.balance_of(get_contract_address());
+                        println!("deposit - balance: {}", balance);
                         assert(erc20.approve(gateway, basic.amount), 'approve failed');
                     },
                     LendingInstruction::Repay(repay) => {
@@ -219,14 +223,19 @@ mod RouterGateway {
                     let swap = *swap;
                     let input = *gateway_outputs.at(i).at(0);
                     let output = *gateway_outputs.at(i).at(1);
+                    
+                    println!("output.balance: {}", output.balance);
+                    println!("swap.should_pay_out: {}", swap.should_pay_out);
                     if output.balance != 0 && swap.should_pay_out {
                         let erc20 = IERC20Dispatcher { contract_address: swap.token_out };
+                        println!("transfer output.balance: {}", output.balance);
                         assert(erc20.transfer(swap.user, output.balance), 'transfer failed');
                     }
                     println!("input.balance: {}", input.balance);
                     println!("swap.should_pay_in: {}", swap.should_pay_in);
                     if input.balance != 0 && swap.should_pay_in {
                         let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
+                        println!("transfer input.balance: {}", input.balance);
                         assert(erc20.transfer(swap.user, input.balance), 'transfer failed');
                     }
                 }
