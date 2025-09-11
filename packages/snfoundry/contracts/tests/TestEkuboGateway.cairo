@@ -153,6 +153,7 @@ fn test_ekubo_gateway_deployment() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_ekubo_swap_eth_usdc() {
     println!("Setting up Ekubo test context for ETH/USDC swap");

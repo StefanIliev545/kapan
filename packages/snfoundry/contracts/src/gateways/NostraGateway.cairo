@@ -161,7 +161,7 @@ mod NostraGateway {
 
         // @dev - burns the debt token amounts by transfering the underlying.
         // caller not restricted as this is inbound flow.
-        fn repay(ref self: ContractState, repay: @Repay) -> u256 {
+        fn repay(ref self: ContractState, repay: @Repay) -> (u256, u256) {
             let repay = *repay;
             let underlying = repay.basic.token;
             let mut amount = repay.basic.amount;
@@ -179,11 +179,12 @@ mod NostraGateway {
             assert(underlying_token.approve(debt, to_repay), 'approve failed');
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
             debt_token.burn(user, to_repay);
-            if amount > to_repay {
-                let refund = amount - to_repay;
+            
+            let refund = if amount > to_repay { amount - to_repay } else { 0 };
+            if refund > 0 {
                 assert(underlying_token.transfer(get_caller_address(), refund), 'transfer failed');
             }
-            to_repay
+            (to_repay, refund)
         }
 
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
@@ -224,10 +225,11 @@ mod NostraGateway {
                         results.append(outs.span());
                     },
                     LendingInstruction::Repay(instruction) => {
-                        let amount = self.repay(instruction);
+                        let (repaid_amount, refund_amount) = self.repay(instruction);
                         let token = instruction.basic.token;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token: *token, balance: 0 });
+                        outs.append(InstructionOutput { token: *token, balance: repaid_amount });
+                        outs.append(InstructionOutput { token: *token, balance: refund_amount });
                         results.append(outs.span());
                     },
                     _ => {}

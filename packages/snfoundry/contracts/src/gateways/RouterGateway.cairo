@@ -84,25 +84,13 @@ mod RouterGateway {
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Reborrow(reborrow) => {
-                        let target_instruction = previous_instruction_span.at(*reborrow.target_instruction_index);
-                        let repay_amount = match target_instruction {
-                            LendingInstruction::Repay(repay) => {
-                                let basic = *repay.basic;
-                                basic.amount
-                            },
-                            _ => {
-                                panic!("reborrow-target-not-repay")
-                            }
-                        };
-                        // Get the output from the target instruction (repay output is what was repaid)
+                        // Get the outputs from the target instruction (repay now returns two outputs: repaid_amount, refund_amount)
                         let target_outputs = *gateway_outputs.at(*reborrow.target_instruction_index);
-                        let repaid_amount = *target_outputs.at(0).balance; // Repay output is what was repaid
-                        assert(repay_amount >= repaid_amount, 'reborrow-underflow');
-                        let needed_amount = repay_amount - repaid_amount;
+                        let repaid_amount = *target_outputs.at(0).balance; // First output is what was repaid
                         remappedInstructions.append(LendingInstruction::Borrow(Borrow {
                             basic: BasicInstruction {
                                 token: *reborrow.token,
-                                amount: needed_amount,
+                                amount: repaid_amount,
                                 user: *reborrow.user,
                             },
                             context: *reborrow.context,
@@ -129,49 +117,9 @@ mod RouterGateway {
             remappedInstructions.span()
         }
 
-        // @dev - befor sending instructions to the protocol's gateway we need to grant necessary approvals.
-        // furthermore we keep track of the balances beforehand in order to calculate diffs.
-        fn before_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, should_transfer: bool) -> Span<u256> {
+        // @dev - before sending instructions to the protocol's gateway we need to grant necessary approvals.
+        fn before_send_instructions(ref self: ContractState, gateway: ContractAddress, instructions: Span<LendingInstruction>, should_transfer: bool) {
             let mut i: usize = 0;
-            let mut balancesBefore = array![];
-
-            // First pass: collect balances before any transfers/approvals
-            while i != instructions.len() {
-                match instructions.at(i) {
-                    LendingInstruction::Deposit(deposit) => {
-                        balancesBefore.append(0); // Irrelevant
-                    },
-                    LendingInstruction::Repay(repay) => {
-                        let basic = *repay.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesBefore.append(balance);
-                    },
-                    LendingInstruction::Withdraw(withdraw) => {
-                        let basic = *withdraw.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesBefore.append(balance);
-                    },
-                    LendingInstruction::Borrow(borrow) => {
-                        let basic = *borrow.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesBefore.append(balance);
-                    },
-                    LendingInstruction::Swap(swap) => {
-                        let swap = *swap;
-                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesBefore.append(balance);
-                    },
-                    _ => {}
-                }
-                i += 1;
-            }
-
-            // Second pass: execute transfers/approvals as needed
-            i = 0;
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit) => {
@@ -206,105 +154,52 @@ mod RouterGateway {
                 }
                 i += 1;
             }
-
-            balancesBefore.span()
         }
 
-        // @dev - after the instructions are executed we need to send back to the user the balance differences.
-        // It is however possible to skip the transfer in cases of debt refinancing where the balances are used in place
-        // to fund the follow up redeposit. 
+        // @dev - after the instructions are executed we need to send back to the user the tokens.
         fn after_send_instructions(
             ref self: ContractState,
             gateway: ContractAddress,
             instructions: Span<LendingInstruction>,
-            balancesBefore: Span<u256>,
+            gateway_outputs: Span<Span<InstructionOutput>>,
             should_transfer: bool
-        ) -> Span<u256> {
-            // First pass: count balances after execution
-            let mut i: usize = 0;
-            let mut balancesAfter = array![];
-            while i != instructions.len() {
-                match instructions.at(i) {
-                    LendingInstruction::Borrow(borrow) => {
-                        let basic = *borrow.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        balancesAfter.append(balance - *balancesBefore.at(i));
-                    },
-                    LendingInstruction::Withdraw(withdraw) => {
-                        let basic = *withdraw.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        if balance >= *balancesBefore.at(i) {
-                            let diff = balance - *balancesBefore.at(i);
-                            balancesAfter.append(diff);
-                        } else {
-                            balancesAfter.append(0); // Prevent underflow for now
-                        }
-                    },
-                    LendingInstruction::Repay(repay) => {
-                        let basic = *repay.basic;
-                        let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                        let balance = erc20.balance_of(get_contract_address());
-                        if balance >= *balancesBefore.at(i) {
-                            let diff = balance - *balancesBefore.at(i);
-                            balancesAfter.append(diff);
-                        } else {
-                            balancesAfter.append(0); // Prevent underflow for now
-                        }
-                        if *repay.repay_all {
-                            erc20.approve(gateway, 0);
-                        }
-                    },
-                    LendingInstruction::Swap(swap) => {
-                        let swap = *swap;
-                        let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
-                        let balance = erc20.balance_of(get_contract_address());
-                        if balance >= *balancesBefore.at(i) {
-                            let diff = balance - *balancesBefore.at(i);
-                            balancesAfter.append(diff);
-                        } else {
-                            balancesAfter.append(0);
-                        }
-                    },
-                    LendingInstruction::Deposit(deposit) => {
-                        balancesAfter.append(0);
-                    },
-                    _ => {}
-                }
-                i += 1;
-            }
-
-            // Second pass: perform transfers if needed
+        ) {
             if should_transfer {
-                i = 0;
+                let mut i: usize = 0;
                 while i != instructions.len() {
                     match instructions.at(i) {
                         LendingInstruction::Borrow(borrow) => {
                             let basic = *borrow.basic;
                             let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                            assert(erc20.transfer(basic.user, erc20.balance_of(get_contract_address())), 'transfer failed');
+                            let output = *gateway_outputs.at(i).at(0);
+                            assert(erc20.transfer(basic.user, output.balance), 'transfer failed');
                         },
                         LendingInstruction::Withdraw(withdraw) => {
                             let basic = *withdraw.basic;
                             let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                            let diff = balancesAfter.at(i);
-                            assert(erc20.transfer(basic.user, *diff), 'transfer failed');
+                            let output = *gateway_outputs.at(i).at(0);
+                            assert(erc20.transfer(basic.user, output.balance), 'transfer failed');
                         },
                         LendingInstruction::Repay(repay) => {
                             let basic = *repay.basic;
-                            let diff = balancesAfter.at(i);
-                            if *diff != 0 {
+                            // Repay now returns two outputs: repaid_amount (index 0), refund_amount (index 1)
+                            let refund_output = *gateway_outputs.at(i).at(1);
+                            if refund_output.balance != 0 {
                                 let erc20 = IERC20Dispatcher { contract_address: basic.token };
-                                assert(erc20.transfer(basic.user, *diff), 'transfer failed');
+                                assert(erc20.transfer(basic.user, refund_output.balance), 'transfer failed');
+                            }
+
+                            if *repay.repay_all {
+                                let erc20 = IERC20Dispatcher { contract_address: basic.token };
+                                erc20.approve(gateway, 0);
                             }
                         },
                         LendingInstruction::Swap(swap) => {
-                            let diff = balancesAfter.at(i);
-                            if *diff != 0 {
-                                let swap = *swap;
+                            let swap = *swap;
+                            let output = *gateway_outputs.at(i).at(0);
+                            if output.balance != 0 {
                                 let erc20 = IERC20Dispatcher { contract_address: swap.token_in };
-                                assert(erc20.transfer(get_caller_address(), *diff), 'transfer failed');
+                                assert(erc20.transfer(get_caller_address(), output.balance), 'transfer failed');
                             }
                         },
                         _ => {}
@@ -312,8 +207,6 @@ mod RouterGateway {
                     i += 1;
                 }
             }
-
-            balancesAfter.span()
         }
 
         // @dev - the core logic loop of the router. It goes protocol by protocol, giving approvals and transfering from caller
@@ -339,10 +232,13 @@ mod RouterGateway {
                 }
 
                 // Process all instructions for this protocol at once
-                let balances_before = self.before_send_instructions(gateway, instructions_span, should_transfer);
+                self.before_send_instructions(gateway, instructions_span, should_transfer);
                 let dispatcher = ILendingInstructionProcessorDispatcher { contract_address: gateway };
+                println!("Processing instructions for gateway: {:?}", gateway);
                 let gateway_outputs = dispatcher.process_instructions(instructions_span);
-                let diffs = self.after_send_instructions(gateway, instructions_span, balances_before, should_transfer);
+                println!("processed");
+                self.after_send_instructions(gateway, instructions_span, gateway_outputs, should_transfer);
+                println!("after send instructions");
                 for output_set in gateway_outputs {
                     all_outputs.append(*output_set);
                 }

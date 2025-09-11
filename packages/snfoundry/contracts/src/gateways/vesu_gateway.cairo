@@ -362,7 +362,7 @@ mod VesuGateway {
         }
 
 
-        fn repay(ref self: ContractState, instruction: @Repay) -> u256 {
+        fn repay(ref self: ContractState, instruction: @Repay) -> (u256, u256) {
             let basic = *instruction.basic;
             let context = *instruction.context;
             assert(context.is_some(), 'Context is required for repay');
@@ -393,11 +393,11 @@ mod VesuGateway {
             let debt_amount = I257Impl::new(to_repay, true);
             self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
 
-            if basic.amount > to_repay {
-                let refund = basic.amount - to_repay;
+            let refund = if basic.amount > to_repay { basic.amount - to_repay } else { 0 };
+            if refund > 0 {
                 assert(erc20.transfer(get_caller_address(), refund), 'transfer failed');
             }
-            to_repay
+            (to_repay, refund)
         }
 
         // @dev - This calls vesu to modify a position. Positions in vesu are marked by collateral/debt pairs,
@@ -525,10 +525,11 @@ mod VesuGateway {
                         results.append(outs.span());
                     },
                     LendingInstruction::Repay(repay_params) => {
-                        let amount = self.repay(repay_params);
+                        let (repaid_amount, refund_amount) = self.repay(repay_params);
                         let token = *repay_params.basic.token;
                         let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: amount });
+                        outs.append(InstructionOutput { token, balance: repaid_amount });
+                        outs.append(InstructionOutput { token, balance: refund_amount });
                         results.append(outs.span());
                     },
                     _ => {}
