@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { FC, useMemo, useState } from "react";
+import Image from "next/image";
 import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
 import { MovePositionModal } from "~~/components/modals/stark/MovePositionModal";
@@ -8,6 +8,7 @@ import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectMod
 import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
 import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
 
@@ -25,7 +26,6 @@ interface VesuPositionProps {
   supportedAssets: TokenMetadata[];
   poolId: bigint;
 }
-
 
 // Helper: Calculate rates based on protocol data (returns numbers)
 const calculateRates = (
@@ -87,11 +87,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     : 0n;
 
   const position = useMemo(
-    () =>
-      new PositionManager(
-        Number(collateralValue) / 1e18,
-        Number(debtValue) / 1e18,
-      ),
+    () => new PositionManager(Number(collateralValue) / 1e18, Number(debtValue) / 1e18),
     [collateralValue, debtValue],
   );
 
@@ -189,16 +185,14 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               <div className="divider my-1"></div>
 
               <div className="space-y-1">
-                <div className="flex justify-between">
+                <div className="flex justify-between w-full gap-1">
                   <span className="text-sm text-gray-500">Supply APY</span>
                   <span className="text-sm font-medium text-success">
-                    {(collateralRates.supplyAPY * 100).toFixed(3)}%
+                    {formatPercentage(collateralRates.supplyAPY * 100, 3)}%
                   </span>
                 </div>
                 <div className="flex justify-end">
-                  <span className="text-sm font-medium">
-                    ${(Number(monthlyYield) / 1e18).toFixed(3)} per month
-                  </span>
+                  <span className="text-sm font-medium">${(Number(monthlyYield) / 1e18).toFixed(3)} per month</span>
                 </div>
               </div>
             </div>
@@ -223,20 +217,20 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
               <div className="space-y-1">
                 {nominalDebt === "0" ? (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between w-full gap-1">
                     <span className="text-sm text-gray-400">No debt</span>
                     <span className="text-sm font-medium text-gray-400">-</span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between w-full gap-1">
                       <span className="text-sm text-gray-500">Borrow APR</span>
-                      <span className="text-sm font-medium text-error">{(debtRates.borrowAPR * 100).toFixed(3)}%</span>
+                      <span className="text-sm font-medium text-error">
+                        {formatPercentage(debtRates.borrowAPR * 100, 3)}%
+                      </span>
                     </div>
                     <div className="flex justify-end">
-                      <span className="text-sm font-medium">
-                        ${(Number(monthlyCost) / 1e18).toFixed(3)} per month
-                      </span>
+                      <span className="text-sm font-medium">${(Number(monthlyCost) / 1e18).toFixed(3)} per month</span>
                     </div>
                   </>
                 )}
@@ -248,7 +242,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-gray-500">
-              Loan-to-value: <span className="font-medium">{Number(ltv).toFixed(2)}%</span>
+              Loan-to-value: <span className="font-medium">{formatPercentage(Number(ltv))}%</span>
             </span>
             {nominalDebt !== "0" && (
               <button className="btn btn-xs btn-outline btn-primary" onClick={() => setIsMoveModalOpen(true)}>
@@ -343,6 +337,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
         collateralAsset={collateralAsset}
         isVesu={true}
         vesuContext={{ poolId, counterpartToken: collateralAsset }}
+        position={position}
       />
 
       {debtMetadata && (
@@ -350,19 +345,19 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <BorrowModalStark
             isOpen={isBorrowModalOpen}
             onClose={() => setIsBorrowModalOpen(false)}
-          token={{
-            name: debtSymbol,
-            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-            address: debtAsset,
-            currentRate: debtRates.borrowAPR * 100,
-            usdPrice: debtUsdPrice,
-            decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-          }}
-          protocolName="Vesu"
-          currentDebt={debtNum}
-          vesuContext={{ poolId, counterpartToken: collateralAsset }}
-          position={position}
-        />
+            token={{
+              name: debtSymbol,
+              icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+              address: debtAsset,
+              currentRate: debtRates.borrowAPR * 100,
+              usdPrice: debtUsdPrice,
+              decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+            }}
+            protocolName="Vesu"
+            currentDebt={debtNum}
+            vesuContext={{ poolId, counterpartToken: collateralAsset }}
+            position={position}
+          />
 
           <RepayModalStark
             isOpen={isRepayModalOpen}

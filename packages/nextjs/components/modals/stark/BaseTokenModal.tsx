@@ -24,6 +24,7 @@ import {
 } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
 import { universalErc20Abi } from "~~/utils/Constants";
+import formatPercentage from "~~/utils/formatPercentage";
 import { feltToString } from "~~/utils/protocols";
 
 // Helper to convert a string to its felt representation
@@ -488,7 +489,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
           <div className="p-4 bg-base-200 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-base-content/70">{actionType === "deposit" ? "Supply" : "Borrow"} APY:</span>
-              <span className="font-bold text-lg">{token.currentRate.toFixed(2)}%</span>
+              <span className="font-bold text-lg">{formatPercentage(token.currentRate)}%</span>
             </div>
             <div className="mt-1 text-xs text-base-content/60">
               {actionType === "deposit"

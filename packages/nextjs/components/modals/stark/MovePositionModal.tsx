@@ -48,6 +48,13 @@ const getPoolNameFromId = (poolId: bigint): string => {
   return entry ? entry[0] : "Unknown Pool";
 };
 
+type OutputPointer = { instruction_index: bigint; output_index: bigint };
+
+const toOutputPointer = (instructionIndex: number): OutputPointer => ({
+  instruction_index: BigInt(instructionIndex),
+  output_index: 0n,
+});
+
 interface MovePositionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -403,7 +410,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Withdraw: undefined,
             Redeposit: {
               token: collateral.token,
-              target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
+              target_output_pointer: toOutputPointer(1), // Point to corresponding withdraw instruction (offset by repay instruction)
               user: userAddress,
               context: contextRedeposit,
             },
@@ -417,7 +424,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Redeposit: undefined,
             Reborrow: {
               token: position.tokenAddress,
-              target_instruction_index: 0, // Point to repay instruction
+              target_output_pointer: toOutputPointer(0), // Point to repay instruction
               approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
               user: userAddress,
               context: contextReborrow,
@@ -555,7 +562,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         Withdraw: undefined,
         Redeposit: {
           token: collateral.token,
-          target_instruction_index: 1 + index,
+          target_output_pointer: toOutputPointer(1 + index),
           user: userAddress,
           context: depositInstructionContext,
         },
@@ -571,7 +578,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Redeposit: undefined,
       Reborrow: {
         token: position.tokenAddress,
-        target_instruction_index: 0,
+        target_output_pointer: toOutputPointer(0),
         approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
         user: userAddress,
         context: borrowInstructionContext,
@@ -927,10 +934,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] p-6 overflow-y-auto rounded-none">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full">
+      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[360px] p-6 rounded-none flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 flex-grow overflow-y-auto">
             {/* FROM SECTION */}
-            <div className="space-y-3 md:col-span-3">
+            <div className="space-y-6 md:col-span-3">
               <label className="text-sm font-medium text-base-content/80">From</label>
               <div className="flex items-center gap-3 h-12 border-b-2 border-base-300 px-1">
                 <Image
@@ -949,22 +956,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     <span className="text-base-content/70 text-xs">Loading collaterals...</span>
                   </div>
                 ) : (
-                  <CollateralSelector
-                    collaterals={collateralsForSelector}
-                    isLoading={false}
-                    selectedProtocol={selectedProtocol}
-                    onCollateralSelectionChange={handleCollateralSelectionChange}
-                    marketToken={position.tokenAddress}
-                    onMaxClick={handleCollateralMaxClick}
-                    hideAmounts
-                    initialSelectedCollaterals={selectedCollateralsWithAmounts}
-                  />
+                  <div className="mt-6">
+                    <CollateralSelector
+                      collaterals={collateralsForSelector}
+                      isLoading={false}
+                      selectedProtocol={selectedProtocol}
+                      onCollateralSelectionChange={handleCollateralSelectionChange}
+                      marketToken={position.tokenAddress}
+                      onMaxClick={handleCollateralMaxClick}
+                      hideAmounts
+                      initialSelectedCollaterals={selectedCollateralsWithAmounts}
+                    />
+                  </div>
                 )
               )}
             </div>
 
             {/* AMOUNTS SECTION */}
-            <div className="space-y-3 md:col-span-6">
+            <div className="space-y-6 md:col-span-6">
               <div className="text-center mb-2">
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
                   Debt
@@ -974,8 +983,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </label>
                 <div className="text-xs text-base-content/60">
                   Available: {getFormattedBalance} {position.name}
-                </div>
-              </div>
+        </div>
+      </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 w-32 shrink-0">
                   <div className="w-6 h-6 relative">
@@ -1040,7 +1049,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
             {/* TO SECTION */}
             <div className="flex flex-col md:col-span-3 h-full">
-              <div className="space-y-3 flex-1">
+              <div className="space-y-6 flex-1">
                 <div>
                   <label className="text-sm font-medium text-base-content/80">To</label>
                   <div className="dropdown w-full">
@@ -1189,30 +1198,30 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 )}
               </div>
 
-              <div className="pt-5 mt-auto">
-                <button
-                  className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
-                    loading ? "animate-pulse" : ""
-                  }`}
-                  onClick={step === "done" ? onClose : handleMovePosition}
-                  disabled={step === "done" ? false : isActionDisabled}
-                >
-                  <span>
-                    {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-                    {actionButtonText}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump className="text-gray-400" />
-                    {feeLoading && feeNative === null ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : feeError ? null : feeNative !== null ? (
-                      <span>{feeNative.toFixed(4)} STRK</span>
-                    ) : null}
-                  </span>
-                </button>
-              </div>
             </div>
           </div>
+        <div className="flex justify-end pt-5 mt-auto">
+          <button
+            className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
+              loading ? "animate-pulse" : ""
+            }`}
+            onClick={step === "done" ? onClose : handleMovePosition}
+            disabled={step === "done" ? false : isActionDisabled}
+          >
+            <span>
+              {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+              {actionButtonText}
+            </span>
+            <span className="flex items-center gap-1 text-xs">
+              <FaGasPump className="text-gray-400" />
+              {feeLoading && feeNative === null ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : feeError ? null : feeNative !== null ? (
+                <span>{feeNative.toFixed(4)} STRK</span>
+              ) : null}
+            </span>
+          </button>
+        </div>
       </div>
 
       <form

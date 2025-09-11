@@ -3,9 +3,10 @@ import Image from "next/image";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { VesuContext } from "~~/hooks/useLendingAction";
+import formatPercentage from "~~/utils/formatPercentage";
+import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
-import { PositionManager } from "~~/utils/position";
 
 interface TokenSelectModalStarkProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                       <div
                         className={`badge ${hoveredToken === address ? "badge-primary" : "badge-outline"} p-3 font-medium`}
                       >
-                        {token.borrowAPR ? (token.borrowAPR * 100).toFixed(2) : "0.00"}% APR
+                        {formatPercentage(token.borrowAPR ?? 0, 2, false)}% APR
                       </div>
                     </div>
                   );
@@ -163,19 +164,11 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             name: feltToString(selectedToken.symbol),
             icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
             address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
-            currentRate: selectedToken.borrowAPR ? selectedToken.borrowAPR * 100 : 0,
-            usdPrice:
-              selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e18 : 0,
+            currentRate: selectedToken.borrowAPR ?? 0,
+            usdPrice: selectedToken.price && selectedToken.price.is_valid ? Number(selectedToken.price.value) / 1e8 : 0,
           }}
           protocolName={protocolName}
-          currentDebt={
-            selectedToken.total_nominal_debt
-              ? Number(
-                  selectedToken.total_nominal_debt /
-                    10n ** BigInt(selectedToken.decimals),
-                )
-              : 0
-          }
+          currentDebt={0}
           vesuContext={vesuContext}
           position={position}
         />

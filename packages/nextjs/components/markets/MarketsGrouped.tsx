@@ -13,6 +13,7 @@ import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // Helper: Aave rate conversion
 const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
@@ -53,8 +54,8 @@ const useAaveData = (): MarketData[] => {
       return {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
-        supplyRate: `${supplyAPY.toFixed(2)}%`,
-        borrowRate: `${borrowAPY.toFixed(2)}%`,
+        supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+        borrowRate: `${formatPercentage(borrowAPY, 2, false)}%`,
         price: price.toFixed(2),
         utilization: utilization.toFixed(2),
         address: token.token,
@@ -115,8 +116,8 @@ const useCompoundData = (): MarketData[] => {
         return {
           icon: tokenNameToLogo(t.symbol),
           name: t.symbol,
-          supplyRate: `${supplyAPR.toFixed(2)}%`,
-          borrowRate: `${borrowAPR.toFixed(2)}%`,
+          supplyRate: `${formatPercentage(supplyAPR, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
           price: priceNum.toFixed(2),
           utilization: utilization.toFixed(2),
           address: t.address as string,
@@ -167,6 +168,7 @@ const useNostraData = (): MarketData[] => {
       const address = `0x${info[0].toString(16).padStart(64, "0")}`;
       const symbol = feltToString(info[1]);
       const rate = rates[idx];
+      // Rates are provided in WAD (1e18); divide by 1e16 to obtain percentage values
       const supplyAPY = Number(rate.lending_rate) / 1e16;
       const borrowAPR = Number(rate.borrowing_rate) / 1e16;
       const utilization = borrowAPR > 0 ? (supplyAPY / borrowAPR) * 100 : 0;
@@ -174,8 +176,8 @@ const useNostraData = (): MarketData[] => {
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        supplyRate: `${supplyAPY.toFixed(2)}%`,
-        borrowRate: `${borrowAPR.toFixed(2)}%`,
+        supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+        borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
         price,
         utilization: utilization.toFixed(2),
         address,
@@ -211,8 +213,8 @@ const useVenusData = (): MarketData[] => {
         return {
           icon: tokenNameToLogo(symbols[i]),
           name: symbols[i],
-          supplyRate: `${supplyAPY.toFixed(2)}%`,
-          borrowRate: `${borrowAPY.toFixed(2)}%`,
+          supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowAPY, 2, false)}%`,
           price: price.toFixed(2),
           utilization: utilization.toFixed(2),
           address: token,
@@ -247,8 +249,8 @@ const useVesuData = (): MarketData[] => {
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
         name: symbol,
-        supplyRate: formatRate(supplyAPY),
-        borrowRate: formatRate(borrowAPR),
+        supplyRate: formatRate(supplyAPY, false),
+        borrowRate: formatRate(borrowAPR, false),
         price: formatPrice(asset.price.value),
         utilization: formatUtilization(asset.utilization),
         address,
@@ -324,6 +326,23 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     return sorted.filter(g => g.name.toLowerCase().includes(lower) || g.name.toLowerCase().includes(canon));
   }, [sorted, search]);
 
+  const [groupSorts, setGroupSorts] = useState<
+    Record<string, { column: "supply" | "borrow"; direction: "asc" | "desc" }>
+  >({});
+
+  const toggleGroupSort = (name: string, column: "supply" | "borrow") => {
+    setGroupSorts(prev => {
+      const current = prev[name] || { column: "borrow", direction: "asc" };
+      return {
+        ...prev,
+        [name]:
+          current.column === column
+            ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
+            : { column, direction: "asc" },
+      };
+    });
+  };
+
   const networkIcons: Record<"evm" | "starknet", string> = {
     evm: "/logos/arb.svg",
     starknet: "/logos/starknet.svg",
@@ -369,69 +388,80 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
         </div>
       </div>
       <div className="space-y-4">
-        {filtered.map(group => (
-          <details key={group.name} className="collapse collapse-arrow rounded-lg">
-            <summary className="collapse-title p-0 list-none">
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-base-100 border border-base-300 hover:bg-base-200 cursor-pointer">
-                <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
-                <span className="font-medium">{group.name}</span>
-                <div className="ml-auto mr-8 flex gap-4">
-                  <RatePill
-                    variant="supply"
-                    label="Supply Rate"
-                    rate={group.bestSupply.supplyRate}
-                    networkType={group.bestSupply.networkType}
-                    protocol={group.bestSupply.protocol}
-                  />
-                  <RatePill
-                    variant="borrow"
-                    label="Borrow Rate"
-                    rate={group.bestBorrow.borrowRate}
-                    networkType={group.bestBorrow.networkType}
-                    protocol={group.bestBorrow.protocol}
-                  />
-                </div>
-              </div>
-            </summary>
-            <div className="collapse-content p-0 mt-2 space-y-2">
-              {group.markets.map(m => (
-                <div
-                  key={m.protocol + m.address}
-                  className="grid grid-cols-4 items-center gap-4 p-3 rounded-lg bg-base-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
-                    <span>{networkNames[m.networkType]}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
-                    <span className="capitalize">{protocolNames[m.protocol]}</span>
-                  </div>
-                  <div className="justify-self-center">
+        {filtered.map(group => {
+          const sortInfo = groupSorts[group.name] || { column: "borrow", direction: "asc" };
+          const sortedMarkets = [...group.markets].sort((a, b) => {
+            const key = sortInfo.column === "supply" ? "supplyRate" : "borrowRate";
+            const aVal = parseFloat(a[key]);
+            const bVal = parseFloat(b[key]);
+            return sortInfo.direction === "asc" ? aVal - bVal : bVal - aVal;
+          });
+          return (
+            <details key={group.name} className="collapse collapse-arrow rounded-lg">
+              <summary className="collapse-title p-0 list-none">
+                <div className="flex items-center gap-4 p-4 rounded-lg bg-base-100 border border-base-300 hover:bg-base-200 cursor-pointer">
+                  <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
+                  <span className="font-medium">{group.name}</span>
+                  <div className="ml-auto mr-8 flex gap-4">
                     <RatePill
                       variant="supply"
                       label="Supply Rate"
-                      rate={m.supplyRate}
-                      networkType={m.networkType}
-                      protocol={m.protocol}
-                      showIcons={false}
+                      rate={group.bestSupply.supplyRate}
+                      networkType={group.bestSupply.networkType}
+                      protocol={group.bestSupply.protocol}
                     />
-                  </div>
-                  <div className="justify-self-center">
                     <RatePill
                       variant="borrow"
                       label="Borrow Rate"
-                      rate={m.borrowRate}
-                      networkType={m.networkType}
-                      protocol={m.protocol}
-                      showIcons={false}
+                      rate={group.bestBorrow.borrowRate}
+                      networkType={group.bestBorrow.networkType}
+                      protocol={group.bestBorrow.protocol}
                     />
                   </div>
                 </div>
-              ))}
-            </div>
-          </details>
-        ))}
+              </summary>
+              <div className="collapse-content p-0 mt-2 space-y-2">
+                <div className="grid grid-cols-5 gap-4 p-3 text-xs font-medium uppercase text-base-content/60">
+                  <span>Network</span>
+                  <span>Protocol</span>
+                  <span className="justify-self-center">Utilization</span>
+                  <button
+                    type="button"
+                    className="justify-self-center underline cursor-pointer"
+                    onClick={() => toggleGroupSort(group.name, "supply")}
+                  >
+                    Supply Rate
+                  </button>
+                  <button
+                    type="button"
+                    className="justify-self-center underline cursor-pointer"
+                    onClick={() => toggleGroupSort(group.name, "borrow")}
+                  >
+                    Borrow Rate
+                  </button>
+                </div>
+                {sortedMarkets.map(m => (
+                  <div
+                    key={m.protocol + m.address}
+                    className="grid grid-cols-5 items-center gap-4 p-3 rounded-lg bg-base-100"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
+                      <span>{networkNames[m.networkType]}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
+                      <span className="capitalize">{protocolNames[m.protocol]}</span>
+                    </div>
+                    <div className="justify-self-center font-medium">{m.utilization}%</div>
+                    <div className="justify-self-center">{m.supplyRate}</div>
+                    <div className="justify-self-center">{m.borrowRate}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          );
+        })}
       </div>
     </div>
   );

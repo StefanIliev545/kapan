@@ -72,14 +72,9 @@ export const VesuProtocolView: FC = () => {
     if (!userAddress) return;
     refetchCounter.current += 1;
     if (refetchCounter.current >= 3) {
-      setPositionsRefetchInterval(15000);
+      setPositionsRefetchInterval(5000);
     }
   }, [mergedUserPositions, userAddress]);
-
-  useEffect(() => {
-    refetchCounter.current = 0;
-    setPositionsRefetchInterval(2000);
-  }, [userAddress]);
 
   const isUpdating = isFetching1 || isFetching2;
 
@@ -91,6 +86,17 @@ export const VesuProtocolView: FC = () => {
 
   // Keep previous positions while new data is loading to avoid UI flicker
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  useEffect(() => {
+    refetchCounter.current = 0;
+    setPositionsRefetchInterval(2000);
+    setCachedPositions([]);
+    setHasLoadedOnce(false);
+    if (userAddress) {
+      refetchPositions();
+    }
+  }, [userAddress, refetchPositions]);
 
   useEffect(() => {
     if (!userAddress) {
@@ -99,14 +105,9 @@ export const VesuProtocolView: FC = () => {
     }
     if (!isUpdating) {
       setCachedPositions(mergedUserPositions);
+      setHasLoadedOnce(true);
     }
   }, [mergedUserPositions, isUpdating, userAddress]);
-
-  useEffect(() => {
-    if (userAddress) {
-      refetchPositions();
-    }
-  }, [userAddress, refetchPositions]);
 
   useEffect(() => {
     const handler = () => refetchPositions();
@@ -213,7 +214,7 @@ export const VesuProtocolView: FC = () => {
             ) : null}
           </div>
           <div className={`flex flex-wrap gap-4 justify-start ${isUpdating ? "" : ""}`}>
-            {status === "connecting" ? (
+            {status === "connecting" || (userAddress && !hasLoadedOnce) ? (
               <div className="text-center py-4 w-full">
                 <span className="loading loading-spinner" />
               </div>

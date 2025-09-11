@@ -127,7 +127,8 @@ export const NostraProtocolView: FC = () => {
       const symbol = symbolMap[underlying];
       const interestRate = rates?.[index];
 
-      // Convert rates to APY/APR (rates are in RAY format - 1e27)
+      // Convert rates from WAD (1e18) to percentage values
+      // Divide by 1e16 to account for the 1e2 factor when converting to percent
       const supplyAPY = interestRate ? Number(interestRate.lending_rate) / 1e16 : 0;
       const borrowAPR = interestRate ? Number(interestRate.borrowing_rate) / 1e16 : 0;
 

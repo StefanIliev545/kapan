@@ -2,13 +2,14 @@ import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
-import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModal } from "./modals/BorrowModal";
-import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
+import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
-import { PositionManager } from "~~/utils/position";
+import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
+import formatPercentage from "~~/utils/formatPercentage";
+import { PositionManager } from "~~/utils/position";
 
 export interface ProtocolPosition {
   icon: string;
@@ -340,7 +341,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       />
                     </div>
                   ))}
-                  
+
                   {/* "Add Borrow" button */}
                   <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
                     <FiPlus className="w-4 h-4 mr-1" />
@@ -371,46 +372,54 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               <div className="modal-box max-w-4xl bg-base-100">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="font-bold text-xl tracking-tight">Select a Token to Supply</h3>
-                  <button 
-                    className="btn btn-sm btn-circle btn-ghost" 
-                    onClick={handleCloseTokenSelectModal}
-                  >
+                  <button className="btn btn-sm btn-circle btn-ghost" onClick={handleCloseTokenSelectModal}>
                     ✕
                   </button>
                 </div>
-                
+
                 <div className="max-h-[60vh] overflow-y-auto pr-2">
                   {allSupplyPositions.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                       {allSupplyPositions.map((position, index) => (
-                        <div 
-                          key={`supply-${position.tokenAddress}-${index}`} 
+                        <div
+                          key={`supply-${position.tokenAddress}-${index}`}
                           className="bg-base-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 
                             shadow-md hover:shadow-lg border-transparent border transform hover:scale-105"
                           onClick={() => handleSelectSupplyToken(position)}
                         >
                           <div className="avatar mb-3">
                             <div className="w-16 h-16 rounded-full bg-base-100 p-1 ring-2 ring-base-300 dark:ring-base-content/20">
-                              <Image 
-                                src={position.icon} 
-                                alt={position.name} 
-                                width={64} 
-                                height={64} 
+                              <Image
+                                src={position.icon}
+                                alt={position.name}
+                                width={64}
+                                height={64}
                                 className="object-contain"
                               />
                             </div>
                           </div>
                           <span className="font-bold text-lg mb-1">{position.name}</span>
                           <div className="badge badge-outline p-3 font-medium">
-                            {position.currentRate.toFixed(2)}% APR
+                            {formatPercentage(position.currentRate)}% APR
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="text-center py-12 text-base-content/70 bg-base-200/50 rounded-xl">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-12 h-12 mx-auto mb-4 opacity-50">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        className="w-12 h-12 mx-auto mb-4 opacity-50"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                        />
                       </svg>
                       <p className="text-lg">No tokens available to supply</p>
                     </div>
@@ -429,28 +438,28 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             onClose={handleCloseBorrowSelectModal}
             tokens={allBorrowPositions.map(pos => ({
               address: BigInt(pos.tokenAddress),
-              symbol: BigInt("0x" + Buffer.from(pos.name).toString('hex')), // Convert name to felt format
+              symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")), // Convert name to felt format
               decimals: pos.tokenDecimals || 18,
               rate_accumulator: BigInt(0),
               utilization: BigInt(0),
-              fee_rate: BigInt(Math.floor(pos.currentRate * 1e18 / (365 * 24 * 60 * 60))), // Convert APR to per-second rate
+              fee_rate: BigInt(Math.floor(((pos.currentRate / 100) * 1e18) / (365 * 24 * 60 * 60))), // Convert APR percentage to per-second rate
               price: {
                 value: BigInt(pos.tokenPrice || 0),
-                is_valid: true
+                is_valid: true,
               },
               total_nominal_debt: pos.tokenBalance ?? 0n,
               last_rate_accumulator: BigInt(0),
               reserve: BigInt(0),
               scale: BigInt(0),
               borrowAPR: pos.currentRate,
-              supplyAPY: pos.currentRate * 0.7  // Approximate supply APY as 70% of borrow APR
+              supplyAPY: pos.currentRate * 0.7, // Approximate supply APY as 70% of borrow APR
             }))}
             protocolName={protocolName}
             position={positionManager}
           />
 
           {/* Deposit Modal for Starknet */}
-          {selectedSupplyToken &&
+          {selectedSupplyToken && (
             <DepositModalStark
               isOpen={isDepositModalOpen}
               onClose={handleCloseDepositModal}
@@ -459,17 +468,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 icon: selectedSupplyToken.icon,
                 address: selectedSupplyToken.address,
                 currentRate: selectedSupplyToken.currentRate,
-                usdPrice: selectedSupplyToken.tokenPrice
-                  ? Number(selectedSupplyToken.tokenPrice) / 1e8
-                : 0,
+                usdPrice: selectedSupplyToken.tokenPrice ? Number(selectedSupplyToken.tokenPrice) / 1e8 : 0,
               }}
               protocolName={protocolName}
               position={positionManager}
             />
-          }
+          )}
 
           {/* Borrow Modal for Starknet */}
-          {isTokenBorrowModalOpen &&
+          {isTokenBorrowModalOpen && (
             <BorrowModalStark
               isOpen={isTokenBorrowModalOpen}
               onClose={handleCloseBorrowModal}
@@ -480,33 +487,27 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       icon: selectedToken.icon,
                       currentRate: selectedToken.currentRate,
                       address: selectedToken.tokenAddress,
-                      usdPrice: selectedToken.tokenPrice
-                        ? Number(selectedToken.tokenPrice) / 1e8
-                        : 0,
+                      usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
                     }
                   : {
                       name: borrowedPositions[0]?.name || "",
                       icon: borrowedPositions[0]?.icon || "",
                       currentRate: borrowedPositions[0]?.currentRate || 0,
                       address: borrowedPositions[0]?.tokenAddress || "",
-                      usdPrice: borrowedPositions[0]?.tokenPrice
-                        ? Number(borrowedPositions[0]?.tokenPrice) / 1e8
-                        : 0,
+                      usdPrice: borrowedPositions[0]?.tokenPrice ? Number(borrowedPositions[0]?.tokenPrice) / 1e8 : 0,
                     }
               }
               protocolName={protocolName}
               currentDebt={
                 selectedToken
-                  ? Number(selectedToken.tokenBalance) /
-                      10 ** (selectedToken.tokenDecimals || 18)
+                  ? Number(selectedToken.tokenBalance) / 10 ** (selectedToken.tokenDecimals || 18)
                   : borrowedPositions[0]
-                  ? Number(borrowedPositions[0].tokenBalance) /
-                    10 ** (borrowedPositions[0].tokenDecimals || 18)
-                  : 0
+                    ? Number(borrowedPositions[0].tokenBalance) / 10 ** (borrowedPositions[0].tokenDecimals || 18)
+                    : 0
               }
               position={positionManager}
             />
-          }
+          )}
         </>
       ) : (
         <>
@@ -542,29 +543,23 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       icon: selectedToken.icon,
                       address: selectedToken.tokenAddress,
                       currentRate: selectedToken.currentRate,
-                      usdPrice: selectedToken.tokenPrice
-                        ? Number(selectedToken.tokenPrice) / 1e8
-                        : 0,
+                      usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
                     }
                   : {
                       name: borrowedPositions[0]?.name || "",
                       icon: borrowedPositions[0]?.icon || "",
                       address: borrowedPositions[0]?.tokenAddress || "",
                       currentRate: borrowedPositions[0]?.currentRate || 0,
-                      usdPrice: borrowedPositions[0]?.tokenPrice
-                        ? Number(borrowedPositions[0]?.tokenPrice) / 1e8
-                        : 0,
+                      usdPrice: borrowedPositions[0]?.tokenPrice ? Number(borrowedPositions[0]?.tokenPrice) / 1e8 : 0,
                     }
               }
               protocolName={protocolName}
               currentDebt={
                 selectedToken
-                  ? Number(selectedToken.tokenBalance) /
-                      10 ** (selectedToken.tokenDecimals || 18)
+                  ? Number(selectedToken.tokenBalance) / 10 ** (selectedToken.tokenDecimals || 18)
                   : borrowedPositions[0]
-                  ? Number(borrowedPositions[0].tokenBalance) /
-                    10 ** (borrowedPositions[0].tokenDecimals || 18)
-                  : 0
+                    ? Number(borrowedPositions[0].tokenBalance) / 10 ** (borrowedPositions[0].tokenDecimals || 18)
+                    : 0
               }
               position={positionManager}
             />
