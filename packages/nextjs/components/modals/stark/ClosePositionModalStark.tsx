@@ -21,20 +21,34 @@ interface EkuboTier {
   feePercent: number;
   precisionPercent: number;
   tickSpacing: number;
+  feeFelt: bigint;
 }
 
+const defineTier = (
+  feePercent: number,
+  precisionPercent: number,
+  tickSpacing: number,
+): EkuboTier => ({
+  feePercent,
+  precisionPercent,
+  tickSpacing,
+  feeFelt: feePercentToFelt(feePercent),
+});
+
 const EKUBO_TIERS: EkuboTier[] = [
-  { feePercent: 0.01, precisionPercent: 0.002, tickSpacing: 20 },
-  { feePercent: 0.05, precisionPercent: 0.1, tickSpacing: 1000 },
-  { feePercent: 0.3, precisionPercent: 0.6, tickSpacing: 3000 },
-  { feePercent: 1, precisionPercent: 2, tickSpacing: 10000 },
-  { feePercent: 5, precisionPercent: 10, tickSpacing: 50000 },
+  defineTier(0.01, 0.002, 20),
+  defineTier(0.05, 0.1, 1000),
+  defineTier(0.3, 0.6, 3000),
+  defineTier(1, 2, 10000),
+  defineTier(5, 10, 50000),
 ];
 
-const FEE_Q64 = 2 ** 64;
+const FEE_Q128 = 1n << 128n;
 
-const feePercentToFelt = (feePercent: number): bigint =>
-  BigInt(Math.round((feePercent / 100) * FEE_Q64)) << 64n;
+const feePercentToFelt = (feePercent: number): bigint => {
+  const numerator = BigInt(Math.round(feePercent * 1_000_000));
+  return (FEE_Q128 * numerator) / (100n * 1_000_000n);
+};
 
 interface TokenInfo {
   name: string;
@@ -89,7 +103,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         try {
           const context = new CairoOption(
             CairoOptionVariant.Some,
-            [feePercentToFelt(tier.feePercent), BigInt(tier.tickSpacing), 0n],
+            [tier.feeFelt, BigInt(tier.tickSpacing), 0n],
           );
           const swapInstruction = new CairoCustomEnum({
             Deposit: undefined,
@@ -217,11 +231,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         should_pay_in: true,
         context: new CairoOption(
           CairoOptionVariant.Some,
-          [
-            feePercentToFelt(chosenTier.feePercent),
-            BigInt(chosenTier.tickSpacing),
-            0n,
-          ],
+          [chosenTier.feeFelt, BigInt(chosenTier.tickSpacing), 0n],
         ),
       },
     });
