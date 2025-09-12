@@ -7,7 +7,7 @@ import {
 import { green, red } from "./helpers/colorize-log";
 import { CallData, constants } from "starknet";
 
-const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
+const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -47,6 +47,13 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
+  const { address: ekuboGatewayAddress } = await deployContract({
+    contract: "EkuboGateway",
+    constructorArgs: {
+      core: "0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b",
+    },
+  });
+
   await deployContract({
     contract: "OptimalInterestRateFinder",
     constructorArgs: {
@@ -64,10 +71,10 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
 
 
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress };
 };
 
-const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
+const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
@@ -112,6 +119,13 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
+  const { address: ekuboGatewayAddress } = await deployContract({
+    contract: "EkuboGateway",
+    constructorArgs: {
+      core: "0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b",
+    },
+  });
+
   await deployContract({
     contract: "OptimalInterestRateFinder",
     constructorArgs: {
@@ -128,10 +142,10 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress };
 };
 
-const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
+const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string}): Promise<void> => {
 
   const nonce = await deployer.getNonce();
 
@@ -304,6 +318,14 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
         "nostra",
         addresses.nostraGatewayAddress,
       ]
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "ekubo",
+        addresses.ekuboGatewayAddress,
+      ]
     }
   ]
 
@@ -327,7 +349,7 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
   }
 };
 
-const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
+const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string}): Promise<void> => {
   const nonce = await deployer.getNonce();
 
   const re7Pool = "3592370751539490711610556844458488648008775713878064059760995781404350938653";
@@ -377,6 +399,14 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       calldata: [
         "nostra",
         addresses.nostraGatewayAddress,
+      ]
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "ekubo",
+        addresses.ekuboGatewayAddress,
       ]
     }
   ];

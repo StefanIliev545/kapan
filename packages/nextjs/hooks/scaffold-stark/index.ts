@@ -8,3 +8,4 @@ export * from "./useSwitchNetwork";
 export * from "./useScaffoldReadContract";
 export * from "./useScaffoldMultiWriteContract";
 export * from "./useBlockNumberContext";
+export * from "./useScaffoldContract";
