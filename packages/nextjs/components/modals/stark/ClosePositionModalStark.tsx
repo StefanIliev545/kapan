@@ -44,12 +44,13 @@ const defineTier = (
   feeFelt: feePercentToFelt(feePercent),
 });
 
+// 1 tick = ~1e-6 multiplicative step (1/100th of a bip)
 const EKUBO_TIERS: EkuboTier[] = [
-  defineTier(0.01, 0.002, 20),
-  defineTier(0.05, 0.1, 1000),
-  defineTier(0.3, 0.6, 3000),
-  defineTier(1, 2, 10000),
-  defineTier(5, 10, 50000),
+  defineTier(0.01, 0.02, 200), // 0.01% fee, ~0.02% precision
+  defineTier(0.05, 0.1, 1000), // 0.05% fee, 0.1% precision (ETH/USDC standard)
+  defineTier(0.3, 0.6, 6000), // 0.3% fee, 0.6% precision
+  defineTier(1, 2, 19800), // 1% fee, ~2% precision (≈ log_{1.000001}(1.02))
+  defineTier(5, 10, 95300), // 5% fee, ~10% precision (≈ log_{1.000001}(1.10))
 ];
 
 interface TokenInfo {
