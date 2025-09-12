@@ -1,3 +1,5 @@
+"use client";
+
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { BaseModal } from "../BaseModal";
@@ -16,6 +18,13 @@ import {
 } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
+
+const FEE_Q128 = 1n << 128n;
+
+const feePercentToFelt = (feePercent: number): bigint => {
+  const numerator = BigInt(Math.round(feePercent * 1_000_000));
+  return (FEE_Q128 * numerator) / (100n * 1_000_000n);
+};
 
 interface EkuboTier {
   feePercent: number;
@@ -42,13 +51,6 @@ const EKUBO_TIERS: EkuboTier[] = [
   defineTier(1, 2, 10000),
   defineTier(5, 10, 50000),
 ];
-
-const FEE_Q128 = 1n << 128n;
-
-const feePercentToFelt = (feePercent: number): bigint => {
-  const numerator = BigInt(Math.round(feePercent * 1_000_000));
-  return (FEE_Q128 * numerator) / (100n * 1_000_000n);
-};
 
 interface TokenInfo {
   name: string;
