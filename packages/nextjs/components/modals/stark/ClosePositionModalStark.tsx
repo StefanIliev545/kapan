@@ -20,24 +20,21 @@ import { formatTokenAmount } from "~~/utils/protocols";
 interface EkuboTier {
   feePercent: number;
   precisionPercent: number;
-  feeNumerator: number;
-  feeDenominator: number;
   tickSpacing: number;
 }
 
 const EKUBO_TIERS: EkuboTier[] = [
-  { feePercent: 0.01, precisionPercent: 0.002, feeNumerator: 1, feeDenominator: 100, tickSpacing: 20 },
-  { feePercent: 0.05, precisionPercent: 0.1, feeNumerator: 5, feeDenominator: 100, tickSpacing: 1000 },
-  { feePercent: 0.3, precisionPercent: 0.6, feeNumerator: 3, feeDenominator: 10, tickSpacing: 3000 },
-  { feePercent: 1, precisionPercent: 2, feeNumerator: 1, feeDenominator: 1, tickSpacing: 10000 },
-  { feePercent: 5, precisionPercent: 10, feeNumerator: 5, feeDenominator: 1, tickSpacing: 50000 },
+  { feePercent: 0.01, precisionPercent: 0.002, tickSpacing: 20 },
+  { feePercent: 0.05, precisionPercent: 0.1, tickSpacing: 1000 },
+  { feePercent: 0.3, precisionPercent: 0.6, tickSpacing: 3000 },
+  { feePercent: 1, precisionPercent: 2, tickSpacing: 10000 },
+  { feePercent: 5, precisionPercent: 10, tickSpacing: 50000 },
 ];
 
-const FEE_SCALE = 2n ** 128n;
+const FEE_Q64 = 2 ** 64;
 
-const feePercentToFelt = (tier: EkuboTier): bigint =>
-  (BigInt(tier.feeNumerator) * FEE_SCALE) /
-  (BigInt(tier.feeDenominator) * 100n);
+const feePercentToFelt = (feePercent: number): bigint =>
+  BigInt(Math.round((feePercent / 100) * FEE_Q64)) << 64n;
 
 interface TokenInfo {
   name: string;
@@ -92,7 +89,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         try {
           const context = new CairoOption(
             CairoOptionVariant.Some,
-            [feePercentToFelt(tier), BigInt(tier.tickSpacing), 0n],
+            [feePercentToFelt(tier.feePercent), BigInt(tier.tickSpacing), 0n],
           );
           const swapInstruction = new CairoCustomEnum({
             Deposit: undefined,
@@ -114,9 +111,14 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
             },
             Reswap: undefined,
           });
-          const res: any = await (ekuboGateway as any).call(
+          const call = (ekuboGateway as any).populate(
             "process_instructions",
             [[swapInstruction]],
+          );
+          const { result } = await (ekuboGateway.provider as any).callContract(call);
+          const res: any = (ekuboGateway as any).parseResponse(
+            "process_instructions",
+            result,
           );
           const outs = res?.[0] || [];
           const out = outs.find((o: any) => o.token === debt.address);
@@ -215,7 +217,11 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         should_pay_in: true,
         context: new CairoOption(
           CairoOptionVariant.Some,
-          [feePercentToFelt(chosenTier), BigInt(chosenTier.tickSpacing), 0n],
+          [
+            feePercentToFelt(chosenTier.feePercent),
+            BigInt(chosenTier.tickSpacing),
+            0n,
+          ],
         ),
       },
     });
