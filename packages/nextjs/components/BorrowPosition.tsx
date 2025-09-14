@@ -15,6 +15,7 @@ import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+import { normalizeProtocolName } from "~~/utils/protocol";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -64,10 +65,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   });
 
   // Determine if there's a better rate available on another protocol
+  const ratesAreSame = Math.abs(currentRate - optimalRateDisplay) < 0.000001;
   const hasBetterRate =
     hasBalance &&
     optimalProtocol &&
-    optimalProtocol !== protocolName &&
+    !ratesAreSame &&
+    normalizeProtocolName(optimalProtocol) !== normalizeProtocolName(protocolName) &&
     optimalRateDisplay < currentRate;
 
   const formatNumber = (num: number) =>
