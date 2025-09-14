@@ -65,9 +65,11 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   });
 
   // Determine if there's a better rate available on another protocol
+  const ratesAreSame = Math.abs(currentRate - optimalRateDisplay) < 0.000001;
   const hasBetterRate =
     hasBalance &&
     optimalProtocol &&
+    !ratesAreSame &&
     normalizeProtocolName(optimalProtocol) !== normalizeProtocolName(protocolName) &&
     optimalRateDisplay < currentRate;
 
