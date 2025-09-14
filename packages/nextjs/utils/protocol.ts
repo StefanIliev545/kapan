@@ -11,4 +11,11 @@ export const getProtocolLogo = (protocolName: string): string => {
   };
   
   return protocolLogos[protocolName] || tokenNameToLogo(protocolName);
-}; 
+};
+
+/**
+ * Normalize protocol names for comparison purposes.
+ * Removes spaces, hyphens and underscores and lowercases the result.
+ */
+export const normalizeProtocolName = (name: string): string =>
+  name.toLowerCase().replace(/[\s-_]/g, "");
