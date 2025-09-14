@@ -63,6 +63,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     type: "borrow",
   });
 
+  // Determine if there's a better rate available on another protocol
+  const hasBetterRate =
+    hasBalance &&
+    optimalProtocol &&
+    optimalProtocol !== protocolName &&
+    optimalRateDisplay < currentRate;
+
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
@@ -191,8 +198,22 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             </div>
           </div>
 
-          {/* Expand Indicator */}
-          <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end">
+          {/* Expand Indicator and quick Move action */}
+          <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end gap-2">
+            {hasBetterRate && (
+              <button
+                className="btn btn-xs btn-secondary animate-pulse"
+                onClick={e => {
+                  e.stopPropagation();
+                  moveModal.open();
+                }}
+                disabled={!isWalletConnected}
+                aria-label="Move"
+                title="Move debt to another protocol"
+              >
+                Move
+              </button>
+            )}
             <div
               className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"} transition-colors duration-200`}
             >
@@ -224,7 +245,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               </button>
 
               <button
-                className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                className={`btn btn-sm w-full flex justify-center items-center ${hasBetterRate ? "btn-secondary" : "btn-outline"}`}
                 onClick={moveModal.open}
                 disabled={!hasBalance || !isWalletConnected}
                 aria-label="Move"
@@ -266,7 +287,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               </button>
 
               <button
-                className="btn btn-sm btn-outline flex justify-center items-center"
+                className={`btn btn-sm flex justify-center items-center ${hasBetterRate ? "btn-secondary" : "btn-outline"}`}
                 onClick={moveModal.open}
                 disabled={!hasBalance || !isWalletConnected}
                 aria-label="Move"
