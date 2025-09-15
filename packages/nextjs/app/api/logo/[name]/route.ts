@@ -1,8 +1,5 @@
-import { NextRequest } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-
-export const dynamic = "force-static";
 
 const PUBLIC_LOGOS_DIR = path.join(process.cwd(), "public", "logos");
 
@@ -15,7 +12,7 @@ async function readFileIfExists(filePath: string) {
   }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { name: string } }) {
+export async function GET(_req: Request, { params }: { params: { name: string } }) {
   const raw = (params.name || "").toString();
   const name = raw.toLowerCase();
 
