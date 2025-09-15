@@ -26,6 +26,7 @@ pub struct AvnuContext {
     pub routes: Array<Route>,
     pub integrator_fee_amount_bps: u128,
     pub integrator_fee_recipient: ContractAddress,
+    pub amount: u256,
 }
 
 #[starknet::interface]
@@ -95,21 +96,21 @@ pub mod AvnuGateway {
             erc20.approve(self.router.read().contract_address, swap.max_in);
 
             // Extract Avnu context from swap context if provided
-            let (routes, _integrator_fee_amount_bps, _integrator_fee_recipient) = if let Option::Some(context_data) = swap.context {
+            let (routes, _integrator_fee_amount_bps, _integrator_fee_recipient, _amount) = if let Option::Some(context_data) = swap.context {
                     // Deserialize AvnuContext from context
                 let mut context_span = context_data;
                 let avnu_context: AvnuContext = Serde::deserialize(ref context_span).unwrap();
-                      (avnu_context.routes, avnu_context.integrator_fee_amount_bps, avnu_context.integrator_fee_recipient)
+                      (avnu_context.routes, avnu_context.integrator_fee_amount_bps, avnu_context.integrator_fee_recipient, avnu_context.amount)
             } else {
                 // Default values if no context provided
-                (array![], 0, swap.user)
+                (array![], 0, swap.user, 0)
             };
 
             // Call Avnu's swap_exact_token_to for exact output
             // For exact out: we want exactly `exact_out` amount of buy_token, willing to spend up to `max_in` of sell_token
             let success = self.router.read().swap_exact_token_to(
                 swap.token_in,           // sell_token_address
-                swap.max_in,             // sell_token_amount (max amount we're willing to spend)
+                _amount,             // sell_token_amount (max amount we're willing to spend)
                 swap.max_in,             // sell_token_max_amount (same as max_in for exact output)
                 swap.token_out,          // buy_token_address
                 swap.exact_out,          // buy_token_amount (exact amount we want)
@@ -135,6 +136,8 @@ pub mod AvnuGateway {
                 assert(out_erc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
             
+            println!("DEBUG: Refunding {:?} to caller", in_balance);
+            println!("DEBUG: Paying out {:?} to caller", out_balance);
             (in_balance, out_balance)
         }
 
@@ -187,6 +190,7 @@ pub mod AvnuGateway {
                 assert(out_erc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
             
+            println!("DEBUG: Refunding {:?} to caller", in_balance);
             (in_balance, out_balance)
         }
     }

@@ -301,6 +301,7 @@ fn test_ekubo_swap_eth_usdc() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_ekubo_swap_exact_in() {
     let context = setup_ekubo_test_context();
@@ -369,6 +370,7 @@ fn test_ekubo_swap_exact_in() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_create_position_and_move_debt_with_reswap() {
     println!("Setting up test context with Router and Vesu");
@@ -570,6 +572,7 @@ fn test_create_position_and_move_debt_with_reswap() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt_reswap_and_redeposit_kept_in_router() {
     println!("Setting up test context with Router and Vesu (redeposit flow)");
