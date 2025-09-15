@@ -12,8 +12,10 @@ async function readFileIfExists(filePath: string) {
   }
 }
 
-export async function GET(_req: Request, { params }: { params: { name: string } }) {
-  const raw = (params.name || "").toString();
+export async function GET(req: Request) {
+  const pathname = new URL(req.url).pathname;
+  const segments = pathname.split("/");
+  const raw = decodeURIComponent(segments[segments.length - 1] || "");
   const name = raw.toLowerCase();
 
   const svgPath = path.join(PUBLIC_LOGOS_DIR, `${name}.svg`);
