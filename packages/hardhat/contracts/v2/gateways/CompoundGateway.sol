@@ -111,7 +111,7 @@ contract CompoundGateway is ILendingGateway, IGatewayView, ProtocolGateway, Owna
         return (comet.getSupplyRate(comet.getUtilization()), true);
     }
 
-    function getBorrowBalanceCurrent(address token, address user) external override returns (uint256) {
+    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
         return getBorrowBalance(token, user);
     }
 }

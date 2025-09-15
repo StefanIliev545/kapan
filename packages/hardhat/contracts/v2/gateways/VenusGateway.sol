@@ -114,7 +114,7 @@ contract VenusGateway is ILendingGateway, IGatewayView, ProtocolGateway, Reentra
         return (VTokenInterface(vToken).supplyRatePerBlock(), true);
     }
 
-    function getBorrowBalanceCurrent(address token, address user) external override returns (uint256) {
+    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
         return getBorrowBalance(token, user);
     }
 
