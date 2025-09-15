@@ -62,6 +62,13 @@ pub trait IVesuViewer<TContractState> {
         start_index: usize,
         end_index: usize,
     ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
+    fn get_position_from_context(
+        self: @TContractState,
+        user: ContractAddress,
+        ctx: VesuContext,
+        other_token: ContractAddress,
+        is_debt_context: bool,
+    ) -> (ContractAddress, ContractAddress, PositionWithAmounts);
 }
 
 #[derive(Drop, Serde)]
@@ -868,6 +875,34 @@ mod VesuGateway {
                 i += 1;
             };
             positions
+        }
+
+        fn get_position_from_context(
+            self: @ContractState,
+            user: ContractAddress,
+            ctx: VesuContext,
+            other_token: ContractAddress,
+            is_debt_context: bool,
+        ) -> (ContractAddress, ContractAddress, PositionWithAmounts) {
+            let pool_id = if ctx.pool_id == Zero::zero() { self.pool_id.read() } else { ctx.pool_id };
+            let collateral_asset = if is_debt_context { other_token } else { ctx.position_counterpart_token };
+            let debt_asset = if is_debt_context { ctx.position_counterpart_token } else { other_token };
+            let singleton_dispatcher = ISingletonDispatcher { contract_address: self.vesu_singleton.read() };
+            let extension = IDefaultExtensionCLDispatcher { contract_address: singleton_dispatcher.extension(pool_id) };
+            let (position, _, debt) = singleton_dispatcher.position(pool_id, collateral_asset, debt_asset, user);
+            let vtoken = extension.v_token_for_collateral_asset(pool_id, collateral_asset);
+            let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
+            let collateral_amount = erc4626.convert_to_assets(position.collateral_shares);
+            (
+                collateral_asset,
+                debt_asset,
+                PositionWithAmounts {
+                    collateral_shares: position.collateral_shares,
+                    collateral_amount,
+                    nominal_debt: debt,
+                    is_vtoken: false,
+                },
+            )
         }
 
         // @dev - This is only used for UI purposes.

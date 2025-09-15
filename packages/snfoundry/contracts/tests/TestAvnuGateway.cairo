@@ -11,13 +11,15 @@ use kapan::interfaces::IGateway::{
     OutputPointer,
     Deposit,
     Borrow,
+    Reborrow,
     Repay,
     Withdraw,
     Reswap,
+    ReswapExactIn,
     Redeposit,
     BasicInstruction,
 };
-use kapan::gateways::avnu_gateway::{Route, AvnuContext, SwapExactTokenToCalldata};
+use kapan::gateways::avnu_gateway::{Route, SwapExactTokenToCalldata, MultiRouteSwapCalldata};
 use kapan::gateways::vesu_gateway::{IVesuViewerDispatcher, IVesuViewerDispatcherTrait};
 use starknet::{
     ContractAddress, 
@@ -100,6 +102,7 @@ fn deploy_vesu_gateway(router: ContractAddress) -> ContractAddress {
     let mut supported_assets = array![];
     supported_assets.append(ETH_ADDRESS());
     supported_assets.append(USDC_ADDRESS());
+    supported_assets.append(STRK_ADDRESS());
     calldata.append_serde(supported_assets);
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
@@ -711,4 +714,151 @@ fn test_avnu_move_debt_reswap_and_redeposit_kept_in_router() {
         }
     };
     assert(found_zero_debt, 'expected-zero-debt');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_avnu_switch_collateral_with_reswap_exact_in() {
+    let context = setup_avnu_test_context();
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('avnu', context.avnu_gateway_address);
+    let vesu_gateway_address = deploy_vesu_gateway(context.router_address);
+    router.add_gateway('vesu', vesu_gateway_address);
+
+    // Seed position: deposit 1 ETH, borrow 200 USDC (STRK will be borrowed later)
+    use kapan::gateways::vesu_gateway::VesuContext;
+    let mut vesu_eth_context = array![];
+    VesuContext { pool_id: 0, position_counterpart_token: ETH_ADDRESS() }.serialize(ref vesu_eth_context);
+    let mut vesu_usdc_context = array![];
+    VesuContext { pool_id: 0, position_counterpart_token: USDC_ADDRESS() }.serialize(ref vesu_usdc_context);
+    let mut vesu_strk_context = array![];
+    VesuContext { pool_id: 0, position_counterpart_token: STRK_ADDRESS() }.serialize(ref vesu_strk_context);
+
+
+    let create_instructions = array![
+        ProtocolInstructions {
+            protocol_name: 'vesu',
+            instructions: array![
+                LendingInstruction::Deposit(Deposit { basic: BasicInstruction { token: ETH_ADDRESS(), amount: 1000000000000000000, user: USER_ADDRESS() }, context: Option::None }),
+                LendingInstruction::Borrow(Borrow { basic: BasicInstruction { token: STRK_ADDRESS(), amount: 2500000000000000000000, user: USER_ADDRESS() }, context: Option::Some(vesu_eth_context.span()) }),
+            ].span(),
+        }
+    ];
+    let create_auth = context.router_dispatcher.get_authorizations_for_instructions(create_instructions.span(), true);
+    for authorization in create_auth {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let _ = call_contract_syscall(*token, *selector, call_data.span());
+    };
+    println!("Executing creation");
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let _ = context.router_dispatcher.process_protocol_instructions(create_instructions.span());
+    println!("Creation completed successfully!");
+
+    // Prepare Avnu context for exact-in swap: swap withdrawn ETH -> USDC, keep in router
+    let mut routes = array![];
+    let mut ekubo_params: Array<felt252> = array![];
+    ekubo_params.append(ETH_ADDRESS().into());
+    ekubo_params.append(USDC_ADDRESS().into());
+    ekubo_params.append(170141183460469235273462165868118016);
+    ekubo_params.append(1000);
+    ekubo_params.append(starknet::contract_address_const::<0>().into());
+    ekubo_params.append(6277100250585753475930931601400621808602321654880405518632);
+    routes.append(Route { exchange_address: contract_address_const::<0x5dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b>(), sell_token: ETH_ADDRESS(), buy_token: USDC_ADDRESS(), percent: 1000000000000, additional_swap_params: ekubo_params });
+    let mr_ctx = MultiRouteSwapCalldata {
+        sell_token_address: ETH_ADDRESS(),
+        sell_token_amount: 0,
+        buy_token_address: USDC_ADDRESS(),
+        buy_token_amount: 4500000000,
+        buy_token_min_amount: 4000000000,
+        beneficiary: USER_ADDRESS(),
+        integrator_fee_amount_bps: 0,
+        integrator_fee_recipient: USER_ADDRESS(),
+        routes,
+    };
+    let mut mr_ctx_data = array![];
+    mr_ctx.serialize(ref mr_ctx_data);
+
+    // Build move_debt: repay USDC, withdraw ETH, reswapExactIn withdrawn ETH -> USDC (keep in router), redeposit USDC, reborrow STRK
+    let repay_all_usdc = LendingInstruction::Repay(Repay { 
+        basic: BasicInstruction { token: STRK_ADDRESS(), amount: 2500000000000000000000, user: USER_ADDRESS() }, 
+        repay_all: true, 
+        context: Option::Some(vesu_eth_context.span())
+    });
+    let withdraw_all_eth = LendingInstruction::Withdraw(Withdraw { 
+        basic: BasicInstruction { token: ETH_ADDRESS(), amount: 1000000000000000000, user: USER_ADDRESS() }, 
+        withdraw_all: true, 
+        context: Option::Some(vesu_strk_context.span()) 
+    });
+
+    // ReswapExactIn: exact_in from withdraw output (ETH), token_out = USDC, keep both transfers disabled
+    let reswap_exact_in = LendingInstruction::ReswapExactIn(ReswapExactIn {
+        exact_in: OutputPointer { instruction_index: 1, output_index: 0 },
+        min_out: 4000000000,
+        token_out: USDC_ADDRESS(),
+        user: USER_ADDRESS(),
+        should_pay_out: false,
+        should_pay_in: false,
+        context: Option::Some(mr_ctx_data.span()),
+    });
+
+    let redeposit_usdc = LendingInstruction::Redeposit(Redeposit { 
+        token: USDC_ADDRESS(), 
+        user: USER_ADDRESS(), 
+        target_output: OutputPointer { instruction_index: 2, output_index: 1 }, 
+        context: Option::Some(vesu_strk_context.span()) 
+    });
+    // Reborrow STRK against new USDC collateral using reborrow pattern (approval amount can be same as min_out)
+    let reborrow_strk = LendingInstruction::Reborrow(Reborrow { 
+        token: STRK_ADDRESS(),
+        target_output: OutputPointer { instruction_index: 0, output_index: 0 }, 
+        approval_amount: 2600000000000000000000, 
+        user: USER_ADDRESS(), 
+        context: Option::Some(vesu_usdc_context.span()) 
+    });
+
+    let mut md_instructions = array![];
+    md_instructions.append(ProtocolInstructions { protocol_name: 'vesu', instructions: array![repay_all_usdc, withdraw_all_eth].span() });
+    md_instructions.append(ProtocolInstructions { protocol_name: 'avnu', instructions: array![reswap_exact_in].span() });
+    md_instructions.append(ProtocolInstructions { protocol_name: 'vesu', instructions: array![redeposit_usdc, reborrow_strk].span() });
+
+    let md_auth = context.router_dispatcher.get_authorizations_for_instructions(array![*md_instructions.at(0), *md_instructions.at(1)].span(), true);
+    for authorization in md_auth {
+        let (token, selector, call_data) = authorization;
+        cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+        let result = call_contract_syscall(*token, *selector, call_data.span());
+        assert(result.is_ok(), 'switch-collateral auth failed');
+    };
+
+    println!("Executing move_debt");
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.move_debt(md_instructions.span());
+    println!("Move debt completed successfully!");
+
+    // Verify positions: no ETH/STRK, yes USDC/STRK; print amounts and check STRK debt ~ expected
+    let viewer = IVesuViewerDispatcher { contract_address: vesu_gateway_address };
+    // Fetch ETH/STRK position directly
+    let eth_strk_ctx = VesuContext { pool_id: 0, position_counterpart_token: STRK_ADDRESS() };
+    let (eth_collateral, eth_debt, eth_pos) = viewer.get_position_from_context(USER_ADDRESS(), eth_strk_ctx, ETH_ADDRESS(), true);
+    println!("ETH/STRK pos: coll{:?}, debt {:?}", eth_pos.collateral_amount, eth_pos.nominal_debt);
+    let has_eth_strk = eth_pos.collateral_shares > 0 || eth_pos.nominal_debt > 0;
+
+    // Fetch USDC/STRK position directly
+    let usdc_strk_ctx = VesuContext { pool_id: 0, position_counterpart_token: STRK_ADDRESS() };
+    let (usdc_collateral, usdc_debt, usdc_pos) = viewer.get_position_from_context(USER_ADDRESS(), usdc_strk_ctx, USDC_ADDRESS(), true);
+    println!("USDC/STRK pos: coll {:?}, debt {:?}", usdc_pos.collateral_amount, usdc_pos.nominal_debt);
+    let has_usdc_strk = usdc_pos.collateral_shares > 0 || usdc_pos.nominal_debt > 0;
+    let usdc_strk_debt: u256 = usdc_pos.nominal_debt;
+    assert(!has_eth_strk, 'unexpected-eth-strk');
+    assert(has_usdc_strk, 'missing-usdc-strk');
+
+    // Expect roughly the same STRK debt as initial (2_500 STRK), allow 10% tolerance
+    let expected_strk: u256 = 2500000000000000000000;
+    let ten_percent: u256 = expected_strk / 10;
+    let mut lower_bound = expected_strk - ten_percent;
+    let mut upper_bound = expected_strk + ten_percent;
+    assert(usdc_strk_debt >= lower_bound, 'strk-debt-too-low');
+    assert(usdc_strk_debt <= upper_bound, 'strk-debt-too-high');
 }

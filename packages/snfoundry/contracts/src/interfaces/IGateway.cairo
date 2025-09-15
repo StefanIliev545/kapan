@@ -74,6 +74,17 @@ pub struct Reswap {
 }
 
 #[derive(Drop, Serde, Copy)]
+pub struct ReswapExactIn {
+    pub exact_in: OutputPointer,
+    pub min_out: u256,
+    pub token_out: ContractAddress,
+    pub user: ContractAddress,
+    pub should_pay_out: bool,
+    pub should_pay_in: bool,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
 pub struct Swap {
     pub token_in: ContractAddress,
     pub token_out: ContractAddress,
@@ -108,6 +119,7 @@ pub enum LendingInstruction {
     Swap: Swap,
     SwapExactIn: SwapExactIn,
     Reswap: Reswap,
+    ReswapExactIn: ReswapExactIn,
 }
 
 #[starknet::interface]

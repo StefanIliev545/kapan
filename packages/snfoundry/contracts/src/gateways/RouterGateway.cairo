@@ -132,6 +132,22 @@ mod RouterGateway {
                             should_pay_in: *reswap.should_pay_in,
                         }));
                     },
+                    LendingInstruction::ReswapExactIn(reswap) => {
+                        // exact_in pointer determines input token and amount
+                        let exact_ptr = *reswap.exact_in;
+                        let exact_in_outputs = *gateway_outputs.at(exact_ptr.instruction_index);
+                        let exact_in_amount = *exact_in_outputs.at(exact_ptr.output_index).balance;
+                        remappedInstructions.append(LendingInstruction::SwapExactIn(SwapExactIn {
+                            token_in: *exact_in_outputs.at(exact_ptr.output_index).token,
+                            token_out: *reswap.token_out,
+                            exact_in: exact_in_amount,
+                            min_out: *reswap.min_out,
+                            context: *reswap.context,
+                            user: *reswap.user,
+                            should_pay_out: *reswap.should_pay_out,
+                            should_pay_in: *reswap.should_pay_in,
+                        }));
+                    },
                     _ => {
                         remappedInstructions.append(*instruction);
                     }
@@ -370,6 +386,9 @@ mod RouterGateway {
                             swap.user
                         },
                         LendingInstruction::Reswap(reswap) => {
+                            reswap.user
+                        },
+                        LendingInstruction::ReswapExactIn(reswap) => {
                             reswap.user
                         },
                         _ => {
