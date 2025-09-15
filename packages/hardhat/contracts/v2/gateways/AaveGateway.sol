@@ -32,19 +32,50 @@ contract AaveGateway is ILendingGateway, IGatewayView, ProtocolGateway, Reentran
     }
 
     // --------- Core instruction processing ---------
-    function processLendingInstructions(LendingInstruction[] calldata instructions) external override onlyRouter {
+    function processLendingInstructions(LendingInstruction[] calldata instructions)
+        external
+        override
+        onlyRouter
+        returns (InstructionOutput[][] memory outputs)
+    {
+        outputs = new InstructionOutput[][](instructions.length);
         for (uint256 i = 0; i < instructions.length; i++) {
             LendingInstruction calldata ins = instructions[i];
             if (ins.instructionType == InstructionType.Deposit) {
                 _deposit(ins.basic.token, ins.basic.user, ins.basic.amount);
+                outputs[i] = _singleOutput(ins.basic.token, 0);
             } else if (ins.instructionType == InstructionType.Borrow) {
-                _borrow(ins.basic.token, ins.basic.user, ins.basic.amount);
+                uint256 outAmount = _borrow(ins.basic.token, ins.basic.user, ins.basic.amount);
+                outputs[i] = _singleOutput(ins.basic.token, outAmount);
             } else if (ins.instructionType == InstructionType.Repay) {
-                _repay(ins.basic.token, ins.basic.user, ins.basic.amount, ins.repayAll);
+                (uint256 repaid, uint256 refund) =
+                    _repay(ins.basic.token, ins.basic.user, ins.basic.amount, ins.repayAll);
+                outputs[i] = _dualOutput(ins.basic.token, repaid, refund);
             } else if (ins.instructionType == InstructionType.Withdraw) {
-                _withdraw(ins.basic.token, ins.basic.user, ins.basic.amount, ins.withdrawAll);
+                uint256 outAmount =
+                    _withdraw(ins.basic.token, ins.basic.user, ins.basic.amount, ins.withdrawAll);
+                outputs[i] = _singleOutput(ins.basic.token, outAmount);
             }
         }
+    }
+
+    function _singleOutput(address token, uint256 amount)
+        internal
+        pure
+        returns (InstructionOutput[] memory arr)
+    {
+        arr = new InstructionOutput[](1);
+        arr[0] = InstructionOutput({token: token, balance: amount});
+    }
+
+    function _dualOutput(address token, uint256 a, uint256 b)
+        internal
+        pure
+        returns (InstructionOutput[] memory arr)
+    {
+        arr = new InstructionOutput[](2);
+        arr[0] = InstructionOutput({token: token, balance: a});
+        arr[1] = InstructionOutput({token: token, balance: b});
     }
 
     function _deposit(address token, address user, uint256 amount) internal nonReentrant {
@@ -54,33 +85,44 @@ contract AaveGateway is ILendingGateway, IGatewayView, ProtocolGateway, Reentran
         pool.supply(token, amount, user, REFERRAL_CODE);
     }
 
-    function _borrow(address token, address user, uint256 amount) internal nonReentrant {
+    function _borrow(address token, address user, uint256 amount) internal nonReentrant returns (uint256 outAmount) {
         IPool pool = IPool(poolAddressesProvider.getPool());
         (, address variableDebtToken, bool found) = _getReserveAddresses(token);
         require(found && variableDebtToken != address(0), "invalid debt token");
         uint256 allowance = DebtToken(variableDebtToken).borrowAllowance(user, address(this));
         require(allowance >= amount, "insufficient borrow allowance");
         pool.borrow(token, amount, 2, REFERRAL_CODE, user);
-        IERC20(token).safeTransfer(msg.sender, IERC20(token).balanceOf(address(this)));
+        outAmount = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransfer(msg.sender, outAmount);
     }
 
-    function _repay(address token, address user, uint256 amount, bool repayAll) internal nonReentrant {
+    function _repay(address token, address user, uint256 amount, bool repayAll)
+        internal
+        nonReentrant
+        returns (uint256 repaidAmount, uint256 refund)
+    {
         IPool pool = IPool(poolAddressesProvider.getPool());
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         uint256 repayAmount = repayAll ? type(uint256).max : amount;
         IERC20(token).approve(address(pool), repayAmount);
         pool.repay(token, repayAmount, 2, user);
-        uint256 leftover = IERC20(token).balanceOf(address(this));
-        if (leftover > 0) {
-            IERC20(token).safeTransfer(msg.sender, leftover);
+        refund = IERC20(token).balanceOf(address(this));
+        if (refund > 0) {
+            IERC20(token).safeTransfer(msg.sender, refund);
         }
+        repaidAmount = amount - refund;
     }
 
-    function _withdraw(address token, address user, uint256 amount, bool withdrawAll) internal nonReentrant {
+    function _withdraw(address token, address user, uint256 amount, bool withdrawAll)
+        internal
+        nonReentrant
+        returns (uint256 outAmount)
+    {
         IPool pool = IPool(poolAddressesProvider.getPool());
         uint256 withdrawAmount = withdrawAll ? type(uint256).max : amount;
         pool.withdraw(token, withdrawAmount, address(this));
-        IERC20(token).safeTransfer(msg.sender, IERC20(token).balanceOf(address(this)));
+        outAmount = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransfer(msg.sender, outAmount);
     }
 
     // --------- View functions ---------

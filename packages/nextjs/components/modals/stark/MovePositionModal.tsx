@@ -48,6 +48,13 @@ const getPoolNameFromId = (poolId: bigint): string => {
   return entry ? entry[0] : "Unknown Pool";
 };
 
+type OutputPointer = { instruction_index: bigint; output_index: bigint };
+
+const toOutputPointer = (instructionIndex: number): OutputPointer => ({
+  instruction_index: BigInt(instructionIndex),
+  output_index: 0n,
+});
+
 interface MovePositionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -403,7 +410,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Withdraw: undefined,
             Redeposit: {
               token: collateral.token,
-              target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
+              target_output_pointer: toOutputPointer(1), // Point to corresponding withdraw instruction (offset by repay instruction)
               user: userAddress,
               context: contextRedeposit,
             },
@@ -417,7 +424,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Redeposit: undefined,
             Reborrow: {
               token: position.tokenAddress,
-              target_instruction_index: 0, // Point to repay instruction
+              target_output_pointer: toOutputPointer(0), // Point to repay instruction
               approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
               user: userAddress,
               context: contextReborrow,
@@ -555,7 +562,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         Withdraw: undefined,
         Redeposit: {
           token: collateral.token,
-          target_instruction_index: 1 + index,
+          target_output_pointer: toOutputPointer(1 + index),
           user: userAddress,
           context: depositInstructionContext,
         },
@@ -571,7 +578,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Redeposit: undefined,
       Reborrow: {
         token: position.tokenAddress,
-        target_instruction_index: 0,
+        target_output_pointer: toOutputPointer(0),
         approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
         user: userAddress,
         context: borrowInstructionContext,

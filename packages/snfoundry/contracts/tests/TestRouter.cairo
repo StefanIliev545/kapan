@@ -19,6 +19,7 @@ use kapan::interfaces::IGateway::{
     BasicInstruction,
     Reborrow,
     Redeposit,
+    OutputPointer,
 };
 use kapan::gateways::RouterGateway::{
     ProtocolInstructions,
@@ -304,7 +305,7 @@ fn test_router_setup() {
     let eth_balance = erc20.balance_of(USER_ADDRESS());
 
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
 
     let eth_balance_after = erc20.balance_of(USER_ADDRESS());
     println!("ETH balance before: {:?}", eth_balance);
@@ -400,7 +401,7 @@ fn test_vesu() {
     let eth_balance = erc20.balance_of(USER_ADDRESS());
 
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
 
     let eth_balance_after = erc20.balance_of(USER_ADDRESS());
     println!("ETH balance before: {:?}", eth_balance);
@@ -463,7 +464,7 @@ fn test_move_debt() {
     };
     // Process initial position
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(initial_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(initial_instructions.span());
     
     // Now create instructions to move debt to Vesu
     let mut move_debt_instructions = array![];
@@ -495,13 +496,13 @@ fn test_move_debt() {
 
     let vesu_deposit = Redeposit {
         token: ETH_ADDRESS(),
-        target_instruction_index: 1,
+        target_output: OutputPointer { instruction_index: 1, output_index: 0 },
         user: USER_ADDRESS(),
         context: Option::None,
     };
     let vesu_borrow = Reborrow {
         token: USDC_ADDRESS(),
-        target_instruction_index: 0,
+        target_output: OutputPointer { instruction_index: 0, output_index: 0 },
         approval_amount: 200000000, // 200 USDC
         user: USER_ADDRESS(),
         context: Option::Some(vesu_context.span()),
@@ -587,7 +588,7 @@ fn test_move_debt_reverse() {
     };
     // Process initial position
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(initial_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(initial_instructions.span());
     
     // Now create instructions to move debt to Vesu
     let mut move_debt_instructions = array![];
@@ -618,14 +619,14 @@ fn test_move_debt_reverse() {
 
     let vesu_deposit = Redeposit {
         token: ETH_ADDRESS(),
-        target_instruction_index: 1,
+        target_output: OutputPointer { instruction_index: 1, output_index: 0 },
         user: USER_ADDRESS(),
         context: Option::None,
     };
     
     let vesu_borrow = Reborrow {
         token: USDC_ADDRESS(),
-        target_instruction_index: 0,
+        target_output: OutputPointer { instruction_index: 0, output_index: 0 },
         approval_amount: 200010000, // 200 USDC + margin
         user: USER_ADDRESS(),
         context: Option::None,
@@ -694,7 +695,7 @@ fn test_router_repay_all_withdraw_all_nostra() {
     ];
     
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Deposited ETH via RouterGateway");
     
     // Step 2: Borrow USDC
@@ -719,7 +720,7 @@ fn test_router_repay_all_withdraw_all_nostra() {
     ];
     
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Borrowed USDC via RouterGateway");
     
     // Step 3: Repay All USDC
@@ -746,7 +747,7 @@ fn test_router_repay_all_withdraw_all_nostra() {
     
     println!("Attempting repay_all via RouterGateway...");
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Repaid all USDC via RouterGateway");
     
     // Step 4: Withdraw All ETH
@@ -773,7 +774,7 @@ fn test_router_repay_all_withdraw_all_nostra() {
     
     println!("Attempting withdraw_all via RouterGateway...");
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Withdrew all ETH via RouterGateway");
     
     println!("RouterGateway test completed successfully!");
@@ -825,7 +826,7 @@ fn test_router_repay_all_withdraw_all_vesu() {
     };
 
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Deposited ETH via RouterGateway (Vesu)");
 
     // Step 2: Borrow USDC
@@ -854,7 +855,7 @@ fn test_router_repay_all_withdraw_all_vesu() {
     };
 
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Borrowed USDC via RouterGateway (Vesu)");
 
     // Step 3: Repay All USDC
@@ -889,7 +890,7 @@ fn test_router_repay_all_withdraw_all_vesu() {
     };
 
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Repaid all USDC via RouterGateway (Vesu)");
 
     // Step 4: Withdraw All ETH
@@ -919,7 +920,7 @@ fn test_router_repay_all_withdraw_all_vesu() {
     };
 
     cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
+    let _ = context.router_dispatcher.process_protocol_instructions(protocol_instructions.span());
     println!("Withdrew all ETH via RouterGateway (Vesu)");
 
     println!("RouterGateway Vesu test completed successfully!");

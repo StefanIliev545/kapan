@@ -23,6 +23,7 @@ mod NostraGateway {
     use crate::interfaces::IGateway::{
         ILendingInstructionProcessor,
         LendingInstruction,
+        InstructionOutput,
     };
     use crate::interfaces::IGateway::{Deposit, Withdraw, Borrow, Repay};
     use crate::interfaces::nostra::{
@@ -112,7 +113,7 @@ mod NostraGateway {
 
         // @dev - pull the underlying collateral from a user. Requires permission from the user to this contract.
         // caller is restricted to router or the user in the instruction as this is an outbound flow.
-        fn withdraw(ref self: ContractState, withdraw: @Withdraw) {
+        fn withdraw(ref self: ContractState, withdraw: @Withdraw) -> u256 {
             let withdraw = *withdraw;
             let underlying = withdraw.basic.token;
             let mut amount = withdraw.basic.amount;
@@ -130,11 +131,12 @@ mod NostraGateway {
             let collateral = LentDebtTokenABIDispatcher { contract_address: chosen_collateral };
             collateral.transfer_from(user, get_contract_address(), amount);
             collateral.burn(get_contract_address(), get_caller_address(), amount);
+            amount
         }
 
         // @dev - mint the debt token and transfer the underlying to caller.
         // caller is restricted to router or the user in the instruction as this is an outbound flow.
-        fn borrow(ref self: ContractState, borrow: @Borrow) {
+        fn borrow(ref self: ContractState, borrow: @Borrow) -> u256 {
             let borrow = *borrow;
             let underlying = borrow.basic.token;
             let amount = borrow.basic.amount;
@@ -151,15 +153,15 @@ mod NostraGateway {
             let balance_before = underlying_token.balance_of(get_contract_address());
             debt_token.mint(user, amount);
             let balance_after = underlying_token.balance_of(get_contract_address());
-            assert(balance_after > balance_before, 'mint failed');
 
-            assert(underlying_token.balance_of(get_contract_address()) >= amount, 'insufficient balance');
             assert(underlying_token.transfer(get_caller_address(), amount), 'transfer failed');
+            let diff = balance_after - balance_before;
+            diff
         }
 
         // @dev - burns the debt token amounts by transfering the underlying.
         // caller not restricted as this is inbound flow.
-        fn repay(ref self: ContractState, repay: @Repay) {
+        fn repay(ref self: ContractState, repay: @Repay) -> (u256, u256) {
             let repay = *repay;
             let underlying = repay.basic.token;
             let mut amount = repay.basic.amount;
@@ -168,22 +170,21 @@ mod NostraGateway {
             let debt = self.underlying_to_ndebt.read(underlying);
             assert(debt != Zero::zero(), 'not-token');
 
-            if repay.repay_all {
-                let debt_token_erc20 = IERC20Dispatcher { contract_address: debt };
-                let debt_balance = debt_token_erc20.balance_of(user);
-                amount = debt_balance;
-            }
+            let debt_token_erc20 = IERC20Dispatcher { contract_address: debt };
+            let debt_balance = debt_token_erc20.balance_of(user);
+            let to_repay = if amount > debt_balance { debt_balance } else { amount };
 
             let underlying_token = IERC20Dispatcher { contract_address: underlying };
-
-            let balance_before = underlying_token.balance_of(get_contract_address());
             assert(underlying_token.transfer_from(get_caller_address(), get_contract_address(), amount), 'transfer failed');
-            assert(underlying_token.approve(debt, amount), 'approve failed');
+            assert(underlying_token.approve(debt, to_repay), 'approve failed');
             let debt_token = DebtTokenABIDispatcher { contract_address: debt };
-            debt_token.burn(user, amount);
-            let balance_after = underlying_token.balance_of(get_contract_address());
-            let leftover = balance_after - balance_before;
-            assert(underlying_token.transfer(get_caller_address(), leftover), 'transfer failed');
+            debt_token.burn(user, to_repay);
+            
+            let refund = if amount > to_repay { amount - to_repay } else { 0 };
+            if refund > 0 {
+                assert(underlying_token.transfer(get_caller_address(), refund), 'transfer failed');
+            }
+            (to_repay, refund)
         }
 
         fn assert_router_or_user(self: @ContractState, user: ContractAddress) {
@@ -194,25 +195,47 @@ mod NostraGateway {
     
 
     #[abi(embed_v0)]
-    impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {        
-        fn process_instructions(ref self: ContractState, instructions: Span<LendingInstruction>) {
+    impl ILendingInstructionProcessorImpl of ILendingInstructionProcessor<ContractState> {
+        fn process_instructions(
+            ref self: ContractState,
+            instructions: Span<LendingInstruction>
+        ) -> Span<Span<InstructionOutput>> {
+            let mut results = array![];
             for instruction in instructions {
                 match instruction {
                     LendingInstruction::Deposit(instruction) => {
                         self.deposit(instruction);
+                        let token = instruction.basic.token;
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token: *token, balance: 0 });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Withdraw(instruction) => {
-                        self.withdraw(instruction);
+                        let amount = self.withdraw(instruction);
+                        let token = instruction.basic.token;
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token: *token, balance: amount });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Borrow(instruction) => {
-                        self.borrow(instruction);
+                        let amount = self.borrow(instruction);
+                        let token = instruction.basic.token;
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token: *token, balance: amount });
+                        results.append(outs.span());
                     },
                     LendingInstruction::Repay(instruction) => {
-                        self.repay(instruction);
+                        let (repaid_amount, refund_amount) = self.repay(instruction);
+                        let token = instruction.basic.token;
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token: *token, balance: repaid_amount });
+                        outs.append(InstructionOutput { token: *token, balance: refund_amount });
+                        results.append(outs.span());
                     },
                     _ => {}
                 }
             }
+            results.span()
         }
 
         // @dev - encodes approvals for depositing into nostra or approvals for minting borrow tokens on behalf of the user by THIS contract.

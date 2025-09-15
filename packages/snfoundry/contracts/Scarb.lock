@@ -8,10 +8,16 @@ source = "registry+https://scarbs.xyz/"
 checksum = "sha256:0ad256055661ed5b29ccef7bddbb44136995641cf537a6b259b94b6b6df14133"
 
 [[package]]
+name = "ekubo"
+version = "0.1.0"
+source = "git+https://github.com/EkuboProtocol/abis#f4a16b95967c5596d5a3cd4e0422bb9a2e3eb017"
+
+[[package]]
 name = "kapan"
 version = "0.0.1"
 dependencies = [
  "alexandria_math",
+ "ekubo",
  "openzeppelin",
  "openzeppelin_utils",
  "snforge_std",
@@ -138,15 +144,15 @@ checksum = "sha256:fd348b31c4a4407add33adc3c2b8f26dca71dbd7431faaf726168f37a91db
 
 [[package]]
 name = "snforge_scarb_plugin"
-version = "0.45.0"
+version = "0.49.0"
 source = "registry+https://scarbs.xyz/"
-checksum = "sha256:568482e8c40e7018d9ea729d6df3d5ec22b665cfff1e89181d8ad31bacca11cc"
+checksum = "sha256:903150f0e9542e4277d417029eea4c03af0db398b581f9f7ae3ebbdac9afc657"
 
 [[package]]
 name = "snforge_std"
-version = "0.45.0"
+version = "0.49.0"
 source = "registry+https://scarbs.xyz/"
-checksum = "sha256:c08b359c266e45c4e71b71baa3c4af8dae7fc5416fc8168f0983e5c9a2ac0abe"
+checksum = "sha256:73d73653cc4356ec51b92a6bec9d8385b20318170c2f2ade7891e5185a0e7e64"
 dependencies = [
  "snforge_scarb_plugin",
 ]

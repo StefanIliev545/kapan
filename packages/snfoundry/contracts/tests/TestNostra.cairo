@@ -196,7 +196,7 @@ fn test_deposit() {
     // Process the deposit instruction
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     
     // Verify balance decreased
     let final_balance = erc20.balance_of(USER_ADDRESS());
@@ -239,7 +239,7 @@ fn test_withdraw() {
     // Process the deposit instruction
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     
     // Verify balance decreased
     let final_balance = erc20.balance_of(USER_ADDRESS());
@@ -263,7 +263,7 @@ fn test_withdraw() {
     
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Withdraw(withdraw)];
-    context.gateway_dispatcher.process_instructions(instructions.span());    
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());    
     let after_balance = erc20.balance_of(USER_ADDRESS());
     println!("After USDC balance: {}", after_balance);
     assert(after_balance > final_balance, 'balance not increased');
@@ -302,7 +302,7 @@ fn test_full_flow() {
     // Process the deposit instruction
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     
     // Verify balance decreased
     let final_balance = erc20.balance_of(USER_ADDRESS());
@@ -327,7 +327,7 @@ fn test_full_flow() {
     println!("borrowing");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Borrow(borrow)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     let usdc_erc20 = IERC20Dispatcher { contract_address: USDC_ADDRESS() };
     let user_balance = usdc_erc20.balance_of(USER_ADDRESS());
     println!("User USDC balance: {}", user_balance);
@@ -350,7 +350,7 @@ fn test_full_flow() {
     println!("repaying");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Repay(repay)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     let new_usdc_balance = usdc_erc20.balance_of(USER_ADDRESS());
     println!("New USDC balance: {}", new_usdc_balance);
     assert(new_usdc_balance < user_balance, 'balance not decreased');
@@ -393,7 +393,7 @@ fn test_get_user_positions() {
     println!("depositing");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     // Get user positions
     println!("getting positions");
@@ -459,7 +459,7 @@ fn test_repay_all_withdraw_all() {
     
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     println!("OK Deposited {} ETH", deposit_amount);
     
     // Step 2: Borrow USDC against ETH collateral
@@ -485,7 +485,7 @@ fn test_repay_all_withdraw_all() {
     
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Borrow(borrow)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     
     let usdc_balance_after_borrow = usdc_erc20.balance_of(USER_ADDRESS());
     assert(usdc_balance_after_borrow > initial_usdc_balance, 'borrow failed');
@@ -508,7 +508,7 @@ fn test_repay_all_withdraw_all() {
     
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Repay(repay_all)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     
     let usdc_balance_after_repay = usdc_erc20.balance_of(USER_ADDRESS());
     
@@ -530,7 +530,7 @@ fn test_repay_all_withdraw_all() {
     
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Withdraw(withdraw_all)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
     
     let final_eth_balance = eth_erc20.balance_of(USER_ADDRESS());
     assert(final_eth_balance > initial_eth_balance - deposit_amount, 'withdraw failed');

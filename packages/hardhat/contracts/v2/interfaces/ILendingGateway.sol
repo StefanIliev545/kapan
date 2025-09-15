@@ -22,7 +22,15 @@ interface ILendingGateway {
         bool withdrawAll; // used for Withdraw
     }
 
+    struct InstructionOutput {
+        address token;
+        uint256 balance;
+    }
+
     /// @notice Execute a batch of lending instructions for this protocol
     /// @param instructions The array of instructions to process
-    function processLendingInstructions(LendingInstruction[] calldata instructions) external;
+    /// @return outputs The resulting token movements for each instruction
+    function processLendingInstructions(LendingInstruction[] calldata instructions)
+        external
+        returns (InstructionOutput[][] memory outputs);
 }

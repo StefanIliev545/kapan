@@ -26,19 +26,50 @@ contract CompoundGateway is ILendingGateway, IGatewayView, ProtocolGateway, Owna
         }
     }
 
-    function processLendingInstructions(LendingInstruction[] calldata instructions) external override onlyRouter {
+    function processLendingInstructions(LendingInstruction[] calldata instructions)
+        external
+        override
+        onlyRouter
+        returns (InstructionOutput[][] memory outputs)
+    {
+        outputs = new InstructionOutput[][](instructions.length);
         for (uint256 i = 0; i < instructions.length; i++) {
             LendingInstruction calldata ins = instructions[i];
             if (ins.instructionType == InstructionType.Deposit) {
                 _deposit(ins.basic.token, ins.basic.user, ins.basic.amount);
+                outputs[i] = _singleOutput(ins.basic.token, 0);
             } else if (ins.instructionType == InstructionType.Borrow) {
-                _borrow(ins.basic.token, ins.basic.user, ins.basic.amount);
+                uint256 outAmount = _borrow(ins.basic.token, ins.basic.user, ins.basic.amount);
+                outputs[i] = _singleOutput(ins.basic.token, outAmount);
             } else if (ins.instructionType == InstructionType.Repay) {
-                _repay(ins.basic.token, ins.basic.user, ins.basic.amount, ins.repayAll);
+                (uint256 repaid, uint256 refund) =
+                    _repay(ins.basic.token, ins.basic.user, ins.basic.amount, ins.repayAll);
+                outputs[i] = _dualOutput(ins.basic.token, repaid, refund);
             } else if (ins.instructionType == InstructionType.Withdraw) {
-                _withdraw(ins.basic.token, ins.basic.user, ins.basic.amount, ins.withdrawAll);
+                uint256 outAmount =
+                    _withdraw(ins.basic.token, ins.basic.user, ins.basic.amount, ins.withdrawAll);
+                outputs[i] = _singleOutput(ins.basic.token, outAmount);
             }
         }
+    }
+
+    function _singleOutput(address token, uint256 amount)
+        internal
+        pure
+        returns (InstructionOutput[] memory arr)
+    {
+        arr = new InstructionOutput[](1);
+        arr[0] = InstructionOutput({token: token, balance: amount});
+    }
+
+    function _dualOutput(address token, uint256 a, uint256 b)
+        internal
+        pure
+        returns (InstructionOutput[] memory arr)
+    {
+        arr = new InstructionOutput[](2);
+        arr[0] = InstructionOutput({token: token, balance: a});
+        arr[1] = InstructionOutput({token: token, balance: b});
     }
 
     function _deposit(address token, address user, uint256 amount) internal nonReentrant {
@@ -49,14 +80,23 @@ contract CompoundGateway is ILendingGateway, IGatewayView, ProtocolGateway, Owna
         comet.supplyTo(user, token, amount);
     }
 
-    function _borrow(address token, address user, uint256 amount) internal nonReentrant {
+    function _borrow(address token, address user, uint256 amount)
+        internal
+        nonReentrant
+        returns (uint256 outAmount)
+    {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "comet not set");
         comet.withdrawFrom(user, address(this), token, amount);
-        IERC20(token).safeTransfer(msg.sender, IERC20(token).balanceOf(address(this)));
+        outAmount = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransfer(msg.sender, outAmount);
     }
 
-    function _repay(address token, address user, uint256 amount, bool repayAll) internal nonReentrant {
+    function _repay(address token, address user, uint256 amount, bool repayAll)
+        internal
+        nonReentrant
+        returns (uint256 repaidAmount, uint256 refund)
+    {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "comet not set");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -69,13 +109,18 @@ contract CompoundGateway is ILendingGateway, IGatewayView, ProtocolGateway, Owna
         }
         IERC20(token).approve(address(comet), repayAmount);
         comet.supplyTo(user, token, repayAmount);
-        uint256 leftover = IERC20(token).balanceOf(address(this));
-        if (leftover > 0) {
-            IERC20(token).safeTransfer(msg.sender, leftover);
+        refund = IERC20(token).balanceOf(address(this));
+        if (refund > 0) {
+            IERC20(token).safeTransfer(msg.sender, refund);
         }
+        repaidAmount = amount - refund;
     }
 
-    function _withdraw(address token, address user, uint256 amount, bool withdrawAll) internal nonReentrant {
+    function _withdraw(address token, address user, uint256 amount, bool withdrawAll)
+        internal
+        nonReentrant
+        returns (uint256 outAmount)
+    {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "comet not set");
         uint256 withdrawAmount = amount;
@@ -83,7 +128,8 @@ contract CompoundGateway is ILendingGateway, IGatewayView, ProtocolGateway, Owna
             withdrawAmount = comet.balanceOf(user);
         }
         comet.withdrawFrom(user, address(this), token, withdrawAmount);
-        IERC20(token).safeTransfer(msg.sender, IERC20(token).balanceOf(address(this)));
+        outAmount = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransfer(msg.sender, outAmount);
     }
 
     // --------- View functions ---------
