@@ -66,8 +66,10 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         const tx = await fetchBuildExecuteTransaction(
           quotes[0].quoteId,
           address,
+          0.05,
+          false,
         );
-        const calldata = (tx.calls?.[0]?.calldata as any[]) || [];
+        const calldata = (tx.calls?.find((c: any) => c.entrypoint === "swap_exact_token_to")?.calldata as any[]) || [];
         if (!cancelled)
           setAvnuCalldata(calldata.map((c: any) => BigInt(c.toString())));
       } catch (e) {
