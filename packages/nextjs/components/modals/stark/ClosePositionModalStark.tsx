@@ -10,24 +10,13 @@ import {
   CallData,
   uint256,
 } from "starknet";
+import { fetchBuildExecuteTransaction, fetchQuotes } from "@avnu/avnu-sdk";
+import type { Quote } from "@avnu/avnu-sdk";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { useLendingAuthorizations } from "~~/hooks/useLendingAuthorizations";
-import {
-  useScaffoldContract,
-  useScaffoldMultiWriteContract,
-} from "~~/hooks/scaffold-stark";
+import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
-
-const FEE_Q128 = 1n << 128n;
-
-interface EkuboTier {
-  feePercent: number;
-  precisionPercent: number;
-  tickSpacing: number;
-  feeFelt: bigint;
-  extension: bigint;
-}
 
 interface TokenInfo {
   name: string;
@@ -57,154 +46,51 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
 }) => {
   const { address } = useStarkAccount();
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
-
-  const { data: ekuboGateway } = useScaffoldContract({
-    contractName: "EkuboGateway",
-  });
-
-  const [tiers, setTiers] = useState<EkuboTier[]>([]);
-  const [chosenTierIndex, setChosenTierIndex] = useState(0);
-  const chosenTier = tiers[chosenTierIndex];
-  const [isAutoSelecting, setIsAutoSelecting] = useState(true);
-  const [isSimulating, setIsSimulating] = useState(false);
-
+  const [avnuCalldata, setAvnuCalldata] = useState<bigint[]>([]);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !address) return;
     let cancelled = false;
-    const fetchPools = async () => {
+    const fetchCalldata = async () => {
       try {
-        const a = BigInt(collateral.address);
-        const b = BigInt(debt.address);
-        const [token0, token1] = a < b
-          ? [collateral.address, debt.address]
-          : [debt.address, collateral.address];
-        const resp = await fetch(
-          `https://starknet-mainnet-api.ekubo.org/pair/${token0}/${token1}/pools`,
-        );
-        const json = await resp.json();
-        const poolData = (json.topPools || [])
-          .filter((p: any) => p.fee !== "0")
-          .filter((p: any) => p.depth_percent == null || p.depth_percent > 0);
-        poolData.sort(
-          (a: any, b: any) =>
-            Number(b.depth_percent || 0) - Number(a.depth_percent || 0),
-        );
-        const pools: EkuboTier[] = poolData.map((p: any) => {
-          const feeFelt = BigInt(p.fee);
-          const tickSpacing = Number(p.tick_spacing);
-          return {
-            feePercent: Number((feeFelt * 10000n) / FEE_Q128) / 100,
-            precisionPercent: tickSpacing / 10000,
-            tickSpacing,
-            feeFelt,
-            extension: BigInt(p.extension || "0"),
-          } as EkuboTier;
-        });
-        if (!cancelled && pools.length > 0) {
-          setTiers(pools);
-          setChosenTierIndex(0);
-          setIsAutoSelecting(true);
+        const quoteReq = {
+          sellTokenAddress: collateral.address,
+          buyTokenAddress: debt.address,
+          buyAmount: debtBalance > 0n ? debtBalance : 1n,
+          takerAddress: address,
+        } as const;
+        const quotes = await fetchQuotes(quoteReq);
+        if (quotes.length === 0) {
+          throw new Error("no avnu quote");
         }
+        if (!cancelled) setSelectedQuote(quotes[0]);
+        const tx = await fetchBuildExecuteTransaction(
+          quotes[0].quoteId,
+          address,
+          0.05,
+          false,
+        );
+        const calldata = (tx.calls?.find((c: any) => c.entrypoint === "swap_exact_token_to")?.calldata as any[]) || [];
+        if (!cancelled)
+          setAvnuCalldata(calldata.map((c: any) => BigInt(c.toString())));
       } catch (e) {
-        console.error("failed to fetch Ekubo pools", e);
-        if (!cancelled) setTiers([]);
-      }
-    };
-    fetchPools();
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, collateral.address, debt.address]);
-
-  useEffect(() => {
-    if (
-      !isOpen ||
-      !ekuboGateway ||
-      !isAutoSelecting ||
-      tiers.length === 0
-    )
-      return;
-    let cancelled = false;
-    const simulate = async () => {
-      setIsSimulating(true);
-      let bestIndex = 0;
-      let bestAmount = 0n;
-      for (let i = 0; i < tiers.length; i++) {
-        const tier = tiers[i];
-        if (cancelled) break;
-        try {
-          const context = new CairoOption(
-            CairoOptionVariant.Some,
-            [tier.feeFelt, BigInt(tier.tickSpacing), tier.extension],
-          );
-          const swapInstruction = new CairoCustomEnum({
-            Deposit: undefined,
-            Borrow: undefined,
-            Repay: undefined,
-            Withdraw: undefined,
-            Redeposit: undefined,
-            Reborrow: undefined,
-            Swap: undefined,
-            SwapExactIn: {
-              token_in: collateral.address,
-              token_out: debt.address,
-              exact_in: uint256.bnToUint256(collateralBalance),
-              min_out: uint256.bnToUint256(0n),
-              user: address || "0x0",
-              should_pay_out: false,
-              should_pay_in: false,
-              context,
-            },
-            Reswap: undefined,
-          });
-          const call = (ekuboGateway as any).populate(
-            "process_instructions",
-            [[swapInstruction]],
-          );
-          const { result } = await (ekuboGateway.provider as any).callContract(call);
-          const res: any = (ekuboGateway as any).parseResponse(
-            "process_instructions",
-            result,
-          );
-          const outs = res?.[0] || [];
-          const out = outs.find((o: any) => o.token === debt.address);
-          const amount = out
-            ? BigInt(uint256.uint256ToBN(out.balance).toString())
-            : 0n;
-          if (amount > bestAmount) {
-            bestAmount = amount;
-            bestIndex = i;
-          }
-        } catch (e) {
-          console.error("tier simulation failed", e);
+        console.error("failed to fetch avnu calldata", e);
+        if (!cancelled) {
+          setAvnuCalldata([]);
+          setSelectedQuote(null);
         }
       }
-      if (!cancelled) {
-        setChosenTierIndex(bestIndex);
-        setIsSimulating(false);
-        setIsAutoSelecting(false);
-      }
     };
-    simulate();
+    fetchCalldata();
     return () => {
       cancelled = true;
-      setIsSimulating(false);
     };
-  }, [
-    isOpen,
-    ekuboGateway,
-    collateral.address,
-    debt.address,
-    collateralBalance,
-    address,
-    isAutoSelecting,
-    tiers,
-  ]);
+  }, [isOpen, address, collateral.address, debt.address, debtBalance]);
 
   const protocolInstructions = useMemo(() => {
-    if (!address || !chosenTier) return [];
+    if (!address || avnuCalldata.length === 0) return [];
 
     const repayContext = new CairoOption(
       CairoOptionVariant.Some,
@@ -238,7 +124,11 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       Borrow: undefined,
       Repay: undefined,
       Withdraw: {
-        basic: { token: collateral.address, amount: uint256.bnToUint256(collateralBalance), user: address },
+        basic: { 
+          token: collateral.address, 
+          amount: uint256.bnToUint256(collateralBalance + (collateralBalance / 100n)), // add 1% on top
+          user: address 
+        },
         withdraw_all: true,
         context: withdrawContext,
       },
@@ -266,14 +156,14 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         should_pay_in: true,
         context: new CairoOption(
           CairoOptionVariant.Some,
-          [chosenTier.feeFelt, BigInt(chosenTier.tickSpacing), chosenTier.extension],
+          avnuCalldata,
         ),
       },
     });
 
     return [
       { protocol_name: "vesu", instructions: [repayInstruction, withdrawInstruction] },
-      { protocol_name: "ekubo", instructions: [reswapInstruction] },
+      { protocol_name: "avnu", instructions: [reswapInstruction] },
     ];
   }, [
     address,
@@ -282,7 +172,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     poolId,
     collateralBalance,
     debtBalance,
-    chosenTier,
+    avnuCalldata,
   ]);
 
   useEffect(() => {
@@ -336,72 +226,119 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   );
   const formattedDebt = formatTokenAmount(debtBalance.toString(), debt.decimals);
 
+  const formatUsd = (value?: number) => {
+    if (value === undefined || value === null) return "-";
+    try {
+      return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+    } catch {
+      return `$${value.toFixed(2)}`;
+    }
+  };
+
+  const remainderInfo = useMemo(() => {
+    if (!selectedQuote) return null;
+    const used = selectedQuote.sellAmount;
+    const remainder = collateralBalance > used ? collateralBalance - used : 0n;
+    const remainderFormatted = formatTokenAmount(remainder.toString(), collateral.decimals);
+    const sellUnits = parseFloat(formatTokenAmount(selectedQuote.sellAmount.toString(), collateral.decimals));
+    const remainderUnits = parseFloat(remainderFormatted);
+    let remainderUsd: number | undefined = undefined;
+    if (sellUnits > 0) {
+      remainderUsd = (selectedQuote.sellAmountInUsd || 0) * (remainderUnits / sellUnits);
+    } else if (selectedQuote.sellTokenPriceInUsd !== undefined) {
+      remainderUsd = remainderUnits * (selectedQuote.sellTokenPriceInUsd as number);
+    }
+    return { remainder, remainderFormatted, remainderUsd };
+  }, [selectedQuote, collateralBalance, collateral.decimals]);
+
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md">
-      <div className="p-6 space-y-4">
-        <h3 className="text-lg font-bold">Close Position</h3>
-        <div className="flex justify-between items-start">
-          <div className="flex flex-col items-start">
-            <div className="flex items-center gap-2">
-              <Image
-                src={collateral.icon}
-                alt={collateral.name}
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="font-medium">{collateral.name}</span>
+    <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
+      <div className="space-y-3">
+        <h3 className="text-xl font-semibold">Close position with collateral</h3>
+        {selectedQuote ? (
+          <>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Image src={collateral.icon} alt={collateral.name} width={24} height={24} className="w-6 h-6" />
+                  <div>
+                    <div className="text-base font-medium">
+                      {formatTokenAmount(selectedQuote.sellAmount.toString(), collateral.decimals)} {collateral.name}
+                    </div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
+                  </div>
+                </div>
+                <div className="text-gray-400">→</div>
+                <div className="flex items-center gap-2">
+                  <Image src={debt.icon} alt={debt.name} width={24} height={24} className="w-6 h-6" />
+                  <div className="text-right">
+                    <div className="text-base font-medium">
+                      {formatTokenAmount(selectedQuote.buyAmount.toString(), debt.decimals)} {debt.name}
+                    </div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1 pt-2 border-t border-gray-100">
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">AVNU fee</span>
+                  <span>
+                    {formatTokenAmount(selectedQuote.avnuFees.toString(), debt.decimals)} {debt.name}
+                    <span className="text-gray-500"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
+                  </span>
+                </div>
+                {selectedQuote.integratorFees > 0n && (
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-gray-600">Integrator fee</span>
+                    <span>
+                      {formatTokenAmount(selectedQuote.integratorFees.toString(), debt.decimals)} {debt.name}
+                      <span className="text-gray-500"> · {formatUsd(selectedQuote.integratorFeesInUsd)}</span>
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">Network fee</span>
+                  <span className="text-gray-700">{formatUsd(selectedQuote.gasFeesInUsd)}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">Total fees (USD)</span>
+                  <span className="text-gray-700">
+                    {formatUsd(
+                      (selectedQuote.avnuFeesInUsd || 0) +
+                        (selectedQuote.integratorFeesInUsd || 0) +
+                        (selectedQuote.gasFeesInUsd || 0),
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">Fees in {debt.name}</span>
+                  <span className="text-gray-700">
+                    {formatTokenAmount(
+                      (selectedQuote.buyAmountWithoutFees - selectedQuote.buyAmount).toString(),
+                      debt.decimals,
+                    )} {debt.name}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span className="text-sm text-gray-500">
-              {formattedCollateral} {collateral.name}
-            </span>
-          </div>
-          <div className="flex flex-col items-end">
-            <div className="flex items-center gap-2">
-              <Image
-                src={debt.icon}
-                alt={debt.name}
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="font-medium">{debt.name}</span>
+            <div className="pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] text-gray-600">Withdraw</span>
+                <div className="flex items-center gap-2">
+                  <Image src={collateral.icon} alt={collateral.name} width={20} height={20} className="w-5 h-5" />
+                  <div className="text-right">
+                    <div className="text-base font-medium">{remainderInfo?.remainderFormatted} {collateral.name}</div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(remainderInfo?.remainderUsd)}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <span className="text-sm text-gray-500">
-              {formattedDebt} {debt.name}
-            </span>
-          </div>
-        </div>
-        <p className="text-sm">
-          Repay your {debt.name} debt using {collateral.name} collateral via Ekubo swap.
-        </p>
-        <div className="text-sm flex items-center gap-2">
-          <span>Ekubo tier:</span>
-          <select
-            className="select select-bordered select-sm"
-            value={chosenTierIndex}
-            onChange={e => {
-              const idx = Number(e.target.value);
-              if (!Number.isNaN(idx)) {
-                setIsAutoSelecting(false);
-                setIsSimulating(false);
-                setChosenTierIndex(idx);
-              }
-            }}
-          >
-            {tiers.map((t, i) => (
-              <option key={`${t.feeFelt}-${t.tickSpacing}-${t.extension}`} value={i}>
-                {t.feePercent}% fee / {t.precisionPercent}% precision
-              </option>
-            ))}
-          </select>
-          {isSimulating && <span className="loading loading-spinner loading-sm" />}
-        </div>
-        <div className="mt-6 flex justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleClosePosition}>
+          </>
+        ) : (
+          <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
+        )}
+        <div className="mt-4 flex justify-end">
+          <button className="btn btn-primary btn-sm" onClick={handleClosePosition}>
             Close Position
           </button>
         </div>
