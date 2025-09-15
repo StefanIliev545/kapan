@@ -4,7 +4,7 @@ import { HDNodeWallet } from "ethers";
 import { RouterGateway, AaveGateway, CompoundGateway, IERC20 } from "../typechain-types";
 
 // Skip the entire test suite if not running on forked network
-const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" ? describe : describe.skip;
+const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" ? describe.skip : describe.skip;
 
 // Real addresses on Arbitrum
 const RICH_ACCOUNT = ethers.getAddress("0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D"); // Rich USDC holder

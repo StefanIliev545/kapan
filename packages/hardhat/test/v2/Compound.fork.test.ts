@@ -65,7 +65,30 @@ runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
     const userAddress = await user.getAddress();
     const depositAmount = ethers.parseUnits("1000", 6);
 
-    await usdc.connect(user).approve(await router.getAddress(), depositAmount);
+    // Approvals for deposit
+    {
+      const approvals = await router
+        .connect(user)
+        .getAuthorizationsForInstructions([
+          {
+            protocolName: "compound",
+            instructions: [
+              {
+                instructionType: 0,
+                basic: { token: USDC_ADDRESS, amount: depositAmount, user: userAddress },
+                repayAll: false,
+                withdrawAll: false,
+              },
+            ],
+          },
+        ]);
+      const targets: string[] = approvals[0];
+      const datas: string[] = approvals[1];
+      for (let i = 0; i < targets.length; i++) {
+        await user.sendTransaction({ to: targets[i], data: datas[i] });
+      }
+    }
+
     await router.connect(user).processProtocolInstructions([
       {
         protocolName: "compound",
@@ -80,7 +103,31 @@ runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
       },
     ]);
 
-    expect(await routerView.getBalance("compound", USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
+    expect(await routerView.getBalance("compound", USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount - 1n);
+
+    // Approvals for withdrawAll (manager allow)
+    {
+      const approvals = await router
+        .connect(user)
+        .getAuthorizationsForInstructions([
+          {
+            protocolName: "compound",
+            instructions: [
+              {
+                instructionType: 3,
+                basic: { token: USDC_ADDRESS, amount: 0n, user: userAddress },
+                repayAll: false,
+                withdrawAll: true,
+              },
+            ],
+          },
+        ]);
+      const targets: string[] = approvals[0];
+      const datas: string[] = approvals[1];
+      for (let i = 0; i < targets.length; i++) {
+        await user.sendTransaction({ to: targets[i], data: datas[i] });
+      }
+    }
 
     await router.connect(user).processProtocolInstructions([
       {

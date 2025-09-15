@@ -52,6 +52,36 @@ contract RouterGateway is Ownable {
         }
     }
 
+    /// @notice Aggregate approvals required by gateways for the provided instructions
+    /// @dev Mirrors Cairo get_authorizations_for_instructions; approvals same as v1 gateways
+    function getAuthorizationsForInstructions(ProtocolInstruction[] calldata protocolInstructions)
+        external
+        view
+        returns (address[] memory targets, bytes[] memory calldatas)
+    {
+        uint256 total = 0;
+        // First pass: count
+        for (uint256 i = 0; i < protocolInstructions.length; i++) {
+            ILendingGateway gateway = gateways[protocolInstructions[i].protocolName];
+            require(address(gateway) != address(0), "Protocol not supported");
+            (address[] memory t, ) = gateway.getAuthorizationsForInstructions(protocolInstructions[i].instructions);
+            total += t.length; // assume returned arrays are aligned
+        }
+        targets = new address[](total);
+        calldatas = new bytes[](total);
+        uint256 idx = 0;
+        // Second pass: fill
+        for (uint256 i = 0; i < protocolInstructions.length; i++) {
+            ILendingGateway gateway = gateways[protocolInstructions[i].protocolName];
+            (address[] memory t, bytes[] memory d) = gateway.getAuthorizationsForInstructions(protocolInstructions[i].instructions);
+            for (uint256 j = 0; j < t.length; j++) {
+                targets[idx] = t[j];
+                calldatas[idx] = d[j];
+                idx++;
+            }
+        }
+    }
+
     function _beforeSendInstructions(
         address gateway,
         ILendingGateway.LendingInstruction[] calldata instructions,

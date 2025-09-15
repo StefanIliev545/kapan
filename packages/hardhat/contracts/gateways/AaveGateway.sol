@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { IGateway } from "../interfaces/IGateway.sol";
-import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import { IPoolAddressesProvider } from "../interfaces/aave/IPoolAddressProvider.sol";
 import { IUiPoolDataProviderV3 } from "../interfaces/aave/IUiDataProvider.sol";
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";

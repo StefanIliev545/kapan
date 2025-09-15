@@ -148,5 +148,49 @@ contract VenusGateway is ILendingGateway, ProtocolGateway, ReentrancyGuard {
         }
         revert("vToken not found");
     }
+
+    // --------- Approvals encoding (v1 parity) ---------
+    function getAuthorizationsForInstructions(LendingInstruction[] calldata instructions)
+        external
+        view
+        override
+        returns (address[] memory targets, bytes[] memory calldatas)
+    {
+        uint256 count = 0;
+        for (uint256 i = 0; i < instructions.length; i++) {
+            LendingInstruction calldata ins = instructions[i];
+            if (ins.instructionType == InstructionType.Deposit || ins.instructionType == InstructionType.Repay) {
+                count += 1; // ERC20 approve(router)
+            } else if (ins.instructionType == InstructionType.Borrow) {
+                // Venus uses delegate borrower approval on Comptroller
+                count += 1;
+            }
+        }
+        targets = new address[](count);
+        calldatas = new bytes[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < instructions.length; i++) {
+            LendingInstruction calldata ins = instructions[i];
+            if (ins.instructionType == InstructionType.Deposit) {
+                targets[idx] = ins.basic.token;
+                calldatas[idx] = abi.encodeWithSelector(IERC20.approve.selector, ROUTER, ins.basic.amount);
+                idx += 1;
+            } else if (ins.instructionType == InstructionType.Repay) {
+                targets[idx] = ins.basic.token;
+                uint256 approveAmount = ins.repayAll ? type(uint256).max : ins.basic.amount;
+                calldatas[idx] = abi.encodeWithSelector(IERC20.approve.selector, ROUTER, approveAmount);
+                idx += 1;
+            } else if (ins.instructionType == InstructionType.Borrow) {
+                // Comptroller.updateDelegate(this, true)
+                targets[idx] = address(comptroller);
+                calldatas[idx] = abi.encodeWithSelector(
+                    comptroller.updateDelegate.selector,
+                    address(this),
+                    true
+                );
+                idx += 1;
+            }
+        }
+    }
 }
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../interfaces/IGatewayView.sol";
-import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import "../../interfaces/aave/IPoolAddressProvider.sol";
 import "../../interfaces/aave/IUiDataProvider.sol";
 import "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import {IERC20} from "@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol";

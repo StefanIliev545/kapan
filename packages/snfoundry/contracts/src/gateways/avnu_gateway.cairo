@@ -104,9 +104,23 @@ pub mod AvnuGateway {
                 // Default values if no context provided
                 (array![], 0, swap.user)
             };
-
+            
             // Call Avnu's swap_exact_token_to for exact output
             // For exact out: we want exactly `exact_out` amount of buy_token, willing to spend up to `max_in` of sell_token
+            // DEBUG: serialize and print calldata that will be sent to swap_exact_token_to
+            let mut _debug_calldata = array![];
+            let _debug_beneficiary = get_contract_address();
+            Serde::serialize(@swap.token_in, ref _debug_calldata);
+            Serde::serialize(@swap.max_in, ref _debug_calldata);
+            Serde::serialize(@swap.max_in, ref _debug_calldata);
+            Serde::serialize(@swap.token_out, ref _debug_calldata);
+            Serde::serialize(@swap.exact_out, ref _debug_calldata);
+            Serde::serialize(@_debug_beneficiary, ref _debug_calldata);
+            Serde::serialize(@_integrator_fee_amount_bps, ref _debug_calldata);
+            Serde::serialize(@_integrator_fee_recipient, ref _debug_calldata);
+            Serde::serialize(@routes, ref _debug_calldata);
+            println!("DEBUG: swap_exact_token_to calldata: {:?}", _debug_calldata.span());
+
             let success = self.router.read().swap_exact_token_to(
                 swap.token_in,           // sell_token_address
                 swap.max_in,             // sell_token_amount (max amount we're willing to spend)
@@ -126,6 +140,7 @@ pub mod AvnuGateway {
             // Refund any leftover token_in back to the caller
             let in_balance = erc20.balance_of(get_contract_address());
             if in_balance > 0 {
+                println!("DEBUG: Refunding {:?} to caller", in_balance);
                 assert(erc20.transfer(get_caller_address(), in_balance), 'refund failed');
             }
 

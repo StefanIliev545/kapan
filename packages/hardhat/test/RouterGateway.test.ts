@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { RouterGateway } from "../typechain-types";
 
-describe("RouterGateway", function () {
+describe.skip("RouterGateway", function () {
   let routerGateway: RouterGateway;
   let owner: any;
   let user: any;

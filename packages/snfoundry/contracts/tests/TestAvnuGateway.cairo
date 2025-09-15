@@ -162,7 +162,6 @@ fn test_avnu_swap_exact_out() {
     // Create Avnu context with routes from the ETH→USDC quote
     // Note: Routes are recursive/branching in JSON but we just pick one path (Ekubo)
     let mut routes = array![];
-    
     // Ekubo route (97% of the swap) - from original ETH→USDC quote
     let mut ekubo_params: Array<felt252> = array![];
     ekubo_params.append(eth.into()); // token0
@@ -177,7 +176,7 @@ fn test_avnu_swap_exact_out() {
         exchange_address: contract_address_const::<0x5dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b>(), // Ekubo Core
         sell_token: eth,
         buy_token: usdc,
-        percent: 9700, // 97% (9700 basis points)
+        percent: 1000000000000, // We use 12 decimals precision, 100%
         additional_swap_params: ekubo_params,
     });
     

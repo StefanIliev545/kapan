@@ -3,10 +3,9 @@ pragma solidity ^0.8.0;
 
 import "../interfaces/ILendingGateway.sol";
 import "../../gateways/ProtocolGateway.sol";
-import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import "../../interfaces/aave/IUiDataProvider.sol";
-import "@aave/core-v3/contracts/interfaces/IPool.sol";
-import "@aave/core-v3/contracts/interfaces/IAToken.sol";
+import "../../interfaces/aave/IPoolAddressProvider.sol";
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IERC20} from "@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol";
 import {SafeERC20} from "@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -28,6 +27,67 @@ contract AaveGateway is ILendingGateway, ProtocolGateway, ReentrancyGuard {
         poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
         uiPoolDataProvider = IUiPoolDataProviderV3(_uiPoolDataProvider);
         REFERRAL_CODE = _referralCode;
+    }
+
+    // --------- Approvals encoding (v1 parity) ---------
+    function getAuthorizationsForInstructions(LendingInstruction[] calldata instructions)
+        external
+        view
+        override
+        returns (address[] memory targets, bytes[] memory calldatas)
+    {
+        uint256 count = 0;
+        // First pass: count approvals
+        for (uint256 i = 0; i < instructions.length; i++) {
+            LendingInstruction calldata ins = instructions[i];
+            if (ins.instructionType == InstructionType.Deposit || ins.instructionType == InstructionType.Repay) {
+                // ERC20 approve to ROUTER
+                count += 1;
+            } else if (ins.instructionType == InstructionType.Borrow) {
+                // approveDelegation on variable debt token to this gateway
+                (, address variableDebtToken, bool found) = _getReserveAddresses(ins.basic.token);
+                if (found && variableDebtToken != address(0)) {
+                    count += 1;
+                }
+            }
+        }
+
+        targets = new address[](count);
+        calldatas = new bytes[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < instructions.length; i++) {
+            LendingInstruction calldata ins = instructions[i];
+            if (ins.instructionType == InstructionType.Deposit) {
+                targets[idx] = ins.basic.token;
+                calldatas[idx] = abi.encodeWithSelector(
+                    IERC20.approve.selector,
+                    ROUTER,
+                    ins.basic.amount
+                );
+                idx += 1;
+            } else if (ins.instructionType == InstructionType.Repay) {
+                targets[idx] = ins.basic.token;
+                uint256 approveAmount = ins.repayAll ? type(uint256).max : ins.basic.amount;
+                calldatas[idx] = abi.encodeWithSelector(
+                    IERC20.approve.selector,
+                    ROUTER,
+                    approveAmount
+                );
+                idx += 1;
+            } else if (ins.instructionType == InstructionType.Borrow) {
+                (, address variableDebtToken, bool found) = _getReserveAddresses(ins.basic.token);
+                if (found && variableDebtToken != address(0)) {
+                    targets[idx] = variableDebtToken;
+                    // Align with v1: use max delegation to avoid re-approvals
+                    calldatas[idx] = abi.encodeWithSignature(
+                        "approveDelegation(address,uint256)",
+                        address(this),
+                        type(uint256).max
+                    );
+                    idx += 1;
+                }
+            }
+        }
     }
 
     // --------- Core instruction processing ---------
@@ -78,10 +138,10 @@ contract AaveGateway is ILendingGateway, ProtocolGateway, ReentrancyGuard {
     }
 
     function _deposit(address token, address user, uint256 amount) internal nonReentrant {
-        IPool pool = IPool(poolAddressesProvider.getPool());
+        address pool = poolAddressesProvider.getPool();
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).approve(address(pool), amount);
-        pool.supply(token, amount, user, REFERRAL_CODE);
+        IPool(pool).supply(token, amount, user, REFERRAL_CODE);
     }
 
     function _borrow(address token, address user, uint256 amount) internal nonReentrant returns (uint256 outAmount) {
@@ -112,7 +172,7 @@ contract AaveGateway is ILendingGateway, ProtocolGateway, ReentrancyGuard {
         repaidAmount = amount - refund;
     }
 
-    function _withdraw(address token, address user, uint256 amount, bool withdrawAll)
+    function _withdraw(address token, address /*user*/, uint256 amount, bool withdrawAll)
         internal
         nonReentrant
         returns (uint256 outAmount)

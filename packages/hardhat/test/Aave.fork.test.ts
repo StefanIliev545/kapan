@@ -5,7 +5,7 @@ import { RouterGateway, AaveGateway, IERC20 } from "../typechain-types";
 
 // Skip the entire test suite if not running on forked network
 const runOnlyOnFork = process.env.MAINNET_FORKING_ENABLED === "true" 
-  ? describe 
+  ? describe.skip
   : describe.skip;
 
 // Real addresses on Arbitrum

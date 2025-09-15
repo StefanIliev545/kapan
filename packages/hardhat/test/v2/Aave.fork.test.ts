@@ -14,7 +14,6 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
   let aaveGateway: any;
   let aaveView: any;
   let usdc: any;
-  let weth: any;
   let richSigner: any;
   let user: HDNodeWallet;
 
@@ -29,7 +28,7 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
     richSigner = await ethers.getSigner(RICH_ACCOUNT);
 
     usdc = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", USDC_ADDRESS);
-    weth = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", WETH_ADDRESS);
+    // No direct weth contract needed; approvals are executed via router-provided calldatas
 
     const transferAmount = ethers.parseUnits("2000", 6);
     await usdc.connect(richSigner).transfer(await user.getAddress(), transferAmount);
@@ -70,7 +69,30 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
     const userAddress = await user.getAddress();
     const depositAmount = ethers.parseUnits("1000", 6);
 
-    await usdc.connect(user).approve(await router.getAddress(), depositAmount);
+    // Approvals for deposit
+    {
+      const approvals = await router
+        .connect(user)
+        .getAuthorizationsForInstructions([
+          {
+            protocolName: "aave",
+            instructions: [
+              {
+                instructionType: 0,
+                basic: { token: USDC_ADDRESS, amount: depositAmount, user: userAddress },
+                repayAll: false,
+                withdrawAll: false,
+              },
+            ],
+          },
+        ]);
+      const targets: string[] = approvals[0];
+      const datas: string[] = approvals[1];
+      for (let i = 0; i < targets.length; i++) {
+        await user.sendTransaction({ to: targets[i], data: datas[i] });
+      }
+    }
+
     await router.connect(user).processProtocolInstructions([
       {
         protocolName: "aave",
@@ -87,19 +109,30 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
 
     expect(await routerView.getBalance("aave", USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
 
-    const providerAddr = await aaveGateway.poolAddressesProvider();
-    const provider = await ethers.getContractAt("IPoolAddressesProvider", providerAddr);
-    const poolAddr = await provider.getPool();
-    const pool = await ethers.getContractAt("IPool", poolAddr);
-    const reserveData = await pool.getReserveData(WETH_ADDRESS);
-    const debtToken = await ethers.getContractAt(
-      ["function approveDelegation(address,uint256)"],
-      reserveData.variableDebtTokenAddress,
-      user,
-    );
-
     const borrowAmount = ethers.parseUnits("0.01", 18);
-    await debtToken.approveDelegation(await aaveGateway.getAddress(), borrowAmount);
+    // Approvals for borrow
+    {
+      const approvals = await router
+        .connect(user)
+        .getAuthorizationsForInstructions([
+          {
+            protocolName: "aave",
+            instructions: [
+              {
+                instructionType: 1,
+                basic: { token: WETH_ADDRESS, amount: borrowAmount, user: userAddress },
+                repayAll: false,
+                withdrawAll: false,
+              },
+            ],
+          },
+        ]);
+      const targets: string[] = approvals[0];
+      const datas: string[] = approvals[1];
+      for (let i = 0; i < targets.length; i++) {
+        await user.sendTransaction({ to: targets[i], data: datas[i] });
+      }
+    }
 
     await router.connect(user).processProtocolInstructions([
       {
@@ -115,7 +148,29 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
       },
     ]);
 
-    await weth.connect(user).approve(await router.getAddress(), borrowAmount);
+    // Approvals for repayAll
+    {
+      const approvals = await router
+        .connect(user)
+        .getAuthorizationsForInstructions([
+          {
+            protocolName: "aave",
+            instructions: [
+              {
+                instructionType: 2,
+                basic: { token: WETH_ADDRESS, amount: borrowAmount, user: userAddress },
+                repayAll: true,
+                withdrawAll: false,
+              },
+            ],
+          },
+        ]);
+      const targets: string[] = approvals[0];
+      const datas: string[] = approvals[1];
+      for (let i = 0; i < targets.length; i++) {
+        await user.sendTransaction({ to: targets[i], data: datas[i] });
+      }
+    }
     await router.connect(user).processProtocolInstructions([
       {
         protocolName: "aave",
