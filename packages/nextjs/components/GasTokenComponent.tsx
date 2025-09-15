@@ -23,17 +23,26 @@ interface GasToken {
   icon: string;
   address: string;
   balance: string;
+  isSelectable: boolean;
 }
 
-// Get token icon with fallback to question mark
+// Tokens that have PNG logos instead of SVGs
+const pngLogoMap: Record<string, string> = {
+  ekubo: "/logos/ekubo.png",
+  zend: "/logos/zend.png",
+  dog: "/logos/dog.png",
+  cash: "/logos/cash.png",
+  brother: "/logos/brother.avif",
+  sway: "/logos/sway.avif",
+};
+
+// Get token icon with PNG overrides and fallback to question mark
 const getTokenIcon = (tokenName: string): string => {
-  if (!tokenName) return "/logos/question-mark.svg";
-  
-  try {
-    return tokenNameToLogo(tokenName);
-  } catch {
-    return "/logos/question-mark.svg";
-  }
+  if (!tokenName) return "/logos/x-logo.svg";
+  const key = tokenName.toLowerCase().trim();
+  const png = pngLogoMap[key];
+  if (png) return png;
+  return tokenNameToLogo(key);
 };
 
 export const GasTokenComponent: FC<GasTokenComponentProps> = ({
@@ -57,7 +66,7 @@ export const GasTokenComponent: FC<GasTokenComponentProps> = ({
   const { data: symbolRaw, error: symbolError, isLoading: symbolLoading } = useReadContract({
     address: address as `0x${string}`,
     abi: universalErc20Abi,
-    functionName: "symbol",
+functionName: "symbol",
     args: [],
   });
 
@@ -99,17 +108,27 @@ export const GasTokenComponent: FC<GasTokenComponentProps> = ({
       return 0n;
     };
 
-    const name = decodeFelt(nameRaw) || "";
-    const symbol = decodeFelt(symbolRaw) || name || "";
+    let name = decodeFelt(nameRaw) || "";
+    let symbol = decodeFelt(symbolRaw) || name || "";
+    const normalizedAddress = (address || "").toLowerCase();
+    if (normalizedAddress === "0x040e81cfeb176bfdbc5047bbc55eb471cfab20a6b221f38d8fda134e1bfffca4") {
+      name = "dog";
+      symbol = "dog";
+    }
+    const isNameMissing = !name || name.trim() === "";
     const balanceBig = balanceRaw ? toBigInt(balanceRaw) : 0n;
     const formattedBalance = formatTokenAmount(balanceBig.toString(), decimals);
 
+    const finalName = isNameMissing ? "unknown" : (name || symbol || "Token");
+    const finalSymbol = isNameMissing ? "unknown" : (symbol || name || "TKN");
+
     return {
-      name: name || symbol || "Token",
-      symbol: symbol || name || "TKN",
-      icon: getTokenIcon(symbol || name || "tkn"),
+      name: finalName,
+      symbol: finalSymbol,
+      icon: getTokenIcon(finalSymbol || finalName || "tkn"),
       address,
       balance: formattedBalance,
+      isSelectable: !isNameMissing,
     };
   }, [nameRaw, symbolRaw, balanceRaw, address, decimals]);
 
@@ -164,15 +183,16 @@ export const GasTokenComponent: FC<GasTokenComponentProps> = ({
   return (
     <motion.button
       className={`
-        flex flex-col items-center p-2 rounded-lg border transition-all duration-200 hover:scale-[1.02]
+        flex flex-col items-center p-2 rounded-lg border transition-all duration-200 ${token.isSelectable ? 'hover:scale-[1.02]' : ''}
         ${isSelected 
           ? 'bg-primary/10 border-primary/30 shadow-sm' 
-          : 'bg-base-200 border-base-300/30 hover:bg-base-300'
+          : token.isSelectable ? 'bg-base-200 border-base-300/30 hover:bg-base-300' : 'bg-base-200 border-base-300/30 opacity-60 cursor-not-allowed'
         }
       `}
-      onClick={handleSelect}
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.98 }}
+      onClick={token.isSelectable ? handleSelect : undefined}
+      disabled={!token.isSelectable}
+      whileHover={token.isSelectable ? { y: -1 } : undefined}
+      whileTap={token.isSelectable ? { scale: 0.98 } : undefined}
     >
       {/* Token Icon */}
       <div className="w-6 h-6 relative mb-1">
@@ -183,7 +203,7 @@ export const GasTokenComponent: FC<GasTokenComponentProps> = ({
           className="object-contain"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            target.src = '/logos/question-mark.svg';
+            target.src = '/logos/x-logo.svg';
           }}
         />
       </div>
