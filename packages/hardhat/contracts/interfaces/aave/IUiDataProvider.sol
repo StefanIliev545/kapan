@@ -2,7 +2,7 @@
 pragma solidity ^0.8.10;
 
 import {IPoolAddressesProvider} from './IPoolAddressesProvider.sol';
-import {DataTypes} from './DataTypes.sol';
+import {DataTypes} from '@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol';
 
 interface IUiPoolDataProviderV3 {
   struct AggregatedReserveData {
