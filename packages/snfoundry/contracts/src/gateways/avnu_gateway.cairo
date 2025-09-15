@@ -120,7 +120,6 @@ pub mod AvnuGateway {
                 routes,                  // routes from AvnuContext
             );
 
-            println!("DEBUG: Avnu swap exact token to success: {:?}", success);
 
             assert(success, 'avnu swap failed');
 
@@ -136,8 +135,6 @@ pub mod AvnuGateway {
                 assert(out_erc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
             
-            println!("DEBUG: Refunding {:?} to caller", in_balance);
-            println!("DEBUG: Paying out {:?} to caller", out_balance);
             (in_balance, out_balance)
         }
 
@@ -190,7 +187,6 @@ pub mod AvnuGateway {
                 assert(out_erc20.transfer(get_caller_address(), out_balance), 'refund failed');
             }
             
-            println!("DEBUG: Refunding {:?} to caller", in_balance);
             (in_balance, out_balance)
         }
     }
