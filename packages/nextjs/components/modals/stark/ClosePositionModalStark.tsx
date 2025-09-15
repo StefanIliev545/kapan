@@ -124,7 +124,11 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       Borrow: undefined,
       Repay: undefined,
       Withdraw: {
-        basic: { token: collateral.address, amount: uint256.bnToUint256(collateralBalance), user: address },
+        basic: { 
+          token: collateral.address, 
+          amount: uint256.bnToUint256(collateralBalance + (collateralBalance / 100n)), // add 1% on top
+          user: address 
+        },
         withdraw_all: true,
         context: withdrawContext,
       },
