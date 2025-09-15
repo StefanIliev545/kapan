@@ -3,6 +3,8 @@ export * from "./useDeployedContractInfo";
 export * from "./useNetworkColor";
 export * from "./useAnimationConfig";
 export * from "./useTransactor";
+export * from "./usePaymasterTransactor";
+export * from "./useSmartTransactor";
 export * from "./useAutoConnect";
 export * from "./useSwitchNetwork";
 export * from "./useScaffoldReadContract";

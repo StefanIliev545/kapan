@@ -19,15 +19,16 @@ import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
 import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
 import { StarkBlockNumberProvider, useAutoConnect } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
-import provider from "~~/services/web3/provider";
+import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
+import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
   useAutoConnect();
 
   return (
-    <>
+    <SelectedGasTokenProvider>
       <div className={`flex flex-col min-h-screen `}>
         <Header />
         <main className="relative flex flex-col flex-1">{children}</main>
@@ -35,7 +36,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
       </div>
       <FloatingSocials />
       <Toaster />
-    </>
+    </SelectedGasTokenProvider>
   );
 };
 
@@ -73,6 +74,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     <StarknetConfig
       chains={appChains}
       provider={provider}
+      paymasterProvider={paymasterProvider}
       connectors={connectorsRef.current ?? []}
       explorer={starkscan}
       autoConnect={true}
