@@ -38,7 +38,7 @@ const pngLogoMap: Record<string, string> = {
 
 // Get token icon with PNG overrides and fallback to question mark
 const getTokenIcon = (tokenName: string): string => {
-  if (!tokenName) return "/logos/kapan.svg";
+  if (!tokenName) return "/logos/x-logo.svg";
   const key = tokenName.toLowerCase().trim();
   const png = pngLogoMap[key];
   if (png) return png;
@@ -203,7 +203,7 @@ functionName: "symbol",
           className="object-contain"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            target.src = '/logos/question-mark.svg';
+            target.src = '/logos/x-logo.svg';
           }}
         />
       </div>
