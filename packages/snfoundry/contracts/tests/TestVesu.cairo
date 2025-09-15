@@ -144,7 +144,7 @@ fn perform_deposit(ref context: TestContext, amount: u256) -> u256 {
 
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     // Return initial balance for verification
     initial_balance
@@ -174,7 +174,7 @@ fn perform_withdrawal(ref context: TestContext, amount: u256) -> u256 {
 
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Withdraw(withdraw)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     // Return initial balance for verification
     initial_balance
@@ -237,7 +237,7 @@ fn test_borrow() {
     println!("borrowing!");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Borrow(borrow)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     let current_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
     println!("usdc balance: {}", current_usdc_balance);
@@ -278,7 +278,7 @@ fn test_repay() {
     println!("borrowing!");
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Borrow(borrow)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     let initial_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
     println!("usdc balance after borrow: {}", initial_usdc_balance);
@@ -299,7 +299,7 @@ fn test_repay() {
 
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Repay(repay)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     let final_usdc_balance = usdcERC20.balance_of(USER_ADDRESS());
     println!("usdc balance after repay: {}", final_usdc_balance);
@@ -332,7 +332,7 @@ fn test_get_all_positions() {
     modify_delegation(SINGLETON_ADDRESS(), USER_ADDRESS(), context.gateway_address, true);
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Borrow(borrow)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     // Create another ETH deposit position since borrowing moved the collateral
     let eth_amount_2 = 3000000000000000000; // 3 ETH
@@ -353,7 +353,7 @@ fn test_get_all_positions() {
 
     cheat_caller_address(context.gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
     let instructions = array![LendingInstruction::Deposit(usdc_deposit)];
-    context.gateway_dispatcher.process_instructions(instructions.span());
+    let _ = context.gateway_dispatcher.process_instructions(instructions.span());
 
     // Get all positions
     let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };

@@ -68,7 +68,7 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
     const balancerV3Vault = process.env.BALANCER_VAULT3 || ethers.ZeroAddress;
     const balancerV2Vault = process.env.BALANCER_VAULT2 || ethers.ZeroAddress;
     router = (await ethers.deployContract(
-      "RouterGateway",
+      "contracts/RouterGateway.sol:RouterGateway",
       [balancerV3Vault, balancerV2Vault, await user.getAddress()],
       richSigner,
     )) as RouterGateway;
@@ -77,7 +77,7 @@ runOnlyOnFork("VenusGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :for
     // Deploy VenusGateway
     console.log("Deploying VenusGateway...");
     venusGateway = (await ethers.deployContract(
-      "VenusGateway",
+      "contracts/gateways/VenusGateway.sol:VenusGateway",
       [COMPTROLLER_ADDRESS, VENUS_ORACLE_ADDRESS, await router.getAddress()],
       richSigner,
     )) as VenusGateway;

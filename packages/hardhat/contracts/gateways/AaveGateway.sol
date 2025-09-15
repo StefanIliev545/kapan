@@ -3,13 +3,13 @@ pragma solidity ^0.8.0;
 
 import { ProtocolGateway } from "./ProtocolGateway.sol";
 import { IGateway } from "../interfaces/IGateway.sol";
-import { IPoolAddressesProvider } from "../interfaces/aave/IPoolAddressesProvider.sol";
+import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import { IUiPoolDataProviderV3 } from "../interfaces/aave/IUiDataProvider.sol";
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@aave/core-v3/contracts/dependencies/openzeppelin/contracts/IERC20.sol";
+import { SafeERC20 } from "@aave/core-v3/contracts/dependencies/openzeppelin/contracts/SafeERC20.sol";
+import { ERC20 } from "@aave/core-v3/contracts/dependencies/openzeppelin/contracts/ERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IPoolDataProvider } from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 

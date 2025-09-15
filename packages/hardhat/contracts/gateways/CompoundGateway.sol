@@ -3,8 +3,8 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "../interfaces/IGateway.sol";
 import "../interfaces/ICompoundComet.sol";
-import {FeedRegistryInterface} from "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
-import {Denominations} from "@chainlink/contracts/src/v0.8/Denominations.sol";
+import {FeedRegistryInterface} from "../interfaces/chainlink/FeedRegistryInterface.sol";
+import {Denominations} from "../interfaces/chainlink/Denominations.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

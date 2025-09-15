@@ -60,7 +60,7 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
     const balancerV3Vault = process.env.BALANCER_VAULT3 || ethers.ZeroAddress;
     const balancerV2Vault = process.env.BALANCER_VAULT2 || ethers.ZeroAddress;
     router = (await ethers.deployContract(
-      "RouterGateway",
+      "contracts/RouterGateway.sol:RouterGateway",
       [balancerV3Vault, balancerV2Vault, await user.getAddress()],
       richSigner,
     )) as RouterGateway;
@@ -71,7 +71,7 @@ runOnlyOnFork("CompoundGateway: Deposit, Withdraw & Borrow (Forked & Deployed) :
     const wethComet = process.env.COMPOUND_WETH_COMET || ethers.ZeroAddress;
     const priceFeed = process.env.CHAINLINK_FEED_REGISTRY || ethers.ZeroAddress;
     compoundGateway = (await ethers.deployContract(
-      "CompoundGateway",
+      "contracts/gateways/CompoundGateway.sol:CompoundGateway",
       [await router.getAddress(), [comet, wethComet], priceFeed, await user.getAddress()],
       richSigner,
     )) as CompoundGateway;
