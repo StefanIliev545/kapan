@@ -11,6 +11,7 @@ import {
   uint256,
 } from "starknet";
 import { fetchBuildExecuteTransaction, fetchQuotes } from "@avnu/avnu-sdk";
+import type { Quote } from "@avnu/avnu-sdk";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { useLendingAuthorizations } from "~~/hooks/useLendingAuthorizations";
 import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
@@ -47,6 +48,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [avnuCalldata, setAvnuCalldata] = useState<bigint[]>([]);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   useEffect(() => {
     if (!isOpen || !address) return;
@@ -63,6 +65,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         if (quotes.length === 0) {
           throw new Error("no avnu quote");
         }
+        if (!cancelled) setSelectedQuote(quotes[0]);
         const tx = await fetchBuildExecuteTransaction(
           quotes[0].quoteId,
           address,
@@ -74,7 +77,10 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
           setAvnuCalldata(calldata.map((c: any) => BigInt(c.toString())));
       } catch (e) {
         console.error("failed to fetch avnu calldata", e);
-        if (!cancelled) setAvnuCalldata([]);
+        if (!cancelled) {
+          setAvnuCalldata([]);
+          setSelectedQuote(null);
+        }
       }
     };
     fetchCalldata();
@@ -216,50 +222,119 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   );
   const formattedDebt = formatTokenAmount(debtBalance.toString(), debt.decimals);
 
+  const formatUsd = (value?: number) => {
+    if (value === undefined || value === null) return "-";
+    try {
+      return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+    } catch {
+      return `$${value.toFixed(2)}`;
+    }
+  };
+
+  const remainderInfo = useMemo(() => {
+    if (!selectedQuote) return null;
+    const used = selectedQuote.sellAmount;
+    const remainder = collateralBalance > used ? collateralBalance - used : 0n;
+    const remainderFormatted = formatTokenAmount(remainder.toString(), collateral.decimals);
+    const sellUnits = parseFloat(formatTokenAmount(selectedQuote.sellAmount.toString(), collateral.decimals));
+    const remainderUnits = parseFloat(remainderFormatted);
+    let remainderUsd: number | undefined = undefined;
+    if (sellUnits > 0) {
+      remainderUsd = (selectedQuote.sellAmountInUsd || 0) * (remainderUnits / sellUnits);
+    } else if (selectedQuote.sellTokenPriceInUsd !== undefined) {
+      remainderUsd = remainderUnits * (selectedQuote.sellTokenPriceInUsd as number);
+    }
+    return { remainder, remainderFormatted, remainderUsd };
+  }, [selectedQuote, collateralBalance, collateral.decimals]);
+
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md">
-      <div className="p-6 space-y-4">
-        <h3 className="text-lg font-bold">Close Position</h3>
-        <div className="flex justify-between items-start">
-          <div className="flex flex-col items-start">
-            <div className="flex items-center gap-2">
-              <Image
-                src={collateral.icon}
-                alt={collateral.name}
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="font-medium">{collateral.name}</span>
+    <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
+      <div className="space-y-3">
+        <h3 className="text-xl font-semibold">Close position with collateral</h3>
+        {selectedQuote ? (
+          <>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Image src={collateral.icon} alt={collateral.name} width={24} height={24} className="w-6 h-6" />
+                  <div>
+                    <div className="text-base font-medium">
+                      {formatTokenAmount(selectedQuote.sellAmount.toString(), collateral.decimals)} {collateral.name}
+                    </div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
+                  </div>
+                </div>
+                <div className="text-gray-400">→</div>
+                <div className="flex items-center gap-2">
+                  <Image src={debt.icon} alt={debt.name} width={24} height={24} className="w-6 h-6" />
+                  <div className="text-right">
+                    <div className="text-base font-medium">
+                      {formatTokenAmount(selectedQuote.buyAmount.toString(), debt.decimals)} {debt.name}
+                    </div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1 pt-2 border-t border-gray-100">
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">AVNU fee</span>
+                  <span>
+                    {formatTokenAmount(selectedQuote.avnuFees.toString(), debt.decimals)} {debt.name}
+                    <span className="text-gray-500"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
+                  </span>
+                </div>
+                {selectedQuote.integratorFees > 0n && (
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-gray-600">Integrator fee</span>
+                    <span>
+                      {formatTokenAmount(selectedQuote.integratorFees.toString(), debt.decimals)} {debt.name}
+                      <span className="text-gray-500"> · {formatUsd(selectedQuote.integratorFeesInUsd)}</span>
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">Network fee</span>
+                  <span className="text-gray-700">{formatUsd(selectedQuote.gasFeesInUsd)}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">Total fees (USD)</span>
+                  <span className="text-gray-700">
+                    {formatUsd(
+                      (selectedQuote.avnuFeesInUsd || 0) +
+                        (selectedQuote.integratorFeesInUsd || 0) +
+                        (selectedQuote.gasFeesInUsd || 0),
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-600">Fees in {debt.name}</span>
+                  <span className="text-gray-700">
+                    {formatTokenAmount(
+                      (selectedQuote.buyAmountWithoutFees - selectedQuote.buyAmount).toString(),
+                      debt.decimals,
+                    )} {debt.name}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span className="text-sm text-gray-500">
-              {formattedCollateral} {collateral.name}
-            </span>
-          </div>
-          <div className="flex flex-col items-end">
-            <div className="flex items-center gap-2">
-              <Image
-                src={debt.icon}
-                alt={debt.name}
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="font-medium">{debt.name}</span>
+            <div className="pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] text-gray-600">Withdraw</span>
+                <div className="flex items-center gap-2">
+                  <Image src={collateral.icon} alt={collateral.name} width={20} height={20} className="w-5 h-5" />
+                  <div className="text-right">
+                    <div className="text-base font-medium">{remainderInfo?.remainderFormatted} {collateral.name}</div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(remainderInfo?.remainderUsd)}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <span className="text-sm text-gray-500">
-              {formattedDebt} {debt.name}
-            </span>
-          </div>
-        </div>
-        <p className="text-sm">
-          Repay your {debt.name} debt using {collateral.name} collateral via AVNU swap.
-        </p>
-        <div className="mt-6 flex justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleClosePosition}>
+          </>
+        ) : (
+          <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
+        )}
+        <div className="mt-4 flex justify-end">
+          <button className="btn btn-primary btn-sm" onClick={handleClosePosition}>
             Close Position
           </button>
         </div>
