@@ -25,15 +25,21 @@ interface GasToken {
   balance: string;
 }
 
-// Get token icon with fallback to question mark
+// Tokens that have PNG logos instead of SVGs
+const pngLogoMap: Record<string, string> = {
+  ekubo: "/logos/ekubo.png",
+  zend: "/logos/zend.png",
+  dog: "/logos/dog.png",
+  cash: "/logos/cash.png",
+};
+
+// Get token icon with PNG overrides and fallback to question mark
 const getTokenIcon = (tokenName: string): string => {
   if (!tokenName) return "/logos/question-mark.svg";
-  
-  try {
-    return tokenNameToLogo(tokenName);
-  } catch {
-    return "/logos/question-mark.svg";
-  }
+  const key = tokenName.toLowerCase().trim();
+  const png = pngLogoMap[key];
+  if (png) return png;
+  return tokenNameToLogo(key);
 };
 
 export const GasTokenComponent: FC<GasTokenComponentProps> = ({
@@ -57,7 +63,7 @@ export const GasTokenComponent: FC<GasTokenComponentProps> = ({
   const { data: symbolRaw, error: symbolError, isLoading: symbolLoading } = useReadContract({
     address: address as `0x${string}`,
     abi: universalErc20Abi,
-    functionName: "symbol",
+functionName: "symbol",
     args: [],
   });
 

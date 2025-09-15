@@ -233,8 +233,7 @@ export const tokenNameToLogo = (tokenName: string) => {
     // stupid shit
     return "/logos/usdt.svg";
   }
-  // Route with svg->png->fallback resolution
-  return `/api/logo/${tokenName.toLowerCase()}`;
+  return `/logos/${tokenName.toLowerCase()}.svg`;
 };
 
 export const ERC20ABI = [
