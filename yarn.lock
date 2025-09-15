@@ -4630,6 +4630,7 @@ __metadata:
     gray-matter: ^4.0.3
     heatmap.js: ^2.0.5
     lodash.merge: ^4.6.2
+    moment: ^2.30.1
     next: ^15.2.4
     next-mdx-remote: ^5.0.0
     next-nprogress-bar: ~2.3.13
@@ -4638,6 +4639,7 @@ __metadata:
     postcss: ~8.4.45
     prettier: ~3.3.3
     qrcode.react: ~4.0.1
+    qs: ^6.13.1
     react: ~18.3.1
     react-copy-to-clipboard: ^5.1.0
     react-dom: ~18.3.1
@@ -16683,6 +16685,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"moment@npm:^2.30.1":
+  version: 2.30.1
+  resolution: "moment@npm:2.30.1"
+  checksum: 859236bab1e88c3e5802afcf797fc801acdbd0ee509d34ea3df6eea21eb6bcc2abd4ae4e4e64aa7c986aa6cba563c6e62806218e6412a765010712e5fa121ba6
+  languageName: node
+  linkType: hard
+
 "motion-dom@npm:^12.23.12":
   version: 12.23.12
   resolution: "motion-dom@npm:12.23.12"
@@ -18463,7 +18472,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"qs@npm:^6.14.0, qs@npm:^6.4.0, qs@npm:^6.9.4":
+"qs@npm:^6.13.1, qs@npm:^6.14.0, qs@npm:^6.4.0, qs@npm:^6.9.4":
   version: 6.14.0
   resolution: "qs@npm:6.14.0"
   dependencies:

@@ -7,7 +7,7 @@ import {
 import { green, red } from "./helpers/colorize-log";
 import { CallData, constants } from "starknet";
 
-const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
+const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string, avnuGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -34,6 +34,17 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
       router: routerGatewayAddress,
       owner: deployer.address,
       supported_assets: supportedAssets,
+    },
+  });
+
+  // Deploy AvnuGateway
+  const { address: avnuGatewayAddress } = await deployContract({
+    contract: "AvnuGateway",
+    constructorArgs: {
+      router: "0x04270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f", // Avnu mainnet router (same as forking tests)
+      owner: "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_recipient: "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_bps: 0,
     },
   });
 
@@ -71,7 +82,7 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
 
 
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress };
+  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress, avnuGatewayAddress };
 };
 
 const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
@@ -145,7 +156,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
   return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress };
 };
 
-const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string}): Promise<void> => {
+const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string, avnuGatewayAddress: string}): Promise<void> => {
 
   const nonce = await deployer.getNonce();
 
@@ -309,6 +320,14 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
       calldata: [
         "vesu",
         addresses.vesuGatewayAddress,
+      ]
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "avnu",
+        addresses.avnuGatewayAddress,
       ]
     },
     {
