@@ -72,11 +72,10 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     console.log("Balancer V3 Vault:", balancerV3Vault);
     console.log("Balancer V2 Vault:", balancerV2Vault);
 
-    router = (await ethers.deployContract("RouterGateway", [
-      balancerV3Vault,
-      balancerV2Vault,
-      userAddress,
-    ])) as RouterGateway;
+    router = (await ethers.deployContract(
+      "contracts/RouterGateway.sol:RouterGateway",
+      [balancerV3Vault, balancerV2Vault, userAddress],
+    )) as RouterGateway;
     console.log("RouterGateway deployed to:", await router.getAddress());
 
     // Deploy AaveGateway
@@ -84,12 +83,15 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     const aaveUiPoolDataProvider = process.env.AAVE_UI_POOL_DATA_PROVIDER || ethers.ZeroAddress;
     const aaveReferralCode = process.env.AAVE_REFERRAL_CODE || "0";
 
-    aaveGateway = (await ethers.deployContract("AaveGateway", [
-      await router.getAddress(),
-      aavePoolAddressesProvider,
-      aaveUiPoolDataProvider,
-      aaveReferralCode,
-    ])) as AaveGateway;
+    aaveGateway = (await ethers.deployContract(
+      "contracts/gateways/AaveGateway.sol:AaveGateway",
+      [
+        await router.getAddress(),
+        aavePoolAddressesProvider,
+        aaveUiPoolDataProvider,
+        aaveReferralCode,
+      ],
+    )) as AaveGateway;
     console.log("AaveGateway deployed to:", await aaveGateway.getAddress());
 
     // Deploy CompoundGateway
@@ -97,12 +99,10 @@ runOnlyOnFork("Debt Movement Integration Tests :fork", function () {
     const compoundWethComet = process.env.COMPOUND_WETH_COMET || ethers.ZeroAddress;
     const chainlinkFeedRegistry = process.env.CHAINLINK_FEED_REGISTRY || ethers.ZeroAddress;
 
-    compoundGateway = (await ethers.deployContract("CompoundGateway", [
-      await router.getAddress(),
-      [compoundUsdcComet, compoundWethComet],
-      chainlinkFeedRegistry,
-      userAddress,
-    ])) as CompoundGateway;
+    compoundGateway = (await ethers.deployContract(
+      "contracts/gateways/CompoundGateway.sol:CompoundGateway",
+      [await router.getAddress(), [compoundUsdcComet, compoundWethComet], chainlinkFeedRegistry, userAddress],
+    )) as CompoundGateway;
     console.log("CompoundGateway deployed to:", await compoundGateway.getAddress());
 
     // Register gateways with the router
