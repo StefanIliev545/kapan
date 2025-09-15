@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import "../interfaces/ILendingGateway.sol";
-import "../interfaces/IGatewayView.sol";
 import "../../gateways/ProtocolGateway.sol";
 import "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import "../../interfaces/aave/IUiDataProvider.sol";
@@ -16,7 +15,7 @@ interface DebtToken {
     function borrowAllowance(address user, address spender) external view returns (uint256);
 }
 
-contract AaveGateway is ILendingGateway, IGatewayView, ProtocolGateway, ReentrancyGuard {
+contract AaveGateway is ILendingGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IPoolAddressesProvider public immutable poolAddressesProvider;
@@ -123,67 +122,6 @@ contract AaveGateway is ILendingGateway, IGatewayView, ProtocolGateway, Reentran
         pool.withdraw(token, withdrawAmount, address(this));
         outAmount = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransfer(msg.sender, outAmount);
-    }
-
-    // --------- View functions ---------
-    function getBalance(address token, address user) external view override returns (uint256) {
-        (address aToken,, bool found) = _getReserveAddresses(token);
-        if (found && aToken != address(0)) {
-            try IERC20(aToken).balanceOf(user) returns (uint256 bal) {
-                return bal;
-            } catch {}
-        }
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) =
-            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
-        for (uint256 i = 0; i < userReserves.length; i++) {
-            if (userReserves[i].underlyingAsset == token) {
-                return userReserves[i].scaledATokenBalance;
-            }
-        }
-        return 0;
-    }
-
-    function getBorrowBalance(address token, address user) public view override returns (uint256) {
-        (, address variableDebtToken, bool found) = _getReserveAddresses(token);
-        if (found && variableDebtToken != address(0)) {
-            try IERC20(variableDebtToken).balanceOf(user) returns (uint256 bal) {
-                return bal;
-            } catch {}
-        }
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) =
-            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
-        for (uint256 i = 0; i < userReserves.length; i++) {
-            if (userReserves[i].underlyingAsset == token) {
-                return userReserves[i].scaledVariableDebt;
-            }
-        }
-        return 0;
-    }
-
-    function getBorrowRate(address token) external view override returns (uint256, bool) {
-        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) =
-            uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        for (uint256 i = 0; i < reserves.length; i++) {
-            if (reserves[i].underlyingAsset == token) {
-                return (reserves[i].variableBorrowRate, true);
-            }
-        }
-        return (0, false);
-    }
-
-    function getSupplyRate(address token) external view override returns (uint256, bool) {
-        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) =
-            uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        for (uint256 i = 0; i < reserves.length; i++) {
-            if (reserves[i].underlyingAsset == token) {
-                return (reserves[i].liquidityRate, true);
-            }
-        }
-        return (0, false);
-    }
-
-    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
-        return getBorrowBalance(token, user);
     }
 
     function _getReserveAddresses(address token) internal view returns (address aToken, address variableDebtToken, bool found) {

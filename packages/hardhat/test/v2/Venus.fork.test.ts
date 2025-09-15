@@ -9,7 +9,9 @@ const USDC_ADDRESS = ethers.getAddress("0xaf88d065e77c8cC2239327C5EDb3A432268e58
 
 runOnlyOnFork("VenusGateway V2: deposit and withdraw :fork", function () {
   let router: any;
+  let routerView: any;
   let venusGateway: any;
+  let venusView: any;
   let usdc: any;
   let richSigner: any;
   let user: HDNodeWallet;
@@ -36,15 +38,27 @@ runOnlyOnFork("VenusGateway V2: deposit and withdraw :fork", function () {
       richSigner,
     );
 
+    routerView = await ethers.deployContract(
+      "contracts/v2/RouterView.sol:RouterView",
+      [await user.getAddress()],
+      richSigner,
+    );
+
     const comptroller = process.env.VENUS_COMPTROLLER || ethers.ZeroAddress;
-    const oracle = process.env.VENUS_ORACLE || ethers.ZeroAddress;
     venusGateway = await ethers.deployContract(
       "contracts/v2/gateways/VenusGateway.sol:VenusGateway",
-      [comptroller, oracle, await router.getAddress()],
+      [await router.getAddress(), comptroller],
+      richSigner,
+    );
+
+    venusView = await ethers.deployContract(
+      "contracts/v2/gateways/VenusGatewayView.sol:VenusGatewayView",
+      [await venusGateway.getAddress()],
       richSigner,
     );
 
     await router.connect(user).addGateway("venus", await venusGateway.getAddress());
+    await routerView.connect(user).addGateway("venus", await venusView.getAddress());
   });
 
   it("should deposit and withdraw all USDC", async function () {
@@ -66,7 +80,7 @@ runOnlyOnFork("VenusGateway V2: deposit and withdraw :fork", function () {
       },
     ]);
 
-    expect(await venusGateway.getBalance(USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
+    expect(await routerView.getBalance("venus", USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
 
     await router.connect(user).processProtocolInstructions([
       {
@@ -82,6 +96,6 @@ runOnlyOnFork("VenusGateway V2: deposit and withdraw :fork", function () {
       },
     ]);
 
-    expect(await venusGateway.getBalance(USDC_ADDRESS, userAddress)).to.equal(0n);
+    expect(await routerView.getBalance("venus", USDC_ADDRESS, userAddress)).to.equal(0n);
   });
 });

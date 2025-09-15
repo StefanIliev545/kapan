@@ -9,7 +9,9 @@ const USDC_ADDRESS = ethers.getAddress("0xaf88d065e77c8cC2239327C5EDb3A432268e58
 
 runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
   let router: any;
+  let routerView: any;
   let compoundGateway: any;
+  let compoundView: any;
   let usdc: any;
   let richSigner: any;
   let user: HDNodeWallet;
@@ -36,6 +38,12 @@ runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
       richSigner,
     );
 
+    routerView = await ethers.deployContract(
+      "contracts/v2/RouterView.sol:RouterView",
+      [await user.getAddress()],
+      richSigner,
+    );
+
     const comet = process.env.COMPOUND_USDC_COMET || ethers.ZeroAddress;
     compoundGateway = await ethers.deployContract(
       "contracts/v2/gateways/CompoundGateway.sol:CompoundGateway",
@@ -43,7 +51,14 @@ runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
       richSigner,
     );
 
+    compoundView = await ethers.deployContract(
+      "contracts/v2/gateways/CompoundGatewayView.sol:CompoundGatewayView",
+      [[comet]],
+      richSigner,
+    );
+
     await router.connect(user).addGateway("compound", await compoundGateway.getAddress());
+    await routerView.connect(user).addGateway("compound", await compoundView.getAddress());
   });
 
   it("should deposit and withdraw all USDC", async function () {
@@ -65,7 +80,7 @@ runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
       },
     ]);
 
-    expect(await compoundGateway.getBalance(USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
+    expect(await routerView.getBalance("compound", USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
 
     await router.connect(user).processProtocolInstructions([
       {
@@ -81,6 +96,6 @@ runOnlyOnFork("CompoundGateway V2: deposit and withdraw :fork", function () {
       },
     ]);
 
-    expect(await compoundGateway.getBalance(USDC_ADDRESS, userAddress)).to.equal(0n);
+    expect(await routerView.getBalance("compound", USDC_ADDRESS, userAddress)).to.equal(0n);
   });
 });

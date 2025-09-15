@@ -2,7 +2,6 @@
 pragma solidity ^0.8.10;
 
 import "../interfaces/ILendingGateway.sol";
-import "../interfaces/IGatewayView.sol";
 import "../../gateways/ProtocolGateway.sol";
 import "../../interfaces/venus/ComptrollerInterface.sol";
 import "../../interfaces/venus/VTokenInterface.sol";
@@ -10,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract VenusGateway is ILendingGateway, IGatewayView, ProtocolGateway, ReentrancyGuard {
+contract VenusGateway is ILendingGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     ComptrollerInterface public comptroller;
@@ -134,34 +133,6 @@ contract VenusGateway is ILendingGateway, IGatewayView, ProtocolGateway, Reentra
         userVTokenBalance[user][vToken] -= vTokensToRedeem;
         outAmount = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransfer(msg.sender, outAmount);
-    }
-
-    // --------- View functions ---------
-    function getBalance(address token, address user) external view override returns (uint256) {
-        address vToken = getVTokenForUnderlying(token);
-        uint256 vBal = userVTokenBalance[user][vToken];
-        if (vBal == 0) return 0;
-        uint256 exchangeRate = VTokenInterface(vToken).exchangeRateStored();
-        return (vBal * exchangeRate) / 1e18;
-    }
-
-    function getBorrowBalance(address token, address user) public view override returns (uint256) {
-        address vToken = getVTokenForUnderlying(token);
-        return VTokenInterface(vToken).borrowBalanceStored(user);
-    }
-
-    function getBorrowRate(address token) external view override returns (uint256, bool) {
-        address vToken = getVTokenForUnderlying(token);
-        return (VTokenInterface(vToken).borrowRatePerBlock(), true);
-    }
-
-    function getSupplyRate(address token) external view override returns (uint256, bool) {
-        address vToken = getVTokenForUnderlying(token);
-        return (VTokenInterface(vToken).supplyRatePerBlock(), true);
-    }
-
-    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
-        return getBorrowBalance(token, user);
     }
 
     // helper to find vToken for underlying asset

@@ -10,7 +10,9 @@ const WETH_ADDRESS = ethers.getAddress("0x82aF49447D8a07e3bd95BD0d56f35241523fBa
 
 runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
   let router: any;
+  let routerView: any;
   let aaveGateway: any;
+  let aaveView: any;
   let usdc: any;
   let weth: any;
   let richSigner: any;
@@ -39,6 +41,12 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
       richSigner,
     );
 
+    routerView = await ethers.deployContract(
+      "contracts/v2/RouterView.sol:RouterView",
+      [await user.getAddress()],
+      richSigner,
+    );
+
     const poolAddressesProvider = process.env.AAVE_POOL_ADDRESSES_PROVIDER || ethers.ZeroAddress;
     const uiPoolDataProvider = process.env.AAVE_UI_POOL_DATA_PROVIDER || ethers.ZeroAddress;
     const referralCode = Number(process.env.AAVE_REFERRAL_CODE || "0");
@@ -48,7 +56,14 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
       richSigner,
     );
 
+    aaveView = await ethers.deployContract(
+      "contracts/v2/gateways/AaveGatewayView.sol:AaveGatewayView",
+      [poolAddressesProvider, uiPoolDataProvider],
+      richSigner,
+    );
+
     await router.connect(user).addGateway("aave", await aaveGateway.getAddress());
+    await routerView.connect(user).addGateway("aave", await aaveView.getAddress());
   });
 
   it("should deposit, borrow, repayAll and withdrawAll", async function () {
@@ -70,7 +85,7 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
       },
     ]);
 
-    expect(await aaveGateway.getBalance(USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
+    expect(await routerView.getBalance("aave", USDC_ADDRESS, userAddress)).to.be.greaterThanOrEqual(depositAmount);
 
     const providerAddr = await aaveGateway.poolAddressesProvider();
     const provider = await ethers.getContractAt("IPoolAddressesProvider", providerAddr);
@@ -115,7 +130,7 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
       },
     ]);
 
-    expect(await aaveGateway.getBorrowBalance(WETH_ADDRESS, userAddress)).to.equal(0n);
+    expect(await routerView.getBorrowBalance("aave", WETH_ADDRESS, userAddress)).to.equal(0n);
 
     await router.connect(user).processProtocolInstructions([
       {
@@ -131,6 +146,6 @@ runOnlyOnFork("AaveGateway V2: full flow :fork", function () {
       },
     ]);
 
-    expect(await aaveGateway.getBalance(USDC_ADDRESS, userAddress)).to.equal(0n);
+    expect(await routerView.getBalance("aave", USDC_ADDRESS, userAddress)).to.equal(0n);
   });
 });
