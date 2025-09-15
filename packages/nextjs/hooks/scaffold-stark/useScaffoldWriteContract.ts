@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useTargetNetwork } from "./useTargetNetwork";
-import { Abi, useNetwork, useSendTransaction } from "@starknet-react/core";
+import { Abi, useNetwork } from "@starknet-react/core";
 import { Contract as StarknetJsContract } from "starknet";
-import { useDeployedContractInfo, useTransactor } from "~~/hooks/scaffold-stark";
+import { useDeployedContractInfo, useSmartTransactor } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 import {
   ContractAbi,
@@ -22,11 +22,8 @@ export const useScaffoldWriteContract = <
 }: UseScaffoldWriteConfig<TAbi, TContractName, TFunctionName>) => {
   const { data: deployedContractData } = useDeployedContractInfo(contractName);
   const { chain } = useNetwork();
-  const sendTxnWrapper = useTransactor();
+  const sendTxnWrapper = useSmartTransactor();
   const { targetNetwork } = useTargetNetwork();
-
-  // leave blank for now since default args will be called by the trigger function anyway
-  const sendTransactionInstance = useSendTransaction({});
 
   const sendContractWriteTx = useCallback(
     async (params?: { args?: UseScaffoldWriteConfig<TAbi, TContractName, TFunctionName>["args"] }) => {
@@ -54,25 +51,20 @@ export const useScaffoldWriteContract = <
 
       const newCalls = deployedContractData ? [contractInstance.populate(functionName, newArgs as any[])] : [];
 
-      if (sendTransactionInstance.sendAsync) {
-        try {
-          // setIsMining(true);
-          return await sendTxnWrapper(() => sendTransactionInstance.sendAsync(newCalls as any[]));
-        } catch (e: any) {
-          throw e;
-        } finally {
-          // setIsMining(false);
-        }
-      } else {
-        notification.error("Contract writer error. Try again.");
-        return;
+      try {
+        // setIsMining(true);
+        // Route directly through smart/paymaster transactor with the prepared calls
+        return await sendTxnWrapper(newCalls as any[]);
+      } catch (e: any) {
+        throw e;
+      } finally {
+        // setIsMining(false);
       }
     },
-    [args, chain?.id, deployedContractData, functionName, sendTransactionInstance, sendTxnWrapper, targetNetwork.id],
+    [args, chain?.id, deployedContractData, functionName, sendTxnWrapper, targetNetwork.id],
   );
 
   return {
-    ...sendTransactionInstance,
     sendAsync: sendContractWriteTx,
   };
 };

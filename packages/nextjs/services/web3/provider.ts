@@ -1,5 +1,5 @@
 import * as chains from "@starknet-react/chains";
-import { jsonRpcProvider, starknetChainId } from "@starknet-react/core";
+import { jsonRpcProvider, starknetChainId, avnuPaymasterProvider } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 
 // Get the current target network (first one in the array)
@@ -23,5 +23,10 @@ const provider = jsonRpcProvider({
     chainId: starknetChainId(currentNetwork.id),
   }),
 });
+
+const paymasterProvider = avnuPaymasterProvider({
+});
+
+export { paymasterProvider };
 
 export default provider;
