@@ -69,29 +69,29 @@ pub trait IExchange<TContractState> {
 }
 
 #[derive(Drop, Serde)]
-struct SwapExactTokenToCalldata {
-    sell_token_address: ContractAddress,
-    sell_token_amount: u256,
-    sell_token_max_amount: u256,
-    buy_token_address: ContractAddress,
-    buy_token_amount: u256,
-    beneficiary: ContractAddress,
-    integrator_fee_amount_bps: u128,
-    integrator_fee_recipient: ContractAddress,
-    routes: Array<Route>,
+pub struct SwapExactTokenToCalldata {
+    pub sell_token_address: ContractAddress,
+    pub sell_token_amount: u256,
+    pub sell_token_max_amount: u256,
+    pub buy_token_address: ContractAddress,
+    pub buy_token_amount: u256,
+    pub beneficiary: ContractAddress,
+    pub integrator_fee_amount_bps: u128,
+    pub integrator_fee_recipient: ContractAddress,
+    pub routes: Array<Route>,
 }
 
 #[derive(Drop, Serde)]
-struct MultiRouteSwapCalldata {
-    sell_token_address: ContractAddress,
-    sell_token_amount: u256,
-    buy_token_address: ContractAddress,
-    buy_token_amount: u256,
-    buy_token_min_amount: u256,
-    beneficiary: ContractAddress,
-    integrator_fee_amount_bps: u128,
-    integrator_fee_recipient: ContractAddress,
-    routes: Array<Route>,
+pub struct MultiRouteSwapCalldata {
+    pub sell_token_address: ContractAddress,
+    pub sell_token_amount: u256,
+    pub buy_token_address: ContractAddress,
+    pub buy_token_amount: u256,
+    pub buy_token_min_amount: u256,
+    pub beneficiary: ContractAddress,
+    pub integrator_fee_amount_bps: u128,
+    pub integrator_fee_recipient: ContractAddress,
+    pub routes: Array<Route>,
 }
 
 #[starknet::contract]
