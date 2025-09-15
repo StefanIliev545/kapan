@@ -117,17 +117,14 @@ fn prefund_address(recipient: ContractAddress, rich_address: ContractAddress, to
 }
 
 fn setup_avnu_test_context() -> TestContext {
-    println!("Deploying RouterGateway");
     let router_address = deploy_router_gateway();
 
-    println!("Deploying AvnuGateway");
     let avnu_gateway_address = deploy_avnu_gateway();
     
     // Pre-fund the test user with tokens
-    println!("Pre-funding user address");
     prefund_address(USER_ADDRESS(), RICH_ADDRESS(), ETH_ADDRESS(), 15000000000000000000); // 15 ETH
     prefund_address(USER_ADDRESS(), USDC_RICH_ADDRESS(), USDC_ADDRESS(), 1000000000); // 1000 USDC
-    prefund_address(USER_ADDRESS(), RICH_ADDRESS(), STRK_ADDRESS(), 10000000000000000000000); // 10000 STRK
+    prefund_address(USER_ADDRESS(), RICH_ADDRESS(), STRK_ADDRESS(), 10000000000000000000000000); // 10000000000 STRK
     
     let router_dispatcher = RouterGatewayTraitDispatcher {
         contract_address: router_address
@@ -661,8 +658,8 @@ fn test_avnu_move_debt_reswap_and_redeposit_kept_in_router() {
         buy_token_address: USDC_ADDRESS(),
         buy_token_amount: 0,
         beneficiary: USER_ADDRESS(),
-        integrator_fee_amount_bps: 0,
-        integrator_fee_recipient: USER_ADDRESS(),
+        integrator_fee_amount_bps: 0, 
+        integrator_fee_recipient: USER_ADDRESS(), 
         routes: routes2,
     };
     let mut avnu_ctx2_data = array![];
@@ -861,4 +858,125 @@ fn test_avnu_switch_collateral_with_reswap_exact_in() {
     let mut upper_bound = expected_strk + ten_percent;
     assert(usdc_strk_debt >= lower_bound, 'strk-debt-too-low');
     assert(usdc_strk_debt <= upper_bound, 'strk-debt-too-high');
+}
+
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_avnu_switch_debt_with_reswap_exact_out() {
+    let context = setup_avnu_test_context();
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
+    let router = RouterGatewayTraitDispatcher { contract_address: context.router_address };
+    router.add_gateway('avnu', context.avnu_gateway_address);
+    let vesu_gateway_address = deploy_vesu_gateway(context.router_address);
+    router.add_gateway('vesu', vesu_gateway_address);
+
+    // 1) Create initial position: deposit huge STRK collateral and borrow a bit of ETH debt (to be repaid)
+    use kapan::gateways::vesu_gateway::VesuContext;
+    let mut vesu_strk_ctx = array![];
+    let vesu_strk = VesuContext { pool_id: 0, position_counterpart_token: STRK_ADDRESS() };
+    vesu_strk.serialize(ref vesu_strk_ctx);
+    let mut vesu_eth_context = array![];
+    let vesu_eth = VesuContext { pool_id: 0, position_counterpart_token: ETH_ADDRESS() };
+    vesu_eth.serialize(ref vesu_eth_context);
+    let mut vesu_usdc_context = array![];
+    let vesu_usdc = VesuContext { pool_id: 0, position_counterpart_token: USDC_ADDRESS() };
+    vesu_usdc.serialize(ref vesu_usdc_context);
+
+    // Deposit STRK (use previous amount with a leading 1)
+    let deposit_strk = LendingInstruction::Deposit(Deposit { basic: BasicInstruction {
+         token: STRK_ADDRESS(), amount: 10000000000000000000000000, user: USER_ADDRESS() }, 
+         context: Option::None 
+    });
+    // Borrow small ETH (will be repaid via exact_out swap)
+    let repay_eth_amount: u256 = 50000000000000000; // 0.01 ETH
+    let borrow_eth = LendingInstruction::Borrow(Borrow { 
+        basic: BasicInstruction { token: ETH_ADDRESS(), amount: repay_eth_amount, user: USER_ADDRESS() }, 
+        context: Option::Some(vesu_strk_ctx.span()) 
+    });
+
+    let create_instructions = array![ ProtocolInstructions { protocol_name: 'vesu', instructions: array![deposit_strk, borrow_eth].span() } ];
+    let create_auth = context.router_dispatcher.get_authorizations_for_instructions(create_instructions.span(), true);
+    for authorization in create_auth { let (token, selector, call_data) = authorization; cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1)); let _ = call_contract_syscall(*token, *selector, call_data.span()); };
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    let _ = context.router_dispatcher.process_protocol_instructions(create_instructions.span());
+    println!("Creation completed successfully!");
+
+    // 2) Build Avnu exact-out context: swap USDC -> ETH, exact_out = repay_eth_amount, max_in = 100 USDC
+    let mut routes = array![];
+    let mut ekubo_params: Array<felt252> = array![];
+    ekubo_params.append(ETH_ADDRESS().into());
+    ekubo_params.append(USDC_ADDRESS().into());
+    ekubo_params.append(170141183460469235273462165868118016); // 0.05%
+    ekubo_params.append(1000);
+    ekubo_params.append(starknet::contract_address_const::<0>().into());
+    ekubo_params.append(6277100250585753475930931601400621808602321654880405518632);
+    routes.append(Route { 
+        exchange_address: contract_address_const::<0x5dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b>(), 
+        sell_token: USDC_ADDRESS(), 
+        buy_token: ETH_ADDRESS(), 
+        percent: 1000000000000, 
+        additional_swap_params: ekubo_params });
+    let exact_out_ctx = SwapExactTokenToCalldata {
+        sell_token_address: USDC_ADDRESS(),
+        sell_token_amount: 100000000, // 100 USDC
+        sell_token_max_amount: 300000000, // max_in = what we borrow
+        buy_token_address: ETH_ADDRESS(),
+        buy_token_amount: repay_eth_amount, // exact_out
+        beneficiary: USER_ADDRESS(),
+        integrator_fee_amount_bps: 0,
+        integrator_fee_recipient: USER_ADDRESS(),
+        routes,
+    };
+    let mut exact_out_ctx_data = array![];
+    exact_out_ctx.serialize(ref exact_out_ctx_data);
+
+    // 3) Move debt: repay ETH, optional withdraw/redeposit STRK (no-op), borrow 100 USDC, reswap USDC->ETH exact_out
+    let repay_eth = LendingInstruction::Repay(Repay { 
+        basic: BasicInstruction { token: ETH_ADDRESS(), amount: repay_eth_amount, user: USER_ADDRESS() }, 
+        repay_all: true, 
+        context: Option::Some(vesu_strk_ctx.span()) 
+    });
+    let withdraw_zero_strk = LendingInstruction::Withdraw(Withdraw { 
+        basic: BasicInstruction { token: STRK_ADDRESS(), amount: 10000000000000000000000000, user: USER_ADDRESS() }, 
+        withdraw_all: true, 
+        context: Option::Some(vesu_eth_context.span()) 
+    });
+    let redeposit_zero_strk = LendingInstruction::Redeposit(Redeposit { 
+        token: STRK_ADDRESS(), 
+        user: USER_ADDRESS(), 
+        target_output: OutputPointer { instruction_index: 1, output_index: 0 }, 
+        context: Option::Some(vesu_usdc_context.span()) 
+    });
+    let borrow_usdc = LendingInstruction::Borrow(Borrow { 
+        basic: BasicInstruction { token: USDC_ADDRESS(), amount: 450000000, user: USER_ADDRESS() }, 
+        context: Option::Some(vesu_strk_ctx.span()) 
+    });
+
+    // Avnu reswap: exact_out from repay (idx 0), max_in from borrow (idx 3)
+    let reswap_exact_out = LendingInstruction::Reswap(Reswap {
+        exact_out: OutputPointer { instruction_index: 0, output_index: 0 },
+        max_in: OutputPointer { instruction_index: 3, output_index: 0 },
+        user: USER_ADDRESS(),
+        should_pay_out: false,
+        should_pay_in: false,
+        context: Option::Some(exact_out_ctx_data.span()),
+    });
+
+    let mut md_instructions = array![];
+    md_instructions.append(ProtocolInstructions { protocol_name: 'vesu', instructions: array![repay_eth, withdraw_zero_strk].span() });
+    md_instructions.append(ProtocolInstructions { protocol_name: 'vesu', instructions: array![redeposit_zero_strk, borrow_usdc].span() });
+    md_instructions.append(ProtocolInstructions { protocol_name: 'avnu', instructions: array![reswap_exact_out].span() });
+
+    let md_auth = context.router_dispatcher.get_authorizations_for_instructions(array![*md_instructions.at(0), *md_instructions.at(1)].span(), true);
+    for authorization in md_auth { let (token, selector, call_data) = authorization; cheat_caller_address(*token, USER_ADDRESS(), CheatSpan::TargetCalls(1)); let result = call_contract_syscall(*token, *selector, call_data.span()); assert(result.is_ok(), 'switch-debt auth failed'); };
+
+    cheat_caller_address(context.router_address, USER_ADDRESS(), CheatSpan::TargetCalls(1));
+    context.router_dispatcher.move_debt(md_instructions.span());
+    println!("Move debt completed successfully (switch debt)!");
+    
+    let viewer = IVesuViewerDispatcher { contract_address: vesu_gateway_address };
+    let (_c2, _d2, pos_usdc) = viewer.get_position_from_context(USER_ADDRESS(), vesu_strk, USDC_ADDRESS(), false);
+    assert(pos_usdc.nominal_debt != 0, 'usdc-debt-too-low');
+    println!("STRK/USDC after: coll {:?}, debt {:?}", pos_usdc.collateral_amount, pos_usdc.nominal_debt);
 }
