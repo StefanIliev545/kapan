@@ -10,6 +10,7 @@ use crate::interfaces::IGateway::{
     InstructionOutput,
 };
 use starknet::{ClassHash, get_caller_address, get_contract_address};
+use core::serde::Serde;
 
 #[derive(Drop, Serde, Clone)]
 pub struct Route {
@@ -67,6 +68,32 @@ pub trait IExchange<TContractState> {
     ) -> bool;
 }
 
+#[derive(Drop, Serde)]
+struct SwapExactTokenToCalldata {
+    sell_token_address: ContractAddress,
+    sell_token_amount: u256,
+    sell_token_max_amount: u256,
+    buy_token_address: ContractAddress,
+    buy_token_amount: u256,
+    beneficiary: ContractAddress,
+    integrator_fee_amount_bps: u128,
+    integrator_fee_recipient: ContractAddress,
+    routes: Array<Route>,
+}
+
+#[derive(Drop, Serde)]
+struct MultiRouteSwapCalldata {
+    sell_token_address: ContractAddress,
+    sell_token_amount: u256,
+    buy_token_address: ContractAddress,
+    buy_token_amount: u256,
+    buy_token_min_amount: u256,
+    beneficiary: ContractAddress,
+    integrator_fee_amount_bps: u128,
+    integrator_fee_recipient: ContractAddress,
+    routes: Array<Route>,
+}
+
 #[starknet::contract]
 pub mod AvnuGateway {
     use super::*;
@@ -85,6 +112,26 @@ pub mod AvnuGateway {
 
     #[generate_trait]
     impl InternalFunctions of InternalFunctionsTrait {
+        fn deserialize_exact_out(data: Span<felt252>) -> SwapExactTokenToCalldata {
+            let mut span = data;
+            Serde::<SwapExactTokenToCalldata>::deserialize(ref span).unwrap()
+        }
+
+        fn deserialize_exact_in(data: Span<felt252>) -> MultiRouteSwapCalldata {
+            let mut span = data;
+            Serde::<MultiRouteSwapCalldata>::deserialize(ref span).unwrap()
+        }
+
+        fn ensure_swap_out_matches_context(swap: @Swap, context: @SwapExactTokenToCalldata) {
+            assert(swap.token_in == context.sell_token_address, 'token_in mismatch');
+            assert(swap.token_out == context.buy_token_address, 'token_out mismatch');
+        }
+
+        fn ensure_swap_in_matches_context(swap: @SwapExactIn, context: @MultiRouteSwapCalldata) {
+            assert(swap.token_in == context.sell_token_address, 'token_in mismatch');
+            assert(swap.token_out == context.buy_token_address, 'token_out mismatch');
+        }
+        
         fn execute_swap_exact_out(ref self: ContractState, swap: @Swap) -> (u256, u256) {
             let swap = *swap;
           
@@ -95,29 +142,23 @@ pub mod AvnuGateway {
             // Approve Avnu router to pull tokens from this contract
             erc20.approve(self.router.read().contract_address, swap.max_in);
 
-            // Extract Avnu context from swap context if provided
-            let (routes, _integrator_fee_amount_bps, _integrator_fee_recipient, _amount) = if let Option::Some(context_data) = swap.context {
-                    // Deserialize AvnuContext from context
-                let mut context_span = context_data;
-                let avnu_context: AvnuContext = Serde::deserialize(ref context_span).unwrap();
-                      (avnu_context.routes, avnu_context.integrator_fee_amount_bps, avnu_context.integrator_fee_recipient, avnu_context.amount)
-            } else {
-                // Default values if no context provided
-                (array![], 0, swap.user, 0)
-            };
-
+            // Context is mandatory for Avnu swaps (same pattern as Vesu)
+            let context_out = swap.context;
+            assert(context_out.is_some(), 'Context is required for swap');
+            let parsed_out = Self::deserialize_exact_out(context_out.unwrap());
+            Self::ensure_swap_out_matches_context(@swap, @parsed_out);
             // Call Avnu's swap_exact_token_to for exact output
             // For exact out: we want exactly `exact_out` amount of buy_token, willing to spend up to `max_in` of sell_token
             let success = self.router.read().swap_exact_token_to(
                 swap.token_in,           // sell_token_address
-                _amount,             // sell_token_amount (max amount we're willing to spend)
-                swap.max_in,             // sell_token_max_amount (same as max_in for exact output)
+                parsed_out.sell_token_amount,            // sell_token_amount from context
+                parsed_out.sell_token_max_amount,       // sell_token_max_amount from context
                 swap.token_out,          // buy_token_address
                 swap.exact_out,          // buy_token_amount (exact amount we want)
                 get_contract_address(),  // beneficiary
-                _integrator_fee_amount_bps, // integrator_fee_amount_bps from AvnuContext
-                _integrator_fee_recipient,  // integrator_fee_recipient from AvnuContext
-                routes,                  // routes from AvnuContext
+                parsed_out.integrator_fee_amount_bps,
+                parsed_out.integrator_fee_recipient,
+                parsed_out.routes,
             );
 
 
@@ -148,17 +189,11 @@ pub mod AvnuGateway {
             // Approve Avnu router to pull tokens from this contract
             erc20.approve(self.router.read().contract_address, swap.exact_in);
 
-            // Extract Avnu context from swap context if provided
-            let (routes, _integrator_fee_amount_bps, _integrator_fee_recipient) = if let Option::Some(context_data) = swap.context {
-                // Deserialize AvnuContext from context
-                let mut context_span = context_data;
-                let avnu_context: AvnuContext = Serde::deserialize(ref context_span).unwrap();
-                (avnu_context.routes, avnu_context.integrator_fee_amount_bps, avnu_context.integrator_fee_recipient)
-            } else {
-                // Default values if no context provided
-                (array![], 0, swap.user)
-            };
-
+            // Context is mandatory for Avnu swaps (same pattern as Vesu)
+            let context_in = swap.context;
+            assert(context_in.is_some(), 'Context is required for swap');
+            let parsed_in = Self::deserialize_exact_in(context_in.unwrap());
+            Self::ensure_swap_in_matches_context(@swap, @parsed_in);
             // Call Avnu's multi_route_swap for exact input
             // For exact in: we sell exactly `exact_in` amount of sell_token, want at least `min_out` of buy_token
             let success = self.router.read().multi_route_swap(
@@ -168,9 +203,9 @@ pub mod AvnuGateway {
                 swap.min_out,            // buy_token_amount (minimum amount we want)
                 swap.min_out,            // buy_token_min_amount (same as min_out for exact input)
                 get_contract_address(),  // beneficiary
-                _integrator_fee_amount_bps, // integrator_fee_amount_bps from AvnuContext
-                _integrator_fee_recipient,  // integrator_fee_recipient from AvnuContext
-                routes,                  // routes from AvnuContext
+                parsed_in.integrator_fee_amount_bps,
+                parsed_in.integrator_fee_recipient,
+                parsed_in.routes,
             );
 
             assert(success, 'avnu swap failed');

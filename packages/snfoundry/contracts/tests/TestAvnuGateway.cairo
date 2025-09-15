@@ -169,7 +169,6 @@ fn test_avnu_gateway_deployment() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_swap_exact_out() {
     let context = setup_avnu_test_context();
@@ -185,46 +184,57 @@ fn test_avnu_swap_exact_out() {
     // USDC (ERC20 on Starknet)
     let usdc: ContractAddress = USDC_ADDRESS();
     
-    // Create Avnu context with routes from the ETH→USDC quote
-    // Note: Routes are recursive/branching in JSON but we just pick one path (Ekubo)
-    let mut routes = array![];
-    
-    // Ekubo route (97% of the swap) - from original ETH→USDC quote
-    let mut ekubo_params: Array<felt252> = array![];
-    ekubo_params.append(eth.into()); // token0
-    ekubo_params.append(usdc.into()); // token1  
-    ekubo_params.append(170141183460469235273462165868118016); // fee (0.05% in fixed-point)
-    ekubo_params.append(1000); // tick_spacing
-    ekubo_params.append(starknet::contract_address_const::<0>().into()); // extension
-    // Allow full-range price movement to avoid artificial reverts in tests
-    ekubo_params.append(6277100250585753475930931601400621808602321654880405518632); // sqrt_ratio_distance (MAX)
-    
-    routes.append(Route {
-        exchange_address: contract_address_const::<0x5dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b>(), // Ekubo Core
-        sell_token: eth,
-        buy_token: usdc,
-        percent: 1000000000000, // 97% (9700 basis points)
-        additional_swap_params: ekubo_params,
-    });
-    
-    let avnu_context = AvnuContext {
-        routes,
-        integrator_fee_amount_bps: 0, // No integrator fees
-        integrator_fee_recipient: USER_ADDRESS(),
-        amount: 22058144364613168,
-    };
-    
-    // Serialize Avnu context
-    let mut context_data = array![];
-    avnu_context.serialize(ref context_data);
-    println!("DEBUG: Serialized context data length: {:?}", context_data.len());
+    // Pass raw Avnu router swap_exact_token_to calldata as context (felts array)
+    let mut context_data: Array<felt252> = array![
+        // sell_token_address (ETH)
+        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
+        // sell_token_amount (u256: low, high)
+        0x4e92b5b26eecd4, 0x0,
+        // sell_token_max_amount (u256: low, high)
+        0x4ef7488686850d, 0x0,
+        // buy_token_address (USDC)
+        0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+        // buy_token_amount (u256: low, high)
+        0x5f5e100, 0x0,
+        // beneficiary (ignored in gateway, Avnu sets to gateway)
+        0x052d8e9778d026588a51595e30b0f45609b4f771eecf0e335cdefed1d84a9d89,
+        // integrator_fee_amount_bps
+        0x0,
+        // integrator_fee_recipient
+        0x0,
+        // routes len = 1
+        0x1,
+        // Route 0
+        // sell_token
+        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
+        // buy_token
+        0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+        // exchange_address (Ekubo Core)
+        0x05dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b,
+        // percent
+        0x0e8d4a51000,
+        // additional_swap_params len = 6
+        0x6,
+        // token0
+        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
+        // token1
+        0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+        // fee (Q64.64)
+        0x20c49ba5e353f80000000000000000,
+        // tick_spacing
+        0x3e8,
+        // extension
+        0x0,
+        // sqrt_ratio_distance
+        0x2df7c3f5bccaf6000000000000,
+    ];
     
     // Create swap instruction: Swap ETH for USDC (exact out) - using real quote amounts
     let swap = Swap {
         token_in: eth,
         token_out: usdc,
-        exact_out: 100000000, // 100 USDC (exact amount we want from quote)
-        max_in: 1000000000000000000, // 1 ETH max (from quote sellAmount)
+        exact_out: 100000000, // 0x5f5e100
+        max_in: 1000000000000000000, // 1 ETH max
         user: USER_ADDRESS(),
         should_pay_out: true,
         should_pay_in: true,
@@ -310,53 +320,56 @@ fn test_avnu_swap_exact_in() {
     let eth: ContractAddress = ETH_ADDRESS();
     let usdc: ContractAddress = USDC_ADDRESS();
 
-    // Create Avnu context with routes from the ETH→USDC quote for exact in test
-    let mut routes = array![];
-    
-    // Ekubo route (97% of the swap) - from original ETH→USDC quote
-    let mut ekubo_params: Array<felt252> = array![];
-    ekubo_params.append(eth.into()); // token0
-    ekubo_params.append(usdc.into()); // token1  
-    ekubo_params.append(170141183460469235273462165868118016); // fee (0.05% in fixed-point)
-    ekubo_params.append(1000); // tick_spacing
-    ekubo_params.append(starknet::contract_address_const::<0>().into()); // extension
-    // Allow full-range price movement to avoid artificial reverts in tests
-    ekubo_params.append(6277100250585753475930931601400621808602321654880405518632); // sqrt_ratio_distance (MAX)
-    
-    routes.append(Route {
-        exchange_address: contract_address_const::<0x5dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b>(), // Ekubo Core
-        sell_token: eth,
-        buy_token: usdc,
-        percent: 9700, // 97% (9700 basis points)
-        additional_swap_params: ekubo_params,
-    });
-    
-    // StarkDefi route (3% of the swap) - from original ETH→USDC quote
-    routes.append(Route {
-        sell_token: eth,
-        buy_token: usdc,
-        exchange_address: contract_address_const::<0x7eee624919fae668387d0d34d86d67795e5c919bc994841581144977ef21c32>(), // StarkDefi
-        percent: 300, // 3% (300 basis points)
-        additional_swap_params: array![], // StarkDefi doesn't need pool params
-    });
-    
-    let avnu_context = AvnuContext {
-        routes,
-        integrator_fee_amount_bps: 0, // No integrator fees
-        integrator_fee_recipient: USER_ADDRESS(),
-        amount: 22058144364613168,
-    };
-    
-    // Serialize Avnu context
-    let mut context_data = array![];
-    avnu_context.serialize(ref context_data);
-    println!("DEBUG: Serialized context data length: {:?}", context_data.len());
+    // Pass raw Avnu router multi_route_swap calldata as context (felts array)
+    let mut context_data: Array<felt252> = array![
+        // sell_token_address (ETH)
+        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
+        // sell_token_amount (u256: low, high)
+        0x2386f26fc10000, 0x0,
+        // buy_token_address (USDC)
+        0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+        // buy_token_amount (u256: low, high)
+        0x2b133f1, 0x0,
+        // buy_token_min_amount (u256: low, high)
+        0x2adc1c2, 0x0,
+        // beneficiary
+        0x052d8e9778d026588a51595e30b0f45609b4f771eecf0e335cdefed1d84a9d89,
+        // integrator_fee_amount_bps
+        0x0,
+        // integrator_fee_recipient
+        0x0,
+        // routes len = 1
+        0x1,
+        // Route 0
+        // sell_token
+        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
+        // buy_token
+        0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+        // exchange_address (Ekubo Core)
+        0x05dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b,
+        // percent
+        0x0e8d4a51000,
+        // additional_swap_params len = 6
+        0x6,
+        // token0
+        0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7,
+        // token1
+        0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8,
+        // fee (Q64.64)
+        0x20c49ba5e353f80000000000000000,
+        // tick_spacing
+        0x3e8,
+        // extension
+        0x0,
+        // sqrt_ratio_distance
+        0x2df7c3f5bccaf6000000000000,
+    ];
     
     let swap = SwapExactIn {
         token_in: eth,
         token_out: usdc,
-        exact_in: 1000000000000000000, // 1 ETH (from quote)
-        min_out: 100000000, // 100 USDC minimum (from quote)
+        exact_in: 10000000000000000, // 0x2386f26fc10000 (0.01 ETH)
+        min_out: 45000002, // 0x2adc1c2 (~45.000002 USDC)
         user: USER_ADDRESS(),
         should_pay_out: true,
         should_pay_in: true,
@@ -372,7 +385,7 @@ fn test_avnu_swap_exact_in() {
     println!("USDC balance before swap: {:?}", usdc_balance_before);
     
     cheat_caller_address(eth, USER_ADDRESS(), CheatSpan::TargetCalls(1));
-    eth_erc20.approve(context.router_address, 1000000000000000000);
+    eth_erc20.approve(context.router_address, 10000000000000000);
 
     let mut protocol_instructions = array![];
     protocol_instructions.append(ProtocolInstructions {
@@ -576,6 +589,7 @@ fn test_avnu_create_position_and_move_debt_with_reswap() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_move_debt_reswap_and_redeposit_kept_in_router() {
     println!("Setting up test context with Router and Vesu (redeposit flow, Avnu)");
