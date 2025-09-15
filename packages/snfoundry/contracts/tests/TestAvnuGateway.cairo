@@ -86,7 +86,10 @@ fn deploy_router_gateway() -> ContractAddress {
 fn deploy_avnu_gateway() -> ContractAddress {
     let contract_class = declare("AvnuGateway").unwrap().contract_class();
     let mut calldata = array![];
-    calldata.append_serde(AVNU_ROUTER_ADDRESS()); // Mainnet Avnu router address
+    calldata.append_serde(AVNU_ROUTER_ADDRESS()); // router
+    calldata.append_serde(USER_ADDRESS()); // owner
+    calldata.append_serde(contract_address_const::<0>()); // fee_recipient (none)
+    calldata.append_serde(0); // fee_bps
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }

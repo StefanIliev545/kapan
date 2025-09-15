@@ -1,6 +1,7 @@
 use core::array::{Array, ArrayTrait, Span};
 use starknet::ContractAddress;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+use openzeppelin::access::ownable::OwnableComponent;
 use crate::interfaces::IGateway::{
     LendingInstruction,
     Swap,
@@ -99,15 +100,60 @@ pub mod AvnuGateway {
     use super::*;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
+    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+
+    #[abi(embed_v0)]
+    impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
+    impl InternalOwnableImpl = OwnableComponent::InternalImpl<ContractState>;
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        #[flat]
+        OwnableEvent: OwnableComponent::Event,
+    }
+
     #[storage]
     struct Storage {
         // Mainnet Avnu router address: 0x04270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f
         router: IExchangeDispatcher,
+        fee_recipient: ContractAddress,
+        fee_bps: u128,
+        #[substorage(v0)]
+        ownable: OwnableComponent::Storage,
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, router: ContractAddress) {
+    fn constructor(
+        ref self: ContractState,
+        router: ContractAddress,
+        owner: ContractAddress,
+        fee_recipient: ContractAddress,
+        fee_bps: u128,
+    ) {
         self.router.write(IExchangeDispatcher { contract_address: router });
+        self.fee_recipient.write(fee_recipient);
+        self.fee_bps.write(fee_bps);
+        self.ownable.initializer(owner);
+    }
+
+    #[starknet::interface]
+    pub trait IAvnuGatewayAdmin<TContractState> {
+        fn set_fee_bps(ref self: TContractState, fee_bps: u128);
+        fn set_fee_recipient(ref self: TContractState, fee_recipient: ContractAddress);
+    }
+
+    #[abi(embed_v0)]
+    impl IAvnuGatewayAdminImpl of IAvnuGatewayAdmin<ContractState> {
+        fn set_fee_bps(ref self: ContractState, fee_bps: u128) {
+            self.ownable.assert_only_owner();
+            self.fee_bps.write(fee_bps);
+        }
+
+        fn set_fee_recipient(ref self: ContractState, fee_recipient: ContractAddress) {
+            self.ownable.assert_only_owner();
+            self.fee_recipient.write(fee_recipient);
+        }
     }
 
     #[generate_trait]
@@ -156,8 +202,8 @@ pub mod AvnuGateway {
                 swap.token_out,          // buy_token_address
                 swap.exact_out,          // buy_token_amount (exact amount we want)
                 get_contract_address(),  // beneficiary
-                parsed_out.integrator_fee_amount_bps,
-                parsed_out.integrator_fee_recipient,
+                self.fee_bps.read(),
+                self.fee_recipient.read(),
                 parsed_out.routes,
             );
 
@@ -203,8 +249,8 @@ pub mod AvnuGateway {
                 swap.min_out,            // buy_token_amount (minimum amount we want)
                 swap.min_out,            // buy_token_min_amount (same as min_out for exact input)
                 get_contract_address(),  // beneficiary
-                parsed_in.integrator_fee_amount_bps,
-                parsed_in.integrator_fee_recipient,
+                self.fee_bps.read(),
+                self.fee_recipient.read(),
                 parsed_in.routes,
             );
 
