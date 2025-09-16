@@ -35,6 +35,9 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
     debtBalance,
     balance,
   );
+  if (token.decimals == null) {
+    token.decimals = decimals;
+  }
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = balance < bump ? balance : bump;
