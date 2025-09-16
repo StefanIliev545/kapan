@@ -31,6 +31,9 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
     undefined,
     supplyBalance,
   );
+  if (token.decimals == null) {
+    token.decimals = decimals;
+  }
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
   return (

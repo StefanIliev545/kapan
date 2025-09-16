@@ -32,6 +32,9 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
     decimals,
     vesuContext,
   );
+  if (token.decimals == null) {
+    token.decimals = decimals;
+  }
   return (
     <TokenActionModal
       isOpen={isOpen}
