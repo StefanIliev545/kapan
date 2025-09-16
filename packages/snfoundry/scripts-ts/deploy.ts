@@ -3,6 +3,9 @@ import {
   executeDeployCalls,
   exportDeployments,
   deployer,
+  assertRpcNetworkActive,
+  assertDeployerSignable,
+  assertDeployerDefined,
 } from "./deploy-contract";
 import { green, red } from "./helpers/colorize-log";
 import { CallData, constants } from "starknet";
@@ -350,13 +353,11 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
-    version: constants.TRANSACTION_VERSION.V3,
   });
   const result = await deployer.execute(
     calls,
     {
       nonce: nonce,
-      version: constants.TRANSACTION_VERSION.V3,
       resourceBounds: fee.resourceBounds,
     }
   );
@@ -432,13 +433,11 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
-    version: constants.TRANSACTION_VERSION.V3,
   });
   const result = await deployer.execute(
     calls,
     {
       nonce: nonce,
-      version: constants.TRANSACTION_VERSION.V3,
       resourceBounds: fee.resourceBounds,
     }
   );
@@ -452,6 +451,10 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
 
 const main = async (): Promise<void> => {
   try {
+    assertDeployerDefined();
+
+    await Promise.all([assertRpcNetworkActive(), assertDeployerSignable()]);
+
     const gatewayAddress = await deployScriptMainnet();
     await executeDeployCalls();
     await initializeContracts(gatewayAddress);
