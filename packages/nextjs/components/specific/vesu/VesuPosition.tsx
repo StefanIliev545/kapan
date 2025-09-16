@@ -7,6 +7,8 @@ import { RepayModalStark } from "~~/components/modals/stark/RepayModalStark";
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
 import { ClosePositionModalStark } from "~~/components/modals/stark/ClosePositionModalStark";
+import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModalStark";
+import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
 import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -64,6 +66,10 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [switchDropdown, setSwitchDropdown] = useState<null | "collateral" | "debt">(null);
+  const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
+  const [switchAction, setSwitchAction] = useState<null | "switch-collateral" | "switch-debt">(null);
+  const [switchTargetToken, setSwitchTargetToken] = useState<TokenMetadata | null>(null);
 
   // Find metadata for both assets
   const collateralMetadata = supportedAssets.find(
@@ -151,27 +157,99 @@ export const VesuPosition: FC<VesuPositionProps> = ({
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
           <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
-              <Image
-                src={tokenNameToLogo(collateralSymbol.toLowerCase())}
-                alt={collateralSymbol}
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="font-medium">{collateralSymbol}</span>
-              {isVtoken && <span className="badge badge-sm badge-primary">vToken</span>}
-            </div>
-            {nominalDebt !== "0" && (
-              <div className="flex items-center gap-2">
+            {/* Collateral header (icon + name) clickable */}
+            <div className="dropdown">
+              <div
+                tabIndex={0}
+                className="flex items-center gap-2 cursor-pointer underline decoration-dotted"
+                onClick={() => setSwitchDropdown(prev => (prev === "collateral" ? null : "collateral"))}
+              >
                 <Image
-                  src={tokenNameToLogo(debtSymbol.toLowerCase())}
-                  alt={debtSymbol}
+                  src={tokenNameToLogo(collateralSymbol.toLowerCase())}
+                  alt={collateralSymbol}
                   width={24}
                   height={24}
                   className="w-6 h-6"
                 />
-                <span className="font-medium">{debtSymbol}</span>
+                <span className="font-medium">{collateralSymbol}</span>
+                {isVtoken && <span className="badge badge-sm badge-primary">vToken</span>}
+              </div>
+              {switchDropdown === "collateral" && (
+                <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50">
+                  <li className="menu-title"><span>Switch collateral</span></li>
+                  <li>
+                    <div className="grid grid-cols-3 gap-2 p-1">
+                      {supportedAssets
+                        .filter(a => `0x${BigInt(a.address).toString(16).padStart(64, "0")}` !== collateralAsset)
+                        .map(asset => (
+                          <button
+                            key={asset.address}
+                            className="btn btn-ghost btn-xs h-auto py-2 normal-case"
+                            onClick={() => {
+                              setSwitchAction("switch-collateral");
+                              setSwitchTargetToken(asset);
+                              setIsSwitchModalOpen(true);
+                              setSwitchDropdown(null);
+                            }}
+                          >
+                            <div className="flex flex-col items-center gap-1">
+                              <Image src={tokenNameToLogo(feltToString(asset.symbol).toLowerCase())} alt={feltToString(asset.symbol)} width={20} height={20} className="w-5 h-5" />
+                              <span className="text-xs">{feltToString(asset.symbol)}</span>
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                  </li>
+                </ul>
+              )}
+            </div>
+            {nominalDebt !== "0" && (
+              <div className="flex items-center gap-2">
+                {/* Debt header (icon + name) clickable */}
+                <div className="dropdown dropdown-end">
+                  <div
+                    tabIndex={0}
+                    className="flex items-center gap-2 cursor-pointer underline decoration-dotted"
+                    onClick={() => setSwitchDropdown(prev => (prev === "debt" ? null : "debt"))}
+                  >
+                    <Image
+                      src={tokenNameToLogo(debtSymbol.toLowerCase())}
+                      alt={debtSymbol}
+                      width={24}
+                      height={24}
+                      className="w-6 h-6"
+                    />
+                    <span className="font-medium">{debtSymbol}</span>
+                  </div>
+                  {switchDropdown === "debt" && (
+                    <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50">
+                      <li className="menu-title"><span>Switch debt</span></li>
+                      <li>
+                        <div className="grid grid-cols-3 gap-2 p-1">
+                          {supportedAssets
+                            .filter(a => `0x${BigInt(a.address).toString(16).padStart(64, "0")}` !== debtAsset)
+                            .map(asset => (
+                              <button
+                                key={asset.address}
+                                className="btn btn-ghost btn-xs h-auto py-2 normal-case"
+                                onClick={() => {
+                                  setSwitchAction("switch-debt");
+                                  setSwitchTargetToken(asset);
+                                  setIsSwitchModalOpen(true);
+                                  setSwitchDropdown(null);
+                                }}
+                              >
+                                <div className="flex flex-col items-center gap-1">
+                                  <Image src={tokenNameToLogo(feltToString(asset.symbol).toLowerCase())} alt={feltToString(asset.symbol)} width={20} height={20} className="w-5 h-5" />
+                                  <span className="text-xs">{feltToString(asset.symbol)}</span>
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </li>
+                    </ul>
+                  )}
+                </div>
                 <button
                   className="btn btn-circle btn-ghost btn-xs"
                   onClick={() => setIsCloseModalOpen(true)}
@@ -186,8 +264,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             <div className="space-y-2">
               <div className="text-2xl font-bold">${(Number(collateralValue) / 1e18).toFixed(3)}</div>
               <div className="text-lg text-gray-500">
-                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(3) : formattedCollateral}{" "}
-                {collateralSymbol}
+                {collateralSymbol === "ETH" ? parseFloat(formattedCollateral).toFixed(3) : formattedCollateral} {collateralSymbol}
               </div>
 
               <div className="divider my-1"></div>
@@ -420,6 +497,72 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             poolId={poolId}
           />
         </>
+      )}
+
+      {/* Switch Debt Modal */}
+      {switchAction === "switch-debt" && switchTargetToken && debtMetadata && (
+        <SwitchDebtModalStark
+          isOpen={isSwitchModalOpen}
+          onClose={() => {
+            setIsSwitchModalOpen(false);
+            setSwitchAction(null);
+            setSwitchTargetToken(null);
+          }}
+          poolId={poolId}
+          collateral={{
+            name: collateralSymbol,
+            address: collateralAsset,
+            decimals: Number(collateralMetadata.decimals),
+            icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+          }}
+          currentDebt={{
+            name: debtSymbol,
+            address: debtAsset,
+            decimals: Number(debtMetadata.decimals),
+            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+          }}
+          targetDebt={{
+            name: feltToString(switchTargetToken.symbol),
+            address: `0x${BigInt(switchTargetToken.address).toString(16).padStart(64, "0")}`,
+            decimals: Number(switchTargetToken.decimals),
+            icon: tokenNameToLogo(feltToString(switchTargetToken.symbol).toLowerCase()),
+          }}
+          debtBalance={BigInt(nominalDebt)}
+          collateralBalance={BigInt(collateralAmount)}
+        />
+      )}
+
+      {/* Switch Collateral Modal */}
+      {switchAction === "switch-collateral" && switchTargetToken && (
+        <SwitchCollateralModalStark
+          isOpen={isSwitchModalOpen}
+          onClose={() => {
+            setIsSwitchModalOpen(false);
+            setSwitchAction(null);
+            setSwitchTargetToken(null);
+          }}
+          poolId={poolId}
+          currentCollateral={{
+            name: collateralSymbol,
+            address: collateralAsset,
+            decimals: Number(collateralMetadata.decimals),
+            icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+          }}
+          targetCollateral={{
+            name: feltToString(switchTargetToken.symbol),
+            address: `0x${BigInt(switchTargetToken.address).toString(16).padStart(64, "0")}`,
+            decimals: Number(switchTargetToken.decimals),
+            icon: tokenNameToLogo(feltToString(switchTargetToken.symbol).toLowerCase()),
+          }}
+          debtToken={{
+            name: debtMetadata ? debtSymbol : "",
+            address: debtMetadata ? debtAsset : "0x0",
+            decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+            icon: debtMetadata ? tokenNameToLogo(debtSymbol.toLowerCase()) : "",
+          }}
+          collateralBalance={BigInt(collateralAmount)}
+          debtBalance={BigInt(nominalDebt)}
+        />
       )}
     </>
   );
