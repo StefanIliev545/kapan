@@ -5,12 +5,13 @@ interface BaseModalProps {
   onClose: () => void;
   children: ReactNode;
   maxWidthClass?: string;
+  boxClassName?: string;
 }
 
-export const BaseModal: FC<BaseModalProps> = ({ isOpen, onClose, children, maxWidthClass = "max-w-md" }) => {
+export const BaseModal: FC<BaseModalProps> = ({ isOpen, onClose, children, maxWidthClass = "max-w-md", boxClassName = "" }) => {
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className={`modal-box ${maxWidthClass}`}>
+      <div className={`modal-box ${maxWidthClass} ${boxClassName}`}>
         {children}
       </div>
       <form method="dialog" className="modal-backdrop" onClick={onClose}>

@@ -23,6 +23,9 @@ export const BorrowModal: FC<BorrowModalProps> = ({
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
   const { execute, buildTx } = useLendingAction("evm", "Borrow", token.address, protocolName, decimals);
+  if (token.decimals == null) {
+    token.decimals = decimals;
+  }
   return (
     <TokenActionModal
       isOpen={isOpen}

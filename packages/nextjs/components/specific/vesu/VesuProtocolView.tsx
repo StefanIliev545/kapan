@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { ContractResponse, POOL_IDS, VesuMarkets } from "./VesuMarkets";
 import { VesuPosition } from "./VesuPosition";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
@@ -15,8 +15,7 @@ export const VesuProtocolView: FC = () => {
   const { address: userAddress, status } = useAccount();
   const poolId = POOL_IDS["Genesis"];
 
-  const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
-  const refetchCounter = useRef(0);
+  const POSITIONS_REFETCH_INTERVAL = 5000; // 5 seconds
 
   const { data: supportedAssets, error: assetsError } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -39,8 +38,7 @@ export const VesuProtocolView: FC = () => {
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 0n, 3n],
-    watch: true,
-    refetchInterval: positionsRefetchInterval,
+    refetchInterval: POSITIONS_REFETCH_INTERVAL,
   });
   const {
     data: userPositionsPart2,
@@ -51,8 +49,7 @@ export const VesuProtocolView: FC = () => {
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 3n, 10n],
-    watch: true,
-    refetchInterval: positionsRefetchInterval,
+    refetchInterval: POSITIONS_REFETCH_INTERVAL,
   });
 
   if (positionsError1) {
@@ -68,13 +65,6 @@ export const VesuProtocolView: FC = () => {
     return [...p1, ...p2];
   }, [userPositionsPart1, userPositionsPart2]);
 
-  useEffect(() => {
-    if (!userAddress) return;
-    refetchCounter.current += 1;
-    if (refetchCounter.current >= 3) {
-      setPositionsRefetchInterval(5000);
-    }
-  }, [mergedUserPositions, userAddress]);
 
   const isUpdating = isFetching1 || isFetching2;
 
@@ -89,8 +79,6 @@ export const VesuProtocolView: FC = () => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
-    refetchCounter.current = 0;
-    setPositionsRefetchInterval(2000);
     setCachedPositions([]);
     setHasLoadedOnce(false);
     if (userAddress) {

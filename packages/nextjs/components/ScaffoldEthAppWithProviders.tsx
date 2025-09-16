@@ -77,7 +77,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       paymasterProvider={paymasterProvider}
       connectors={connectorsRef.current ?? []}
       explorer={starkscan}
-      autoConnect={false}
+      autoConnect={true}
     >
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
