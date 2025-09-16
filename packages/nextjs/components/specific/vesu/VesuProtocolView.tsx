@@ -156,7 +156,7 @@ export const VesuProtocolView: FC = () => {
   const assetsWithRates = useMemo<AssetWithRates[]>(() => {
     if (!supportedAssets) return [];
 
-    return (supportedAssets as ContractResponse).map(asset => {
+    return (supportedAssets as unknown as ContractResponse).map(asset => {
       if (asset.scale === 0n) {
         return { ...asset, borrowAPR: 0, supplyAPY: 0 };
       }
@@ -224,14 +224,13 @@ export const VesuProtocolView: FC = () => {
   const vesuRows = useMemo<VesuPositionRow[]>(() => {
     if (assetMap.size === 0) return [];
 
-    return cachedPositions
-      .map((position, index) => {
+    return cachedPositions.flatMap((position, index) => {
         const collateralAddress = toHexAddress(position[0]);
         const debtAddress = toHexAddress(position[1]);
         const positionData = position[2];
 
         const collateralMetadata = assetMap.get(collateralAddress);
-        if (!collateralMetadata) return null;
+        if (!collateralMetadata) return [];
 
         const collateralSymbol = feltToString(collateralMetadata.symbol);
         const collateralPrice = normalizePrice(collateralMetadata.price);
@@ -288,16 +287,17 @@ export const VesuProtocolView: FC = () => {
           debtSymbol = feltToString(debtMetadata.symbol);
         }
 
-        return {
-          key: `${collateralAddress}-${debtAddress}-${index}`,
-          supply: supplyPosition,
-          borrow: borrowPosition,
-          isVtoken: positionData.is_vtoken,
-          collateralSymbol,
-          debtSymbol,
-        };
-      })
-      .filter((row): row is VesuPositionRow => row !== null);
+        return [
+          {
+            key: `${collateralAddress}-${debtAddress}-${index}`,
+            supply: supplyPosition,
+            borrow: borrowPosition,
+            isVtoken: positionData.is_vtoken,
+            collateralSymbol,
+            debtSymbol,
+          },
+        ];
+      });
   }, [assetMap, cachedPositions, poolId]);
 
   const totalNetBalance = useMemo(() => {
