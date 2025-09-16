@@ -482,7 +482,7 @@ const buildDebtSwitchInstructions = ({
       max_in: toOutputPointer(borrowIndex),
       user: address,
       should_pay_out: false,
-      should_pay_in: false,
+      should_pay_in: true,
       context: new CairoOption(CairoOptionVariant.Some, avnuData),
     },
     ReswapExactIn: undefined,
