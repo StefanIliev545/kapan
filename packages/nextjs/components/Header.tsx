@@ -9,7 +9,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BanknotesIcon,
   Bars3Icon,
-  BeakerIcon,
   DocumentChartBarIcon,
   SparklesIcon,
   WalletIcon,
@@ -17,7 +16,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
-import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { GasTokenSelector } from "~~/components/GasTokenSelector";
+import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 
 type HeaderMenuLink = {
@@ -254,21 +254,8 @@ export const Header = () => {
                                 <CustomConnectButton />
                               </div>
                               <div className="h-7 w-[1px] bg-base-300"></div>
-                              <div className="px-3 py-1.5 opacity-70">
-                                <Image
-                                  width={18}
-                                  height={18}
-                                  alt="Starknet Logo"
-                                  className="dark:hidden"
-                                  src="/logos/starknet.svg"
-                                />
-                                <Image
-                                  width={18}
-                                  height={18}
-                                  alt="Starknet Logo"
-                                  className="hidden dark:block"
-                                  src="/logos/starknet-dark.svg"
-                                />
+                              <div className="px-3 py-1.5">
+                                <GasTokenSelector />
                               </div>
                             </div>
                             {/* Removed Stark faucet and FaucetButton from mobile drawer */}
@@ -351,15 +338,8 @@ export const Header = () => {
                   <CustomConnectButton />
                 </div>
                 <div className="h-7 w-[1px] bg-base-300"></div>
-                <div className="px-3 py-1.5 opacity-70">
-                  <Image width={18} height={18} alt="Starknet Logo" className="dark:hidden" src="/logos/starknet.svg" />
-                  <Image
-                    width={18}
-                    height={18}
-                    alt="Starknet Logo"
-                    className="hidden dark:block"
-                    src="/logos/starknet-dark.svg"
-                  />
+                <div className="px-3 py-1.5">
+                  <GasTokenSelector />
                 </div>
               </div>
               {/* Removed Stark faucet and FaucetButton from desktop header */}

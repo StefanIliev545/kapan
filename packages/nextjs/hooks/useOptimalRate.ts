@@ -43,22 +43,32 @@ export const useOptimalRate = ({ networkType, tokenAddress, type }: UseOptimalRa
 
     // EVM path: contract returns [protocols: string[], rates: uint256[], success: bool[]]
     const [protocols, rates, success] = data as unknown as [string[], bigint[] | string[], boolean[]];
-    let maxIx = -1;
-    let maxRate = 0n;
+    let bestIx = -1;
+    let bestRate: bigint | undefined;
     for (let i = 0; i < (rates?.length || 0); i++) {
       const ok = success?.[i];
       const r = BigInt((rates as any)[i] ?? 0);
-      if (ok && r > maxRate) {
-        maxRate = r;
-        maxIx = i;
+      if (!ok) continue;
+
+      if (bestRate === undefined) {
+        bestRate = r;
+        bestIx = i;
+        continue;
+      }
+
+      // For supply we want the highest rate, for borrow the lowest
+      if (type === "borrow" ? r < bestRate : r > bestRate) {
+        bestRate = r;
+        bestIx = i;
       }
     }
-    if (maxIx === -1) return { protocol: "", rate: 0 };
 
-    const protocol = protocols?.[maxIx] || "";
+    if (bestIx === -1 || bestRate === undefined) return { protocol: "", rate: 0 };
+
+    const protocol = protocols?.[bestIx] || "";
     // EVM rates are scaled by 1e8 per useProtocolRates/useTokenData
-    const rate = Number(maxRate) / 1e8;
+    const rate = Number(bestRate) / 1e8;
     return { protocol, rate };
-  }, [data, networkType]);
+  }, [data, networkType, type]);
 };
 

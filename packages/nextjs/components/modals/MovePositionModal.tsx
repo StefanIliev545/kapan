@@ -1,18 +1,18 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
+import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
+import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
+import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { getProtocolLogo } from "~~/utils/protocol";
-import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
-import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -44,11 +44,7 @@ const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
 // Extend the collateral type with rawBalance
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
   const { address: userAddress } = useAccount();
-  const protocols = [
-    { name: "Aave V3" },
-    { name: "Compound V3" },
-    { name: "Venus" },
-  ];
+  const protocols = [{ name: "Aave V3" }, { name: "Compound V3" }, { name: "Venus" }];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
@@ -112,10 +108,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     const prices = tokenPrices as unknown as bigint[];
     const addresses = [...collateralsForSelector.map(c => c.address), position.tokenAddress];
     return {
-      tokenToPrices: prices.reduce((acc, price, index) => {
-        acc[addresses[index].toLowerCase()] = price / 10n ** 10n;
-        return acc;
-      }, {} as Record<string, bigint>),
+      tokenToPrices: prices.reduce(
+        (acc, price, index) => {
+          acc[addresses[index].toLowerCase()] = price / 10n ** 10n;
+          return acc;
+        },
+        {} as Record<string, bigint>,
+      ),
     };
   }, [tokenPrices, collateralsForSelector, position.tokenAddress]);
 
@@ -324,9 +323,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   };
 
   // Handler for collateral selection and amount changes
-  const handleCollateralSelectionChange = (collaterals: CollateralWithAmount[]) => {
+  const handleCollateralSelectionChange = useCallback((collaterals: CollateralWithAmount[]) => {
     setSelectedCollateralsWithAmounts(collaterals);
-  };
+  }, []);
 
   const isActionDisabled =
     loading ||
@@ -338,7 +337,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     step !== "idle";
 
   return (
-    <dialog className={`modal ${isOpen ? "modal-open" : ""}`}> 
+    <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[360px] p-6 rounded-none flex flex-col">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-full flex-grow">
           {/* FROM SECTION */}
@@ -376,9 +375,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <div className="text-center mb-2">
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
                   Debt
-                  {position.type === "supply" && (
-                    <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />
-                  )}
+                  {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
                 </label>
                 <div className="text-xs text-base-content/60">
                   Available: {formatDisplayNumber(formattedTokenBalance)} {position.name}
@@ -430,11 +427,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
             <div className="flex justify-between text-sm text-base-content/70">
               <span>Debt Value: ${formatDisplayNumber(debtUsdValue)}</span>
-              {position.type === "borrow" && (
-                <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>
-              )}
+              {position.type === "borrow" && <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>}
             </div>
-
           </div>
 
           {/* TO SECTION */}
@@ -444,122 +438,123 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
-                    className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
-                  >
-                    <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                      {selectedProtocol ? (
-                        <>
-                          <Image
-                            src={getProtocolLogo(selectedProtocol)}
-                            alt={selectedProtocol}
-                            width={32}
-                            height={32}
-                            className="rounded-full min-w-[32px]"
-                          />
-                          <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
-                        </>
-                      ) : (
-                        <span className="text-base-content/50">Select protocol</span>
-                      )}
-                    </div>
-                    <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
+                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
+                >
+                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                    {selectedProtocol ? (
+                      <>
+                        <Image
+                          src={getProtocolLogo(selectedProtocol)}
+                          alt={selectedProtocol}
+                          width={32}
+                          height={32}
+                          className="rounded-full min-w-[32px]"
+                        />
+                        <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
+                      </>
+                    ) : (
+                      <span className="text-base-content/50">Select protocol</span>
+                    )}
                   </div>
-                  <ul
-                    tabIndex={0}
-                    className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                  >
-                    {protocols
-                      .filter(p => p.name !== fromProtocol)
-                      .map(protocol => (
-                        <li key={protocol.name}>
-                          <button
-                            className="flex items-center gap-3 py-2"
-                            onClick={() => setSelectedProtocol(protocol.name)}
-                          >
-                            <Image
-                              src={getProtocolLogo(protocol.name)}
-                              alt={protocol.name}
-                              width={32}
-                              height={32}
-                              className="rounded-full min-w-[32px]"
-                            />
-                            <span className="truncate text-lg">{protocol.name}</span>
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
+                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
-                <div className="dropdown w-full">
-                  <div
-                    tabIndex={0}
-                    className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
-                  >
-                    <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                      <Image
-                        src={selectedFlashLoanProvider.icon}
-                        alt={selectedFlashLoanProvider.name}
-                        width={32}
-                        height={32}
-                        className="rounded-full min-w-[32px]"
-                      />
-                      <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
-                      {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
-                    </div>
-                    <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                  <ul
-                    tabIndex={0}
-                    className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                  >
-                    {FLASH_LOAN_PROVIDERS.map(provider => (
-                      <li key={provider.name}>
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                >
+                  {protocols
+                    .filter(p => p.name !== fromProtocol)
+                    .map(protocol => (
+                      <li key={protocol.name}>
                         <button
                           className="flex items-center gap-3 py-2"
-                          onClick={() => setSelectedFlashLoanProvider(provider)}
+                          onClick={() => setSelectedProtocol(protocol.name)}
                         >
                           <Image
-                            src={provider.icon}
-                            alt={provider.name}
+                            src={getProtocolLogo(protocol.name)}
+                            alt={protocol.name}
                             width={32}
                             height={32}
                             className="rounded-full min-w-[32px]"
                           />
-                          <span className="truncate text-lg">{provider.name}</span>
+                          <span className="truncate text-lg">{protocol.name}</span>
                         </button>
                       </li>
                     ))}
-                  </ul>
-                </div>
+                </ul>
               </div>
-
-              {hasProviderSufficientBalance !== null && amount && (
-                <div
-                  className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
-                    hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
-                  }`}
-                >
-                  {hasProviderSufficientBalance ? (
-                    <>
-                      <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this transaction.
-                    </>
-                  ) : (
-                    <>
-                      <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
-                      flash loan.
-                    </>
-                  )}
-                </div>
-              )}
             </div>
+
+            <div>
+              <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
+              <div className="dropdown w-full">
+                <div
+                  tabIndex={0}
+                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
+                >
+                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                    <Image
+                      src={selectedFlashLoanProvider.icon}
+                      alt={selectedFlashLoanProvider.name}
+                      width={32}
+                      height={32}
+                      className="rounded-full min-w-[32px]"
+                    />
+                    <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
+                    {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
+                  </div>
+                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                >
+                  {FLASH_LOAN_PROVIDERS.map(provider => (
+                    <li key={provider.name}>
+                      <button
+                        className="flex items-center gap-3 py-2"
+                        onClick={() => setSelectedFlashLoanProvider(provider)}
+                      >
+                        <Image
+                          src={provider.icon}
+                          alt={provider.name}
+                          width={32}
+                          height={32}
+                          className="rounded-full min-w-[32px]"
+                        />
+                        <span className="truncate text-lg">{provider.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {hasProviderSufficientBalance !== null && amount && (
+              <div
+                className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
+                  hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
+                }`}
+              >
+                {hasProviderSufficientBalance ? (
+                  <>
+                    <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this
+                    transaction.
+                  </>
+                ) : (
+                  <>
+                    <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
+                    flash loan.
+                  </>
+                )}
+              </div>
+            )}
           </div>
+        </div>
         <div className="flex justify-end pt-6 mt-auto">
           <button
             className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${

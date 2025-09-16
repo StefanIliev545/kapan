@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { useTransactor } from "./useTransactor";
+import { useSmartTransactor } from "./useSmartTransactor";
 import { Abi, useNetwork, useSendTransaction } from "@starknet-react/core";
 import { Call, InvocationsDetails, Contract as StarknetJsContract } from "starknet";
 import { notification } from "~~/utils/scaffold-stark";
@@ -30,7 +30,7 @@ export const useScaffoldMultiWriteContract = <
 }) => {
   const { targetNetwork } = useTargetNetwork();
   const { chain } = useNetwork();
-  const sendTxnWrapper = useTransactor();
+  const sendTxnWrapper = useSmartTransactor();
 
   // TODO add custom options
 

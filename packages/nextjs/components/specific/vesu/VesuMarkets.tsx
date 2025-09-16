@@ -31,9 +31,10 @@ interface VesuMarketsProps {
   supportedAssets?: ContractResponse;
   viewMode: "list" | "grid";
   search: string;
+  allowDeposit?: boolean;
 }
 
-export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, search }) => {
+export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, search, allowDeposit = false }) => {
 
   const markets: MarketData[] = useMemo(() => {
     if (!supportedAssets) return [];
@@ -57,9 +58,10 @@ export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, s
         address,
         networkType: "starknet",
         protocol: "vesu",
+        allowDeposit,
       } as MarketData;
     });
-  }, [supportedAssets]);
+  }, [supportedAssets, allowDeposit]);
 
   return <MarketsSection title="Vesu Markets" markets={markets} viewMode={viewMode} search={search} />;
 };

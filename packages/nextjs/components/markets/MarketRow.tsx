@@ -13,6 +13,7 @@ type MarketRowProps = {
   address: string;
   networkType: "evm" | "starknet";
   protocol: string;
+  allowDeposit?: boolean;
 };
 
 export const MarketRow: FC<MarketRowProps> = ({
@@ -25,6 +26,7 @@ export const MarketRow: FC<MarketRowProps> = ({
   address,
   networkType,
   protocol,
+  allowDeposit = false,
 }) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
@@ -56,7 +58,7 @@ export const MarketRow: FC<MarketRowProps> = ({
                 labels="center"
               />
             </div>
-            {networkType === "starknet" && (
+            {allowDeposit && networkType === "starknet" && (
               <button
                 className="btn btn-sm btn-primary ml-auto"
                 onClick={() => setIsDepositModalOpen(true)}
@@ -74,7 +76,7 @@ export const MarketRow: FC<MarketRowProps> = ({
               <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{name}</span>
             </div>
-            {networkType === "starknet" && (
+            {allowDeposit && networkType === "starknet" && (
               <button
                 className="btn btn-sm btn-primary"
                 onClick={() => setIsDepositModalOpen(true)}
@@ -111,7 +113,7 @@ export const MarketRow: FC<MarketRowProps> = ({
               <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{name}</span>
             </div>
-            {networkType === "starknet" && (
+            {allowDeposit && networkType === "starknet" && (
               <button
                 className="btn btn-xs btn-primary"
                 onClick={() => setIsDepositModalOpen(true)}
@@ -142,7 +144,7 @@ export const MarketRow: FC<MarketRowProps> = ({
         </div>
       </div>
 
-      {networkType === "starknet" && (
+      {allowDeposit && networkType === "starknet" && (
         <DepositModalStark
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}
