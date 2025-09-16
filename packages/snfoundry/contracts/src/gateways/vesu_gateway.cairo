@@ -83,6 +83,13 @@ trait IERC20Symbol<TContractState> {
     fn symbol(self: @TContractState) -> felt252;
 }
 
+#[derive(Copy, Drop)]
+struct InstructionPair {
+    first: usize,
+    second: usize,
+    paired: bool,
+}
+
 #[starknet::contract]
 mod VesuGateway {
     use alexandria_math::i257::{I257Impl, i257};
@@ -165,6 +172,133 @@ mod VesuGateway {
 
     #[generate_trait]
     impl VesuGatewayInternal of IVesuGatewayInternal {
+        // Pairing support: represent a (possibly) paired instruction window
+      
+
+        // Identify instruction categories
+        fn is_collateral_action(self: @ContractState, instr: @LendingInstruction) -> bool {
+            match instr {
+                LendingInstruction::Deposit(_) => true,
+                LendingInstruction::Withdraw(_) => true,
+                _ => false,
+            }
+        }
+
+        fn is_debt_action(self: @ContractState, instr: @LendingInstruction) -> bool {
+            match instr {
+                LendingInstruction::Borrow(_) => true,
+                LendingInstruction::Repay(_) => true,
+                _ => false,
+            }
+        }
+
+        // Extract normalized pair key (pool, collateral, debt, user) for matching
+        fn extract_pair_key(
+            self: @ContractState,
+            instr: @LendingInstruction,
+        ) -> (felt252, ContractAddress, ContractAddress, ContractAddress, bool) {
+            match instr {
+                LendingInstruction::Deposit(params) => {
+                    let basic = *params.basic;
+                    let mut pool = self.pool_id.read();
+                    let mut debt: ContractAddress = Zero::zero();
+                    if params.context.is_some() {
+                        let mut ctx_bytes: Span<felt252> = (*params.context).unwrap();
+                        let vesu_ctx: VesuContext = Serde::deserialize(ref ctx_bytes).unwrap();
+                        if vesu_ctx.pool_id != Zero::zero() { pool = vesu_ctx.pool_id; }
+                        if vesu_ctx.position_counterpart_token != Zero::zero() { debt = vesu_ctx.position_counterpart_token; }
+                    }
+                    (pool, basic.token, debt, basic.user, true)
+                },
+                LendingInstruction::Withdraw(params) => {
+                    let basic = *params.basic;
+                    let mut pool = self.pool_id.read();
+                    let mut debt: ContractAddress = Zero::zero();
+                    if params.context.is_some() {
+                        let mut ctx_bytes: Span<felt252> = (*params.context).unwrap();
+                        let vesu_ctx: VesuContext = Serde::deserialize(ref ctx_bytes).unwrap();
+                        if vesu_ctx.pool_id != Zero::zero() { pool = vesu_ctx.pool_id; }
+                        if vesu_ctx.position_counterpart_token != Zero::zero() { debt = vesu_ctx.position_counterpart_token; }
+                    }
+                    (pool, basic.token, debt, basic.user, true)
+                },
+                LendingInstruction::Borrow(params) => {
+                    let basic = *params.basic;
+                    let ctx = *params.context;
+                    let mut ctx_bytes = ctx.unwrap();
+                    let vesu_ctx: VesuContext = Serde::deserialize(ref ctx_bytes).unwrap();
+                    let mut pool = self.pool_id.read();
+                    if vesu_ctx.pool_id != Zero::zero() { pool = vesu_ctx.pool_id; }
+                    (pool, vesu_ctx.position_counterpart_token, basic.token, basic.user, false)
+                },
+                LendingInstruction::Repay(params) => {
+                    let basic = *params.basic;
+                    let ctx = *params.context;
+                    let mut ctx_bytes = ctx.unwrap();
+                    let vesu_ctx: VesuContext = Serde::deserialize(ref ctx_bytes).unwrap();
+                    let mut pool = self.pool_id.read();
+                    if vesu_ctx.pool_id != Zero::zero() { pool = vesu_ctx.pool_id; }
+                    (pool, vesu_ctx.position_counterpart_token, basic.token, basic.user, false)
+                },
+                _ => { (0, Zero::zero(), Zero::zero(), Zero::zero(), false) },
+            }
+        }
+
+        // Order-agnostic pairing: sequentially group instructions by key (pool, collateral, debt, user)
+        fn pair_instructions(
+            self: @ContractState,
+            instrs: Span<LendingInstruction>,
+        ) -> Array<InstructionPair> {
+            let mut pairs: Array<InstructionPair> = array![];
+            let mut pending_index_opt: Option<usize> = Option::None(());
+            let mut pending_pool: felt252 = 0;
+            let mut pending_collateral: ContractAddress = Zero::zero();
+            let mut pending_debt: ContractAddress = Zero::zero();
+            let mut pending_user: ContractAddress = Zero::zero();
+
+            let len = instrs.len();
+            let mut i: usize = 0;
+            while i != len {
+                let curr = instrs.at(i);
+                let (p, c, d, u, _) = self.extract_pair_key(curr);
+
+                match pending_index_opt {
+                    Option::Some(pending_index) => {
+                        // Match if same (pool, collateral, user) and debt equal or either one is zero
+                        let debts_match = pending_debt == Zero::zero() || d == Zero::zero() || pending_debt == d;
+                        if p == pending_pool && c == pending_collateral && u == pending_user && debts_match {
+                            pairs.append(InstructionPair { first: pending_index, second: i, paired: true });
+                            pending_index_opt = Option::None(());
+                        } else {
+                            pairs.append(InstructionPair { first: pending_index, second: 0, paired: false });
+                            pending_index_opt = Option::Some(i);
+                            pending_pool = p;
+                            pending_collateral = c;
+                            pending_debt = d;
+                            pending_user = u;
+                        }
+                    },
+                    Option::None(()) => {
+                        pending_index_opt = Option::Some(i);
+                        pending_pool = p;
+                        pending_collateral = c;
+                        pending_debt = d;
+                        pending_user = u;
+                    },
+                }
+                i += 1;
+            };
+
+            // Flush any remaining pending as a single
+            match pending_index_opt {
+                Option::Some(pending_index) => {
+                    pairs.append(InstructionPair { first: pending_index, second: 0, paired: false });
+                },
+                Option::None(()) => { },
+            }
+
+            pairs
+        }
         fn get_vtoken_for_collateral(
             self: @ContractState, collateral: ContractAddress,
             pool_id: felt252,
@@ -177,7 +311,7 @@ mod VesuGateway {
             extension.v_token_for_collateral_asset(pool_id, collateral)
         }
 
-        fn deposit(ref self: ContractState, instruction: @Deposit) {
+        fn deposit(ref self: ContractState, instruction: @Deposit) -> ModifyPositionParams {
             let basic = *instruction.basic;
             let mut pool_id = self.pool_id.read();
             let mut debt_asset = Zero::zero(); // Zero debt token for deposit
@@ -208,13 +342,13 @@ mod VesuGateway {
 
             // Create positive i257 for deposit
             let collateral_amount = I257Impl::new(basic.amount, false);
-            let response = self
-                .modify_collateral_for(
+            self
+                .build_modify_params_collateral(
                     pool_id, collateral_asset, debt_asset, user, collateral_amount,
-                );
+                )
         }
 
-        fn withdraw(ref self: ContractState, instruction: @Withdraw) -> u256 {
+        fn withdraw(ref self: ContractState, instruction: @Withdraw) -> ModifyPositionParams {
             let basic = *instruction.basic;
             let mut pool_id = self.pool_id.read();
             let collateral_asset = basic.token;
@@ -235,17 +369,10 @@ mod VesuGateway {
 
             // Create negative i257 for withdraw
             let collateral_amount = I257Impl::new(basic.amount, true);
-            let response = self
-                .modify_collateral_for(
+            self
+                .build_modify_params_collateral(
                     pool_id, collateral_asset, debt_asset, user, collateral_amount,
-                );
-
-            let amount = response.collateral_delta.abs();
-            // Transfer tokens back to user using the actual amount withdrawn
-            let erc20 = IERC20Dispatcher { contract_address: basic.token };
-            let result = erc20.transfer(get_caller_address(), amount);
-            assert(result, Errors::TRANSFER_FAILED);
-            amount
+                )
         }
 
         // @dev - moves the assets in vesu between a collateral + zero key to collateral + debt key.
@@ -289,14 +416,14 @@ mod VesuGateway {
 
         // @dev - calls modify on vesu with a delta in the collateral. This means both deposit and withdraw logic
         // is handled here. 
-        fn modify_collateral_for(
+        fn build_modify_params_collateral(
             ref self: ContractState,
             pool_id: felt252,
             collateral_asset: ContractAddress,
             debt_asset: ContractAddress,
             user: ContractAddress,
             collateral_amount: i257,
-        ) -> UpdatePositionResponse {
+        ) -> ModifyPositionParams {
             let singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
             };
@@ -338,10 +465,10 @@ mod VesuGateway {
                 debt: Default::default(),
                 data: ArrayTrait::new().span(),
             };
-            singleton_dispatcher.modify_position(modify_params)
+            modify_params
         }
 
-        fn borrow(ref self: ContractState, instruction: @Borrow) -> u256 {
+        fn borrow(ref self: ContractState, instruction: @Borrow) -> ModifyPositionParams {
             let basic = *instruction.basic;
             let context = *instruction.context;
             self.assert_router_or_user(basic.user);
@@ -359,17 +486,11 @@ mod VesuGateway {
 
             // Create positive i257 for borrow
             let debt_amount = I257Impl::new(basic.amount, false);
-            self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
-
-            // Transfer debt tokens to user
-            let erc20 = IERC20Dispatcher { contract_address: debt_asset };
-            let result = erc20.transfer(get_caller_address(), basic.amount);
-            assert(result, Errors::TRANSFER_FAILED);
-            basic.amount
+            self.build_modify_params_debt(pool_id, collateral_asset, debt_asset, user, debt_amount)
         }
 
 
-        fn repay(ref self: ContractState, instruction: @Repay) -> (u256, u256) {
+        fn repay(ref self: ContractState, instruction: @Repay) -> (ModifyPositionParams, u256, u256) {
             let basic = *instruction.basic;
             let context = *instruction.context;
             assert(context.is_some(), 'Context is required for repay');
@@ -398,26 +519,21 @@ mod VesuGateway {
 
             // Create negative i257 for repay (reducing debt)
             let debt_amount = I257Impl::new(to_repay, true);
-            self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
-
             let refund = if basic.amount > to_repay { basic.amount - to_repay } else { 0 };
-            if refund > 0 {
-                assert(erc20.transfer(get_caller_address(), refund), 'transfer failed');
-            }
-            (to_repay, refund)
+            (self.build_modify_params_debt(pool_id, collateral_asset, debt_asset, user, debt_amount), to_repay, refund)
         }
 
         // @dev - This calls vesu to modify a position. Positions in vesu are marked by collateral/debt pairs,
         // so in case its a first time borrow on this pair transfer must be called first in order to switch the position
         // key in vesu.
-        fn modify_debt_for(
+        fn build_modify_params_debt(
             ref self: ContractState,
             pool_id: felt252,
             collateral_asset: ContractAddress,
             debt_asset: ContractAddress,
             user: ContractAddress,
             debt_amount: i257,
-        ) {
+        ) -> ModifyPositionParams {
             let singleton_dispatcher = ISingletonDispatcher {
                 contract_address: self.vesu_singleton.read(),
             };
@@ -443,7 +559,157 @@ mod VesuGateway {
                 },
                 data: ArrayTrait::new().span(),
             };
-            singleton_dispatcher.modify_position(modify_params);
+            modify_params
+        }
+        
+        fn merge_modify_params(
+            self: @ContractState,
+            collateral_params: ModifyPositionParams,
+            debt_params: ModifyPositionParams,
+        ) -> ModifyPositionParams {
+            let chosen_debt_asset = if debt_params.debt_asset != Zero::zero() { debt_params.debt_asset } else { collateral_params.debt_asset };
+            ModifyPositionParams {
+                pool_id: collateral_params.pool_id,
+                collateral_asset: collateral_params.collateral_asset,
+                debt_asset: chosen_debt_asset,
+                user: collateral_params.user,
+                collateral: collateral_params.collateral,
+                debt: debt_params.debt,
+                data: ArrayTrait::new().span(),
+            }
+        }
+
+        fn is_amount_effective(self: @ContractState, amount: Amount) -> bool {
+            let zero_i = I257Impl::new(0, false);
+            amount.amount_type == AmountType::Target || amount.value != zero_i
+        }
+
+        fn build_group_indices(self: @ContractState, pair: InstructionPair) -> Array<usize> {
+            let mut group: Array<usize> = array![];
+            group.append(pair.first);
+            if pair.paired { group.append(pair.second); }
+            group
+        }
+
+        fn build_params_for_group(
+            ref self: ContractState,
+            instructions: Span<LendingInstruction>,
+            group: Span<usize>,
+        ) -> Array<ModifyPositionParams> {
+            let mut params_list: Array<ModifyPositionParams> = ArrayTrait::new();
+            for gidx in group {
+                let idx = *gidx;
+                match instructions.at(idx) {
+                    LendingInstruction::Deposit(dep) => {
+                        let p = self.deposit(dep);
+                        params_list.append(p);
+                    },
+                    LendingInstruction::Withdraw(wd) => {
+                        let p = self.withdraw(wd);
+                        params_list.append(p);
+                    },
+                    LendingInstruction::Borrow(bor) => {
+                        let p = self.borrow(bor);
+                        params_list.append(p);
+                    },
+                    LendingInstruction::Repay(rep) => {
+                        let (p, _, _) = self.repay(rep);
+                        params_list.append(p);
+                    },
+                    _ => {}
+                }
+            };
+            params_list
+        }
+
+        fn merge_and_execute(
+            ref self: ContractState,
+            params_list: Span<ModifyPositionParams>,
+        ) -> UpdatePositionResponse {
+            let singleton_dispatcher = ISingletonDispatcher { contract_address: self.vesu_singleton.read() };
+            if params_list.len() == 2 {
+                let first = *params_list.at(0);
+                let second = *params_list.at(1);
+                // Choose effective amounts regardless of instruction type
+                let coll = if self.is_amount_effective(first.collateral) { first.collateral } else { second.collateral };
+                let debt = if self.is_amount_effective(first.debt) { first.debt } else { second.debt };
+                let chosen_debt_asset = if self.is_amount_effective(second.debt) { second.debt_asset } else { first.debt_asset };
+                let merged = ModifyPositionParams {
+                    pool_id: if first.pool_id != 0 { first.pool_id } else { second.pool_id },
+                    collateral_asset: if first.collateral_asset != Zero::zero() { first.collateral_asset } else { second.collateral_asset },
+                    debt_asset: if chosen_debt_asset != Zero::zero() { chosen_debt_asset } else { first.debt_asset },
+                    user: if first.user != Zero::zero() { first.user } else { second.user },
+                    collateral: coll,
+                    debt: debt,
+                    data: ArrayTrait::new().span(),
+                };
+                singleton_dispatcher.modify_position(merged)
+            } else {
+                let single = *params_list.at(0);
+                singleton_dispatcher.modify_position(single)
+            }
+        }
+
+        fn post_actions_for_group(
+            ref self: ContractState,
+            instructions: Span<LendingInstruction>,
+            group: Span<usize>,
+            response: UpdatePositionResponse,
+        ) -> Array<Span<InstructionOutput>> {
+            let mut outs_all: Array<Span<InstructionOutput>> = array![];
+            let withdrawn = response.collateral_delta.abs();
+            let debt_changed = response.debt_delta.abs();
+            for gidx in group {
+                let idx = *gidx;
+                match instructions.at(idx) {
+                    LendingInstruction::Deposit(dep) => {
+                        let dep = *dep;
+                        let token = dep.basic.token;
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance: 0 });
+                        outs_all.append(outs.span());
+                    },
+                    LendingInstruction::Withdraw(wd) => {
+                        let wd = *wd;
+                        let token = wd.basic.token;
+                        if withdrawn > 0 { 
+                            let erc20 = IERC20Dispatcher { contract_address: token }; 
+                            assert(erc20.transfer(get_caller_address(), withdrawn), Errors::TRANSFER_FAILED); 
+                        }
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance: withdrawn });
+                        outs_all.append(outs.span());
+                    },
+                    LendingInstruction::Borrow(bor) => {
+                        let bor = *bor;
+                        let token = bor.basic.token;
+                        if debt_changed > 0 { 
+                            let erc20 = IERC20Dispatcher { contract_address: token }; 
+                            assert(erc20.transfer(get_caller_address(), debt_changed), Errors::TRANSFER_FAILED); 
+                        }
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance: debt_changed });
+                        outs_all.append(outs.span());
+                    },
+                    LendingInstruction::Repay(rep) => {
+                        let rep = *rep;
+                        let token = rep.basic.token;
+                        let requested = rep.basic.amount;
+                        let repaid = debt_changed;
+                        let refund = if requested > repaid { requested - repaid } else { 0 };
+                        if refund > 0 { 
+                            let erc20 = IERC20Dispatcher { contract_address: token }; 
+                            assert(erc20.transfer(get_caller_address(), refund), Errors::TRANSFER_FAILED); 
+                        }
+                        let mut outs = array![];
+                        outs.append(InstructionOutput { token, balance: repaid });
+                        outs.append(InstructionOutput { token, balance: refund });
+                        outs_all.append(outs.span());
+                    },
+                    _ => {}
+                }
+            };
+            outs_all
         }
 
         // @dev - helper function that should be used in places that bring money OUT of the lending protocols.
@@ -506,43 +772,22 @@ mod VesuGateway {
             ref self: ContractState,
             instructions: Span<LendingInstruction>
         ) -> Span<Span<InstructionOutput>> {
-            let mut i: usize = 0;
             let mut results = array![];
-            while i != instructions.len() {
-                match instructions.at(i) {
-                    LendingInstruction::Deposit(deposit_params) => {
-                        self.deposit(deposit_params);
-                        let token = *deposit_params.basic.token;
-                        let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: 0 });
-                        results.append(outs.span());
-                    },
-                    LendingInstruction::Withdraw(withdraw_params) => {
-                        let amount = self.withdraw(withdraw_params);
-                        let token = *withdraw_params.basic.token;
-                        let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: amount });
-                        results.append(outs.span());
-                    },
-                    LendingInstruction::Borrow(borrow_params) => {
-                        let amount = self.borrow(borrow_params);
-                        let token = *borrow_params.basic.token;
-                        let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: amount });
-                        results.append(outs.span());
-                    },
-                    LendingInstruction::Repay(repay_params) => {
-                        let (repaid_amount, refund_amount) = self.repay(repay_params);
-                        let token = *repay_params.basic.token;
-                        let mut outs = array![];
-                        outs.append(InstructionOutput { token, balance: repaid_amount });
-                        outs.append(InstructionOutput { token, balance: refund_amount });
-                        results.append(outs.span());
-                    },
-                    _ => {}
+            let pairs = self.pair_instructions(instructions);
+
+            let mut i: usize = 0;
+            let len = pairs.len();
+            while i != len {
+                let pair = *pairs.at(i);
+                let group = self.build_group_indices(pair);
+                let params_list = self.build_params_for_group(instructions, group.span());
+                let response = self.merge_and_execute(params_list.span());
+                let outs_arr = self.post_actions_for_group(instructions, group.span(), response);
+                for j in 0..outs_arr.len() {
+                    results.append(*outs_arr.at(j));
                 }
                 i += 1;
-            }
+            };
             results.span()
         }
 
