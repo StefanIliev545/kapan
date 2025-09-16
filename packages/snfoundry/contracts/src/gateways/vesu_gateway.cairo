@@ -114,9 +114,24 @@ mod VesuGateway {
     };
     use crate::interfaces::vesu_data::{
         Amount, AmountDenomination, AmountType, Context, ModifyPositionParams, Position,
-        TransferPositionParams, UnsignedAmount, UpdatePositionResponse,
+        TransferPositionParams, UnsignedAmount,
     };
     use super::*;
+
+    #[derive(Copy, Drop)]
+    struct PositionKey {
+        pool_id: felt252,
+        collateral_asset: ContractAddress,
+        debt_asset: ContractAddress,
+        user: ContractAddress,
+    }
+
+    #[derive(Copy, Drop)]
+    struct PendingPositionModification {
+        key: PositionKey,
+        collateral_delta: i257,
+        debt_delta: i257,
+    }
 
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -177,7 +192,220 @@ mod VesuGateway {
             extension.v_token_for_collateral_asset(pool_id, collateral)
         }
 
-        fn deposit(ref self: ContractState, instruction: @Deposit) {
+        fn zero_i257(self: @ContractState) -> i257 {
+            I257Impl::new(0, false)
+        }
+
+        fn is_i257_zero(self: @ContractState, value: i257) -> bool {
+            value.abs() == 0
+        }
+
+        fn add_i257(self: @ContractState, left: i257, right: i257) -> i257 {
+            let left_abs = left.abs();
+            let right_abs = right.abs();
+            if left.is_negative() == right.is_negative() {
+                let sum = left_abs + right_abs;
+                return I257Impl::new(sum, left.is_negative());
+            }
+            if left_abs >= right_abs {
+                let diff = left_abs - right_abs;
+                I257Impl::new(diff, left.is_negative())
+            } else {
+                let diff = right_abs - left_abs;
+                I257Impl::new(diff, right.is_negative())
+            }
+        }
+
+        fn keys_equal(self: @ContractState, left: PositionKey, right: PositionKey) -> bool {
+            left.pool_id == right.pool_id
+                && left.collateral_asset == right.collateral_asset
+                && left.debt_asset == right.debt_asset
+                && left.user == right.user
+        }
+
+        fn ensure_pending_entry(
+            ref self: ContractState,
+            ref pending: Array<PendingPositionModification>,
+            key: PositionKey,
+        ) -> usize {
+            let mut index: usize = 0;
+            let len = pending.len();
+            while index != len {
+                let entry = pending.at(index).read();
+                if self.keys_equal(entry.key, key) {
+                    return index;
+                }
+                index += 1;
+            };
+            let entry = PendingPositionModification {
+                key,
+                collateral_delta: self.zero_i257(),
+                debt_delta: self.zero_i257(),
+            };
+            pending.append(entry);
+            len
+        }
+
+        fn add_pending_collateral(
+            ref self: ContractState,
+            ref pending: Array<PendingPositionModification>,
+            key: PositionKey,
+            delta: i257,
+        ) {
+            if self.is_i257_zero(delta) {
+                return;
+            }
+            let index = self.ensure_pending_entry(ref pending, key);
+            let mut entry = pending.at(index).read();
+            entry.collateral_delta = self.add_i257(entry.collateral_delta, delta);
+            pending.at(index).write(entry);
+        }
+
+        fn add_pending_debt(
+            ref self: ContractState,
+            ref pending: Array<PendingPositionModification>,
+            key: PositionKey,
+            delta: i257,
+        ) {
+            if self.is_i257_zero(delta) {
+                return;
+            }
+            let index = self.ensure_pending_entry(ref pending, key);
+            let mut entry = pending.at(index).read();
+            entry.debt_delta = self.add_i257(entry.debt_delta, delta);
+            pending.at(index).write(entry);
+        }
+
+        fn flush_pending_for_key(
+            ref self: ContractState,
+            ref pending: Array<PendingPositionModification>,
+            key: PositionKey,
+            flush_collateral: bool,
+            flush_debt: bool,
+        ) {
+            let mut index: usize = 0;
+            let len = pending.len();
+            while index != len {
+                let entry = pending.at(index).read();
+                if self.keys_equal(entry.key, key) {
+                    let mut should_flush = false;
+                    if flush_collateral && !self.is_i257_zero(entry.collateral_delta) {
+                        should_flush = true;
+                    }
+                    if flush_debt && !self.is_i257_zero(entry.debt_delta) {
+                        should_flush = true;
+                    }
+                    if should_flush {
+                        self.execute_pending_modification(entry);
+                        let cleared = PendingPositionModification {
+                            key: entry.key,
+                            collateral_delta: self.zero_i257(),
+                            debt_delta: self.zero_i257(),
+                        };
+                        pending.at(index).write(cleared);
+                    }
+                    break;
+                }
+                index += 1;
+            };
+        }
+
+        fn execute_pending_modification(
+            ref self: ContractState,
+            entry: PendingPositionModification,
+        ) {
+            if self.is_i257_zero(entry.collateral_delta) && self.is_i257_zero(entry.debt_delta) {
+                return;
+            }
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+            if !self.is_i257_zero(entry.debt_delta) {
+                let (position, _, _) = singleton_dispatcher
+                    .position(entry.key.pool_id, entry.key.collateral_asset, entry.key.debt_asset, entry.key.user);
+                if position.collateral_shares == 0 && position.nominal_debt == 0 {
+                    self.transfer_position_for(
+                        entry.key.pool_id,
+                        entry.key.collateral_asset,
+                        entry.key.debt_asset,
+                        entry.key.user,
+                        0,
+                    );
+                }
+            }
+
+            let modify_params = ModifyPositionParams {
+                pool_id: entry.key.pool_id,
+                collateral_asset: entry.key.collateral_asset,
+                debt_asset: entry.key.debt_asset,
+                user: entry.key.user,
+                collateral: Amount {
+                    amount_type: AmountType::Delta,
+                    denomination: AmountDenomination::Assets,
+                    value: entry.collateral_delta,
+                },
+                debt: Amount {
+                    amount_type: AmountType::Delta,
+                    denomination: AmountDenomination::Assets,
+                    value: entry.debt_delta,
+                },
+                data: ArrayTrait::new().span(),
+            };
+            singleton_dispatcher.modify_position(modify_params);
+        }
+
+        fn flush_all_pending(
+            ref self: ContractState,
+            ref pending: Array<PendingPositionModification>,
+        ) {
+            let mut index: usize = 0;
+            let len = pending.len();
+            while index != len {
+                let entry = pending.at(index).read();
+                self.execute_pending_modification(entry);
+                index += 1;
+            };
+        }
+
+        fn prepare_withdraw_collateral_delta(
+            ref self: ContractState,
+            pool_id: felt252,
+            collateral_asset: ContractAddress,
+            debt_asset: ContractAddress,
+            user: ContractAddress,
+            collateral_amount: i257,
+        ) -> (i257, u256) {
+            if !collateral_amount.is_negative() {
+                let amount = collateral_amount.abs();
+                return (I257Impl::new(amount, false), amount);
+            }
+
+            let singleton_dispatcher = ISingletonDispatcher {
+                contract_address: self.vesu_singleton.read(),
+            };
+            let context = singleton_dispatcher.context(pool_id, collateral_asset, debt_asset, user);
+            let vesu_context: Context = context;
+
+            let vtoken = self.get_vtoken_for_collateral(collateral_asset, pool_id);
+            let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
+            let requested_shares = erc4626.convert_to_shares(collateral_amount.abs());
+            let available_shares = vesu_context.position.collateral_shares;
+            assert(available_shares > 0, 'No-collateral');
+
+            let assets_to_withdraw = if requested_shares >= available_shares {
+                erc4626.convert_to_assets(available_shares)
+            } else {
+                erc4626.convert_to_assets(requested_shares)
+            };
+            let final_amount = I257Impl::new(assets_to_withdraw, true);
+            (final_amount, assets_to_withdraw)
+        }
+
+        fn deposit(
+            ref self: ContractState,
+            instruction: @Deposit,
+            ref pending: Array<PendingPositionModification>,
+        ) {
             let basic = *instruction.basic;
             let mut pool_id = self.pool_id.read();
             let mut debt_asset = Zero::zero(); // Zero debt token for deposit
@@ -208,13 +436,15 @@ mod VesuGateway {
 
             // Create positive i257 for deposit
             let collateral_amount = I257Impl::new(basic.amount, false);
-            let response = self
-                .modify_collateral_for(
-                    pool_id, collateral_asset, debt_asset, user, collateral_amount,
-                );
+            let key = PositionKey { pool_id, collateral_asset, debt_asset, user };
+            self.add_pending_collateral(ref pending, key, collateral_amount);
         }
 
-        fn withdraw(ref self: ContractState, instruction: @Withdraw) -> u256 {
+        fn withdraw(
+            ref self: ContractState,
+            instruction: @Withdraw,
+            ref pending: Array<PendingPositionModification>,
+        ) -> u256 {
             let basic = *instruction.basic;
             let mut pool_id = self.pool_id.read();
             let collateral_asset = basic.token;
@@ -235,12 +465,16 @@ mod VesuGateway {
 
             // Create negative i257 for withdraw
             let collateral_amount = I257Impl::new(basic.amount, true);
-            let response = self
-                .modify_collateral_for(
-                    pool_id, collateral_asset, debt_asset, user, collateral_amount,
-                );
-
-            let amount = response.collateral_delta.abs();
+            let key = PositionKey { pool_id, collateral_asset, debt_asset, user };
+            self.flush_pending_for_key(ref pending, key, true, false);
+            let (final_amount, amount) = self.prepare_withdraw_collateral_delta(
+                pool_id,
+                collateral_asset,
+                debt_asset,
+                user,
+                collateral_amount,
+            );
+            self.add_pending_collateral(ref pending, key, final_amount);
             // Transfer tokens back to user using the actual amount withdrawn
             let erc20 = IERC20Dispatcher { contract_address: basic.token };
             let result = erc20.transfer(get_caller_address(), amount);
@@ -287,61 +521,11 @@ mod VesuGateway {
             }
         }
 
-        // @dev - calls modify on vesu with a delta in the collateral. This means both deposit and withdraw logic
-        // is handled here. 
-        fn modify_collateral_for(
+        fn borrow(
             ref self: ContractState,
-            pool_id: felt252,
-            collateral_asset: ContractAddress,
-            debt_asset: ContractAddress,
-            user: ContractAddress,
-            collateral_amount: i257,
-        ) -> UpdatePositionResponse {
-            let singleton_dispatcher = ISingletonDispatcher {
-                contract_address: self.vesu_singleton.read(),
-            };
-
-            // Get context which contains all position info
-            let context = singleton_dispatcher.context(pool_id, collateral_asset, debt_asset, user);
-            let vesu_context: Context = context;
-
-            // If withdrawing, ensure we don't withdraw more than available
-            let mut final_amount = collateral_amount;
-            let mut amount_type = AmountType::Delta; // means we apply the delta from the current position size
-            if collateral_amount.is_negative() {
-
-                let vtoken = self.get_vtoken_for_collateral(collateral_asset, pool_id);
-                let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
-                let requested_shares = erc4626.convert_to_shares(collateral_amount.abs());
-                let available_shares = vesu_context.position.collateral_shares;
-                assert(available_shares > 0, 'No-collateral');
-
-                if requested_shares >= available_shares {
-                    // For exact or over withdrawals, use Target with 0
-                    amount_type = AmountType::Target;
-                    final_amount = I257Impl::new(0, false);
-                } else {
-                    // For partial withdrawals, use Delta with the negative amount
-                    let max_assets = erc4626.convert_to_assets(requested_shares);
-                    final_amount = I257Impl::new(max_assets, true);
-                }
-            }
-
-            let modify_params = ModifyPositionParams {
-                pool_id,
-                collateral_asset,
-                debt_asset,
-                user,
-                collateral: Amount {
-                    amount_type, denomination: AmountDenomination::Assets, value: final_amount,
-                },
-                debt: Default::default(),
-                data: ArrayTrait::new().span(),
-            };
-            singleton_dispatcher.modify_position(modify_params)
-        }
-
-        fn borrow(ref self: ContractState, instruction: @Borrow) -> u256 {
+            instruction: @Borrow,
+            ref pending: Array<PendingPositionModification>,
+        ) -> u256 {
             let basic = *instruction.basic;
             let context = *instruction.context;
             self.assert_router_or_user(basic.user);
@@ -359,7 +543,8 @@ mod VesuGateway {
 
             // Create positive i257 for borrow
             let debt_amount = I257Impl::new(basic.amount, false);
-            self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
+            let key = PositionKey { pool_id, collateral_asset, debt_asset, user };
+            self.add_pending_debt(ref pending, key, debt_amount);
 
             // Transfer debt tokens to user
             let erc20 = IERC20Dispatcher { contract_address: debt_asset };
@@ -369,7 +554,11 @@ mod VesuGateway {
         }
 
 
-        fn repay(ref self: ContractState, instruction: @Repay) -> (u256, u256) {
+        fn repay(
+            ref self: ContractState,
+            instruction: @Repay,
+            ref pending: Array<PendingPositionModification>,
+        ) -> (u256, u256) {
             let basic = *instruction.basic;
             let context = *instruction.context;
             assert(context.is_some(), 'Context is required for repay');
@@ -383,6 +572,9 @@ mod VesuGateway {
             let user = basic.user;
             let collateral_asset = vesu_context.position_counterpart_token;
             let debt_asset = basic.token;
+
+            let key = PositionKey { pool_id, collateral_asset, debt_asset, user };
+            self.flush_pending_for_key(ref pending, key, false, true);
 
             let current_debt = self.get_debt_for_user_position(*instruction);
             let to_repay = if basic.amount > current_debt { current_debt } else { basic.amount };
@@ -398,52 +590,13 @@ mod VesuGateway {
 
             // Create negative i257 for repay (reducing debt)
             let debt_amount = I257Impl::new(to_repay, true);
-            self.modify_debt_for(pool_id, collateral_asset, debt_asset, user, debt_amount);
+            self.add_pending_debt(ref pending, key, debt_amount);
 
             let refund = if basic.amount > to_repay { basic.amount - to_repay } else { 0 };
             if refund > 0 {
                 assert(erc20.transfer(get_caller_address(), refund), 'transfer failed');
             }
             (to_repay, refund)
-        }
-
-        // @dev - This calls vesu to modify a position. Positions in vesu are marked by collateral/debt pairs,
-        // so in case its a first time borrow on this pair transfer must be called first in order to switch the position
-        // key in vesu.
-        fn modify_debt_for(
-            ref self: ContractState,
-            pool_id: felt252,
-            collateral_asset: ContractAddress,
-            debt_asset: ContractAddress,
-            user: ContractAddress,
-            debt_amount: i257,
-        ) {
-            let singleton_dispatcher = ISingletonDispatcher {
-                contract_address: self.vesu_singleton.read(),
-            };
-
-            // Check if position exists
-            let (position, _, _) = singleton_dispatcher
-                .position(pool_id, collateral_asset, debt_asset, user);
-            if position.collateral_shares == 0 && position.nominal_debt == 0 {
-                // Transfer position from zero debt to target debt
-                self.transfer_position_for(pool_id, collateral_asset, debt_asset, user, 0);
-            }
-
-            let modify_params = ModifyPositionParams {
-                pool_id,
-                collateral_asset,
-                debt_asset,
-                user,
-                collateral: Default::default(),
-                debt: Amount {
-                    amount_type: AmountType::Delta,
-                    denomination: AmountDenomination::Assets,
-                    value: debt_amount,
-                },
-                data: ArrayTrait::new().span(),
-            };
-            singleton_dispatcher.modify_position(modify_params);
         }
 
         // @dev - helper function that should be used in places that bring money OUT of the lending protocols.
@@ -508,31 +661,32 @@ mod VesuGateway {
         ) -> Span<Span<InstructionOutput>> {
             let mut i: usize = 0;
             let mut results = array![];
+            let mut pending: Array<PendingPositionModification> = array![];
             while i != instructions.len() {
                 match instructions.at(i) {
                     LendingInstruction::Deposit(deposit_params) => {
-                        self.deposit(deposit_params);
+                        self.deposit(deposit_params, ref pending);
                         let token = *deposit_params.basic.token;
                         let mut outs = array![];
                         outs.append(InstructionOutput { token, balance: 0 });
                         results.append(outs.span());
                     },
                     LendingInstruction::Withdraw(withdraw_params) => {
-                        let amount = self.withdraw(withdraw_params);
+                        let amount = self.withdraw(withdraw_params, ref pending);
                         let token = *withdraw_params.basic.token;
                         let mut outs = array![];
                         outs.append(InstructionOutput { token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Borrow(borrow_params) => {
-                        let amount = self.borrow(borrow_params);
+                        let amount = self.borrow(borrow_params, ref pending);
                         let token = *borrow_params.basic.token;
                         let mut outs = array![];
                         outs.append(InstructionOutput { token, balance: amount });
                         results.append(outs.span());
                     },
                     LendingInstruction::Repay(repay_params) => {
-                        let (repaid_amount, refund_amount) = self.repay(repay_params);
+                        let (repaid_amount, refund_amount) = self.repay(repay_params, ref pending);
                         let token = *repay_params.basic.token;
                         let mut outs = array![];
                         outs.append(InstructionOutput { token, balance: repaid_amount });
@@ -543,6 +697,7 @@ mod VesuGateway {
                 }
                 i += 1;
             }
+            self.flush_all_pending(ref pending);
             results.span()
         }
 
