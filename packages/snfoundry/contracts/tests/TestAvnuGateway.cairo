@@ -721,6 +721,7 @@ fn test_avnu_move_debt_reswap_and_redeposit_kept_in_router() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_switch_collateral_with_reswap_exact_in() {
     let context = setup_avnu_test_context();

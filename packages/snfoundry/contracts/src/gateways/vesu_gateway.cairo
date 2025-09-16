@@ -780,7 +780,6 @@ mod VesuGateway {
             while i != len {
                 let pair = *pairs.at(i);
                 let group = self.build_group_indices(pair);
-                println!("Group length: {:?}", group.len());
                 let params_list = self.build_params_for_group(instructions, group.span());
                 let response = self.merge_and_execute(params_list.span());
                 let outs_arr = self.post_actions_for_group(instructions, group.span(), response);
