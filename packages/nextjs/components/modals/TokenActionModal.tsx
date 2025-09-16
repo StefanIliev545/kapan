@@ -212,6 +212,10 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const afterUtil = position ? afterPosition.utilization() : utilization;
   const afterLtv = position ? afterPosition.loanToValue() : ltv;
 
+  if (isOpen) {
+    console.log(`token.decimals: ${token.decimals}`);
+  }
+
   const effectiveMax = useMemo(() => {
     if (action !== "Borrow" || !position || !token.usdPrice) return max;
     const decimals = token.decimals || 18;
