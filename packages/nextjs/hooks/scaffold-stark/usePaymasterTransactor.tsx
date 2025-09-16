@@ -3,8 +3,9 @@ import { AccountInterface, InvokeFunctionResponse, constants, RpcProvider, Call 
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
-import { usePaymasterSendTransaction, usePaymasterGasTokens } from "@starknet-react/core";
+import { usePaymasterGasTokens } from "@starknet-react/core";
 import { universalStrkAddress } from "~~/utils/Constants";
+import { useKapanPaymasterSendTransaction } from "~~/hooks/useKapanPaymasterSendTransaction";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
@@ -54,7 +55,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
 
   // Setup paymaster transaction hook
-  const { sendAsync: sendPaymasterTransaction } = usePaymasterSendTransaction({
+  const { sendAsync: sendPaymasterTransaction } = useKapanPaymasterSendTransaction({
     calls: [], // Will be overridden in execution
     options: {
       feeMode: shouldUsePaymaster
