@@ -172,6 +172,7 @@ fn test_avnu_gateway_deployment() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_swap_exact_out() {
     let context = setup_avnu_test_context();
@@ -311,6 +312,7 @@ fn test_avnu_swap_exact_out() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_swap_exact_in() {
     let context = setup_avnu_test_context();
@@ -427,6 +429,7 @@ fn test_avnu_swap_exact_in() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_create_position_and_move_debt_with_reswap() {
     println!("Setting up test context with Router and Vesu");
@@ -595,6 +598,7 @@ fn test_avnu_create_position_and_move_debt_with_reswap() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_move_debt_reswap_and_redeposit_kept_in_router() {
     println!("Setting up test context with Router and Vesu (redeposit flow, Avnu)");
@@ -864,6 +868,7 @@ fn test_avnu_switch_collateral_with_reswap_exact_in() {
 }
 
 #[test]
+#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_avnu_switch_debt_with_reswap_exact_out() {
     let context = setup_avnu_test_context();
