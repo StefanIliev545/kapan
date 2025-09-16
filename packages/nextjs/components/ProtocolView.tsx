@@ -10,6 +10,7 @@ import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+import type { VesuContext } from "~~/hooks/useLendingAction";
 
 export interface ProtocolPosition {
   icon: string;
@@ -23,6 +24,14 @@ export interface ProtocolPosition {
   tokenSymbol?: string; // Token symbol for price feed selection
   collateralView?: React.ReactNode;
   collateralValue?: number; // Optional collateral value (used by borrowed positions)
+  vesuContext?: {
+    deposit?: VesuContext;
+    withdraw?: VesuContext;
+    borrow?: VesuContext;
+    repay?: VesuContext;
+  };
+  actionsDisabled?: boolean;
+  actionsDisabledReason?: string;
 }
 
 interface ProtocolViewProps {
@@ -82,6 +91,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     address: string;
     currentRate: number;
     tokenPrice?: bigint;
+    tokenDecimals?: number;
+    vesuContext?: ProtocolPosition["vesuContext"];
+    actionsDisabled?: boolean;
+    actionsDisabledReason?: string;
   } | null>(null);
 
   // Sync showAll with forceShowAll prop; reset when wallet connects
@@ -204,12 +217,17 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
   // Handle supply token selection for Starknet
   const handleSelectSupplyToken = (token: ProtocolPosition) => {
+    if (token.actionsDisabled) return;
     setSelectedSupplyToken({
       name: token.name,
       icon: token.icon,
       address: token.tokenAddress,
       currentRate: token.currentRate,
       tokenPrice: token.tokenPrice,
+      tokenDecimals: token.tokenDecimals,
+      vesuContext: token.vesuContext,
+      actionsDisabled: token.actionsDisabled,
+      actionsDisabledReason: token.actionsDisabledReason,
     });
     setIsTokenSelectModalOpen(false);
     setIsDepositModalOpen(true);
@@ -469,9 +487,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 address: selectedSupplyToken.address,
                 currentRate: selectedSupplyToken.currentRate,
                 usdPrice: selectedSupplyToken.tokenPrice ? Number(selectedSupplyToken.tokenPrice) / 1e8 : 0,
+                decimals: selectedSupplyToken.tokenDecimals,
               }}
               protocolName={protocolName}
               position={positionManager}
+              vesuContext={selectedSupplyToken.vesuContext?.deposit}
             />
           )}
 
@@ -506,6 +526,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     : 0
               }
               position={positionManager}
+              vesuContext={
+                selectedToken?.vesuContext?.borrow ?? borrowedPositions[0]?.vesuContext?.borrow
+              }
             />
           )}
         </>

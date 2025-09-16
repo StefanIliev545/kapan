@@ -39,6 +39,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   collateralValue,
   networkType,
   position,
+  vesuContext,
+  actionsDisabled = false,
+  actionsDisabledReason,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -51,11 +54,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
-  const address = networkType === "evm" ? evm.address : starknet.address;
   const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance (debt)
   const hasBalance = tokenBalance > 0;
+
+  const disabledMessage =
+    actionsDisabledReason ||
+    (networkType === "starknet"
+      ? "Action unavailable for this market"
+      : "Action unavailable");
 
   // Fetch optimal rate
   const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
@@ -210,9 +218,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   e.stopPropagation();
                   moveModal.open();
                 }}
-                disabled={!isWalletConnected}
+                disabled={!isWalletConnected || actionsDisabled}
                 aria-label="Move"
-                title="Move debt to another protocol"
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move debt"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Move debt to another protocol"
+                }
               >
                 Move
               </button>
@@ -237,9 +251,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
                 onClick={repayModal.open}
-                disabled={!hasBalance || !isWalletConnected}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
                 aria-label="Repay"
-                title={!isWalletConnected ? "Connect wallet to repay" : "Repay debt"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to repay"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Repay debt"
+                }
               >
                 <div className="flex items-center justify-center">
                   <FiMinus className="w-4 h-4 mr-1" />
@@ -250,9 +270,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <button
                 className={`btn btn-sm w-full flex justify-center items-center ${hasBetterRate ? "btn-secondary" : "btn-outline"}`}
                 onClick={moveModal.open}
-                disabled={!hasBalance || !isWalletConnected}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
                 aria-label="Move"
-                title={!isWalletConnected ? "Connect wallet to move debt" : "Move debt to another protocol"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move debt"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Move debt to another protocol"
+                }
               >
                 <div className="flex items-center justify-center">
                   <FiRepeat className="w-4 h-4 mr-1" />
@@ -263,9 +289,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
                 onClick={borrowModal.open}
-                disabled={!isWalletConnected}
+                disabled={!isWalletConnected || actionsDisabled}
                 aria-label="Borrow"
-                title={!isWalletConnected ? "Connect wallet to borrow" : "Borrow more tokens"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to borrow"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Borrow more tokens"
+                }
               >
                 <div className="flex items-center justify-center">
                   <FiPlus className="w-4 h-4 mr-1" />
@@ -279,9 +311,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
                 onClick={repayModal.open}
-                disabled={!hasBalance || !isWalletConnected}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
                 aria-label="Repay"
-                title={!isWalletConnected ? "Connect wallet to repay" : "Repay debt"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to repay"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Repay debt"
+                }
               >
                 <div className="flex items-center justify-center">
                   <FiMinus className="w-4 h-4 mr-1" />
@@ -292,9 +330,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <button
                 className={`btn btn-sm flex justify-center items-center ${hasBetterRate ? "btn-secondary" : "btn-outline"}`}
                 onClick={moveModal.open}
-                disabled={!hasBalance || !isWalletConnected}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
                 aria-label="Move"
-                title={!isWalletConnected ? "Connect wallet to move debt" : "Move debt to another protocol"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move debt"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Move debt to another protocol"
+                }
               >
                 <div className="flex items-center justify-center">
                   <FiRepeat className="w-4 h-4 mr-1" />
@@ -305,9 +349,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
                 onClick={borrowModal.open}
-                disabled={!isWalletConnected}
+                disabled={!isWalletConnected || actionsDisabled}
                 aria-label="Borrow"
-                title={!isWalletConnected ? "Connect wallet to borrow" : "Borrow more tokens"}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to borrow"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Borrow more tokens"
+                }
               >
                 <div className="flex items-center justify-center">
                   <FiPlus className="w-4 h-4 mr-1" />
@@ -315,6 +365,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 </div>
               </button>
             </div>
+
+            {actionsDisabled && (
+              <div className="mt-3 text-sm text-base-content/70">
+                {disabledMessage}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -343,6 +399,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             currentDebt={debtAmount}
             position={position}
+            vesuContext={vesuContext?.borrow}
           />
           <RepayModalStark
             isOpen={repayModal.isOpen}
@@ -358,6 +415,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
+            vesuContext={vesuContext?.repay}
           />
           <MovePositionModalStark
             isOpen={moveModal.isOpen}

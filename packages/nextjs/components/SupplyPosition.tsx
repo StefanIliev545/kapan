@@ -37,6 +37,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   networkType,
   position,
   disableMove = false,
+  vesuContext,
+  actionsDisabled = false,
+  actionsDisabledReason,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -49,11 +52,16 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
-  const address = networkType === "evm" ? evm.address : starknet.address;
   const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance
   const hasBalance = tokenBalance > 0;
+
+  const disabledMessage =
+    actionsDisabledReason ||
+    (networkType === "starknet"
+      ? "Action unavailable for this market"
+      : "Action unavailable");
 
   // Fetch optimal rate
   const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
@@ -191,8 +199,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <button
                 className="btn btn-sm btn-primary w-full flex justify-center items-center"
                 onClick={depositModal.open}
-                disabled={!isWalletConnected}
-                title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
+                disabled={!isWalletConnected || actionsDisabled}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to deposit"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Deposit tokens"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Deposit</span>
@@ -201,11 +215,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <button
                 className="btn btn-sm btn-outline w-full flex justify-center items-center"
                 onClick={withdrawModal.open}
-                disabled={!isWalletConnected || !hasBalance}
+                disabled={!isWalletConnected || !hasBalance || actionsDisabled}
                 title={
                   !isWalletConnected
                     ? "Connect wallet to withdraw"
-                    : !hasBalance
+                    : actionsDisabled
+                      ? disabledMessage
+                      : !hasBalance
                       ? "No balance to withdraw"
                       : "Withdraw tokens"
                 }
@@ -218,11 +234,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 <button
                   className="btn btn-sm btn-outline w-full flex justify-center items-center"
                   onClick={moveModal.open}
-                  disabled={!isWalletConnected || !hasBalance}
+                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
                   title={
                     !isWalletConnected
                       ? "Connect wallet to move supply"
-                      : !hasBalance
+                      : actionsDisabled
+                        ? disabledMessage
+                        : !hasBalance
                         ? "No balance to move"
                         : "Move supply to another protocol"
                   }
@@ -239,8 +257,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <button
                 className="btn btn-sm btn-primary flex justify-center items-center"
                 onClick={depositModal.open}
-                disabled={!isWalletConnected}
-                title={!isWalletConnected ? "Connect wallet to deposit" : "Deposit tokens"}
+                disabled={!isWalletConnected || actionsDisabled}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to deposit"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Deposit tokens"
+                }
               >
                 <div className="flex items-center justify-center">
                   <span>Deposit</span>
@@ -249,11 +273,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <button
                 className="btn btn-sm btn-outline flex justify-center items-center"
                 onClick={withdrawModal.open}
-                disabled={!isWalletConnected || !hasBalance}
+                disabled={!isWalletConnected || !hasBalance || actionsDisabled}
                 title={
                   !isWalletConnected
                     ? "Connect wallet to withdraw"
-                    : !hasBalance
+                    : actionsDisabled
+                      ? disabledMessage
+                      : !hasBalance
                       ? "No balance to withdraw"
                       : "Withdraw tokens"
                 }
@@ -266,11 +292,13 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 <button
                   className="btn btn-sm btn-outline flex justify-center items-center"
                   onClick={moveModal.open}
-                  disabled={!isWalletConnected || !hasBalance}
+                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
                   title={
                     !isWalletConnected
                       ? "Connect wallet to move supply"
-                      : !hasBalance
+                      : actionsDisabled
+                        ? disabledMessage
+                        : !hasBalance
                         ? "No balance to move"
                         : "Move supply to another protocol"
                   }
@@ -281,6 +309,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {isExpanded && actionsDisabled && (
+          <div className="mt-3 text-sm text-base-content/70" onClick={e => e.stopPropagation()}>
+            {disabledMessage}
           </div>
         )}
       </div>
@@ -301,6 +335,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             }}
             protocolName={protocolName}
             position={position}
+            vesuContext={vesuContext?.deposit}
           />
           <WithdrawModalStark
             isOpen={withdrawModal.isOpen}
@@ -316,6 +351,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             protocolName={protocolName}
             supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
+            vesuContext={vesuContext?.withdraw}
           />
         </>
       ) : (
