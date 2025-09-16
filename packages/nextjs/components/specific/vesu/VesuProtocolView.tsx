@@ -6,8 +6,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { PositionManager } from "~~/utils/position";
-import { feltToString, toAnnualRates } from "~~/utils/protocols";
-import type { ContractResponse } from "./VesuMarkets";
+import { feltToString, toAnnualRates, type TokenMetadata } from "~~/utils/protocols";
 import { POOL_IDS } from "./VesuMarkets";
 import { formatUnits } from "viem";
 
@@ -15,29 +14,158 @@ const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0"
 
 const normalizePrice = (price: { value: bigint; is_valid: boolean }) => (price.is_valid ? price.value / 10n ** 10n : 0n);
 
+const toBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "bigint") return value !== 0n;
+  return fallback;
+};
+
+const normalizeDecimals = (value: unknown): number | null => {
+  if (value === undefined || value === null) return 18;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "bigint") {
+    const asNumber = Number(value);
+    return Number.isFinite(asNumber) ? asNumber : null;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
+  if (!Array.isArray(assets)) return [];
+
+  return assets.flatMap(entry => {
+    if (!entry || typeof entry !== "object") return [];
+
+    const candidate = entry as {
+      address?: unknown;
+      symbol?: unknown;
+      decimals?: unknown;
+      rate_accumulator?: unknown;
+      utilization?: unknown;
+      fee_rate?: unknown;
+      price?: unknown;
+      total_nominal_debt?: unknown;
+      last_rate_accumulator?: unknown;
+      reserve?: unknown;
+      scale?: unknown;
+    };
+
+    const priceCandidate = candidate.price as { value?: unknown; is_valid?: unknown } | undefined;
+
+    if (
+      typeof candidate.address !== "bigint" ||
+      typeof candidate.symbol !== "bigint" ||
+      typeof candidate.rate_accumulator !== "bigint" ||
+      typeof candidate.utilization !== "bigint" ||
+      typeof candidate.fee_rate !== "bigint" ||
+      typeof candidate.total_nominal_debt !== "bigint" ||
+      typeof candidate.last_rate_accumulator !== "bigint" ||
+      typeof candidate.reserve !== "bigint" ||
+      typeof candidate.scale !== "bigint" ||
+      !priceCandidate ||
+      typeof priceCandidate.value !== "bigint"
+    ) {
+      return [];
+    }
+
+    const decimals = normalizeDecimals(candidate.decimals);
+    if (decimals === null) return [];
+
+    return [
+      {
+        address: candidate.address,
+        symbol: candidate.symbol,
+        decimals,
+        rate_accumulator: candidate.rate_accumulator,
+        utilization: candidate.utilization,
+        fee_rate: candidate.fee_rate,
+        price: {
+          value: priceCandidate.value,
+          is_valid: toBoolean(priceCandidate.is_valid, false),
+        },
+        total_nominal_debt: candidate.total_nominal_debt,
+        last_rate_accumulator: candidate.last_rate_accumulator,
+        reserve: candidate.reserve,
+        scale: candidate.scale,
+      },
+    ];
+  });
+};
+
+type PositionTuple = [
+  bigint,
+  bigint,
+  {
+    collateral_shares: bigint;
+    collateral_amount: bigint;
+    nominal_debt: bigint;
+    is_vtoken: boolean;
+  },
+];
+
+const parsePositionTuples = (positions: unknown): PositionTuple[] => {
+  if (!Array.isArray(positions)) return [];
+
+  return positions.flatMap(entry => {
+    if (!Array.isArray(entry) || entry.length < 3) return [];
+
+    const [collateralRaw, debtRaw, statsRaw] = entry;
+    if (typeof collateralRaw !== "bigint" || typeof debtRaw !== "bigint" || !statsRaw || typeof statsRaw !== "object") {
+      return [];
+    }
+
+    const stats = statsRaw as {
+      collateral_shares?: unknown;
+      collateral_amount?: unknown;
+      nominal_debt?: unknown;
+      is_vtoken?: unknown;
+    };
+
+    const collateralShares = stats.collateral_shares;
+    const collateralAmount = stats.collateral_amount;
+    const nominalDebt = stats.nominal_debt;
+
+    if (
+      typeof collateralShares !== "bigint" ||
+      typeof collateralAmount !== "bigint" ||
+      typeof nominalDebt !== "bigint"
+    ) {
+      return [];
+    }
+
+    const tuple: PositionTuple = [
+      collateralRaw,
+      debtRaw,
+      {
+        collateral_shares: collateralShares,
+        collateral_amount: collateralAmount,
+        nominal_debt: nominalDebt,
+        is_vtoken: toBoolean(stats.is_vtoken, false),
+      },
+    ];
+
+    return [tuple];
+  });
+};
+
 const computeUsdValue = (amount: bigint, decimals: number, price: bigint): number => {
   if (amount === 0n || price === 0n) {
     return 0;
   }
 
-  const amountAsNumber = Number(formatUnits(amount, decimals));
+  const safeDecimals = Number.isFinite(decimals) ? decimals : 18;
+  const amountAsNumber = Number(formatUnits(amount, safeDecimals));
   const priceAsNumber = Number(price) / 1e8;
 
   return amountAsNumber * priceAsNumber;
 };
 
-type PositionTuple = {
-  0: bigint; // collateral asset
-  1: bigint; // debt asset
-  2: {
-    collateral_shares: bigint;
-    collateral_amount: bigint;
-    nominal_debt: bigint;
-    is_vtoken: boolean;
-  };
-};
-
-type AssetWithRates = ContractResponse[number] & { borrowAPR: number; supplyAPY: number };
+type AssetWithRates = TokenMetadata & { borrowAPR: number; supplyAPY: number };
 
 type VesuPositionRow = {
   key: string;
@@ -100,9 +228,9 @@ export const VesuProtocolView: FC = () => {
   }
 
   const mergedUserPositions = useMemo(() => {
-    const p1 = (userPositionsPart1 as unknown as PositionTuple[]) || [];
-    const p2 = (userPositionsPart2 as unknown as PositionTuple[]) || [];
-    return [...p1, ...p2];
+    const firstBatch = parsePositionTuples(userPositionsPart1);
+    const secondBatch = parsePositionTuples(userPositionsPart2);
+    return [...firstBatch, ...secondBatch];
   }, [userPositionsPart1, userPositionsPart2]);
 
   useEffect(() => {
@@ -153,10 +281,10 @@ export const VesuProtocolView: FC = () => {
     };
   }, [refetchPositions]);
 
-  const assetsWithRates = useMemo<AssetWithRates[]>(() => {
-    if (!supportedAssets) return [];
+  const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 
-    return (supportedAssets as unknown as ContractResponse).map(asset => {
+  const assetsWithRates = useMemo<AssetWithRates[]>(() => {
+    return normalizedAssets.map(asset => {
       if (asset.scale === 0n) {
         return { ...asset, borrowAPR: 0, supplyAPY: 0 };
       }
@@ -171,7 +299,7 @@ export const VesuProtocolView: FC = () => {
 
       return { ...asset, borrowAPR, supplyAPY };
     });
-  }, [supportedAssets]);
+  }, [normalizedAssets]);
 
   const assetMap = useMemo(() => {
     const map = new Map<string, AssetWithRates>();
