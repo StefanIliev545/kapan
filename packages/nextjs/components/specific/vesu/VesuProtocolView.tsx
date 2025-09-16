@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
+import { ProtocolPosition } from "../../ProtocolView";
 import { SupplyPosition } from "../../SupplyPosition";
 import { BorrowPosition } from "../../BorrowPosition";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
@@ -109,12 +109,33 @@ type PositionTuple = [
 ];
 
 const parsePositionTuples = (positions: unknown): PositionTuple[] => {
-  if (!Array.isArray(positions)) return [];
+  if (!positions) return [];
 
-  return positions.flatMap(entry => {
-    if (!Array.isArray(entry) || entry.length < 3) return [];
+  const entries = Array.isArray(positions)
+    ? positions
+    : typeof positions === "object"
+      ? Object.values(positions as Record<string, unknown>)
+      : [];
 
-    const [collateralRaw, debtRaw, statsRaw] = entry;
+  return entries.flatMap(entry => {
+    if (!entry) return [];
+
+    let collateralRaw: unknown;
+    let debtRaw: unknown;
+    let statsRaw: unknown;
+
+    if (Array.isArray(entry)) {
+      if (entry.length < 3) return [];
+      [collateralRaw, debtRaw, statsRaw] = entry;
+    } else if (typeof entry === "object") {
+      const obj = entry as Record<string, unknown>;
+      collateralRaw = obj[0] ?? obj["0"];
+      debtRaw = obj[1] ?? obj["1"];
+      statsRaw = obj[2] ?? obj["2"];
+    } else {
+      return [];
+    }
+
     if (typeof collateralRaw !== "bigint" || typeof debtRaw !== "bigint" || !statsRaw || typeof statsRaw !== "object") {
       return [];
     }
@@ -353,9 +374,9 @@ export const VesuProtocolView: FC = () => {
     if (assetMap.size === 0) return [];
 
     return cachedPositions.flatMap((position, index) => {
-        const collateralAddress = toHexAddress(position[0]);
-        const debtAddress = toHexAddress(position[1]);
-        const positionData = position[2];
+      const collateralAddress = toHexAddress(position[0]);
+      const debtAddress = toHexAddress(position[1]);
+      const positionData = position[2];
 
         const collateralMetadata = assetMap.get(collateralAddress);
         if (!collateralMetadata) return [];
@@ -445,19 +466,77 @@ export const VesuProtocolView: FC = () => {
       maximumFractionDigits: 2,
     }).format(value);
 
+  const isLoadingAssets = supportedAssets == null;
+
   return (
     <div className="w-full flex flex-col p-4 space-y-6">
-      <ProtocolView
-        protocolName="Vesu"
-        protocolIcon="/logos/vesu.svg"
-        ltv={75}
-        maxLtv={90}
-        suppliedPositions={suppliablePositions}
-        borrowedPositions={borrowablePositions}
-        forceShowAll={!userAddress}
-        networkType="starknet"
-        disableMoveSupply
-      />
+      <div className="card bg-base-100 shadow-md">
+        <div className="card-body p-4 space-y-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <h2 className="card-title text-lg">Vesu Markets</h2>
+            {isLoadingAssets && (
+              <div className="flex items-center text-xs text-base-content/60">
+                <span className="loading loading-spinner loading-xs mr-1" /> Loading markets
+              </div>
+            )}
+          </div>
+
+          {isLoadingAssets ? (
+            <div className="flex justify-center py-6">
+              <span className="loading loading-spinner loading-md" />
+            </div>
+          ) : assetsWithRates.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-3">
+                <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                  Suppliable assets
+                </div>
+                {suppliablePositions.length > 0 ? (
+                  suppliablePositions.map(position => (
+                    <SupplyPosition
+                      key={position.tokenAddress}
+                      {...position}
+                      protocolName="Vesu"
+                      networkType="starknet"
+                      disableMove
+                      hideBalanceColumn
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+                    No supply markets available
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                  Borrowable assets
+                </div>
+                {borrowablePositions.length > 0 ? (
+                  borrowablePositions.map(position => (
+                    <BorrowPosition
+                      key={position.tokenAddress}
+                      {...position}
+                      protocolName="Vesu"
+                      networkType="starknet"
+                      hideBalanceColumn
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+                    No borrow markets available
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+              No markets available
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4 space-y-4">
@@ -494,30 +573,39 @@ export const VesuProtocolView: FC = () => {
                   row.borrow ? [row.borrow] : [],
                 );
 
+                const containerColumns = row.borrow
+                  ? "grid-cols-1 md:grid-cols-2 md:divide-x"
+                  : "grid-cols-1";
+
                 return (
-                  <div key={row.key} className="grid gap-4 md:grid-cols-2">
-                    <SupplyPosition
-                      {...row.supply}
-                      protocolName="Vesu"
-                      networkType="starknet"
-                      position={positionManager}
-                      disableMove
-                      afterInfoContent={
-                        row.isVtoken ? <span className="badge badge-xs badge-primary ml-2">vToken</span> : undefined
-                      }
-                    />
-                    {row.borrow ? (
-                      <BorrowPosition
-                        {...row.borrow}
+                  <div
+                    key={row.key}
+                    className={`rounded-md border border-base-300 overflow-hidden`}
+                  >
+                    <div
+                      className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}
+                    >
+                      <SupplyPosition
+                        {...row.supply}
                         protocolName="Vesu"
                         networkType="starknet"
                         position={positionManager}
+                        disableMove
+                        afterInfoContent={
+                          row.isVtoken ? <span className="badge badge-xs badge-primary ml-2">vToken</span> : undefined
+                        }
+                        containerClassName="rounded-none"
                       />
-                    ) : (
-                      <div className="flex items-center justify-center rounded-md bg-base-200/60 p-4 text-sm text-base-content/70">
-                        No active debt for {row.collateralSymbol}
-                      </div>
-                    )}
+                      {row.borrow && (
+                        <BorrowPosition
+                          {...row.borrow}
+                          protocolName="Vesu"
+                          networkType="starknet"
+                          position={positionManager}
+                          containerClassName="rounded-none"
+                        />
+                      )}
+                    </div>
                   </div>
                 );
               })

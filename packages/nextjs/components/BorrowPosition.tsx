@@ -22,6 +22,8 @@ export type BorrowPositionProps = ProtocolPosition & {
   protocolName: string;
   networkType: "evm" | "starknet";
   position?: PositionManager;
+  containerClassName?: string;
+  hideBalanceColumn?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -42,6 +44,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   vesuContext,
   actionsDisabled = false,
   actionsDisabledReason,
+  containerClassName,
+  hideBalanceColumn = false,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -110,7 +114,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full p-3 rounded-md ${isExpanded ? "bg-base-300" : "bg-base-200"} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
+        className={`w-full p-3 rounded-md ${
+          isExpanded ? "bg-base-300" : "bg-base-200"
+        } cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -171,21 +177,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </div>
 
           {/* Stats: Rates */}
-          <div className="order-2 lg:order-none lg:col-span-6 grid grid-cols-3 gap-0 items-center min-w-[200px]">
-            <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-              <div className="text-sm font-medium h-6 line-clamp-1">
-                <FiatBalance
-                  tokenAddress={tokenAddress}
-                  rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-                  price={tokenPrice}
-                  decimals={tokenDecimals}
-                  tokenSymbol={name}
-                  isNegative={true}
-                  className="text-red-500"
-                />
+          <div
+            className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
+              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+            }`}
+          >
+            {!hideBalanceColumn && (
+              <div className="px-2 border-r border-base-300">
+                <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
+                <div className="text-sm font-medium h-6 line-clamp-1">
+                  <FiatBalance
+                    tokenAddress={tokenAddress}
+                    rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+                    price={tokenPrice}
+                    decimals={tokenDecimals}
+                    tokenSymbol={name}
+                    isNegative={true}
+                    className="text-red-500"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
