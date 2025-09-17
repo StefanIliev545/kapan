@@ -11,8 +11,8 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
-import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+import formatPercentage from "~~/utils/formatPercentage";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
@@ -37,7 +37,6 @@ export type SupplyPositionProps = ProtocolPosition & {
 export const SupplyPosition: FC<SupplyPositionProps> = ({
   icon,
   name,
-  balance,
   tokenBalance,
   currentRate,
   protocolName,
@@ -88,13 +87,19 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     type: "supply",
   });
 
-  const monthlyRate = (currentRate ?? 0) / 12;
-
-  const formatNumber = (num: number) =>
+  const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(Math.abs(num));
+    }).format(Math.abs(value));
+
+  const monthlyRate = (currentRate ?? 0) / 12;
+  const monthlyYieldUsd = supplyAmount * usdPrice * monthlyRate;
+  const monthlyYieldSign = monthlyYieldUsd >= 0 ? "+" : "-";
+  const monthlyYieldLabel = monthlyYieldUsd >= 0 ? "yield" : "cost";
+  const monthlyYieldClass = monthlyYieldUsd >= 0 ? "text-success" : "text-error";
 
   const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
@@ -146,40 +151,6 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
             <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            <div
-              className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
-              onClick={e => e.stopPropagation()}
-            >
-              <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                <FiInfo
-                  className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
-                  aria-hidden="true"
-                />
-              </div>
-              <div
-                tabIndex={0}
-                className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-                style={{
-                  right: "auto",
-                  transform: "translateX(-50%)",
-                  left: "50%",
-                  borderRadius: "4px",
-                }}
-              >
-                <div className="card-body p-3">
-                  <h3 className="card-title text-sm">{name} Details</h3>
-                  <div className="text-xs space-y-1">
-                    <p className="text-base-content/70">Contract Address:</p>
-                    <p className="font-mono break-all">{tokenAddress}</p>
-                    <p className="text-base-content/70">Protocol:</p>
-                    <p>{protocolName}</p>
-                    <p className="text-base-content/70">Type:</p>
-                    <p className="capitalize">Supply Position</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Render additional content after the info button if provided */}
             {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
           </div>
@@ -213,8 +184,11 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             </div>
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">Monthly</div>
-              <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1 text-success">
-                +{formatPercentage(monthlyRate)}% yield
+              <div
+                className={`font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1 ${monthlyYieldClass}`}
+              >
+                {monthlyYieldSign}
+                {formatCurrency(monthlyYieldUsd)} {monthlyYieldLabel}
               </div>
             </div>
             <div className="px-2">
@@ -230,6 +204,43 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   height={optimalProtocol == "vesu" ? 35 : 16}
                   className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
+                <div
+                  className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-2"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div
+                    tabIndex={0}
+                    role="button"
+                    className="cursor-pointer flex items-center justify-center h-[1.125em]"
+                  >
+                    <FiInfo
+                      className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div
+                    tabIndex={0}
+                    className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
+                    style={{
+                      right: "auto",
+                      transform: "translateX(-50%)",
+                      left: "50%",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <div className="card-body p-3">
+                      <h3 className="card-title text-sm">{name} Details</h3>
+                      <div className="text-xs space-y-1">
+                        <p className="text-base-content/70">Contract Address:</p>
+                        <p className="font-mono break-all">{tokenAddress}</p>
+                        <p className="text-base-content/70">Protocol:</p>
+                        <p>{protocolName}</p>
+                        <p className="text-base-content/70">Type:</p>
+                        <p className="capitalize">Supply Position</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
