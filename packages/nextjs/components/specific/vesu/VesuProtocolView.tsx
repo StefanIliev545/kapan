@@ -775,6 +775,7 @@ export const VesuProtocolView: FC = () => {
                         disableMove
                         subtitle={row.isVtoken ? "vToken" : undefined}
                         containerClassName="rounded-none"
+                        showInfoDropdown={false}
                       />
                       {row.borrow ? (
                         <BorrowPosition
@@ -784,9 +785,11 @@ export const VesuProtocolView: FC = () => {
                           position={positionManager}
                           containerClassName="rounded-none"
                           availableActions={
-                            row.hasDebt ? undefined : { borrow: true, repay: false, move: false }
+                            row.hasDebt ? { move: false } : { borrow: true, repay: false, move: false }
                           }
                           showNoDebtLabel={!row.hasDebt}
+                          showInfoDropdown={false}
+                          headerOpensMoveModal={row.hasDebt}
                         />
                       ) : (
                         <div className="p-3 bg-base-200/60 border border-dashed border-base-300 h-full flex items-center justify-between gap-3">

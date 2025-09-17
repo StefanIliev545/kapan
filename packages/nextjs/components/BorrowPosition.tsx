@@ -33,6 +33,7 @@ export type BorrowPositionProps = ProtocolPosition & {
   borrowCtaLabel?: string;
   showNoDebtLabel?: boolean;
   showInfoDropdown?: boolean;
+  headerOpensMoveModal?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -61,6 +62,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   borrowCtaLabel,
   showNoDebtLabel = false,
   showInfoDropdown = true,
+  headerOpensMoveModal = false,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -132,6 +134,18 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const movePoolId = vesuContext?.borrow?.poolId ?? vesuContext?.repay?.poolId;
 
+  const canOpenMoveModalFromHeader =
+    headerOpensMoveModal && hasBalance && !actionsDisabled && isWalletConnected;
+
+  const handleHeaderActivation = (
+    event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (!headerOpensMoveModal) return;
+    event.stopPropagation();
+    if (!canOpenMoveModalFromHeader) return;
+    moveModal.open();
+  };
+
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
@@ -143,6 +157,30 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     }
     expanded.toggle();
   };
+
+  const headerClassName = `order-1 lg:order-none lg:col-span-3 flex items-center ${
+    headerOpensMoveModal ? "gap-1" : ""
+  } ${canOpenMoveModalFromHeader ? "cursor-pointer" : ""}`;
+
+  const headerInteractiveProps: {
+    role?: "button";
+    tabIndex?: number;
+    onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
+    onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+    "aria-disabled"?: boolean;
+  } = headerOpensMoveModal
+    ? {
+        role: "button",
+        tabIndex: 0,
+        onClick: handleHeaderActivation,
+        onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+          if (event.key === "Enter" || event.key === " ") {
+            handleHeaderActivation(event);
+          }
+        },
+        "aria-disabled": !canOpenMoveModalFromHeader,
+      }
+    : {};
 
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
@@ -165,11 +203,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
           {/* Header: Icon and Title */}
-          <div className="order-1 lg:order-none lg:col-span-3 flex items-center">
+          <div className={headerClassName} {...headerInteractiveProps}>
             <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
-            <span className="ml-2 font-semibold text-lg truncate">{name}</span>
+            <span className={`ml-2 font-semibold text-lg truncate ${headerOpensMoveModal ? "underline" : ""}`}>
+              {name}
+            </span>
             {showInfoDropdown && (
               <div
                 className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
