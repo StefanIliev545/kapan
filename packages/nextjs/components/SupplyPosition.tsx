@@ -88,6 +88,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     type: "supply",
   });
 
+  const monthlyRate = (currentRate ?? 0) / 12;
+
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
@@ -185,7 +187,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           {/* Stats: Rates */}
           <div
             className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
-              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+              hideBalanceColumn ? "grid-cols-3" : "grid-cols-4"
             }`}
           >
             {!hideBalanceColumn && (
@@ -207,6 +209,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
                 {formatPercentage(currentRate)}%
+              </div>
+            </div>
+            <div className="px-2 border-r border-base-300">
+              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">Monthly</div>
+              <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1 text-success">
+                +{formatPercentage(monthlyRate)}% yield
               </div>
             </div>
             <div className="px-2">

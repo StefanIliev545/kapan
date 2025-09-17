@@ -90,6 +90,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     type: "borrow",
   });
 
+  const monthlyRate = (currentRate ?? 0) / 12;
+
   // Determine if there's a better rate available on another protocol
   const ratesAreSame = Math.abs(currentRate - optimalRateDisplay) < 0.000001;
   const hasBetterRate =
@@ -216,7 +218,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           {/* Stats: Rates */}
           <div
             className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
-              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+              hideBalanceColumn ? "grid-cols-3" : "grid-cols-4"
             }`}
           >
             {!hideBalanceColumn && (
@@ -245,6 +247,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
                 {formatPercentage(currentRate)}%
+              </div>
+            </div>
+            <div className="px-2 border-r border-base-300">
+              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">Monthly</div>
+              <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1 text-error">
+                -{formatPercentage(monthlyRate)}% cost
               </div>
             </div>
             <div className="px-2">
