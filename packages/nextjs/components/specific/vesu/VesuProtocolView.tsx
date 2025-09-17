@@ -759,12 +759,6 @@ export const VesuProtocolView: FC = () => {
                   });
                 };
 
-                const extraHeaderContent = row.isVtoken ? (
-                  <div className="flex items-center gap-2 ml-2">
-                    <span className="badge badge-xs badge-primary">vToken</span>
-                  </div>
-                ) : undefined;
-
                 return (
                   <div
                     key={row.key}
@@ -779,7 +773,7 @@ export const VesuProtocolView: FC = () => {
                         networkType="starknet"
                         position={positionManager}
                         disableMove
-                        afterInfoContent={extraHeaderContent}
+                        subtitle={row.isVtoken ? "vToken" : undefined}
                         containerClassName="rounded-none"
                       />
                       {row.borrow ? (
