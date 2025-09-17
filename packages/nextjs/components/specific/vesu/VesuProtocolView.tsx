@@ -1,7 +1,9 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import { ProtocolPosition } from "../../ProtocolView";
 import { SupplyPosition } from "../../SupplyPosition";
 import { BorrowPosition } from "../../BorrowPosition";
+import { TokenSelectModalStark } from "../../modals/stark/TokenSelectModalStark";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -9,6 +11,7 @@ import { PositionManager } from "~~/utils/position";
 import { feltToString, toAnnualRates, type TokenMetadata } from "~~/utils/protocols";
 import { POOL_IDS } from "./VesuMarkets";
 import { formatUnits } from "viem";
+import type { VesuContext } from "~~/hooks/useLendingAction";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -195,6 +198,10 @@ type VesuPositionRow = {
   isVtoken: boolean;
   collateralSymbol: string;
   debtSymbol?: string;
+  collateralAsset: AssetWithRates;
+  debtAsset?: AssetWithRates;
+  borrowContext?: VesuContext;
+  hasDebt: boolean;
 };
 
 export const VesuProtocolView: FC = () => {
@@ -272,6 +279,12 @@ export const VesuProtocolView: FC = () => {
 
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [borrowSelection, setBorrowSelection] = useState<{
+    tokens: AssetWithRates[];
+    collateralAddress: string;
+    vesuContext?: VesuContext;
+    position: PositionManager;
+  } | null>(null);
 
   useEffect(() => {
     refetchCounter.current = 0;
@@ -378,75 +391,84 @@ export const VesuProtocolView: FC = () => {
       const debtAddress = toHexAddress(position[1]);
       const positionData = position[2];
 
-        const collateralMetadata = assetMap.get(collateralAddress);
-        if (!collateralMetadata) return [];
+      const collateralMetadata = assetMap.get(collateralAddress);
+      if (!collateralMetadata) return [];
 
-        const collateralSymbol = feltToString(collateralMetadata.symbol);
-        const collateralPrice = normalizePrice(collateralMetadata.price);
-        const collateralUsd = computeUsdValue(positionData.collateral_amount, collateralMetadata.decimals, collateralPrice);
+      const collateralSymbol = feltToString(collateralMetadata.symbol);
+      const collateralPrice = normalizePrice(collateralMetadata.price);
+      const collateralUsd = computeUsdValue(positionData.collateral_amount, collateralMetadata.decimals, collateralPrice);
 
-        const disabledReason = positionData.is_vtoken ? "Managing vToken positions is not supported" : undefined;
+      const disabledReason = positionData.is_vtoken ? "Managing vToken positions is not supported" : undefined;
 
-        const supplyPosition: ProtocolPosition = {
-          icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
-          name: collateralSymbol,
-          balance: collateralUsd,
-          tokenBalance: positionData.collateral_amount,
-          currentRate: (collateralMetadata.supplyAPY ?? 0) * 100,
-          tokenAddress: collateralAddress,
-          tokenDecimals: collateralMetadata.decimals,
-          tokenPrice: collateralPrice,
-          tokenSymbol: collateralSymbol,
-          vesuContext: {
-            deposit: positionData.nominal_debt > 0n ? { poolId, counterpartToken: debtAddress } : undefined,
-            withdraw: { poolId, counterpartToken: debtAddress },
-          },
+      const supplyPosition: ProtocolPosition = {
+        icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+        name: collateralSymbol,
+        balance: collateralUsd,
+        tokenBalance: positionData.collateral_amount,
+        currentRate: (collateralMetadata.supplyAPY ?? 0) * 100,
+        tokenAddress: collateralAddress,
+        tokenDecimals: collateralMetadata.decimals,
+        tokenPrice: collateralPrice,
+        tokenSymbol: collateralSymbol,
+        vesuContext: {
+          deposit: positionData.nominal_debt > 0n ? { poolId, counterpartToken: debtAddress } : undefined,
+          withdraw: { poolId, counterpartToken: debtAddress },
+        },
+        actionsDisabled: positionData.is_vtoken,
+        actionsDisabledReason: disabledReason,
+      };
+
+      const debtMetadata = assetMap.get(debtAddress);
+      const borrowContext = debtMetadata ? { poolId, counterpartToken: collateralAddress } : undefined;
+      const hasDebt = positionData.nominal_debt > 0n && Boolean(debtMetadata);
+
+      let borrowPosition: ProtocolPosition | undefined;
+      let debtSymbol: string | undefined;
+
+      if (hasDebt && debtMetadata) {
+        debtSymbol = feltToString(debtMetadata.symbol);
+        const debtPrice = normalizePrice(debtMetadata.price);
+        const debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
+
+        borrowPosition = {
+          icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+          name: debtSymbol,
+          balance: -debtUsd,
+          tokenBalance: positionData.nominal_debt,
+          currentRate: (debtMetadata.borrowAPR ?? 0) * 100,
+          tokenAddress: debtAddress,
+          tokenDecimals: debtMetadata.decimals,
+          tokenPrice: debtPrice,
+          tokenSymbol: debtSymbol,
+          collateralValue: collateralUsd,
+          vesuContext: borrowContext
+            ? {
+                borrow: borrowContext,
+                repay: { poolId, counterpartToken: collateralAddress },
+              }
+            : undefined,
           actionsDisabled: positionData.is_vtoken,
           actionsDisabledReason: disabledReason,
         };
+      } else if (debtMetadata) {
+        debtSymbol = feltToString(debtMetadata.symbol);
+      }
 
-        const debtMetadata = assetMap.get(debtAddress);
-        let borrowPosition: ProtocolPosition | undefined;
-        let debtSymbol: string | undefined;
-
-        if (positionData.nominal_debt > 0n && debtMetadata) {
-          debtSymbol = feltToString(debtMetadata.symbol);
-          const debtPrice = normalizePrice(debtMetadata.price);
-          const debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
-
-          borrowPosition = {
-            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-            name: debtSymbol,
-            balance: -debtUsd,
-            tokenBalance: positionData.nominal_debt,
-            currentRate: (debtMetadata.borrowAPR ?? 0) * 100,
-            tokenAddress: debtAddress,
-            tokenDecimals: debtMetadata.decimals,
-            tokenPrice: debtPrice,
-            tokenSymbol: debtSymbol,
-            collateralValue: collateralUsd,
-            vesuContext: {
-              borrow: { poolId, counterpartToken: collateralAddress },
-              repay: { poolId, counterpartToken: collateralAddress },
-            },
-            actionsDisabled: positionData.is_vtoken,
-            actionsDisabledReason: disabledReason,
-          };
-        } else if (debtMetadata) {
-          debtSymbol = feltToString(debtMetadata.symbol);
-        }
-
-        return [
-          {
-            key: `${collateralAddress}-${debtAddress}-${index}`,
-            supply: supplyPosition,
-            borrow: borrowPosition,
-            isVtoken: positionData.is_vtoken,
-            collateralSymbol,
-            debtSymbol,
-          },
-        ];
-      });
+      return [
+        {
+          key: `${collateralAddress}-${debtAddress}-${index}`,
+          supply: supplyPosition,
+          borrow: borrowPosition,
+          isVtoken: positionData.is_vtoken,
+          collateralSymbol,
+          debtSymbol,
+          collateralAsset: collateralMetadata,
+          debtAsset: debtMetadata,
+          borrowContext,
+          hasDebt,
+        },
+      ];
+    });
   }, [assetMap, cachedPositions, poolId]);
 
   const totalNetBalance = useMemo(() => {
@@ -500,6 +522,7 @@ export const VesuProtocolView: FC = () => {
                       networkType="starknet"
                       disableMove
                       hideBalanceColumn
+                      availableActions={{ withdraw: false, move: false }}
                     />
                   ))
                 ) : (
@@ -521,6 +544,7 @@ export const VesuProtocolView: FC = () => {
                       protocolName="Vesu"
                       networkType="starknet"
                       hideBalanceColumn
+                      availableActions={{ borrow: true, repay: false, move: false }}
                     />
                   ))
                 ) : (
@@ -577,6 +601,41 @@ export const VesuProtocolView: FC = () => {
                   ? "grid-cols-1 md:grid-cols-2 md:divide-x"
                   : "grid-cols-1";
 
+                const canInitiateBorrow = !row.hasDebt && Boolean(row.debtAsset) && Boolean(row.borrowContext);
+
+                const handleBorrowFromSupply = (event: MouseEvent<HTMLButtonElement>) => {
+                  event.stopPropagation();
+                  if (!canInitiateBorrow || !row.debtAsset || !row.borrowContext) return;
+                  setBorrowSelection({
+                    tokens: [row.debtAsset],
+                    collateralAddress: row.supply.tokenAddress,
+                    vesuContext: row.borrowContext,
+                    position: positionManager,
+                  });
+                };
+
+                const extraHeaderContent = row.isVtoken || canInitiateBorrow
+                  ? (
+                      <div className="flex items-center gap-2 ml-2">
+                        {row.isVtoken && <span className="badge badge-xs badge-primary">vToken</span>}
+                        {canInitiateBorrow && (
+                          <button
+                            className="btn btn-xs btn-outline"
+                            onClick={handleBorrowFromSupply}
+                            disabled={row.supply.actionsDisabled}
+                            title={
+                              row.supply.actionsDisabled
+                                ? row.supply.actionsDisabledReason
+                                : "Borrow against this collateral"
+                            }
+                          >
+                            Borrow
+                          </button>
+                        )}
+                      </div>
+                    )
+                  : undefined;
+
                 return (
                   <div
                     key={row.key}
@@ -591,9 +650,7 @@ export const VesuProtocolView: FC = () => {
                         networkType="starknet"
                         position={positionManager}
                         disableMove
-                        afterInfoContent={
-                          row.isVtoken ? <span className="badge badge-xs badge-primary ml-2">vToken</span> : undefined
-                        }
+                        afterInfoContent={extraHeaderContent}
                         containerClassName="rounded-none"
                       />
                       {row.borrow && (
@@ -617,6 +674,18 @@ export const VesuProtocolView: FC = () => {
           </div>
         </div>
       </div>
+      {borrowSelection && (
+        <TokenSelectModalStark
+          isOpen={borrowSelection !== null}
+          onClose={() => setBorrowSelection(null)}
+          tokens={borrowSelection.tokens}
+          protocolName="Vesu"
+          collateralAsset={borrowSelection.collateralAddress}
+          isVesu
+          vesuContext={borrowSelection.vesuContext}
+          position={borrowSelection.position}
+        />
+      )}
     </div>
   );
 };

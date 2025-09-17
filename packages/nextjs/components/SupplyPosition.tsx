@@ -23,6 +23,14 @@ export type SupplyPositionProps = ProtocolPosition & {
   disableMove?: boolean;
   containerClassName?: string;
   hideBalanceColumn?: boolean;
+  availableActions?: {
+    deposit?: boolean;
+    withdraw?: boolean;
+    move?: boolean;
+  };
+  onDeposit?: () => void;
+  onWithdraw?: () => void;
+  onMove?: () => void;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -44,6 +52,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   actionsDisabledReason,
   containerClassName,
   hideBalanceColumn = false,
+  availableActions,
+  onDeposit,
+  onWithdraw,
+  onMove,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -82,10 +94,33 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
+  const actionConfig = {
+    deposit: availableActions?.deposit !== false,
+    withdraw: availableActions?.withdraw !== false,
+    move: availableActions?.move !== false,
+  };
+
+  const showDepositButton = actionConfig.deposit;
+  const showWithdrawButton = actionConfig.withdraw;
+  const showMoveButton = actionConfig.move && !disableMove;
+
+  const visibleActionCount = [showDepositButton, showWithdrawButton, showMoveButton].filter(Boolean).length;
+  const hasAnyActions = visibleActionCount > 0;
+
+  const actionGridClass =
+    visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
+
+  const handleDepositClick = onDeposit ?? depositModal.open;
+  const handleWithdrawClick = onWithdraw ?? withdrawModal.open;
+  const handleMoveClick = onMove ?? moveModal.open;
+
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
     if ((e.target as HTMLElement).closest(".dropdown")) {
+      return;
+    }
+    if (!hasAnyActions) {
       return;
     }
     expanded.toggle();
@@ -191,61 +226,69 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
           {/* Expand Indicator */}
           <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end">
-            <div
-              className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"} transition-colors duration-200`}
-            >
-              {isExpanded ? (
-                <FiChevronUp className="w-4 h-4 text-primary" />
-              ) : (
-                <FiChevronDown className="w-4 h-4 text-base-content/70" />
-              )}
-            </div>
+            {hasAnyActions && (
+              <div
+                className={`flex items-center justify-center w-7 h-7 rounded-full ${
+                  isExpanded ? "bg-primary/20" : "bg-base-300/50"
+                } transition-colors duration-200`}
+              >
+                {isExpanded ? (
+                  <FiChevronUp className="w-4 h-4 text-primary" />
+                ) : (
+                  <FiChevronDown className="w-4 h-4 text-base-content/70" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Action Buttons - Only visible when expanded */}
-        {isExpanded && (
+        {isExpanded && hasAnyActions && (
           <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Mobile layout - full width buttons stacked vertically */}
             <div className="flex flex-col gap-2 md:hidden">
-              <button
-                className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={depositModal.open}
-                disabled={!isWalletConnected || actionsDisabled}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to deposit"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : "Deposit tokens"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Deposit</span>
-                </div>
-              </button>
-              <button
-                className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={withdrawModal.open}
-                disabled={!isWalletConnected || !hasBalance || actionsDisabled}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to withdraw"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : !hasBalance
-                      ? "No balance to withdraw"
-                      : "Withdraw tokens"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Withdraw</span>
-                </div>
-              </button>
-              {!disableMove && (
+              {showDepositButton && (
+                <button
+                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
+                  onClick={handleDepositClick}
+                  disabled={!isWalletConnected || actionsDisabled}
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to deposit"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Deposit tokens"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <span>Deposit</span>
+                  </div>
+                </button>
+              )}
+              {showWithdrawButton && (
                 <button
                   className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                  onClick={moveModal.open}
+                  onClick={handleWithdrawClick}
+                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to withdraw"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : !hasBalance
+                          ? "No balance to withdraw"
+                          : "Withdraw tokens"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <span>Withdraw</span>
+                  </div>
+                </button>
+              )}
+              {showMoveButton && (
+                <button
+                  className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                  onClick={handleMoveClick}
                   disabled={!isWalletConnected || !hasBalance || actionsDisabled}
                   title={
                     !isWalletConnected
@@ -253,8 +296,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                       : actionsDisabled
                         ? disabledMessage
                         : !hasBalance
-                        ? "No balance to move"
-                        : "Move supply to another protocol"
+                          ? "No balance to move"
+                          : "Move supply to another protocol"
                   }
                 >
                   <div className="flex items-center justify-center">
@@ -265,45 +308,49 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             </div>
 
             {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className="hidden md:grid grid-cols-3 gap-3">
-              <button
-                className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={depositModal.open}
-                disabled={!isWalletConnected || actionsDisabled}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to deposit"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : "Deposit tokens"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Deposit</span>
-                </div>
-              </button>
-              <button
-                className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={withdrawModal.open}
-                disabled={!isWalletConnected || !hasBalance || actionsDisabled}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to withdraw"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : !hasBalance
-                      ? "No balance to withdraw"
-                      : "Withdraw tokens"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Withdraw</span>
-                </div>
-              </button>
-              {!disableMove && (
+            <div className={`hidden md:grid gap-3 ${actionGridClass}`}>
+              {showDepositButton && (
+                <button
+                  className="btn btn-sm btn-primary flex justify-center items-center"
+                  onClick={handleDepositClick}
+                  disabled={!isWalletConnected || actionsDisabled}
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to deposit"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Deposit tokens"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <span>Deposit</span>
+                  </div>
+                </button>
+              )}
+              {showWithdrawButton && (
                 <button
                   className="btn btn-sm btn-outline flex justify-center items-center"
-                  onClick={moveModal.open}
+                  onClick={handleWithdrawClick}
+                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to withdraw"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : !hasBalance
+                          ? "No balance to withdraw"
+                          : "Withdraw tokens"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <span>Withdraw</span>
+                  </div>
+                </button>
+              )}
+              {showMoveButton && (
+                <button
+                  className="btn btn-sm btn-outline flex justify-center items-center"
+                  onClick={handleMoveClick}
                   disabled={!isWalletConnected || !hasBalance || actionsDisabled}
                   title={
                     !isWalletConnected
@@ -311,8 +358,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                       : actionsDisabled
                         ? disabledMessage
                         : !hasBalance
-                        ? "No balance to move"
-                        : "Move supply to another protocol"
+                          ? "No balance to move"
+                          : "Move supply to another protocol"
                   }
                 >
                   <div className="flex items-center justify-center">
