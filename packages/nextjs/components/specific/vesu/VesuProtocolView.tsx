@@ -445,15 +445,14 @@ export const VesuProtocolView: FC = () => {
       let borrowPosition: ProtocolPosition | undefined;
       let debtSymbol: string | undefined;
 
-      if (hasDebt && debtMetadata) {
+      if (debtMetadata) {
         debtSymbol = feltToString(debtMetadata.symbol);
         const debtPrice = normalizePrice(debtMetadata.price);
-        const debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
 
-        borrowPosition = {
+        const baseBorrowPosition: ProtocolPosition = {
           icon: tokenNameToLogo(debtSymbol.toLowerCase()),
           name: debtSymbol,
-          balance: -debtUsd,
+          balance: 0,
           tokenBalance: positionData.nominal_debt,
           currentRate: (debtMetadata.borrowAPR ?? 0) * 100,
           tokenAddress: debtAddress,
@@ -461,21 +460,28 @@ export const VesuProtocolView: FC = () => {
           tokenPrice: debtPrice,
           tokenSymbol: debtSymbol,
           collateralValue: collateralUsd,
-          vesuContext: borrowContext
-            ? {
-                borrow: borrowContext,
-                repay: { poolId, counterpartToken: collateralAddress },
-              }
-            : undefined,
-          moveSupport: {
-            preselectedCollaterals: moveCollaterals,
-            disableCollateralSelection: true,
+          vesuContext: {
+            borrow: borrowContext,
+            ...(hasDebt ? { repay: { poolId, counterpartToken: collateralAddress } } : {}),
           },
           actionsDisabled: positionData.is_vtoken,
           actionsDisabledReason: disabledReason,
         };
-      } else if (debtMetadata) {
-        debtSymbol = feltToString(debtMetadata.symbol);
+
+        if (hasDebt) {
+          const debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
+
+          borrowPosition = {
+            ...baseBorrowPosition,
+            balance: -debtUsd,
+            moveSupport: {
+              preselectedCollaterals: moveCollaterals,
+              disableCollateralSelection: true,
+            },
+          };
+        } else {
+          borrowPosition = baseBorrowPosition;
+        }
       }
 
       return [
@@ -672,6 +678,10 @@ export const VesuProtocolView: FC = () => {
                           networkType="starknet"
                           position={positionManager}
                           containerClassName="rounded-none"
+                          availableActions={
+                            row.hasDebt ? undefined : { borrow: true, repay: false, move: false }
+                          }
+                          showNoDebtLabel={!row.hasDebt}
                         />
                       ) : (
                         <div className="p-3 bg-base-200/60 border border-dashed border-base-300 h-full flex items-center justify-between gap-3">

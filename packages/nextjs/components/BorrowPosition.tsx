@@ -31,6 +31,7 @@ export type BorrowPositionProps = ProtocolPosition & {
   };
   onBorrow?: () => void;
   borrowCtaLabel?: string;
+  showNoDebtLabel?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -57,6 +58,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   availableActions,
   onBorrow,
   borrowCtaLabel,
+  showNoDebtLabel = false,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -72,7 +74,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance (debt)
-  const hasBalance = tokenBalance > 0;
+  const hasBalance =
+    typeof tokenBalance === "bigint" ? tokenBalance > 0n : (tokenBalance ?? 0) > 0;
 
   const disabledMessage =
     actionsDisabledReason ||
@@ -220,15 +223,21 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <div className="px-2 border-r border-base-300">
                 <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
                 <div className="text-sm font-medium h-6 line-clamp-1">
-                  <FiatBalance
-                    tokenAddress={tokenAddress}
-                    rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-                    price={tokenPrice}
-                    decimals={tokenDecimals}
-                    tokenSymbol={name}
-                    isNegative={true}
-                    className="text-red-500"
-                  />
+                  {showNoDebtLabel ? (
+                    <span className="text-base-content/70">No debt</span>
+                  ) : (
+                    <FiatBalance
+                      tokenAddress={tokenAddress}
+                      rawValue={
+                        typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)
+                      }
+                      price={tokenPrice}
+                      decimals={tokenDecimals}
+                      tokenSymbol={name}
+                      isNegative={true}
+                      className="text-red-500"
+                    />
+                  )}
                 </div>
               </div>
             )}
