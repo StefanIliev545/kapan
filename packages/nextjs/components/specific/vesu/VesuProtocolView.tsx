@@ -91,11 +91,14 @@ export const VesuProtocolView: FC = () => {
       setCachedPositions([]);
       return;
     }
-    if (!isUpdating) {
+
+    const hasPositionData = userPositionsPart1 !== undefined || userPositionsPart2 !== undefined;
+
+    if (hasPositionData) {
       setCachedPositions(mergedUserPositions);
       setHasLoadedOnce(true);
     }
-  }, [mergedUserPositions, isUpdating, userAddress]);
+  }, [mergedUserPositions, userAddress, userPositionsPart1, userPositionsPart2]);
 
   useEffect(() => {
     const handler = () => refetchPositions();
