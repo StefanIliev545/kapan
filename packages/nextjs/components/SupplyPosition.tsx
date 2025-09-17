@@ -32,6 +32,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   onWithdraw?: () => void;
   onMove?: () => void;
   showQuickDepositButton?: boolean;
+  showInfoDropdown?: boolean;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -58,6 +59,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   onWithdraw,
   onMove,
   showQuickDepositButton = false,
+  showInfoDropdown = true,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -134,7 +136,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       <div
         className={`w-full p-3 rounded-md ${
           isExpanded ? "bg-base-300" : "bg-base-200"
-        } cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md ${containerClassName ?? ""}`}
+        } ${hasAnyActions ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"} transition-all duration-200 ${
+          containerClassName ?? ""
+        }`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -144,39 +148,41 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
             <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            <div
-              className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
-              onClick={e => e.stopPropagation()}
-            >
-              <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                <FiInfo
-                  className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
-                  aria-hidden="true"
-                />
-              </div>
+            {showInfoDropdown && (
               <div
-                tabIndex={0}
-                className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-                style={{
-                  right: "auto",
-                  transform: "translateX(-50%)",
-                  left: "50%",
-                  borderRadius: "4px",
-                }}
+                className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
+                onClick={e => e.stopPropagation()}
               >
-                <div className="card-body p-3">
-                  <h3 className="card-title text-sm">{name} Details</h3>
-                  <div className="text-xs space-y-1">
-                    <p className="text-base-content/70">Contract Address:</p>
-                    <p className="font-mono break-all">{tokenAddress}</p>
-                    <p className="text-base-content/70">Protocol:</p>
-                    <p>{protocolName}</p>
-                    <p className="text-base-content/70">Type:</p>
-                    <p className="capitalize">Supply Position</p>
+                <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
+                  <FiInfo
+                    className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div
+                  tabIndex={0}
+                  className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
+                  style={{
+                    right: "auto",
+                    transform: "translateX(-50%)",
+                    left: "50%",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <div className="card-body p-3">
+                    <h3 className="card-title text-sm">{name} Details</h3>
+                    <div className="text-xs space-y-1">
+                      <p className="text-base-content/70">Contract Address:</p>
+                      <p className="font-mono break-all">{tokenAddress}</p>
+                      <p className="text-base-content/70">Protocol:</p>
+                      <p>{protocolName}</p>
+                      <p className="text-base-content/70">Type:</p>
+                      <p className="capitalize">Supply Position</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Render additional content after the info button if provided */}
             {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
