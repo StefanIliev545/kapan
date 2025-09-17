@@ -34,6 +34,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   onWithdraw?: () => void;
   onMove?: () => void;
   showQuickDepositButton?: boolean;
+  extraActions?: React.ReactNode;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -62,6 +63,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   onWithdraw,
   onMove,
   showQuickDepositButton = false,
+  extraActions,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -392,6 +394,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             {disabledMessage}
           </div>
         )}
+
+        {isExpanded && extraActions && <div className="mt-3" onClick={e => e.stopPropagation()}>{extraActions}</div>}
       </div>
 
       {showQuickDepositButton && (

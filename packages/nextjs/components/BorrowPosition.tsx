@@ -35,6 +35,7 @@ export type BorrowPositionProps = ProtocolPosition & {
   borrowCtaLabel?: string;
   showNoDebtLabel?: boolean;
   infoButton?: React.ReactNode;
+  extraActions?: React.ReactNode;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -65,6 +66,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   borrowCtaLabel,
   showNoDebtLabel = false,
   infoButton,
+  extraActions,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -467,6 +469,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 {disabledMessage}
               </div>
             )}
+
+            {extraActions && <div className="mt-3">{extraActions}</div>}
           </div>
         )}
       </div>
