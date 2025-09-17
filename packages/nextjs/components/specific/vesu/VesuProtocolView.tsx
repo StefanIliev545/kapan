@@ -607,7 +607,7 @@ export const VesuProtocolView: FC = () => {
                           networkType="starknet"
                           disableMove
                           hideBalanceColumn
-                          availableActions={{ withdraw: false, move: false }}
+                          availableActions={{ deposit: false, withdraw: false, move: false }}
                         />
                       ))
                     ) : (
@@ -629,7 +629,7 @@ export const VesuProtocolView: FC = () => {
                           protocolName="Vesu"
                           networkType="starknet"
                           hideBalanceColumn
-                          availableActions={{ repay: false, move: false }}
+                          availableActions={{ borrow: false, repay: false, move: false }}
                         />
                       ))
                     ) : (
