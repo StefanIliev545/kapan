@@ -616,48 +616,31 @@ export const VesuProtocolView: FC = () => {
                   row.borrow ? [row.borrow] : [],
                 );
 
-                const containerColumns = row.borrow
-                  ? "grid-cols-1 md:grid-cols-2 md:divide-x"
-                  : "grid-cols-1";
+                const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
-                const canInitiateBorrow = !row.hasDebt && Boolean(row.borrowContext);
+                const availableBorrowTokens = assetsWithRates.filter(
+                  asset => toHexAddress(asset.address) !== row.supply.tokenAddress,
+                );
+                const canInitiateBorrow =
+                  !row.hasDebt && Boolean(row.borrowContext) && availableBorrowTokens.length > 0;
+                const borrowButtonDisabled = row.supply.actionsDisabled;
 
                 const handleBorrowFromSupply = (event: MouseEvent<HTMLButtonElement>) => {
                   event.stopPropagation();
                   if (!canInitiateBorrow || !row.borrowContext) return;
-                  const availableTokens = assetsWithRates.filter(
-                    asset => toHexAddress(asset.address) !== row.supply.tokenAddress,
-                  );
-                  if (availableTokens.length === 0) return;
                   setBorrowSelection({
-                    tokens: availableTokens,
+                    tokens: availableBorrowTokens,
                     collateralAddress: row.supply.tokenAddress,
                     vesuContext: row.borrowContext,
                     position: positionManager,
                   });
                 };
 
-                const extraHeaderContent = row.isVtoken || canInitiateBorrow
-                  ? (
-                      <div className="flex items-center gap-2 ml-2">
-                        {row.isVtoken && <span className="badge badge-xs badge-primary">vToken</span>}
-                        {canInitiateBorrow && (
-                          <button
-                            className="btn btn-xs btn-outline"
-                            onClick={handleBorrowFromSupply}
-                            disabled={row.supply.actionsDisabled}
-                            title={
-                              row.supply.actionsDisabled
-                                ? row.supply.actionsDisabledReason
-                                : "Borrow against this collateral"
-                            }
-                          >
-                            Borrow
-                          </button>
-                        )}
-                      </div>
-                    )
-                  : undefined;
+                const extraHeaderContent = row.isVtoken ? (
+                  <div className="flex items-center gap-2 ml-2">
+                    <span className="badge badge-xs badge-primary">vToken</span>
+                  </div>
+                ) : undefined;
 
                 return (
                   <div
@@ -677,7 +660,7 @@ export const VesuProtocolView: FC = () => {
                         containerClassName="rounded-none"
                         showQuickDepositButton={!row.isVtoken}
                       />
-                      {row.borrow && (
+                      {row.borrow ? (
                         <BorrowPosition
                           {...row.borrow}
                           protocolName="Vesu"
@@ -685,6 +668,31 @@ export const VesuProtocolView: FC = () => {
                           position={positionManager}
                           containerClassName="rounded-none"
                         />
+                      ) : (
+                        <div className="p-3 bg-base-200/60 border border-dashed border-base-300 h-full flex flex-col justify-between gap-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-semibold text-base-content/70">No debt</span>
+                            <span className="text-xs text-base-content/50">
+                              You are not borrowing against this collateral yet.
+                            </span>
+                          </div>
+                          <div className="flex justify-end">
+                            <button
+                              className="btn btn-sm btn-outline"
+                              onClick={handleBorrowFromSupply}
+                              disabled={!canInitiateBorrow || borrowButtonDisabled}
+                              title={
+                                borrowButtonDisabled
+                                  ? row.supply.actionsDisabledReason
+                                  : canInitiateBorrow
+                                    ? "Borrow against this collateral"
+                                    : "No borrowable assets available"
+                              }
+                            >
+                              Borrow
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
