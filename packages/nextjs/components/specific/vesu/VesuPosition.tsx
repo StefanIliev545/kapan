@@ -342,7 +342,6 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             tokens={supportedAssets}
             protocolName="Vesu"
             collateralAsset={collateralAsset}
-            isVesu={true}
             vesuContext={{ poolId, counterpartToken: collateralAsset }}
             position={position}
           />

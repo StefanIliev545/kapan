@@ -13,6 +13,7 @@ import { feltToString, toAnnualRates, type TokenMetadata } from "~~/utils/protoc
 import { POOL_IDS } from "./VesuMarkets";
 import { formatUnits } from "viem";
 import type { VesuContext } from "~~/hooks/useLendingAction";
+import { FiPlus } from "react-icons/fi";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -286,6 +287,11 @@ export const VesuProtocolView: FC = () => {
     collateralAddress: string;
     vesuContext: VesuContext;
     position: PositionManager;
+  } | null>(null);
+  const [depositSelection, setDepositSelection] = useState<{
+    tokens: AssetWithRates[];
+    vesuContext?: VesuContext;
+    position?: PositionManager;
   } | null>(null);
 
   useEffect(() => {
@@ -658,7 +664,6 @@ export const VesuProtocolView: FC = () => {
                         disableMove
                         afterInfoContent={extraHeaderContent}
                         containerClassName="rounded-none"
-                        showQuickDepositButton={!row.isVtoken}
                       />
                       {row.borrow ? (
                         <BorrowPosition
@@ -703,6 +708,41 @@ export const VesuProtocolView: FC = () => {
                 No positions found
               </div>
             )}
+
+            <div className="rounded-md border border-dashed border-base-300 overflow-hidden">
+              <div className="grid divide-y divide-base-300 md:divide-y-0 grid-cols-1 md:grid-cols-2 md:divide-x">
+                <div className="p-3 bg-base-200/60 h-full flex flex-col justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-semibold text-base-content/70">Add collateral</span>
+                    <span className="text-xs text-base-content/50">
+                      Supply assets to start or grow your borrowing power.
+                    </span>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={event => {
+                        event.stopPropagation();
+                        if (assetsWithRates.length === 0) return;
+                        setDepositSelection({
+                          tokens: assetsWithRates,
+                        });
+                      }}
+                      disabled={assetsWithRates.length === 0}
+                      title={
+                        assetsWithRates.length === 0
+                          ? "No assets available to deposit"
+                          : "Deposit collateral"
+                      }
+                    >
+                      <FiPlus className="w-4 h-4" />
+                      <span>Deposit</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="hidden md:block" aria-hidden="true" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -713,9 +753,19 @@ export const VesuProtocolView: FC = () => {
           tokens={borrowSelection.tokens}
           protocolName="Vesu"
           collateralAsset={borrowSelection.collateralAddress}
-          isVesu
           vesuContext={borrowSelection.vesuContext}
           position={borrowSelection.position}
+        />
+      )}
+      {depositSelection && (
+        <TokenSelectModalStark
+          isOpen={depositSelection !== null}
+          onClose={() => setDepositSelection(null)}
+          tokens={depositSelection.tokens}
+          protocolName="Vesu"
+          vesuContext={depositSelection.vesuContext}
+          position={depositSelection.position}
+          action="deposit"
         />
       )}
     </div>
