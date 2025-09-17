@@ -505,6 +505,35 @@ export const VesuProtocolView: FC = () => {
     });
   }, [assetMap, cachedPositions, poolId]);
 
+  const netBalanceUsd = useMemo(() => {
+    if (vesuRows.length === 0) {
+      return 0;
+    }
+
+    let totalSupply = 0;
+    let totalDebt = 0;
+
+    vesuRows.forEach(row => {
+      totalSupply += row.supply.balance;
+      if (row.borrow) {
+        totalDebt += Math.abs(row.borrow.balance);
+      }
+    });
+
+    return totalSupply - totalDebt;
+  }, [vesuRows]);
+
+  const formatCurrency = useCallback((amount: number) => {
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    return formatter.format(amount);
+  }, []);
+
   const hasPositions = vesuRows.length > 0;
 
   useEffect(() => {
@@ -547,6 +576,16 @@ export const VesuProtocolView: FC = () => {
               <div className="flex flex-col">
                 <div className="text-xl font-bold tracking-tight">Vesu</div>
                 <div className="text-xs text-base-content/70">Manage your Starknet lending positions</div>
+                {userAddress && (
+                  <div className="text-xs text-base-content/70 flex items-center gap-1 mt-1">
+                    <span>Balance:</span>
+                    <span
+                      className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}
+                    >
+                      {formatCurrency(netBalanceUsd)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
