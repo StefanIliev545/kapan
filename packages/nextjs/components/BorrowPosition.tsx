@@ -22,6 +22,15 @@ export type BorrowPositionProps = ProtocolPosition & {
   protocolName: string;
   networkType: "evm" | "starknet";
   position?: PositionManager;
+  containerClassName?: string;
+  hideBalanceColumn?: boolean;
+  availableActions?: {
+    borrow?: boolean;
+    repay?: boolean;
+    move?: boolean;
+  };
+  onBorrow?: () => void;
+  borrowCtaLabel?: string;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -39,6 +48,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   collateralValue,
   networkType,
   position,
+  vesuContext,
+  moveSupport,
+  actionsDisabled = false,
+  actionsDisabledReason,
+  containerClassName,
+  hideBalanceColumn = false,
+  availableActions,
+  onBorrow,
+  borrowCtaLabel,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -51,11 +69,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
-  const address = networkType === "evm" ? evm.address : starknet.address;
   const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
 
   // Check if position has a balance (debt)
   const hasBalance = tokenBalance > 0;
+
+  const disabledMessage =
+    actionsDisabledReason ||
+    (networkType === "starknet"
+      ? "Action unavailable for this market"
+      : "Action unavailable");
 
   // Fetch optimal rate
   const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
@@ -81,10 +104,33 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
+  const actionConfig = {
+    borrow: availableActions?.borrow !== false,
+    repay: availableActions?.repay !== false,
+    move: availableActions?.move !== false,
+  };
+
+  const showBorrowButton = actionConfig.borrow;
+  const showRepayButton = actionConfig.repay;
+  const showMoveButton = actionConfig.move && hasBalance;
+
+  const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton].filter(Boolean).length;
+  const hasAnyActions = visibleActionCount > 0;
+
+  const actionGridClass =
+    visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
+
+  const handleBorrowClick = onBorrow ?? borrowModal.open;
+
+  const movePoolId = vesuContext?.borrow?.poolId ?? vesuContext?.repay?.poolId;
+
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
     // Don't expand if clicking on the info button or its dropdown
     if ((e.target as HTMLElement).closest(".dropdown")) {
+      return;
+    }
+    if (!hasAnyActions) {
       return;
     }
     expanded.toggle();
@@ -102,7 +148,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full p-3 rounded-md ${isExpanded ? "bg-base-300" : "bg-base-200"} cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md`}
+        className={`w-full p-3 rounded-md ${
+          isExpanded ? "bg-base-300" : "bg-base-200"
+        } cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -163,21 +211,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </div>
 
           {/* Stats: Rates */}
-          <div className="order-2 lg:order-none lg:col-span-6 grid grid-cols-3 gap-0 items-center min-w-[200px]">
-            <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-              <div className="text-sm font-medium h-6 line-clamp-1">
-                <FiatBalance
-                  tokenAddress={tokenAddress}
-                  rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-                  price={tokenPrice}
-                  decimals={tokenDecimals}
-                  tokenSymbol={name}
-                  isNegative={true}
-                  className="text-red-500"
-                />
+          <div
+            className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
+              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+            }`}
+          >
+            {!hideBalanceColumn && (
+              <div className="px-2 border-r border-base-300">
+                <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
+                <div className="text-sm font-medium h-6 line-clamp-1">
+                  <FiatBalance
+                    tokenAddress={tokenAddress}
+                    rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+                    price={tokenPrice}
+                    decimals={tokenDecimals}
+                    tokenSymbol={name}
+                    isNegative={true}
+                    className="text-red-500"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
@@ -203,118 +257,186 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
           {/* Expand Indicator and quick Move action */}
           <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end gap-2">
-            {hasBetterRate && (
+            {hasBetterRate && showMoveButton && (
               <button
                 className="btn btn-xs btn-secondary animate-pulse"
                 onClick={e => {
                   e.stopPropagation();
                   moveModal.open();
                 }}
-                disabled={!isWalletConnected}
+                disabled={!isWalletConnected || actionsDisabled}
                 aria-label="Move"
-                title="Move debt to another protocol"
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to move debt"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Move debt to another protocol"
+                }
               >
                 Move
               </button>
             )}
-            <div
-              className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"} transition-colors duration-200`}
-            >
-              {isExpanded ? (
-                <FiChevronUp className="w-4 h-4 text-primary" />
-              ) : (
-                <FiChevronDown className="w-4 h-4 text-base-content/70" />
-              )}
-            </div>
+            {hasAnyActions && (
+              <div
+                className={`flex items-center justify-center w-7 h-7 rounded-full ${
+                  isExpanded ? "bg-primary/20" : "bg-base-300/50"
+                } transition-colors duration-200`}
+              >
+                {isExpanded ? (
+                  <FiChevronUp className="w-4 h-4 text-primary" />
+                ) : (
+                  <FiChevronDown className="w-4 h-4 text-base-content/70" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Action Buttons - Only visible when expanded */}
-        {isExpanded && (
+        {isExpanded && hasAnyActions && (
           <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Mobile layout - full width buttons stacked vertically */}
             <div className="flex flex-col gap-2 md:hidden">
-              <button
-                className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={repayModal.open}
-                disabled={!hasBalance || !isWalletConnected}
-                aria-label="Repay"
-                title={!isWalletConnected ? "Connect wallet to repay" : "Repay debt"}
-              >
-                <div className="flex items-center justify-center">
-                  <FiMinus className="w-4 h-4 mr-1" />
-                  <span>Repay</span>
-                </div>
-              </button>
+              {showRepayButton && (
+                <button
+                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
+                  onClick={repayModal.open}
+                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                  aria-label="Repay"
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to repay"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Repay debt"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <FiMinus className="w-4 h-4 mr-1" />
+                    <span>Repay</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                className={`btn btn-sm w-full flex justify-center items-center ${hasBetterRate ? "btn-secondary" : "btn-outline"}`}
-                onClick={moveModal.open}
-                disabled={!hasBalance || !isWalletConnected}
-                aria-label="Move"
-                title={!isWalletConnected ? "Connect wallet to move debt" : "Move debt to another protocol"}
-              >
-                <div className="flex items-center justify-center">
-                  <FiRepeat className="w-4 h-4 mr-1" />
-                  <span>Move</span>
-                </div>
-              </button>
+              {showMoveButton && (
+                <button
+                  className={`btn btn-sm w-full flex justify-center items-center ${
+                    hasBetterRate ? "btn-secondary" : "btn-outline"
+                  }`}
+                  onClick={moveModal.open}
+                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                  aria-label="Move"
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to move debt"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Move debt to another protocol"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <FiRepeat className="w-4 h-4 mr-1" />
+                    <span>Move</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                onClick={borrowModal.open}
-                disabled={!isWalletConnected}
-                aria-label="Borrow"
-                title={!isWalletConnected ? "Connect wallet to borrow" : "Borrow more tokens"}
-              >
-                <div className="flex items-center justify-center">
-                  <FiPlus className="w-4 h-4 mr-1" />
-                  <span>Borrow</span>
-                </div>
-              </button>
+              {showBorrowButton && (
+                <button
+                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
+                  onClick={handleBorrowClick}
+                  disabled={!isWalletConnected || actionsDisabled}
+                  aria-label="Borrow"
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to borrow"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Borrow more tokens"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <FiPlus className="w-4 h-4 mr-1" />
+                    <span>{borrowCtaLabel ?? "Borrow"}</span>
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className="hidden md:grid grid-cols-3 gap-3">
-              <button
-                className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={repayModal.open}
-                disabled={!hasBalance || !isWalletConnected}
-                aria-label="Repay"
-                title={!isWalletConnected ? "Connect wallet to repay" : "Repay debt"}
-              >
-                <div className="flex items-center justify-center">
-                  <FiMinus className="w-4 h-4 mr-1" />
-                  <span>Repay</span>
-                </div>
-              </button>
+            <div className={`hidden md:grid gap-3 ${actionGridClass}`}>
+              {showRepayButton && (
+                <button
+                  className="btn btn-sm btn-primary flex justify-center items-center"
+                  onClick={repayModal.open}
+                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                  aria-label="Repay"
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to repay"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Repay debt"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <FiMinus className="w-4 h-4 mr-1" />
+                    <span>Repay</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                className={`btn btn-sm flex justify-center items-center ${hasBetterRate ? "btn-secondary" : "btn-outline"}`}
-                onClick={moveModal.open}
-                disabled={!hasBalance || !isWalletConnected}
-                aria-label="Move"
-                title={!isWalletConnected ? "Connect wallet to move debt" : "Move debt to another protocol"}
-              >
-                <div className="flex items-center justify-center">
-                  <FiRepeat className="w-4 h-4 mr-1" />
-                  <span>Move</span>
-                </div>
-              </button>
+              {showMoveButton && (
+                <button
+                  className={`btn btn-sm flex justify-center items-center ${
+                    hasBetterRate ? "btn-secondary" : "btn-outline"
+                  }`}
+                  onClick={moveModal.open}
+                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                  aria-label="Move"
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to move debt"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Move debt to another protocol"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <FiRepeat className="w-4 h-4 mr-1" />
+                    <span>Move</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                className="btn btn-sm btn-primary flex justify-center items-center"
-                onClick={borrowModal.open}
-                disabled={!isWalletConnected}
-                aria-label="Borrow"
-                title={!isWalletConnected ? "Connect wallet to borrow" : "Borrow more tokens"}
-              >
-                <div className="flex items-center justify-center">
-                  <FiPlus className="w-4 h-4 mr-1" />
-                  <span>Borrow</span>
-                </div>
-              </button>
+              {showBorrowButton && (
+                <button
+                  className="btn btn-sm btn-primary flex justify-center items-center"
+                  onClick={handleBorrowClick}
+                  disabled={!isWalletConnected || actionsDisabled}
+                  aria-label="Borrow"
+                  title={
+                    !isWalletConnected
+                      ? "Connect wallet to borrow"
+                      : actionsDisabled
+                        ? disabledMessage
+                        : "Borrow more tokens"
+                  }
+                >
+                  <div className="flex items-center justify-center">
+                    <FiPlus className="w-4 h-4 mr-1" />
+                    <span>{borrowCtaLabel ?? "Borrow"}</span>
+                  </div>
+                </button>
+              )}
             </div>
+
+            {actionsDisabled && (
+              <div className="mt-3 text-sm text-base-content/70">
+                {disabledMessage}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -343,6 +465,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             currentDebt={debtAmount}
             position={position}
+            vesuContext={vesuContext?.borrow}
           />
           <RepayModalStark
             isOpen={repayModal.isOpen}
@@ -358,6 +481,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
+            vesuContext={vesuContext?.repay}
           />
           <MovePositionModalStark
             isOpen={moveModal.isOpen}
@@ -369,7 +493,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               type: "borrow",
               tokenAddress,
               decimals: tokenDecimals ?? 18,
+              poolId: movePoolId,
             }}
+            preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+            disableCollateralSelection={moveSupport?.disableCollateralSelection}
           />
         </>
       ) : (
