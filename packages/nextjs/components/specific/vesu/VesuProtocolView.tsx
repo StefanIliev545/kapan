@@ -17,7 +17,7 @@ import { feltToString, toAnnualRates, type TokenMetadata } from "~~/utils/protoc
 import { POOL_IDS } from "./VesuMarkets";
 import { formatUnits } from "viem";
 import type { VesuContext } from "~~/hooks/useLendingAction";
-import { FiChevronDown, FiChevronUp, FiPlus } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiPlus, FiSettings } from "react-icons/fi";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -769,78 +769,80 @@ export const VesuProtocolView: FC = () => {
                 const isCollateralMenuOpen =
                   activeSwitchMenu?.key === row.key && activeSwitchMenu.type === "collateral";
 
-                const renderCollateralName = (defaultName: string) => {
-                  if (collateralSwitchOptions.length === 0) {
-                    return (
-                      <>
-                        <span className="font-semibold text-lg truncate">{defaultName}</span>
-                        {row.isVtoken && <span className="badge badge-xs badge-primary">vToken</span>}
-                      </>
-                    );
-                  }
+                const renderCollateralName = (defaultName: string) => (
+                  <>
+                    <span className="font-semibold text-lg truncate">{defaultName}</span>
+                    {row.isVtoken && <span className="badge badge-xs badge-primary">vToken</span>}
+                  </>
+                );
 
-                  const handleToggle = (event: MouseEvent<HTMLDivElement>) => {
-                    event.stopPropagation();
-                    setActiveSwitchMenu(isCollateralMenuOpen ? null : { key: row.key, type: "collateral" });
-                  };
+                const supplyMenuHasActions = collateralSwitchOptions.length > 0;
 
-                  return (
-                    <div className="dropdown dropdown-bottom" onClick={event => event.stopPropagation()}>
+                const supplyInfoButton = !supplyMenuHasActions
+                  ? null
+                  : (
                       <div
-                        tabIndex={0}
-                        role="button"
-                        className="flex items-center gap-2 cursor-pointer underline decoration-dotted"
-                        onClick={handleToggle}
+                        className="dropdown dropdown-bottom dropdown-end"
+                        onClick={event => event.stopPropagation()}
                       >
-                        <span className="font-semibold text-lg truncate">{defaultName}</span>
-                        {row.isVtoken && <span className="badge badge-xs badge-primary">vToken</span>}
-                      </div>
-                      {isCollateralMenuOpen && (
-                        <ul
+                        <button
+                          type="button"
                           tabIndex={0}
-                          className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50"
+                          className="btn btn-ghost btn-xs btn-circle"
+                          onClick={event => {
+                            event.stopPropagation();
+                            setActiveSwitchMenu(
+                              isCollateralMenuOpen ? null : { key: row.key, type: "collateral" },
+                            );
+                          }}
                         >
-                          <li className="menu-title">
-                            <span>Switch collateral</span>
-                          </li>
-                          <li>
-                            <div className="grid grid-cols-3 gap-2 p-1">
-                              {collateralSwitchOptions.map(asset => {
-                                const symbol = feltToString(asset.symbol);
-                                return (
-                                  <button
-                                    key={asset.address.toString()}
-                                    className="btn btn-ghost btn-xs h-auto py-2 normal-case"
-                                    onClick={event => {
-                                      event.stopPropagation();
-                                      setActiveSwitchMenu(null);
-                                      setSwitchSelection({
-                                        type: "collateral",
-                                        row,
-                                        target: asset,
-                                      });
-                                    }}
-                                  >
-                                    <div className="flex flex-col items-center gap-1">
-                                      <Image
-                                        src={tokenNameToLogo(symbol.toLowerCase())}
-                                        alt={symbol}
-                                        width={20}
-                                        height={20}
-                                        className="w-5 h-5"
-                                      />
-                                      <span className="text-xs">{symbol}</span>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </li>
-                        </ul>
-                      )}
-                    </div>
-                  );
-                };
+                          <FiSettings className="w-4 h-4" />
+                        </button>
+                        {isCollateralMenuOpen && (
+                          <ul
+                            tabIndex={0}
+                            className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50"
+                          >
+                            <li className="menu-title">
+                              <span>Switch collateral</span>
+                            </li>
+                            <li>
+                              <div className="grid grid-cols-3 gap-2 p-1">
+                                {collateralSwitchOptions.map(asset => {
+                                  const symbol = feltToString(asset.symbol);
+                                  return (
+                                    <button
+                                      key={asset.address.toString()}
+                                      className="btn btn-ghost btn-xs h-auto py-2 normal-case"
+                                      onClick={event => {
+                                        event.stopPropagation();
+                                        setActiveSwitchMenu(null);
+                                        setSwitchSelection({
+                                          type: "collateral",
+                                          row,
+                                          target: asset,
+                                        });
+                                      }}
+                                    >
+                                      <div className="flex flex-col items-center gap-1">
+                                        <Image
+                                          src={tokenNameToLogo(symbol.toLowerCase())}
+                                          alt={symbol}
+                                          width={20}
+                                          height={20}
+                                          className="w-5 h-5"
+                                        />
+                                        <span className="text-xs">{symbol}</span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </li>
+                          </ul>
+                        )}
+                      </div>
+                    );
 
                 const isDebtMenuOpen = activeSwitchMenu?.key === row.key && activeSwitchMenu.type === "debt";
                 const debtSwitchOptions = assetsWithRates.filter(asset => {
@@ -848,86 +850,95 @@ export const VesuProtocolView: FC = () => {
                   return !row.borrow || assetAddress !== row.borrow.tokenAddress;
                 });
 
-                const renderDebtName = (defaultName: string) => {
-                  if (!row.borrow || !row.debtAsset || debtSwitchOptions.length === 0) {
-                    return <span className="font-semibold text-lg truncate">{defaultName}</span>;
-                  }
-
-                  const handleToggle = (event: MouseEvent<HTMLDivElement>) => {
-                    event.stopPropagation();
-                    setActiveSwitchMenu(isDebtMenuOpen ? null : { key: row.key, type: "debt" });
-                  };
-
-                  return (
-                    <div className="dropdown dropdown-bottom" onClick={event => event.stopPropagation()}>
-                      <div
-                        tabIndex={0}
-                        role="button"
-                        className="flex items-center gap-2 cursor-pointer underline decoration-dotted"
-                        onClick={handleToggle}
-                      >
-                        <span className="font-semibold text-lg truncate">{defaultName}</span>
-                      </div>
-                      {isDebtMenuOpen && (
-                        <ul
-                          tabIndex={0}
-                          className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50"
-                        >
-                          <li className="menu-title">
-                            <span>Switch debt</span>
-                          </li>
-                          <li>
-                            <div className="grid grid-cols-3 gap-2 p-1">
-                              {debtSwitchOptions.map(asset => {
-                                const symbol = feltToString(asset.symbol);
-                                return (
-                                  <button
-                                    key={asset.address.toString()}
-                                    className="btn btn-ghost btn-xs h-auto py-2 normal-case"
-                                    onClick={event => {
-                                      event.stopPropagation();
-                                      setActiveSwitchMenu(null);
-                                      setSwitchSelection({
-                                        type: "debt",
-                                        row,
-                                        target: asset,
-                                      });
-                                    }}
-                                  >
-                                    <div className="flex flex-col items-center gap-1">
-                                      <Image
-                                        src={tokenNameToLogo(symbol.toLowerCase())}
-                                        alt={symbol}
-                                        width={20}
-                                        height={20}
-                                        className="w-5 h-5"
-                                      />
-                                      <span className="text-xs">{symbol}</span>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </li>
-                        </ul>
-                      )}
-                    </div>
-                  );
-                };
+                const renderDebtName = (defaultName: string) => (
+                  <span className="font-semibold text-lg truncate">{defaultName}</span>
+                );
 
                 const showCloseAction = Boolean(row.borrow && row.borrow.tokenBalance > 0n && !row.isVtoken);
-                const closeButton = showCloseAction ? (
-                  <button
-                    className="btn btn-circle btn-ghost btn-xs"
-                    onClick={event => {
-                      event.stopPropagation();
-                      setActiveSwitchMenu(null);
-                      setCloseSelection(row);
-                    }}
-                  >
-                    ✕
-                  </button>
-                ) : undefined;
+                const debtMenuHasActions = showCloseAction || debtSwitchOptions.length > 0;
+
+                const debtInfoButton = !debtMenuHasActions
+                  ? null
+                  : (
+                      <div
+                        className="dropdown dropdown-bottom dropdown-end"
+                        onClick={event => event.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          className="btn btn-ghost btn-xs btn-circle"
+                          onClick={event => {
+                            event.stopPropagation();
+                            setActiveSwitchMenu(isDebtMenuOpen ? null : { key: row.key, type: "debt" });
+                          }}
+                        >
+                          <FiSettings className="w-4 h-4" />
+                        </button>
+                        {isDebtMenuOpen && (
+                          <ul
+                            tabIndex={0}
+                            className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50"
+                          >
+                            <li className="menu-title">
+                              <span>Manage debt</span>
+                            </li>
+                            {debtSwitchOptions.length > 0 && (
+                              <li>
+                                <div className="grid grid-cols-3 gap-2 p-1">
+                                  {debtSwitchOptions.map(asset => {
+                                    const symbol = feltToString(asset.symbol);
+                                    return (
+                                      <button
+                                        key={asset.address.toString()}
+                                        className="btn btn-ghost btn-xs h-auto py-2 normal-case"
+                                        onClick={event => {
+                                          event.stopPropagation();
+                                          setActiveSwitchMenu(null);
+                                          setSwitchSelection({
+                                            type: "debt",
+                                            row,
+                                            target: asset,
+                                          });
+                                        }}
+                                      >
+                                        <div className="flex flex-col items-center gap-1">
+                                          <Image
+                                            src={tokenNameToLogo(symbol.toLowerCase())}
+                                            alt={symbol}
+                                            width={20}
+                                            height={20}
+                                            className="w-5 h-5"
+                                          />
+                                          <span className="text-xs">{symbol}</span>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </li>
+                            )}
+                            {showCloseAction && (
+                              <li>
+                                <button
+                                  className="btn btn-ghost btn-sm justify-start"
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    setActiveSwitchMenu(null);
+                                    setCloseSelection(row);
+                                  }}
+                                >
+                                  Close with collateral
+                                </button>
+                              </li>
+                            )}
+                            {!showCloseAction && debtSwitchOptions.length === 0 && (
+                              <li className="px-2 py-1 text-xs text-base-content/60">No actions available</li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
+                    );
 
                 return (
                   <div
@@ -944,6 +955,7 @@ export const VesuProtocolView: FC = () => {
                         position={positionManager}
                         disableMove
                         renderName={renderCollateralName}
+                        infoButton={supplyInfoButton ?? undefined}
                         containerClassName="rounded-none"
                       />
                       {row.borrow ? (
@@ -954,7 +966,7 @@ export const VesuProtocolView: FC = () => {
                           position={positionManager}
                           containerClassName="rounded-none"
                           renderName={renderDebtName}
-                          afterInfoContent={closeButton}
+                          infoButton={debtInfoButton ?? undefined}
                           availableActions={
                             row.hasDebt ? undefined : { borrow: true, repay: false, move: false }
                           }
