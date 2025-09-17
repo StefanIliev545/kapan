@@ -2,6 +2,7 @@ import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
+import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
 import { BorrowModal } from "./modals/BorrowModal";
 import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
@@ -29,6 +30,10 @@ export interface ProtocolPosition {
     withdraw?: VesuContext;
     borrow?: VesuContext;
     repay?: VesuContext;
+  };
+  moveSupport?: {
+    preselectedCollaterals?: CollateralWithAmount[];
+    disableCollateralSelection?: boolean;
   };
   actionsDisabled?: boolean;
   actionsDisabledReason?: string;

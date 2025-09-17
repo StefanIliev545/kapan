@@ -1,6 +1,7 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { ProtocolPosition } from "../../ProtocolView";
+import type { CollateralWithAmount } from "../../specific/collateral/CollateralSelector";
 import { SupplyPosition } from "../../SupplyPosition";
 import { BorrowPosition } from "../../BorrowPosition";
 import { TokenSelectModalStark } from "../../modals/stark/TokenSelectModalStark";
@@ -200,8 +201,9 @@ type VesuPositionRow = {
   debtSymbol?: string;
   collateralAsset: AssetWithRates;
   debtAsset?: AssetWithRates;
-  borrowContext?: VesuContext;
+  borrowContext: VesuContext;
   hasDebt: boolean;
+  moveCollaterals?: CollateralWithAmount[];
 };
 
 export const VesuProtocolView: FC = () => {
@@ -282,7 +284,7 @@ export const VesuProtocolView: FC = () => {
   const [borrowSelection, setBorrowSelection] = useState<{
     tokens: AssetWithRates[];
     collateralAddress: string;
-    vesuContext?: VesuContext;
+    vesuContext: VesuContext;
     position: PositionManager;
   } | null>(null);
 
@@ -397,6 +399,18 @@ export const VesuProtocolView: FC = () => {
       const collateralSymbol = feltToString(collateralMetadata.symbol);
       const collateralPrice = normalizePrice(collateralMetadata.price);
       const collateralUsd = computeUsdValue(positionData.collateral_amount, collateralMetadata.decimals, collateralPrice);
+      const formattedCollateral = formatUnits(positionData.collateral_amount, collateralMetadata.decimals);
+      const moveCollaterals: CollateralWithAmount[] = [
+        {
+          token: collateralAddress,
+          amount: positionData.collateral_amount,
+          symbol: collateralSymbol,
+          decimals: collateralMetadata.decimals,
+          maxAmount: positionData.collateral_amount,
+          supported: true,
+          inputValue: formattedCollateral,
+        },
+      ];
 
       const disabledReason = positionData.is_vtoken ? "Managing vToken positions is not supported" : undefined;
 
@@ -419,7 +433,7 @@ export const VesuProtocolView: FC = () => {
       };
 
       const debtMetadata = assetMap.get(debtAddress);
-      const borrowContext = debtMetadata ? { poolId, counterpartToken: collateralAddress } : undefined;
+      const borrowContext: VesuContext = { poolId, counterpartToken: collateralAddress };
       const hasDebt = positionData.nominal_debt > 0n && Boolean(debtMetadata);
 
       let borrowPosition: ProtocolPosition | undefined;
@@ -447,6 +461,10 @@ export const VesuProtocolView: FC = () => {
                 repay: { poolId, counterpartToken: collateralAddress },
               }
             : undefined,
+          moveSupport: {
+            preselectedCollaterals: moveCollaterals,
+            disableCollateralSelection: true,
+          },
           actionsDisabled: positionData.is_vtoken,
           actionsDisabledReason: disabledReason,
         };
@@ -466,6 +484,7 @@ export const VesuProtocolView: FC = () => {
           debtAsset: debtMetadata,
           borrowContext,
           hasDebt,
+          moveCollaterals,
         },
       ];
     });
@@ -522,7 +541,7 @@ export const VesuProtocolView: FC = () => {
                       networkType="starknet"
                       disableMove
                       hideBalanceColumn
-                      availableActions={{ withdraw: false, move: false }}
+                      availableActions={{ deposit: false, withdraw: false, move: false }}
                     />
                   ))
                 ) : (
@@ -544,7 +563,7 @@ export const VesuProtocolView: FC = () => {
                       protocolName="Vesu"
                       networkType="starknet"
                       hideBalanceColumn
-                      availableActions={{ borrow: true, repay: false, move: false }}
+                      availableActions={{ borrow: false, repay: false, move: false }}
                     />
                   ))
                 ) : (
@@ -601,13 +620,17 @@ export const VesuProtocolView: FC = () => {
                   ? "grid-cols-1 md:grid-cols-2 md:divide-x"
                   : "grid-cols-1";
 
-                const canInitiateBorrow = !row.hasDebt && Boolean(row.debtAsset) && Boolean(row.borrowContext);
+                const canInitiateBorrow = !row.hasDebt && Boolean(row.borrowContext);
 
                 const handleBorrowFromSupply = (event: MouseEvent<HTMLButtonElement>) => {
                   event.stopPropagation();
-                  if (!canInitiateBorrow || !row.debtAsset || !row.borrowContext) return;
+                  if (!canInitiateBorrow || !row.borrowContext) return;
+                  const availableTokens = assetsWithRates.filter(
+                    asset => toHexAddress(asset.address) !== row.supply.tokenAddress,
+                  );
+                  if (availableTokens.length === 0) return;
                   setBorrowSelection({
-                    tokens: [row.debtAsset],
+                    tokens: availableTokens,
                     collateralAddress: row.supply.tokenAddress,
                     vesuContext: row.borrowContext,
                     position: positionManager,
@@ -652,6 +675,7 @@ export const VesuProtocolView: FC = () => {
                         disableMove
                         afterInfoContent={extraHeaderContent}
                         containerClassName="rounded-none"
+                        showQuickDepositButton={!row.isVtoken}
                       />
                       {row.borrow && (
                         <BorrowPosition

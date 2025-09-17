@@ -49,6 +49,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   networkType,
   position,
   vesuContext,
+  moveSupport,
   actionsDisabled = false,
   actionsDisabledReason,
   containerClassName,
@@ -120,6 +121,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
 
   const handleBorrowClick = onBorrow ?? borrowModal.open;
+
+  const movePoolId = vesuContext?.borrow?.poolId ?? vesuContext?.repay?.poolId;
 
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
@@ -490,7 +493,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               type: "borrow",
               tokenAddress,
               decimals: tokenDecimals ?? 18,
+              poolId: movePoolId,
             }}
+            preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+            disableCollateralSelection={moveSupport?.disableCollateralSelection}
           />
         </>
       ) : (

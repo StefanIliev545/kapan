@@ -6,7 +6,7 @@ import { DepositModal } from "./modals/DepositModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
-import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiInfo, FiPlus } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -31,6 +31,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   onDeposit?: () => void;
   onWithdraw?: () => void;
   onMove?: () => void;
+  showQuickDepositButton?: boolean;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -56,6 +57,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   onDeposit,
   onWithdraw,
   onMove,
+  showQuickDepositButton = false,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -377,6 +379,31 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           </div>
         )}
       </div>
+
+      {showQuickDepositButton && (
+        <div className="mt-2" onClick={e => e.stopPropagation()}>
+          <button
+            className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-base-300 rounded-md text-sm text-primary hover:border-primary/70 hover:text-primary"
+            onClick={event => {
+              event.stopPropagation();
+              if (!actionsDisabled) {
+                handleDepositClick();
+              }
+            }}
+            disabled={!isWalletConnected || actionsDisabled}
+            title={
+              !isWalletConnected
+                ? "Connect wallet to deposit"
+                : actionsDisabled
+                  ? disabledMessage
+                  : "Deposit more collateral"
+            }
+          >
+            <FiPlus className="w-4 h-4" />
+            <span>Deposit</span>
+          </button>
+        </div>
+      )}
 
       {/* Modals */}
       {networkType === "starknet" ? (
