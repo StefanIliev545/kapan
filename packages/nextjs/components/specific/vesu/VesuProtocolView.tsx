@@ -782,7 +782,9 @@ export const VesuProtocolView: FC = () => {
                   ? null
                   : (
                       <div
-                        className="dropdown dropdown-bottom dropdown-end"
+                        className={`dropdown dropdown-bottom dropdown-end ${
+                          isCollateralMenuOpen ? "dropdown-open" : ""
+                        }`}
                         onClick={event => event.stopPropagation()}
                       >
                         <button
@@ -861,7 +863,9 @@ export const VesuProtocolView: FC = () => {
                   ? null
                   : (
                       <div
-                        className="dropdown dropdown-bottom dropdown-end"
+                        className={`dropdown dropdown-bottom dropdown-end ${
+                          isDebtMenuOpen ? "dropdown-open" : ""
+                        }`}
                         onClick={event => event.stopPropagation()}
                       >
                         <button
