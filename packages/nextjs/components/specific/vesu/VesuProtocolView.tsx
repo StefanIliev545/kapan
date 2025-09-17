@@ -1,5 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+import Image from "next/image";
 import { ProtocolPosition } from "../../ProtocolView";
 import type { CollateralWithAmount } from "../../specific/collateral/CollateralSelector";
 import { SupplyPosition } from "../../SupplyPosition";
@@ -13,7 +14,7 @@ import { feltToString, toAnnualRates, type TokenMetadata } from "~~/utils/protoc
 import { POOL_IDS } from "./VesuMarkets";
 import { formatUnits } from "viem";
 import type { VesuContext } from "~~/hooks/useLendingAction";
-import { FiPlus } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiPlus } from "react-icons/fi";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -293,6 +294,8 @@ export const VesuProtocolView: FC = () => {
     vesuContext?: VesuContext;
     position?: PositionManager;
   } | null>(null);
+  const [isMarketsOpen, setIsMarketsOpen] = useState(!userAddress);
+  const [marketsManuallyToggled, setMarketsManuallyToggled] = useState(false);
 
   useEffect(() => {
     refetchCounter.current = 0;
@@ -500,6 +503,29 @@ export const VesuProtocolView: FC = () => {
     return vesuRows.reduce((total, row) => total + row.supply.balance + (row.borrow ? row.borrow.balance : 0), 0);
   }, [vesuRows]);
 
+  const hasPositions = vesuRows.length > 0;
+
+  useEffect(() => {
+    if (!userAddress) {
+      setIsMarketsOpen(true);
+      setMarketsManuallyToggled(false);
+      return;
+    }
+
+    if (marketsManuallyToggled) return;
+
+    if (hasPositions) {
+      setIsMarketsOpen(false);
+    } else {
+      setIsMarketsOpen(true);
+    }
+  }, [userAddress, hasPositions, marketsManuallyToggled]);
+
+  const handleToggleMarkets = () => {
+    setIsMarketsOpen(previous => !previous);
+    setMarketsManuallyToggled(true);
+  };
+
   if (assetsError) {
     console.error("Error loading markets:", assetsError);
     return <div>Error loading markets</div>;
@@ -519,69 +545,110 @@ export const VesuProtocolView: FC = () => {
     <div className="w-full flex flex-col p-4 space-y-6">
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4 space-y-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <h2 className="card-title text-lg">Vesu Markets</h2>
-            {isLoadingAssets && (
-              <div className="flex items-center text-xs text-base-content/60">
-                <span className="loading loading-spinner loading-xs mr-1" /> Loading markets
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 relative rounded-lg bg-base-200 p-1 flex items-center justify-center">
+                <Image src="/logos/vesu.svg" alt="Vesu icon" width={36} height={36} className="object-contain" />
               </div>
-            )}
+              <div className="flex flex-col">
+                <div className="text-xl font-bold tracking-tight">Vesu</div>
+                <div className="text-base-content/70 flex items-center gap-1">
+                  <span className="text-sm">Balance:</span>
+                  <span className={`text-sm font-medium ${totalNetBalance >= 0 ? "text-success" : "text-error"}`}>
+                    {formatCurrency(totalNetBalance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 md:items-end">
+              {!userAddress ? (
+                <span className="text-xs text-base-content/70 text-right">
+                  Connect your Starknet wallet to view personalized positions
+                </span>
+              ) : hasPositions ? (
+                <span className="text-xs text-base-content/70 text-right">
+                  Markets are hidden while you manage your positions
+                </span>
+              ) : (
+                <span className="text-xs text-base-content/70 text-right">
+                  No active positions yet – explore the markets below
+                </span>
+              )}
+              <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={handleToggleMarkets}>
+                <span className="mr-2">Vesu markets</span>
+                {isMarketsOpen ? <FiChevronUp className="w-4 h-4" /> : <FiChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
-          {isLoadingAssets ? (
-            <div className="flex justify-center py-6">
-              <span className="loading loading-spinner loading-md" />
-            </div>
-          ) : assetsWithRates.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-3">
-                <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-                  Suppliable assets
-                </div>
-                {suppliablePositions.length > 0 ? (
-                  suppliablePositions.map(position => (
-                    <SupplyPosition
-                      key={position.tokenAddress}
-                      {...position}
-                      protocolName="Vesu"
-                      networkType="starknet"
-                      disableMove
-                      hideBalanceColumn
-                      availableActions={{ deposit: false, withdraw: false, move: false }}
-                    />
-                  ))
-                ) : (
-                  <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
-                    No supply markets available
+          {isMarketsOpen && (
+            <div className="space-y-4 border-t border-base-200 pt-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <h2 className="card-title text-lg">Vesu Markets</h2>
+                {isLoadingAssets && (
+                  <div className="flex items-center text-xs text-base-content/60">
+                    <span className="loading loading-spinner loading-xs mr-1" /> Loading markets
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3">
-                <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-                  Borrowable assets
+              {isLoadingAssets ? (
+                <div className="flex justify-center py-6">
+                  <span className="loading loading-spinner loading-md" />
                 </div>
-                {borrowablePositions.length > 0 ? (
-                  borrowablePositions.map(position => (
-                    <BorrowPosition
-                      key={position.tokenAddress}
-                      {...position}
-                      protocolName="Vesu"
-                      networkType="starknet"
-                      hideBalanceColumn
-                      availableActions={{ borrow: false, repay: false, move: false }}
-                    />
-                  ))
-                ) : (
-                  <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
-                    No borrow markets available
+              ) : assetsWithRates.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                      Suppliable assets
+                    </div>
+                    {suppliablePositions.length > 0 ? (
+                      suppliablePositions.map(position => (
+                        <SupplyPosition
+                          key={position.tokenAddress}
+                          {...position}
+                          protocolName="Vesu"
+                          networkType="starknet"
+                          disableMove
+                          hideBalanceColumn
+                          availableActions={{ deposit: false, withdraw: false, move: false }}
+                        />
+                      ))
+                    ) : (
+                      <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+                        No supply markets available
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
-              No markets available
+
+                  <div className="space-y-3">
+                    <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                      Borrowable assets
+                    </div>
+                    {borrowablePositions.length > 0 ? (
+                      borrowablePositions.map(position => (
+                        <BorrowPosition
+                          key={position.tokenAddress}
+                          {...position}
+                          protocolName="Vesu"
+                          networkType="starknet"
+                          hideBalanceColumn
+                          availableActions={{ borrow: false, repay: false, move: false }}
+                        />
+                      ))
+                    ) : (
+                      <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+                        No borrow markets available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+                  No markets available
+                </div>
+              )}
             </div>
           )}
         </div>
