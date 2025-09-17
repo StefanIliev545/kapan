@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import Image from "next/image";
 import { ProtocolPosition } from "../../ProtocolView";
 import type { CollateralWithAmount } from "../../specific/collateral/CollateralSelector";
@@ -349,7 +349,14 @@ export const VesuProtocolView: FC = () => {
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const handleDocumentClick = () => setActiveSwitchMenu(null);
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".vesu-switch-menu")) {
+        return;
+      }
+
+      setActiveSwitchMenu(null);
+    };
 
     document.addEventListener("click", handleDocumentClick);
 
@@ -754,7 +761,7 @@ export const VesuProtocolView: FC = () => {
                   !row.hasDebt && Boolean(row.borrowContext) && availableBorrowTokens.length > 0;
                 const borrowButtonDisabled = row.supply.actionsDisabled;
 
-                const handleBorrowFromSupply = (event: MouseEvent<HTMLButtonElement>) => {
+                const handleBorrowFromSupply = (event: ReactMouseEvent<HTMLButtonElement>) => {
                   event.stopPropagation();
                   if (!canInitiateBorrow || !row.borrowContext) return;
                   setActiveSwitchMenu(null);
@@ -782,7 +789,7 @@ export const VesuProtocolView: FC = () => {
                   ? null
                   : (
                       <div
-                        className={`dropdown dropdown-bottom dropdown-end ${
+                        className={`dropdown dropdown-bottom dropdown-end vesu-switch-menu ${
                           isCollateralMenuOpen ? "dropdown-open" : ""
                         }`}
                         onClick={event => event.stopPropagation()}
@@ -863,7 +870,7 @@ export const VesuProtocolView: FC = () => {
                   ? null
                   : (
                       <div
-                        className={`dropdown dropdown-bottom dropdown-end ${
+                        className={`dropdown dropdown-bottom dropdown-end vesu-switch-menu ${
                           isDebtMenuOpen ? "dropdown-open" : ""
                         }`}
                         onClick={event => event.stopPropagation()}
