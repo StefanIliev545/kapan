@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import Image from "next/image";
 import { ProtocolPosition } from "../../ProtocolView";
@@ -9,6 +9,7 @@ import { TokenSelectModalStark } from "../../modals/stark/TokenSelectModalStark"
 import { ClosePositionModalStark } from "../../modals/stark/ClosePositionModalStark";
 import { SwitchCollateralModalStark } from "../../modals/stark/SwitchCollateralModalStark";
 import { SwitchDebtModalStark } from "../../modals/stark/SwitchDebtModalStark";
+import { BaseModal } from "../../modals/BaseModal";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -17,7 +18,7 @@ import { feltToString, toAnnualRates, type TokenMetadata } from "~~/utils/protoc
 import { POOL_IDS } from "./VesuMarkets";
 import { formatUnits } from "viem";
 import type { VesuContext } from "~~/hooks/useLendingAction";
-import { FiChevronDown, FiChevronUp, FiPlus, FiSettings } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -211,12 +212,76 @@ type VesuPositionRow = {
   moveCollaterals?: CollateralWithAmount[];
 };
 
-type SwitchMenuState = { key: string; type: "collateral" | "debt" } | null;
-
 type SwitchSelectionState = {
   row: VesuPositionRow;
   target: AssetWithRates;
   type: "collateral" | "debt";
+};
+
+type SwitchPickerState = {
+  row: VesuPositionRow;
+  type: "collateral" | "debt";
+  options: AssetWithRates[];
+};
+
+type SwitchTokenPickerModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  tokens: AssetWithRates[];
+  onSelect: (token: AssetWithRates) => void;
+};
+
+const SwitchTokenPickerModal: FC<SwitchTokenPickerModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  description,
+  tokens,
+  onSelect,
+}) => {
+  return (
+    <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="p-4">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold">{title}</h3>
+            {description && <p className="text-sm text-base-content/60 mt-1">{description}</p>}
+          </div>
+          <button type="button" className="btn btn-sm btn-circle btn-ghost" onClick={onClose} aria-label="Close">
+            <FiX className="w-4 h-4" />
+          </button>
+        </div>
+        {tokens.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3">
+            {tokens.map(token => {
+              const symbol = feltToString(token.symbol);
+              return (
+                <button
+                  key={token.address.toString()}
+                  type="button"
+                  className="btn btn-ghost h-auto py-3 normal-case flex flex-col items-center gap-2"
+                  onClick={() => onSelect(token)}
+                >
+                  <Image
+                    src={tokenNameToLogo(symbol.toLowerCase())}
+                    alt={symbol}
+                    width={32}
+                    height={32}
+                    className="w-8 h-8"
+                  />
+                  <span className="text-sm font-medium">{symbol}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-sm text-base-content/60">No alternative assets available.</div>
+        )}
+      </div>
+    </BaseModal>
+  );
 };
 
 export const VesuProtocolView: FC = () => {
@@ -311,8 +376,8 @@ export const VesuProtocolView: FC = () => {
     vesuContext?: VesuContext;
     position?: PositionManager;
   } | null>(null);
-  const [activeSwitchMenu, setActiveSwitchMenu] = useState<SwitchMenuState>(null);
   const [switchSelection, setSwitchSelection] = useState<SwitchSelectionState | null>(null);
+  const [switchPicker, setSwitchPicker] = useState<SwitchPickerState | null>(null);
   const [closeSelection, setCloseSelection] = useState<VesuPositionRow | null>(null);
   const [isMarketsOpen, setIsMarketsOpen] = useState(!userAddress);
   const [marketsManuallyToggled, setMarketsManuallyToggled] = useState(false);
@@ -345,25 +410,6 @@ export const VesuProtocolView: FC = () => {
       window.removeEventListener("txCompleted", handler);
     };
   }, [refetchPositions]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest(".vesu-switch-menu")) {
-        return;
-      }
-
-      setActiveSwitchMenu(null);
-    };
-
-    document.addEventListener("click", handleDocumentClick);
-
-    return () => {
-      document.removeEventListener("click", handleDocumentClick);
-    };
-  }, []);
 
   const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 
@@ -764,7 +810,6 @@ export const VesuProtocolView: FC = () => {
                 const handleBorrowFromSupply = (event: ReactMouseEvent<HTMLButtonElement>) => {
                   event.stopPropagation();
                   if (!canInitiateBorrow || !row.borrowContext) return;
-                  setActiveSwitchMenu(null);
                   setBorrowSelection({
                     tokens: availableBorrowTokens,
                     collateralAddress: row.supply.tokenAddress,
@@ -772,9 +817,6 @@ export const VesuProtocolView: FC = () => {
                     position: positionManager,
                   });
                 };
-
-                const isCollateralMenuOpen =
-                  activeSwitchMenu?.key === row.key && activeSwitchMenu.type === "collateral";
 
                 const renderCollateralName = (defaultName: string) => (
                   <>
@@ -785,75 +827,32 @@ export const VesuProtocolView: FC = () => {
 
                 const supplyMenuHasActions = collateralSwitchOptions.length > 0;
 
+                const handleOpenSwitchPicker = (type: "collateral" | "debt", options: AssetWithRates[]) => {
+                  if (options.length === 0) return;
+                  setSwitchPicker({
+                    row,
+                    type,
+                    options,
+                  });
+                };
+
                 const supplyInfoButton = !supplyMenuHasActions
                   ? null
                   : (
-                      <div
-                        className={`dropdown dropdown-bottom dropdown-end vesu-switch-menu ${
-                          isCollateralMenuOpen ? "dropdown-open" : ""
-                        }`}
-                        onClick={event => event.stopPropagation()}
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs btn-circle"
+                        onClick={event => {
+                          event.stopPropagation();
+                          handleOpenSwitchPicker("collateral", collateralSwitchOptions);
+                        }}
+                        aria-label="Switch collateral"
+                        title="Switch collateral"
                       >
-                        <button
-                          type="button"
-                          tabIndex={0}
-                          className="btn btn-ghost btn-xs btn-circle"
-                          onClick={event => {
-                            event.stopPropagation();
-                            setActiveSwitchMenu(
-                              isCollateralMenuOpen ? null : { key: row.key, type: "collateral" },
-                            );
-                          }}
-                        >
-                          <FiSettings className="w-4 h-4" />
-                        </button>
-                        {isCollateralMenuOpen && (
-                          <ul
-                            tabIndex={0}
-                            className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50"
-                          >
-                            <li className="menu-title">
-                              <span>Switch collateral</span>
-                            </li>
-                            <li>
-                              <div className="grid grid-cols-3 gap-2 p-1">
-                                {collateralSwitchOptions.map(asset => {
-                                  const symbol = feltToString(asset.symbol);
-                                  return (
-                                    <button
-                                      key={asset.address.toString()}
-                                      className="btn btn-ghost btn-xs h-auto py-2 normal-case"
-                                      onClick={event => {
-                                        event.stopPropagation();
-                                        setActiveSwitchMenu(null);
-                                        setSwitchSelection({
-                                          type: "collateral",
-                                          row,
-                                          target: asset,
-                                        });
-                                      }}
-                                    >
-                                      <div className="flex flex-col items-center gap-1">
-                                        <Image
-                                          src={tokenNameToLogo(symbol.toLowerCase())}
-                                          alt={symbol}
-                                          width={20}
-                                          height={20}
-                                          className="w-5 h-5"
-                                        />
-                                        <span className="text-xs">{symbol}</span>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </li>
-                          </ul>
-                        )}
-                      </div>
+                        <FiRefreshCw className="w-4 h-4" />
+                      </button>
                     );
 
-                const isDebtMenuOpen = activeSwitchMenu?.key === row.key && activeSwitchMenu.type === "debt";
                 const debtSwitchOptions = assetsWithRates.filter(asset => {
                   const assetAddress = toHexAddress(asset.address);
                   return !row.borrow || assetAddress !== row.borrow.tokenAddress;
@@ -864,92 +863,48 @@ export const VesuProtocolView: FC = () => {
                 );
 
                 const showCloseAction = Boolean(row.borrow && row.borrow.tokenBalance > 0n && !row.isVtoken);
-                const debtMenuHasActions = showCloseAction || debtSwitchOptions.length > 0;
+                const debtActionButtons: ReactNode[] = [];
 
-                const debtInfoButton = !debtMenuHasActions
-                  ? null
-                  : (
-                      <div
-                        className={`dropdown dropdown-bottom dropdown-end vesu-switch-menu ${
-                          isDebtMenuOpen ? "dropdown-open" : ""
-                        }`}
-                        onClick={event => event.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          tabIndex={0}
-                          className="btn btn-ghost btn-xs btn-circle"
-                          onClick={event => {
-                            event.stopPropagation();
-                            setActiveSwitchMenu(isDebtMenuOpen ? null : { key: row.key, type: "debt" });
-                          }}
-                        >
-                          <FiSettings className="w-4 h-4" />
-                        </button>
-                        {isDebtMenuOpen && (
-                          <ul
-                            tabIndex={0}
-                            className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-72 z-50"
-                          >
-                            <li className="menu-title">
-                              <span>Manage debt</span>
-                            </li>
-                            {debtSwitchOptions.length > 0 && (
-                              <li>
-                                <div className="grid grid-cols-3 gap-2 p-1">
-                                  {debtSwitchOptions.map(asset => {
-                                    const symbol = feltToString(asset.symbol);
-                                    return (
-                                      <button
-                                        key={asset.address.toString()}
-                                        className="btn btn-ghost btn-xs h-auto py-2 normal-case"
-                                        onClick={event => {
-                                          event.stopPropagation();
-                                          setActiveSwitchMenu(null);
-                                          setSwitchSelection({
-                                            type: "debt",
-                                            row,
-                                            target: asset,
-                                          });
-                                        }}
-                                      >
-                                        <div className="flex flex-col items-center gap-1">
-                                          <Image
-                                            src={tokenNameToLogo(symbol.toLowerCase())}
-                                            alt={symbol}
-                                            width={20}
-                                            height={20}
-                                            className="w-5 h-5"
-                                          />
-                                          <span className="text-xs">{symbol}</span>
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </li>
-                            )}
-                            {showCloseAction && (
-                              <li>
-                                <button
-                                  className="btn btn-ghost btn-sm justify-start"
-                                  onClick={event => {
-                                    event.stopPropagation();
-                                    setActiveSwitchMenu(null);
-                                    setCloseSelection(row);
-                                  }}
-                                >
-                                  Close with collateral
-                                </button>
-                              </li>
-                            )}
-                            {!showCloseAction && debtSwitchOptions.length === 0 && (
-                              <li className="px-2 py-1 text-xs text-base-content/60">No actions available</li>
-                            )}
-                          </ul>
-                        )}
-                      </div>
-                    );
+                if (showCloseAction) {
+                  debtActionButtons.push(
+                    <button
+                      key="close"
+                      type="button"
+                      className="btn btn-ghost btn-xs btn-circle"
+                      onClick={event => {
+                        event.stopPropagation();
+                        setCloseSelection(row);
+                      }}
+                      aria-label="Close with collateral"
+                      title="Close with collateral"
+                    >
+                      <FiX className="w-4 h-4" />
+                    </button>,
+                  );
+                }
+
+                if (debtSwitchOptions.length > 0) {
+                  debtActionButtons.push(
+                    <button
+                      key="switch"
+                      type="button"
+                      className="btn btn-ghost btn-xs btn-circle"
+                      onClick={event => {
+                        event.stopPropagation();
+                        handleOpenSwitchPicker("debt", debtSwitchOptions);
+                      }}
+                      aria-label="Switch debt"
+                      title="Switch debt"
+                    >
+                      <FiRefreshCw className="w-4 h-4" />
+                    </button>,
+                  );
+                }
+
+                const debtHeaderActions =
+                  debtActionButtons.length === 0 ? null : (
+                    <div className="flex items-center gap-1">{debtActionButtons}</div>
+                  );
 
                 return (
                   <div
@@ -977,7 +932,8 @@ export const VesuProtocolView: FC = () => {
                           position={positionManager}
                           containerClassName="rounded-none"
                           renderName={renderDebtName}
-                          infoButton={debtInfoButton ?? undefined}
+                          infoButton={debtHeaderActions ? null : undefined}
+                          afterInfoContent={debtHeaderActions ?? undefined}
                           availableActions={
                             row.hasDebt ? undefined : { borrow: true, repay: false, move: false }
                           }
@@ -1074,6 +1030,29 @@ export const VesuProtocolView: FC = () => {
           vesuContext={depositSelection.vesuContext}
           position={depositSelection.position}
           action="deposit"
+        />
+      )}
+      {switchPicker && (
+        <SwitchTokenPickerModal
+          isOpen={switchPicker !== null}
+          onClose={() => setSwitchPicker(null)}
+          title={switchPicker.type === "collateral" ? "Switch collateral" : "Switch debt"}
+          description={
+            switchPicker.type === "collateral"
+              ? `Select a new asset to replace ${switchPicker.row.collateralSymbol}.`
+              : switchPicker.row.debtSymbol
+                ? `Select a new asset to replace ${switchPicker.row.debtSymbol}.`
+                : "Select a new debt asset."
+          }
+          tokens={switchPicker.options}
+          onSelect={token => {
+            setSwitchPicker(null);
+            setSwitchSelection({
+              row: switchPicker.row,
+              target: token,
+              type: switchPicker.type,
+            });
+          }}
         />
       )}
       {switchSelection && switchSelection.type === "debt" && switchSelection.row.debtAsset && (
