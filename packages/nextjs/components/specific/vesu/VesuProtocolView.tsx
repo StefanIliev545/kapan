@@ -674,29 +674,27 @@ export const VesuProtocolView: FC = () => {
                           containerClassName="rounded-none"
                         />
                       ) : (
-                        <div className="p-3 bg-base-200/60 border border-dashed border-base-300 h-full flex flex-col justify-between gap-3">
+                        <div className="p-3 bg-base-200/60 border border-dashed border-base-300 h-full flex items-center justify-between gap-3">
                           <div className="flex flex-col gap-1">
                             <span className="text-sm font-semibold text-base-content/70">No debt</span>
                             <span className="text-xs text-base-content/50">
                               You are not borrowing against this collateral yet.
                             </span>
                           </div>
-                          <div className="flex justify-end">
-                            <button
-                              className="btn btn-sm btn-outline"
-                              onClick={handleBorrowFromSupply}
-                              disabled={!canInitiateBorrow || borrowButtonDisabled}
-                              title={
-                                borrowButtonDisabled
-                                  ? row.supply.actionsDisabledReason
-                                  : canInitiateBorrow
-                                    ? "Borrow against this collateral"
-                                    : "No borrowable assets available"
-                              }
-                            >
-                              Borrow
-                            </button>
-                          </div>
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={handleBorrowFromSupply}
+                            disabled={!canInitiateBorrow || borrowButtonDisabled}
+                            title={
+                              borrowButtonDisabled
+                                ? row.supply.actionsDisabledReason
+                                : canInitiateBorrow
+                                  ? "Borrow against this collateral"
+                                  : "No borrowable assets available"
+                            }
+                          >
+                            Borrow
+                          </button>
                         </div>
                       )}
                     </div>
