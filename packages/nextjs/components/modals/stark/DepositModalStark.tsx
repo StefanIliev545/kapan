@@ -33,7 +33,6 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
   if (token.decimals == null) {
     token.decimals = decimals;
   }
-  
   return (
     <TokenActionModal
       isOpen={isOpen}
