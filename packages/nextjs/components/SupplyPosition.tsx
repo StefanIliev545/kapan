@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, ReactNode } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -23,6 +23,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   disableMove?: boolean;
   containerClassName?: string;
   hideBalanceColumn?: boolean;
+  subtitle?: ReactNode;
   availableActions?: {
     deposit?: boolean;
     withdraw?: boolean;
@@ -54,6 +55,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   actionsDisabledReason,
   containerClassName,
   hideBalanceColumn = false,
+  subtitle,
   availableActions,
   onDeposit,
   onWithdraw,
@@ -143,11 +145,16 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
           {/* Header: Icon and Title */}
-          <div className="order-1 lg:order-none lg:col-span-3 flex items-center">
+          <div className="order-1 lg:order-none lg:col-span-3 flex items-center min-w-0">
             <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
-            <span className="ml-2 font-semibold text-lg truncate">{name}</span>
+            <div className="ml-2 flex flex-col min-w-0">
+              <span className="font-semibold text-lg truncate leading-tight">{name}</span>
+              {subtitle ? (
+                <span className="text-xs text-base-content/60 truncate leading-tight">{subtitle}</span>
+              ) : null}
+            </div>
             {showInfoDropdown && (
               <div
                 className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
