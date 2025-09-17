@@ -280,6 +280,12 @@ export const VesuProtocolView: FC = () => {
     refetchPositionsPart2();
   }, [userAddress, refetchPositionsPart1, refetchPositionsPart2]);
 
+  const refetchPositionsRef = useRef(refetchPositions);
+
+  useEffect(() => {
+    refetchPositionsRef.current = refetchPositions;
+  }, [refetchPositions]);
+
   const [cachedPositions, setCachedPositions] = useState<PositionTuple[]>([]);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [borrowSelection, setBorrowSelection] = useState<{
@@ -300,9 +306,9 @@ export const VesuProtocolView: FC = () => {
     setCachedPositions([]);
     setHasLoadedOnce(false);
     if (userAddress) {
-      refetchPositions();
+      refetchPositionsRef.current?.();
     }
-  }, [userAddress, refetchPositions]);
+  }, [userAddress]);
 
   useEffect(() => {
     if (!userAddress) {
