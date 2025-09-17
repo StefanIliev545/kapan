@@ -1,6 +1,7 @@
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { BorrowModalStark } from "./BorrowModalStark";
+import { DepositModalStark } from "./DepositModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { VesuContext } from "~~/hooks/useLendingAction";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -8,15 +9,20 @@ import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
 
+type TokenWithRates = TokenMetadata & {
+  borrowAPR?: number;
+  supplyAPY?: number;
+};
+
 interface TokenSelectModalStarkProps {
   isOpen: boolean;
   onClose: () => void;
-  tokens: TokenMetadata[];
+  tokens: TokenWithRates[];
   protocolName: string;
   collateralAsset?: string;
-  isVesu?: boolean;
   vesuContext?: VesuContext;
   position?: PositionManager;
+  action?: "borrow" | "deposit";
 }
 
 export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
@@ -25,21 +31,29 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   tokens,
   protocolName,
   collateralAsset,
-  isVesu = false,
   vesuContext,
   position,
+  action = "borrow",
 }) => {
-  const [selectedToken, setSelectedToken] = useState<TokenMetadata | null>(null);
+  const [selectedToken, setSelectedToken] = useState<TokenWithRates | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
   const [hoveredToken, setHoveredToken] = useState<string | null>(null);
 
   // Filter out the collateral asset from available tokens if provided
-  const availableTokens = tokens.filter(
-    asset => !collateralAsset || `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` !== collateralAsset,
+  const availableTokens = useMemo(
+    () =>
+      tokens.filter(
+        asset => !collateralAsset || `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` !== collateralAsset,
+      ),
+    [tokens, collateralAsset],
   );
 
+  const modalTitle = action === "borrow" ? "Select a Token to Borrow" : "Select a Token to Deposit";
+
+  const rateLabel = action === "borrow" ? "APR" : "APY";
+
   // Handle token selection
-  const handleSelectToken = (token: TokenMetadata) => {
+  const handleSelectToken = (token: TokenWithRates) => {
     setSelectedToken(token);
     setIsTokenModalOpen(true);
   };
@@ -65,7 +79,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       <dialog className={`modal ${isOpen && !isTokenModalOpen ? "modal-open" : ""}`}>
         <div className="modal-box max-w-4xl bg-base-100">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-xl tracking-tight">Select a Token to Borrow</h3>
+            <h3 className="font-bold text-xl tracking-tight">{modalTitle}</h3>
             <button className="btn btn-sm btn-circle btn-ghost" onClick={handleDone}>
               ✕
             </button>
@@ -110,7 +124,11 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                       <div
                         className={`badge ${hoveredToken === address ? "badge-primary" : "badge-outline"} p-3 font-medium`}
                       >
-                        {formatPercentage(token.borrowAPR ?? 0, 2, false)}% APR
+                        {formatPercentage(
+                          action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0,
+                          2,
+                          false,
+                        )}% {rateLabel}
                       </div>
                     </div>
                   );
@@ -132,7 +150,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                     d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
                   />
                 </svg>
-                <p className="text-lg">No tokens available to borrow</p>
+                <p className="text-lg">
+                  No tokens available to {action === "borrow" ? "borrow" : "deposit"}
+                </p>
               </div>
             )}
           </div>
@@ -156,22 +176,42 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       </dialog>
 
       {/* Render borrow modal if a token is selected */}
-      {selectedToken && (
-        <BorrowModalStark
+        {selectedToken && action === "borrow" && (
+          <BorrowModalStark
+            isOpen={isTokenModalOpen}
+            onClose={handleModalClose}
+            token={{
+              name: feltToString(selectedToken.symbol),
+              icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
+              address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
+              currentRate: selectedToken.borrowAPR ?? 0,
+              usdPrice:
+                selectedToken.price && selectedToken.price.is_valid
+                  ? Number(selectedToken.price.value) / 1e18
+                  : 0,
+            }}
+            protocolName={protocolName}
+            currentDebt={0}
+            vesuContext={vesuContext}
+            position={position}
+          />
+        )}
+
+      {selectedToken && action === "deposit" && (
+        <DepositModalStark
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}
           token={{
             name: feltToString(selectedToken.symbol),
             icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
             address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
-            currentRate: selectedToken.borrowAPR ?? 0,
+            currentRate: selectedToken.supplyAPY ?? 0,
             usdPrice:
               selectedToken.price && selectedToken.price.is_valid
                 ? Number(selectedToken.price.value) / 1e18
                 : 0,
           }}
           protocolName={protocolName}
-          currentDebt={0}
           vesuContext={vesuContext}
           position={position}
         />

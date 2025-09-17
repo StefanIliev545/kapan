@@ -15,6 +15,9 @@ interface DepositModalProps {
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position }) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
   const { execute, buildTx } = useLendingAction("evm", "Deposit", token.address, protocolName, decimals);
+  if (token.decimals == null) {
+    token.decimals = decimals;
+  }
   return (
     <TokenActionModal
       isOpen={isOpen}
