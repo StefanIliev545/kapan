@@ -115,7 +115,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     move: availableActions?.move !== false,
   };
 
-  const showBorrowButton = actionConfig.borrow;
+  const canInitiateBorrow =
+    networkType === "evm" ? true : Boolean(vesuContext?.borrow || onBorrow);
+
+  const showBorrowButton = actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow);
   const showRepayButton = actionConfig.repay;
   const showMoveButton = actionConfig.move && hasBalance;
 
