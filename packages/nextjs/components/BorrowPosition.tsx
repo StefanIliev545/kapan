@@ -37,6 +37,7 @@ export type BorrowPositionProps = ProtocolPosition & {
 export const BorrowPosition: FC<BorrowPositionProps> = ({
   icon,
   name,
+  balance,
   tokenBalance,
   currentRate,
   protocolName,
