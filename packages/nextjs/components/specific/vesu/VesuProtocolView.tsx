@@ -327,6 +327,23 @@ export const VesuProtocolView: FC = () => {
   }, [mergedUserPositions, isLoading1, isLoading2, userAddress]);
 
   useEffect(() => {
+    if (!userAddress) return;
+    if (positionsError1 || positionsError2) {
+      setHasLoadedOnce(true);
+      return;
+    }
+    if (userPositionsPart1 !== undefined || userPositionsPart2 !== undefined) {
+      setHasLoadedOnce(true);
+    }
+  }, [
+    positionsError1,
+    positionsError2,
+    userAddress,
+    userPositionsPart1,
+    userPositionsPart2,
+  ]);
+
+  useEffect(() => {
     const handler = () => refetchPositions();
     window.addEventListener("txCompleted", handler);
     return () => {
