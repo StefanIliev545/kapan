@@ -230,6 +230,7 @@ export const VesuProtocolView: FC = () => {
     data: userPositionsPart1,
     error: positionsError1,
     isFetching: isFetching1,
+    isLoading: isLoading1,
     refetch: refetchPositionsPart1,
   } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -243,6 +244,7 @@ export const VesuProtocolView: FC = () => {
     data: userPositionsPart2,
     error: positionsError2,
     isFetching: isFetching2,
+    isLoading: isLoading2,
     refetch: refetchPositionsPart2,
   } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -273,7 +275,7 @@ export const VesuProtocolView: FC = () => {
     }
   }, [mergedUserPositions, userAddress]);
 
-  const isUpdating = isFetching1 || isFetching2;
+  const isUpdating = (isFetching1 && !isLoading1) || (isFetching2 && !isLoading2);
 
   const refetchPositions = useCallback(() => {
     if (!userAddress) return;
@@ -318,11 +320,11 @@ export const VesuProtocolView: FC = () => {
       setCachedPositions([]);
       return;
     }
-    if (!isUpdating) {
+    if (!isLoading1 && !isLoading2) {
       setCachedPositions(mergedUserPositions);
       setHasLoadedOnce(true);
     }
-  }, [mergedUserPositions, isUpdating, userAddress]);
+  }, [mergedUserPositions, isLoading1, isLoading2, userAddress]);
 
   useEffect(() => {
     const handler = () => refetchPositions();
