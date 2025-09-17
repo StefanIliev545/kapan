@@ -499,10 +499,6 @@ export const VesuProtocolView: FC = () => {
     });
   }, [assetMap, cachedPositions, poolId]);
 
-  const totalNetBalance = useMemo(() => {
-    return vesuRows.reduce((total, row) => total + row.supply.balance + (row.borrow ? row.borrow.balance : 0), 0);
-  }, [vesuRows]);
-
   const hasPositions = vesuRows.length > 0;
 
   useEffect(() => {
@@ -512,13 +508,13 @@ export const VesuProtocolView: FC = () => {
       return;
     }
 
-    if (marketsManuallyToggled) return;
+    setMarketsManuallyToggled(false);
+  }, [userAddress]);
 
-    if (hasPositions) {
-      setIsMarketsOpen(false);
-    } else {
-      setIsMarketsOpen(true);
-    }
+  useEffect(() => {
+    if (!userAddress || marketsManuallyToggled) return;
+
+    setIsMarketsOpen(!hasPositions);
   }, [userAddress, hasPositions, marketsManuallyToggled]);
 
   const handleToggleMarkets = () => {
@@ -530,14 +526,6 @@ export const VesuProtocolView: FC = () => {
     console.error("Error loading markets:", assetsError);
     return <div>Error loading markets</div>;
   }
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
 
   const isLoadingAssets = supportedAssets == null;
 
@@ -552,12 +540,7 @@ export const VesuProtocolView: FC = () => {
               </div>
               <div className="flex flex-col">
                 <div className="text-xl font-bold tracking-tight">Vesu</div>
-                <div className="text-base-content/70 flex items-center gap-1">
-                  <span className="text-sm">Balance:</span>
-                  <span className={`text-sm font-medium ${totalNetBalance >= 0 ? "text-success" : "text-error"}`}>
-                    {formatCurrency(totalNetBalance)}
-                  </span>
-                </div>
+                <div className="text-xs text-base-content/70">Manage your Starknet lending positions</div>
               </div>
             </div>
 
@@ -576,7 +559,7 @@ export const VesuProtocolView: FC = () => {
                 </span>
               )}
               <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={handleToggleMarkets}>
-                <span className="mr-2">Vesu markets</span>
+                <span className="mr-2">Markets</span>
                 {isMarketsOpen ? <FiChevronUp className="w-4 h-4" /> : <FiChevronDown className="w-4 h-4" />}
               </button>
             </div>
@@ -585,7 +568,7 @@ export const VesuProtocolView: FC = () => {
           {isMarketsOpen && (
             <div className="space-y-4 border-t border-base-200 pt-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <h2 className="card-title text-lg">Vesu Markets</h2>
+                <h2 className="card-title text-lg">Markets</h2>
                 {isLoadingAssets && (
                   <div className="flex items-center text-xs text-base-content/60">
                     <span className="loading loading-spinner loading-xs mr-1" /> Loading markets
@@ -662,12 +645,6 @@ export const VesuProtocolView: FC = () => {
               {isUpdating && userAddress && (
                 <div className="flex items-center text-xs text-base-content/60">
                   <span className="loading loading-spinner loading-xs mr-1" /> Updating
-                </div>
-              )}
-              {userAddress && vesuRows.length > 0 && (
-                <div className="text-right">
-                  <div className="text-sm text-base-content/70">Total Net Balance</div>
-                  <div className="text-xl font-bold">{formatCurrency(totalNetBalance)}</div>
                 </div>
               )}
             </div>
