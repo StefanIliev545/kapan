@@ -23,39 +23,52 @@ export interface CloseTokenInfo {
   icon: string;
 }
 
+export interface CloseCollateralInfo extends CloseTokenInfo {
+  rawBalance: bigint;
+}
+
 interface UseNostraClosePositionArgs {
   isOpen: boolean;
   address?: string;
   debt: CloseTokenInfo | null;
-  collateral: CloseTokenInfo | null;
+  collaterals: CloseCollateralInfo[];
   debtBalance: bigint;
-  collateralBalance: bigint;
 }
+
+type SwapPlan = {
+  collateral: CloseCollateralInfo;
+  repayAmount: bigint;
+  quote: Quote;
+  calldata: bigint[];
+};
 
 export const useNostraClosePosition = ({
   isOpen,
   address,
   debt,
-  collateral,
+  collaterals,
   debtBalance,
-  collateralBalance,
 }: UseNostraClosePositionArgs) => {
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [swapPlans, setSwapPlans] = useState<SwapPlan[]>([]);
   const [protocolInstructions, setProtocolInstructions] = useState<BaseProtocolInstruction[]>([]);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
+  const collateralKey = useMemo(
+    () => collaterals.map(collateral => `${collateral.address}-${collateral.rawBalance}`).join("|"),
+    [collaterals],
+  );
 
   useEffect(() => {
-    setSelectedQuote(null);
+    setSwapPlans([]);
     setProtocolInstructions([]);
     setFetchedAuthorizations([]);
     setError(null);
-  }, [isOpen, debt?.address, collateral?.address]);
+  }, [isOpen, debt?.address, collateralKey]);
 
   useEffect(() => {
-    if (!isOpen || !address || !debt || !collateral || debtBalance === 0n || collateralBalance === 0n) {
+    if (!isOpen || !address || !debt || debtBalance === 0n || collaterals.length === 0) {
       return;
     }
 
@@ -65,92 +78,142 @@ export const useNostraClosePosition = ({
       setLoading(true);
       setError(null);
       try {
-        const repayAmount = debtBalance > 0n ? debtBalance : 1n;
-        const quoteRequest = {
-          sellTokenAddress: collateral.address,
-          buyTokenAddress: debt.address,
-          buyAmount: repayAmount,
-          takerAddress: address,
-        } as const;
+        const activeCollaterals = collaterals.filter(collateral => collateral.rawBalance > 0n);
+        if (activeCollaterals.length === 0) throw new Error("Selected collateral has no balance");
 
-        const quotes = await fetchQuotes(quoteRequest as any);
-        if (quotes.length === 0) throw new Error("Unable to fetch AVNU quote");
+        const totalCollateral = activeCollaterals.reduce((sum, item) => sum + item.rawBalance, 0n);
+        if (totalCollateral === 0n) throw new Error("Selected collateral has no balance");
 
-        const quote = quotes[0];
-        if (!cancelled) setSelectedQuote(quote);
-
-        const tx = await fetchBuildExecuteTransaction(quote.quoteId, address, SLIPPAGE, false);
-        const swapCall = tx.calls?.find((call: any) =>
-          ["swap_exact_token_to", "multi_route_swap", "swap_exact_in"].includes(call.entrypoint),
-        );
-        if (!swapCall) throw new Error("Failed to extract AVNU calldata");
-        const calldata = (swapCall.calldata as any[]).map(value => BigInt(value.toString()));
-
-        const repayInstruction = new CairoCustomEnum({
-          Deposit: undefined,
-          Borrow: undefined,
-          Repay: {
-            basic: { token: debt.address, amount: uint256.bnToUint256(repayAmount), user: address },
-            repay_all: true,
-            context: new CairoOption<bigint[]>(CairoOptionVariant.None),
-          },
-          Withdraw: undefined,
-          Redeposit: undefined,
-          Reborrow: undefined,
-          Swap: undefined,
-          SwapExactIn: undefined,
-          Reswap: undefined,
-          ReswapExactIn: undefined,
+        const plannedRepays: { collateral: CloseCollateralInfo; repayAmount: bigint }[] = [];
+        let assigned = 0n;
+        activeCollaterals.forEach((collateral, index) => {
+          let repayAmount: bigint;
+          if (index === activeCollaterals.length - 1) {
+            repayAmount = debtBalance - assigned;
+          } else {
+            repayAmount = (debtBalance * collateral.rawBalance) / totalCollateral;
+            assigned += repayAmount;
+          }
+          if (repayAmount < 0n) repayAmount = 0n;
+          if (index === activeCollaterals.length - 1) {
+            assigned += repayAmount;
+          }
+          plannedRepays.push({ collateral, repayAmount });
         });
 
-        const withdrawAmount = withBuffer(collateralBalance, 200n);
-        const withdrawInstruction = new CairoCustomEnum({
-          Deposit: undefined,
-          Borrow: undefined,
-          Repay: undefined,
-          Withdraw: {
-            basic: { token: collateral.address, amount: uint256.bnToUint256(withdrawAmount), user: address },
-            withdraw_all: true,
-            context: new CairoOption<bigint[]>(CairoOptionVariant.None),
-          },
-          Redeposit: undefined,
-          Reborrow: undefined,
-          Swap: undefined,
-          SwapExactIn: undefined,
-          Reswap: undefined,
-          ReswapExactIn: undefined,
+        const meaningfulRepays = plannedRepays.filter(plan => plan.repayAmount > 0n);
+        if (meaningfulRepays.length === 0) throw new Error("Debt amount is too small for the selected collateral");
+
+        const planResults: SwapPlan[] = [];
+        for (const [index, plan] of meaningfulRepays.entries()) {
+          const repayAmount = plan.repayAmount;
+          const quoteRequest = {
+            sellTokenAddress: plan.collateral.address,
+            buyTokenAddress: debt.address,
+            buyAmount: repayAmount,
+            takerAddress: address,
+          } as const;
+
+          const quotes = await fetchQuotes(quoteRequest as any);
+          if (quotes.length === 0) throw new Error(`Unable to fetch AVNU quote for ${plan.collateral.name}`);
+          const quote = quotes[0];
+
+          const tx = await fetchBuildExecuteTransaction(quote.quoteId, address, SLIPPAGE, false);
+          const swapCall = tx.calls?.find((call: any) =>
+            ["swap_exact_token_to", "multi_route_swap", "swap_exact_in"].includes(call.entrypoint),
+          );
+          if (!swapCall) throw new Error("Failed to extract AVNU calldata");
+          const calldata = (swapCall.calldata as any[]).map(value => BigInt(value.toString()));
+
+          planResults.push({ collateral: plan.collateral, repayAmount, quote, calldata });
+        }
+
+        const nostraInstructions: CairoCustomEnum[] = [];
+        const avnuInstructions: CairoCustomEnum[] = [];
+
+        planResults.forEach((plan, index) => {
+          const repayInstructionIndex = nostraInstructions.length;
+          const repayInstruction = new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: {
+              basic: { token: debt.address, amount: uint256.bnToUint256(plan.repayAmount), user: address },
+              repay_all: index === planResults.length - 1,
+              context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+            },
+            Withdraw: undefined,
+            Redeposit: undefined,
+            Reborrow: undefined,
+            Swap: undefined,
+            SwapExactIn: undefined,
+            Reswap: undefined,
+            ReswapExactIn: undefined,
+          });
+          nostraInstructions.push(repayInstruction);
+
+          const withdrawInstructionIndex = nostraInstructions.length;
+          const withdrawAmount = withBuffer(plan.collateral.rawBalance, 200n);
+          const withdrawInstruction = new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: {
+              basic: {
+                token: plan.collateral.address,
+                amount: uint256.bnToUint256(withdrawAmount),
+                user: address,
+              },
+              withdraw_all: true,
+              context: new CairoOption<bigint[]>(CairoOptionVariant.None),
+            },
+            Redeposit: undefined,
+            Reborrow: undefined,
+            Swap: undefined,
+            SwapExactIn: undefined,
+            Reswap: undefined,
+            ReswapExactIn: undefined,
+          });
+          nostraInstructions.push(withdrawInstruction);
+
+          const reswapInstruction = new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: undefined,
+            Redeposit: undefined,
+            Reborrow: undefined,
+            Swap: undefined,
+            SwapExactIn: undefined,
+            Reswap: {
+              exact_out: toOutputPointer(repayInstructionIndex),
+              max_in: toOutputPointer(withdrawInstructionIndex),
+              user: address,
+              should_pay_out: false,
+              should_pay_in: true,
+              context: new CairoOption(CairoOptionVariant.Some, plan.calldata),
+            },
+            ReswapExactIn: undefined,
+          });
+          avnuInstructions.push(reswapInstruction);
         });
 
-        const reswapInstruction = new CairoCustomEnum({
-          Deposit: undefined,
-          Borrow: undefined,
-          Repay: undefined,
-          Withdraw: undefined,
-          Redeposit: undefined,
-          Reborrow: undefined,
-          Swap: undefined,
-          SwapExactIn: undefined,
-          Reswap: {
-            exact_out: toOutputPointer(0),
-            max_in: toOutputPointer(1),
-            user: address,
-            should_pay_out: false,
-            should_pay_in: true,
-            context: new CairoOption(CairoOptionVariant.Some, calldata),
-          },
-          ReswapExactIn: undefined,
-        });
+        const instructions: BaseProtocolInstruction[] = [];
+        if (nostraInstructions.length > 0) {
+          instructions.push({ protocol_name: "nostra", instructions: nostraInstructions });
+        }
+        if (avnuInstructions.length > 0) {
+          instructions.push({ protocol_name: "avnu", instructions: avnuInstructions });
+        }
 
-        const instructions: BaseProtocolInstruction[] = [
-          { protocol_name: "nostra", instructions: [repayInstruction, withdrawInstruction] },
-          { protocol_name: "avnu", instructions: [reswapInstruction] },
-        ];
-
-        if (!cancelled) setProtocolInstructions(instructions);
+        if (!cancelled) {
+          setSwapPlans(planResults);
+          setProtocolInstructions(instructions);
+        }
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.message ?? "Failed to prepare close instructions");
           setProtocolInstructions([]);
+          setSwapPlans([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -162,7 +225,7 @@ export const useNostraClosePosition = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, address, debt?.address, collateral?.address, debtBalance, collateralBalance]);
+  }, [isOpen, address, debt?.address, collateralKey, debtBalance]);
 
   useEffect(() => {
     if (!isOpen || !isAuthReady || protocolInstructions.length === 0) {
@@ -200,21 +263,23 @@ export const useNostraClosePosition = ({
     ];
   }, [protocolInstructions, fetchedAuthorizations]);
 
-  const swapSummary = useMemo(() => {
-    if (!selectedQuote || !debt || !collateral) return null;
-    return {
-      sellToken: collateral,
+  const swapSummaries = useMemo(() => {
+    if (!debt || swapPlans.length === 0) return [];
+    return swapPlans.map(plan => ({
+      collateral: plan.collateral,
+      sellToken: plan.collateral,
       buyToken: debt,
-      sellAmount: selectedQuote.sellAmount,
-      buyAmount: selectedQuote.buyAmount,
-    };
-  }, [selectedQuote, debt, collateral]);
+      sellAmount: plan.quote.sellAmount,
+      buyAmount: plan.quote.buyAmount,
+      quote: plan.quote,
+    }));
+  }, [swapPlans, debt]);
 
   return {
     loading,
     error,
-    selectedQuote,
-    swapSummary,
+    swapSummaries,
+    swapPlans,
     calls,
   };
 };
