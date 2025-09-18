@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import DebtComparison from "./DebtComparison.client";
+import StableArea from "../common/StableArea";
 
 const HeroSection = () => {
   return (
@@ -80,7 +81,9 @@ const HeroSection = () => {
           <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
             <div className="card-body p-6">
               {/* Debt comparison component */}
-              <DebtComparison />
+              <StableArea minHeight="26rem" innerClassName="h-full">
+                <DebtComparison />
+              </StableArea>
             </div>
           </div>
         </div>
