@@ -12,6 +12,8 @@ pub mod gateways {
     pub mod avnu_gateway;
 }
 
+pub mod router;
+
 pub mod utils {
     pub mod optimal_interest_rate_finder;
     pub mod ui_helper;
