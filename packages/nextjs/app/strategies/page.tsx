@@ -22,23 +22,19 @@ type MarketRate = {
   borrowAPR: number; // percentage (e.g. 3.45 => 3.45%)
 };
 
-type StrategyHop = {
-  title: string;
-  description: string;
-  rate: number;
-  rateLabel: string;
-  protocol: ProtocolName;
+type StrategyLeg = {
+  asset: string;
+  tokenAddress: string;
+  borrow: MarketRate;
+  supply: MarketRate;
+  netSpread: number;
 };
 
 type StrategyCandidate = {
   id: string;
-  symbol: string;
-  tokenAddress: string;
+  collateral: MarketRate;
+  legs: StrategyLeg[];
   netYield: number;
-  borrow: MarketRate;
-  supply: MarketRate;
-  collateral?: MarketRate;
-  hops: StrategyHop[];
 };
 
 const toHexAddress = (value: bigint | string) => {
@@ -46,19 +42,12 @@ const toHexAddress = (value: bigint | string) => {
   return `0x${bigintValue.toString(16).padStart(64, "0")}`;
 };
 
-const createHop = ({
-  title,
-  description,
-  rate,
-  protocol,
-  rateLabel,
-}: Omit<StrategyHop, "rateLabel"> & { rateLabel?: string }): StrategyHop => ({
-  title,
-  description,
-  rate,
-  protocol,
-  rateLabel: rateLabel ?? `${formatPercentage(rate)}% ${rate >= 0 ? "APY" : "APR"}`,
-});
+const normalizeProtocolName = (value: string): ProtocolName => {
+  const normalized = value.toLowerCase();
+  if (normalized.includes("nostra")) return "Nostra";
+  if (normalized.includes("vesu")) return "Vesu";
+  return value as ProtocolName;
+};
 
 const StrategiesPage = () => {
   const {
@@ -171,80 +160,96 @@ const StrategiesPage = () => {
       bySymbol.set(market.symbol, { ...bySymbol.get(market.symbol), Vesu: market });
     });
 
-    const pickCollateral = (protocol: ProtocolName, excludeSymbol: string): MarketRate | undefined => {
-      const pool = protocol === "Nostra" ? nostraMarkets : vesuMarkets;
-      return pool
-        .filter(market => market.symbol !== excludeSymbol && market.supplyAPY > 0)
-        .sort((a, b) => b.supplyAPY - a.supplyAPY)[0];
-    };
-
-    const candidates: StrategyCandidate[] = [];
+    const spreads: StrategyLeg[] = [];
 
     for (const [symbol, entry] of bySymbol.entries()) {
       const nostra = entry.Nostra;
       const vesu = entry.Vesu;
 
       if (!nostra || !vesu) continue;
-      if (nostra.borrowAPR === 0 && vesu.borrowAPR === 0) continue;
 
       const bestSupply = nostra.supplyAPY >= vesu.supplyAPY ? nostra : vesu;
       const bestBorrow = nostra.borrowAPR <= vesu.borrowAPR ? nostra : vesu;
 
       if (bestSupply.protocol === bestBorrow.protocol) continue;
 
-      const netYield = bestSupply.supplyAPY - bestBorrow.borrowAPR;
-      if (netYield <= 0) continue;
+      const netSpread = bestSupply.supplyAPY - bestBorrow.borrowAPR;
+      if (netSpread <= 0) continue;
 
-      const collateral = pickCollateral(bestBorrow.protocol, symbol);
-
-      const hops: StrategyHop[] = [];
-
-      if (collateral) {
-        hops.push(
-          createHop({
-            title: `Supply ${collateral.symbol} on ${collateral.protocol}`,
-            description:
-              `Provide ${collateral.symbol} as collateral on ${collateral.protocol} to unlock borrowing power while still collecting its ${formatPercentage(collateral.supplyAPY)}% APY.`,
-            protocol: collateral.protocol,
-            rate: collateral.supplyAPY,
-            rateLabel: `${formatPercentage(collateral.supplyAPY)}% APY`,
-          }),
-        );
-      }
-
-      hops.push(
-        createHop({
-          title: `Borrow ${symbol} on ${bestBorrow.protocol}`,
-          description: `Draw $100 worth of ${symbol} against the collateral at the current ${formatPercentage(bestBorrow.borrowAPR)}% APR.`,
-          protocol: bestBorrow.protocol,
-          rate: bestBorrow.borrowAPR,
-          rateLabel: `${formatPercentage(bestBorrow.borrowAPR)}% APR`,
-        }),
-      );
-
-      hops.push(
-        createHop({
-          title: `Deposit ${symbol} on ${bestSupply.protocol}`,
-          description: `Loop the borrowed ${symbol} into ${bestSupply.protocol} to earn the ${formatPercentage(bestSupply.supplyAPY)}% supply APY.`,
-          protocol: bestSupply.protocol,
-          rate: bestSupply.supplyAPY,
-          rateLabel: `${formatPercentage(bestSupply.supplyAPY)}% APY`,
-        }),
-      );
-
-      candidates.push({
-        id: `${symbol}-${bestBorrow.protocol}-to-${bestSupply.protocol}`,
-        symbol,
-        tokenAddress: nostra.tokenAddress || vesu.tokenAddress,
-        netYield,
+      spreads.push({
+        asset: symbol,
+        tokenAddress: bestSupply.tokenAddress || bestBorrow.tokenAddress,
         borrow: bestBorrow,
         supply: bestSupply,
-        collateral,
-        hops,
+        netSpread,
       });
     }
 
-    return candidates.sort((a, b) => b.netYield - a.netYield);
+    const preferredCollateralSymbols = new Set([
+      "WBTC",
+      "BTC",
+      "WBTC.E",
+      "ETH",
+      "WETH",
+      "STETH",
+      "WSTETH",
+    ]);
+
+    const combinedMarkets = [...nostraMarkets, ...vesuMarkets];
+
+    const collateralOptions = combinedMarkets
+      .filter(market => preferredCollateralSymbols.has(market.symbol.toUpperCase()))
+      .filter(market => market.supplyAPY > 0)
+      .sort((a, b) => b.supplyAPY - a.supplyAPY);
+
+    const fallbacks = combinedMarkets.filter(market => market.supplyAPY > 0).sort((a, b) => b.supplyAPY - a.supplyAPY);
+
+    const collateralCandidates = collateralOptions.length > 0 ? collateralOptions : fallbacks;
+
+    const candidates: StrategyCandidate[] = [];
+
+    collateralCandidates.forEach(collateral => {
+      const firstLegOptions = spreads
+        .filter(spread => spread.borrow.protocol === collateral.protocol)
+        .sort((a, b) => b.netSpread - a.netSpread);
+
+      firstLegOptions.forEach(firstLeg => {
+        const distinctAssetOptions = spreads
+          .filter(
+            spread =>
+              spread.borrow.protocol === firstLeg.supply.protocol &&
+              spread.asset.toLowerCase() !== firstLeg.asset.toLowerCase(),
+          )
+          .sort((a, b) => b.netSpread - a.netSpread);
+
+        const sameAssetFallback = spreads
+          .filter(
+            spread =>
+              spread.borrow.protocol === firstLeg.supply.protocol &&
+              spread.asset.toLowerCase() === firstLeg.asset.toLowerCase(),
+          )
+          .sort((a, b) => b.netSpread - a.netSpread);
+
+        const bestSecondLeg = (distinctAssetOptions[0] || sameAssetFallback[0]) as StrategyLeg | undefined;
+        if (!bestSecondLeg) return;
+
+        const netYield = firstLeg.netSpread + bestSecondLeg.netSpread;
+
+        if (netYield <= 0) return;
+
+        candidates.push({
+          id: `${collateral.symbol}-${collateral.protocol}-${firstLeg.asset}-${bestSecondLeg.asset}-${firstLeg.supply.protocol}-${bestSecondLeg.supply.protocol}`,
+          collateral,
+          legs: [firstLeg, bestSecondLeg],
+          netYield,
+        });
+      });
+    });
+
+    return candidates
+      .sort((a, b) => b.netYield - a.netYield)
+      .filter((candidate, index, arr) => arr.findIndex(other => other.id === candidate.id) === index)
+      .slice(0, 4);
   }, [nostraMarkets, vesuMarkets]);
 
   const loading = isLoadingNostraAssets || isLoadingNostraRates || isLoadingVesu;
@@ -260,9 +265,9 @@ const StrategiesPage = () => {
           Cross-protocol strategies powered by live optimal rates
         </h1>
         <p className="mt-4 text-base text-base-content/70">
-          We continuously read the supported markets from the Vesu and Nostra gateways on Starknet and pair them with the on-chain
-          optimal interest rate finder. Whenever one protocol offers a cheaper borrow than the other protocol&apos;s supply yield, you
-          get a concrete loop opportunity.
+          We continuously read the supported markets from the Vesu and Nostra gateways on Starknet and cross-check them with the
+          on-chain optimal interest rate finder. When two assets simultaneously clear with a cheaper borrow on one desk and a richer
+          supply on the other, we stitch them into a five-hop loop so long ETH or WBTC vaults can auto-amplify their carry in real time.
         </p>
       </div>
 
@@ -272,10 +277,10 @@ const StrategiesPage = () => {
         </div>
       ) : strategies.length === 0 ? (
         <div className="mx-auto max-w-2xl rounded-2xl border border-base-300 bg-base-100/60 p-10 text-center">
-          <h2 className="text-2xl font-semibold text-base-content">No cross-protocol spreads right now</h2>
+          <h2 className="text-2xl font-semibold text-base-content">No multi-hop spreads right now</h2>
           <p className="mt-3 text-base text-base-content/70">
-            Vesu and Nostra are currently pricing borrow and supply rates within each other&apos;s ranges. Check back soon as market
-            utilization shifts.
+            We need two assets with opposing borrow/supply quotes across Vesu and Nostra to build a five-step loop. Utilization is
+            tight at the moment, so check back when the Starknet desks desync.
           </p>
         </div>
       ) : (
@@ -290,75 +295,114 @@ const StrategiesPage = () => {
 };
 
 const StrategyCard = ({ strategy }: { strategy: StrategyCandidate }) => {
-  const { protocol: optimalBorrowProtocol, rate: optimalBorrowRate } = useOptimalRate({
+  const [firstLeg, secondLeg] = strategy.legs as [StrategyLeg, StrategyLeg];
+
+  const firstBorrow = useOptimalRate({
     networkType: "starknet",
-    tokenAddress: strategy.tokenAddress,
+    tokenAddress: firstLeg.tokenAddress,
     type: "borrow",
   });
 
-  const { protocol: optimalSupplyProtocol, rate: optimalSupplyRate } = useOptimalRate({
+  const firstSupply = useOptimalRate({
     networkType: "starknet",
-    tokenAddress: strategy.tokenAddress,
+    tokenAddress: firstLeg.tokenAddress,
     type: "supply",
   });
 
-  const borrowProtocol = (optimalBorrowProtocol || strategy.borrow.protocol) as ProtocolName;
-  const borrowRate = optimalBorrowRate > 0 ? optimalBorrowRate : strategy.borrow.borrowAPR;
-
-  const supplyProtocol = (optimalSupplyProtocol || strategy.supply.protocol) as ProtocolName;
-  const supplyRate = optimalSupplyRate > 0 ? optimalSupplyRate : strategy.supply.supplyAPY;
-
-  const displayNetYield = supplyRate - borrowRate;
-
-  const borrowHopIndex = strategy.collateral ? 1 : 0;
-  const depositHopIndex = borrowHopIndex + 1;
-
-  const displayHops = strategy.hops.map((hop, index) => {
-    if (index === borrowHopIndex) {
-      return {
-        ...hop,
-        title: `Borrow ${strategy.symbol} on ${borrowProtocol}`,
-        rateLabel: `${formatPercentage(borrowRate)}% APR`,
-        description: `Draw $100 worth of ${strategy.symbol} against the collateral at the ${formatPercentage(borrowRate)}% APR advertised by ${borrowProtocol}.`,
-      } satisfies StrategyHop;
-    }
-    if (index === depositHopIndex) {
-      return {
-        ...hop,
-        title: `Deposit ${strategy.symbol} on ${supplyProtocol}`,
-        rateLabel: `${formatPercentage(supplyRate)}% APY`,
-        description: `Loop the borrowed ${strategy.symbol} into ${supplyProtocol} and collect the ${formatPercentage(supplyRate)}% supply APY.`,
-      } satisfies StrategyHop;
-    }
-    return hop;
+  const secondBorrow = useOptimalRate({
+    networkType: "starknet",
+    tokenAddress: secondLeg.tokenAddress,
+    type: "borrow",
   });
+
+  const secondSupply = useOptimalRate({
+    networkType: "starknet",
+    tokenAddress: secondLeg.tokenAddress,
+    type: "supply",
+  });
+
+  const collateralProtocol = strategy.collateral.protocol;
+
+  const firstBorrowProtocol = normalizeProtocolName(firstBorrow.protocol || firstLeg.borrow.protocol);
+  const firstBorrowRate = firstBorrow.rate > 0 ? firstBorrow.rate : firstLeg.borrow.borrowAPR;
+
+  const firstSupplyProtocol = normalizeProtocolName(firstSupply.protocol || firstLeg.supply.protocol);
+  const firstSupplyRate = firstSupply.rate > 0 ? firstSupply.rate : firstLeg.supply.supplyAPY;
+
+  const secondBorrowProtocol = normalizeProtocolName(secondBorrow.protocol || secondLeg.borrow.protocol);
+  const secondBorrowRate = secondBorrow.rate > 0 ? secondBorrow.rate : secondLeg.borrow.borrowAPR;
+
+  const secondSupplyProtocol = normalizeProtocolName(secondSupply.protocol || secondLeg.supply.protocol);
+  const secondSupplyRate = secondSupply.rate > 0 ? secondSupply.rate : secondLeg.supply.supplyAPY;
+
+  const loopNetYield = firstSupplyRate + secondSupplyRate - firstBorrowRate - secondBorrowRate;
+  const collateralYield = strategy.collateral.supplyAPY;
+
+  const hops = [
+    {
+      title: `Supply ${strategy.collateral.symbol} on ${collateralProtocol}`,
+      description: `Post your ${strategy.collateral.symbol} as collateral on ${collateralProtocol} and keep stacking its ${formatPercentage(collateralYield)}% APY while unlocking borrow power.`,
+      rateLabel: `${formatPercentage(collateralYield)}% APY`,
+    },
+    {
+      title: `Borrow ${firstLeg.asset} on ${firstBorrowProtocol}`,
+      description: `Tap the ${strategy.collateral.symbol} position to draw $100 of ${firstLeg.asset} at ${formatPercentage(firstBorrowRate)}% APR.`,
+      rateLabel: `${formatPercentage(firstBorrowRate)}% APR`,
+    },
+    {
+      title: `Deposit ${firstLeg.asset} on ${firstSupplyProtocol}`,
+      description: `Loop the borrowed ${firstLeg.asset} into ${firstSupplyProtocol} and earn ${formatPercentage(firstSupplyRate)}% APY on it.`,
+      rateLabel: `${formatPercentage(firstSupplyRate)}% APY`,
+    },
+    {
+      title: `Borrow ${secondLeg.asset} on ${secondBorrowProtocol}`,
+      description: `Against the ${firstLeg.asset} stack, borrow ${secondLeg.asset} for $100 notional at ${formatPercentage(secondBorrowRate)}% APR.`,
+      rateLabel: `${formatPercentage(secondBorrowRate)}% APR`,
+    },
+    {
+      title: `Deposit ${secondLeg.asset} on ${secondSupplyProtocol}`,
+      description: `Park the ${secondLeg.asset} flow on ${secondSupplyProtocol} to add another ${formatPercentage(secondSupplyRate)}% APY layer.`,
+      rateLabel: `${formatPercentage(secondSupplyRate)}% APY`,
+    },
+  ];
+
+  const assetPath = `${strategy.collateral.symbol} ➜ ${firstLeg.asset} ➜ ${secondLeg.asset}`;
 
   return (
     <article className="rounded-3xl border border-base-300 bg-base-100/80 p-6 shadow-sm">
-      <header className="flex flex-col gap-2 pb-4 border-b border-base-200">
+      <header className="flex flex-col gap-2 border-b border-base-200 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-primary/80">{strategy.symbol} loop</p>
-            <h2 className="text-2xl font-semibold text-base-content">
-              {borrowProtocol} ➜ {supplyProtocol}
-            </h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-primary/80">{strategy.collateral.symbol} collateral loop</p>
+            <h2 className="text-2xl font-semibold text-base-content">{assetPath}</h2>
           </div>
           <div className="text-right">
             <p className="text-xs uppercase text-base-content/50">Net yield on $100</p>
-            <p className="text-3xl font-bold text-success">{formatPercentage(displayNetYield)}%</p>
+            <p className="text-3xl font-bold text-success">{formatPercentage(loopNetYield)}%</p>
           </div>
         </div>
         <p className="text-sm text-base-content/60">
-          Borrow {strategy.symbol} on {borrowProtocol} at {formatPercentage(borrowRate)}% APR and park it on {supplyProtocol} for
-          {" "}
-          {formatPercentage(supplyRate)}% APY. The spread compounds on a $100 deposit of {strategy.symbol}.
+          Stake {strategy.collateral.symbol} on {collateralProtocol} to unlock credit, borrow {firstLeg.asset} on {firstBorrowProtocol} and
+          stream it into {firstSupplyProtocol} for yield, then tap that desk to borrow {secondLeg.asset} and shuttle it back to {secondSupplyProtocol}.
+          Each borrow leg is sized to $100 notionally, so the net shown is the annualized spread you earn while the collateral keeps compounding.
         </p>
+        <div className="flex flex-wrap gap-4 text-xs text-base-content/60">
+          <span className="rounded-full bg-base-200 px-3 py-1 font-medium text-base-content">
+            Collateral APY: {formatPercentage(collateralYield)}%
+          </span>
+          <span className="rounded-full bg-base-200 px-3 py-1 font-medium text-base-content">
+            Borrow cost: {formatPercentage(firstBorrowRate + secondBorrowRate)}% APR
+          </span>
+          <span className="rounded-full bg-base-200 px-3 py-1 font-medium text-base-content">
+            Supply stack: {formatPercentage(firstSupplyRate + secondSupplyRate)}% APY
+          </span>
+        </div>
       </header>
 
       <ol className="mt-6 space-y-4">
-        {displayHops.map((hop, index) => (
+        {hops.map((hop, index) => (
           <li key={`${strategy.id}-hop-${index}`} className="rounded-2xl border border-base-200 bg-base-100 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                   {index + 1}
@@ -376,8 +420,8 @@ const StrategyCard = ({ strategy }: { strategy: StrategyCandidate }) => {
 
       <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-base-200 pt-4 text-sm text-base-content/60">
         <div>
-          <span className="font-semibold text-base-content">Risk notes:</span> Monitor liquidation buffers on {borrowProtocol} and keep an
-          eye on utilization-driven rate jumps on {supplyProtocol}.
+          <span className="font-semibold text-base-content">Risk notes:</span> Keep health factors padded on {collateralProtocol} and
+          watch utilization shocks on {firstBorrowProtocol} / {secondBorrowProtocol} that can reprice the borrow legs.
         </div>
         <Link href="/markets" className="inline-flex items-center gap-1 text-primary hover:text-primary-focus" prefetch={false}>
           View live markets
