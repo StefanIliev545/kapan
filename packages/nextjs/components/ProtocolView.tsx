@@ -35,6 +35,13 @@ export interface ProtocolPosition {
     preselectedCollaterals?: CollateralWithAmount[];
     disableCollateralSelection?: boolean;
   };
+  availableActions?: {
+    deposit?: boolean;
+    withdraw?: boolean;
+    borrow?: boolean;
+    repay?: boolean;
+    move?: boolean;
+  };
   actionsDisabled?: boolean;
   actionsDisabledReason?: string;
 }
