@@ -72,13 +72,33 @@ export const useAutoConnect = (): void => {
       return;
     }
 
-    attemptedConnectorRef.current = connectorId;
-    connect({ connector });
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
-        currentTime.toString(),
-      );
-    }
+    const ready = async (): Promise<boolean> => {
+      if (typeof connector.ready !== "function") {
+        return true;
+      }
+
+      try {
+        return await connector.ready();
+      } catch (err) {
+        console.warn("Failed to check connector readiness", err);
+        return false;
+      }
+    };
+
+    void (async () => {
+      const isReady = await ready();
+      if (!isReady) {
+        return;
+      }
+
+      attemptedConnectorRef.current = connectorId;
+      connect({ connector });
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
+          currentTime.toString(),
+        );
+      }
+    })();
   }, [connect, connectors, lastConnectionTime, savedConnector, status]);
 };

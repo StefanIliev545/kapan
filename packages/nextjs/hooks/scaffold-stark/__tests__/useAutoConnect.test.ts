@@ -44,8 +44,12 @@ describe("useAutoConnect", () => {
   beforeEach(() => {
     mockConnect = vi.fn();
     mockConnectors = [
-      { id: "wallet-1" },
-      { id: "burner-wallet", burnerAccount: null },
+      { id: "wallet-1", ready: vi.fn().mockResolvedValue(true) },
+      {
+        id: "burner-wallet",
+        burnerAccount: null,
+        ready: vi.fn().mockResolvedValue(true),
+      },
     ];
     (useConnect as ReturnType<typeof vi.fn>).mockImplementation(() => ({
       connect: mockConnect,
@@ -96,10 +100,11 @@ describe("useAutoConnect", () => {
       }),
     );
     mockConnectors = [
-      { id: "wallet-1" },
+      { id: "wallet-1", ready: vi.fn().mockResolvedValue(true) },
       {
         id: "burner-wallet",
         burnerAccount: burnerAccounts[1],
+        ready: vi.fn().mockResolvedValue(true),
       },
     ];
     (useConnect as ReturnType<typeof vi.fn>).mockImplementation(() => ({
@@ -156,4 +161,14 @@ describe("useAutoConnect", () => {
     });
   });
 
+  it("should not auto-connect if the connector is not ready", () => {
+    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
+    mockConnectors[0].ready.mockResolvedValue(false);
+
+    renderHook(() => useAutoConnect());
+
+    return waitFor(() => {
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+  });
 });
