@@ -10,6 +10,7 @@
     "lint": "next lint",
     "serve": "next start",
     "start": "next dev",
+    "storybook": "node ./scripts/storybook.cjs dev -p 6006",
     "storybook:build": "node ./scripts/storybook.cjs build",
     "vercel": "vercel --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false --build-env ENABLE_EXPERIMENTAL_COREPACK=1 --build-env VERCEL_TELEMETRY_DISABLED=1",
     "vercel:login": "vercel login",
@@ -67,6 +68,7 @@
   },
   "devDependencies": {
     "@storybook/nextjs": "^9.1.7",
+    "@storybook/nextjs-vite": "^9.1.7",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",

@@ -7,26 +7,23 @@ const require = createRequire(import.meta.url);
 const config: StorybookConfig = {
   stories: ["../**/*.stories.@(ts|tsx|mdx)"],
   addons: [getAbsolutePath("msw-storybook-addon")],
-
   framework: {
-    name: getAbsolutePath("@storybook/nextjs"),
-    options: {
-      nextConfigPath: "../next.config.js",
-      
-    },
+    name: "@storybook/nextjs",
+    options: {},
   },
-  core: {
-    builder: {
-      name: '@storybook/builder-webpack5',
-      options: {
-        fsCache: true,         // enables Webpack’s filesystem cache between runs
-        lazyCompilation: true, // faster startup; compiles on demand in dev
-      },
-    },
+  staticDirs: ["../public"],
+  webpackFinal: async (baseConfig) => {
+    const config = baseConfig;
+    config.resolve = config.resolve ?? {};
+    config.resolve.fallback = {
+      ...(config.resolve.fallback ?? {}),
+      fs: false,
+      stream: false,
+      zlib: false,
+    };
+
+    return config;
   },
-
-
-  staticDirs: ["../public"]
 };
 
 export default config;
