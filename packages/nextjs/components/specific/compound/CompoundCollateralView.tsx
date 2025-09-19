@@ -1,7 +1,7 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { DepositCollateralModal } from "./DepositCollateralModal";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -62,14 +62,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   // Only fetch data when the component is visible or when first mounted
   const shouldFetch = isVisible;
 
-  // Format currency with 2 decimal places
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(num);
-  };
-
   // Format currency in USD
   const formatUSD = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -127,8 +119,10 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   });
 
   // Ensure baseTokenDecimals is in the expected array format
-  const baseTokenDecimalsArray =
-    typeof baseTokenDecimals === "number" ? [BigInt(baseTokenDecimals)] : [baseTokenDecimals];
+  const baseTokenDecimalsArray = useMemo(
+    () => (typeof baseTokenDecimals === "number" ? [BigInt(baseTokenDecimals)] : [baseTokenDecimals]),
+    [baseTokenDecimals],
+  );
 
   // Extract baseToken price in USD
   const baseTokenUsdPrice = useMemo(() => {
@@ -143,7 +137,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     }
 
     // CompoundData returns [supplyRate, borrowRate, balance, borrowBalance, price, priceScale]
-    const [_, __, ___, borrowBalanceRaw, price] = compoundData;
+    const [, , , borrowBalanceRaw, price] = compoundData;
 
     // Get the correct decimals for this token
     const decimals = Number(baseTokenDecimalsArray[0]);

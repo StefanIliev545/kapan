@@ -9,6 +9,7 @@ import {
   UseDeployedContractConfig,
   contracts,
 } from "~~/utils/scaffold-eth/contract";
+import { getStorybookMock, invokeStorybookMock } from "~~/utils/storybook";
 
 // Cache deployment checks per chain + address to avoid spamming RPC nodes
 const deploymentStatusCache = new Map<string, ContractCodeStatus>();
@@ -40,6 +41,16 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
   const finalConfig: UseDeployedContractConfig<TContractName> =
     typeof configOrName === "string" ? { contractName: configOrName } : (configOrName as any);
 
+  const storybookHandler = getStorybookMock<
+    {
+      config: UseDeployedContractConfig<TContractName>;
+      originalResult: DeployedContractData<TContractName>;
+    },
+    DeployedContractData<TContractName>
+  >("useDeployedContractInfo");
+
+  const shouldMock = Boolean(storybookHandler);
+
   useEffect(() => {
     if (typeof configOrName === "string") {
       console.warn(
@@ -58,6 +69,9 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
   const publicClient = usePublicClient({ chainId: selectedNetwork.id });
 
   useEffect(() => {
+    if (shouldMock) {
+      return;
+    }
     const checkContractDeployment = async () => {
       if (!deployedContract || !cacheKey) {
         setStatus(ContractCodeStatus.NOT_FOUND);
@@ -87,10 +101,27 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
     };
 
     checkContractDeployment();
-  }, [isMounted, cacheKey, deployedContract, publicClient]);
+  }, [isMounted, cacheKey, deployedContract, publicClient, shouldMock]);
 
-  return {
+  const result: DeployedContractData<TContractName> = {
     data: status === ContractCodeStatus.DEPLOYED ? deployedContract : undefined,
-    isLoading: status === ContractCodeStatus.LOADING,
+    isLoading: shouldMock ? false : status === ContractCodeStatus.LOADING,
   };
+
+  if (storybookHandler) {
+    const override = invokeStorybookMock(
+      "useDeployedContractInfo",
+      storybookHandler,
+      {
+        config: finalConfig,
+        originalResult: result,
+      },
+    );
+
+    if (override) {
+      return override;
+    }
+  }
+
+  return result;
 }
