@@ -1,7 +1,7 @@
 import { feltToHex } from "./common";
 import { ContractAbi, ContractName } from "./contract";
 import { ExtractAbiEvent, ExtractAbiEventNames } from "abi-wan-kanabi/kanabi";
-import { Abi, AbiEntry, AbiEnums, AbiStructs, CallData, createAbiParser, parseCalldataField } from "starknet";
+import { Abi, AbiEntry, AbiEnums, AbiStructs, CallData, parseCalldataField } from "starknet";
 
 const stringToByteArrayFelt = (str: string): string[] => {
   const bytes = new TextEncoder().encode(str);
@@ -32,19 +32,13 @@ export const serializeEventKey = (
   abiEntry: AbiEntry,
   structs: AbiStructs,
   enums: AbiEnums,
-  parser: ReturnType<typeof createAbiParser>,
+  parser: CallData["parser"],
 ): string[] => {
   if (abiEntry.type === "core::byte_array::ByteArray") {
     return stringToByteArrayFelt(input).map(item => feltToHex(BigInt(item)));
   }
   const args = [input][Symbol.iterator]();
-  const parsed = parseCalldataField({
-    argsIterator: args,
-    input: abiEntry,
-    structs,
-    enums,
-    parser,
-  });
+  const parsed = parseCalldataField(args, abiEntry, structs, enums);
   if (typeof parsed === "string") {
     return [feltToHex(BigInt(parsed))];
   }
@@ -93,7 +87,7 @@ export const composeEventFilterKeys = (
   }
   const enums = CallData.getAbiEnum(abi);
   const structs = CallData.getAbiStruct(abi);
-  const parser = createAbiParser(abi);
+  const parser = new CallData(abi).parser;
   const members = event.members as unknown as {
     name: string;
     type: string;
