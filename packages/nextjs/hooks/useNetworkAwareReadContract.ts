@@ -17,6 +17,21 @@ type ReadContractConfig<T extends NetworkType, TContractName extends ContractNam
   [key: string]: any;
 };
 
+const resolveStorybookMock = <T extends NetworkType, TResult>(
+  params: ReadContractConfig<T, ContractName | ContractNameStark, string>,
+): TResult | undefined => {
+  if (typeof window === "undefined") return undefined;
+  const mocks = (window as unknown as { __STORYBOOK_MOCKS?: Record<string, unknown> }).__STORYBOOK_MOCKS;
+  const handler = mocks?.useNetworkAwareReadContract;
+  if (typeof handler !== "function") return undefined;
+  try {
+    return handler(params) as TResult;
+  } catch (error) {
+    console.warn("Storybook mock for useNetworkAwareReadContract threw", error);
+    return undefined;
+  }
+};
+
 export const useNetworkAwareReadContract = <
   T extends NetworkType,
   TContractName extends ContractName | ContractNameStark,
@@ -32,6 +47,25 @@ export const useNetworkAwareReadContract = <
     ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
     : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
 } => {
+  const mock = resolveStorybookMock<
+    T,
+    Omit<ReturnType<typeof useReadContract>, "data"> & {
+      data: T extends "evm"
+        ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
+        : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
+    }
+  >({
+    networkType,
+    contractName,
+    functionName,
+    args,
+    ...readConfig,
+  });
+
+  if (mock) {
+    return mock;
+  }
+
   // Call EVM hook only when network type is EVM
   const evmResult = useScaffoldReadContractEth({
     contractName: contractName as ContractName,
@@ -59,4 +93,4 @@ export const useNetworkAwareReadContract = <
       ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
       : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
   };
-}; 
+};

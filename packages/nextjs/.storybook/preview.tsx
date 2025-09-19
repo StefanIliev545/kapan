@@ -89,13 +89,32 @@ const preview: Preview = {
     },
   },
   decorators: [
-    (Story) => (
-      <AppProviders>
-        <Web3Providers>
-          <Story />
-        </Web3Providers>
-      </AppProviders>
-    ),
+    (Story, context) => {
+      useEffect(() => {
+        if (typeof window === "undefined") return;
+        const target = window as unknown as { __STORYBOOK_MOCKS?: unknown };
+        if (context.parameters.storybookMocks) {
+          target.__STORYBOOK_MOCKS = context.parameters.storybookMocks;
+        } else if (target.__STORYBOOK_MOCKS) {
+          delete target.__STORYBOOK_MOCKS;
+        }
+        return () => {
+          if (typeof window === "undefined") return;
+          const current = window as unknown as { __STORYBOOK_MOCKS?: unknown };
+          if (current.__STORYBOOK_MOCKS === context.parameters.storybookMocks) {
+            delete current.__STORYBOOK_MOCKS;
+          }
+        };
+      }, [context.parameters.storybookMocks]);
+
+      return (
+        <AppProviders>
+          <Web3Providers>
+            <Story />
+          </Web3Providers>
+        </AppProviders>
+      );
+    },
   ],
   loaders: [mswLoader],
 };
