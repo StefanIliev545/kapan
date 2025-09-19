@@ -7,6 +7,7 @@ import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithPro
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
+import { QueryProvider } from "~~/app/providers/QueryProvider";
 
 const baseMetadata = getMetadata({
   title: "Kapan Finance | DeFi Lending Aggregator",
@@ -33,7 +34,9 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
     <html suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider>
-          <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+          <QueryProvider>
+            <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+          </QueryProvider>
         </ThemeProvider>
         <SpeedInsights />
         <Analytics />
