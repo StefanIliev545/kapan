@@ -1,6 +1,7 @@
 import { Abi, useReadContract } from "@starknet-react/core";
 import { useScaffoldReadContract as useScaffoldReadContractEth } from "./scaffold-eth/useScaffoldReadContract";
 import { useScaffoldReadContract as useScaffoldReadContractStark } from "./scaffold-stark/useScaffoldReadContract";
+import { getStorybookMock, invokeStorybookMock } from "~~/utils/storybook";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
 import { ContractName as ContractNameStark } from "~~/utils/scaffold-stark/contract";
 import { AbiFunctionReturnType, ContractAbi as ContractAbiEth } from "~~/utils/scaffold-eth/contract";
@@ -32,6 +33,31 @@ export const useNetworkAwareReadContract = <
     ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
     : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
 } => {
+  const mockHandler = getStorybookMock<
+    ReadContractConfig<T, ContractName | ContractNameStark, string>,
+    Omit<ReturnType<typeof useReadContract>, "data"> & {
+      data: T extends "evm"
+        ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
+        : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
+    }
+  >("useNetworkAwareReadContract");
+
+  const mock = invokeStorybookMock(
+    "useNetworkAwareReadContract",
+    mockHandler,
+    {
+      networkType,
+      contractName,
+      functionName,
+      args,
+      ...readConfig,
+    } as ReadContractConfig<T, ContractName | ContractNameStark, string>,
+  );
+
+  if (mock) {
+    return mock;
+  }
+
   // Call EVM hook only when network type is EVM
   const evmResult = useScaffoldReadContractEth({
     contractName: contractName as ContractName,
@@ -59,4 +85,4 @@ export const useNetworkAwareReadContract = <
       ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
       : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
   };
-}; 
+};

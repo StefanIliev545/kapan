@@ -7,6 +7,7 @@ import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import { replacer } from "~~/utils/scaffold-eth/common";
+import { getStorybookMock, invokeStorybookMock } from "~~/utils/storybook";
 import {
   AbiFunctionReturnType,
   ContractAbi,
@@ -39,6 +40,31 @@ export const useScaffoldReadContract = <
     chainId: selectedNetwork.id as AllowedChainIds,
   });
 
+  const storybookHandler = getStorybookMock<
+    {
+      contractName: ContractName;
+      functionName: string;
+      args: typeof args;
+      chainId: typeof chainId;
+      readConfig: UseScaffoldReadConfig<TContractName, TFunctionName>;
+      network: "evm";
+      originalResult: Omit<ReturnType<typeof useReadContract>, "data" | "refetch"> & {
+        data: AbiFunctionReturnType<ContractAbi, TFunctionName> | undefined;
+        refetch: (options?: RefetchOptions | undefined) => Promise<
+          QueryObserverResult<AbiFunctionReturnType<ContractAbi, TFunctionName>, ReadContractErrorType>
+        >;
+      };
+    },
+    Omit<ReturnType<typeof useReadContract>, "data" | "refetch"> & {
+      data: AbiFunctionReturnType<ContractAbi, TFunctionName> | undefined;
+      refetch: (
+        options?: RefetchOptions | undefined,
+      ) => Promise<QueryObserverResult<AbiFunctionReturnType<ContractAbi, TFunctionName>, ReadContractErrorType>>;
+    }
+  >("useScaffoldReadContract");
+
+  const shouldMock = Boolean(storybookHandler);
+
   const {
     query: queryOptions,
     watch,
@@ -55,6 +81,10 @@ export const useScaffoldReadContract = <
 
   const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : undefined;
 
+  const { enabled: queryEnabled, ...restQueryOptions } = queryOptions || {};
+
+  const argsDefined = !Array.isArray(args) || !args.some(arg => arg === undefined);
+
   const readContractHookRes = useReadContract({
     chainId: selectedNetwork.id,
     functionName,
@@ -65,8 +95,8 @@ export const useScaffoldReadContract = <
     blockTag: sanitizedBlockTag,
     ...(restConfig as any),
     query: {
-      enabled: !Array.isArray(args) || !args.some(arg => arg === undefined),
-      ...queryOptions,
+      enabled: argsDefined && (queryEnabled ?? true) && !shouldMock,
+      ...restQueryOptions,
     },
   }) as Omit<ReturnType<typeof useReadContract>, "data" | "refetch"> & {
     data: AbiFunctionReturnType<ContractAbi, TFunctionName> | undefined;
@@ -78,11 +108,32 @@ export const useScaffoldReadContract = <
   const blockNumber = useBlockNumberContext();
 
   useEffect(() => {
+    if (shouldMock) return;
     if (defaultWatch && blockNumber !== undefined) {
       readContractHookRes.refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockNumber, defaultWatch]);
+  }, [blockNumber, defaultWatch, shouldMock]);
+
+  if (storybookHandler) {
+    const override = invokeStorybookMock(
+      "useScaffoldReadContract",
+      storybookHandler,
+      {
+        contractName,
+        functionName,
+        args,
+        chainId,
+        readConfig: readConfig as UseScaffoldReadConfig<TContractName, TFunctionName>,
+        network: "evm",
+        originalResult: readContractHookRes,
+      },
+    );
+
+    if (override) {
+      return override;
+    }
+  }
 
   return readContractHookRes;
 };

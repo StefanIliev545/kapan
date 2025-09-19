@@ -1,0 +1,1 @@
+{"v":5,"entries":{"protocols-vesu--default":{"type":"story","id":"protocols-vesu--default","name":"Default","title":"Protocols/Vesu","importPath":"./components/specific/vesu/VesuProtocolView.stories.tsx","componentPath":"./components/specific/vesu/VesuProtocolView.tsx","tags":["dev","test"]}}}
