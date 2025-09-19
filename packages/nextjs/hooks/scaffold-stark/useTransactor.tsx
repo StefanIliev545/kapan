@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse, constants, RpcProvider } from "starknet";
+import { AccountInterface, ETransactionVersion, InvokeFunctionResponse, constants, RpcProvider } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 
@@ -66,7 +66,7 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
         console.log("tx", tx);
         transactionHash = (
           await walletClient.execute(tx, {
-            version: constants.TRANSACTION_VERSION.V2,
+            version: ETransactionVersion.V2,
           })
         ).transaction_hash;
       } else {
