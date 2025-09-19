@@ -174,16 +174,50 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
         try {
           const estimate = await estimateProtocolFee(calls, overrides);
           const suggestedAmount = extractSuggestedGasAmount(estimate);
+          const estimatedAmount = toBigIntSafe(estimate?.estimated_fee_in_gas_token);
+
+          console.log("Protocol paymaster fee estimate", {
+            token: selectedToken?.symbol ?? selectedToken?.address,
+            suggested: suggestedAmount?.toString() ?? null,
+            estimated: estimatedAmount?.toString() ?? null,
+          });
 
           if (suggestedAmount && suggestedAmount > 0n) {
             overrides = { ...overrides, amount: suggestedAmount };
 
             if (selectedToken && suggestedAmount.toString() !== selectedToken.amount) {
-              updateSelectedToken({ ...selectedToken, amount: suggestedAmount.toString() });
+              updateSelectedToken({
+                ...selectedToken,
+                amount: suggestedAmount.toString(),
+                lastEstimate: {
+                  suggestedMaxFee: suggestedAmount.toString(),
+                  estimatedFee: estimatedAmount?.toString(),
+                  tokenAddress: selectedToken.address,
+                  updatedAt: Date.now(),
+                  mode: selectedToken.mode,
+                },
+              });
+            } else if (selectedToken) {
+              updateSelectedToken({
+                ...selectedToken,
+                lastEstimate: {
+                  suggestedMaxFee: suggestedAmount.toString(),
+                  estimatedFee: estimatedAmount?.toString(),
+                  tokenAddress: selectedToken.address,
+                  updatedAt: Date.now(),
+                  mode: selectedToken.mode,
+                },
+              });
             }
           }
         } catch (feeError) {
           console.warn("Failed to estimate protocol paymaster fee", feeError);
+          if (selectedToken?.lastEstimate) {
+            updateSelectedToken({
+              ...selectedToken,
+              lastEstimate: undefined,
+            });
+          }
         }
       }
 

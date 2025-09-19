@@ -17,6 +17,13 @@ interface SelectedGasToken {
     poolId: string;
     counterpartToken: string;
   };
+  lastEstimate?: {
+    suggestedMaxFee?: string;
+    estimatedFee?: string;
+    tokenAddress: string;
+    updatedAt: number;
+    mode?: "default" | "collateral" | "borrow";
+  };
 }
 
 interface SelectedGasTokenContextType {
@@ -33,6 +40,7 @@ const DEFAULT_TOKEN: SelectedGasToken = {
   balance: "0.000",
   decimals: 18,
   mode: "default",
+  lastEstimate: undefined,
 };
 
 const SelectedGasTokenContext = createContext<SelectedGasTokenContextType | undefined>(undefined);
@@ -50,6 +58,7 @@ export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ ch
           ...DEFAULT_TOKEN,
           ...parsed,
           mode: parsed.mode ?? "default",
+          lastEstimate: parsed.lastEstimate,
         });
       }
     } catch (error) {

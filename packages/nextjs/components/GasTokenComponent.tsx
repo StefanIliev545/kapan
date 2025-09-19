@@ -145,6 +145,7 @@ functionName: "symbol",
       amount: undefined,
       useMax: undefined,
       vesuContext: undefined,
+      lastEstimate: undefined,
     };
     // Update the global selected token
     updateSelectedToken(newToken);

@@ -194,6 +194,7 @@ export const GasTokenSelector = () => {
         poolId: option.poolIdString,
         counterpartToken: option.counterpartToken,
       },
+      lastEstimate: undefined,
     });
     setIsOpen(false);
   };
@@ -213,6 +214,7 @@ export const GasTokenSelector = () => {
         poolId: option.poolIdString,
         counterpartToken: option.counterpartToken,
       },
+      lastEstimate: undefined,
     });
     setIsOpen(false);
   };
