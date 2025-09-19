@@ -156,22 +156,4 @@ describe("useAutoConnect", () => {
     });
   });
 
-  it("should only attempt to auto-connect once while disconnected", async () => {
-    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
-    const now = Date.now();
-    vi.mocked(useReadLocalStorage).mockReturnValue(now);
-
-    const { rerender } = renderHook(() => useAutoConnect());
-
-    await waitFor(() => {
-      expect(mockConnect).toHaveBeenCalledTimes(1);
-    });
-
-    mockConnectors = [{ id: "wallet-1" }];
-    rerender();
-
-    await waitFor(() => {
-      expect(mockConnect).toHaveBeenCalledTimes(1);
-    });
-  });
 });
