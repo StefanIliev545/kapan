@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
+import { useAccount } from "~~/hooks/useAccount";
 
 /**
  * Automatically connect to a wallet/connector based on config and prior wallet
@@ -35,28 +36,37 @@ export const useAutoConnect = (): void => {
   );
 
   const { connect, connectors } = useConnect();
+  const { status } = useAccount();
 
   useEffect(() => {
-    if (scaffoldConfig.walletAutoConnect) {
-      const currentTime = Date.now();
-      const ttlExpired =
-        currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
-      if (!ttlExpired) {
-        const connectorId = typeof savedConnector === 'string' ? savedConnector : savedConnector?.id;
-        const connector = connectors.find(
-          (conn) => conn.id === connectorId,
-        );
-
-        if (connector) {
-          connect({ connector });
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem(
-              LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
-              currentTime.toString(),
-            );
-          }
-        }
-      }
+    if (!scaffoldConfig.walletAutoConnect) {
+      return;
     }
-  }, [connect, connectors, lastConnectionTime, savedConnector]);
+
+    if (status !== "disconnected") {
+      return;
+    }
+
+    const currentTime = Date.now();
+    const ttlExpired =
+      currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
+    if (ttlExpired) {
+      return;
+    }
+
+    const connectorId = typeof savedConnector === "string" ? savedConnector : savedConnector?.id;
+    const connector = connectors.find((conn) => conn.id === connectorId);
+
+    if (!connector) {
+      return;
+    }
+
+    connect({ connector });
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
+        currentTime.toString(),
+      );
+    }
+  }, [connect, connectors, lastConnectionTime, savedConnector, status]);
 };
