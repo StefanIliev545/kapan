@@ -18,7 +18,7 @@ function main() {
 
   if (network !== "sepolia" && network !== "mainnet") {
     console.error(
-      `Unsupported network: ${network}. Please use 'sepolia' or 'mainnet'.`
+      `Unsupported network: ${network}. Please use 'sepolia' or 'mainnet'.`,
     );
     process.exit(1);
   }
@@ -39,7 +39,7 @@ function main() {
     ([contractName, contractInfo]: [string, any]) => {
       const { address, abi } = contractInfo;
       const interfaceNameItem = abi.find(
-        (item) => item.type === "impl" && item.interface_name
+        (item) => item.type === "impl" && item.interface_name,
       );
       if (!interfaceNameItem) {
         console.error(red(`Failed to find Contract for ${contractName}`));
@@ -52,13 +52,13 @@ function main() {
       try {
         execSync(
           `sncast verify --contract-address ${address} --contract-name ${contract} --network ${network} --verifier walnut --confirm-verification`,
-          { stdio: "inherit" }
+          { stdio: "inherit" },
         );
         console.log(green("Successfully verified"), contractName);
       } catch (error) {
         console.error(red(`Failed to verify ${contractName}:`), error);
       }
-    }
+    },
   );
   console.log(green("✅ Verification process completed."));
 }

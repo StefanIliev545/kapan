@@ -5,6 +5,7 @@ import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
 import { MovePositionModal } from "./modals/MovePositionModal";
 import { RepayModal } from "./modals/RepayModal";
+import type { TokenInfo } from "./modals/TokenActionModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
@@ -76,6 +77,17 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
+  const debtBalanceBigInt =
+    typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance ?? 0);
+
+  const tokenInfo: TokenInfo = {
+    name,
+    icon,
+    address: tokenAddress,
+    currentRate,
+    usdPrice,
+    decimals: tokenDecimals || 18,
+  };
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -334,6 +346,71 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       </div>
     ) : null;
 
+  const commonBorrowModalProps = {
+    isOpen: borrowModal.isOpen,
+    onClose: borrowModal.close,
+    token: tokenInfo,
+    protocolName,
+    currentDebt: debtAmount,
+    position,
+  };
+
+  const commonRepayModalProps = {
+    isOpen: repayModal.isOpen,
+    onClose: repayModal.close,
+    token: tokenInfo,
+    protocolName,
+    debtBalance: debtBalanceBigInt,
+    position,
+  };
+
+  const moveModalElement =
+    networkType === "starknet" ? (
+      <MovePositionModalStark
+        isOpen={moveModal.isOpen}
+        onClose={moveModal.close}
+        fromProtocol={protocolName}
+        position={{
+          name,
+          balance: debtBalanceBigInt,
+          type: "borrow",
+          tokenAddress,
+          decimals: tokenDecimals ?? 18,
+          poolId: movePoolId,
+        }}
+        preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+        disableCollateralSelection={moveSupport?.disableCollateralSelection}
+      />
+    ) : (
+      <MovePositionModal
+        isOpen={moveModal.isOpen}
+        onClose={moveModal.close}
+        fromProtocol={protocolName}
+        position={{
+          name,
+          balance: balance ?? 0,
+          type: "borrow",
+          tokenAddress,
+          decimals: tokenDecimals || 18,
+        }}
+      />
+    );
+
+  const modals =
+    networkType === "starknet" ? (
+      <>
+        <BorrowModalStark {...commonBorrowModalProps} vesuContext={vesuContext?.borrow} />
+        <RepayModalStark {...commonRepayModalProps} vesuContext={vesuContext?.repay} />
+        {moveModalElement}
+      </>
+    ) : (
+      <>
+        <BorrowModal {...commonBorrowModalProps} />
+        <RepayModal {...commonRepayModalProps} />
+        {moveModalElement}
+      </>
+    );
+
   return (
     <>
       <PositionCard
@@ -350,102 +427,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       />
 
       {/* Modals */}
-      {networkType === "starknet" ? (
-        <>
-          <BorrowModalStark
-            isOpen={borrowModal.isOpen}
-            onClose={borrowModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            currentDebt={debtAmount}
-            position={position}
-            vesuContext={vesuContext?.borrow}
-          />
-          <RepayModalStark
-            isOpen={repayModal.isOpen}
-            onClose={repayModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            vesuContext={vesuContext?.repay}
-          />
-          <MovePositionModalStark
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={protocolName}
-            position={{
-              name,
-              balance: tokenBalance ?? 0n,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals ?? 18,
-              poolId: movePoolId,
-            }}
-            preSelectedCollaterals={moveSupport?.preselectedCollaterals}
-            disableCollateralSelection={moveSupport?.disableCollateralSelection}
-          />
-        </>
-      ) : (
-        <>
-          <BorrowModal
-            isOpen={borrowModal.isOpen}
-            onClose={borrowModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            currentDebt={debtAmount}
-            position={position}
-          />
-          <RepayModal
-            isOpen={repayModal.isOpen}
-            onClose={repayModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-          />
-          <MovePositionModal
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={protocolName}
-            position={{
-              name,
-              balance: balance ? balance : 0,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals || 18,
-            }}
-          />
-        </>
-      )}
+      {modals}
     </>
   );
 };

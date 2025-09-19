@@ -6,6 +6,7 @@ import { DepositModal } from "./modals/DepositModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
+import type { TokenInfo } from "./modals/TokenActionModal";
 import { FiPlus } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
@@ -76,6 +77,16 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const isExpanded = expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const supplyBalanceBigInt =
+    typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance ?? 0);
+  const tokenInfo: TokenInfo = {
+    name,
+    icon,
+    address: tokenAddress,
+    currentRate,
+    usdPrice,
+    decimals: tokenDecimals || 18,
+  };
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
   const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
@@ -263,6 +274,53 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   const indicatorContent = hasAnyActions ? <PositionToggleIndicator isExpanded={isExpanded} /> : null;
 
+  const commonDepositModalProps = {
+    isOpen: depositModal.isOpen,
+    onClose: depositModal.close,
+    token: tokenInfo,
+    protocolName,
+    position,
+  };
+
+  const commonWithdrawModalProps = {
+    isOpen: withdrawModal.isOpen,
+    onClose: withdrawModal.close,
+    token: tokenInfo,
+    protocolName,
+    supplyBalance: supplyBalanceBigInt,
+    position,
+  };
+
+  const depositWithdrawModals =
+    networkType === "starknet" ? (
+      <>
+        <DepositModalStark {...commonDepositModalProps} vesuContext={vesuContext?.deposit} />
+        <WithdrawModalStark {...commonWithdrawModalProps} vesuContext={vesuContext?.withdraw} />
+      </>
+    ) : (
+      <DepositModal {...commonDepositModalProps} />
+    );
+
+  const moveSupplyModal =
+    disableMove
+      ? null
+      : (
+          <MoveSupplyModal
+            isOpen={moveModal.isOpen}
+            onClose={moveModal.close}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              rawBalance: supplyBalanceBigInt,
+              decimals: tokenDecimals,
+              price: tokenPrice,
+            }}
+            fromProtocol={protocolName}
+          />
+        );
+
   return (
     <>
       <PositionCard
@@ -304,75 +362,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       )}
 
       {/* Modals */}
-      {networkType === "starknet" ? (
-        <>
-          <DepositModalStark
-            isOpen={depositModal.isOpen}
-            onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            position={position}
-            vesuContext={vesuContext?.deposit}
-          />
-          <WithdrawModalStark
-            isOpen={withdrawModal.isOpen}
-            onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            vesuContext={vesuContext?.withdraw}
-          />
-        </>
-      ) : (
-        <>
-          <DepositModal
-            isOpen={depositModal.isOpen}
-            onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            position={position}
-          />
-        </>
-      )}
+      {depositWithdrawModals}
 
-      {!disableMove && (
-        <MoveSupplyModal
-          isOpen={moveModal.isOpen}
-          onClose={moveModal.close}
-          token={{
-            name,
-            icon,
-            address: tokenAddress,
-            currentRate,
-            rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
-            decimals: tokenDecimals,
-            price: tokenPrice,
-          }}
-          fromProtocol={protocolName}
-        />
-      )}
+      {moveSupplyModal}
     </>
   );
 };
