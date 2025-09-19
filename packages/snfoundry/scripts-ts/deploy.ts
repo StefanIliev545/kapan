@@ -3,14 +3,19 @@ import {
   executeDeployCalls,
   exportDeployments,
   deployer,
+  assertRpcNetworkActive,
+  assertDeployerSignable,
+  assertDeployerDefined,
 } from "./deploy-contract";
 import { green, red } from "./helpers/colorize-log";
-import { CallData, ETransactionVersion } from "starknet";
+import { CallData, constants } from "starknet";
 
 const deployScriptMainnet = async (): Promise<{
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
   routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
+  avnuGatewayAddress: string;
 }> => {
   // Deploy VesuGateway
   const supportedAssets = [
@@ -44,6 +49,20 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
+  // Deploy AvnuGateway
+  const { address: avnuGatewayAddress } = await deployContract({
+    contract: "AvnuGateway",
+    constructorArgs: {
+      router:
+        "0x04270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f", // Avnu mainnet router (same as forking tests)
+      owner:
+        "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_recipient:
+        "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_bps: 0,
+    },
+  });
+
   // Deploy NostraGateway
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
@@ -52,6 +71,13 @@ const deployScriptMainnet = async (): Promise<{
         "0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff",
       router: routerGatewayAddress,
       owner: deployer.address,
+    },
+  });
+
+  const { address: ekuboGatewayAddress } = await deployContract({
+    contract: "EkuboGateway",
+    constructorArgs: {
+      core: "0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b",
     },
   });
 
@@ -70,13 +96,20 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+  return {
+    nostraGatewayAddress,
+    vesuGatewayAddress,
+    routerGatewayAddress,
+    ekuboGatewayAddress,
+    avnuGatewayAddress,
+  };
 };
 
 const deployScriptSepolia = async (): Promise<{
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
   routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
 }> => {
   // Deploy VesuGateway
   const supportedAssets = [
@@ -124,6 +157,13 @@ const deployScriptSepolia = async (): Promise<{
     },
   });
 
+  const { address: ekuboGatewayAddress } = await deployContract({
+    contract: "EkuboGateway",
+    constructorArgs: {
+      core: "0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b",
+    },
+  });
+
   await deployContract({
     contract: "OptimalInterestRateFinder",
     constructorArgs: {
@@ -139,13 +179,20 @@ const deployScriptSepolia = async (): Promise<{
     },
   });
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+  return {
+    nostraGatewayAddress,
+    vesuGatewayAddress,
+    routerGatewayAddress,
+    ekuboGatewayAddress,
+  };
 };
 
 const initializeContracts = async (addresses: {
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
   routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
+  avnuGatewayAddress: string;
 }): Promise<void> => {
   const nonce = await deployer.getNonce();
 
@@ -313,24 +360,32 @@ const initializeContracts = async (addresses: {
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
+      calldata: ["avnu", addresses.avnuGatewayAddress],
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
       calldata: ["nostra", addresses.nostraGatewayAddress],
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: ["ekubo", addresses.ekuboGatewayAddress],
     },
   ];
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
-    version: ETransactionVersion.V3,
   });
   const result = await deployer.execute(calls, {
     nonce: nonce,
-    version: ETransactionVersion.V3,
     resourceBounds: fee.resourceBounds,
   });
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {
     console.log(
-      red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`),
+      red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`)
     );
     throw new Error("Failed to initialize contracts");
   }
@@ -340,6 +395,7 @@ const initializeContractsSepolia = async (addresses: {
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
   routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
 }): Promise<void> => {
   const nonce = await deployer.getNonce();
 
@@ -387,22 +443,25 @@ const initializeContractsSepolia = async (addresses: {
       entrypoint: "add_gateway",
       calldata: ["nostra", addresses.nostraGatewayAddress],
     },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: ["ekubo", addresses.ekuboGatewayAddress],
+    },
   ];
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
-    version: ETransactionVersion.V3,
   });
   const result = await deployer.execute(calls, {
     nonce: nonce,
-    version: ETransactionVersion.V3,
     resourceBounds: fee.resourceBounds,
   });
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {
     console.log(
-      red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`),
+      red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`)
     );
     throw new Error("Failed to initialize contracts");
   }
@@ -410,6 +469,10 @@ const initializeContractsSepolia = async (addresses: {
 
 const main = async (): Promise<void> => {
   try {
+    assertDeployerDefined();
+
+    await Promise.all([assertRpcNetworkActive(), assertDeployerSignable()]);
+
     const gatewayAddress = await deployScriptMainnet();
     await executeDeployCalls();
     await initializeContracts(gatewayAddress);
