@@ -4,10 +4,11 @@ import { formatUnits } from "viem";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import type { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import type { VesuContext } from "~~/hooks/useLendingAction";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import type { TokenMetadata } from "~~/utils/protocols";
-import { feltToString, toAnnualRates } from "~~/utils/protocols";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+import { useVesuAssets } from "~~/hooks/useVesuAssets";
+import type { AssetWithRates } from "~~/hooks/useVesuAssets";
+import { feltToString } from "~~/utils/protocols";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -18,82 +19,6 @@ const toBoolean = (value: unknown, fallback = false): boolean => {
   if (typeof value === "number") return value !== 0;
   if (typeof value === "bigint") return value !== 0n;
   return fallback;
-};
-
-const normalizeDecimals = (value: unknown): number | null => {
-  if (value === undefined || value === null) return 18;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "bigint") {
-    const asNumber = Number(value);
-    return Number.isFinite(asNumber) ? asNumber : null;
-  }
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-};
-
-const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
-  if (!Array.isArray(assets)) return [];
-
-  return assets.flatMap(entry => {
-    if (!entry || typeof entry !== "object") return [];
-
-    const candidate = entry as {
-      address?: unknown;
-      symbol?: unknown;
-      decimals?: unknown;
-      rate_accumulator?: unknown;
-      utilization?: unknown;
-      fee_rate?: unknown;
-      price?: unknown;
-      total_nominal_debt?: unknown;
-      last_rate_accumulator?: unknown;
-      reserve?: unknown;
-      scale?: unknown;
-    };
-
-    const priceCandidate = candidate.price as { value?: unknown; is_valid?: unknown } | undefined;
-
-    if (
-      typeof candidate.address !== "bigint" ||
-      typeof candidate.symbol !== "bigint" ||
-      typeof candidate.rate_accumulator !== "bigint" ||
-      typeof candidate.utilization !== "bigint" ||
-      typeof candidate.fee_rate !== "bigint" ||
-      typeof candidate.total_nominal_debt !== "bigint" ||
-      typeof candidate.last_rate_accumulator !== "bigint" ||
-      typeof candidate.reserve !== "bigint" ||
-      typeof candidate.scale !== "bigint" ||
-      !priceCandidate ||
-      typeof priceCandidate.value !== "bigint"
-    ) {
-      return [];
-    }
-
-    const decimals = normalizeDecimals(candidate.decimals);
-    if (decimals === null) return [];
-
-    return [
-      {
-        address: candidate.address,
-        symbol: candidate.symbol,
-        decimals,
-        rate_accumulator: candidate.rate_accumulator,
-        utilization: candidate.utilization,
-        fee_rate: candidate.fee_rate,
-        price: {
-          value: priceCandidate.value,
-          is_valid: toBoolean(priceCandidate.is_valid, false),
-        },
-        total_nominal_debt: candidate.total_nominal_debt,
-        last_rate_accumulator: candidate.last_rate_accumulator,
-        reserve: candidate.reserve,
-        scale: candidate.scale,
-      },
-    ];
-  });
 };
 
 type PositionTuple = [
@@ -185,8 +110,6 @@ const computeUsdValue = (amount: bigint, decimals: number, price: bigint): numbe
   return amountAsNumber * priceAsNumber;
 };
 
-export type AssetWithRates = TokenMetadata & { borrowAPR: number; supplyAPY: number };
-
 export type VesuPositionRow = {
   key: string;
   supply: ProtocolPosition;
@@ -221,15 +144,7 @@ export const useVesuLendingPositions = (
   const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
   const refetchCounter = useRef(0);
 
-  const {
-    data: supportedAssets,
-    error: assetsError,
-  } = useScaffoldReadContract({
-    contractName: "VesuGateway",
-    functionName: "get_supported_assets_ui",
-    args: [poolId],
-    refetchInterval: 0,
-  });
+  const { assetsWithRates, assetMap, isLoading: isLoadingAssets, assetsError } = useVesuAssets(poolId);
 
   const {
     data: userPositionsPart1,
@@ -258,12 +173,6 @@ export const useVesuLendingPositions = (
     watch: true,
     refetchInterval: positionsRefetchInterval,
   });
-
-  useEffect(() => {
-    if (assetsError) {
-      console.error("Error fetching supported assets:", assetsError);
-    }
-  }, [assetsError]);
 
   useEffect(() => {
     if (positionsError1) {
@@ -340,34 +249,6 @@ export const useVesuLendingPositions = (
       setHasLoadedOnce(true);
     }
   }, [positionsError1, positionsError2, userAddress, userPositionsPart1, userPositionsPart2]);
-
-  const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
-
-  const assetsWithRates = useMemo<AssetWithRates[]>(() => {
-    return normalizedAssets.map(asset => {
-      if (asset.scale === 0n) {
-        return { ...asset, borrowAPR: 0, supplyAPY: 0 };
-      }
-
-      const { borrowAPR, supplyAPY } = toAnnualRates(
-        asset.fee_rate,
-        asset.total_nominal_debt,
-        asset.last_rate_accumulator,
-        asset.reserve,
-        asset.scale,
-      );
-
-      return { ...asset, borrowAPR, supplyAPY };
-    });
-  }, [normalizedAssets]);
-
-  const assetMap = useMemo(() => {
-    const map = new Map<string, AssetWithRates>();
-    assetsWithRates.forEach(asset => {
-      map.set(toHexAddress(asset.address), asset);
-    });
-    return map;
-  }, [assetsWithRates]);
 
   const suppliablePositions = useMemo<ProtocolPosition[]>(() => {
     return assetsWithRates.map(asset => {
@@ -519,8 +400,6 @@ export const useVesuLendingPositions = (
       ];
     });
   }, [assetMap, cachedPositions, poolId]);
-
-  const isLoadingAssets = supportedAssets == null;
 
   return {
     assetsWithRates,

@@ -242,7 +242,8 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const {
     loading: feeLoading,
     error: feeError,
-    feeNative,
+    effectiveNative,
+    effectiveCurrency,
   } = useGasEstimate({
     enabled: isOpen && network === "stark",
     buildCalls: buildCallsForEstimate,
@@ -337,10 +338,12 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 {network === "stark" && (
                   <span className="flex items-center gap-1 text-xs">
                     <FaGasPump className="text-gray-400" />
-                    {feeLoading && feeNative === null ? (
+                    {feeLoading && effectiveNative === null ? (
                       <span className="loading loading-spinner loading-xs" />
-                    ) : feeError ? null : feeNative !== null ? (
-                      <span>{feeNative.toFixed(4)} STRK</span>
+                    ) : feeError ? null : effectiveNative !== null ? (
+                      <span>
+                        {effectiveNative.toFixed(4)} {effectiveCurrency ?? "STRK"}
+                      </span>
                     ) : null}
                   </span>
                 )}

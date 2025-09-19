@@ -3,7 +3,7 @@ type Props = {
   error: string | null;
   feeNative: number | null;
   label?: string;
-  unit?: "ETH" | "STRK";
+  unit?: string;
 };
 
 export function FeeEstimate({

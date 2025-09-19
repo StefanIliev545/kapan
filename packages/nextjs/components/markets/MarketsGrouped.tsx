@@ -133,7 +133,7 @@ const useNostraData = (): MarketData[] => {
     networkType: "starknet",
     contractName: "NostraGateway",
     functionName: "get_supported_assets_info",
-    args: [0n],
+    args: ["0x0"],
   });
 
   const tokenAddresses = useMemo(

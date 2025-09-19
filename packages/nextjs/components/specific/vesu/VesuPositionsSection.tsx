@@ -4,7 +4,8 @@ import { FiPlus } from "react-icons/fi";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
 import { PositionManager } from "~~/utils/position";
-import type { AssetWithRates, VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
+import type { AssetWithRates } from "~~/hooks/useVesuAssets";
+import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
 
 interface BorrowSelectionRequest {
   tokens: AssetWithRates[];
