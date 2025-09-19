@@ -1,5 +1,5 @@
 import { useReadLocalStorage } from "usehooks-ts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
@@ -37,6 +37,7 @@ export const useAutoConnect = (): void => {
 
   const { connect, connectors } = useConnect();
   const { status } = useAccount();
+  const attemptedConnectorRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!scaffoldConfig.walletAutoConnect) {
@@ -44,6 +45,16 @@ export const useAutoConnect = (): void => {
     }
 
     if (status !== "disconnected") {
+      attemptedConnectorRef.current = null;
+      return;
+    }
+
+    const connectorId = typeof savedConnector === "string" ? savedConnector : savedConnector?.id;
+    if (!connectorId) {
+      return;
+    }
+
+    if (attemptedConnectorRef.current === connectorId) {
       return;
     }
 
@@ -51,16 +62,17 @@ export const useAutoConnect = (): void => {
     const ttlExpired =
       currentTime - (lastConnectionTime || 0) > scaffoldConfig.autoConnectTTL;
     if (ttlExpired) {
+      attemptedConnectorRef.current = null;
       return;
     }
 
-    const connectorId = typeof savedConnector === "string" ? savedConnector : savedConnector?.id;
     const connector = connectors.find((conn) => conn.id === connectorId);
 
     if (!connector) {
       return;
     }
 
+    attemptedConnectorRef.current = connectorId;
     connect({ connector });
     if (typeof window !== "undefined") {
       window.localStorage.setItem(

@@ -1,10 +1,13 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useAutoConnect } from "../useAutoConnect";
 import { useConnect } from "@starknet-react/core";
 import { useReadLocalStorage } from "usehooks-ts";
 import scaffoldConfig from "~~/scaffold.config";
 import { burnerAccounts } from "@scaffold-stark/stark-burner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAccount } from "~~/hooks/useAccount";
+
+type Mock = ReturnType<typeof vi.fn>;
 
 // Mock the dependencies
 vi.mock("usehooks-ts", () => ({
@@ -18,6 +21,7 @@ vi.mock("@starknet-react/core", () => ({
 vi.mock("~~/scaffold.config", () => ({
   default: {
     walletAutoConnect: true,
+    autoConnectTTL: 60000,
   },
 }));
 
@@ -26,9 +30,16 @@ vi.mock("@scaffold-stark/stark-burner", () => ({
   BurnerConnector: vi.fn(),
 }));
 
+vi.mock("~~/hooks/useAccount", () => ({
+  useAccount: vi.fn(() => ({
+    status: "disconnected",
+  })),
+}));
+
 describe("useAutoConnect", () => {
   let mockConnect: ReturnType<typeof vi.fn>;
   let mockConnectors: any[];
+  const mockedUseAccount = useAccount as unknown as Mock;
 
   beforeEach(() => {
     mockConnect = vi.fn();
@@ -36,24 +47,30 @@ describe("useAutoConnect", () => {
       { id: "wallet-1" },
       { id: "burner-wallet", burnerAccount: null },
     ];
-    (useConnect as ReturnType<typeof vi.fn>).mockReturnValue({
+    (useConnect as ReturnType<typeof vi.fn>).mockImplementation(() => ({
       connect: mockConnect,
       connectors: mockConnectors,
-    });
+    }));
     vi.spyOn(scaffoldConfig, "walletAutoConnect", "get").mockReturnValue(true);
+    mockedUseAccount.mockReturnValue({ status: "disconnected" } as any);
+    vi.mocked(useReadLocalStorage).mockReturnValue(Date.now());
+    window.localStorage.clear();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it("should auto-connect if walletAutoConnect is enabled and a saved connector exists", () => {
-    vi.mocked(useReadLocalStorage).mockReturnValue({ id: "wallet-1" });
+    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
 
     renderHook(() => useAutoConnect());
 
-    expect(mockConnect).toHaveBeenCalledWith({
-      connector: expect.objectContaining({ id: "wallet-1" }),
+    return waitFor(() => {
+      expect(mockConnect).toHaveBeenCalledWith({
+        connector: expect.objectContaining({ id: "wallet-1" }),
+      });
     });
   });
 
@@ -61,18 +78,23 @@ describe("useAutoConnect", () => {
     vi.spyOn(scaffoldConfig, "walletAutoConnect", "get").mockReturnValue(
       false as true,
     );
-    vi.mocked(useReadLocalStorage).mockReturnValue({ id: "wallet-1" });
+    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
 
     renderHook(() => useAutoConnect());
 
-    expect(mockConnect).not.toHaveBeenCalled();
+    return waitFor(() => {
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
   });
 
   it("should auto-connect to the burner wallet and set burnerAccount if savedConnector exists", () => {
-    vi.mocked(useReadLocalStorage).mockReturnValue({
-      id: "burner-wallet",
-      ix: 1,
-    });
+    window.localStorage.setItem(
+      "lastUsedConnector",
+      JSON.stringify({
+        id: "burner-wallet",
+        ix: 1,
+      }),
+    );
     mockConnectors = [
       { id: "wallet-1" },
       {
@@ -80,36 +102,76 @@ describe("useAutoConnect", () => {
         burnerAccount: burnerAccounts[1],
       },
     ];
-    (useConnect as ReturnType<typeof vi.fn>).mockReturnValue({
+    (useConnect as ReturnType<typeof vi.fn>).mockImplementation(() => ({
       connect: mockConnect,
       connectors: mockConnectors,
-    });
+    }));
 
     renderHook(() => useAutoConnect());
 
-    expect(mockConnect).toHaveBeenCalledWith({
-      connector: expect.objectContaining({
-        id: "burner-wallet",
-        burnerAccount: burnerAccounts[1],
-      }),
+    return waitFor(() => {
+      expect(mockConnect).toHaveBeenCalledWith({
+        connector: expect.objectContaining({
+          id: "burner-wallet",
+          burnerAccount: burnerAccounts[1],
+        }),
+      });
     });
   });
 
   it("should not connect if there is no saved connector", () => {
-    vi.mocked(useReadLocalStorage).mockReturnValue(null);
+    window.localStorage.removeItem("lastUsedConnector");
 
     renderHook(() => useAutoConnect());
 
-    expect(mockConnect).not.toHaveBeenCalled();
+    return waitFor(() => {
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
   });
 
   it("should not connect if saved connector is not found in the connectors list", () => {
-    vi.mocked(useReadLocalStorage).mockReturnValue({
-      id: "non-existent-connector",
-    });
+    window.localStorage.setItem(
+      "lastUsedConnector",
+      JSON.stringify({
+        id: "non-existent-connector",
+      }),
+    );
 
     renderHook(() => useAutoConnect());
 
-    expect(mockConnect).not.toHaveBeenCalled();
+    return waitFor(() => {
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+  });
+
+  it("should not auto-connect if the last connection time exceeds the TTL", () => {
+    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
+    const now = Date.now();
+    vi.mocked(useReadLocalStorage).mockReturnValue(now - scaffoldConfig.autoConnectTTL - 1);
+
+    renderHook(() => useAutoConnect());
+
+    return waitFor(() => {
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+  });
+
+  it("should only attempt to auto-connect once while disconnected", async () => {
+    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
+    const now = Date.now();
+    vi.mocked(useReadLocalStorage).mockReturnValue(now);
+
+    const { rerender } = renderHook(() => useAutoConnect());
+
+    await waitFor(() => {
+      expect(mockConnect).toHaveBeenCalledTimes(1);
+    });
+
+    mockConnectors = [{ id: "wallet-1" }];
+    rerender();
+
+    await waitFor(() => {
+      expect(mockConnect).toHaveBeenCalledTimes(1);
+    });
   });
 });
