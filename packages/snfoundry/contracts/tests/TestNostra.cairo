@@ -154,7 +154,6 @@ fn setup_test_context() -> TestContext {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_deploy_and_add_supported_assets() {
     // Setup test context
@@ -165,7 +164,6 @@ fn test_deploy_and_add_supported_assets() {
 } 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_deposit() {
     let context = setup_test_context();
@@ -208,7 +206,6 @@ fn test_deposit() {
 use kapan::interfaces::nostra::{LentDebtTokenABIDispatcher, LentDebtTokenABIDispatcherTrait};
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_withdraw() {
     let context = setup_test_context();
@@ -271,7 +268,6 @@ fn test_withdraw() {
 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_full_flow() {
     let context = setup_test_context();
@@ -361,7 +357,6 @@ fn test_full_flow() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_user_positions() {
     let context = setup_test_context();
@@ -405,7 +400,6 @@ fn test_get_user_positions() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_interest_rates() {
     let context = setup_test_context();
@@ -419,7 +413,6 @@ fn test_get_interest_rates() {
 use kapan::interfaces::IGateway::{InterestRateViewDispatcher, InterestRateViewDispatcherTrait};
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_borrow_rate() {
     let context = setup_test_context();
@@ -431,7 +424,6 @@ fn test_get_borrow_rate() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_repay_all_withdraw_all() {
     let context = setup_test_context();

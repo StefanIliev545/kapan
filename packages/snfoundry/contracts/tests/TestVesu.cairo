@@ -181,7 +181,6 @@ fn perform_withdrawal(ref context: TestContext, amount: u256) -> u256 {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_deposit() {
     let mut context = setup_test_context();
@@ -194,7 +193,6 @@ fn test_deposit() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_basic_withdraw() {
     let mut context = setup_test_context();
@@ -213,7 +211,6 @@ fn test_basic_withdraw() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_borrow() {
     let mut context = setup_test_context();
@@ -249,7 +246,6 @@ fn test_borrow() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_repay() {
     println!("testing repay");
@@ -309,7 +305,6 @@ fn test_repay() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_all_positions() {
     let mut context = setup_test_context();
@@ -391,7 +386,6 @@ fn test_get_all_positions() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_supported_assets_ui() {
     let context = setup_test_context();
@@ -414,7 +408,6 @@ fn test_get_supported_assets_ui() {
 use kapan::interfaces::IGateway::{InterestRateViewDispatcher, InterestRateViewDispatcherTrait};
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_get_borrow_rate() {
     let mut context = setup_test_context();

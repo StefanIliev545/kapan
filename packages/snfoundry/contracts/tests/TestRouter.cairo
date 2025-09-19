@@ -226,7 +226,6 @@ use core::poseidon::PoseidonTrait;
 use core::hash::{HashStateTrait, HashStateExTrait};
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_router_setup() {
     println!("Setting up test context");
@@ -318,7 +317,6 @@ const POOL_ID: felt252 =
     2198503327643286920898110335698706244522220458610657370981979460625005526824;
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_vesu() {
     let context = setup_test_context();
@@ -417,7 +415,6 @@ fn test_vesu() {
 } 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt() {
     let context = setup_test_context();
@@ -536,7 +533,6 @@ fn test_move_debt() {
 
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_move_debt_reverse() {
     let context = setup_test_context();
@@ -659,7 +655,6 @@ fn test_move_debt_reverse() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_router_repay_all_withdraw_all_nostra() {
     let context = setup_test_context();
@@ -782,7 +777,6 @@ fn test_router_repay_all_withdraw_all_nostra() {
 }
 
 #[test]
-#[ignore]
 #[fork("MAINNET_LATEST")]
 fn test_router_repay_all_withdraw_all_vesu() {
     let context = setup_test_context();
