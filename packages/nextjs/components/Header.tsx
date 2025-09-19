@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowTrendingUpIcon,
   BanknotesIcon,
   Bars3Icon,
   DocumentChartBarIcon,
@@ -31,6 +32,11 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Lending",
     href: "/app",
     icon: <WalletIcon className="h-5 w-5" />,
+  },
+  {
+    label: "Strategies",
+    href: "/strategies",
+    icon: <ArrowTrendingUpIcon className="h-5 w-5" />,
   },
   {
     label: "Automate",
