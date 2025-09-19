@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Account } from "starknet";
-import { useAccount } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
 import { useGlobalState } from "~~/services/store/store";
 import { weiToEth, friToStrk } from "~~/lib/feeUnits";
 

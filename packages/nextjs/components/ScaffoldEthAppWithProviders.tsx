@@ -25,7 +25,6 @@ import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
-  useAutoConnect();
 
   return (
     <SelectedGasTokenProvider>
@@ -77,7 +76,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       paymasterProvider={paymasterProvider}
       connectors={connectorsRef.current ?? []}
       explorer={starkscan}
-      autoConnect={false}
+      autoConnect={true}
     >
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>

@@ -1,4 +1,3 @@
-import * as chains from "@starknet-react/chains";
 import { jsonRpcProvider, starknetChainId, avnuPaymasterProvider } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 
@@ -19,7 +18,7 @@ if (!rpcUrl) {
 const provider = jsonRpcProvider({
   rpc: () => ({
     nodeUrl: rpcUrl,
-    specVersion: "0.9",
+    specVersion: "0.9.0",
     chainId: starknetChainId(currentNetwork.id),
   }),
 });
