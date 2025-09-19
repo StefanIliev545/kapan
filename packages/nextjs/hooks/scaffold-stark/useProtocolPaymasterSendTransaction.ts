@@ -10,6 +10,7 @@ import {
   Call,
   CallData,
   PaymasterDetails,
+  PaymasterFeeEstimate,
   uint256,
   type BigNumberish,
 } from "starknet";
@@ -20,9 +21,9 @@ import {
   type BaseProtocolInstruction,
 } from "~~/hooks/useLendingAuthorizations";
 
-type BaseFeeMode = { mode: "sponsored" } | { mode: "default"; gasToken: string };
+type BaseFeeMode = { mode: "default"; gasToken: string };
 
-type ExtendedMode = "default" | "sponsored" | "collateral" | "borrow";
+type ExtendedMode = "default" | "collateral" | "borrow";
 
 interface VesuContext {
   poolId: bigint;
@@ -61,6 +62,7 @@ export interface UseProtocolPaymasterSendTransactionArgs {
 
 export type UseProtocolPaymasterSendTransactionResult = UsePaymasterSendTransactionResult & {
   prepareCalls: (calls?: Call[]) => Promise<Call[]>;
+  estimateFee: (calls?: Call[]) => Promise<PaymasterFeeEstimate>;
 };
 
 const ensureHexAddress = (address?: string) => {
@@ -143,10 +145,6 @@ export const useProtocolPaymasterSendTransaction = (
   const { getAuthorizations } = useLendingAuthorizations();
 
   const { baseFeeMode, customContext } = useMemo(() => {
-    if (mode === "sponsored") {
-      return { baseFeeMode: { mode: "sponsored" } as BaseFeeMode, customContext: null };
-    }
-
     const gasTokenAddress = ensureHexAddress(gasToken);
 
     if (mode === "collateral" || mode === "borrow") {
@@ -238,10 +236,22 @@ export const useProtocolPaymasterSendTransaction = (
     [sendAsync],
   );
 
+  const estimateFee = useCallback(
+    async (userCalls?: Call[]) => {
+      if (!account) {
+        throw new Error("Account address is required to estimate protocol paymaster fees");
+      }
+      const finalCalls = await prepareCalls(userCalls);
+      return account.estimatePaymasterTransactionFee(finalCalls, paymasterDetails);
+    },
+    [account, prepareCalls, paymasterDetails],
+  );
+
   return {
     send,
     sendAsync,
     prepareCalls,
+    estimateFee,
     ...rest,
   };
 };

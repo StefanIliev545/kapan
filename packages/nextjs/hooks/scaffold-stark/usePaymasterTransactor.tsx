@@ -90,10 +90,10 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
     : undefined;
 
   // Setup paymaster transaction hook
-  const { sendAsync: sendPaymasterTransaction } = useProtocolPaymasterSendTransaction({
+  const { sendAsync: sendPaymasterTransaction, estimateFee: estimateProtocolFee } = useProtocolPaymasterSendTransaction({
     calls: [],
-    mode: shouldUsePaymaster ? (hasCustomConfig ? selectedMode : "default") : "sponsored",
-    gasToken: shouldUsePaymaster ? selectedToken?.address : undefined,
+    mode: hasCustomConfig ? selectedMode : "default",
+    gasToken: selectedToken?.address ?? universalStrkAddress,
     protocol: hasCustomConfig ? selectedToken?.protocol : undefined,
     amount: hasCustomConfig ? customAmount : undefined,
     useMax: hasCustomConfig ? selectedToken?.useMax : undefined,
@@ -134,6 +134,13 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
           
           if (shouldUsePaymaster && selectedToken?.address) {
             console.log(`Using paymaster with ${selectedToken.symbol} for gas payment`);
+            if (hasCustomConfig) {
+              try {
+                await estimateProtocolFee(calls);
+              } catch (feeError) {
+                console.warn("Failed to estimate protocol paymaster fee", feeError);
+              }
+            }
             const paymasterResult = await sendPaymasterTransaction(calls);
             transactionHash = paymasterResult.transaction_hash;
           } else {
@@ -151,6 +158,13 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
         
         if (shouldUsePaymaster && selectedToken?.address) {
           console.log(`Using paymaster with ${selectedToken.symbol} for gas payment`);
+          if (hasCustomConfig) {
+            try {
+              await estimateProtocolFee(calls);
+            } catch (feeError) {
+              console.warn("Failed to estimate protocol paymaster fee", feeError);
+            }
+          }
           const paymasterResult = await sendPaymasterTransaction(calls);
           transactionHash = paymasterResult.transaction_hash;
         } else {
