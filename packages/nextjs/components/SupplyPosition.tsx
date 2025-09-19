@@ -92,6 +92,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     type: "supply",
   });
 
+  const hasOptimalProtocol = Boolean(optimalProtocol);
+  const displayedOptimalProtocol = hasOptimalProtocol ? optimalProtocol : protocolName;
+  const displayedOptimalRate = hasOptimalProtocol ? optimalRateDisplay : currentRate;
+
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
@@ -226,14 +230,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
               <div className="font-medium flex items-center h-6">
                 <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {formatPercentage(optimalRateDisplay)}%
+                  {formatPercentage(displayedOptimalRate)}%
                 </span>
                 <Image
-                  src={getProtocolLogo(optimalProtocol)}
-                  alt={optimalProtocol}
-                  width={optimalProtocol == "vesu" ? 35 : 16}
-                  height={optimalProtocol == "vesu" ? 35 : 16}
-                  className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
+                  src={getProtocolLogo(displayedOptimalProtocol)}
+                  alt={displayedOptimalProtocol}
+                  width={displayedOptimalProtocol == "vesu" ? 35 : 16}
+                  height={displayedOptimalProtocol == "vesu" ? 35 : 16}
+                  className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
             </div>
