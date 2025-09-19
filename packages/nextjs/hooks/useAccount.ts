@@ -4,6 +4,7 @@ import {
 } from "@starknet-react/core";
 import { useEffect, useState, useMemo } from "react";
 import { AccountInterface, constants } from "starknet";
+import { getStorybookMock, invokeStorybookMock } from "~~/utils/storybook";
 
 /**
  * Wrapper around starknet-react's useAccount hook to fix inconsistencies and provide workarounds.
@@ -22,6 +23,12 @@ import { AccountInterface, constants } from "starknet";
  */
 
 export function useAccount(): UseAccountResult {
+  const mockHandler = getStorybookMock<undefined, UseAccountResult>("useAccount");
+  const mock = invokeStorybookMock("useAccount", mockHandler, undefined);
+  if (mock) {
+    return mock;
+  }
+
   const starknetAccount = useStarknetReactAccount();
   const { account, address, status } = starknetAccount;
 

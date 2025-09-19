@@ -3,6 +3,7 @@ import { BlockNumber } from "starknet";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useStarkBlockNumber } from "./useBlockNumberContext";
 import { replacer } from "~~/utils/scaffold-stark/common";
+import { getStorybookMock, invokeStorybookMock } from "~~/utils/storybook";
 import {
   AbiFunctionOutputs,
   ContractAbi,
@@ -21,10 +22,28 @@ export const useScaffoldReadContract = <
   args,
   ...readConfig
 }: UseScaffoldReadConfig<TAbi, TContractName, TFunctionName>) => {
+  const storybookHandler = getStorybookMock<
+    {
+      contractName: ContractName;
+      functionName: string;
+      args: typeof args;
+      readConfig: UseScaffoldReadConfig<TAbi, TContractName, TFunctionName>;
+      network: "stark";
+      originalResult: Omit<ReturnType<typeof useReadContract>, "data"> & {
+        data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;
+      };
+    },
+    Omit<ReturnType<typeof useReadContract>, "data"> & {
+      data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;
+    }
+  >("useScaffoldReadContract");
+
+  const shouldMock = Boolean(storybookHandler);
+
   const { data: deployedContract } = useDeployedContractInfo(contractName);
   const blockNumber = useStarkBlockNumber();
 
-  const { watch: watchConfig, query: queryOptions, ...restConfig } = readConfig as any;
+  const { watch: watchConfig, query: queryOptions, enabled: readEnabled, ...restConfig } = readConfig as any;
 
   const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : [];
 
@@ -33,17 +52,46 @@ export const useScaffoldReadContract = <
       ? (Number(blockNumber) as BlockNumber)
       : ("pending" as BlockNumber);
 
-  return useReadContract({
+  const { enabled: queryEnabled, ...restQueryOptions } = queryOptions || {};
+
+  const argsDefined = !Array.isArray(args) || !args?.some(arg => arg === undefined);
+
+  const result = useReadContract({
     functionName,
     address: deployedContract?.address,
     abi: deployedContract?.abi,
     watch: false,
     args: serializedArgs as typeof args,
-    enabled: args && (!Array.isArray(args) || !args.some(arg => arg === undefined)),
+    enabled: !shouldMock && argsDefined && (readEnabled ?? true),
     blockIdentifier,
     ...restConfig,
-    query: { keepPreviousData: true, ...(queryOptions || {}) },
+    query: {
+      keepPreviousData: true,
+      ...restQueryOptions,
+      enabled: (queryEnabled ?? true) && !shouldMock,
+    },
   }) as Omit<ReturnType<typeof useReadContract>, "data"> & {
     data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;
   };
+
+  if (storybookHandler) {
+    const override = invokeStorybookMock(
+      "useScaffoldReadContract",
+      storybookHandler,
+      {
+        contractName,
+        functionName,
+        args,
+        readConfig: readConfig as UseScaffoldReadConfig<TAbi, TContractName, TFunctionName>,
+        network: "stark",
+        originalResult: result,
+      },
+    );
+
+    if (override) {
+      return override;
+    }
+  }
+
+  return result;
 };

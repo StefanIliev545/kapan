@@ -70,6 +70,20 @@ const AppProviders = ({ children }: PropsWithChildren) => (
 );
 
 const preview: Preview = {
+  globalTypes: {
+    dataMode: {
+      name: "Data source",
+      description: "Choose between mocked or live contract data",
+      defaultValue: "mocked" as const,
+      toolbar: {
+        icon: "database",
+        items: [
+          { value: "mocked", title: "Mocked data" },
+          { value: "live", title: "Live data" },
+        ],
+      },
+    },
+  },
   parameters: {
     actions: { argTypesRegex: "^on[A-Z].*" },
     controls: {
@@ -90,10 +104,13 @@ const preview: Preview = {
   },
   decorators: [
     (Story, context) => {
+      const dataMode =
+        (context.globals?.dataMode as "mocked" | "live" | undefined) ?? "mocked";
+
       useEffect(() => {
         if (typeof window === "undefined") return;
         const target = window as unknown as { __STORYBOOK_MOCKS?: unknown };
-        if (context.parameters.storybookMocks) {
+        if (dataMode === "mocked" && context.parameters.storybookMocks) {
           target.__STORYBOOK_MOCKS = context.parameters.storybookMocks;
         } else if (target.__STORYBOOK_MOCKS) {
           delete target.__STORYBOOK_MOCKS;
@@ -105,7 +122,7 @@ const preview: Preview = {
             delete current.__STORYBOOK_MOCKS;
           }
         };
-      }, [context.parameters.storybookMocks]);
+      }, [context.parameters.storybookMocks, dataMode]);
 
       return (
         <AppProviders>
