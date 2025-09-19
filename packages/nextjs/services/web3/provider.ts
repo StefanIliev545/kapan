@@ -1,4 +1,4 @@
-import { jsonRpcProvider, starknetChainId, avnuPaymasterProvider } from "@starknet-react/core";
+import { avnuPaymasterProvider, alchemyProvider } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
 
 // Get the current target network (first one in the array)
@@ -15,16 +15,12 @@ if (!rpcUrl) {
   console.warn(`No RPC Provider URL configured for ${currentNetworkName}. Using public provider.`);
 }
 
-const provider = jsonRpcProvider({
-  rpc: () => ({
-    nodeUrl: rpcUrl,
-    specVersion: "0.9.0",
-    chainId: starknetChainId(currentNetwork.id),
-  }),
+const provider = alchemyProvider({
+  apiKey: scaffoldConfig.alchemyApiKey,
 });
 
-const paymasterProvider = avnuPaymasterProvider({
-});
+
+const paymasterProvider = avnuPaymasterProvider({});
 
 export { paymasterProvider };
 

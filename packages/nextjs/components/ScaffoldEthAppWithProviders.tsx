@@ -21,6 +21,7 @@ import { StarkBlockNumberProvider, useAutoConnect } from "~~/hooks/scaffold-star
 import { appChains } from "~~/services/web3/connectors";
 import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
+import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
@@ -78,21 +79,23 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       explorer={starkscan}
       autoConnect={true}
     >
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <BlockNumberProvider>
-            <StarkBlockNumberProvider>
-              <ProgressBar height="3px" color="#2299dd" />
-              <RainbowKitProvider
-                avatar={BlockieAvatar}
-                theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-              >
-                <ScaffoldEthApp>{children}</ScaffoldEthApp>
-              </RainbowKitProvider>
-            </StarkBlockNumberProvider>
-          </BlockNumberProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
+      <AccountProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <QueryClientProvider client={queryClient}>
+            <BlockNumberProvider>
+              <StarkBlockNumberProvider>
+                <ProgressBar height="3px" color="#2299dd" />
+                <RainbowKitProvider
+                  avatar={BlockieAvatar}
+                  theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+                >
+                  <ScaffoldEthApp>{children}</ScaffoldEthApp>
+                </RainbowKitProvider>
+              </StarkBlockNumberProvider>
+            </BlockNumberProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </AccountProvider>
     </StarknetConfig>
   );
 };
