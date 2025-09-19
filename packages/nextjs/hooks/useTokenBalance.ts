@@ -1,4 +1,6 @@
-import { useAccount as useStarkAccount, useReadContract as useStarkReadContract } from "@starknet-react/core";
+import { useReadContract as useStarkReadContract } from "@starknet-react/core";
+import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
+
 import { useAccount as useEvmAccount, useReadContract as useEvmReadContract } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { universalErc20Abi } from "~~/utils/Constants";

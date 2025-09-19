@@ -1,5 +1,5 @@
 import { Abi, useReadContract } from "@starknet-react/core";
-import { BlockNumber } from "starknet";
+import { BlockNumber, BlockTag } from "starknet";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useStarkBlockNumber } from "./useBlockNumberContext";
 import { replacer } from "~~/utils/scaffold-stark/common";
@@ -31,7 +31,7 @@ export const useScaffoldReadContract = <
   const blockIdentifier: BlockNumber =
     watchConfig && blockNumber !== undefined
       ? (Number(blockNumber) as BlockNumber)
-      : ("pending" as BlockNumber);
+      : (BlockTag.LATEST);
 
   return useReadContract({
     functionName,

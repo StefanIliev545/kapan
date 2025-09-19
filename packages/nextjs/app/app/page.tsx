@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { NextPage } from "next";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
+import StableArea from "~~/components/common/StableArea";
 import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
@@ -67,11 +68,13 @@ const App: NextPage = () => {
   ];
 
   return (
-    <div className="container mx-auto flex p-0">
-      <div className="hidden lg:block">
-        <LendingSidebar />
+    <div className="container mx-auto flex flex-col gap-6 p-0 lg:flex-row lg:gap-10 min-h-[calc(100vh-6rem)] py-6">
+      <div className="hidden lg:block lg:flex-shrink-0">
+        <StableArea minHeight="32rem" className="sticky top-[4.5rem]">
+          <LendingSidebar />
+        </StableArea>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 space-y-6">
         <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 
         {selectedNetwork === "arbitrum" && (
@@ -82,17 +85,27 @@ const App: NextPage = () => {
 
         {/* Protocol Views */}
         {selectedNetwork === "arbitrum" && (
-          <>
-            <AaveProtocolView />
-            <CompoundProtocolView />
-            <VenusProtocolView />
-          </>
+          <div className="space-y-6">
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <AaveProtocolView />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <CompoundProtocolView />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <VenusProtocolView />
+            </StableArea>
+          </div>
         )}
         {selectedNetwork === "starknet" && (
-          <>
-            <VesuProtocolView />
-            <NostraProtocolView />
-          </>
+          <div className="space-y-6">
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <VesuProtocolView />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <NostraProtocolView />
+            </StableArea>
+          </div>
         )}
         {/* Custom Call to Action with additional section */}
         <CallToAction sections={customSections} />

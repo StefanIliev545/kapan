@@ -51,7 +51,7 @@ Kapan currently supports the following lending protocols:
 Before you begin, you need to install the following tools:
 
 - [Node (>= v18.18)](https://nodejs.org/en/download/)
-- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
+- Yarn ([Berry 3.2.3](https://yarnpkg.com/getting-started/install))
 - [Git](https://git-scm.com/downloads)
 
 ## Development Setup
@@ -60,9 +60,14 @@ To get started with Kapan Finance development, follow the steps below:
 
 1. Install dependencies:
 
-```
+-```
 yarn install
 ```
+
+> [!IMPORTANT]
+> This workspace is managed with Yarn Berry's `node-modules` linker. Using `npm` or committing `package-lock.json` will cause Next.js
+> to patch the lockfile on every build, dramatically slowing down compilation. Always install dependencies with `yarn` and delete
+> any generated `package-lock.json` files before running builds.
 
 2. Run a local network:
 
@@ -83,6 +88,12 @@ yarn start
 ```
 
 Visit your app on: `http://localhost:3000`
+
+To create an optimized production build:
+
+```
+yarn build
+```
 
 ## Contributing
 

@@ -37,7 +37,6 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
     walletClient = account;
   }
 
-  // Create provider for waiting for transaction receipts
   const provider = new RpcProvider({
     nodeUrl: targetNetwork.rpcUrls.public.http[0],
   });
@@ -82,13 +81,11 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
         <TxnNotification message="Waiting for transaction to complete." blockExplorerLink={blockExplorerTxURL} />,
       );
 
-      // Wait for transaction receipt
       try {
         await provider.waitForTransaction(transactionHash);
         console.log("Transaction confirmed:", transactionHash);
       } catch (waitError) {
         console.warn("Error waiting for transaction:", waitError);
-        // Continue anyway - transaction might be included but receipt fetch failed
       }
 
       notification.remove(notificationId);

@@ -176,26 +176,26 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       </dialog>
 
       {/* Render borrow modal if a token is selected */}
-        {selectedToken && action === "borrow" && (
-          <BorrowModalStark
-            isOpen={isTokenModalOpen}
-            onClose={handleModalClose}
-            token={{
-              name: feltToString(selectedToken.symbol),
-              icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
-              address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
-              currentRate: selectedToken.borrowAPR ?? 0,
-              usdPrice:
-                selectedToken.price && selectedToken.price.is_valid
-                  ? Number(selectedToken.price.value) / 1e18
-                  : 0,
+      {selectedToken && action === "borrow" && (
+        <BorrowModalStark
+          isOpen={isTokenModalOpen}
+          onClose={handleModalClose}
+          token={{
+            name: feltToString(selectedToken.symbol),
+            icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
+            address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
+            currentRate: selectedToken.borrowAPR ?? 0,
+            usdPrice:
+              selectedToken.price && selectedToken.price.is_valid
+              ? Number(selectedToken.price.value) / 1e18
+              : 0,
             }}
-            protocolName={protocolName}
-            currentDebt={0}
-            vesuContext={vesuContext}
-            position={position}
-          />
-        )}
+          protocolName={protocolName}
+          currentDebt={0}
+          vesuContext={vesuContext}
+          position={position}
+        />
+      )}
 
       {selectedToken && action === "deposit" && (
         <DepositModalStark

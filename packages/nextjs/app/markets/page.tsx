@@ -10,6 +10,7 @@ import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 import { ContractResponse, POOL_IDS } from "~~/components/specific/vesu/VesuMarkets";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
+import StableArea from "~~/components/common/StableArea";
 
 const MarketLoader = () => (
   <div className="flex justify-center py-10">
@@ -60,11 +61,13 @@ const MarketsPage: NextPage = () => {
   });
 
   return (
-    <div className="container mx-auto px-5 flex">
-      <div className="hidden lg:block">
-        <LendingSidebar />
+    <div className="container mx-auto flex flex-col gap-6 px-5 lg:flex-row lg:gap-10 min-h-[calc(100vh-6rem)] py-6">
+      <div className="hidden lg:block lg:flex-shrink-0">
+        <StableArea minHeight="32rem" className="sticky top-[4.5rem]">
+          <LendingSidebar />
+        </StableArea>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 space-y-6">
         <div className="flex items-center mb-4">
           {groupMode === "protocol" && (
             <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
@@ -117,27 +120,39 @@ const MarketsPage: NextPage = () => {
           </div>
         </div>
         {groupMode === "token" ? (
-          <MarketsGrouped search={search} />
+          <StableArea as="section" minHeight="32rem" innerClassName="h-full">
+            <MarketsGrouped search={search} />
+          </StableArea>
         ) : (
-          <>
+          <div className="space-y-6">
             {selectedNetwork === "arbitrum" && (
               <>
-                <AaveMarkets viewMode={viewMode} search={search} />
-                <CompoundMarkets viewMode={viewMode} search={search} />
-                <VenusMarkets viewMode={viewMode} search={search} />
+                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
+                  <AaveMarkets viewMode={viewMode} search={search} />
+                </StableArea>
+                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
+                  <CompoundMarkets viewMode={viewMode} search={search} />
+                </StableArea>
+                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
+                  <VenusMarkets viewMode={viewMode} search={search} />
+                </StableArea>
               </>
             )}
             {selectedNetwork === "starknet" && (
               <>
-                <VesuMarkets
-                  supportedAssets={supportedAssets as ContractResponse | undefined}
-                  viewMode={viewMode}
-                  search={search}
-                />
-                <NostraMarkets viewMode={viewMode} search={search} />
+                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
+                  <VesuMarkets
+                    supportedAssets={supportedAssets as ContractResponse | undefined}
+                    viewMode={viewMode}
+                    search={search}
+                  />
+                </StableArea>
+                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
+                  <NostraMarkets viewMode={viewMode} search={search} />
+                </StableArea>
               </>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
