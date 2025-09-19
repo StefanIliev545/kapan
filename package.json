@@ -8,6 +8,7 @@
     ]
   },
   "scripts": {
+    "build": "yarn next:build",
     "snchain": "yarn workspace @ss-2/snfoundry chain",
     "sndeploy": "yarn workspace @ss-2/snfoundry deploy",
     "sndeploy:clear": "yarn workspace @ss-2/snfoundry deploy:clear",
