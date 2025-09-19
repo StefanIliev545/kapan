@@ -5,6 +5,7 @@ import { BlockNumber, GetLogsParameters } from "viem";
 import { Config, UsePublicClientReturnType, usePublicClient } from "wagmi";
 import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { qk } from "~~/lib/queryKeys";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import { replacer } from "~~/utils/scaffold-eth/common";
 import {
@@ -104,18 +105,17 @@ export const useScaffoldEventHistory = <
 
   const isContractAddressAndClientReady = Boolean(deployedContractData?.address) && Boolean(publicClient);
 
+  const filtersKey = filters ? JSON.stringify(filters, replacer) : undefined;
+
   const query = useInfiniteQuery({
-    queryKey: [
-      "eventHistory",
-      {
-        contractName,
-        address: deployedContractData?.address,
-        eventName,
-        fromBlock: fromBlock.toString(),
-        chainId: selectedNetwork.id,
-        filters: JSON.stringify(filters, replacer),
-      },
-    ],
+    queryKey: qk.eventHistory(
+      selectedNetwork.id,
+      deployedContractData?.address ?? "",
+      contractName,
+      eventName,
+      fromBlock.toString(),
+      filtersKey,
+    ),
     queryFn: async ({ pageParam }) => {
       if (!isContractAddressAndClientReady) return undefined;
       const data = await getEvents(
@@ -156,6 +156,8 @@ export const useScaffoldEventHistory = <
         pageParams: data.pageParams,
       };
     },
+    staleTime: 2 * 60 * 1000,
+    placeholderData: previousData => previousData,
   });
 
   useEffect(() => {

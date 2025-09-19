@@ -4579,6 +4579,7 @@ __metadata:
     "@starknet-react/core": ^5.0.3
     "@starknet-react/typescript-config": ^0.0.2
     "@tanstack/react-query": ^5.72.2
+    "@tanstack/react-query-devtools": ^5.72.2
     "@testing-library/dom": ^10.4.0
     "@testing-library/jest-dom": ^6.6.3
     "@testing-library/react": ^16.2.0
@@ -4931,6 +4932,25 @@ __metadata:
   version: 5.85.6
   resolution: "@tanstack/query-core@npm:5.85.6"
   checksum: fffd2663fb4e30bc1840183897beb6587a4279d8c23b7759ae8667800469cb59d7904241959e79285f9eac85f35b02f9a4da2b2474c123857a670429d54504be
+  languageName: node
+  linkType: hard
+
+"@tanstack/query-devtools@npm:5.87.3":
+  version: 5.87.3
+  resolution: "@tanstack/query-devtools@npm:5.87.3"
+  checksum: 63d138f4f7295a31f1f6224e2601ccf5fb2b0e38aed7fe8c6c0fa2d661da82b6d6670911d92d31b1c8267f2cc3f25fde28dfb8beb165b9c8f24c110c9d8e2507
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-query-devtools@npm:^5.72.2":
+  version: 5.89.0
+  resolution: "@tanstack/react-query-devtools@npm:5.89.0"
+  dependencies:
+    "@tanstack/query-devtools": 5.87.3
+  peerDependencies:
+    "@tanstack/react-query": ^5.89.0
+    react: ^18 || ^19
+  checksum: c0f961d255afaa3cad99a591c9ea92007d23e3a9de2bd3a1bbe8c645fd7accbbad6c5d4fcbfed32aa0f1215cf686148deee12e58617a7eacfbf70af47d1ebf08
   languageName: node
   linkType: hard
 
