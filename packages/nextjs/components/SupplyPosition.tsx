@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, ReactNode } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -17,14 +17,15 @@ import { PositionManager } from "~~/utils/position";
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
-  afterInfoContent?: React.ReactNode;
-  renderName?: (name: string) => React.ReactNode;
+  afterInfoContent?: ReactNode;
+  renderName?: (name: string) => ReactNode;
   networkType: "evm" | "starknet";
   position?: PositionManager;
   disableMove?: boolean;
   containerClassName?: string;
   hideBalanceColumn?: boolean;
-  infoButton?: React.ReactNode;
+  subtitle?: ReactNode;
+  infoButton?: ReactNode;
   availableActions?: {
     deposit?: boolean;
     withdraw?: boolean;
@@ -34,7 +35,8 @@ export type SupplyPositionProps = ProtocolPosition & {
   onWithdraw?: () => void;
   onMove?: () => void;
   showQuickDepositButton?: boolean;
-  extraActions?: React.ReactNode;
+  showInfoDropdown?: boolean;
+  extraActions?: ReactNode;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -57,12 +59,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   actionsDisabledReason,
   containerClassName,
   hideBalanceColumn = false,
+  subtitle,
   infoButton,
   availableActions,
   onDeposit,
   onWithdraw,
   onMove,
   showQuickDepositButton = false,
+  showInfoDropdown = true,
   extraActions,
 }) => {
   const moveModal = useModal();
@@ -93,6 +97,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     tokenAddress,
     type: "supply",
   });
+
+  const hasOptimalProtocol = Boolean(optimalProtocol);
+  const displayedOptimalProtocol = hasOptimalProtocol ? optimalProtocol : protocolName;
+  const displayedOptimalRate = hasOptimalProtocol ? optimalRateDisplay : currentRate;
 
   const formatNumber = (num: number) =>
     new Intl.NumberFormat("en-US", {
@@ -164,7 +172,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     </div>
   );
 
-  const infoButtonNode = infoButton ?? defaultInfoButton;
+  const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
 
   return (
     <>
@@ -172,21 +180,30 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       <div
         className={`w-full p-3 rounded-md ${
           isExpanded ? "bg-base-300" : "bg-base-200"
-        } cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md ${containerClassName ?? ""}`}
+        } ${hasAnyActions ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"} transition-all duration-200 ${
+          containerClassName ?? ""
+        }`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
           {/* Header: Icon and Title */}
-          <div className="order-1 lg:order-none lg:col-span-3 flex items-center">
+          <div className="order-1 lg:order-none lg:col-span-3 flex items-center min-w-0">
             <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
               <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
             </div>
-            <div className="ml-2 flex items-center gap-1">
-              {renderName ? (
-                <>{renderName(name)}</>
-              ) : (
-                <span className="font-semibold text-lg truncate">{name}</span>
-              )}
+            <div className="ml-2 flex items-center gap-1 min-w-0">
+              <div className="flex flex-col min-w-0">
+                {renderName ? (
+                  <>{renderName(name)}</>
+                ) : (
+                  <>
+                    <span className="font-semibold text-lg truncate leading-tight">{name}</span>
+                    {subtitle ? (
+                      <span className="text-xs text-base-content/60 truncate leading-tight">{subtitle}</span>
+                    ) : null}
+                  </>
+                )}
+              </div>
             </div>
             {infoButtonNode && (
               <div className="flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
@@ -194,7 +211,6 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               </div>
             )}
 
-            {/* Render additional content after the info button if provided */}
             {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
           </div>
 
@@ -229,14 +245,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
               <div className="font-medium flex items-center h-6">
                 <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {formatPercentage(optimalRateDisplay)}%
+                  {formatPercentage(displayedOptimalRate)}%
                 </span>
                 <Image
-                  src={getProtocolLogo(optimalProtocol)}
-                  alt={optimalProtocol}
-                  width={optimalProtocol == "vesu" ? 35 : 16}
-                  height={optimalProtocol == "vesu" ? 35 : 16}
-                  className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
+                  src={getProtocolLogo(displayedOptimalProtocol)}
+                  alt={displayedOptimalProtocol}
+                  width={displayedOptimalProtocol == "vesu" ? 35 : 16}
+                  height={displayedOptimalProtocol == "vesu" ? 35 : 16}
+                  className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
             </div>

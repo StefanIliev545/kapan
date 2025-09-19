@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse, constants, RpcProvider, Call } from "starknet";
+import { AccountInterface, InvokeFunctionResponse, RpcProvider, Call } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
@@ -102,9 +102,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
           } else {
             console.log("Using regular transaction with STRK for gas payment");
             // Fallback to regular transaction
-            const regularResult = await walletClient.execute(calls, {
-              version: constants.TRANSACTION_VERSION.V2,
-            });
+            const regularResult = await walletClient.execute(calls);
             transactionHash = regularResult.transaction_hash;
           }
         }
@@ -118,9 +116,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
           transactionHash = paymasterResult.transaction_hash;
         } else {
           console.log("Using regular transaction with STRK for gas payment");
-          const regularResult = await walletClient.execute(calls, {
-            version: constants.TRANSACTION_VERSION.V2,
-          });
+          const regularResult = await walletClient.execute(calls);
           transactionHash = regularResult.transaction_hash;
         }
       } else {

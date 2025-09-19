@@ -4,6 +4,7 @@ import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import {
   BigNumberish,
+  BlockNumber,
   ByteArray,
   CairoCustomEnum,
   CairoOption,
@@ -13,8 +14,9 @@ import {
   byteArray,
   num,
   uint256,
+  WalletAccount,
+  wallet,
 } from "starknet";
-import { WalletAccount, wallet } from "starknet";
 import { formatUnits, parseUnits } from "viem";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import {
@@ -100,7 +102,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     functionName: "balance_of",
     abi: universalErc20Abi,
     args: [userAddress as `0x${string}`],
-    blockIdentifier: "pending",
+    blockIdentifier: "latest" as BlockNumber,
     enabled: isOpen && (actionType === "deposit" || actionType === "repay"),
   });
 

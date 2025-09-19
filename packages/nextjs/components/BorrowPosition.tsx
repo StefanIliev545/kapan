@@ -36,6 +36,7 @@ export type BorrowPositionProps = ProtocolPosition & {
   showNoDebtLabel?: boolean;
   infoButton?: React.ReactNode;
   extraActions?: React.ReactNode;
+  showInfoDropdown?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -67,6 +68,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   showNoDebtLabel = false,
   infoButton,
   extraActions,
+  showInfoDropdown = true,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -98,6 +100,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     type: "borrow",
   });
 
+  const hasOptimalProtocol = Boolean(optimalProtocol);
+  const displayedOptimalProtocol = hasOptimalProtocol ? optimalProtocol : protocolName;
+  const displayedOptimalRate = hasOptimalProtocol ? optimalRateDisplay : currentRate;
+
   // Determine if there's a better rate available on another protocol
   const ratesAreSame = Math.abs(currentRate - optimalRateDisplay) < 0.000001;
   const hasBetterRate =
@@ -121,7 +127,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     move: availableActions?.move !== false,
   };
 
-  const showBorrowButton = actionConfig.borrow;
+  const canInitiateBorrow =
+    networkType === "evm" ? true : Boolean(vesuContext?.borrow || onBorrow);
+
+  const showBorrowButton = actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow);
   const showRepayButton = actionConfig.repay;
   const showMoveButton = actionConfig.move && hasBalance;
 
@@ -203,7 +212,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     </div>
   );
 
-  const infoButtonNode = infoButton ?? defaultInfoButton;
+  const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
 
   return (
     <>
@@ -211,7 +220,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       <div
         className={`w-full p-3 rounded-md ${
           isExpanded ? "bg-base-300" : "bg-base-200"
-        } cursor-pointer transition-all duration-200 hover:bg-primary/10 hover:shadow-md ${containerClassName ?? ""}`}
+        } ${hasAnyActions ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"} transition-all duration-200 ${
+          containerClassName ?? ""
+        }`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -274,14 +285,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APR</div>
               <div className="font-medium flex items-center h-6">
                 <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {formatPercentage(optimalRateDisplay)}%
+                  {formatPercentage(displayedOptimalRate)}%
                 </span>
                 <Image
-                  src={getProtocolLogo(optimalProtocol)}
-                  alt={optimalProtocol}
-                  width={optimalProtocol == "vesu" ? 35 : 16}
-                  height={optimalProtocol == "vesu" ? 35 : 16}
-                  className={`flex-shrink-0 ${optimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
+                  src={getProtocolLogo(displayedOptimalProtocol)}
+                  alt={displayedOptimalProtocol}
+                  width={displayedOptimalProtocol == "vesu" ? 35 : 16}
+                  height={displayedOptimalProtocol == "vesu" ? 35 : 16}
+                  className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
                 />
               </div>
             </div>
