@@ -3,7 +3,7 @@ import { useTargetNetwork } from "./useTargetNetwork";
 import { useStarkBlockNumber } from "./useBlockNumberContext";
 import { Abi, ExtractAbiEvent, ExtractAbiEventNames } from "abi-wan-kanabi/kanabi";
 import { RpcProvider, hash } from "starknet";
-import { CallData, events as starknetEvents } from "starknet";
+import { CallData, createAbiParser, events as starknetEvents } from "starknet";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { replacer } from "~~/utils/scaffold-stark/common";
 import { ContractAbi, ContractName, UseScaffoldEventHistoryConfig } from "~~/utils/scaffold-stark/contract";
@@ -181,13 +181,16 @@ export const useScaffoldEventHistory = <
 
   const eventHistoryData = useMemo(() => {
     if (deployedContractData) {
+      const abi = deployedContractData.abi as Abi;
+      const abiParser = createAbiParser(abi);
       return (events || []).map(event => {
         const logs = [JSON.parse(JSON.stringify(event.log))];
         const parsed = starknetEvents.parseEvents(
           logs,
-          starknetEvents.getAbiEvents(deployedContractData.abi),
-          CallData.getAbiStruct(deployedContractData.abi),
-          CallData.getAbiEnum(deployedContractData.abi),
+          starknetEvents.getAbiEvents(abi),
+          CallData.getAbiStruct(abi),
+          CallData.getAbiEnum(abi),
+          abiParser,
         );
         const args = parsed.length ? parsed[0][eventName] : {};
         const { event: rawEvent, ...rest } = event;

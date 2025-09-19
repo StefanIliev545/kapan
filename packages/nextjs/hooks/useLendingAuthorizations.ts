@@ -29,7 +29,11 @@ export const useLendingAuthorizations = () => {
       rawSelectors: false,
     });
 
-    const contract = new Contract(routerGateway.abi, routerGateway.address, account);
+    const contract = new Contract({
+      abi: routerGateway.abi,
+      address: routerGateway.address,
+      providerOrAccount: account,
+    });
     const protocolInstructions = await contract.call(
       "get_authorizations_for_instructions",
       authInstruction,
