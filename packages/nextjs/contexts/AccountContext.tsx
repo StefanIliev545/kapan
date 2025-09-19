@@ -87,7 +87,6 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
           return constants.StarknetChainId.SN_MAIN;
         },
         cairoVersion: "1",
-        signer: {},
       };
 
       return provisionalAccount as AccountInterface;
