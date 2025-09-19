@@ -139,6 +139,12 @@ functionName: "symbol",
       name: token.name,
       icon: token.icon,
       balance: token.balance,
+      decimals,
+      mode: "default" as const,
+      protocol: undefined,
+      amount: undefined,
+      useMax: undefined,
+      vesuContext: undefined,
     };
     // Update the global selected token
     updateSelectedToken(newToken);

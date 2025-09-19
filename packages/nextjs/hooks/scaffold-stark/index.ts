@@ -4,6 +4,7 @@ export * from "./useNetworkColor";
 export * from "./useAnimationConfig";
 export * from "./useTransactor";
 export * from "./usePaymasterTransactor";
+export * from "./useProtocolPaymasterSendTransaction";
 export * from "./useSmartTransactor";
 export * from "./useAutoConnect";
 export * from "./useSwitchNetwork";

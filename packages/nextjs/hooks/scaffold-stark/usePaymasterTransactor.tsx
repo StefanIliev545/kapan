@@ -3,8 +3,9 @@ import { AccountInterface, InvokeFunctionResponse, constants, RpcProvider, Call 
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
-import { usePaymasterSendTransaction, usePaymasterGasTokens } from "@starknet-react/core";
+import { usePaymasterGasTokens } from "@starknet-react/core";
 import { universalStrkAddress } from "~~/utils/Constants";
+import { useProtocolPaymasterSendTransaction } from "./useProtocolPaymasterSendTransaction";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
@@ -49,18 +50,54 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   const selectedAddr = selectedToken?.address?.toLowerCase();
   const STRK_ADDRESS = universalStrkAddress.toLowerCase();
   const { data: paymasterTokens } = usePaymasterGasTokens();
+  const selectedMode = selectedToken?.mode ?? "default";
+  const isCustomMode = selectedMode === "collateral" || selectedMode === "borrow";
   const isSelectedStrk = selectedAddr === STRK_ADDRESS || (selectedToken?.symbol?.toUpperCase?.() === "STRK");
   const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: any) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
-  const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
+
+  let customAmount: bigint | undefined;
+  if (selectedToken?.amount && isCustomMode) {
+    try {
+      customAmount = BigInt(selectedToken.amount);
+    } catch (error) {
+      console.warn("Failed to parse custom gas token amount", error);
+    }
+  }
+
+  const hasCustomConfig =
+    isCustomMode &&
+    customAmount !== undefined &&
+    typeof selectedToken?.protocol === "string" &&
+    selectedToken.protocol.trim().length > 0;
+  const shouldUsePaymaster = hasCustomConfig || (!isSelectedStrk && isSupportedPaymasterToken);
+
+  const vesuContext = selectedToken?.vesuContext && isCustomMode
+    ? {
+        poolId: (() => {
+          try {
+            return BigInt(selectedToken.vesuContext.poolId);
+          } catch (error) {
+            console.warn("Failed to parse Vesu pool id", error);
+            return undefined;
+          }
+        })(),
+        counterpartToken: selectedToken.vesuContext.counterpartToken,
+      }
+    : undefined;
+
+  const normalizedVesuContext = vesuContext?.poolId && vesuContext.counterpartToken
+    ? { poolId: vesuContext.poolId, counterpartToken: vesuContext.counterpartToken }
+    : undefined;
 
   // Setup paymaster transaction hook
-  const { sendAsync: sendPaymasterTransaction } = usePaymasterSendTransaction({
-    calls: [], // Will be overridden in execution
-    options: {
-      feeMode: shouldUsePaymaster
-        ? { mode: "default" as const, gasToken: selectedToken!.address }
-        : { mode: "sponsored" as const },
-    },
+  const { sendAsync: sendPaymasterTransaction } = useProtocolPaymasterSendTransaction({
+    calls: [],
+    mode: shouldUsePaymaster ? (hasCustomConfig ? selectedMode : "default") : "sponsored",
+    gasToken: shouldUsePaymaster ? selectedToken?.address : undefined,
+    protocol: hasCustomConfig ? selectedToken?.protocol : undefined,
+    amount: hasCustomConfig ? customAmount : undefined,
+    useMax: hasCustomConfig ? selectedToken?.useMax : undefined,
+    vesuContext: hasCustomConfig ? normalizedVesuContext : undefined,
   });
 
   return async tx => {
