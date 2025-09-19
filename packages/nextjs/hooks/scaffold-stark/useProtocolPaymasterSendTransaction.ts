@@ -244,13 +244,23 @@ export const useProtocolPaymasterSendTransaction = (
         calldata: auth.calldata,
       }));
 
-      const executeCall: Call = {
-        contractAddress: routerGateway.address,
-        entrypoint: "process_protocol_instructions",
-        calldata: CallData.compile({ instructions: [baseInstruction] }),
-      };
+      const hasProcessCall = authorizationCalls.some(call => {
+        const contractAddress = call.contractAddress?.toLowerCase?.();
+        return (
+          contractAddress === routerGateway.address.toLowerCase() &&
+          call.entrypoint === "process_protocol_instructions"
+        );
+      });
 
-      return [...formattedCalls, ...authorizationCalls, executeCall];
+      const executeCall: Call | null = hasProcessCall
+        ? null
+        : {
+            contractAddress: routerGateway.address,
+            entrypoint: "process_protocol_instructions",
+            calldata: CallData.compile({ instructions: [baseInstruction] }),
+          };
+
+      return [...formattedCalls, ...authorizationCalls, ...(executeCall ? [executeCall] : [])];
     },
     [account?.address, calls, getAuthorizations, resolveContext, routerGateway?.address],
   );
