@@ -4,7 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
-import starknetContracts from "~~/contracts/snfoundry/deployedContracts";
+import starknetContractsData, {
+  type SNContract,
+  type SNContractsType,
+} from "~~/contracts/snfoundry/deployedContracts";
 import { useAllContracts } from "~~/utils/scaffold-eth/contractsData";
 import { useTargetNetwork as useEvmTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { useTargetNetwork as useStarknetTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
@@ -31,6 +34,8 @@ const networkOptions: NetworkOption[] = [
   },
 ];
 
+const starknetContracts: SNContractsType = starknetContractsData;
+
 export const DeployedContractsList = () => {
   const contractsData = useAllContracts();
   const { targetNetwork: targetEvmNetwork } = useEvmTargetNetwork();
@@ -42,12 +47,18 @@ export const DeployedContractsList = () => {
     setIsMounted(true);
   }, []);
 
-  const starknetContractsForTarget = useMemo(() => {
-    if (!targetStarknetNetwork?.network) {
+  const starknetContractsForTarget = useMemo<Record<string, SNContract>>(() => {
+    const networkKey = targetStarknetNetwork?.network;
+    if (!networkKey) {
       return {};
     }
 
-    return starknetContracts[targetStarknetNetwork.network] ?? {};
+    const networkContracts = starknetContracts[networkKey];
+    if (!networkContracts) {
+      return {};
+    }
+
+    return networkContracts;
   }, [targetStarknetNetwork?.network]);
 
   const contractsToDisplay = useMemo<DisplayContract[]>(() => {
