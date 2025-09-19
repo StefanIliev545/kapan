@@ -5,8 +5,6 @@ export class ContractClassHashCache {
   private cache = new Map<string, string>();
   private pendingRequests = new Map<string, Promise<string | undefined>>();
 
-  private constructor() {}
-
   public static getInstance(): ContractClassHashCache {
     if (!ContractClassHashCache.instance) {
       ContractClassHashCache.instance = new ContractClassHashCache();
@@ -17,7 +15,7 @@ export class ContractClassHashCache {
   public async getClassHash(
     publicClient: ProviderInterface,
     address: string,
-    blockIdentifier: BlockIdentifier = "pending",
+    blockIdentifier: BlockIdentifier = "latest",
   ): Promise<string | undefined> {
     const cacheKey = `${address}-${blockIdentifier}`;
 
