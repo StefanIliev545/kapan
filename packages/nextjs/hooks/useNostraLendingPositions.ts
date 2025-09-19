@@ -9,24 +9,9 @@ import { feltToString } from "~~/utils/protocols";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
-const normalizeDecimals = (value: unknown): number | null => {
-  if (value === undefined || value === null) return 18;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "bigint") {
-    const asNumber = Number(value);
-    return Number.isFinite(asNumber) ? asNumber : null;
-  }
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-};
-
 type ParsedAsset = {
   address: string;
   symbol: string;
-  decimals: number;
 };
 
 type ParsedPosition = {
@@ -53,16 +38,13 @@ const parseAssetInfos = (assets: unknown): ParsedAsset[] => {
 
     let addressRaw: unknown;
     let symbolRaw: unknown;
-    let decimalsRaw: unknown;
-
     if (Array.isArray(entry)) {
-      if (entry.length < 3) return [];
-      [addressRaw, symbolRaw, decimalsRaw] = entry;
+      if (entry.length < 2) return [];
+      [addressRaw, symbolRaw] = entry;
     } else if (typeof entry === "object") {
       const obj = entry as Record<string, unknown>;
       addressRaw = obj[0] ?? obj["0"] ?? obj.address;
       symbolRaw = obj[1] ?? obj["1"] ?? obj.symbol;
-      decimalsRaw = obj[2] ?? obj["2"] ?? obj.decimals;
     } else {
       return [];
     }
@@ -71,17 +53,34 @@ const parseAssetInfos = (assets: unknown): ParsedAsset[] => {
       return [];
     }
 
-    const decimals = normalizeDecimals(decimalsRaw);
-    if (decimals === null) return [];
-
     return [
       {
         address: toHexAddress(addressRaw),
         symbol: feltToString(symbolRaw),
-        decimals,
       },
     ];
   });
+};
+
+const parseTokenDecimals = (decimals: unknown, addresses: string[]): Record<string, number> => {
+  if (!decimals || addresses.length === 0) return {};
+
+  const entries = Array.isArray(decimals)
+    ? decimals
+    : typeof decimals === "object"
+      ? Object.values(decimals as Record<string, unknown>)
+      : [];
+
+  return addresses.reduce<Record<string, number>>((acc, address, index) => {
+    const value = entries[index];
+    if (typeof value === "bigint" || typeof value === "number") {
+      const normalized = Number(value);
+      if (Number.isFinite(normalized)) {
+        acc[address] = normalized;
+      }
+    }
+    return acc;
+  }, {});
 };
 
 const parseUserPositions = (positions: unknown): Record<string, ParsedPosition> => {
@@ -225,6 +224,13 @@ export const useNostraLendingPositions = () => {
     args: [tokenAddresses],
   });
 
+  const tokenDecimalsQuery = useNetworkAwareReadContract({
+    networkType: "starknet",
+    contractName: "UiHelper",
+    functionName: "get_token_decimals",
+    args: [tokenAddresses],
+  });
+
   const positionMap = useMemo(
     () => parseUserPositions(userPositionsQuery.data),
     [userPositionsQuery.data],
@@ -240,12 +246,21 @@ export const useNostraLendingPositions = () => {
     [tokenPricesQuery.data, tokenAddresses],
   );
 
+  const decimalsMap = useMemo(
+    () => parseTokenDecimals(tokenDecimalsQuery.data, tokenAddresses),
+    [tokenDecimalsQuery.data, tokenAddresses],
+  );
+
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
 
     assets.forEach(asset => {
-      const { address: tokenAddress, symbol, decimals } = asset;
+      const { address: tokenAddress, symbol } = asset;
+      const decimals = decimalsMap[tokenAddress];
+      if (decimals === undefined) {
+        return;
+      }
       const position = positionMap[tokenAddress];
       const debtBalance = position?.debtBalance ?? 0n;
       const collateralBalance = position?.collateralBalance ?? 0n;
@@ -284,13 +299,14 @@ export const useNostraLendingPositions = () => {
     });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
-  }, [assets, positionMap, rateMap, priceMap]);
+  }, [assets, positionMap, rateMap, priceMap, decimalsMap]);
 
   const isLoading =
     assetInfoQuery.isLoading ||
     userPositionsQuery.isLoading ||
     interestRatesQuery.isLoading ||
-    tokenPricesQuery.isLoading;
+    tokenPricesQuery.isLoading ||
+    tokenDecimalsQuery.isLoading;
 
   return {
     suppliedPositions,
