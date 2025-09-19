@@ -2,10 +2,26 @@ import { useAccount as useStarkAccount, useReadContract as useStarkReadContract 
 import { useAccount as useEvmAccount, useReadContract as useEvmReadContract } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { universalErc20Abi } from "~~/utils/Constants";
+import { getStorybookMock, invokeStorybookMock } from "~~/utils/storybook";
 
 export type Network = "evm" | "stark";
 
 export const useTokenBalance = (tokenAddress: string, network: Network = "evm") => {
+  const mockHandler = getStorybookMock<
+    { tokenAddress: string; network: Network },
+    { balance: bigint; decimals: number | undefined }
+  >("useTokenBalance");
+
+  const mock = invokeStorybookMock(
+    "useTokenBalance",
+    mockHandler,
+    { tokenAddress, network },
+  );
+
+  if (mock) {
+    return mock;
+  }
+
   if (!tokenAddress) {
     return { balance: 0n, decimals: undefined };
   }
