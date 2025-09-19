@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import GenericModal from "./CustomConnectButton/GenericModal";
 import { Address as AddressType, devnet } from "@starknet-react/chains";
-import { useAccount, useNetwork, useProvider } from "@starknet-react/core";
+import { useNetwork, useProvider } from "@starknet-react/core";
+import { useAccount } from "~~/hooks/useAccount";
 import { BanknotesIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import { cairo, CallData } from "starknet";
 import { AddressInput, EtherInput } from "~~/components/scaffold-stark";

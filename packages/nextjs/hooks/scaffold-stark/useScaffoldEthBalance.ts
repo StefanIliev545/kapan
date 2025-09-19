@@ -22,7 +22,7 @@ const useScaffoldEthBalance = ({ address }: UseScaffoldEthBalanceProps) => {
     watch: false,
     enabled: true,
     args: address ? [address] : [],
-    blockIdentifier: (blockNumber as unknown as BlockNumber) ?? ("pending" as BlockNumber),
+    blockIdentifier: (blockNumber as unknown as BlockNumber) ?? ("latest" as BlockNumber),
   });
 
   return {
