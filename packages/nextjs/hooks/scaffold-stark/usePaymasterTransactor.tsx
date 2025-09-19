@@ -138,7 +138,11 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
     : undefined;
 
   // Setup paymaster transaction hook
-  const { sendAsync: sendPaymasterTransaction, estimateFee: estimateProtocolFee } = useProtocolPaymasterSendTransaction({
+  const {
+    sendAsync: sendPaymasterTransaction,
+    estimateFee: estimateProtocolFee,
+    prepareCalls,
+  } = useProtocolPaymasterSendTransaction({
     calls: [],
     mode: hasCustomConfig ? selectedMode : "default",
     gasToken: selectedToken?.address ?? universalStrkAddress,
@@ -183,7 +187,8 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
         }
       }
 
-      const paymasterResult = await sendPaymasterTransaction(calls, overrides);
+      const finalCalls = await prepareCalls(calls, overrides);
+      const paymasterResult = await sendPaymasterTransaction(finalCalls);
       return paymasterResult.transaction_hash;
     };
 

@@ -9,6 +9,7 @@ import {
   CairoOptionVariant,
   Call,
   CallData,
+  InvokeFunctionResponse,
   PaymasterDetails,
   PaymasterFeeEstimate,
   uint256,
@@ -60,7 +61,12 @@ export interface UseProtocolPaymasterSendTransactionArgs {
   maxFeeInGasToken?: BigNumberish;
 }
 
-export type UseProtocolPaymasterSendTransactionResult = UsePaymasterSendTransactionResult & {
+export type UseProtocolPaymasterSendTransactionResult = Omit<
+  UsePaymasterSendTransactionResult,
+  "send" | "sendAsync" | "estimateFee"
+> & {
+  send: (userCalls?: Call[], overrides?: PaymasterOverrides) => void;
+  sendAsync: (userCalls?: Call[], overrides?: PaymasterOverrides) => Promise<InvokeFunctionResponse>;
   prepareCalls: (calls?: Call[], overrides?: PaymasterOverrides) => Promise<Call[]>;
   estimateFee: (calls?: Call[], overrides?: PaymasterOverrides) => Promise<PaymasterFeeEstimate>;
 };
@@ -197,11 +203,14 @@ export const useProtocolPaymasterSendTransaction = (
     [customContext],
   );
 
-  const { send: _baseSend, sendAsync: baseSendAsync, ...rest } = usePaymasterSendTransaction({
+  const baseResult = usePaymasterSendTransaction({
     calls,
     options: paymasterDetails,
     maxFeeInGasToken,
   });
+
+  const { send: _baseSend, sendAsync: baseSendAsync, ...rest } = baseResult;
+  void _baseSend;
 
   const prepareCalls = useCallback(
     async (userCalls?: Call[], overrides?: PaymasterOverrides) => {
