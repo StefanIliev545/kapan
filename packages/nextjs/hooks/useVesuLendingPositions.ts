@@ -108,8 +108,6 @@ const computeUsdValue = (amount: bigint, decimals: number, price: bigint): numbe
   return amountAsNumber * priceAsNumber;
 };
 
-export type AssetWithRates = TokenMetadata & { borrowAPR: number; supplyAPY: number };
-
 export type VesuPositionRow = {
   key: string;
   supply: ProtocolPosition;
@@ -367,9 +365,6 @@ export const useVesuLendingPositions = (
       ];
     });
   }, [assetMap, cachedPositions, poolId]);
-
-  const isLoadingAssets = supportedAssets == null;
-
   return {
     assetsWithRates,
     suppliablePositions,

@@ -63,10 +63,7 @@ export const useScaffoldMultiWriteContract = <
               contractName as ContractName
             ] as Contract<TContractName>;
             // we convert to starknetjs contract instance here since deployed data may be undefined if contract is not deployed
-            const contractInstance = new StarknetJsContract({
-              abi: contract.abi,
-              address: contract.address,
-            });
+            const contractInstance = new StarknetJsContract(contract.abi, contract.address);
 
             console.log("unparsed args", unParsedArgs);
             return contractInstance.populate(functionName, unParsedArgs as any[]);

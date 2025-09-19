@@ -1,4 +1,4 @@
-import { CallData, Contract, num } from "starknet";
+import { Abi, CallData, Contract, num } from "starknet";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { useDeployedContractInfo as useStarkDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { feltToString } from "~~/utils/protocols";
@@ -29,11 +29,7 @@ export const useLendingAuthorizations = () => {
       rawSelectors: false,
     });
 
-    const contract = new Contract({
-      abi: routerGateway.abi,
-      address: routerGateway.address,
-      providerOrAccount: account,
-    });
+    const contract = new Contract(routerGateway.abi as Abi, routerGateway.address, account);
     const protocolInstructions = await contract.call(
       "get_authorizations_for_instructions",
       authInstruction,
