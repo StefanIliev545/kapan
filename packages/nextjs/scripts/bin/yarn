@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+if [ -n "$STORYBOOK_YARN_LOG" ]; then
+  printf '%s\n' "yarn-wrapper args: $*" >> "$STORYBOOK_YARN_LOG"
+fi
+
+if [ "$1" = "config" ] && [ "$2" = "get" ] && [ "$3" = "registry" ]; then
+  if [ -n "$YARN_NPM_REGISTRY_SERVER" ]; then
+    printf '%s\n' "$YARN_NPM_REGISTRY_SERVER"
+  else
+    printf '%s\n' "https://registry.yarnpkg.com"
+  fi
+  exit 0
+fi
+
+if [ -z "$STORYBOOK_YARN_CJS" ]; then
+  >&2 printf '%s\n' "storybook yarn wrapper misconfigured: STORYBOOK_YARN_CJS is not set"
+  exit 1
+fi
+
+node_bin=${STORYBOOK_NODE:-node}
+exec "$node_bin" "$STORYBOOK_YARN_CJS" "$@"
