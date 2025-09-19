@@ -92,12 +92,18 @@ export const useAutoConnect = (): void => {
       }
 
       attemptedConnectorRef.current = connectorId;
-      connect({ connector });
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
-          currentTime.toString(),
-        );
+
+      try {
+        await connect({ connector });
+      } catch (err) {
+        console.warn("Failed to auto connect", err);
+      } finally {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(
+            LAST_CONNECTED_TIME_LOCALSTORAGE_KEY,
+            currentTime.toString(),
+          );
+        }
       }
     })();
   }, [connect, connectors, lastConnectionTime, savedConnector, status]);

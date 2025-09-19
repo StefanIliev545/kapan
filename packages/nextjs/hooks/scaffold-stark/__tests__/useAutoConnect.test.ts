@@ -6,6 +6,7 @@ import scaffoldConfig from "~~/scaffold.config";
 import { burnerAccounts } from "@scaffold-stark/stark-burner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAccount } from "~~/hooks/useAccount";
+import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
 
 type Mock = ReturnType<typeof vi.fn>;
 
@@ -42,7 +43,7 @@ describe("useAutoConnect", () => {
   const mockedUseAccount = useAccount as unknown as Mock;
 
   beforeEach(() => {
-    mockConnect = vi.fn();
+    mockConnect = vi.fn().mockResolvedValue(undefined);
     mockConnectors = [
       { id: "wallet-1", ready: vi.fn().mockResolvedValue(true) },
       {
@@ -59,6 +60,22 @@ describe("useAutoConnect", () => {
     mockedUseAccount.mockReturnValue({ status: "disconnected" } as any);
     vi.mocked(useReadLocalStorage).mockReturnValue(Date.now());
     window.localStorage.clear();
+  });
+
+  it("should swallow connector errors when auto-connecting", async () => {
+    const error = new Error("failed to connect");
+    window.localStorage.setItem("lastUsedConnector", JSON.stringify({ id: "wallet-1" }));
+    mockConnect.mockRejectedValueOnce(error);
+
+    renderHook(() => useAutoConnect());
+
+    await waitFor(() => {
+      expect(mockConnect).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(window.localStorage.getItem(LAST_CONNECTED_TIME_LOCALSTORAGE_KEY)).toBeTruthy();
+    });
   });
 
   afterEach(() => {
