@@ -5,21 +5,30 @@ import {
   CairoOption,
   CairoOptionVariant,
   CallData,
+  createAbiParser,
 } from "starknet";
 import { mockDeployedContractAbi } from "./mockDeployedContractAbi";
 
 const abiEnum = CallData.getAbiEnum(mockDeployedContractAbi.abi);
 const abiStruct = CallData.getAbiStruct(mockDeployedContractAbi.abi);
+const parser = createAbiParser(mockDeployedContractAbi.abi);
 const event = mockDeployedContractAbi.abi.find(
   (part) =>
     part.type === "event" &&
     part.name === "contracts::YourContract::YourContract::GreetingChanged",
 );
 
+const serialize = (
+  input: Parameters<typeof serializeEventKey>[0],
+  abiEntry: Parameters<typeof serializeEventKey>[1],
+  structs: Parameters<typeof serializeEventKey>[2],
+  enums: Parameters<typeof serializeEventKey>[3],
+) => serializeEventKey(input, abiEntry, structs, enums, parser);
+
 describe("serializeEventKey", () => {
   it("should serialize event string key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         "hello world",
         { name: "", type: "core::byte_array::ByteArray" },
         {},
@@ -30,7 +39,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize event long string event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         "Long string, more than 31 characters.",
         { name: "", type: "core::byte_array::ByteArray" },
         {},
@@ -46,7 +55,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize u256 event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         9986n,
         { name: "", type: "core::integer::u256" },
         abiStruct,
@@ -57,7 +66,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize u512 event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         9986n,
         { name: "", type: "core::integer::u512" },
         abiStruct,
@@ -68,7 +77,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize ContractAddress event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         "0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691",
         { name: "", type: "core::starknet::contract_address::ContractAddress" },
         abiStruct,
@@ -81,7 +90,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize ContractAddress array event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         [
           "0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691",
           "0x6a1991c289bda4d029f9acee45b37c0f4ed86d0c35d977ed320f8594afaa0b3",
@@ -102,7 +111,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize tuple event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         {
           0: 1n,
           1: 2n,
@@ -126,7 +135,7 @@ describe("serializeEventKey", () => {
 
   it("should serialize struct event key correctly", () => {
     expect(
-      serializeEventKey(
+      serialize(
         {
           addr: new CairoOption(
             CairoOptionVariant.Some,
@@ -153,7 +162,7 @@ describe("serializeEventKey", () => {
       val1: "123",
     });
 
-    const result = serializeEventKey(
+    const result = serialize(
       simpleEnum,
       { name: "enum_param", type: "contracts::YourContract::SimpleEnum" },
       abiStruct,
@@ -172,7 +181,7 @@ describe("serializeEventKey", () => {
       val1: simpleEnum,
     });
     expect(
-      serializeEventKey(
+      serialize(
         someEnum,
         {
           name: "test",

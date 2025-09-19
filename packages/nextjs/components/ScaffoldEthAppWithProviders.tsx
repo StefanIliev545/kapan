@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import { StarknetConfig, argent, braavos, starkscan, useInjectedConnectors } from "@starknet-react/core";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
@@ -17,7 +16,7 @@ import { Header } from "~~/components/Header";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
 import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
-import { StarkBlockNumberProvider, useAutoConnect } from "~~/hooks/scaffold-stark";
+import { StarkBlockNumberProvider } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
 import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
@@ -39,15 +38,6 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
     </SelectedGasTokenProvider>
   );
 };
-
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 2,
-    },
-  },
-});
 
 export const ScaffoldEthAppWithProviders = ({ children }: { children: React.ReactNode }) => {
   const { resolvedTheme } = useTheme();
@@ -81,19 +71,17 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     >
       <AccountProvider>
         <WagmiProvider config={wagmiConfig}>
-          <QueryClientProvider client={queryClient}>
-            <BlockNumberProvider>
-              <StarkBlockNumberProvider>
-                <ProgressBar height="3px" color="#2299dd" />
-                <RainbowKitProvider
-                  avatar={BlockieAvatar}
-                  theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-                >
-                  <ScaffoldEthApp>{children}</ScaffoldEthApp>
-                </RainbowKitProvider>
-              </StarkBlockNumberProvider>
-            </BlockNumberProvider>
-          </QueryClientProvider>
+          <BlockNumberProvider>
+            <StarkBlockNumberProvider>
+              <ProgressBar height="3px" color="#2299dd" />
+              <RainbowKitProvider
+                avatar={BlockieAvatar}
+                theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+              >
+                <ScaffoldEthApp>{children}</ScaffoldEthApp>
+              </RainbowKitProvider>
+            </StarkBlockNumberProvider>
+          </BlockNumberProvider>
         </WagmiProvider>
       </AccountProvider>
     </StarknetConfig>
