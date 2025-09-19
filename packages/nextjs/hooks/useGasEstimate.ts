@@ -1,52 +1,43 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Account, Call } from "starknet";
+import type { Account, Call, PaymasterDetails } from "starknet";
+import { usePaymasterEstimateFees, usePaymasterGasTokens } from "@starknet-react/core";
 import { useAccount } from "~~/hooks/useAccount";
+import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 import { useGlobalState } from "~~/services/store/store";
 import { weiToEth, friToStrk } from "~~/lib/feeUnits";
+import { universalStrkAddress } from "~~/utils/Constants";
 
 type BuildCalls =
   | (() => Call | Call[] | null | undefined | Promise<Call | Call[] | null | undefined>)
   | (() => Promise<Call | Call[] | null | undefined>);
 
-type DisplayCurrency = "ETH" | "STRK"; // preferred display (not necessarily the fee token)
+type DisplayCurrency = "ETH" | "STRK";
 
 export function useGasEstimate(opts: {
   enabled: boolean;
   buildCalls: BuildCalls;
-  currency?: DisplayCurrency; // preferred display currency for feeNative/feeUsd
+  currency?: DisplayCurrency;      // preferred display currency for standard estimate
   debounceMs?: number;
+  preferPaymaster?: boolean;       // if true, effective* fields prefer paymaster when available
 }) {
-  const { enabled, buildCalls, currency = "STRK", debounceMs = 300 } = opts;
+  const {
+    enabled,
+    buildCalls,
+    currency = "ETH",
+    debounceMs = 300,
+    preferPaymaster = true,
+  } = opts;
 
   const { account } = useAccount();
-
-  // Prices from your store
+  const { selectedToken } = useSelectedGasToken();
   const ethPrice = useGlobalState(s => s.nativeCurrencyPrice); // USD/ETH
   const strkPrice = useGlobalState(s => s.strkCurrencyPrice);  // USD/STRK
 
-  // UI state
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fee state
-  /** Raw atomic amount in the network's fee token (WEI or FRI) */
-  const [feeAtomic, setFeeAtomic] = useState<bigint | null>(null);
-  /** Kept for backward compatibility: when unit === 'FRI' this is actually FRI, not WEI */
-  const feeWei = feeAtomic; // NOTE: name preserved; see feeUnit for the true unit
-  /** 'WEI' | 'FRI' as returned by starknet.js */
-  const [feeUnit, setFeeUnit] = useState<"WEI" | "FRI" | null>(null);
-  /** Fee in the chosen display currency (ETH or STRK), when we can compute it */
-  const [feeNative, setFeeNative] = useState<number | null>(null);
-  /** Fee in USD (derived from prices), when we can compute it */
-  const [feeUsd, setFeeUsd] = useState<number | null>(null);
-  /** The currency actually used to compute feeNative (may differ from `currency` if prices missing) */
-  const [usedCurrency, setUsedCurrency] = useState<DisplayCurrency | null>(null);
-
-  // Debounce + request sequencing
+  // ---------------- internal state / debounce ----------------
+  const [callsState, setCallsState] = useState<Call[] | undefined>(undefined);
   const timer = useRef<number | null>(null);
-  const seq = useRef(0);
   const prevKey = useRef<string | null>(null);
 
   const clearTimer = () => {
@@ -56,9 +47,6 @@ export function useGasEstimate(opts: {
     }
   };
 
-  // --- helpers ----------------------------------------------------------------
-
-  /** stable stringify so we don't re-estimate needlessly due to key order */
   const stableStringify = (value: unknown): string => {
     const seen = new WeakSet();
     const walk = (v: any): any => {
@@ -78,153 +66,225 @@ export function useGasEstimate(opts: {
     return JSON.stringify(walk(value));
   };
 
-  const callsKey = useCallback(
-    (addr: string, calls: Call | Call[]) =>
-      `${addr}:${stableStringify(Array.isArray(calls) ? calls : [calls])}`,
-    [],
-  );
-
-  const resetFees = () => {
-    setFeeAtomic(null);
-    setFeeUnit(null);
-    setFeeNative(null);
-    setFeeUsd(null);
-    setUsedCurrency(null);
-    setError(null);
-  };
-
-  /** Convert atomic fee + unit into native amounts and USD, respecting preferred display currency when possible */
-  const computeDisplay = useCallback(
-    (atomic: bigint, unit: "WEI" | "FRI") => {
-      // 1) actual on-chain fee token + native amount
-      const actualToken: DisplayCurrency = unit === "WEI" ? "ETH" : "STRK";
-      const actualNative =
-        unit === "WEI" ? weiToEth(atomic) : friToStrk(atomic); // both return number
-
-      // 2) USD using the actual token’s price (if we have it)
-      const priceActual =
-        actualToken === "ETH" ? ethPrice ?? null : strkPrice ?? null;
-      const usd = priceActual != null ? actualNative * priceActual : null;
-
-      // 3) Preferred display currency handling
-      if (currency === actualToken) {
-        return { native: actualNative, usd, used: actualToken as DisplayCurrency };
-      }
-
-      // Need to convert actual token amount to the preferred display currency via USD prices
-      if (usd != null) {
-        const targetPrice = currency === "ETH" ? ethPrice ?? null : strkPrice ?? null;
-        if (targetPrice != null && targetPrice > 0) {
-          return { native: usd / targetPrice, usd, used: currency as DisplayCurrency };
-        }
-      }
-
-      // Fallback: show in the actual token if we can't convert
-      return { native: actualNative, usd, used: actualToken as DisplayCurrency };
-    },
-    [currency, ethPrice, strkPrice],
-  );
-
-  // --- core estimation --------------------------------------------------------
-
-  const doEstimate = useCallback(
-    async (acct: Account, calls: Call | Call[]) => {
-      setLoading(true);
-      setError(null);
-      const mySeq = ++seq.current;
-
-      try {
-        const callArray = Array.isArray(calls) ? calls : [calls];
-
-        // v8-compliant: estimate a single *Invoke* (supports multi-call via array)
-        // Response contains `suggestedMaxFee` (bigint) and `unit` ('WEI' | 'FRI')
-        const res = await acct.estimateInvokeFee(callArray);
-
-        // guard against race conditions
-        if (mySeq !== seq.current) return;
-
-        // Prefer suggestedMaxFee; fall back to overall_fee if needed (both are bigint)
-        const atomic: bigint =
-          (res as any)?.suggestedMaxFee ??
-          (res as any)?.overall_fee ??
-          0n;
-
-        const unit = (res as any)?.unit as "WEI" | "FRI" | undefined;
-
-        setFeeAtomic(atomic);
-        if (unit) setFeeUnit(unit);
-
-        const { native, usd, used } = unit
-          ? computeDisplay(atomic, unit)
-          : { native: null, usd: null, used: null };
-
-        setFeeNative(native);
-        setFeeUsd(usd);
-        setUsedCurrency(used);
-      } catch (e) {
-        console.error("Fee estimation failed:", e);
-        // Only show a user-friendly message; details already logged
-        setError("Fee estimation unavailable");
-        resetFees();
-      } finally {
-        if (mySeq === seq.current) setLoading(false);
-      }
-    },
-    [computeDisplay],
-  );
-
-  const refresh = useCallback(async () => {
-    if (!account) return;
-    const calls = await buildCalls();
-    if (!calls) {
-      prevKey.current = null;
-      resetFees();
-      return;
-    }
-    const key = callsKey(account.address, calls);
-    prevKey.current = key;
-    await doEstimate(account as Account, calls);
-  }, [account, buildCalls, callsKey, doEstimate]);
-
-  // Debounced auto-run
   useEffect(() => {
     clearTimer();
-
-    if (!enabled || !account) {
-      resetFees();
+    if (!enabled) {
+      setCallsState(undefined);
+      prevKey.current = null;
       return;
     }
-
     timer.current = window.setTimeout(async () => {
       const calls = await buildCalls();
       if (!calls) {
+        setCallsState(undefined);
         prevKey.current = null;
-        resetFees();
         return;
       }
-      const key = callsKey(account.address, calls);
-      if (prevKey.current === key) return; // no change
-
+      const arr = Array.isArray(calls) ? calls : [calls];
+      const key = stableStringify(arr);
+      if (prevKey.current === key) return;
       prevKey.current = key;
-      await doEstimate(account as Account, calls);
+      setCallsState(arr);
     }, debounceMs) as unknown as number;
-
     return clearTimer;
-  }, [enabled, account?.address, buildCalls, callsKey, doEstimate, debounceMs, account]);
+  }, [enabled, debounceMs, buildCalls]);
+
+  // ---------------- standard estimate (starknet.js v8) ----------------
+  const [stdLoading, setStdLoading] = useState(false);
+  const [stdError, setStdError] = useState<string | null>(null);
+  const [feeUnit, setFeeUnit] = useState<"WEI" | "FRI" | null>(null);
+  const [feeAtomic, setFeeAtomic] = useState<bigint | null>(null);
+  const [feeNative, setFeeNative] = useState<number | null>(null);
+  const [feeUsd, setFeeUsd] = useState<number | null>(null);
+  const [usedCurrency, setUsedCurrency] = useState<DisplayCurrency | null>(null);
+
+  const resetStd = () => {
+    setStdError(null);
+    setFeeUnit(null);
+    setFeeAtomic(null);
+    setFeeNative(null);
+    setFeeUsd(null);
+    setUsedCurrency(null);
+  };
+
+  const computeStdDisplay = useCallback((atomic: bigint, unit: "WEI" | "FRI") => {
+    const actualToken: DisplayCurrency = unit === "WEI" ? "ETH" : "STRK";
+    const actualNative = unit === "WEI" ? weiToEth(atomic) : friToStrk(atomic);
+    const price = actualToken === "ETH" ? ethPrice ?? null : strkPrice ?? null;
+    const usd = price != null ? actualNative * price : null;
+
+    if (currency === actualToken) {
+      return { native: actualNative, usd, used: actualToken };
+    }
+    if (usd != null) {
+      const tgt = currency === "ETH" ? ethPrice ?? null : strkPrice ?? null;
+      if (tgt != null && tgt > 0) return { native: usd / tgt, usd, used: currency };
+    }
+    return { native: actualNative, usd, used: actualToken };
+  }, [currency, ethPrice, strkPrice]);
+
+  const doStdEstimate = useCallback(async (acct: Account, calls?: Call[]) => {
+    if (!calls || calls.length === 0) {
+      resetStd();
+      return;
+    }
+    setStdLoading(true);
+    setStdError(null);
+    try {
+      const res = await acct.estimateInvokeFee(calls);
+      const atomic: bigint =
+        (res as any)?.suggestedMaxFee ??
+        (res as any)?.overall_fee ??
+        0n;
+      const unit = (res as any)?.unit as "WEI" | "FRI" | undefined;
+
+      setFeeAtomic(atomic);
+      if (unit) {
+        setFeeUnit(unit);
+        const { native, usd, used } = computeStdDisplay(atomic, unit);
+        setFeeNative(native);
+        setFeeUsd(usd);
+        setUsedCurrency(used);
+      } else {
+        setFeeNative(null);
+        setFeeUsd(null);
+        setUsedCurrency(null);
+      }
+    } catch (e) {
+      console.error("standard fee estimation failed", e);
+      resetStd();
+      setStdError("Fee estimation unavailable");
+    } finally {
+      setStdLoading(false);
+    }
+  }, [computeStdDisplay]);
+
+  useEffect(() => {
+    if (!enabled || !account?.address) {
+      resetStd();
+      return;
+    }
+    void doStdEstimate(account as Account, callsState);
+  }, [enabled, account?.address, callsState, doStdEstimate, account]);
+
+  // ---------------- paymaster estimate (AVNU) ----------------
+  const { data: pmTokens } = usePaymasterGasTokens();
+  const selectedDecimals = useMemo(() => {
+    const addr = selectedToken?.address?.toLowerCase?.();
+    const t = pmTokens?.find((x: any) => {
+      const tokenAddress =
+        (x.address ?? x.tokenAddress ?? x.token_address ?? "") as string;
+      return tokenAddress.toLowerCase?.() === addr;
+    });
+    return Number(
+      t?.decimals ?? 18,
+    );
+  }, [pmTokens, selectedToken?.address]);
+
+  const paymasterOptions: PaymasterDetails | undefined = useMemo(() => {
+    if (!selectedToken?.address) return {
+      feeMode: { mode: "default", gasToken: universalStrkAddress },
+    };
+    return {
+      feeMode: { mode: "default", gasToken: selectedToken.address },
+    };
+  }, [selectedToken?.address]);
+
+  const pmEnabled = enabled && !!callsState?.length && !!paymasterOptions;
+
+  const {
+    data: pmData,
+    error: pmErrorObj,
+    isPending: pmLoading,
+  } = usePaymasterEstimateFees({
+    calls: callsState,
+    options: paymasterOptions,
+    enabled: pmEnabled,
+  });
+
+  const pmAtomic: bigint | null = useMemo(() => {
+    if (!pmData) return null;
+    const raw =
+      (pmData as any)?.suggested_max_fee_in_gas_token ??
+      (pmData as any)?.suggestedMaxFeeInGasToken ??
+      (pmData as any)?.suggested_max_fee ??
+      (pmData as any)?.suggestedMaxFee ??
+      0;
+    try {
+      return typeof raw === "bigint" ? raw : BigInt(raw);
+    } catch {
+      return null;
+    }
+  }, [pmData]);
+
+  const pmNative: number | null = useMemo(() => {
+    if (pmAtomic == null || !selectedToken?.symbol) return null;
+
+    if (selectedToken.symbol === "ETH") return weiToEth(pmAtomic);
+    if (selectedToken.symbol === "STRK") return friToStrk(pmAtomic);
+
+    try {
+      return Number(pmAtomic) / 10 ** selectedDecimals;
+    } catch {
+      return null;
+    }
+  }, [pmAtomic, selectedDecimals, selectedToken?.symbol]);
+
+  const pmUsd: number | null = useMemo(() => {
+    if (pmNative == null || !selectedToken?.symbol) return null;
+    if (selectedToken.symbol === "ETH" && ethPrice != null) return pmNative * ethPrice;
+    if (selectedToken.symbol === "STRK" && strkPrice != null) return pmNative * strkPrice;
+    return null;
+  }, [pmNative, selectedToken?.symbol, ethPrice, strkPrice]);
+
+  const pmError = pmErrorObj ? pmErrorObj.message ?? "Paymaster estimation failed" : null;
+
+  // ---------------- effective display ----------------
+  const showPaymaster =
+    !!pmAtomic &&
+    (!!preferPaymaster || selectedToken?.symbol !== (feeUnit === "WEI" ? "ETH" : "STRK"));
+
+  const effectiveNative = showPaymaster ? pmNative : feeNative;
+  const effectiveUsd = showPaymaster ? pmUsd : feeUsd;
+  const effectiveCurrency: string | null = showPaymaster
+    ? selectedToken?.symbol ?? null
+    : usedCurrency;
+
+  const loading = stdLoading || (pmEnabled && pmLoading);
+  const error = showPaymaster ? pmError : stdError;
+
+  const refresh = useCallback(async () => {
+    const calls = await buildCalls();
+    setCallsState(calls ? (Array.isArray(calls) ? calls : [calls]) : undefined);
+  }, [buildCalls]);
 
   return {
-    // Status
     loading,
     error,
 
-    // Amounts
-    feeWei,        // bigint | null (actually WEI or FRI; see feeUnit)
-    feeNative,     // number | null, in `usedCurrency`
-    feeUsd,        // number | null
-    feeUnit,       // 'WEI' | 'FRI' | null (from starknet.js)
-    usedCurrency,  // 'ETH' | 'STRK' | null (what feeNative is denominated in)
+    feeWei: feeAtomic,
+    feeNative,
+    feeUsd,
+    feeUnit,
+    usedCurrency,
 
-    // Controls
+    paymaster: {
+      enabled: pmEnabled,
+      loading: pmLoading,
+      error: pmError,
+      feeAtomic: pmAtomic,
+      feeNative: pmNative,
+      feeUsd: pmUsd,
+      token: selectedToken,
+      decimals: selectedDecimals,
+      raw: pmData,
+    },
+
+    usingPaymaster: !!showPaymaster,
+    effectiveNative,
+    effectiveUsd,
+    effectiveCurrency,
+
     refresh,
   };
 }

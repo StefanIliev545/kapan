@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 export interface NetworkOption {
@@ -21,6 +21,10 @@ export const NetworkFilter: React.FC<NetworkFilterProps> = ({
   onNetworkChange 
 }) => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>(defaultNetwork);
+
+  useEffect(() => {
+    setSelectedNetwork(defaultNetwork);
+  }, [defaultNetwork]);
 
   const handleNetworkChange = (networkId: string) => {
     setSelectedNetwork(networkId);
