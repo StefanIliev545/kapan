@@ -238,19 +238,26 @@ export const useProtocolPaymasterSendTransaction = (
       const baseInstruction = buildBaseInstruction(activeContext, account.address);
       const authorizations = await getAuthorizations([baseInstruction]);
 
+      const isProcessInstructionCall = (call: Call): boolean => {
+        const entrypoint = call.entrypoint?.toLowerCase?.();
+        if (!entrypoint) return false;
+
+        const matchesProcess = entrypoint.includes("process_protocol_instruction");
+        if (!matchesProcess) return false;
+
+        const contractAddress = call.contractAddress?.toLowerCase?.();
+        if (!contractAddress) return matchesProcess;
+
+        return contractAddress === routerGateway.address.toLowerCase();
+      };
+
       const authorizationCalls: Call[] = (authorizations || []).map(auth => ({
         contractAddress: auth.contractAddress,
         entrypoint: auth.entrypoint,
         calldata: auth.calldata,
       }));
 
-      const hasProcessCall = authorizationCalls.some(call => {
-        const contractAddress = call.contractAddress?.toLowerCase?.();
-        return (
-          contractAddress === routerGateway.address.toLowerCase() &&
-          call.entrypoint === "process_protocol_instructions"
-        );
-      });
+      const hasProcessCall = authorizationCalls.some(isProcessInstructionCall);
 
       const executeCall: Call | null = hasProcessCall
         ? null
@@ -260,7 +267,25 @@ export const useProtocolPaymasterSendTransaction = (
             calldata: CallData.compile({ instructions: [baseInstruction] }),
           };
 
-      return [...formattedCalls, ...authorizationCalls, ...(executeCall ? [executeCall] : [])];
+      const combinedCalls = [...formattedCalls, ...authorizationCalls, ...(executeCall ? [executeCall] : [])];
+
+      if (!combinedCalls.some(isProcessInstructionCall)) {
+        return combinedCalls;
+      }
+
+      let seenProcessInstruction = false;
+      return combinedCalls.filter(call => {
+        if (!isProcessInstructionCall(call)) {
+          return true;
+        }
+
+        if (seenProcessInstruction) {
+          return false;
+        }
+
+        seenProcessInstruction = true;
+        return true;
+      });
     },
     [account?.address, calls, getAuthorizations, resolveContext, routerGateway?.address],
   );

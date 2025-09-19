@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "node ./node_modules/next/dist/bin/next build",
+    "build": "NEXT_IGNORE_INCORRECT_LOCKFILE=1 node ./node_modules/next/dist/bin/next build",
     "check-types": "tsc --noEmit --incremental",
     "dev": "node ./node_modules/next/dist/bin/next dev --turbo",
     "format": "prettier --write . '!(node_modules|.next|contracts)/**/*'",

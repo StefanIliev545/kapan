@@ -166,15 +166,17 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
       console.log(`Using paymaster with ${selectedToken?.symbol ?? "custom token"} for gas payment`);
 
       let overrides: { amount: bigint } | undefined;
+      let latestEstimate: PaymasterFeeEstimate | undefined;
+      let tokenSnapshot = selectedToken;
 
       if (hasCustomConfig) {
         const baseAmount = customAmount && customAmount > 0n ? customAmount : 1n;
         overrides = { amount: baseAmount };
 
         try {
-          const estimate = await estimateProtocolFee(calls, overrides);
-          const suggestedAmount = extractSuggestedGasAmount(estimate);
-          const estimatedAmount = toBigIntSafe(estimate?.estimated_fee_in_gas_token);
+          latestEstimate = await estimateProtocolFee(calls, overrides);
+          let suggestedAmount = extractSuggestedGasAmount(latestEstimate);
+          let estimatedAmount = toBigIntSafe(latestEstimate?.estimated_fee_in_gas_token);
 
           console.log("Protocol paymaster fee estimate", {
             token: selectedToken?.symbol ?? selectedToken?.address,
@@ -183,45 +185,84 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
           });
 
           if (suggestedAmount && suggestedAmount > 0n) {
-            overrides = { ...overrides, amount: suggestedAmount };
+            let effectiveAmount = suggestedAmount;
 
-            if (selectedToken && suggestedAmount.toString() !== selectedToken.amount) {
-              updateSelectedToken({
-                ...selectedToken,
-                amount: suggestedAmount.toString(),
-                lastEstimate: {
-                  suggestedMaxFee: suggestedAmount.toString(),
-                  estimatedFee: estimatedAmount?.toString(),
-                  tokenAddress: selectedToken.address,
-                  updatedAt: Date.now(),
-                  mode: selectedToken.mode,
-                },
+            if (suggestedAmount !== overrides?.amount) {
+              const refinedEstimate = await estimateProtocolFee(calls, {
+                ...overrides,
+                amount: suggestedAmount,
               });
-            } else if (selectedToken) {
-              updateSelectedToken({
-                ...selectedToken,
-                lastEstimate: {
-                  suggestedMaxFee: suggestedAmount.toString(),
-                  estimatedFee: estimatedAmount?.toString(),
-                  tokenAddress: selectedToken.address,
-                  updatedAt: Date.now(),
-                  mode: selectedToken.mode,
-                },
-              });
+
+              latestEstimate = refinedEstimate;
+              const refinedSuggested = extractSuggestedGasAmount(refinedEstimate);
+              if (refinedSuggested && refinedSuggested > 0n) {
+                effectiveAmount = refinedSuggested;
+              }
+
+              suggestedAmount = refinedSuggested ?? suggestedAmount;
+              estimatedAmount = toBigIntSafe(refinedEstimate?.estimated_fee_in_gas_token);
             }
+
+            overrides = { ...overrides, amount: effectiveAmount };
+
+            if (tokenSnapshot) {
+              const nextToken = {
+                ...tokenSnapshot,
+                amount: effectiveAmount.toString(),
+                lastEstimate: {
+                  suggestedMaxFee: suggestedAmount?.toString(),
+                  estimatedFee: estimatedAmount?.toString(),
+                  tokenAddress: tokenSnapshot.address,
+                  updatedAt: Date.now(),
+                  mode: tokenSnapshot.mode,
+                },
+              };
+              updateSelectedToken(nextToken);
+              tokenSnapshot = nextToken;
+            }
+          } else if (tokenSnapshot) {
+            const nextToken = {
+              ...tokenSnapshot,
+              lastEstimate: undefined,
+            };
+            updateSelectedToken(nextToken);
+            tokenSnapshot = nextToken;
           }
         } catch (feeError) {
           console.warn("Failed to estimate protocol paymaster fee", feeError);
-          if (selectedToken?.lastEstimate) {
-            updateSelectedToken({
-              ...selectedToken,
+          if (tokenSnapshot?.lastEstimate) {
+            const nextToken = {
+              ...tokenSnapshot,
               lastEstimate: undefined,
-            });
+            };
+            updateSelectedToken(nextToken);
+            tokenSnapshot = nextToken;
           }
         }
       }
 
       const finalCalls = await prepareCalls(calls, overrides);
+
+      if (latestEstimate) {
+        const suggestedAmount = extractSuggestedGasAmount(latestEstimate);
+        const estimatedAmount = toBigIntSafe(latestEstimate?.estimated_fee_in_gas_token);
+
+        if (tokenSnapshot) {
+          const nextToken = {
+            ...tokenSnapshot,
+            lastEstimate: {
+              suggestedMaxFee: suggestedAmount?.toString(),
+              estimatedFee: estimatedAmount?.toString(),
+              tokenAddress: tokenSnapshot.address,
+              updatedAt: Date.now(),
+              mode: tokenSnapshot.mode,
+            },
+          };
+          updateSelectedToken(nextToken);
+          tokenSnapshot = nextToken;
+        }
+      }
+
       const paymasterResult = await sendPaymasterTransaction(finalCalls);
       return paymasterResult.transaction_hash;
     };
