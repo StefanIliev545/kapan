@@ -2,10 +2,10 @@ import { FC } from "react";
 
 import { ProtocolView } from "../../ProtocolView";
 import { useAccount } from "~~/hooks/useAccount";
+import { NostraTokensProvider } from "~~/contexts/NostraTokensContext";
 import { useNostraLendingPositions } from "~~/hooks/useNostraLendingPositions";
 
-export const NostraProtocolView: FC = () => {
-  const { address: connectedAddress } = useAccount();
+const NostraProtocolViewContent: FC<{ connectedAddress?: string }> = ({ connectedAddress }) => {
   const { suppliedPositions, borrowedPositions } = useNostraLendingPositions();
 
   return (
@@ -20,6 +20,16 @@ export const NostraProtocolView: FC = () => {
       networkType="starknet"
       disableMoveSupply
     />
+  );
+};
+
+export const NostraProtocolView: FC = () => {
+  const { address: connectedAddress } = useAccount();
+
+  return (
+    <NostraTokensProvider>
+      <NostraProtocolViewContent connectedAddress={connectedAddress} />
+    </NostraTokensProvider>
   );
 };
 

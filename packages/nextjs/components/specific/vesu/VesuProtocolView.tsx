@@ -2,6 +2,7 @@ import { FC, useEffect, useMemo, useState } from "react";
 
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
+import { VesuTokensProvider } from "~~/contexts/VesuTokensContext";
 import type { VesuContext } from "~~/hooks/useLendingAction";
 import {
   useVesuLendingPositions,
@@ -26,10 +27,11 @@ type DepositSelectionState = {
   position?: PositionManager;
 } | null;
 
-export const VesuProtocolView: FC = () => {
-  const { address: userAddress, status } = useAccount();
-  const poolId = POOL_IDS["Genesis"];
-
+const VesuProtocolViewContent: FC<{ poolId: bigint; userAddress?: string; status?: string }> = ({
+  poolId,
+  userAddress,
+  status,
+}) => {
   const {
     assetsWithRates,
     suppliablePositions,
@@ -165,6 +167,17 @@ export const VesuProtocolView: FC = () => {
         />
       )}
     </div>
+  );
+};
+
+export const VesuProtocolView: FC = () => {
+  const { address: userAddress, status } = useAccount();
+  const poolId = POOL_IDS["Genesis"];
+
+  return (
+    <VesuTokensProvider poolId={poolId}>
+      <VesuProtocolViewContent poolId={poolId} userAddress={userAddress} status={status} />
+    </VesuTokensProvider>
   );
 };
 
