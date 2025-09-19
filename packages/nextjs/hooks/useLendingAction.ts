@@ -119,11 +119,11 @@ export const useLendingAction = (
       };
       const fullInstruction = CallData.compile({ instructions: [baseInstruction] });
       const authInstruction = CallData.compile({ instructions: [baseInstruction], rawSelectors: false });
-      const contract = new Contract(
-        starkRouterGateway.abi as Abi,
-        starkRouterGateway.address,
-        starkAccount,
-      );
+      const contract = new Contract({
+        abi: starkRouterGateway.abi as Abi,
+        address: starkRouterGateway.address,
+        providerOrAccount: starkAccount,
+      });
       const protocolInstructions = await contract.call(
         "get_authorizations_for_instructions",
         authInstruction,
