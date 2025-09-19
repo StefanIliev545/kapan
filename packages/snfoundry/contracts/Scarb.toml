@@ -14,7 +14,7 @@ alexandria_math = "0.4.0"
 
 [dev-dependencies]
 openzeppelin_utils = "1.0.0"
-snforge_std = "0.45.0"
+snforge_std = "0.49.0"
 
 [[target.starknet-contract]]
 casm = true
@@ -30,8 +30,8 @@ threads = 1
 
 [[tool.snforge.fork]]
 name = "MAINNET_LATEST"
-url = "https://starknet-mainnet.public.blastapi.io/rpc/v0_8"
-block_id.tag = "latest"
+url = "$FORK_URL"
+block_id.number = "2205419"
 
 [scripts]
 test = "snforge test"
