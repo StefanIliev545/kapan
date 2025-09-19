@@ -216,7 +216,7 @@ export const useProtocolPaymasterSendTransaction = (
         calldata: CallData.compile({ instructions: [baseInstruction] }),
       };
 
-      return [...authorizationCalls, executeCall, ...formattedCalls];
+      return [...formattedCalls, ...authorizationCalls, executeCall];
     },
     [account?.address, calls, customContext, getAuthorizations, routerGateway?.address],
   );

@@ -178,6 +178,7 @@ interface UseVesuGasSourcesResult {
 export const useVesuGasSources = (): UseVesuGasSourcesResult => {
   const { address: userAddress } = useAccount();
   const poolId = POOL_IDS["Genesis"];
+  const poolIdString = useMemo(() => poolId.toString(), [poolId]);
 
   const { data: supportedAssets, error: assetsError, isLoading: isAssetsLoading } = useScaffoldReadContract({
     contractName: "VesuGateway",
@@ -250,7 +251,7 @@ export const useVesuGasSources = (): UseVesuGasSourcesResult => {
           formattedEstimate: formatUnits(normalizedEstimate, collateral.decimals),
           estimateAmount: normalizedEstimate,
           poolId,
-          poolIdString: poolId.toString(),
+          poolIdString,
           counterpartToken: position.debtAddress,
           counterpartSymbol: debt?.symbol,
         } as VesuGasCollateralOption;
@@ -278,7 +279,7 @@ export const useVesuGasSources = (): UseVesuGasSourcesResult => {
           formattedEstimate: formatUnits(estimateAmount, debt.decimals),
           estimateAmount,
           poolId,
-          poolIdString: poolId.toString(),
+          poolIdString,
           counterpartToken: position.collateralAddress,
           counterpartSymbol: collateral?.symbol,
         } as VesuGasBorrowOption;
@@ -287,7 +288,14 @@ export const useVesuGasSources = (): UseVesuGasSourcesResult => {
   }, [assetMap, mergedPositions, poolId]);
 
   const combinedError = assetsError || positionsError1 || positionsError2;
-  const isLoading = Boolean(isAssetsLoading || (userAddress && (isFetchingPart1 || isFetchingPart2)));
+
+  const isInitialAssetsLoading = !supportedAssets && isAssetsLoading;
+  const isInitialPositionsLoading = Boolean(
+    userAddress &&
+      ((userPositionsPart1 === undefined && isFetchingPart1) || (userPositionsPart2 === undefined && isFetchingPart2)),
+  );
+
+  const isLoading = Boolean(isInitialAssetsLoading || isInitialPositionsLoading);
 
   return {
     collateralOptions,
