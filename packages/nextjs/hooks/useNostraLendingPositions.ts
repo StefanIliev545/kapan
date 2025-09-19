@@ -157,6 +157,8 @@ const parseInterestRates = (rates: unknown, addresses: string[]): Record<string,
   }, {});
 };
 
+const PRICE_SCALE = 10n ** 10n;
+
 const parsePrices = (prices: unknown, addresses: string[]): Record<string, bigint> => {
   if (!prices || addresses.length === 0) return {};
 
@@ -169,19 +171,19 @@ const parsePrices = (prices: unknown, addresses: string[]): Record<string, bigin
   return addresses.reduce<Record<string, bigint>>((acc, address, index) => {
     const price = entries[index];
     if (typeof price === "bigint") {
-      acc[address] = price;
+      acc[address] = price / PRICE_SCALE;
     }
     return acc;
   }, {});
 };
 
-const computeUsdValue = (amount: bigint, decimals: number, price: bigint): number => {
-  if (amount === 0n || price === 0n) {
+const computeUsdValue = (amount: bigint, decimals: number, priceWithEightDecimals: bigint): number => {
+  if (amount === 0n || priceWithEightDecimals === 0n) {
     return 0;
   }
 
   const tokenAmount = Number(formatUnits(amount, decimals));
-  const priceAsNumber = Number(price) / 1e18;
+  const priceAsNumber = Number(priceWithEightDecimals) / 1e8;
 
   return tokenAmount * priceAsNumber;
 };
@@ -248,13 +250,13 @@ export const useNostraLendingPositions = () => {
       const debtBalance = position?.debtBalance ?? 0n;
       const collateralBalance = position?.collateralBalance ?? 0n;
       const rates = rateMap[tokenAddress];
-      const price = priceMap[tokenAddress] ?? 0n;
+      const priceWithEightDecimals = priceMap[tokenAddress] ?? 0n;
 
       const supplyAPY = rates?.supplyAPY ?? 0;
       const borrowAPR = rates?.borrowAPR ?? 0;
 
-      const suppliedValue = computeUsdValue(collateralBalance, decimals, price);
-      const borrowedValue = computeUsdValue(debtBalance, decimals, price);
+      const suppliedValue = computeUsdValue(collateralBalance, decimals, priceWithEightDecimals);
+      const borrowedValue = computeUsdValue(debtBalance, decimals, priceWithEightDecimals);
 
       supplied.push({
         icon: tokenNameToLogo(symbol.toLowerCase()),
@@ -264,7 +266,7 @@ export const useNostraLendingPositions = () => {
         currentRate: supplyAPY,
         tokenAddress,
         tokenDecimals: decimals,
-        tokenPrice: price,
+        tokenPrice: priceWithEightDecimals,
         tokenSymbol: symbol,
       });
 
@@ -276,7 +278,7 @@ export const useNostraLendingPositions = () => {
         currentRate: borrowAPR,
         tokenAddress,
         tokenDecimals: decimals,
-        tokenPrice: price,
+        tokenPrice: priceWithEightDecimals,
         tokenSymbol: symbol,
       });
     });
