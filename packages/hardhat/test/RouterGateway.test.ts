@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { RouterGateway } from "../typechain-types";
+import { RouterGateway, MockGateway, ERC20PresetMinterPauser } from "../typechain-types";
 
 describe("RouterGateway", function () {
   let routerGateway: RouterGateway;
@@ -32,6 +32,39 @@ describe("RouterGateway", function () {
       await expect(
         routerGateway.connect(user).addGateway("testProtocol", mockGatewayAddress)
       ).to.be.revertedWithCustomError(routerGateway, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("Protocol Instructions", function () {
+    it("should cap oversized deposits and repays and support withdraw_all", async function () {
+      const mockGateway = (await ethers.deployContract("MockGateway")) as MockGateway;
+      await routerGateway.addGateway("mock", await mockGateway.getAddress());
+
+      const token = (await ethers.deployContract("ERC20PresetMinterPauser", ["Test", "TST"])) as ERC20PresetMinterPauser;
+
+      // Deposit with amount larger than balance
+      await token.mint(await owner.getAddress(), 500);
+      await token.approve(await routerGateway.getAddress(), 1000);
+      await routerGateway.processProtocolInstructions([
+        { protocolName: "mock", instructions: [ { instructionType: 0, basic: { token: await token.getAddress(), amount: 1000, user: await owner.getAddress() }, context: "0x" } ] }
+      ]);
+      expect(await mockGateway.lastAmount()).to.equal(500);
+
+      // Repay all debt with limited balance
+      await mockGateway.setMockDebt(1000);
+      await token.mint(await owner.getAddress(), 300);
+      await token.approve(await routerGateway.getAddress(), 300);
+      await routerGateway.processProtocolInstructions([
+        { protocolName: "mock", instructions: [ { instructionType: 3, basic: { token: await token.getAddress(), amount: ethers.MaxUint256, user: await owner.getAddress() }, context: "0x" } ] }
+      ]);
+      expect(await mockGateway.lastAmount()).to.equal(300);
+
+      // Withdraw all available balance
+      await mockGateway.setMockBalance(1000);
+      await routerGateway.processProtocolInstructions([
+        { protocolName: "mock", instructions: [ { instructionType: 1, basic: { token: await token.getAddress(), amount: ethers.MaxUint256, user: await owner.getAddress() }, context: "0x" } ] }
+      ]);
+      expect(await mockGateway.lastAmount()).to.equal(1000);
     });
   });
 
