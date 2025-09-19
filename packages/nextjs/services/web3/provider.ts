@@ -19,7 +19,7 @@ if (!rpcUrl) {
 const provider = jsonRpcProvider({
   rpc: () => ({
     nodeUrl: rpcUrl,
-    specVersion: "0.8.1",
+    specVersion: "0.9",
     chainId: starknetChainId(currentNetwork.id),
   }),
 });

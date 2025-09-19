@@ -102,7 +102,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     functionName: "balance_of",
     abi: universalErc20Abi,
     args: [userAddress as `0x${string}`],
-    blockIdentifier: "pending" as BlockNumber,
+    blockIdentifier: "latest" as BlockNumber,
     enabled: isOpen && (actionType === "deposit" || actionType === "repay"),
   });
 
