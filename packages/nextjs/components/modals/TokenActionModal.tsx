@@ -7,6 +7,7 @@ import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 
 export interface TokenInfo {
   name: string;
@@ -197,6 +198,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
   const parsed = parseFloat(amount || "0");
+  const { selectedToken } = useSelectedGasToken();
 
   const price = token.usdPrice || 0;
   const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
@@ -252,6 +254,42 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     buildCalls: buildCallsForEstimate,
     currency: "STRK",
   });
+
+  const paymasterEstimate = useMemo(() => {
+    if (!selectedToken?.lastEstimate) return null;
+    const tokenAddress = selectedToken.address?.toLowerCase?.();
+    const estimateAddress = selectedToken.lastEstimate.tokenAddress?.toLowerCase?.();
+    if (!tokenAddress || tokenAddress !== estimateAddress) return null;
+
+    const decimals = selectedToken.decimals ?? 18;
+    const symbol = selectedToken.symbol ?? "TKN";
+    const mode = selectedToken.lastEstimate.mode ?? selectedToken.mode ?? "default";
+
+    let formattedSuggested: string | null = null;
+    if (selectedToken.lastEstimate.suggestedMaxFee) {
+      try {
+        formattedSuggested = formatUnits(BigInt(selectedToken.lastEstimate.suggestedMaxFee), decimals);
+      } catch (error) {
+        console.warn("Failed to format suggested paymaster fee", error);
+      }
+    }
+
+    let formattedEstimated: string | null = null;
+    if (selectedToken.lastEstimate.estimatedFee) {
+      try {
+        formattedEstimated = formatUnits(BigInt(selectedToken.lastEstimate.estimatedFee), decimals);
+      } catch (error) {
+        console.warn("Failed to format estimated paymaster fee", error);
+      }
+    }
+
+    return {
+      formattedSuggested,
+      formattedEstimated,
+      symbol,
+      mode,
+    };
+  }, [selectedToken]);
 
   const handleClose = () => {
     setAmount("");
@@ -339,13 +377,29 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                   )}
                 </span>
                 {network === "stark" && (
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump className="text-gray-400" />
-                    {feeLoading && feeNative === null ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : feeError ? null : feeNative !== null ? (
-                      <span>{feeNative.toFixed(4)} STRK</span>
-                    ) : null}
+                  <span className="flex flex-col items-end gap-1 text-xs">
+                    <span className="flex items-center gap-1">
+                      <FaGasPump className="text-gray-400" />
+                      {feeLoading && feeNative === null ? (
+                        <span className="loading loading-spinner loading-xs" />
+                      ) : feeError ? null : feeNative !== null ? (
+                        <span>{feeNative.toFixed(4)} STRK</span>
+                      ) : null}
+                    </span>
+                    {paymasterEstimate && paymasterEstimate.mode !== "default" && (
+                      <span className="flex items-center gap-1 text-[10px] text-base-content/60">
+                        ≈
+                        <span className="font-medium">
+                          {paymasterEstimate.formattedSuggested ?? paymasterEstimate.formattedEstimated ?? "-"}
+                        </span>
+                        {paymasterEstimate.symbol}
+                        {paymasterEstimate.formattedEstimated &&
+                          paymasterEstimate.formattedSuggested &&
+                          paymasterEstimate.formattedEstimated !== paymasterEstimate.formattedSuggested && (
+                            <span className="text-[10px]">(est. {paymasterEstimate.formattedEstimated})</span>
+                          )}
+                      </span>
+                    )}
                   </span>
                 )}
               </button>

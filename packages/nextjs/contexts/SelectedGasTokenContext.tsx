@@ -8,6 +8,22 @@ interface SelectedGasToken {
   name: string;
   icon: string;
   balance: string;
+  decimals?: number;
+  mode?: "default" | "collateral" | "borrow";
+  protocol?: string;
+  amount?: string;
+  useMax?: boolean;
+  vesuContext?: {
+    poolId: string;
+    counterpartToken: string;
+  };
+  lastEstimate?: {
+    suggestedMaxFee?: string;
+    estimatedFee?: string;
+    tokenAddress: string;
+    updatedAt: number;
+    mode?: "default" | "collateral" | "borrow";
+  };
 }
 
 interface SelectedGasTokenContextType {
@@ -21,7 +37,10 @@ const DEFAULT_TOKEN: SelectedGasToken = {
   symbol: "STRK",
   name: "STRK",
   icon: "/logos/strk.svg",
-  balance: "0.000"
+  balance: "0.000",
+  decimals: 18,
+  mode: "default",
+  lastEstimate: undefined,
 };
 
 const SelectedGasTokenContext = createContext<SelectedGasTokenContextType | undefined>(undefined);
@@ -34,8 +53,13 @@ export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ ch
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored);
-        setSelectedToken(parsed);
+        const parsed = JSON.parse(stored) as SelectedGasToken;
+        setSelectedToken({
+          ...DEFAULT_TOKEN,
+          ...parsed,
+          mode: parsed.mode ?? "default",
+          lastEstimate: parsed.lastEstimate,
+        });
       }
     } catch (error) {
       console.warn("Failed to load selected gas token from localStorage:", error);
@@ -62,7 +86,7 @@ export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ ch
 export const useSelectedGasToken = () => {
   const context = useContext(SelectedGasTokenContext);
   if (context === undefined) {
-    throw new Error('useSelectedGasToken must be used within a SelectedGasTokenProvider');
+    throw new Error("useSelectedGasToken must be used within a SelectedGasTokenProvider");
   }
   return context;
 };

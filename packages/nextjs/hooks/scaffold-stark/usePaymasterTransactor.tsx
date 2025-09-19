@@ -1,10 +1,19 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse, constants, RpcProvider, Call } from "starknet";
+import {
+  AccountInterface,
+  InvokeFunctionResponse,
+  constants,
+  RpcProvider,
+  Call,
+  PaymasterFeeEstimate,
+  BigNumberish,
+} from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
-import { usePaymasterSendTransaction, usePaymasterGasTokens } from "@starknet-react/core";
+import { usePaymasterGasTokens } from "@starknet-react/core";
 import { universalStrkAddress } from "~~/utils/Constants";
+import { useProtocolPaymasterSendTransaction } from "./useProtocolPaymasterSendTransaction";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
@@ -26,6 +35,46 @@ const TxnNotification = ({ message, blockExplorerLink }: { message: string; bloc
   );
 };
 
+const toBigIntSafe = (value?: BigNumberish | null): bigint | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    return BigInt(Math.floor(value));
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return null;
+    try {
+      return BigInt(trimmed);
+    } catch (error) {
+      console.warn("Failed to parse BigNumberish string", value, error);
+      return null;
+    }
+  }
+
+  try {
+    return BigInt((value as { toString: () => string }).toString());
+  } catch (error) {
+    console.warn("Unable to convert BigNumberish value", value, error);
+    return null;
+  }
+};
+
+const extractSuggestedGasAmount = (estimate: PaymasterFeeEstimate): bigint | null => {
+  const suggested = toBigIntSafe(estimate?.suggested_max_fee_in_gas_token);
+  if (suggested && suggested > 0n) {
+    return suggested;
+  }
+
+  const estimated = toBigIntSafe(estimate?.estimated_fee_in_gas_token);
+  if (estimated && estimated > 0n) {
+    return estimated;
+  }
+
+  return null;
+};
+
 /**
  * Paymaster-aware transactor that automatically uses gasless transactions when non-STRK token is selected.
  * Falls back to regular transactions for STRK or when paymaster is unavailable.
@@ -34,7 +83,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   let walletClient = _walletClient;
   const { account } = useAccount();
   const { targetNetwork } = useTargetNetwork();
-  const { selectedToken } = useSelectedGasToken();
+  const { selectedToken, updateSelectedToken } = useSelectedGasToken();
 
   if (walletClient === undefined && account) {
     walletClient = account;
@@ -49,18 +98,58 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   const selectedAddr = selectedToken?.address?.toLowerCase();
   const STRK_ADDRESS = universalStrkAddress.toLowerCase();
   const { data: paymasterTokens } = usePaymasterGasTokens();
+  const selectedMode = selectedToken?.mode ?? "default";
+  const isCustomMode = selectedMode === "collateral" || selectedMode === "borrow";
   const isSelectedStrk = selectedAddr === STRK_ADDRESS || (selectedToken?.symbol?.toUpperCase?.() === "STRK");
   const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: any) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
-  const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
+
+  let customAmount: bigint | undefined;
+  if (selectedToken?.amount && isCustomMode) {
+    try {
+      customAmount = BigInt(selectedToken.amount);
+    } catch (error) {
+      console.warn("Failed to parse custom gas token amount", error);
+    }
+  }
+
+  const hasCustomConfig =
+    isCustomMode &&
+    customAmount !== undefined &&
+    typeof selectedToken?.protocol === "string" &&
+    selectedToken.protocol.trim().length > 0;
+  const shouldUsePaymaster = hasCustomConfig || (!isSelectedStrk && isSupportedPaymasterToken);
+
+  const vesuContext = selectedToken?.vesuContext && isCustomMode
+    ? {
+        poolId: (() => {
+          try {
+            return BigInt(selectedToken.vesuContext.poolId);
+          } catch (error) {
+            console.warn("Failed to parse Vesu pool id", error);
+            return undefined;
+          }
+        })(),
+        counterpartToken: selectedToken.vesuContext.counterpartToken,
+      }
+    : undefined;
+
+  const normalizedVesuContext = vesuContext?.poolId && vesuContext.counterpartToken
+    ? { poolId: vesuContext.poolId, counterpartToken: vesuContext.counterpartToken }
+    : undefined;
 
   // Setup paymaster transaction hook
-  const { sendAsync: sendPaymasterTransaction } = usePaymasterSendTransaction({
-    calls: [], // Will be overridden in execution
-    options: {
-      feeMode: shouldUsePaymaster
-        ? { mode: "default" as const, gasToken: selectedToken!.address }
-        : { mode: "sponsored" as const },
-    },
+  const {
+    sendAsync: sendPaymasterTransaction,
+    estimateFee: estimateProtocolFee,
+    prepareCalls,
+  } = useProtocolPaymasterSendTransaction({
+    calls: [],
+    mode: hasCustomConfig ? selectedMode : "default",
+    gasToken: selectedToken?.address ?? universalStrkAddress,
+    protocol: hasCustomConfig ? selectedToken?.protocol : undefined,
+    amount: hasCustomConfig ? customAmount : undefined,
+    useMax: hasCustomConfig ? selectedToken?.useMax : undefined,
+    vesuContext: hasCustomConfig ? normalizedVesuContext : undefined,
   });
 
   return async tx => {
@@ -72,6 +161,111 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
 
     let notificationId = null;
     let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
+
+    const performPaymasterExecution = async (calls: Call[]) => {
+      console.log(`Using paymaster with ${selectedToken?.symbol ?? "custom token"} for gas payment`);
+
+      let overrides: { amount: bigint } | undefined;
+      let latestEstimate: PaymasterFeeEstimate | undefined;
+      let tokenSnapshot = selectedToken;
+
+      if (hasCustomConfig) {
+        const baseAmount = customAmount && customAmount > 0n ? customAmount : 1n;
+        overrides = { amount: baseAmount };
+
+        try {
+          latestEstimate = await estimateProtocolFee(calls, overrides);
+          let suggestedAmount = extractSuggestedGasAmount(latestEstimate);
+          let estimatedAmount = toBigIntSafe(latestEstimate?.estimated_fee_in_gas_token);
+
+          console.log("Protocol paymaster fee estimate", {
+            token: selectedToken?.symbol ?? selectedToken?.address,
+            suggested: suggestedAmount?.toString() ?? null,
+            estimated: estimatedAmount?.toString() ?? null,
+          });
+
+          if (suggestedAmount && suggestedAmount > 0n) {
+            let effectiveAmount = suggestedAmount;
+
+            if (suggestedAmount !== overrides?.amount) {
+              const refinedEstimate = await estimateProtocolFee(calls, {
+                ...overrides,
+                amount: suggestedAmount,
+              });
+
+              latestEstimate = refinedEstimate;
+              const refinedSuggested = extractSuggestedGasAmount(refinedEstimate);
+              if (refinedSuggested && refinedSuggested > 0n) {
+                effectiveAmount = refinedSuggested;
+              }
+
+              suggestedAmount = refinedSuggested ?? suggestedAmount;
+              estimatedAmount = toBigIntSafe(refinedEstimate?.estimated_fee_in_gas_token);
+            }
+
+            overrides = { ...overrides, amount: effectiveAmount };
+
+            if (tokenSnapshot) {
+              const nextToken = {
+                ...tokenSnapshot,
+                amount: effectiveAmount.toString(),
+                lastEstimate: {
+                  suggestedMaxFee: suggestedAmount?.toString(),
+                  estimatedFee: estimatedAmount?.toString(),
+                  tokenAddress: tokenSnapshot.address,
+                  updatedAt: Date.now(),
+                  mode: tokenSnapshot.mode,
+                },
+              };
+              updateSelectedToken(nextToken);
+              tokenSnapshot = nextToken;
+            }
+          } else if (tokenSnapshot) {
+            const nextToken = {
+              ...tokenSnapshot,
+              lastEstimate: undefined,
+            };
+            updateSelectedToken(nextToken);
+            tokenSnapshot = nextToken;
+          }
+        } catch (feeError) {
+          console.warn("Failed to estimate protocol paymaster fee", feeError);
+          if (tokenSnapshot?.lastEstimate) {
+            const nextToken = {
+              ...tokenSnapshot,
+              lastEstimate: undefined,
+            };
+            updateSelectedToken(nextToken);
+            tokenSnapshot = nextToken;
+          }
+        }
+      }
+
+      const finalCalls = await prepareCalls(calls, overrides);
+
+      if (latestEstimate) {
+        const suggestedAmount = extractSuggestedGasAmount(latestEstimate);
+        const estimatedAmount = toBigIntSafe(latestEstimate?.estimated_fee_in_gas_token);
+
+        if (tokenSnapshot) {
+          const nextToken = {
+            ...tokenSnapshot,
+            lastEstimate: {
+              suggestedMaxFee: suggestedAmount?.toString(),
+              estimatedFee: estimatedAmount?.toString(),
+              tokenAddress: tokenSnapshot.address,
+              updatedAt: Date.now(),
+              mode: tokenSnapshot.mode,
+            },
+          };
+          updateSelectedToken(nextToken);
+          tokenSnapshot = nextToken;
+        }
+      }
+
+      const paymasterResult = await sendPaymasterTransaction(finalCalls);
+      return paymasterResult.transaction_hash;
+    };
 
     try {
       const networkId = await walletClient.getChainId();
@@ -94,11 +288,9 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
         } else {
           // Result is Call or Call[] - decide whether to use paymaster
           const calls = Array.isArray(result) ? result : [result];
-          
+
           if (shouldUsePaymaster && selectedToken?.address) {
-            console.log(`Using paymaster with ${selectedToken.symbol} for gas payment`);
-            const paymasterResult = await sendPaymasterTransaction(calls);
-            transactionHash = paymasterResult.transaction_hash;
+            transactionHash = await performPaymasterExecution(calls);
           } else {
             console.log("Using regular transaction with STRK for gas payment");
             // Fallback to regular transaction
@@ -111,11 +303,9 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
       } else if (tx != null) {
         // tx is already a Call or Call[]
         const calls = Array.isArray(tx) ? tx : [tx];
-        
+
         if (shouldUsePaymaster && selectedToken?.address) {
-          console.log(`Using paymaster with ${selectedToken.symbol} for gas payment`);
-          const paymasterResult = await sendPaymasterTransaction(calls);
-          transactionHash = paymasterResult.transaction_hash;
+          transactionHash = await performPaymasterExecution(calls);
         } else {
           console.log("Using regular transaction with STRK for gas payment");
           const regularResult = await walletClient.execute(calls, {

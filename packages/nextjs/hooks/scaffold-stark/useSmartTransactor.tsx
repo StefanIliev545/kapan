@@ -26,7 +26,25 @@ export const useSmartTransactor = (_walletClient?: AccountInterface) => {
   const strkAddr = universalStrkAddress.toLowerCase();
   const isSelectedStrk = selectedAddr === strkAddr || (selectedToken?.symbol?.toUpperCase?.() === "STRK");
   const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: any) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
-  const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
+  let customAmount: bigint | undefined;
+  const selectedMode = selectedToken?.mode ?? "default";
+  const isCustomMode = selectedMode === "collateral" || selectedMode === "borrow";
+
+  if (selectedToken?.amount && isCustomMode) {
+    try {
+      customAmount = BigInt(selectedToken.amount);
+    } catch (error) {
+      console.warn("SmartTransactor: failed to parse custom gas token amount", error);
+    }
+  }
+
+  const hasCustomConfig =
+    isCustomMode &&
+    customAmount !== undefined &&
+    typeof selectedToken?.protocol === "string" &&
+    selectedToken.protocol.trim().length > 0;
+
+  const shouldUsePaymaster = hasCustomConfig || (!isSelectedStrk && isSupportedPaymasterToken);
 
   // Only log once per token change
   // console.log(`SmartTransactor: Using ${shouldUsePaymaster ? 'paymaster' : 'regular'} transactor for ${selectedToken?.symbol || 'STRK'}`);
