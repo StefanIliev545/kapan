@@ -1,4 +1,4 @@
-FROM starknetfoundation/starknet-dev:2.11.4
+FROM starknetfoundation/starknet-dev:2.12.0
 
 ENV DEVNET_VERSION=0.4.0
 RUN ARCH=$(uname -m) && \
