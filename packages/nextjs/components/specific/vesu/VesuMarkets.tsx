@@ -7,25 +7,14 @@ import {
   formatRate,
   formatUtilization,
   toAnnualRates,
+  type TokenMetadata,
 } from "~~/utils/protocols";
 
 export const POOL_IDS = {
   Genesis: 2198503327643286920898110335698706244522220458610657370981979460625005526824n,
 } as const;
 
-export type ContractResponse = {
-  readonly address: bigint;
-  readonly symbol: bigint;
-  readonly decimals: number;
-  readonly rate_accumulator: bigint;
-  readonly utilization: bigint;
-  readonly fee_rate: bigint;
-  readonly price: { value: bigint; is_valid: boolean };
-  readonly total_nominal_debt: bigint;
-  readonly last_rate_accumulator: bigint;
-  readonly reserve: bigint;
-  readonly scale: bigint;
-}[];
+export type ContractResponse = TokenMetadata[];
 
 interface VesuMarketsProps {
   supportedAssets?: ContractResponse;
