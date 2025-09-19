@@ -7,7 +7,12 @@ import {
 import { green, red } from "./helpers/colorize-log";
 import { CallData, constants } from "starknet";
 
-const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
+const deployScriptMainnet = async (): Promise<{
+  nostraGatewayAddress: string,
+  vesuGatewayAddress: string,
+  vesuVTokenGatewayAddress: string,
+  routerGatewayAddress: string,
+}> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -34,6 +39,17 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
       router: routerGatewayAddress,
       owner: deployer.address,
       supported_assets: supportedAssets,
+    },
+  });
+
+  const { address: vesuVTokenGatewayAddress } = await deployContract({
+    contract: "VesuVTokenGateway",
+    constructorArgs: {
+      vesu_singleton: "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
+      pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
+      router: routerGatewayAddress,
+      owner: deployer.address,
+      supported_vtokens: [],
     },
   });
 
@@ -64,10 +80,15 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
 
 
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+  return { nostraGatewayAddress, vesuGatewayAddress, vesuVTokenGatewayAddress, routerGatewayAddress };
 };
 
-const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string }> => {
+const deployScriptSepolia = async (): Promise<{
+  nostraGatewayAddress: string,
+  vesuGatewayAddress: string,
+  vesuVTokenGatewayAddress: string,
+  routerGatewayAddress: string,
+}> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
@@ -102,6 +123,17 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
+  const { address: vesuVTokenGatewayAddress } = await deployContract({
+    contract: "VesuVTokenGateway",
+    constructorArgs: {
+      vesu_singleton: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
+      pool_id: "730993554056884283224259059297934576024721456828383733531590831263129347422",
+      router: routerGatewayAddress,
+      owner: deployer.address,
+      supported_vtokens: [],
+    },
+  });
+
   // Deploy NostraGateway
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
@@ -128,10 +160,15 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress };
+  return { nostraGatewayAddress, vesuGatewayAddress, vesuVTokenGatewayAddress, routerGatewayAddress };
 };
 
-const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
+const initializeContracts = async (addresses: {
+  nostraGatewayAddress: string,
+  vesuGatewayAddress: string,
+  vesuVTokenGatewayAddress: string,
+  routerGatewayAddress: string,
+}): Promise<void> => {
 
   const nonce = await deployer.getNonce();
 
@@ -301,6 +338,14 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
       calldata: [
+        "vesu-vtoken",
+        addresses.vesuVTokenGatewayAddress,
+      ]
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
         "nostra",
         addresses.nostraGatewayAddress,
       ]
@@ -327,7 +372,12 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
   }
 };
 
-const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string}): Promise<void> => {
+const initializeContractsSepolia = async (addresses: {
+  nostraGatewayAddress: string,
+  vesuGatewayAddress: string,
+  vesuVTokenGatewayAddress: string,
+  routerGatewayAddress: string,
+}): Promise<void> => {
   const nonce = await deployer.getNonce();
 
   const re7Pool = "3592370751539490711610556844458488648008775713878064059760995781404350938653";
@@ -369,6 +419,14 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
       calldata: [
         "vesu",
         addresses.vesuGatewayAddress,
+      ]
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "vesu-vtoken",
+        addresses.vesuVTokenGatewayAddress,
       ]
     },
     {

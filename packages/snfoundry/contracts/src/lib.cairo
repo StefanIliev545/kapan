@@ -6,6 +6,7 @@ pub mod interfaces {
 }
 pub mod gateways {
     pub mod vesu_gateway;
+    pub mod vesu_vtoken_gateway;
     pub mod NostraGateway;
     pub mod RouterGateway;
 }
