@@ -8,7 +8,7 @@ import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
-import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
+import { FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -16,6 +16,13 @@ import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { normalizeProtocolName } from "~~/utils/protocol";
+import {
+  PositionActionButton,
+  PositionActionButtons,
+  PositionCard,
+  PositionInfoDropdown,
+  PositionToggleIndicator,
+} from "./positions/PositionCard";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -45,7 +52,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   tokenAddress,
   tokenPrice,
   tokenDecimals,
-  tokenSymbol,
   collateralView,
   collateralValue,
   networkType,
@@ -105,12 +111,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     normalizeProtocolName(optimalProtocol) !== normalizeProtocolName(protocolName) &&
     optimalRateDisplay < currentRate;
 
-  const formatNumber = (num: number) =>
-    new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(num));
-
   const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
 
   const actionConfig = {
@@ -126,11 +126,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const showRepayButton = actionConfig.repay;
   const showMoveButton = actionConfig.move && hasBalance;
 
-  const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton].filter(Boolean).length;
-  const hasAnyActions = visibleActionCount > 0;
-
-  const actionGridClass =
-    visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
+  const hasAnyActions = showRepayButton || showMoveButton || showBorrowButton;
 
   const handleBorrowClick = onBorrow ?? borrowModal.open;
 
@@ -156,319 +152,202 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       })
     : null;
 
-  return (
-    <>
-      {/* Outer container - clickable to expand/collapse */}
-      <div
-        className={`w-full p-3 rounded-md ${
-          isExpanded ? "bg-base-300" : "bg-base-200"
-        } ${hasAnyActions ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"} transition-all duration-200 ${
-          containerClassName ?? ""
-        }`}
-        onClick={toggleExpanded}
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-12 relative">
-          {/* Header: Icon and Title */}
-          <div className="order-1 lg:order-none lg:col-span-3 flex items-center">
-            <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
-            </div>
-            <span className="ml-2 font-semibold text-lg truncate">{name}</span>
-            {showInfoDropdown && (
-              <div
-                className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1"
-                onClick={e => e.stopPropagation()}
-              >
-                <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-                  <FiInfo
-                    className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
-                    aria-hidden="true"
-                  />
-                </div>
-                <div
-                  tabIndex={0}
-                  className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-                  style={{
-                    right: "auto",
-                    transform: "translateX(-50%)",
-                    left: "50%",
-                    borderRadius: "4px",
-                  }}
-                >
-                  <div className="card-body p-3">
-                    <h3 className="card-title text-sm">{name} Details</h3>
-                    <div className="text-xs space-y-1">
-                      <p className="text-base-content/70">Contract Address:</p>
-                      <p className="font-mono break-all">{tokenAddress}</p>
-                      <p className="text-base-content/70">Protocol:</p>
-                      <p>{protocolName}</p>
-                      <p className="text-base-content/70">Type:</p>
-                      <p className="capitalize">Borrow Position</p>
-                      {collateralValue && (
-                        <>
-                          <p className="text-base-content/70">Collateral Value:</p>
-                          <p>
-                            <FiatBalance
-                              tokenAddress={tokenAddress}
-                              rawValue={BigInt(Math.round(collateralValue * 10 ** 8))}
-                              price={BigInt(10 ** 8)}
-                              decimals={8}
-                              tokenSymbol={name}
-                              isNegative={false}
-                            />
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+  const actionButtons: PositionActionButton[] = [];
 
-          {/* Stats: Rates */}
-          <div
-            className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
-              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
-            }`}
-          >
-            {!hideBalanceColumn && (
-              <div className="px-2 border-r border-base-300">
-                <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-                <div className="text-sm font-medium h-6 line-clamp-1">
-                  {showNoDebtLabel ? (
-                    <span className="text-base-content/70">No debt</span>
-                  ) : (
-                    <FiatBalance
-                      tokenAddress={tokenAddress}
-                      rawValue={
-                        typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)
-                      }
-                      price={tokenPrice}
-                      decimals={tokenDecimals}
-                      tokenSymbol={name}
-                      isNegative={true}
-                      className="text-red-500"
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-            <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
-              <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
-                {formatPercentage(currentRate)}%
-              </div>
-            </div>
-            <div className="px-2">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APR</div>
-              <div className="font-medium flex items-center h-6">
-                <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {formatPercentage(displayedOptimalRate)}%
-                </span>
-                <Image
-                  src={getProtocolLogo(displayedOptimalProtocol)}
-                  alt={displayedOptimalProtocol}
-                  width={displayedOptimalProtocol == "vesu" ? 35 : 16}
-                  height={displayedOptimalProtocol == "vesu" ? 35 : 16}
-                  className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
-                />
-              </div>
-            </div>
-          </div>
+  if (showRepayButton) {
+    actionButtons.push({
+      key: "repay",
+      label: "Repay",
+      icon: <FiMinus className="w-4 h-4" />,
+      onClick: repayModal.open,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      className: "btn-primary",
+      ariaLabel: "Repay",
+      title:
+        !isWalletConnected
+          ? "Connect wallet to repay"
+          : actionsDisabled
+            ? disabledMessage
+            : "Repay debt",
+    });
+  }
 
-          {/* Expand Indicator and quick Move action */}
-          <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end gap-2">
-            {hasBetterRate && showMoveButton && (
-              <button
-                className="btn btn-xs btn-secondary animate-pulse"
-                onClick={e => {
-                  e.stopPropagation();
-                  moveModal.open();
-                }}
-                disabled={!isWalletConnected || actionsDisabled}
-                aria-label="Move"
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to move debt"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : "Move debt to another protocol"
-                }
-              >
-                Move
-              </button>
-            )}
-            {hasAnyActions && (
-              <div
-                className={`flex items-center justify-center w-7 h-7 rounded-full ${
-                  isExpanded ? "bg-primary/20" : "bg-base-300/50"
-                } transition-colors duration-200`}
-              >
-                {isExpanded ? (
-                  <FiChevronUp className="w-4 h-4 text-primary" />
-                ) : (
-                  <FiChevronDown className="w-4 h-4 text-base-content/70" />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+  if (showMoveButton) {
+    actionButtons.push({
+      key: "move",
+      label: "Move",
+      icon: <FiRepeat className="w-4 h-4" />,
+      onClick: moveModal.open,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      className: hasBetterRate ? "btn-secondary" : "btn-outline",
+      ariaLabel: "Move",
+      title:
+        !isWalletConnected
+          ? "Connect wallet to move debt"
+          : actionsDisabled
+            ? disabledMessage
+            : "Move debt to another protocol",
+    });
+  }
 
-        {/* Action Buttons - Only visible when expanded */}
-        {isExpanded && hasAnyActions && (
+  if (showBorrowButton) {
+    actionButtons.push({
+      key: "borrow",
+      label: borrowCtaLabel ?? "Borrow",
+      icon: <FiPlus className="w-4 h-4" />,
+      onClick: handleBorrowClick,
+      disabled: !isWalletConnected || actionsDisabled,
+      className: "btn-primary",
+      ariaLabel: "Borrow",
+      title:
+        !isWalletConnected
+          ? "Connect wallet to borrow"
+          : actionsDisabled
+            ? disabledMessage
+            : "Borrow more tokens",
+    });
+  }
+
+  const actionSection =
+    isExpanded && hasAnyActions
+      ? (
           <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
-            {/* Mobile layout - full width buttons stacked vertically */}
-            <div className="flex flex-col gap-2 md:hidden">
-              {showRepayButton && (
-                <button
-                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                  onClick={repayModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Repay"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to repay"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Repay debt"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiMinus className="w-4 h-4 mr-1" />
-                    <span>Repay</span>
-                  </div>
-                </button>
-              )}
-
-              {showMoveButton && (
-                <button
-                  className={`btn btn-sm w-full flex justify-center items-center ${
-                    hasBetterRate ? "btn-secondary" : "btn-outline"
-                  }`}
-                  onClick={moveModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Move"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to move debt"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Move debt to another protocol"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiRepeat className="w-4 h-4 mr-1" />
-                    <span>Move</span>
-                  </div>
-                </button>
-              )}
-
-              {showBorrowButton && (
-                <button
-                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                  onClick={handleBorrowClick}
-                  disabled={!isWalletConnected || actionsDisabled}
-                  aria-label="Borrow"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to borrow"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Borrow more tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    <span>{borrowCtaLabel ?? "Borrow"}</span>
-                  </div>
-                </button>
-              )}
-            </div>
-
-            {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className={`hidden md:grid gap-3 ${actionGridClass}`}>
-              {showRepayButton && (
-                <button
-                  className="btn btn-sm btn-primary flex justify-center items-center"
-                  onClick={repayModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Repay"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to repay"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Repay debt"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiMinus className="w-4 h-4 mr-1" />
-                    <span>Repay</span>
-                  </div>
-                </button>
-              )}
-
-              {showMoveButton && (
-                <button
-                  className={`btn btn-sm flex justify-center items-center ${
-                    hasBetterRate ? "btn-secondary" : "btn-outline"
-                  }`}
-                  onClick={moveModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Move"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to move debt"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Move debt to another protocol"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiRepeat className="w-4 h-4 mr-1" />
-                    <span>Move</span>
-                  </div>
-                </button>
-              )}
-
-              {showBorrowButton && (
-                <button
-                  className="btn btn-sm btn-primary flex justify-center items-center"
-                  onClick={handleBorrowClick}
-                  disabled={!isWalletConnected || actionsDisabled}
-                  aria-label="Borrow"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to borrow"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Borrow more tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    <span>{borrowCtaLabel ?? "Borrow"}</span>
-                  </div>
-                </button>
-              )}
-            </div>
-
+            <PositionActionButtons actions={actionButtons} />
             {actionsDisabled && (
-              <div className="mt-3 text-sm text-base-content/70">
-                {disabledMessage}
-              </div>
+              <div className="mt-3 text-sm text-base-content/70">{disabledMessage}</div>
             )}
           </div>
-        )}
-      </div>
+        )
+      : null;
 
-      {/* Collateral View (if provided) - Only visible when expanded */}
-      {collateralView && isExpanded && (
-        <div className="overflow-hidden transition-all duration-300 mt-2">
-          <div className="py-2">{collateralViewWithVisibility}</div>
+  const headerContent = (
+    <>
+      <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
+        <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
+      </div>
+      <span className="ml-2 font-semibold text-lg truncate">{name}</span>
+      {showInfoDropdown && (
+        <PositionInfoDropdown
+          name={name}
+          protocolName={protocolName}
+          tokenAddress={tokenAddress}
+          typeLabel="Borrow Position"
+          extraDetails=
+            {collateralValue
+              ? (
+                  <>
+                    <p className="text-base-content/70">Collateral Value:</p>
+                    <p>
+                      <FiatBalance
+                        tokenAddress={tokenAddress}
+                        rawValue={BigInt(Math.round(collateralValue * 10 ** 8))}
+                        price={BigInt(10 ** 8)}
+                        decimals={8}
+                        tokenSymbol={name}
+                        isNegative={false}
+                      />
+                    </p>
+                  </>
+                )
+              : null}
+        />
+      )}
+    </>
+  );
+
+  const statsContent = (
+    <>
+      {!hideBalanceColumn && (
+        <div className="px-2 border-r border-base-300">
+          <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
+          <div className="text-sm font-medium h-6 line-clamp-1">
+            {showNoDebtLabel ? (
+              <span className="text-base-content/70">No debt</span>
+            ) : (
+              <FiatBalance
+                tokenAddress={tokenAddress}
+                rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+                price={tokenPrice}
+                decimals={tokenDecimals}
+                tokenSymbol={name}
+                isNegative={true}
+                className="text-red-500"
+              />
+            )}
+          </div>
         </div>
       )}
+      <div className="px-2 border-r border-base-300">
+        <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
+        <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
+          {formatPercentage(currentRate)}%
+        </div>
+      </div>
+      <div className="px-2">
+        <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APR</div>
+        <div className="font-medium flex items-center h-6">
+          <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
+            {formatPercentage(displayedOptimalRate)}%
+          </span>
+          <Image
+            src={getProtocolLogo(displayedOptimalProtocol)}
+            alt={displayedOptimalProtocol}
+            width={displayedOptimalProtocol == "vesu" ? 35 : 16}
+            height={displayedOptimalProtocol == "vesu" ? 35 : 16}
+            className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
+          />
+        </div>
+      </div>
+    </>
+  );
+
+  const indicatorContent = (
+    <>
+      {hasBetterRate && showMoveButton && (
+        <button
+          className="btn btn-xs btn-secondary animate-pulse"
+          onClick={e => {
+            e.stopPropagation();
+            moveModal.open();
+          }}
+          disabled={!isWalletConnected || actionsDisabled}
+          aria-label="Move"
+          title={
+            !isWalletConnected
+              ? "Connect wallet to move debt"
+              : actionsDisabled
+                ? disabledMessage
+                : "Move debt to another protocol"
+          }
+        >
+          Move
+        </button>
+      )}
+      {hasAnyActions ? <PositionToggleIndicator isExpanded={isExpanded} /> : null}
+    </>
+  );
+
+  const footer =
+    collateralView && isExpanded ? (
+      <div className="overflow-hidden transition-all duration-300 mt-2">
+        <div className="py-2">{collateralViewWithVisibility}</div>
+      </div>
+    ) : null;
+
+  return (
+    <>
+      <PositionCard
+        isExpanded={isExpanded}
+        canToggle={hasAnyActions}
+        onToggle={toggleExpanded}
+        containerClassName={containerClassName}
+        header={headerContent}
+        stats={statsContent}
+        statsClassName={hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"}
+        indicator={indicatorContent}
+        actionSection={actionSection}
+        footer={footer}
+      />
 
       {/* Modals */}
       {networkType === "starknet" ? (
