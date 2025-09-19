@@ -43,7 +43,7 @@ const VesuStrategyCard = ({ option, variant, isSelected, onSelect }: VesuStrateg
   const actionLabel = isCollateral ? "Withdraw" : "Borrow";
   const positionLabel = isCollateral ? "Deposited" : "Outstanding";
   const formattedPosition = isCollateral
-    ? option.formattedBalance
+    ? (option as VesuGasCollateralOption).formattedBalance
     : (option as VesuGasBorrowOption).formattedOutstanding;
 
   return (
