@@ -61,9 +61,11 @@ export interface UseProtocolPaymasterSendTransactionArgs {
 }
 
 export type UseProtocolPaymasterSendTransactionResult = UsePaymasterSendTransactionResult & {
-  prepareCalls: (calls?: Call[]) => Promise<Call[]>;
-  estimateFee: (calls?: Call[]) => Promise<PaymasterFeeEstimate>;
+  prepareCalls: (calls?: Call[], overrides?: PaymasterOverrides) => Promise<Call[]>;
+  estimateFee: (calls?: Call[], overrides?: PaymasterOverrides) => Promise<PaymasterFeeEstimate>;
 };
+
+type PaymasterOverrides = Partial<Pick<CustomModeContext, "amount" | "useMax" | "vesuContext">>;
 
 const ensureHexAddress = (address?: string) => {
   if (!address) throw new Error("Gas token address is required for this paymaster mode");
@@ -178,6 +180,23 @@ export const useProtocolPaymasterSendTransaction = (
     [paymasterOptions, baseFeeMode],
   );
 
+  const resolveContext = useCallback(
+    (overrides?: PaymasterOverrides): CustomModeContext | null => {
+      if (!customContext) return null;
+      if (!overrides) return customContext;
+
+      const nextContext: CustomModeContext = {
+        ...customContext,
+        ...(overrides.amount !== undefined ? { amount: overrides.amount } : {}),
+        ...(overrides.useMax !== undefined ? { useMax: overrides.useMax } : {}),
+        ...(overrides.vesuContext !== undefined ? { vesuContext: overrides.vesuContext } : {}),
+      };
+
+      return nextContext;
+    },
+    [customContext],
+  );
+
   const { send: _baseSend, sendAsync: baseSendAsync, ...rest } = usePaymasterSendTransaction({
     calls,
     options: paymasterDetails,
@@ -185,11 +204,13 @@ export const useProtocolPaymasterSendTransaction = (
   });
 
   const prepareCalls = useCallback(
-    async (userCalls?: Call[]) => {
+    async (userCalls?: Call[], overrides?: PaymasterOverrides) => {
       const mergedCalls = userCalls ?? calls ?? [];
       const formattedCalls = Array.isArray(mergedCalls) ? mergedCalls : [mergedCalls];
 
-      if (!customContext) {
+      const activeContext = resolveContext(overrides);
+
+      if (!activeContext) {
         return formattedCalls;
       }
 
@@ -201,7 +222,11 @@ export const useProtocolPaymasterSendTransaction = (
         throw new Error("RouterGateway contract information is required for custom paymaster modes");
       }
 
-      const baseInstruction = buildBaseInstruction(customContext, account.address);
+      if (activeContext.amount === undefined || activeContext.amount <= 0n) {
+        throw new Error("A positive amount is required for protocol paymaster instructions");
+      }
+
+      const baseInstruction = buildBaseInstruction(activeContext, account.address);
       const authorizations = await getAuthorizations([baseInstruction]);
 
       const authorizationCalls: Call[] = (authorizations || []).map(auth => ({
@@ -218,30 +243,30 @@ export const useProtocolPaymasterSendTransaction = (
 
       return [...formattedCalls, ...authorizationCalls, executeCall];
     },
-    [account?.address, calls, customContext, getAuthorizations, routerGateway?.address],
+    [account?.address, calls, getAuthorizations, resolveContext, routerGateway?.address],
   );
 
   const sendAsync = useCallback(
-    async (userCalls?: Call[]) => {
-      const finalCalls = await prepareCalls(userCalls);
+    async (userCalls?: Call[], overrides?: PaymasterOverrides) => {
+      const finalCalls = await prepareCalls(userCalls, overrides);
       return baseSendAsync(finalCalls);
     },
     [baseSendAsync, prepareCalls],
   );
 
   const send = useCallback(
-    (userCalls?: Call[]) => {
-      void sendAsync(userCalls);
+    (userCalls?: Call[], overrides?: PaymasterOverrides) => {
+      void sendAsync(userCalls, overrides);
     },
     [sendAsync],
   );
 
   const estimateFee = useCallback(
-    async (userCalls?: Call[]) => {
+    async (userCalls?: Call[], overrides?: PaymasterOverrides) => {
       if (!account) {
         throw new Error("Account address is required to estimate protocol paymaster fees");
       }
-      const finalCalls = await prepareCalls(userCalls);
+      const finalCalls = await prepareCalls(userCalls, overrides);
       return account.estimatePaymasterTransactionFee(finalCalls, paymasterDetails);
     },
     [account, prepareCalls, paymasterDetails],

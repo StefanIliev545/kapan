@@ -13,6 +13,7 @@ import {
   useVesuGasSources,
   type VesuGasBorrowOption,
   type VesuGasCollateralOption,
+  type VesuGasOptionPair,
 } from "~~/hooks/useVesuGasSources";
 
 const DEFAULT_GAS_TOKEN = {
@@ -30,56 +31,115 @@ interface TokenInfo {
 
 const normalizeAddress = (value?: string | null) => (value ? value.toLowerCase() : "");
 
-interface VesuStrategyCardProps {
-  option: VesuGasCollateralOption | VesuGasBorrowOption;
+interface VesuStrategyHalfProps {
+  option?: VesuGasCollateralOption | VesuGasBorrowOption;
   variant: "collateral" | "borrow";
   isSelected: boolean;
-  onSelect: () => void;
+  onSelect: (option: VesuGasCollateralOption | VesuGasBorrowOption) => void;
 }
 
-const VesuStrategyCard = ({ option, variant, isSelected, onSelect }: VesuStrategyCardProps) => {
+const VesuStrategyHalf = ({ option, variant, isSelected, onSelect }: VesuStrategyHalfProps) => {
   const isCollateral = variant === "collateral";
-  const primaryLabel = isCollateral ? "Collateral" : "Debt";
-  const actionLabel = isCollateral ? "Withdraw" : "Borrow";
-  const positionLabel = isCollateral ? "Deposited" : "Outstanding";
-  const formattedPosition = isCollateral
-    ? (option as VesuGasCollateralOption).formattedBalance
-    : (option as VesuGasBorrowOption).formattedOutstanding;
+  const label = isCollateral ? "Collateral" : "Debt";
+
+  const handleClick = () => {
+    if (!option) return;
+    onSelect(option);
+  };
+
+  const formattedBalance = (() => {
+    if (!option) return "-";
+    if (isCollateral) {
+      return (option as VesuGasCollateralOption).formattedBalance;
+    }
+    const outstanding = (option as VesuGasBorrowOption).formattedOutstanding;
+    return outstanding.startsWith("-") ? outstanding : `-${outstanding}`;
+  })();
+
+  const estimatedAmount = option
+    ? isCollateral
+      ? (option as VesuGasCollateralOption).formattedEstimate
+      : (option as VesuGasBorrowOption).formattedEstimate
+    : undefined;
+
+  const counterpart = option?.counterpartSymbol;
+  const icon = option?.icon;
+  const tokenSymbol = option?.tokenSymbol;
 
   return (
     <motion.button
       type="button"
-      className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition-all duration-200 ${
-        isSelected
-          ? "border-primary/50 bg-primary/10 shadow-sm"
-          : "border-base-300/30 bg-base-200 hover:bg-base-300 hover:border-base-300/60"
+      onClick={handleClick}
+      disabled={!option}
+      whileHover={option ? { y: -1 } : undefined}
+      className={`flex h-full w-full flex-col items-center gap-2 p-3 transition-all duration-200 ${
+        option
+          ? isSelected
+            ? "bg-primary/10"
+            : "hover:bg-base-300/60"
+          : "opacity-50"
       }`}
-      onClick={onSelect}
-      whileHover={{ y: -1 }}
     >
       <div className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-base-content/50">
-        <span>{primaryLabel}</span>
-        {option.counterpartSymbol && (
-          <span className="text-base-content/40">
-            {isCollateral ? `Debt: ${option.counterpartSymbol}` : `Coll.: ${option.counterpartSymbol}`}
-          </span>
-        )}
+        <span>{label}</span>
+        {tokenSymbol && <span className="text-base-content/60">{tokenSymbol}</span>}
       </div>
 
-      <div className="relative h-10 w-10">
-        <Image src={option.icon} alt={`${option.tokenSymbol} icon`} fill className="object-contain rounded-md" />
+      <div className="flex w-full items-center justify-between text-[10px] text-base-content/40">
+        <span>{counterpart ? `↔ ${counterpart}` : ""}</span>
+        {estimatedAmount && <span>≈ {estimatedAmount}</span>}
       </div>
 
-      <div className="text-sm font-semibold text-base-content">{option.tokenSymbol}</div>
-
-      <div className="text-[11px] text-base-content/70">
-        {actionLabel} ≈ {option.formattedEstimate}
-      </div>
-
-      <div className="text-[10px] text-base-content/50">
-        {positionLabel} {formattedPosition}
+      <div className="flex flex-col items-center gap-2">
+        <div className="relative h-9 w-9">
+          {icon ? (
+            <Image src={icon} alt={`${tokenSymbol ?? label} icon`} fill className="rounded-md object-contain" />
+          ) : (
+            <div className="h-full w-full rounded-md bg-base-300" />
+          )}
+        </div>
+        <div className="text-sm font-semibold text-base-content">{formattedBalance}</div>
       </div>
     </motion.button>
+  );
+};
+
+interface VesuStrategyPairCardProps {
+  pair: VesuGasOptionPair;
+  onCollateralSelect: (option: VesuGasCollateralOption) => void;
+  onDebtSelect: (option: VesuGasBorrowOption) => void;
+  isCollateralSelected: boolean;
+  isDebtSelected: boolean;
+}
+
+const VesuStrategyPairCard = ({
+  pair,
+  onCollateralSelect,
+  onDebtSelect,
+  isCollateralSelected,
+  isDebtSelected,
+}: VesuStrategyPairCardProps) => {
+  const { collateral, debt } = pair;
+
+  return (
+    <div
+      className={`grid h-full grid-cols-2 divide-x divide-base-300/40 overflow-hidden rounded-xl border transition-all duration-200 ${
+        isCollateralSelected || isDebtSelected ? "border-primary/60 shadow" : "border-base-300/40 bg-base-200/60"
+      }`}
+    >
+      <VesuStrategyHalf
+        option={collateral}
+        variant="collateral"
+        isSelected={isCollateralSelected}
+        onSelect={option => onCollateralSelect(option as VesuGasCollateralOption)}
+      />
+      <VesuStrategyHalf
+        option={debt}
+        variant="borrow"
+        isSelected={isDebtSelected}
+        onSelect={option => onDebtSelect(option as VesuGasBorrowOption)}
+      />
+    </div>
   );
 };
 
@@ -88,7 +148,7 @@ export const GasTokenSelector = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { selectedToken, updateSelectedToken } = useSelectedGasToken();
   const { data: paymasterTokens, error: paymasterError, isLoading } = usePaymasterGasTokens({ enabled: true });
-  const { collateralOptions, debtOptions, isLoading: vesuLoading, error: vesuError } = useVesuGasSources();
+  const { pairs: vesuPairs, isLoading: vesuLoading, error: vesuError } = useVesuGasSources();
 
   useOutsideClick(dropdownRef, () => setIsOpen(false));
 
@@ -251,41 +311,22 @@ export const GasTokenSelector = () => {
                 <div className="rounded-md border border-error/40 bg-error/10 p-2 text-[11px] text-error">
                   Unable to load Vesu positions.
                 </div>
-              ) : collateralOptions.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                  {collateralOptions.map(option => (
-                    <VesuStrategyCard
-                      key={option.id}
-                      option={option}
-                      variant="collateral"
-                      isSelected={isCollateralSelected(option)}
-                      onSelect={() => handleCollateralSelect(option)}
+              ) : vesuPairs.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {vesuPairs.map(pair => (
+                    <VesuStrategyPairCard
+                      key={pair.id}
+                      pair={pair}
+                      onCollateralSelect={handleCollateralSelect}
+                      onDebtSelect={handleBorrowSelect}
+                      isCollateralSelected={pair.collateral ? isCollateralSelected(pair.collateral) : false}
+                      isDebtSelected={pair.debt ? isBorrowSelected(pair.debt) : false}
                     />
                   ))}
                 </div>
               ) : (
                 <div className="rounded-md border border-base-300/30 bg-base-200/40 p-3 text-[11px] text-base-content/60">
                   No eligible collateral positions found.
-                </div>
-              )}
-
-              {debtOptions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="pt-1">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-base-content/60">Pay with debt</div>
-                    <div className="mt-1 h-px bg-base-300/40" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {debtOptions.map(option => (
-                      <VesuStrategyCard
-                        key={option.id}
-                        option={option}
-                        variant="borrow"
-                        isSelected={isBorrowSelected(option)}
-                        onSelect={() => handleBorrowSelect(option)}
-                      />
-                    ))}
-                  </div>
                 </div>
               )}
             </div>

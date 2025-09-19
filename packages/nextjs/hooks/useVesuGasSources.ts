@@ -168,9 +168,16 @@ export interface VesuGasBorrowOption {
   counterpartSymbol?: string;
 }
 
+export interface VesuGasOptionPair {
+  id: string;
+  collateral?: VesuGasCollateralOption;
+  debt?: VesuGasBorrowOption;
+}
+
 interface UseVesuGasSourcesResult {
   collateralOptions: VesuGasCollateralOption[];
   debtOptions: VesuGasBorrowOption[];
+  pairs: VesuGasOptionPair[];
   isLoading: boolean;
   error?: Error | null;
 }
@@ -287,6 +294,43 @@ export const useVesuGasSources = (): UseVesuGasSourcesResult => {
       .filter((option): option is VesuGasBorrowOption => option !== null);
   }, [assetMap, mergedPositions, poolId]);
 
+  const optionPairs = useMemo<VesuGasOptionPair[]>(() => {
+    if (mergedPositions.length === 0) return [];
+
+    const map = new Map<string, VesuGasOptionPair>();
+
+    const getKey = (collateralAddress: string, debtAddress: string) =>
+      `${collateralAddress.toLowerCase()}-${debtAddress.toLowerCase()}`;
+
+    collateralOptions.forEach(option => {
+      const key = getKey(option.tokenAddress, option.counterpartToken);
+      const existing = map.get(key) ?? { id: key };
+      map.set(key, { ...existing, id: key, collateral: option });
+    });
+
+    debtOptions.forEach(option => {
+      const key = getKey(option.counterpartToken, option.tokenAddress);
+      const existing = map.get(key) ?? { id: key };
+      map.set(key, { ...existing, id: key, debt: option });
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      const aHasCollateral = a.collateral ? 1 : 0;
+      const bHasCollateral = b.collateral ? 1 : 0;
+      if (aHasCollateral !== bHasCollateral) {
+        return bHasCollateral - aHasCollateral;
+      }
+
+      const aHasDebt = a.debt ? 1 : 0;
+      const bHasDebt = b.debt ? 1 : 0;
+      if (aHasDebt !== bHasDebt) {
+        return bHasDebt - aHasDebt;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+  }, [collateralOptions, debtOptions, mergedPositions]);
+
   const combinedError = assetsError || positionsError1 || positionsError2;
 
   const isInitialAssetsLoading = !supportedAssets && isAssetsLoading;
@@ -300,6 +344,7 @@ export const useVesuGasSources = (): UseVesuGasSourcesResult => {
   return {
     collateralOptions,
     debtOptions,
+    pairs: optionPairs,
     isLoading,
     error: combinedError ?? null,
   };
