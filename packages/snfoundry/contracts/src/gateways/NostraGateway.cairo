@@ -1,3 +1,5 @@
+use core::array::{Array, ArrayTrait, Span};
+use core::result::Result;
 use starknet::contract_address::ContractAddress;
 use crate::interfaces::nostra::{InterestState};
 
@@ -14,6 +16,14 @@ pub trait INostraGateway<TContractState> {
 #[starknet::interface]
 trait IERC20Symbol<TContractState> {
     fn symbol(self: @TContractState) -> felt252;
+}
+
+#[starknet::interface]
+pub trait INostraGatewayV3<TContractState> {
+    fn process_v3_instructions(
+        ref self: TContractState,
+        instructions: Span<crate::router::v3::resolved_instruction::ResolvedInstruction>,
+    ) -> Span<Span<InstructionOutput>>;
 }
 
 #[starknet::contract]
@@ -42,6 +52,8 @@ mod NostraGateway {
     use starknet::{get_caller_address, get_contract_address};
     use core::num::traits::Zero;
     use super::InterestState;
+    use crate::router::v3::gateway_encoding::encode_instruction;
+    use crate::router::v3::resolved_instruction::ResolvedInstruction;
 
     use openzeppelin::access::ownable::OwnableComponent;
 
@@ -302,6 +314,28 @@ mod NostraGateway {
             } else {
                 repay.basic.amount
             }
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl INostraGatewayV3Impl of INostraGatewayV3<ContractState> {
+        fn process_v3_instructions(
+            ref self: ContractState,
+            instructions: Span<ResolvedInstruction>,
+        ) -> Span<Span<InstructionOutput>> {
+            let mut legacy: Array<LendingInstruction> = ArrayTrait::new();
+            for instruction in instructions {
+                match encode_instruction(*instruction) {
+                    Result::Ok(encoded) => {
+                        legacy.append(encoded);
+                    }
+                    Result::Err(_) => {
+                        assert(0 == 1, 'unsupported-v3-instruction');
+                    }
+                }
+            }
+
+            ILendingInstructionProcessorImpl::process_instructions(ref self, legacy.span())
         }
     }
 

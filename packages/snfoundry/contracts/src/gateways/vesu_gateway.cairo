@@ -1,4 +1,4 @@
-use core::array::{Array, Span};
+use core::array::{Array, ArrayTrait, Span};
 use core::byte_array::ByteArrayTrait;
 use openzeppelin::token::erc20::interface::{
     IERC20Dispatcher, IERC20DispatcherTrait, IERC20MetadataDispatcher,
@@ -9,6 +9,7 @@ use crate::interfaces::vesu_data::{AssetPrice, Position};
 use core::num::traits::Pow;
 use core::traits::Into;
 use core::integer::u256;
+use core::result::Result;
 
 pub mod Errors {
     pub const APPROVE_FAILED: felt252 = 'Approve failed';
@@ -83,6 +84,14 @@ trait IERC20Symbol<TContractState> {
     fn symbol(self: @TContractState) -> felt252;
 }
 
+#[starknet::interface]
+pub trait IVesuGatewayV3<TContractState> {
+    fn process_v3_instructions(
+        ref self: TContractState,
+        instructions: Span<crate::router::v3::resolved_instruction::ResolvedInstruction>,
+    ) -> Span<Span<InstructionOutput>>;
+}
+
 #[derive(Copy, Drop)]
 struct InstructionPair {
     first: usize,
@@ -115,6 +124,8 @@ mod VesuGateway {
         Withdraw,
         InstructionOutput,
     };
+    use crate::router::v3::gateway_encoding::encode_instruction;
+    use crate::router::v3::resolved_instruction::ResolvedInstruction;
     use crate::interfaces::vesu::{
         IDefaultExtensionCLDispatcher, IDefaultExtensionCLDispatcherTrait, IERC4626Dispatcher,
         IERC4626DispatcherTrait, ISingletonDispatcher, ISingletonDispatcherTrait,
@@ -879,6 +890,28 @@ mod VesuGateway {
                 amount = self.get_debt_for_user_position(repay);
             }
             amount
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl IVesuGatewayV3Impl of IVesuGatewayV3<ContractState> {
+        fn process_v3_instructions(
+            ref self: ContractState,
+            instructions: Span<ResolvedInstruction>,
+        ) -> Span<Span<InstructionOutput>> {
+            let mut legacy: Array<LendingInstruction> = ArrayTrait::new();
+            for instruction in instructions {
+                match encode_instruction(*instruction) {
+                    Result::Ok(encoded) => {
+                        legacy.append(encoded);
+                    }
+                    Result::Err(_) => {
+                        assert(0 == 1, 'unsupported-v3-instruction');
+                    }
+                }
+            }
+
+            ILendingInstructionProcessorImpl::process_instructions(ref self, legacy.span())
         }
     }
     use crate::interfaces::IGateway::InterestRateView;
