@@ -12,6 +12,7 @@ import type { PositionManager } from "~~/utils/position";
 import { POOL_IDS } from "./VesuMarkets";
 import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
+import { calculateNetYieldMetrics } from "~~/utils/netYield";
 
 type BorrowSelectionState = {
   tokens: AssetWithRates[];
@@ -66,6 +67,20 @@ export const VesuProtocolView: FC = () => {
 
     return totalSupply - totalDebt;
   }, [rows]);
+
+  const supplyPositions = useMemo(() => rows.map(row => row.supply), [rows]);
+  const borrowPositions = useMemo(
+    () => rows.flatMap(row => (row.borrow ? [row.borrow] : [])),
+    [rows],
+  );
+
+  const { netYield30d, netApyPercent } = useMemo(
+    () =>
+      calculateNetYieldMetrics(supplyPositions, borrowPositions, {
+        netBalanceOverride: netBalanceUsd,
+      }),
+    [supplyPositions, borrowPositions, netBalanceUsd],
+  );
 
   const formatCurrency = (amount: number) => {
     const formatter = new Intl.NumberFormat("en-US", {
@@ -123,6 +138,8 @@ export const VesuProtocolView: FC = () => {
         userAddress={userAddress}
         hasPositions={hasPositions}
         netBalanceUsd={netBalanceUsd}
+        netYield30d={netYield30d}
+        netApyPercent={netApyPercent}
         onDeposit={() => openDepositModal(assetsWithRates)}
         canDeposit={assetsWithRates.length > 0}
         formatCurrency={formatCurrency}
