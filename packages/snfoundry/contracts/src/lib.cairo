@@ -1,4 +1,4 @@
-pub mod IRSController;
+pub mod irs_controller;
 pub mod interfaces {
     pub mod IGateway;
     pub mod nostra;
