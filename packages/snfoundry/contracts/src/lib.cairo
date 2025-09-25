@@ -1,13 +1,15 @@
+pub mod irs_controller;
+pub mod usdc_mm_vault_4626;
 pub mod interfaces {
     pub mod IGateway;
+    pub mod nostra;
     pub mod vesu;
     pub mod vesu_data;
-    pub mod nostra;
 }
 pub mod gateways {
-    pub mod vesu_gateway;
     pub mod NostraGateway;
     pub mod RouterGateway;
+    pub mod vesu_gateway;
 }
 
 pub mod utils {
