@@ -27,6 +27,19 @@ export const useScaffoldReadContract = <
   const { watch: watchConfig, query: queryOptions, ...restConfig } = readConfig as any;
 
   const serializedArgs = args ? JSON.parse(JSON.stringify(args, replacer)) : [];
+  const argsReady = !Array.isArray(args) || !args.some(arg => arg === undefined);
+  const mergedQueryOptions = {
+    placeholderData: (
+      previousData: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined,
+    ) => previousData,
+    staleTime: 30_000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    ...queryOptions,
+    enabled: argsReady && (queryOptions?.enabled ?? true),
+  };
+
 
   const blockIdentifier: BlockNumber =
     watchConfig && blockNumber !== undefined
@@ -42,7 +55,7 @@ export const useScaffoldReadContract = <
     enabled: args && (!Array.isArray(args) || !args.some(arg => arg === undefined)),
     blockIdentifier,
     ...restConfig,
-    query: { keepPreviousData: true, ...(queryOptions || {}) },
+    query: mergedQueryOptions,
   }) as Omit<ReturnType<typeof useReadContract>, "data"> & {
     data: AbiFunctionOutputs<ContractAbi, TFunctionName> | undefined;
   };

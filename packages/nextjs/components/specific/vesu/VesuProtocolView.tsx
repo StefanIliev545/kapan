@@ -3,10 +3,8 @@ import { FC, useEffect, useMemo, useState } from "react";
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
 import type { VesuContext } from "~~/hooks/useLendingAction";
-import {
-  useVesuLendingPositions,
-  type AssetWithRates,
-} from "~~/hooks/useVesuLendingPositions";
+import { useVesuLendingPositions } from "~~/hooks/useVesuLendingPositions";
+import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { PositionManager } from "~~/utils/position";
 
 import { POOL_IDS } from "./VesuMarkets";
