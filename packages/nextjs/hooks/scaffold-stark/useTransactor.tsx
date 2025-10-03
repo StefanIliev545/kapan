@@ -2,6 +2,7 @@ import { useTargetNetwork } from "./useTargetNetwork";
 import { AccountInterface, InvokeFunctionResponse } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
+import providerFactory from "~~/services/web3/provider";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string>,
@@ -37,9 +38,7 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
     walletClient = account;
   }
 
-  const provider = new RpcProvider({
-    nodeUrl: targetNetwork.rpcUrls.public.http[0],
-  });
+  const provider = providerFactory(targetNetwork);
 
   return async tx => {
     if (!walletClient) {
@@ -78,7 +77,7 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
       );
 
       try {
-        await provider.waitForTransaction(transactionHash);
+        await provider?.waitForTransaction(transactionHash);
         console.log("Transaction confirmed:", transactionHash);
       } catch (waitError) {
         console.warn("Error waiting for transaction:", waitError);
