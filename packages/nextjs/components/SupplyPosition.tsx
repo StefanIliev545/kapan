@@ -6,13 +6,14 @@ import { DepositModal } from "./modals/DepositModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
-import { FiChevronDown, FiChevronUp, FiInfo, FiPlus } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiInfo, FiPlus, FiMinus, FiRepeat, FiArrowRight } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+import { SegmentedActionBar } from "./common/SegmentedActionBar";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 export type SupplyPositionProps = ProtocolPosition & {
@@ -285,170 +286,24 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
           <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
-            {/* Mobile layout - full width buttons stacked vertically */}
-            <div className="flex flex-col gap-2 md:hidden">
-              {showDepositButton && (
-                <button
-                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                  onClick={handleDepositClick}
-                  disabled={!isWalletConnected || actionsDisabled}
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to deposit"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Deposit tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <span>Deposit</span>
-                  </div>
-                </button>
-              )}
-              {showWithdrawButton && (
-                <button
-                  className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                  onClick={handleWithdrawClick}
-                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to withdraw"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : !hasBalance
-                          ? "No balance to withdraw"
-                          : "Withdraw tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <span>Withdraw</span>
-                  </div>
-                </button>
-              )}
-              {showMoveButton && (
-                <button
-                  className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                  onClick={handleMoveClick}
-                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to move supply"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : !hasBalance
-                          ? "No balance to move"
-                          : "Move supply to another protocol"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <span>Move</span>
-                  </div>
-                </button>
-              )}
-
-            {showSwapButton && (
-              <button
-                className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                onClick={handleSwapClick}
-                disabled={!isWalletConnected || actionsDisabled || !hasBalance}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to swap collateral"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : !hasBalance
-                        ? "No collateral to swap"
-                        : "Switch collateral token"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Swap</span>
-                </div>
-              </button>
-            )}
-            </div>
-
-            {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className={`hidden md:grid gap-3 ${actionGridClass}`}>
-              {showDepositButton && (
-                <button
-                  className="btn btn-sm btn-primary flex justify-center items-center"
-                  onClick={handleDepositClick}
-                  disabled={!isWalletConnected || actionsDisabled}
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to deposit"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Deposit tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <span>Deposit</span>
-                  </div>
-                </button>
-              )}
-              {showWithdrawButton && (
-                <button
-                  className="btn btn-sm btn-outline flex justify-center items-center"
-                  onClick={handleWithdrawClick}
-                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to withdraw"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : !hasBalance
-                          ? "No balance to withdraw"
-                          : "Withdraw tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <span>Withdraw</span>
-                  </div>
-                </button>
-              )}
-              {showMoveButton && (
-                <button
-                  className="btn btn-sm btn-outline flex justify-center items-center"
-                  onClick={handleMoveClick}
-                  disabled={!isWalletConnected || !hasBalance || actionsDisabled}
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to move supply"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : !hasBalance
-                          ? "No balance to move"
-                          : "Move supply to another protocol"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <span>Move</span>
-                  </div>
-                </button>
-              )}
-
-            {showSwapButton && (
-              <button
-                className="btn btn-sm btn-outline flex justify-center items-center"
-                onClick={handleSwapClick}
-                disabled={!isWalletConnected || actionsDisabled || !hasBalance}
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to swap collateral"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : !hasBalance
-                        ? "No collateral to swap"
-                        : "Switch collateral token"
-                }
-              >
-                <div className="flex items-center justify-center">
-                  <span>Swap</span>
-                </div>
-              </button>
-            )}
+            {/* Unified segmented bar - centered */}
+            <div className="flex justify-center">
+              <SegmentedActionBar
+                actions={[
+                  ...(showDepositButton
+                    ? [{ key: "deposit", label: "Deposit", icon: <FiPlus className="w-4 h-4" />, onClick: handleDepositClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to deposit" : actionsDisabled ? disabledMessage : "Deposit tokens", variant: "ghost" as const }]
+                    : []),
+                  ...(showWithdrawButton
+                    ? [{ key: "withdraw", label: "Withdraw", icon: <FiMinus className="w-4 h-4" />, onClick: handleWithdrawClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to withdraw" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to withdraw" : "Withdraw tokens", variant: "ghost" as const }]
+                    : []),
+                  ...(showMoveButton
+                    ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: handleMoveClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move supply" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to move" : "Move supply to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showSwapButton
+                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick!, disabled: !isWalletConnected || actionsDisabled || !hasBalance, title: !isWalletConnected ? "Connect wallet to swap collateral" : actionsDisabled ? disabledMessage : !hasBalance ? "No collateral to swap" : "Switch collateral token", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                ]}
+              />
             </div>
           </div>
         )}

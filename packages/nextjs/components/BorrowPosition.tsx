@@ -8,7 +8,8 @@ import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
-import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX, FiArrowRight } from "react-icons/fi";
+import { SegmentedActionBar } from "./common/SegmentedActionBar";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -147,8 +148,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton, showCloseButton, showSwapButton].filter(Boolean).length;
   const hasAnyActions = visibleActionCount > 0;
 
-  const actionGridClass =
-    visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
+  // Render actions in a single horizontal row for both mobile and desktop
 
   const handleBorrowClick = onBorrow ?? borrowModal.open;
 
@@ -348,225 +348,53 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
-          <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
-            {/* Mobile layout - full width buttons stacked vertically */}
-            <div className="flex flex-col gap-2 md:hidden">
-              {showRepayButton && (
-                <button
-                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                  onClick={repayModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Repay"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to repay"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Repay debt"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiMinus className="w-4 h-4 mr-1" />
-                    <span>Repay</span>
-                  </div>
-                </button>
-              )}
-
-              {showBorrowButton && (
-                <button
-                  className="btn btn-sm btn-primary w-full flex justify-center items-center"
-                  onClick={handleBorrowClick}
-                  disabled={!isWalletConnected || actionsDisabled}
-                  aria-label="Borrow"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to borrow"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Borrow more tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    <span>{borrowCtaLabel ?? "Borrow"}</span>
-                  </div>
-                </button>
-              )}
-
-              {showSwapButton && (
-                <button
-                  className="btn btn-sm btn-outline w-full flex justify-center items-center"
-                  onClick={onSwap}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Swap"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to switch debt"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Switch debt token"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiRepeat className="w-4 h-4 mr-1" />
-                    <span>Swap</span>
-                  </div>
-                </button>
-              )}
-
-              {showMoveButton && (
-                <button
-                  className={`btn btn-sm w-full flex justify-center items-center ${
-                    hasBetterRate ? "btn-secondary" : "btn-outline"
-                  }`}
-                  onClick={moveModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Move"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to move debt"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Move debt to another protocol"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiRepeat className="w-4 h-4 mr-1" />
-                    <span>Move</span>
-                  </div>
-                </button>
-              )}
-
-              {showCloseButton && (
-                <button
-                  className="btn btn-sm btn-error w-full flex justify-center items-center"
-                  onClick={onClosePosition}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Close"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to close position"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Close position with collateral"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiX className="w-4 h-4 mr-1" />
-                    <span>Close</span>
-                  </div>
-                </button>
-              )}
+          <div className="mt-1 pt-2 border-t border-base-300" onClick={e => e.stopPropagation()}>
+            {/* Mobile layout - unified segmented bar (centered) */}
+            <div className="md:hidden flex justify-center">
+              <SegmentedActionBar
+                className="mx-2 my-1"
+                actions={[
+                ...(showRepayButton
+                  ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
+                  : []),
+                ...(showBorrowButton
+                  ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
+                  : []),
+                ...(showSwapButton
+                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                  : []),
+                ...(showMoveButton
+                  ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                  : []),
+                ...(showCloseButton
+                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                  : []),
+                ]}
+              />
             </div>
 
-            {/* Desktop layout - evenly distributed buttons in a row */}
-            <div className={`hidden md:grid gap-3 ${actionGridClass}`}>
-              {showRepayButton && (
-                <button
-                  className="btn btn-sm btn-primary flex justify-center items-center"
-                  onClick={repayModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Repay"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to repay"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Repay debt"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiMinus className="w-4 h-4 mr-1" />
-                    <span>Repay</span>
-                  </div>
-                </button>
-              )}
-
-              {showBorrowButton && (
-                <button
-                  className="btn btn-sm btn-primary flex justify-center items-center"
-                  onClick={handleBorrowClick}
-                  disabled={!isWalletConnected || actionsDisabled}
-                  aria-label="Borrow"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to borrow"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Borrow more tokens"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    <span>{borrowCtaLabel ?? "Borrow"}</span>
-                  </div>
-                </button>
-              )}
-
-              {showSwapButton && (
-                <button
-                  className="btn btn-sm btn-outline flex justify-center items-center"
-                  onClick={onSwap}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Swap"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to switch debt"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Switch debt token"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiRepeat className="w-4 h-4 mr-1" />
-                    <span>Swap</span>
-                  </div>
-                </button>
-              )}
-
-              {showMoveButton && (
-                <button
-                  className={`btn btn-sm flex justify-center items-center ${
-                    hasBetterRate ? "btn-secondary" : "btn-outline"
-                  }`}
-                  onClick={moveModal.open}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Move"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to move debt"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Move debt to another protocol"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiRepeat className="w-4 h-4 mr-1" />
-                    <span>Move</span>
-                  </div>
-                </button>
-              )}
-
-              {showCloseButton && (
-                <button
-                  className="btn btn-sm btn-error flex justify-center items-center"
-                  onClick={onClosePosition}
-                  disabled={!hasBalance || !isWalletConnected || actionsDisabled}
-                  aria-label="Close"
-                  title={
-                    !isWalletConnected
-                      ? "Connect wallet to close position"
-                      : actionsDisabled
-                        ? disabledMessage
-                        : "Close position with collateral"
-                  }
-                >
-                  <div className="flex items-center justify-center">
-                    <FiX className="w-4 h-4 mr-1" />
-                    <span>Close</span>
-                  </div>
-                </button>
-              )}
+            {/* Desktop layout - unified segmented bar (centered) */}
+            <div className="hidden md:flex justify-center">
+              <SegmentedActionBar
+                className="mx-2 my-1"
+                actions={[
+                ...(showRepayButton
+                  ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
+                  : []),
+                ...(showBorrowButton
+                  ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
+                  : []),
+                ...(showSwapButton
+                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                  : []),
+                ...(showMoveButton
+                  ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                  : []),
+                ...(showCloseButton
+                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                  : []),
+                ]}
+              />
             </div>
 
             {actionsDisabled && (
