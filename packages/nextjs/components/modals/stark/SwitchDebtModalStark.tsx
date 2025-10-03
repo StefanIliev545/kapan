@@ -108,9 +108,8 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose
             </div>
           </>
         )}
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button className="btn btn-primary btn-sm" onClick={onSubmit} disabled={submitting || loading || !selectedQuote || calls.length === 0}>{submitting ? "Switching..." : "Switch Debt"}</button>
+        <div className="mt-4 flex justify-end">
+          <button className="btn btn-ghost btn-sm" onClick={onSubmit} disabled={submitting || loading || !selectedQuote || calls.length === 0}>{submitting ? "Switching..." : "Switch Debt"}</button>
         </div>
       </div>
     </BaseModal>

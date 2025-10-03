@@ -175,15 +175,43 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     avnuCalldata,
   ]);
 
+  // Build a minimal instruction set that includes only the Withdraw step for authorization requests
+  const withdrawAuthInstructions = useMemo(() => {
+    if (!address) return [] as any[];
+
+    const withdrawContext = new CairoOption(CairoOptionVariant.Some, [poolId, debt.address]);
+    const withdrawInstruction = new CairoCustomEnum({
+      Deposit: undefined,
+      Borrow: undefined,
+      Repay: undefined,
+      Withdraw: {
+        basic: {
+          token: collateral.address,
+          amount: uint256.bnToUint256(collateralBalance + (collateralBalance / 100n)),
+          user: address,
+        },
+        withdraw_all: true,
+        context: withdrawContext,
+      },
+      Redeposit: undefined,
+      Reborrow: undefined,
+      Swap: undefined,
+      SwapExactIn: undefined,
+      Reswap: undefined,
+    });
+
+    return [{ protocol_name: "vesu", instructions: [withdrawInstruction] }];
+  }, [address, poolId, debt.address, collateral.address, collateralBalance]);
+
   useEffect(() => {
     let cancelled = false;
     const fetchAuths = async () => {
-      if (!isOpen || !isAuthReady || protocolInstructions.length === 0) {
+      if (!isOpen || !isAuthReady) {
         setFetchedAuthorizations([]);
         return;
       }
       try {
-        const auths = await getAuthorizations(protocolInstructions as any);
+        const auths = await getAuthorizations(withdrawAuthInstructions as any);
         if (!cancelled) setFetchedAuthorizations(auths);
       } catch {
         if (!cancelled) setFetchedAuthorizations([]);
@@ -193,7 +221,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isAuthReady, getAuthorizations, protocolInstructions]);
+  }, [isOpen, isAuthReady, getAuthorizations, withdrawAuthInstructions]);
 
   const calls = useMemo(() => {
     if (protocolInstructions.length === 0) return [];
@@ -220,11 +248,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     }
   };
 
-  const formattedCollateral = formatTokenAmount(
-    collateralBalance.toString(),
-    collateral.decimals,
-  );
-  const formattedDebt = formatTokenAmount(debtBalance.toString(), debt.decimals);
+  // const formattedCollateral = formatTokenAmount(collateralBalance.toString(), collateral.decimals);
+  // const formattedDebt = formatTokenAmount(debtBalance.toString(), debt.decimals);
 
   const formatUsd = (value?: number) => {
     if (value === undefined || value === null) return "-";
@@ -254,7 +279,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
-        <h3 className="text-xl font-semibold">Close position with collateral</h3>
+        <h3 className="text-xl font-semibold mb-2">Close position with collateral</h3>
         {selectedQuote ? (
           <>
             <div className="space-y-3">
@@ -322,26 +347,23 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
               </div>
             </div>
             <div className="pt-2 border-t border-gray-100">
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] text-gray-600">Withdraw</span>
+              <div className="text-[12px] text-gray-600 mb-1">Withdraw</div>
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Image src={collateral.icon} alt={collateral.name} width={20} height={20} className="w-5 h-5" />
-                  <div className="text-right">
+                  <div>
                     <div className="text-base font-medium">{remainderInfo?.remainderFormatted} {collateral.name}</div>
                     <div className="text-[11px] text-gray-500">{formatUsd(remainderInfo?.remainderUsd)}</div>
                   </div>
                 </div>
+                <button className="btn btn-ghost btn-sm" onClick={handleClosePosition}>Close Position</button>
               </div>
             </div>
           </>
         ) : (
           <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
         )}
-        <div className="mt-4 flex justify-end">
-          <button className="btn btn-primary btn-sm" onClick={handleClosePosition}>
-            Close Position
-          </button>
-        </div>
+        
       </div>
     </BaseModal>
   );
