@@ -8,7 +8,7 @@ import { PositionManager } from "~~/utils/position";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
 import { ClosePositionModalStark } from "~~/components/modals/stark/ClosePositionModalStark";
-import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
+import { TokenSelectModalStark, type TokenWithRates } from "~~/components/modals/stark/TokenSelectModalStark";
 import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModalStark";
 import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
 import { feltToString } from "~~/utils/protocols";
@@ -85,7 +85,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const [isSwapSelectOpen, setIsSwapSelectOpen] = useState(false);
   const [swapType, setSwapType] = useState<"debt" | "collateral" | null>(null);
   const [swapRow, setSwapRow] = useState<VesuPositionRow | null>(null);
-  const [selectedTarget, setSelectedTarget] = useState<AssetWithRates | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<TokenWithRates | null>(null);
   const [isSwitchDebtOpen, setIsSwitchDebtOpen] = useState(false);
   const [isSwitchCollateralOpen, setIsSwitchCollateralOpen] = useState(false);
 
@@ -119,7 +119,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     });
   }, [assetsWithRates, swapRow, swapType]);
 
-  const handleSelectSwapTarget = (token: AssetWithRates) => {
+  const handleSelectSwapTarget = (token: TokenWithRates) => {
     setSelectedTarget(token);
     setIsSwapSelectOpen(false);
     if (!swapRow || !swapType) return;
@@ -284,7 +284,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
             ...asset,
             borrowAPR: asset.borrowAPR,
             supplyAPY: asset.supplyAPY,
-          }))}
+          })) as TokenWithRates[]}
           protocolName="Vesu"
           collateralAsset={swapRow.supply.tokenAddress}
           vesuContext={swapType === "debt" ? swapRow.borrowContext : swapRow.borrowContext}

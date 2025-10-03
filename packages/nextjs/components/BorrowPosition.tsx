@@ -72,7 +72,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   showNoDebtLabel = false,
   infoButton,
   extraActions,
-  showInfoDropdown = true,
+  showInfoDropdown = false,
   onClosePosition,
   onSwap,
 }) => {

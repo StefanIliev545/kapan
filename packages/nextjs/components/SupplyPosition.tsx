@@ -69,7 +69,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   onMove,
   onSwap,
   showQuickDepositButton = false,
-  showInfoDropdown = true,
+  showInfoDropdown = false,
   extraActions,
 }) => {
   const moveModal = useModal();

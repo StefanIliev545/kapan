@@ -9,9 +9,9 @@ import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
 
-type TokenWithRates = TokenMetadata & {
-  borrowAPR?: number;
-  supplyAPY?: number;
+export type TokenWithRates = TokenMetadata & {
+  borrowAPR: number;
+  supplyAPY: number;
 };
 
 interface TokenSelectModalStarkProps {
