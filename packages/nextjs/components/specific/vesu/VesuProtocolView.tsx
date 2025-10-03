@@ -124,7 +124,6 @@ export const VesuProtocolView: FC = () => {
     setDepositSelection({ tokens, vesuContext: options?.vesuContext, position: options?.position });
   };
 
-  const isLoadingAssets = supportedAssets == null;
 
   return (
     <div className="flex w-full flex-col space-y-6 p-4">
