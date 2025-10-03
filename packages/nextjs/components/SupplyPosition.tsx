@@ -37,6 +37,8 @@ export type SupplyPositionProps = ProtocolPosition & {
   onWithdraw?: () => void;
   onMove?: () => void;
   onSwap?: () => void;
+  controlledExpanded?: boolean;
+  onToggleExpanded?: () => void;
   showQuickDepositButton?: boolean;
   showInfoDropdown?: boolean;
   extraActions?: ReactNode;
@@ -69,6 +71,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   onWithdraw,
   onMove,
   onSwap,
+  controlledExpanded,
+  onToggleExpanded,
   showQuickDepositButton = false,
   showInfoDropdown = false,
   extraActions,
@@ -77,7 +81,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const depositModal = useModal();
   const withdrawModal = useModal();
   const expanded = useToggle();
-  const isExpanded = expanded.isOpen;
+  const isExpanded = controlledExpanded ?? expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   const supplyAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
@@ -146,7 +150,11 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     if (!hasAnyActions) {
       return;
     }
-    expanded.toggle();
+    if (onToggleExpanded) {
+      onToggleExpanded();
+    } else {
+      expanded.toggle();
+    }
   };
 
   const defaultInfoButton = (
@@ -185,11 +193,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full p-3 rounded-md ${
-          isExpanded ? "bg-base-300" : "bg-base-200"
-        } ${hasAnyActions ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"} transition-all duration-200 ${
-          containerClassName ?? ""
-        }`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${
+          hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
+        } transition-all duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -285,10 +291,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
-          <div className="mt-3 pt-3 border-t border-base-300" onClick={e => e.stopPropagation()}>
+          <div className="mt-0 pt-1 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Unified segmented bar - centered */}
-            <div className="flex justify-center">
+            <div className="flex justify-center w-full pb-0">
               <SegmentedActionBar
+                autoCompact
+                className="w-full"
                 actions={[
                   ...(showDepositButton
                     ? [{ key: "deposit", label: "Deposit", icon: <FiPlus className="w-4 h-4" />, onClick: handleDepositClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to deposit" : actionsDisabled ? disabledMessage : "Deposit tokens", variant: "ghost" as const }]

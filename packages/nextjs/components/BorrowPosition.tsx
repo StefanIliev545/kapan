@@ -42,6 +42,8 @@ export type BorrowPositionProps = ProtocolPosition & {
   showInfoDropdown?: boolean;
   onClosePosition?: () => void;
   onSwap?: () => void;
+  controlledExpanded?: boolean;
+  onToggleExpanded?: () => void;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -76,12 +78,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   showInfoDropdown = false,
   onClosePosition,
   onSwap,
+  controlledExpanded,
+  onToggleExpanded,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
   const borrowModal = useModal();
   const expanded = useToggle();
-  const isExpanded = expanded.isOpen;
+  const isExpanded = controlledExpanded ?? expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
@@ -163,7 +167,11 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     if (!hasAnyActions) {
       return;
     }
-    expanded.toggle();
+    if (onToggleExpanded) {
+      onToggleExpanded();
+    } else {
+      expanded.toggle();
+    }
   };
 
   // Get the collateral view with isVisible prop
@@ -228,11 +236,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full p-3 rounded-md ${
-          isExpanded ? "bg-base-300" : "bg-base-200"
-        } ${hasAnyActions ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"} transition-all duration-200 ${
-          containerClassName ?? ""
-        }`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${
+          hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
+        } transition-all duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
@@ -348,11 +354,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
-          <div className="mt-1 pt-2 border-t border-base-300" onClick={e => e.stopPropagation()}>
+          <div className="mt-0 pt-1 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Mobile layout - unified segmented bar (centered) */}
-            <div className="md:hidden flex justify-center">
+            <div className="md:hidden flex justify-center w-full pb-0">
               <SegmentedActionBar
-                className="mx-2 my-1"
+                className="w-full"
+                autoCompact
                 actions={[
                 ...(showRepayButton
                   ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
@@ -374,9 +381,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             </div>
 
             {/* Desktop layout - unified segmented bar (centered) */}
-            <div className="hidden md:flex justify-center">
+            <div className="hidden md:flex justify-center w-full pb-0">
               <SegmentedActionBar
-                className="mx-2 my-1"
+                className="w-full"
+                autoCompact
                 actions={[
                 ...(showRepayButton
                   ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]

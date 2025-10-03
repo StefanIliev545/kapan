@@ -129,6 +129,11 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       setIsSwitchCollateralOpen(true);
     }
   };
+
+  // Shared expand state per row.key
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const toggleRowExpanded = (key: string) =>
+    setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
   const renderPositions = () => {
     if (accountStatus === "connecting" || (userAddress && !hasLoadedOnce)) {
       return (
@@ -188,6 +193,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
               containerClassName="rounded-none"
               availableActions={{ deposit: true, withdraw: true, move: false, swap: true }}
               onSwap={() => openSwapSelector("collateral", row)}
+              controlledExpanded={!!expandedRows[row.key]}
+              onToggleExpanded={() => toggleRowExpanded(row.key)}
             />
             {row.borrow ? (
               <BorrowPosition
@@ -200,6 +207,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                 showNoDebtLabel={!row.hasDebt}
                 onClosePosition={row.hasDebt ? () => openCloseForRow(row) : undefined}
                 onSwap={row.hasDebt ? () => openSwapSelector("debt", row) : undefined}
+                controlledExpanded={!!expandedRows[row.key]}
+                onToggleExpanded={() => toggleRowExpanded(row.key)}
               />
             ) : (
               <div className="flex h-full items-center justify-between gap-3 border border-dashed border-base-300 bg-base-200/60 p-3">
