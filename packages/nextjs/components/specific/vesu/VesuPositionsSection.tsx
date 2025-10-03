@@ -255,12 +255,12 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
           <div className="overflow-hidden rounded-md border border-dashed border-base-300">
             <div className="grid grid-cols-1 divide-y divide-base-300 md:grid-cols-2 md:divide-x md:divide-y-0">
-              <div className="flex h-full flex-col justify-between gap-3 bg-base-200/60 p-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-base-content/70">Add collateral</span>
-                  <span className="text-xs text-base-content/50">Supply assets to start or grow your borrowing power.</span>
-                </div>
-                <div className="flex justify-end">
+              <div className="flex h-full flex-col justify-center bg-base-200/60 p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-base-content/70">Add collateral</span>
+                    <span className="text-xs text-base-content/50">Supply assets to start or grow your borrowing power.</span>
+                  </div>
                   <button className="btn btn-sm btn-outline" onClick={onDepositRequest} disabled={assetsWithRates.length === 0}>
                     <FiPlus className="h-4 w-4" />
                     <span>Deposit</span>
