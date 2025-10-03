@@ -4,6 +4,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatPrice } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 
 interface NostraMarketsProps {
   viewMode: "list" | "grid";
@@ -11,11 +12,10 @@ interface NostraMarketsProps {
 }
 
 export const NostraMarkets: FC<NostraMarketsProps> = ({ viewMode, search }) => {
-  const { data: assetInfos } = useNetworkAwareReadContract({
-    networkType: "starknet",
+  const { data: assetInfos } = useScaffoldReadContract({
     contractName: "NostraGateway",
     functionName: "get_supported_assets_info",
-    args: [0n],
+    args: ["0x0"],
   });
 
   const tokenAddresses = useMemo(
@@ -24,16 +24,14 @@ export const NostraMarkets: FC<NostraMarketsProps> = ({ viewMode, search }) => {
     [assetInfos],
   );
 
-  const { data: interestRates } = useNetworkAwareReadContract({
-    networkType: "starknet",
+  const { data: interestRates } = useScaffoldReadContract({
     contractName: "NostraGateway",
     functionName: "get_interest_rates",
     args: [tokenAddresses],
     refetchInterval: 0,
   });
 
-  const { data: prices } = useNetworkAwareReadContract({
-    networkType: "starknet",
+  const { data: prices } = useScaffoldReadContract({
     contractName: "UiHelper",
     functionName: "get_asset_prices",
     args: [tokenAddresses],

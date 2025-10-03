@@ -748,7 +748,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     ];
   }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
 
-  const { loading: feeLoading, error: feeError, feeNative } = useGasEstimate({
+  const {
+    loading: feeLoading,
+    error: feeError,
+    effectiveNative,
+    effectiveCurrency,
+  } = useGasEstimate({
     enabled: isOpen,
     buildCalls: () => estimateCalls ?? null,
     currency: "STRK",
@@ -1214,10 +1219,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             </span>
             <span className="flex items-center gap-1 text-xs">
               <FaGasPump className="text-gray-400" />
-              {feeLoading && feeNative === null ? (
+              {feeLoading && effectiveNative === null ? (
                 <span className="loading loading-spinner loading-xs" />
-              ) : feeError ? null : feeNative !== null ? (
-                <span>{feeNative.toFixed(4)} STRK</span>
+              ) : feeError ? null : effectiveNative !== null ? (
+                <span>
+                  {effectiveNative.toFixed(4)} {effectiveCurrency ?? "STRK"}
+                </span>
               ) : null}
             </span>
           </button>

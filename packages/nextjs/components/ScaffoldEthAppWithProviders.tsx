@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
-import { StarknetConfig, argent, braavos, starkscan, useInjectedConnectors } from "@starknet-react/core";
+import {
+  StarknetConfig,
+  argent,
+  braavos,
+  starkscan,
+  useInjectedConnectors,
+  type Connector,
+} from "@starknet-react/core";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
@@ -22,6 +29,16 @@ import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
+import { ControllerConnector } from "@cartridge/connector";
+import { constants } from "starknet";
+
+const cartridgeConnector = new ControllerConnector({
+  chains: [
+    { rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet" },
+    { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
+  ],
+  defaultChainId: constants.StarknetChainId.SN_MAIN,
+});
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
@@ -53,19 +70,25 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
     includeRecommended: "onlyIfNoConnectors",
     order: "alphabetical",
   });
-  const liveConnectors = useMemo(() => injected.connectors, [injected.connectors]);
+  const liveConnectors = useMemo(() => injected.connectors ?? [], [injected.connectors]);
 
-  const connectorsRef = useRef<typeof liveConnectors | null>(null);
-  if (!connectorsRef.current && liveConnectors?.length) {
-    connectorsRef.current = liveConnectors;
-  }
+  const connectorsRef = useRef<Connector[]>([cartridgeConnector]);
+
+  useEffect(() => {
+    const connectorsWithCartridge = [
+      ...liveConnectors.filter((connector) => connector.id !== cartridgeConnector.id),
+      cartridgeConnector,
+    ];
+
+    connectorsRef.current = connectorsWithCartridge;
+  }, [liveConnectors]);
 
   return (
     <StarknetConfig
       chains={appChains}
       provider={provider}
       paymasterProvider={paymasterProvider}
-      connectors={connectorsRef.current ?? []}
+      connectors={connectorsRef.current}
       explorer={starkscan}
       autoConnect={true}
     >

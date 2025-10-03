@@ -31,7 +31,7 @@ threads = 1
 
 [[tool.snforge.fork]]
 name = "MAINNET_LATEST"
-url = "https://starknet-mainnet.public.blastapi.io/rpc/v0_8"
+url = "$FORK_URL"
 block_id.number = "2205419"
 
 [scripts]

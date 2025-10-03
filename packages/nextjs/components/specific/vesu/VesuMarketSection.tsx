@@ -5,6 +5,7 @@ import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
+import formatPercentage from "~~/utils/formatPercentage";
 
 interface VesuMarketSectionProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ interface VesuMarketSectionProps {
   userAddress?: string;
   hasPositions: boolean;
   netBalanceUsd: number;
+  netYield30d: number;
+  netApyPercent: number | null;
   onDeposit: () => void;
   canDeposit: boolean;
   formatCurrency: (value: number) => string;
@@ -31,10 +34,17 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   userAddress,
   hasPositions,
   netBalanceUsd,
+  netYield30d,
+  netApyPercent,
   onDeposit,
   canDeposit,
   formatCurrency,
 }) => {
+  const formatSignedPercentage = (value: number) => {
+    const formatted = formatPercentage(Math.abs(value));
+    return `${value >= 0 ? "" : "-"}${formatted}%`;
+  };
+
   const renderMarketContent = () => {
     if (assetsError) {
       return (
@@ -125,11 +135,35 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <div className="text-xl font-bold tracking-tight">Vesu</div>
               <div className="text-xs text-base-content/70">Manage your Starknet lending positions</div>
               {userAddress && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-base-content/70">
-                  <span>Balance:</span>
-                  <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
-                    {formatCurrency(netBalanceUsd)}
-                  </span>
+                <div className="mt-1 flex flex-col gap-1 text-xs text-base-content/70">
+                  <div className="flex items-center gap-1">
+                    <span>Balance:</span>
+                    <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
+                      {formatCurrency(netBalanceUsd)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span className="flex items-center gap-1">
+                      <span>30D Net Yield:</span>
+                      <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                        {formatCurrency(netYield30d)}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span>Net APY:</span>
+                      <span
+                        className={`font-semibold ${
+                          netApyPercent == null
+                            ? "text-base-content"
+                            : netApyPercent >= 0
+                              ? "text-success"
+                              : "text-error"
+                        }`}
+                      >
+                        {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
+                      </span>
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

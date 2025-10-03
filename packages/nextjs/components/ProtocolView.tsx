@@ -10,6 +10,7 @@ import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 import formatPercentage from "~~/utils/formatPercentage";
+import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/hooks/useLendingAction";
 
@@ -34,13 +35,6 @@ export interface ProtocolPosition {
   moveSupport?: {
     preselectedCollaterals?: CollateralWithAmount[];
     disableCollateralSelection?: boolean;
-  };
-  availableActions?: {
-    deposit?: boolean;
-    withdraw?: boolean;
-    borrow?: boolean;
-    repay?: boolean;
-    move?: boolean;
   };
   actionsDisabled?: boolean;
   actionsDisabledReason?: string;
@@ -150,6 +144,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     [suppliedPositions, borrowedPositions],
   );
 
+  const { netYield30d, netApyPercent } = useMemo(
+    () =>
+      calculateNetYieldMetrics(suppliedPositions, borrowedPositions, {
+        netBalanceOverride: netBalance,
+      }),
+    [suppliedPositions, borrowedPositions, netBalance],
+  );
+
   // Format currency with sign.
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat("en-US", {
@@ -159,6 +161,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       maximumFractionDigits: 2,
     }).format(Math.abs(amount));
     return amount >= 0 ? formatted : `-${formatted}`;
+  };
+
+  const formatSignedPercentage = (value: number) => {
+    const formatted = formatPercentage(Math.abs(value));
+    return `${value >= 0 ? "" : "-"}${formatted}%`;
   };
 
   // Use effective showAll state (component state OR forced from props)
@@ -269,11 +276,35 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
               <div className="flex flex-col">
                 <div className="text-xl font-bold tracking-tight">{protocolName}</div>
-                <div className="text-base-content/70 flex items-center gap-1">
-                  <span className="text-sm">Balance:</span>
-                  <span className={`text-sm font-medium ${netBalance >= 0 ? "text-success" : "text-error"}`}>
-                    {formatCurrency(netBalance)}
-                  </span>
+                <div className="text-base-content/70 flex flex-col gap-1 text-sm">
+                  <div className="flex items-center gap-1">
+                    <span>Balance:</span>
+                    <span className={`font-medium ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+                      {formatCurrency(netBalance)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    <span className="flex items-center gap-1">
+                      <span>30D Net Yield:</span>
+                      <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                        {formatCurrency(netYield30d)}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span>Net APY:</span>
+                      <span
+                        className={`font-semibold ${
+                          netApyPercent == null
+                            ? "text-base-content"
+                            : netApyPercent >= 0
+                              ? "text-success"
+                              : "text-error"
+                        }`}
+                      >
+                        {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -85,7 +85,11 @@ const generateTsAbis = () => {
         };
       }
 
-      const contracts = ${JSON.stringify(allContractsData, null, 2)} as const satisfies SNContractsType;
+      const contracts = ${JSON.stringify(
+        allContractsData,
+        null,
+        2
+      )} as const satisfies SNContractsType;
       
       export default contracts;`,
       {

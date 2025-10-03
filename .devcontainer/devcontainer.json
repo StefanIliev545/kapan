@@ -17,17 +17,24 @@
 	"forwardPorts": [
 		3000
 	],
+	"mounts": [
+		// Persist VS Code server extensions between rebuilds
+		"source=vscode-extensions,target=/home/node/.vscode-server/extensions,type=volume",
+		// Persist VS Code server user data (includes globalStorage/secret storage used by extensions)
+		"source=vscode-userdata,target=/home/node/.vscode-server/data/User,type=volume"
+	],
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"NomicFoundation.hardhat-solidity",
 				"StarkWare.cairo1",
-				"tamasfe.even-better-toml"
+				"tamasfe.even-better-toml",
+				"openai.chatgpt"
 			]
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc",
+	"postCreateCommand": "echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

@@ -10,7 +10,13 @@ import {
 import { green, red } from "./helpers/colorize-log";
 import { CallData, constants } from "starknet";
 
-const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string, avnuGatewayAddress: string }> => {
+const deployScriptMainnet = async (): Promise<{
+  nostraGatewayAddress: string;
+  vesuGatewayAddress: string;
+  routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
+  avnuGatewayAddress: string;
+}> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
@@ -25,15 +31,18 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
     contract: "RouterGateway",
     constructorArgs: {
       _owner: deployer.address,
-      flashloan_provider: "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
+      flashloan_provider:
+        "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
     },
   });
 
   const { address: vesuGatewayAddress } = await deployContract({
     contract: "VesuGateway",
     constructorArgs: {
-      vesu_singleton: "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
-      pool_id: "2198503327643286920898110335698706244522220458610657370981979460625005526824",
+      vesu_singleton:
+        "0x000d8d6dfec4d33bfb6895de9f3852143a17c6f92fd2a21da3d6924d34870160",
+      pool_id:
+        "2198503327643286920898110335698706244522220458610657370981979460625005526824",
       router: routerGatewayAddress,
       owner: deployer.address,
       supported_assets: supportedAssets,
@@ -55,7 +64,8 @@ const deployScriptMainnet = async (): Promise<{ nostraGatewayAddress: string, ve
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
     constructorArgs: {
-      interest_rate_model: "0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff",
+      interest_rate_model:
+        "0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff",
       router: routerGatewayAddress,
       owner: deployer.address,
     },
@@ -95,28 +105,29 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     "0xabbd6f1e590eb83addd87ba5ac27960d859b1f17d11a3c1cd6a0006704b141", // WBTC
     "0x715649d4c493ca350743e43915b88d2e6838b1c78ddc23d6d9385446b9d6844", // USDC
     "0x41301316d5313cb7ee3389a04cfb788db7dd600d6369bc1ffd7982d6d808ff4",
-    "0x173d770db353707f2bfac025f760d2a45a288e06f56d48d545bcbdcebe3daa2"
+    "0x173d770db353707f2bfac025f760d2a45a288e06f56d48d545bcbdcebe3daa2",
     //"0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8", // USDT
     //"0x042b8f0484674ca266ac5d08e4ac6a3fe65bd3129795def2dca5c34ecc5f96d2", // DAI
     //"0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // LINK
     //"0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // UNI
   ];
 
-  
   const { address: routerGatewayAddress } = await deployContract({
     contract: "RouterGateway",
     constructorArgs: {
       _owner: deployer.address,
-      flashloan_provider: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
+      flashloan_provider:
+        "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
     },
   });
-
 
   const { address: vesuGatewayAddress } = await deployContract({
     contract: "VesuGateway",
     constructorArgs: {
-      vesu_singleton: "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
-      pool_id: "730993554056884283224259059297934576024721456828383733531590831263129347422",
+      vesu_singleton:
+        "0x1ecab07456147a8de92b9273dd6789893401e8462a737431493980d9be6827",
+      pool_id:
+        "730993554056884283224259059297934576024721456828383733531590831263129347422",
       router: routerGatewayAddress,
       owner: deployer.address,
       supported_assets: supportedAssets,
@@ -127,7 +138,8 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
     constructorArgs: {
-      interest_rate_model: "0x02cf4bd3936e99a9f46f3499d1adfe68be8765caef19bf2381e9e4e14a1ca1c6",
+      interest_rate_model:
+        "0x02cf4bd3936e99a9f46f3499d1adfe68be8765caef19bf2381e9e4e14a1ca1c6",
       router: routerGatewayAddress,
       owner: deployer.address,
     },
@@ -148,7 +160,6 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
-
   await deployContract({
     contract: "UiHelper",
     constructorArgs: {
@@ -156,15 +167,27 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
     },
   });
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress };
+  return {
+    nostraGatewayAddress,
+    vesuGatewayAddress,
+    routerGatewayAddress,
+    ekuboGatewayAddress,
+  };
 };
 
-const initializeContracts = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string, avnuGatewayAddress: string}): Promise<void> => {
-
+const initializeContracts = async (addresses: {
+  nostraGatewayAddress: string;
+  vesuGatewayAddress: string;
+  routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
+  avnuGatewayAddress: string;
+}): Promise<void> => {
   const nonce = await deployer.getNonce();
 
-  const re7Pool = "3592370751539490711610556844458488648008775713878064059760995781404350938653";
-  const alterscopeWstETh = "2612229586214495842527551768232431476062656055007024497123940017576986139174";
+  const re7Pool =
+    "3592370751539490711610556844458488648008775713878064059760995781404350938653";
+  const alterscopeWstETh =
+    "2612229586214495842527551768232431476062656055007024497123940017576986139174";
 
   const calls = [
     {
@@ -230,100 +253,97 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool",
-      calldata: [ re7Pool ]
+      calldata: [re7Pool],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        re7Pool, 
-        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" // USDC
-      ]
+      calldata: [
+        re7Pool,
+        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8", // USDC
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        re7Pool, 
-        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7" // ETH
-      ]
+      calldata: [
+        re7Pool,
+        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        re7Pool, 
-        "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" // WSTETH
-      ]
+      calldata: [
+        re7Pool,
+        "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // WSTETH
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        re7Pool, 
-        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" // STRK
-      ]
+      calldata: [
+        re7Pool,
+        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        re7Pool, 
-        "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac" // WBTC
-      ]
+      calldata: [
+        re7Pool,
+        "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac", // WBTC
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool",
-      calldata: [ alterscopeWstETh ]
+      calldata: [alterscopeWstETh],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        alterscopeWstETh, 
-        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" // USDC
-      ]
+      calldata: [
+        alterscopeWstETh,
+        "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8", // USDC
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        alterscopeWstETh, 
-        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7" // ETH
-      ]
+      calldata: [
+        alterscopeWstETh,
+        "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        alterscopeWstETh, 
-        "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" // WSTETH
-      ]
+      calldata: [
+        alterscopeWstETh,
+        "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b", // WSTETH
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        alterscopeWstETh, 
-        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" // STRK
-      ]
+      calldata: [
+        alterscopeWstETh,
+        "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
+      ],
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_asset",
-      calldata: [ 
-        alterscopeWstETh, 
-        "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac" // WBTC
-      ]
+      calldata: [
+        alterscopeWstETh,
+        "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac", // WBTC
+      ],
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: [
-        "vesu",
-        addresses.vesuGatewayAddress,
-      ]
+      calldata: ["vesu", addresses.vesuGatewayAddress],
     },
     {
       contractAddress: addresses.routerGatewayAddress,
@@ -364,15 +384,23 @@ const initializeContracts = async (addresses: {nostraGatewayAddress: string, ves
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {
-    console.log(red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`));
+    console.log(
+      red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`)
+    );
     throw new Error("Failed to initialize contracts");
   }
 };
 
-const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string}): Promise<void> => {
+const initializeContractsSepolia = async (addresses: {
+  nostraGatewayAddress: string;
+  vesuGatewayAddress: string;
+  routerGatewayAddress: string;
+  ekuboGatewayAddress: string;
+}): Promise<void> => {
   const nonce = await deployer.getNonce();
 
-  const re7Pool = "3592370751539490711610556844458488648008775713878064059760995781404350938653";
+  const re7Pool =
+    "3592370751539490711610556844458488648008775713878064059760995781404350938653";
 
   const calls = [
     {
@@ -408,10 +436,7 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: [
-        "vesu",
-        addresses.vesuGatewayAddress,
-      ]
+      calldata: ["vesu", addresses.vesuGatewayAddress],
     },
     {
       contractAddress: addresses.routerGatewayAddress,
@@ -444,7 +469,9 @@ const initializeContractsSepolia = async (addresses: {nostraGatewayAddress: stri
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {
-    console.log(red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`));
+    console.log(
+      red(`Failed to initialize contracts: ${JSON.stringify(txR.value)}`)
+    );
     throw new Error("Failed to initialize contracts");
   }
 };
