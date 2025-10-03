@@ -291,7 +291,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
-          <div className="mt-0 pt-1 border-t border-base-300" onClick={e => e.stopPropagation()}>
+          <div className="-mx-3 mt-0 pt-1 border-t border-base-300" onClick={e => e.stopPropagation()}>
             {/* Unified segmented bar - centered */}
             <div className="flex justify-center w-full pb-0">
               <SegmentedActionBar
