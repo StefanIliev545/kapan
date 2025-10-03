@@ -71,6 +71,22 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === debtAsset,
   );
 
+  // Build token list with rates for selector (must be before any early returns)
+  const tokensWithRates = useMemo(
+    () =>
+      supportedAssets.map(asset => {
+        const { borrowAPR, supplyAPY } = calculateRates(
+          asset.fee_rate,
+          asset.total_nominal_debt,
+          asset.last_rate_accumulator,
+          asset.reserve,
+          asset.scale,
+        );
+        return { ...asset, borrowAPR, supplyAPY };
+      }),
+    [supportedAssets],
+  );
+
   const collateralUsdPrice =
     collateralMetadata && collateralMetadata.price && collateralMetadata.price.is_valid
       ? Number(collateralMetadata.price.value) / 1e18
@@ -143,6 +159,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
       inputValue: formattedCollateral,
     },
   ];
+
 
   return (
     <>
@@ -339,7 +356,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <TokenSelectModalStark
             isOpen={isTokenSelectModalOpen}
             onClose={() => setIsTokenSelectModalOpen(false)}
-            tokens={supportedAssets}
+            tokens={tokensWithRates}
             protocolName="Vesu"
             collateralAsset={collateralAsset}
             vesuContext={{ poolId, counterpartToken: collateralAsset }}
