@@ -23,6 +23,8 @@ interface TokenSelectModalStarkProps {
   vesuContext?: VesuContext;
   position?: PositionManager;
   action?: "borrow" | "deposit";
+  onSelectToken?: (token: TokenWithRates) => void;
+  suppressActionModals?: boolean;
 }
 
 export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
@@ -34,6 +36,8 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   vesuContext,
   position,
   action = "borrow",
+  onSelectToken,
+  suppressActionModals = false,
 }) => {
   const [selectedToken, setSelectedToken] = useState<TokenWithRates | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
@@ -54,6 +58,11 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 
   // Handle token selection
   const handleSelectToken = (token: TokenWithRates) => {
+    if (suppressActionModals && onSelectToken) {
+      onSelectToken(token);
+      onClose();
+      return;
+    }
     setSelectedToken(token);
     setIsTokenModalOpen(true);
   };
@@ -176,7 +185,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       </dialog>
 
       {/* Render borrow modal if a token is selected */}
-      {selectedToken && action === "borrow" && (
+      {!suppressActionModals && selectedToken && action === "borrow" && (
         <BorrowModalStark
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}
@@ -197,7 +206,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
         />
       )}
 
-      {selectedToken && action === "deposit" && (
+      {!suppressActionModals && selectedToken && action === "deposit" && (
         <DepositModalStark
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}

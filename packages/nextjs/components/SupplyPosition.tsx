@@ -30,10 +30,12 @@ export type SupplyPositionProps = ProtocolPosition & {
     deposit?: boolean;
     withdraw?: boolean;
     move?: boolean;
+    swap?: boolean;
   };
   onDeposit?: () => void;
   onWithdraw?: () => void;
   onMove?: () => void;
+  onSwap?: () => void;
   showQuickDepositButton?: boolean;
   showInfoDropdown?: boolean;
   extraActions?: ReactNode;
@@ -65,6 +67,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   onDeposit,
   onWithdraw,
   onMove,
+  onSwap,
   showQuickDepositButton = false,
   showInfoDropdown = true,
   extraActions,
@@ -114,13 +117,15 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     deposit: availableActions?.deposit !== false,
     withdraw: availableActions?.withdraw !== false,
     move: availableActions?.move !== false,
+    swap: availableActions?.swap !== false,
   };
 
   const showDepositButton = actionConfig.deposit;
   const showWithdrawButton = actionConfig.withdraw;
   const showMoveButton = actionConfig.move && !disableMove;
+  const showSwapButton = Boolean(onSwap) && actionConfig.swap;
 
-  const visibleActionCount = [showDepositButton, showWithdrawButton, showMoveButton].filter(Boolean).length;
+  const visibleActionCount = [showDepositButton, showWithdrawButton, showMoveButton, showSwapButton].filter(Boolean).length;
   const hasAnyActions = visibleActionCount > 0;
 
   const actionGridClass =
@@ -129,6 +134,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const handleDepositClick = onDeposit ?? depositModal.open;
   const handleWithdrawClick = onWithdraw ?? withdrawModal.open;
   const handleMoveClick = onMove ?? moveModal.open;
+  const handleSwapClick = onSwap;
 
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
@@ -339,6 +345,27 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   </div>
                 </button>
               )}
+
+            {showSwapButton && (
+              <button
+                className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                onClick={handleSwapClick}
+                disabled={!isWalletConnected || actionsDisabled || !hasBalance}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to swap collateral"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : !hasBalance
+                        ? "No collateral to swap"
+                        : "Switch collateral token"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <span>Swap</span>
+                </div>
+              </button>
+            )}
             </div>
 
             {/* Desktop layout - evenly distributed buttons in a row */}
@@ -401,6 +428,27 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   </div>
                 </button>
               )}
+
+            {showSwapButton && (
+              <button
+                className="btn btn-sm btn-outline flex justify-center items-center"
+                onClick={handleSwapClick}
+                disabled={!isWalletConnected || actionsDisabled || !hasBalance}
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to swap collateral"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : !hasBalance
+                        ? "No collateral to swap"
+                        : "Switch collateral token"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <span>Swap</span>
+                </div>
+              </button>
+            )}
             </div>
           </div>
         )}

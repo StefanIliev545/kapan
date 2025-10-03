@@ -64,22 +64,22 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose
             <div className="space-y-3">
               <div className="flex items-center justify-between bg-base-200/40 p-2 rounded">
                 <div className="flex items-center gap-2">
-                  <Image src={swapSummary?.sellToken.icon || targetDebt.icon} alt={swapSummary?.sellToken.name || targetDebt.name} width={24} height={24} className="w-6 h-6" />
+                  <Image src={swapSummary?.buyToken?.icon || currentDebt.icon} alt={(swapSummary?.buyToken?.name || currentDebt.name)} width={24} height={24} className="w-6 h-6" />
                   <div>
                     <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken.decimals || targetDebt.decimals))} {swapSummary?.sellToken.name || targetDebt.name}
+                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken?.decimals || currentDebt.decimals))} {swapSummary?.buyToken?.name || currentDebt.name}
                     </div>
-                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
                   </div>
                 </div>
                 <div className="text-gray-400">→</div>
                 <div className="flex items-center gap-2">
-                  <Image src={swapSummary?.buyToken.icon || currentDebt.icon} alt={swapSummary?.buyToken.name || currentDebt.name} width={24} height={24} className="w-6 h-6" />
+                  <Image src={swapSummary?.sellToken?.icon || targetDebt.icon} alt={(swapSummary?.sellToken?.name || targetDebt.name)} width={24} height={24} className="w-6 h-6" />
                   <div className="text-right">
                     <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken.decimals || currentDebt.decimals))} {swapSummary?.buyToken.name || currentDebt.name}
+                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken?.decimals || targetDebt.decimals))} {swapSummary?.sellToken?.name || targetDebt.name}
                     </div>
-                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
+                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
                   </div>
                 </div>
               </div>

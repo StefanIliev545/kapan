@@ -8,7 +8,7 @@ import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
-import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -28,6 +28,8 @@ export type BorrowPositionProps = ProtocolPosition & {
     borrow?: boolean;
     repay?: boolean;
     move?: boolean;
+    close?: boolean;
+    swap?: boolean;
   };
   afterInfoContent?: React.ReactNode;
   renderName?: (name: string) => React.ReactNode;
@@ -37,6 +39,8 @@ export type BorrowPositionProps = ProtocolPosition & {
   infoButton?: React.ReactNode;
   extraActions?: React.ReactNode;
   showInfoDropdown?: boolean;
+  onClosePosition?: () => void;
+  onSwap?: () => void;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -69,6 +73,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   infoButton,
   extraActions,
   showInfoDropdown = true,
+  onClosePosition,
+  onSwap,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -125,6 +131,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     borrow: availableActions?.borrow !== false,
     repay: availableActions?.repay !== false,
     move: availableActions?.move !== false,
+    close: availableActions?.close !== false,
+    swap: availableActions?.swap !== false,
   };
 
   const canInitiateBorrow =
@@ -133,8 +141,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const showBorrowButton = actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow);
   const showRepayButton = actionConfig.repay;
   const showMoveButton = actionConfig.move && hasBalance;
+  const showCloseButton = Boolean(onClosePosition) && actionConfig.close && hasBalance;
+  const showSwapButton = Boolean(onSwap) && actionConfig.swap && hasBalance;
 
-  const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton].filter(Boolean).length;
+  const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton, showCloseButton, showSwapButton].filter(Boolean).length;
   const hasAnyActions = visibleActionCount > 0;
 
   const actionGridClass =
@@ -362,6 +372,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 </button>
               )}
 
+            {showCloseButton && (
+              <button
+                className="btn btn-sm btn-error w-full flex justify-center items-center"
+                onClick={onClosePosition}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                aria-label="Close"
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to close position"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Close position with collateral"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <FiX className="w-4 h-4 mr-1" />
+                  <span>Close</span>
+                </div>
+              </button>
+            )}
+
               {showMoveButton && (
                 <button
                   className={`btn btn-sm w-full flex justify-center items-center ${
@@ -384,6 +415,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   </div>
                 </button>
               )}
+
+            {showSwapButton && (
+              <button
+                className="btn btn-sm btn-outline w-full flex justify-center items-center"
+                onClick={onSwap}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                aria-label="Swap"
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to switch debt"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Switch debt token"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <FiRepeat className="w-4 h-4 mr-1" />
+                  <span>Swap</span>
+                </div>
+              </button>
+            )}
 
               {showBorrowButton && (
                 <button
@@ -430,6 +482,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 </button>
               )}
 
+            {showCloseButton && (
+              <button
+                className="btn btn-sm btn-error flex justify-center items-center"
+                onClick={onClosePosition}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                aria-label="Close"
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to close position"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Close position with collateral"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <FiX className="w-4 h-4 mr-1" />
+                  <span>Close</span>
+                </div>
+              </button>
+            )}
+
               {showMoveButton && (
                 <button
                   className={`btn btn-sm flex justify-center items-center ${
@@ -452,6 +525,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   </div>
                 </button>
               )}
+
+            {showSwapButton && (
+              <button
+                className="btn btn-sm btn-outline flex justify-center items-center"
+                onClick={onSwap}
+                disabled={!hasBalance || !isWalletConnected || actionsDisabled}
+                aria-label="Swap"
+                title={
+                  !isWalletConnected
+                    ? "Connect wallet to switch debt"
+                    : actionsDisabled
+                      ? disabledMessage
+                      : "Switch debt token"
+                }
+              >
+                <div className="flex items-center justify-center">
+                  <FiRepeat className="w-4 h-4 mr-1" />
+                  <span>Swap</span>
+                </div>
+              </button>
+            )}
 
               {showBorrowButton && (
                 <button

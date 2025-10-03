@@ -1,4 +1,5 @@
 import type { FC, MouseEvent } from "react";
+import { useMemo, useState } from "react";
 import { FiPlus } from "react-icons/fi";
 
 import { BorrowPosition } from "~~/components/BorrowPosition";
@@ -6,6 +7,12 @@ import { SupplyPosition } from "~~/components/SupplyPosition";
 import { PositionManager } from "~~/utils/position";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
+import { ClosePositionModalStark } from "~~/components/modals/stark/ClosePositionModalStark";
+import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
+import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModalStark";
+import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
+import { feltToString } from "~~/utils/protocols";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
 
 interface BorrowSelectionRequest {
   tokens: AssetWithRates[];
@@ -35,6 +42,93 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   onBorrowRequest,
   onDepositRequest,
 }) => {
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [closeParams, setCloseParams] = useState<
+    | {
+        collateral: { name: string; address: string; decimals: number; icon: string };
+        debt: { name: string; address: string; decimals: number; icon: string };
+        collateralBalance: bigint;
+        debtBalance: bigint;
+        poolId: bigint;
+      }
+    | null
+  >(null);
+
+  const openCloseForRow = (row: VesuPositionRow) => {
+    if (!row.borrow || !row.borrowContext) return;
+    setCloseParams({
+      collateral: {
+        name: row.supply.name,
+        address: row.supply.tokenAddress,
+        decimals: row.supply.tokenDecimals ?? 18,
+        icon: row.supply.icon,
+      },
+      debt: {
+        name: row.borrow.name,
+        address: row.borrow.tokenAddress,
+        decimals: row.borrow.tokenDecimals ?? 18,
+        icon: row.borrow.icon,
+      },
+      collateralBalance: row.supply.tokenBalance,
+      debtBalance: row.borrow.tokenBalance,
+      poolId: row.borrowContext.poolId,
+    });
+    setIsCloseModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsCloseModalOpen(false);
+    setCloseParams(null);
+  };
+
+  // Swap state (debt or collateral)
+  const [isSwapSelectOpen, setIsSwapSelectOpen] = useState(false);
+  const [swapType, setSwapType] = useState<"debt" | "collateral" | null>(null);
+  const [swapRow, setSwapRow] = useState<VesuPositionRow | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<AssetWithRates | null>(null);
+  const [isSwitchDebtOpen, setIsSwitchDebtOpen] = useState(false);
+  const [isSwitchCollateralOpen, setIsSwitchCollateralOpen] = useState(false);
+
+  const openSwapSelector = (type: "debt" | "collateral", row: VesuPositionRow) => {
+    setSwapType(type);
+    setSwapRow(row);
+    setSelectedTarget(null);
+    setIsSwapSelectOpen(true);
+  };
+
+  const closeSwapSelector = () => {
+    setIsSwapSelectOpen(false);
+  };
+
+  const swapCandidateTokens = useMemo(() => {
+    if (!swapRow) return [] as AssetWithRates[];
+    const currentCollateralHex = swapRow.supply.tokenAddress;
+    const currentDebtHex = swapRow.borrow?.tokenAddress;
+    return assetsWithRates.filter(asset => {
+      const addrHex = `0x${asset.address.toString(16).padStart(64, "0")}`;
+      if (swapType === "debt") {
+        // Exclude current debt and collateral
+        if (addrHex === currentDebtHex) return false;
+        if (addrHex === currentCollateralHex) return false;
+        return true;
+      }
+      // collateral: exclude current collateral and debt
+      if (addrHex === currentCollateralHex) return false;
+      if (addrHex === currentDebtHex) return false;
+      return true;
+    });
+  }, [assetsWithRates, swapRow, swapType]);
+
+  const handleSelectSwapTarget = (token: AssetWithRates) => {
+    setSelectedTarget(token);
+    setIsSwapSelectOpen(false);
+    if (!swapRow || !swapType) return;
+    if (swapType === "debt") {
+      setIsSwitchDebtOpen(true);
+    } else {
+      setIsSwitchCollateralOpen(true);
+    }
+  };
   const renderPositions = () => {
     if (accountStatus === "connecting" || (userAddress && !hasLoadedOnce)) {
       return (
@@ -92,6 +186,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
               disableMove
               subtitle={row.isVtoken ? "vToken" : undefined}
               containerClassName="rounded-none"
+              availableActions={{ deposit: true, withdraw: true, move: false, swap: true }}
+              onSwap={() => openSwapSelector("collateral", row)}
             />
             {row.borrow ? (
               <BorrowPosition
@@ -100,8 +196,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                 networkType="starknet"
                 position={positionManager}
                 containerClassName="rounded-none"
-                availableActions={row.hasDebt ? undefined : { borrow: true, repay: false, move: false }}
+                availableActions={row.hasDebt ? { borrow: true, repay: true, move: true, close: true, swap: true } : { borrow: true, repay: false, move: false, swap: false, close: false }}
                 showNoDebtLabel={!row.hasDebt}
+                onClosePosition={row.hasDebt ? () => openCloseForRow(row) : undefined}
+                onSwap={row.hasDebt ? () => openSwapSelector("debt", row) : undefined}
               />
             ) : (
               <div className="flex h-full items-center justify-between gap-3 border border-dashed border-base-300 bg-base-200/60 p-3">
@@ -165,6 +263,95 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           </div>
         </div>
       </div>
+      {closeParams && (
+        <ClosePositionModalStark
+          isOpen={isCloseModalOpen}
+          onClose={handleCloseModal}
+          collateral={closeParams.collateral}
+          debt={closeParams.debt}
+          collateralBalance={closeParams.collateralBalance}
+          debtBalance={closeParams.debtBalance}
+          poolId={closeParams.poolId}
+        />
+      )}
+
+      {/* Token selector for swap target */}
+      {swapRow && swapType && (
+        <TokenSelectModalStark
+          isOpen={isSwapSelectOpen}
+          onClose={closeSwapSelector}
+          tokens={swapCandidateTokens.map(asset => ({
+            ...asset,
+            borrowAPR: asset.borrowAPR,
+            supplyAPY: asset.supplyAPY,
+          }))}
+          protocolName="Vesu"
+          collateralAsset={swapRow.supply.tokenAddress}
+          vesuContext={swapType === "debt" ? swapRow.borrowContext : swapRow.borrowContext}
+          position={PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : [])}
+          action={swapType === "debt" ? "borrow" : "deposit"}
+          onSelectToken={handleSelectSwapTarget}
+          suppressActionModals
+        />
+      )}
+
+      {/* Switch debt modal */}
+      {swapType === "debt" && swapRow && selectedTarget && (
+        <SwitchDebtModalStark
+          isOpen={isSwitchDebtOpen}
+          onClose={() => setIsSwitchDebtOpen(false)}
+          poolId={swapRow.borrowContext.poolId}
+          collateral={{
+            name: swapRow.supply.name,
+            address: swapRow.supply.tokenAddress,
+            decimals: swapRow.supply.tokenDecimals || 18,
+            icon: swapRow.supply.icon,
+          }}
+          currentDebt={{
+            name: swapRow.borrow!.name,
+            address: swapRow.borrow!.tokenAddress,
+            decimals: swapRow.borrow!.tokenDecimals || 18,
+            icon: swapRow.borrow!.icon,
+          }}
+          targetDebt={{
+            name: feltToString(selectedTarget.symbol),
+            address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
+            decimals: selectedTarget.decimals,
+            icon: tokenNameToLogo(feltToString(selectedTarget.symbol).toLowerCase()),
+          }}
+          debtBalance={swapRow.borrow!.tokenBalance}
+          collateralBalance={swapRow.supply.tokenBalance}
+        />
+      )}
+
+      {/* Switch collateral modal */}
+      {swapType === "collateral" && swapRow && selectedTarget && (
+        <SwitchCollateralModalStark
+          isOpen={isSwitchCollateralOpen}
+          onClose={() => setIsSwitchCollateralOpen(false)}
+          poolId={swapRow.borrowContext.poolId}
+          currentCollateral={{
+            name: swapRow.supply.name,
+            address: swapRow.supply.tokenAddress,
+            decimals: swapRow.supply.tokenDecimals || 18,
+            icon: swapRow.supply.icon,
+          }}
+          targetCollateral={{
+            name: feltToString(selectedTarget.symbol),
+            address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
+            decimals: selectedTarget.decimals,
+            icon: tokenNameToLogo(feltToString(selectedTarget.symbol).toLowerCase()),
+          }}
+          debtToken={{
+            name: swapRow.borrow?.name || "",
+            address: swapRow.borrow?.tokenAddress || "0x0",
+            decimals: swapRow.borrow?.tokenDecimals || 18,
+            icon: swapRow.borrow?.icon || "",
+          }}
+          collateralBalance={swapRow.supply.tokenBalance}
+          debtBalance={swapRow.borrow?.tokenBalance || 0n}
+        />
+      )}
     </div>
   );
 };
