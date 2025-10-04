@@ -109,7 +109,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
   const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 
   const assetsWithRates = useMemo<AssetWithRates[]>(() => {
-    return normalizedAssets.map((asset: any) => {
+    return normalizedAssets.map(asset => {
       if (asset.scale === 0n) {
         return { ...asset, borrowAPR: 0, supplyAPY: 0 };
       }
@@ -122,9 +122,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
         asset.scale,
       );
 
-      // For now, just return zero rates until we figure out the correct V2 calculation
-      // The V2 rate calculation is different from V1 and needs proper investigation
-      return { ...asset, borrowAPR: 0, supplyAPY: 0 };
+      return { ...asset, borrowAPR, supplyAPY };
     });
   }, [normalizedAssets]);
 
