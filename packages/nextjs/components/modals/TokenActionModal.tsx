@@ -50,15 +50,16 @@ const formatApy = (apy: number) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 3, minimumFractionDigits: 0 }).format(apy);
 
 const HealthFactor = ({ value }: { value: number }) => {
-  const percent = Math.min(100, Math.max(0, ((value - 1) / 3) * 100));
-  const barColor = value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
-  const textColor = value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
+  const isFiniteValue = Number.isFinite(value);
+  const percent = isFiniteValue ? Math.min(100, Math.max(0, ((value - 1) / 3) * 100)) : 100;
+  const barColor = !isFiniteValue ? "progress-success" : value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
+  const textColor = !isFiniteValue ? "text-success" : value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
   return (
     <div className="flex flex-col text-xs">
       <span className="mb-1">Health Factor</span>
       <div className="flex items-center gap-2">
         <progress className={`progress w-20 ${barColor}`} value={percent} max="100"></progress>
-        <span className={textColor}>{value.toFixed(2)}</span>
+        <span className={textColor}>{isFiniteValue ? value.toFixed(2) : "∞"}</span>
       </div>
     </div>
   );
@@ -219,6 +220,13 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   // const afterUtil = position ? afterPosition.utilization() : utilization; // not shown
   const afterLtv = position ? afterPosition.loanToValue() : ltv;
 
+  // Override defaults for Deposit with no debt: HF = ∞, LTV = 0%
+  const isDepositNoDebtFallback = action === "Deposit" && !position;
+  const beforeHfEffective = isDepositNoDebtFallback ? Infinity : beforeHf;
+  const beforeLtvEffective = isDepositNoDebtFallback ? 0 : beforeLtv;
+  const afterHfEffective = isDepositNoDebtFallback ? Infinity : afterHf;
+  const afterLtvEffective = isDepositNoDebtFallback ? 0 : afterLtv;
+
   if (isOpen) {
     console.log(`token.decimals: ${token.decimals}`);
   }
@@ -284,9 +292,9 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
       <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <LeftMetrics
-            hf={beforeHf}
+            hf={beforeHfEffective}
             utilization={beforeUtil}
-            ltv={beforeLtv}
+            ltv={beforeLtvEffective}
             metricLabel={metricLabel}
             metricValue={before}
             token={token}
@@ -319,7 +327,13 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               max={effectiveMax}
             />
             {(() => {
-              const hfTextColor = afterHf >= 4 ? "text-success" : afterHf > 2 ? "text-warning" : "text-error";
+              const hfTextColor = !Number.isFinite(afterHfEffective)
+                ? "text-success"
+                : afterHfEffective >= 4
+                ? "text-success"
+                : afterHfEffective > 2
+                ? "text-warning"
+                : "text-error";
               return (
                 <div className="text-xs pt-2">
                   <div className="grid grid-cols-3">
@@ -328,8 +342,8 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                     <div className="text-center opacity-70 border-l border-base-300">Debt</div>
                   </div>
                   <div className="grid grid-cols-3 items-center mt-1">
-                    <div className={`text-center ${hfTextColor}`}>{afterHf.toFixed(2)}</div>
-                    <div className="text-center border-l border-base-300">{formatPercentage(afterLtv)}%</div>
+                    <div className={`text-center ${hfTextColor}`}>{Number.isFinite(afterHfEffective) ? afterHfEffective.toFixed(2) : "∞"}</div>
+                    <div className="text-center border-l border-base-300">{formatPercentage(afterLtvEffective)}%</div>
                     <div className="flex items-center justify-center gap-2 border-l border-base-300">
                       <TokenPill value={afterValue} icon={token.icon} name={token.name} />
                     </div>
