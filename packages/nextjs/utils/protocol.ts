@@ -15,6 +15,9 @@ export const getProtocolLogo = (protocolName: string): string => {
     "Aave V3": "/logos/aave.svg",
     "Compound V3": "/logos/compound.svg", 
     "Venus": "/logos/venus.svg",
+    "Vesu": "/logos/vesu.svg",
+    "VesuV2": "/logos/vesu.svg",
+    "Nostra": "/logos/nostra.svg",
   };
   
   return protocolLogos[protocolName] || tokenNameToLogo(protocolName);

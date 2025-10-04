@@ -126,13 +126,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
 
   const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
-    protocolName: (fromProtocol === "VesuV2" ? "Vesu" : fromProtocol) as "Vesu" | "Nostra",
+    protocolName: fromProtocol as "Vesu" | "VesuV2" | "Nostra",
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
     isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"),
   });
 
   const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
-    protocolName: (selectedProtocol === "VesuV2" ? "Vesu" : selectedProtocol) as "Vesu" | "Nostra",
+    protocolName: selectedProtocol as "Vesu" | "VesuV2" | "Nostra",
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
     isOpen: isOpen && !!selectedProtocol,
   });
@@ -141,7 +141,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const firstCollateralsReadyRef = useRef(false);
   useEffect(() => {
     if (
-      (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") ||
+      (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) ||
       (!isLoadingSourceCollaterals && !isLoadingTargetCollaterals)
     ) {
       firstCollateralsReadyRef.current = true;
@@ -155,7 +155,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   ]);
 
   const collateralsForSelector = useMemo(() => {
-    if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
+    if (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) {
       return preSelectedCollaterals.map(collateral => ({
         symbol: collateral.symbol,
         balance: Number(collateral.inputValue || collateral.amount.toString()),
@@ -167,7 +167,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
 
     let filtered = sourceCollaterals.filter(c => c.balance > 0);
-    if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && type === "borrow") {
+    if (fromProtocol === "Nostra" && (selectedProtocol === "Vesu" || selectedProtocol === "VesuV2") && type === "borrow") {
       filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
     }
 
