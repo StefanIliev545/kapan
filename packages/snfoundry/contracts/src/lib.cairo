@@ -2,10 +2,12 @@ pub mod interfaces {
     pub mod IGateway;
     pub mod vesu;
     pub mod vesu_data;
+    pub mod vesu_v2;
     pub mod nostra;
 }
 pub mod gateways {
     pub mod vesu_gateway;
+    pub mod VesuGatewayV2;
     pub mod NostraGateway;
     pub mod RouterGateway;
     pub mod ekubo_gateway;
