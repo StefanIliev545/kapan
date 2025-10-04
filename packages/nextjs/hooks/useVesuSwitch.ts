@@ -3,6 +3,7 @@ import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, uint256 } f
 import { fetchBuildExecuteTransaction, fetchQuotes } from "@avnu/avnu-sdk";
 import type { Quote } from "@avnu/avnu-sdk";
 import { useLendingAuthorizations, type BaseProtocolInstruction } from "~~/hooks/useLendingAuthorizations";
+import { buildVesuContextOption, createVesuContext, type VesuProtocolKey } from "~~/utils/vesu";
 
 const SLIPPAGE = 0.05;
 const BUFFER_BPS = 500n; // 5%
@@ -20,8 +21,8 @@ const toOutputPointer = (
   output_index: BigInt(outputIndex),
 });
 
-const toOption = (poolId: bigint, counterpartToken: string) =>
-  new CairoOption<bigint[]>(CairoOptionVariant.Some, [poolId, BigInt(counterpartToken)]);
+const toContextOption = (protocolKey: VesuProtocolKey, poolKey: string, counterpartToken: string) =>
+  buildVesuContextOption(createVesuContext(protocolKey, poolKey, counterpartToken));
 
 export interface TokenInfo {
   name: string;
@@ -41,7 +42,8 @@ interface UseVesuSwitchArgs {
   targetToken: TokenInfo | null;
   collateralBalance: bigint;
   debtBalance: bigint;
-  poolId: bigint;
+  poolKey: string;
+  protocolKey: VesuProtocolKey;
 }
 
 export const useVesuSwitch = ({
@@ -53,7 +55,8 @@ export const useVesuSwitch = ({
   targetToken,
   collateralBalance,
   debtBalance,
-  poolId,
+  poolKey,
+  protocolKey,
 }: UseVesuSwitchArgs) => {
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [loading, setLoading] = useState(false);
@@ -111,7 +114,7 @@ export const useVesuSwitch = ({
           type === "collateral"
             ? buildCollateralSwitchInstructions({
                 address,
-                poolId,
+                poolKey,
                 currentCollateral,
                 currentDebt,
                 targetToken: targetToken,
@@ -119,10 +122,11 @@ export const useVesuSwitch = ({
                 debtBalance,
                 quote,
                 avnuData: calldata,
+                protocolKey,
               })
             : buildDebtSwitchInstructions({
                 address,
-                poolId,
+                poolKey,
                 currentCollateral,
                 currentDebt,
                 targetToken: targetToken,
@@ -130,6 +134,7 @@ export const useVesuSwitch = ({
                 debtBalance,
                 quote,
                 avnuData: calldata,
+                protocolKey,
               });
         if (!cancelled) {
           setProtocolInstructions(instructions);
@@ -148,7 +153,7 @@ export const useVesuSwitch = ({
                   user: address,
                 },
                 withdraw_all: true,
-                context: toOption(poolId, currentDebt.address),
+                context: toContextOption(protocolKey, poolKey, currentDebt.address),
               },
               Redeposit: undefined,
               Reborrow: undefined,
@@ -157,7 +162,7 @@ export const useVesuSwitch = ({
               Reswap: undefined,
               ReswapExactIn: undefined,
             });
-            setAuthInstructions([{ protocol_name: "vesu", instructions: [withdrawOnly] }]);
+            setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly] }]);
           } else {
             // Authorize Withdraw + Borrow for debt switch
             const withdrawOnly = new CairoCustomEnum({
@@ -171,7 +176,7 @@ export const useVesuSwitch = ({
                   user: address,
                 },
                 withdraw_all: true,
-                context: toOption(poolId, currentDebt.address),
+                context: toContextOption(protocolKey, poolKey, currentDebt.address),
               },
               Redeposit: undefined,
               Reborrow: undefined,
@@ -185,7 +190,7 @@ export const useVesuSwitch = ({
               Deposit: undefined,
               Borrow: {
                 basic: { token: targetToken.address, amount: uint256.bnToUint256(borrowAmount), user: address },
-                context: toOption(poolId, currentCollateral.address),
+                context: toContextOption(protocolKey, poolKey, currentCollateral.address),
               },
               Repay: undefined,
               Withdraw: undefined,
@@ -196,7 +201,7 @@ export const useVesuSwitch = ({
               Reswap: undefined,
               ReswapExactIn: undefined,
             });
-            setAuthInstructions([{ protocol_name: "vesu", instructions: [withdrawOnly, borrowOnly] }]);
+            setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly, borrowOnly] }]);
           }
         }
       } catch (e: any) {
@@ -218,7 +223,8 @@ export const useVesuSwitch = ({
     currentDebt,
     collateralBalance,
     debtBalance,
-    poolId,
+    poolKey,
+    protocolKey,
   ]);
 
   // Fetch authorizations only for authInstructions
@@ -294,7 +300,7 @@ export const useVesuSwitch = ({
 
 interface BuildInstructionArgs {
   address: string;
-  poolId: bigint;
+  poolKey: string;
   currentCollateral: TokenInfo;
   currentDebt: TokenInfo;
   targetToken: TokenInfo;
@@ -302,11 +308,12 @@ interface BuildInstructionArgs {
   debtBalance: bigint;
   quote: Quote;
   avnuData: bigint[];
+  protocolKey: VesuProtocolKey;
 }
 
 const buildCollateralSwitchInstructions = ({
   address,
-  poolId,
+  poolKey,
   currentCollateral,
   currentDebt,
   targetToken,
@@ -314,6 +321,7 @@ const buildCollateralSwitchInstructions = ({
   debtBalance,
   quote,
   avnuData,
+  protocolKey,
 }: BuildInstructionArgs): BaseProtocolInstruction[] => {
   const instructions: BaseProtocolInstruction[] = [];
   const vesuFirst: CairoCustomEnum[] = [];
@@ -330,7 +338,7 @@ const buildCollateralSwitchInstructions = ({
       Repay: {
         basic: { token: currentDebt.address, amount: uint256.bnToUint256(debtBalance), user: address },
         repay_all: true,
-        context: toOption(poolId, currentCollateral.address),
+        context: toContextOption(protocolKey, poolKey, currentCollateral.address),
       },
       Withdraw: undefined,
       Redeposit: undefined,
@@ -352,7 +360,7 @@ const buildCollateralSwitchInstructions = ({
     Withdraw: {
       basic: { token: currentCollateral.address, amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)), user: address },
       withdraw_all: true,
-      context: toOption(poolId, currentDebt.address),
+      context: toContextOption(protocolKey, poolKey, currentDebt.address),
     },
     Redeposit: undefined,
     Reborrow: undefined,
@@ -397,7 +405,7 @@ const buildCollateralSwitchInstructions = ({
       token: targetToken.address,
       target_output_pointer: toOutputPointer(reswapIndex, 1),
       user: address,
-      context: toOption(poolId, currentDebt.address),
+      context: toContextOption(protocolKey, poolKey, currentDebt.address),
     },
     Reborrow: undefined,
     Swap: undefined,
@@ -421,7 +429,7 @@ const buildCollateralSwitchInstructions = ({
         target_output_pointer: toOutputPointer(repayIndex ?? 0),
         approval_amount: uint256.bnToUint256(approvalAmount),
         user: address,
-        context: toOption(poolId, targetToken.address),
+        context: toContextOption(protocolKey, poolKey, targetToken.address),
       },
       Swap: undefined,
       SwapExactIn: undefined,
@@ -431,16 +439,16 @@ const buildCollateralSwitchInstructions = ({
     vesuSecond.push(reborrowInstruction);
   }
 
-  if (vesuFirst.length > 0) instructions.push({ protocol_name: "vesu", instructions: vesuFirst });
+  if (vesuFirst.length > 0) instructions.push({ protocol_name: protocolKey, instructions: vesuFirst });
   instructions.push({ protocol_name: "avnu", instructions: avnuInstructions });
-  if (vesuSecond.length > 0) instructions.push({ protocol_name: "vesu", instructions: vesuSecond });
+  if (vesuSecond.length > 0) instructions.push({ protocol_name: protocolKey, instructions: vesuSecond });
 
   return instructions;
 };
 
 const buildDebtSwitchInstructions = ({
   address,
-  poolId,
+  poolKey,
   currentCollateral,
   currentDebt,
   targetToken,
@@ -448,6 +456,7 @@ const buildDebtSwitchInstructions = ({
   debtBalance,
   quote,
   avnuData,
+  protocolKey,
 }: BuildInstructionArgs): BaseProtocolInstruction[] => {
   const instructions: BaseProtocolInstruction[] = [];
   const vesuFirst: CairoCustomEnum[] = [];
@@ -461,7 +470,7 @@ const buildDebtSwitchInstructions = ({
     Repay: {
       basic: { token: currentDebt.address, amount: uint256.bnToUint256(debtBalance), user: address },
       repay_all: true,
-      context: toOption(poolId, currentCollateral.address),
+      context: toContextOption(protocolKey, poolKey, currentCollateral.address),
     },
     Withdraw: undefined,
     Redeposit: undefined,
@@ -482,7 +491,7 @@ const buildDebtSwitchInstructions = ({
     Withdraw: {
       basic: { token: currentCollateral.address, amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)), user: address },
       withdraw_all: true,
-      context: toOption(poolId, currentDebt.address),
+      context: toContextOption(protocolKey, poolKey, currentDebt.address),
     },
     Redeposit: undefined,
     Reborrow: undefined,
@@ -504,7 +513,7 @@ const buildDebtSwitchInstructions = ({
       token: currentCollateral.address,
       target_output_pointer: toOutputPointer(withdrawIndex),
       user: address,
-      context: toOption(poolId, targetToken.address),
+      context: toContextOption(protocolKey, poolKey, targetToken.address),
     },
     Reborrow: undefined,
     Swap: undefined,
@@ -520,7 +529,7 @@ const buildDebtSwitchInstructions = ({
     Deposit: undefined,
     Borrow: {
       basic: { token: targetToken.address, amount: uint256.bnToUint256(borrowAmount), user: address },
-      context: toOption(poolId, currentCollateral.address),
+      context: toContextOption(protocolKey, poolKey, currentCollateral.address),
     },
     Repay: undefined,
     Withdraw: undefined,
@@ -556,8 +565,8 @@ const buildDebtSwitchInstructions = ({
   });
   const avnuInstructions = [reswapInstruction];
 
-  instructions.push({ protocol_name: "vesu", instructions: vesuFirst });
-  instructions.push({ protocol_name: "vesu", instructions: vesuSecond });
+  instructions.push({ protocol_name: protocolKey, instructions: vesuFirst });
+  instructions.push({ protocol_name: protocolKey, instructions: vesuSecond });
   instructions.push({ protocol_name: "avnu", instructions: avnuInstructions });
 
   return instructions;

@@ -8,13 +8,15 @@ import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
 import { useVesuSwitch } from "~~/hooks/useVesuSwitch";
+import type { VesuProtocolKey } from "~~/utils/vesu";
 
 type BasicToken = { name: string; address: string; decimals: number; icon: string };
 
 interface SwitchDebtModalProps {
   isOpen: boolean;
   onClose: () => void;
-  poolId: bigint;
+  poolKey: string;
+  protocolKey: VesuProtocolKey;
   collateral: BasicToken; // unchanged collateral
   currentDebt: BasicToken; // old debt to repay
   targetDebt: BasicToken; // new debt to borrow
@@ -22,11 +24,21 @@ interface SwitchDebtModalProps {
   collateralBalance: bigint; // to withdraw/redeposit fully
 }
 
-export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose, poolId, collateral, currentDebt, targetDebt, debtBalance, collateralBalance }) => {
+export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({
+  isOpen,
+  onClose,
+  poolKey,
+  protocolKey,
+  collateral,
+  currentDebt,
+  targetDebt,
+  debtBalance,
+  collateralBalance,
+}) => {
   const { address } = useStarkAccount();
   const [submitting, setSubmitting] = useState(false);
   const [preparedOnce, setPreparedOnce] = useState(false);
-  const { loading, selectedQuote, swapSummary, calls } = useVesuSwitch({
+  const { loading, error, selectedQuote, swapSummary, calls } = useVesuSwitch({
     isOpen,
     type: "debt",
     address,
@@ -35,7 +47,8 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose
     targetToken: targetDebt,
     collateralBalance,
     debtBalance,
-    poolId,
+    poolKey,
+    protocolKey,
   });
 
   // Mark prepared after first successful build
@@ -63,6 +76,11 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
+        {error && (
+          <div className="alert alert-error bg-error/10 text-error text-xs">
+            {error}
+          </div>
+        )}
         {!selectedQuote ? (
           <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
         ) : (
