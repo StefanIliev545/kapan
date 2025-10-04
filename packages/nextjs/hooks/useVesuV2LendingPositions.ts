@@ -9,6 +9,8 @@ import { feltToString } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import type { VesuContextV2 } from "~~/utils/vesu";
 
+const ZERO_ADDRESS = "0x".concat("0".repeat(64));
+
 const normalizePrice = (price: { value: bigint; is_valid: boolean }) => (price.is_valid ? price.value / 10n ** 10n : 0n);
 
 const computeUsdValue = (amount: bigint, decimals: number, price: bigint): number => {
@@ -284,6 +286,7 @@ export const useVesuV2LendingPositions = (
       const debtAsset = assetMap.get(debtAddress);
 
       const hasDebt = Boolean(debtAsset) && stats.nominal_debt > 0n;
+      const counterpartForContext = hasDebt ? debtAddress : ZERO_ADDRESS;
 
       if (!collateralAsset) {
         return null;
@@ -306,8 +309,10 @@ export const useVesuV2LendingPositions = (
         tokenPrice: collateralPrice,
         tokenSymbol: collateralSymbol,
         vesuContext: {
-          deposit: hasDebt ? ({ poolAddress, positionCounterpartToken: debtAddress } as VesuContextV2) : undefined,
-          withdraw: { poolAddress, positionCounterpartToken: debtAddress } as VesuContextV2,
+          deposit: hasDebt
+            ? ({ poolAddress, positionCounterpartToken: counterpartForContext } as VesuContextV2)
+            : undefined,
+          withdraw: { poolAddress, positionCounterpartToken: counterpartForContext } as VesuContextV2,
         },
         actionsDisabled: stats.is_vtoken,
         actionsDisabledReason: disabledReason,
@@ -356,8 +361,8 @@ export const useVesuV2LendingPositions = (
         hasDebt,
         isVtoken: stats.is_vtoken,
         borrowContext: {
-          poolAddress: poolAddress,
-          positionCounterpartToken: debtAddress,
+          poolAddress,
+          positionCounterpartToken: counterpartForContext,
         } as VesuContextV2,
       };
     }).filter(Boolean) as VesuPositionRow[];
