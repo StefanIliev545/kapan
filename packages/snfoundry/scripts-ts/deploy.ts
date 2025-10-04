@@ -49,6 +49,17 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
+  // Deploy AvnuGateway
+  const { address: avnuGatewayAddress } = await deployContract({
+    contract: "AvnuGateway",
+    constructorArgs: {
+      router: "0x04270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f", // Avnu mainnet router (same as forking tests)
+      owner: "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_recipient: "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_bps: 0,
+    },
+  });
+
   // Deploy NostraGateway
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
@@ -57,6 +68,13 @@ const deployScriptMainnet = async (): Promise<{
         "0x059a943ca214c10234b9a3b61c558ac20c005127d183b86a99a8f3c60a08b4ff",
       router: routerGatewayAddress,
       owner: deployer.address,
+    },
+  });
+
+  const { address: ekuboGatewayAddress } = await deployContract({
+    contract: "EkuboGateway",
+    constructorArgs: {
+      core: "0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b",
     },
   });
 
@@ -75,21 +93,12 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
-  return {
-    nostraGatewayAddress,
-    vesuGatewayAddress,
-    routerGatewayAddress,
-    avnuGatewayAddress: "0x0000000000000000000000000000000000000000000000000000000000000000",
-    ekuboGatewayAddress: "0x0000000000000000000000000000000000000000000000000000000000000000",
-  };
+
+
+  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress, avnuGatewayAddress };
 };
 
-const deployScriptSepolia = async (): Promise<{
-  nostraGatewayAddress: string;
-  vesuGatewayAddress: string;
-  routerGatewayAddress: string;
-  ekuboGatewayAddress: string;
-}> => {
+const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
@@ -339,27 +348,39 @@ const initializeContracts = async (addresses: {
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["avnu", addresses.avnuGatewayAddress],
+      calldata: [
+        "avnu",
+        addresses.avnuGatewayAddress,
+      ]
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["nostra", addresses.nostraGatewayAddress],
+      calldata: [
+        "nostra",
+        addresses.nostraGatewayAddress,
+      ]
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["ekubo", addresses.ekuboGatewayAddress],
-    },
-  ];
+      calldata: [
+        "ekubo",
+        addresses.ekuboGatewayAddress,
+      ]
+    }
+  ]
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
   });
-  const result = await deployer.execute(calls, {
-    nonce: nonce,
-    resourceBounds: fee.resourceBounds,
-  });
+  const result = await deployer.execute(
+    calls,
+    {
+      nonce: nonce,
+      resourceBounds: fee.resourceBounds,
+    }
+  );
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {
@@ -420,22 +441,31 @@ const initializeContractsSepolia = async (addresses: {
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["nostra", addresses.nostraGatewayAddress],
+      calldata: [
+        "nostra",
+        addresses.nostraGatewayAddress,
+      ]
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["ekubo", addresses.ekuboGatewayAddress],
-    },
+      calldata: [
+        "ekubo",
+        addresses.ekuboGatewayAddress,
+      ]
+    }
   ];
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
   });
-  const result = await deployer.execute(calls, {
-    nonce: nonce,
-    resourceBounds: fee.resourceBounds,
-  });
+  const result = await deployer.execute(
+    calls,
+    {
+      nonce: nonce,
+      resourceBounds: fee.resourceBounds,
+    }
+  );
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {

@@ -124,6 +124,7 @@ export const VesuProtocolView: FC = () => {
     setDepositSelection({ tokens, vesuContext: options?.vesuContext, position: options?.position });
   };
 
+
   return (
     <div className="flex w-full flex-col space-y-6 p-4">
       <VesuMarketSection
@@ -167,7 +168,6 @@ export const VesuProtocolView: FC = () => {
           position={borrowSelection.position}
         />
       )}
-
       {depositSelection && (
         <TokenSelectModalStark
           isOpen={depositSelection !== null}

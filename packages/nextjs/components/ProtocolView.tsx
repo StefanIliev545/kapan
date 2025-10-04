@@ -427,71 +427,29 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       {/* Modals - Conditional based on network type */}
       {networkType === "starknet" ? (
         <>
-          {/* Supply action using a custom token selector for Starknet */}
-          {isTokenSelectModalOpen && (
-            <div className="modal modal-open">
-              <div className="modal-box max-w-4xl bg-base-100">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-xl tracking-tight">Select a Token to Supply</h3>
-                  <button className="btn btn-sm btn-circle btn-ghost" onClick={handleCloseTokenSelectModal}>
-                    ✕
-                  </button>
-                </div>
-
-                <div className="max-h-[60vh] overflow-y-auto pr-2">
-                  {allSupplyPositions.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {allSupplyPositions.map((position, index) => (
-                        <div
-                          key={`supply-${position.tokenAddress}-${index}`}
-                          className="bg-base-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 
-                            shadow-md hover:shadow-lg border-transparent border transform hover:scale-105"
-                          onClick={() => handleSelectSupplyToken(position)}
-                        >
-                          <div className="avatar mb-3">
-                            <div className="w-16 h-16 rounded-full bg-base-100 p-1 ring-2 ring-base-300 dark:ring-base-content/20">
-                              <Image
-                                src={position.icon}
-                                alt={position.name}
-                                width={64}
-                                height={64}
-                                className="object-contain"
-                              />
-                            </div>
-                          </div>
-                          <span className="font-bold text-lg mb-1">{position.name}</span>
-                          <div className="badge badge-outline p-3 font-medium">
-                            {formatPercentage(position.currentRate)}% APR
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-base-content/70 bg-base-200/50 rounded-xl">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        className="w-12 h-12 mx-auto mb-4 opacity-50"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                        />
-                      </svg>
-                      <p className="text-lg">No tokens available to supply</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="modal-backdrop" onClick={handleCloseTokenSelectModal}>
-                <button>close</button>
-              </div>
-            </div>
-          )}
+          {/* Supply Token Select - unified Stark modal */}
+          <TokenSelectModalStark
+            isOpen={isTokenSelectModalOpen}
+            onClose={handleCloseTokenSelectModal}
+            tokens={allSupplyPositions.map(pos => ({
+              address: BigInt(pos.tokenAddress),
+              symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")),
+              decimals: pos.tokenDecimals || 18,
+              rate_accumulator: 0n,
+              utilization: 0n,
+              fee_rate: BigInt(Math.floor(((pos.currentRate / 100) * 1e18) / (365 * 24 * 60 * 60))),
+              price: { value: BigInt(pos.tokenPrice || 0), is_valid: true },
+              total_nominal_debt: pos.tokenBalance ?? 0n,
+              last_rate_accumulator: 0n,
+              reserve: 0n,
+              scale: 0n,
+              borrowAPR: pos.currentRate,
+              supplyAPY: pos.currentRate,
+            }))}
+            protocolName={protocolName}
+            position={positionManager}
+            action="deposit"
+          />
 
           {/* Token Select Modal for Borrow - Starknet */}
           <TokenSelectModalStark
@@ -519,24 +477,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             position={positionManager}
           />
 
-          {/* Deposit Modal for Starknet */}
-          {selectedSupplyToken && (
-            <DepositModalStark
-              isOpen={isDepositModalOpen}
-              onClose={handleCloseDepositModal}
-              token={{
-                name: selectedSupplyToken.name,
-                icon: selectedSupplyToken.icon,
-                address: selectedSupplyToken.address,
-                currentRate: selectedSupplyToken.currentRate,
-                usdPrice: selectedSupplyToken.tokenPrice ? Number(selectedSupplyToken.tokenPrice) / 1e8 : 0,
-                decimals: selectedSupplyToken.tokenDecimals,
-              }}
-              protocolName={protocolName}
-              position={positionManager}
-              vesuContext={selectedSupplyToken.vesuContext?.deposit}
-            />
-          )}
+          {/* Deposit handled by TokenSelectModalStark after selection */}
 
           {/* Borrow Modal for Starknet */}
           {isTokenBorrowModalOpen && (

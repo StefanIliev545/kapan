@@ -48,6 +48,13 @@ const getPoolNameFromId = (poolId: bigint): string => {
   return entry ? entry[0] : "Unknown Pool";
 };
 
+type OutputPointer = { instruction_index: bigint; output_index: bigint };
+
+const toOutputPointer = (instructionIndex: number): OutputPointer => ({
+  instruction_index: BigInt(instructionIndex),
+  output_index: 0n,
+});
+
 interface MovePositionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -403,7 +410,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Withdraw: undefined,
             Redeposit: {
               token: collateral.token,
-              target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
+              target_output_pointer: toOutputPointer(1), // Point to corresponding withdraw instruction (offset by repay instruction)
               user: userAddress,
               context: contextRedeposit,
             },
@@ -417,7 +424,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Redeposit: undefined,
             Reborrow: {
               token: position.tokenAddress,
-              target_instruction_index: 0, // Point to repay instruction
+              target_output_pointer: toOutputPointer(0), // Point to repay instruction
               approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
               user: userAddress,
               context: contextReborrow,
@@ -555,7 +562,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         Withdraw: undefined,
         Redeposit: {
           token: collateral.token,
-          target_instruction_index: 1 + index,
+          target_output_pointer: toOutputPointer(1 + index),
           user: userAddress,
           context: depositInstructionContext,
         },
@@ -571,7 +578,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Redeposit: undefined,
       Reborrow: {
         token: position.tokenAddress,
-        target_instruction_index: 0,
+        target_output_pointer: toOutputPointer(0),
         approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
         user: userAddress,
         context: borrowInstructionContext,
@@ -1195,33 +1202,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   </div>
                 )}
               </div>
-
+              <div className="pt-2">
+                <button
+                  className={`btn btn-ghost w-full h-10 ${loading ? "animate-pulse" : ""}`}
+                  onClick={step === "done" ? onClose : handleMovePosition}
+                  disabled={step === "done" ? false : isActionDisabled}
+                >
+                  {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                  {actionButtonText}
+                </button>
+              </div>
             </div>
           </div>
-        <div className="flex justify-end pt-5 mt-auto">
-          <button
-            className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
-              loading ? "animate-pulse" : ""
-            }`}
-            onClick={step === "done" ? onClose : handleMovePosition}
-            disabled={step === "done" ? false : isActionDisabled}
-          >
-            <span>
-              {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-              {actionButtonText}
-            </span>
-            <span className="flex items-center gap-1 text-xs">
-              <FaGasPump className="text-gray-400" />
-              {feeLoading && effectiveNative === null ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : feeError ? null : effectiveNative !== null ? (
-                <span>
-                  {effectiveNative.toFixed(4)} {effectiveCurrency ?? "STRK"}
-                </span>
-              ) : null}
-            </span>
-          </button>
-        </div>
       </div>
 
       <form

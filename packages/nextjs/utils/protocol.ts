@@ -1,3 +1,10 @@
+export const getDisplayRate = (protocolName: string, rate: number) => {
+  const name = (protocolName || "").toLowerCase();
+  // Vesu rates are decimals (e.g., 0.022); Nostra already percent (e.g., 2.2)
+  if (name === "vesu") return rate * 100;
+  return rate;
+};
+
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 /**
  * Get the logo URL for a specific protocol

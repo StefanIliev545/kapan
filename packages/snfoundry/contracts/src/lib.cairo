@@ -8,6 +8,8 @@ pub mod gateways {
     pub mod vesu_gateway;
     pub mod NostraGateway;
     pub mod RouterGateway;
+    pub mod ekubo_gateway;
+    pub mod avnu_gateway;
 }
 
 pub mod utils {

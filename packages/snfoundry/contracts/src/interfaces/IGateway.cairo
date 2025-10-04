@@ -1,10 +1,22 @@
 use starknet::ContractAddress;
 
 #[derive(Drop, Serde, Copy)]
+pub struct OutputPointer {
+    pub instruction_index: u32,
+    pub output_index: u32,
+}
+
+#[derive(Drop, Serde, Copy)]
 pub struct BasicInstruction {
     pub token: ContractAddress,
     pub amount: u256,
     pub user: ContractAddress,
+}
+
+#[derive(Drop, Serde, Copy)]
+pub struct InstructionOutput {
+    pub token: ContractAddress,
+    pub balance: u256,
 }
 
 #[derive(Drop, Serde, Copy)]
@@ -37,7 +49,7 @@ pub struct Withdraw {
 #[derive(Drop, Serde, Copy)]
 pub struct Redeposit {
     pub token: ContractAddress,
-    pub target_instruction_index: u32,
+    pub target_output: OutputPointer,
     pub user: ContractAddress,
     pub context: Option<Span<felt252>>,
 }
@@ -45,9 +57,54 @@ pub struct Redeposit {
 #[derive(Drop, Serde, Copy)]
 pub struct Reborrow {
     pub token: ContractAddress,
-    pub target_instruction_index: u32,
+    pub target_output: OutputPointer,
     pub approval_amount: u256, //amount to approve for the borrow; not actual borrow.
     pub user: ContractAddress,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
+pub struct Reswap {
+    pub exact_out: OutputPointer,
+    pub max_in: OutputPointer,
+    pub user: ContractAddress,
+    pub should_pay_out: bool,
+    pub should_pay_in: bool,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
+pub struct ReswapExactIn {
+    pub exact_in: OutputPointer,
+    pub min_out: u256,
+    pub token_out: ContractAddress,
+    pub user: ContractAddress,
+    pub should_pay_out: bool,
+    pub should_pay_in: bool,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
+pub struct Swap {
+    pub token_in: ContractAddress,
+    pub token_out: ContractAddress,
+    pub exact_out: u256,
+    pub max_in: u256,
+    pub user: ContractAddress,
+    pub should_pay_out: bool,
+    pub should_pay_in: bool,
+    pub context: Option<Span<felt252>>,
+}
+
+#[derive(Drop, Serde, Copy)]
+pub struct SwapExactIn {
+    pub token_in: ContractAddress,
+    pub token_out: ContractAddress,
+    pub exact_in: u256,
+    pub min_out: u256,
+    pub user: ContractAddress,
+    pub should_pay_out: bool,
+    pub should_pay_in: bool,
     pub context: Option<Span<felt252>>,
 }
 
@@ -59,11 +116,18 @@ pub enum LendingInstruction {
     Withdraw: Withdraw,
     Redeposit: Redeposit,
     Reborrow: Reborrow,
+    Swap: Swap,
+    SwapExactIn: SwapExactIn,
+    Reswap: Reswap,
+    ReswapExactIn: ReswapExactIn,
 }
 
 #[starknet::interface]
 pub trait ILendingInstructionProcessor<TContractState> {
-    fn process_instructions(ref self: TContractState, instructions: Span<LendingInstruction>);
+    fn process_instructions(
+        ref self: TContractState,
+        instructions: Span<LendingInstruction>
+    ) -> Span<Span<InstructionOutput>>;
     fn get_authorizations_for_instructions(ref self: TContractState, instructions: Span<LendingInstruction>, rawSelectors: bool) -> Span<(ContractAddress, felt252, Array<felt252>)>;
     fn get_flash_loan_amount(ref self: TContractState, repay: Repay) -> u256;
 }
