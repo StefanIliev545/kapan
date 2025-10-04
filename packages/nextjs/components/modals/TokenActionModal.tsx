@@ -7,6 +7,7 @@ import { formatUnits, parseUnits } from "viem";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
 import formatPercentage from "~~/utils/formatPercentage";
+import { formatRate } from "~~/utils/protocols";
 import { PositionManager } from "~~/utils/position";
 
 export interface TokenInfo {
@@ -46,8 +47,7 @@ export interface TokenActionModalProps {
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
-const formatApy = (apy: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 3, minimumFractionDigits: 0 }).format(apy);
+// Display APY/APR consistently as percentages
 
 const HealthFactor = ({ value }: { value: number }) => {
   const isFiniteValue = Number.isFinite(value);
@@ -311,7 +311,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             </div>
             <div className="flex items-center justify-between text-xs text-base-content/70">
               <span>
-                {apyLabel} {formatApy(apy)}%
+                {apyLabel} {formatRate(apy)}%
               </span>
               <span>Balance: {format(Number(formatUnits(balance, token.decimals || 18)))}</span>
             </div>

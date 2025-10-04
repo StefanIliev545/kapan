@@ -5,6 +5,7 @@ import { DepositModalStark } from "./DepositModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { VesuContext } from "~~/hooks/useLendingAction";
 import formatPercentage from "~~/utils/formatPercentage";
+import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
@@ -110,7 +111,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                       <span className="text-sm font-medium">{symbol}</span>
                     </div>
                     <div className="text-[11px] text-base-content/60">
-                      {formatPercentage(action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0)}% {rateLabel}
+                      {formatPercentage(
+                        getDisplayRate(protocolName, action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0),
+                      )}% {rateLabel}
                     </div>
                   </button>
                 );

@@ -15,6 +15,7 @@ import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
+import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";
 import { normalizeProtocolName } from "~~/utils/protocol";
 
@@ -294,14 +295,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             <div className="px-2 border-r border-base-300">
               <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APR</div>
               <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
-                {formatPercentage(currentRate)}%
+                {formatPercentage(getDisplayRate(protocolName, currentRate))}%
               </div>
             </div>
             <div className="px-2">
               <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APR</div>
               <div className="font-medium flex items-center h-6">
                 <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {formatPercentage(displayedOptimalRate)}%
+                  {formatPercentage(getDisplayRate(displayedOptimalProtocol, displayedOptimalRate))}%
                 </span>
                 <Image
                   src={getProtocolLogo(displayedOptimalProtocol)}
