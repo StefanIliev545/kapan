@@ -2,7 +2,12 @@ import { FC, useEffect, useMemo, useState } from "react";
 
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import {
+  createVesuContextV1,
+  createVesuContextV2,
+  normalizeStarknetAddress,
+  type VesuContext,
+} from "~~/utils/vesu";
 import { useVesuLendingPositions } from "~~/hooks/useVesuLendingPositions";
 import { useVesuV2LendingPositions } from "~~/hooks/useVesuV2LendingPositions";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
@@ -31,6 +36,7 @@ export const VesuProtocolView: FC = () => {
   const { address: userAddress, status } = useAccount();
   const poolId = POOL_IDS["Genesis"];
   const poolAddress = "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5"; // V2 pool address
+  const normalizedPoolAddress = normalizeStarknetAddress(poolAddress);
 
   const [selectedVersion, setSelectedVersion] = useState<"v1" | "v2">("v1");
 
@@ -38,7 +44,7 @@ export const VesuProtocolView: FC = () => {
   const v1Data = useVesuLendingPositions(userAddress, poolId);
   
   // V2 data
-  const v2Data = useVesuV2LendingPositions(userAddress, poolAddress);
+  const v2Data = useVesuV2LendingPositions(userAddress, normalizedPoolAddress);
 
   // Use data based on selected version
   const {
@@ -133,7 +139,13 @@ export const VesuProtocolView: FC = () => {
 
   const openDepositModal = (tokens: AssetWithRates[], options?: { vesuContext?: VesuContext; position?: PositionManager }) => {
     if (tokens.length === 0) return;
-    setDepositSelection({ tokens, vesuContext: options?.vesuContext, position: options?.position });
+    const zeroCounterpart = normalizeStarknetAddress(0n);
+    const inferredContext =
+      options?.vesuContext ??
+      (selectedVersion === "v1"
+        ? createVesuContextV1(poolId, zeroCounterpart)
+        : createVesuContextV2(normalizedPoolAddress, zeroCounterpart));
+    setDepositSelection({ tokens, vesuContext: inferredContext, position: options?.position });
   };
 
 

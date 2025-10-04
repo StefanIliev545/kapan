@@ -11,6 +11,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
+import { createVesuContextV1 } from "~~/utils/vesu";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -332,7 +333,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               decimals: Number(collateralMetadata.decimals),
             }}
             protocolName="Vesu"
-            vesuContext={nominalDebt !== "0" ? { poolId, counterpartToken: debtAsset } : undefined}
+            vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
             position={position}
           />
 
@@ -349,7 +350,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             }}
             protocolName="Vesu"
             supplyBalance={BigInt(collateralAmount)}
-            vesuContext={{ poolId, counterpartToken: debtAsset }}
+            vesuContext={createVesuContextV1(poolId, debtAsset)}
             position={position}
           />
 
@@ -359,7 +360,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             tokens={tokensWithRates}
             protocolName="Vesu"
             collateralAsset={collateralAsset}
-            vesuContext={{ poolId, counterpartToken: collateralAsset }}
+            vesuContext={createVesuContextV1(poolId, collateralAsset)}
             position={position}
           />
 
@@ -378,7 +379,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 }}
                 protocolName="Vesu"
                 currentDebt={debtNum}
-                vesuContext={{ poolId, counterpartToken: collateralAsset }}
+                vesuContext={createVesuContextV1(poolId, collateralAsset)}
                 position={position}
               />
 
@@ -395,7 +396,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 }}
                 protocolName="Vesu"
                 debtBalance={BigInt(nominalDebt)}
-                vesuContext={{ poolId, counterpartToken: collateralAsset }}
+                vesuContext={createVesuContextV1(poolId, collateralAsset)}
                 position={position}
               />
 

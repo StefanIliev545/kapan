@@ -1,6 +1,7 @@
 import { FC } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
-import { VesuContext, useLendingAction } from "~~/hooks/useLendingAction";
+import { useLendingAction } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 

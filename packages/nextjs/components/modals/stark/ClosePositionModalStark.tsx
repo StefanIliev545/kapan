@@ -17,6 +17,7 @@ import { useLendingAuthorizations } from "~~/hooks/useLendingAuthorizations";
 import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
+import { buildVesuContextOption, createVesuContext, type VesuProtocolKey } from "~~/utils/vesu";
 
 interface TokenInfo {
   name: string;
@@ -32,8 +33,12 @@ interface ClosePositionModalProps {
   debt: TokenInfo;
   collateralBalance: bigint;
   debtBalance: bigint;
-  poolId: bigint;
+  poolKey: string;
+  protocolKey: VesuProtocolKey;
 }
+
+const toPoolContext = (protocolKey: VesuProtocolKey, poolKey: string, tokenAddress: string) =>
+  buildVesuContextOption(createVesuContext(protocolKey, poolKey, tokenAddress));
 
 export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   isOpen,
@@ -42,7 +47,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   debt,
   collateralBalance,
   debtBalance,
-  poolId,
+  poolKey,
+  protocolKey,
 }) => {
   const { address } = useStarkAccount();
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
@@ -92,14 +98,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   const protocolInstructions = useMemo(() => {
     if (!address || avnuCalldata.length === 0) return [];
 
-    const repayContext = new CairoOption(
-      CairoOptionVariant.Some,
-      [poolId, collateral.address],
-    );
-    const withdrawContext = new CairoOption(
-      CairoOptionVariant.Some,
-      [poolId, debt.address],
-    );
+    const repayContext = toPoolContext(protocolKey, poolKey, collateral.address);
+    const withdrawContext = toPoolContext(protocolKey, poolKey, debt.address);
 
     const repayAmount = debtBalance > 0n ? debtBalance : 1n;
 
@@ -162,24 +162,25 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     });
 
     return [
-      { protocol_name: "vesu", instructions: [repayInstruction, withdrawInstruction] },
+      { protocol_name: protocolKey, instructions: [repayInstruction, withdrawInstruction] },
       { protocol_name: "avnu", instructions: [reswapInstruction] },
     ];
   }, [
     address,
     collateral.address,
     debt.address,
-    poolId,
+    poolKey,
     collateralBalance,
     debtBalance,
     avnuCalldata,
+    protocolKey,
   ]);
 
   // Build a minimal instruction set that includes only the Withdraw step for authorization requests
   const withdrawAuthInstructions = useMemo(() => {
     if (!address) return [] as any[];
 
-    const withdrawContext = new CairoOption(CairoOptionVariant.Some, [poolId, debt.address]);
+    const withdrawContext = toPoolContext(protocolKey, poolKey, debt.address);
     const withdrawInstruction = new CairoCustomEnum({
       Deposit: undefined,
       Borrow: undefined,
@@ -200,8 +201,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       Reswap: undefined,
     });
 
-    return [{ protocol_name: "vesu", instructions: [withdrawInstruction] }];
-  }, [address, poolId, debt.address, collateral.address, collateralBalance]);
+    return [{ protocol_name: protocolKey, instructions: [withdrawInstruction] }];
+  }, [address, poolKey, debt.address, collateral.address, collateralBalance, protocolKey]);
 
   useEffect(() => {
     let cancelled = false;

@@ -135,7 +135,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@avnu/avnu-sdk@npm:^3.1.1":
+"@avnu/avnu-sdk@npm:3.1.1":
   version: 3.1.1
   resolution: "@avnu/avnu-sdk@npm:3.1.1"
   peerDependencies:
@@ -4843,7 +4843,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@se-2/nextjs@workspace:packages/nextjs"
   dependencies:
-    "@avnu/avnu-sdk": ^3.1.1
+    "@avnu/avnu-sdk": 3.1.1
     "@cartridge/connector": ^0.10.7
     "@cartridge/controller": ^0.10.7
     "@heroicons/react": ~2.1.5

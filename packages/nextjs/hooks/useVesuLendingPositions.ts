@@ -3,7 +3,12 @@ import { formatUnits } from "viem";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import type { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import {
+  createVesuContextV1,
+  normalizeStarknetAddress,
+  type VesuContext,
+  type VesuProtocolKey,
+} from "~~/utils/vesu";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useVesuAssets } from "~~/hooks/useVesuAssets";
@@ -122,6 +127,8 @@ export type VesuPositionRow = {
   borrowContext: VesuContext;
   hasDebt: boolean;
   moveCollaterals?: CollateralWithAmount[];
+  poolKey: string;
+  protocolKey: VesuProtocolKey;
 };
 
 interface UseVesuLendingPositionsResult {
@@ -251,6 +258,7 @@ export const useVesuLendingPositions = (
   }, [positionsError1, positionsError2, userAddress, userPositionsPart1, userPositionsPart2]);
 
   const suppliablePositions = useMemo<ProtocolPosition[]>(() => {
+    const zeroCounterpart = normalizeStarknetAddress(0n);
     return assetsWithRates.map(asset => {
       const address = toHexAddress(asset.address);
       const symbol = feltToString(asset.symbol);
@@ -266,9 +274,12 @@ export const useVesuLendingPositions = (
         tokenDecimals: asset.decimals,
         tokenPrice: price,
         tokenSymbol: symbol,
+        vesuContext: {
+          deposit: createVesuContextV1(poolId, zeroCounterpart),
+        },
       };
     });
-  }, [assetsWithRates]);
+  }, [assetsWithRates, poolId]);
 
   const borrowablePositions = useMemo<ProtocolPosition[]>(() => {
     return assetsWithRates.map(asset => {
@@ -319,6 +330,9 @@ export const useVesuLendingPositions = (
 
       const disabledReason = positionData.is_vtoken ? "Managing vToken positions is not supported" : undefined;
 
+      const withdrawContext = createVesuContextV1(poolId, debtAddress);
+      const depositContext = createVesuContextV1(poolId, debtAddress);
+
       const supplyPosition: ProtocolPosition = {
         icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
         name: collateralSymbol,
@@ -330,15 +344,15 @@ export const useVesuLendingPositions = (
         tokenPrice: collateralPrice,
         tokenSymbol: collateralSymbol,
         vesuContext: {
-          deposit: positionData.nominal_debt > 0n ? { poolId, counterpartToken: debtAddress } : undefined,
-          withdraw: { poolId, counterpartToken: debtAddress },
+          deposit: depositContext,
+          withdraw: withdrawContext,
         },
         actionsDisabled: positionData.is_vtoken,
         actionsDisabledReason: disabledReason,
       };
 
       const debtMetadata = assetMap.get(debtAddress);
-      const borrowContext: VesuContext = { poolId, counterpartToken: collateralAddress };
+      const borrowContext: VesuContext = createVesuContextV1(poolId, collateralAddress);
       const hasDebt = positionData.nominal_debt > 0n && Boolean(debtMetadata);
 
       let borrowPosition: ProtocolPosition | undefined;
@@ -361,7 +375,7 @@ export const useVesuLendingPositions = (
           collateralValue: collateralUsd,
           vesuContext: {
             borrow: borrowContext,
-            ...(hasDebt ? { repay: { poolId, counterpartToken: collateralAddress } } : {}),
+            ...(hasDebt ? { repay: createVesuContextV1(poolId, collateralAddress) } : {}),
           },
           actionsDisabled: positionData.is_vtoken,
           actionsDisabledReason: disabledReason,
@@ -396,6 +410,8 @@ export const useVesuLendingPositions = (
           borrowContext,
           hasDebt,
           moveCollaterals,
+          poolKey: `0x${poolId.toString(16)}`,
+          protocolKey: "vesu",
         },
       ];
     });

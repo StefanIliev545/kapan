@@ -15,7 +15,7 @@
     "vercel:yolo": "vercel --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false --build-env ENABLE_EXPERIMENTAL_COREPACK=1 --build-env NEXT_PUBLIC_IGNORE_BUILD_ERROR=true --build-env VERCEL_TELEMETRY_DISABLED=1"
   },
   "dependencies": {
-    "@avnu/avnu-sdk": "^3.1.1",
+    "@avnu/avnu-sdk": "3.1.1",
     "@cartridge/connector": "^0.10.7",
     "@cartridge/controller": "^0.10.7",
     "@heroicons/react": "~2.1.5",
