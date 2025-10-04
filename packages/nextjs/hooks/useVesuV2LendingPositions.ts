@@ -7,7 +7,7 @@ import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
 import { feltToString } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import type { VesuContextV2 } from "./useLendingAction";
+import type { VesuContextV2 } from "~~/utils/vesu";
 
 const normalizePrice = (price: { value: bigint; is_valid: boolean }) => (price.is_valid ? price.value / 10n ** 10n : 0n);
 

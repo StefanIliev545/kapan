@@ -3,7 +3,7 @@ import Image from "next/image";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { DepositModalStark } from "./DepositModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 import formatPercentage from "~~/utils/formatPercentage";
 import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";

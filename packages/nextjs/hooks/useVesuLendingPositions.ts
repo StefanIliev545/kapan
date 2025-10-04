@@ -3,7 +3,7 @@ import { formatUnits } from "viem";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import type { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useVesuAssets } from "~~/hooks/useVesuAssets";
