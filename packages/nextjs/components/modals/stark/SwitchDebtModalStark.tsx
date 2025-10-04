@@ -25,6 +25,7 @@ interface SwitchDebtModalProps {
 export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose, poolId, collateral, currentDebt, targetDebt, debtBalance, collateralBalance }) => {
   const { address } = useStarkAccount();
   const [submitting, setSubmitting] = useState(false);
+  const [preparedOnce, setPreparedOnce] = useState(false);
   const { loading, selectedQuote, swapSummary, calls } = useVesuSwitch({
     isOpen,
     type: "debt",
@@ -36,6 +37,11 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose
     debtBalance,
     poolId,
   });
+
+  // Mark prepared after first successful build
+  if (!preparedOnce && selectedQuote && calls.length > 0) {
+    setPreparedOnce(true);
+  }
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -109,7 +115,22 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose
           </>
         )}
         <div className="mt-4 flex justify-end">
-          <button className="btn btn-ghost btn-sm" onClick={onSubmit} disabled={submitting || loading || !selectedQuote || calls.length === 0}>{submitting ? "Switching..." : "Switch Debt"}</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={onSubmit}
+            disabled={submitting || (!preparedOnce && (loading || !selectedQuote || calls.length === 0))}
+          >
+            {submitting ? (
+              "Switching..."
+            ) : !preparedOnce && (loading || !selectedQuote || calls.length === 0) ? (
+              <span className="flex items-center gap-2"><span className="loading loading-spinner loading-xs" /> Preparing…</span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span>Switch Debt</span>
+                {(loading || calls.length === 0) && <span className="loading loading-spinner loading-xs" />}
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </BaseModal>

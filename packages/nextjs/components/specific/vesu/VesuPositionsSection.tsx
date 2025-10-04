@@ -9,6 +9,7 @@ import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
 import { ClosePositionModalStark } from "~~/components/modals/stark/ClosePositionModalStark";
 import { TokenSelectModalStark, type TokenWithRates } from "~~/components/modals/stark/TokenSelectModalStark";
+import SwitchTokenSelectModalStark from "~~/components/modals/stark/SwitchTokenSelectModalStark";
 import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModalStark";
 import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
 import { feltToString } from "~~/utils/protocols";
@@ -88,6 +89,13 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const [selectedTarget, setSelectedTarget] = useState<TokenWithRates | null>(null);
   const [isSwitchDebtOpen, setIsSwitchDebtOpen] = useState(false);
   const [isSwitchCollateralOpen, setIsSwitchCollateralOpen] = useState(false);
+  const [useNewSelector, setUseNewSelector] = useState(true);
+
+  const selectedSymbolStr = useMemo(() => {
+    if (!selectedTarget) return "";
+    const sym: any = (selectedTarget as any).symbol;
+    return typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
+  }, [selectedTarget]);
 
   const openSwapSelector = (type: "debt" | "collateral", row: VesuPositionRow) => {
     setSwapType(type);
@@ -285,23 +293,59 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       )}
 
       {/* Token selector for swap target */}
-      {swapRow && swapType && (
-        <TokenSelectModalStark
+      {swapRow && swapType && useNewSelector ? (
+        <SwitchTokenSelectModalStark
           isOpen={isSwapSelectOpen}
           onClose={closeSwapSelector}
-          tokens={swapCandidateTokens.map(asset => ({
-            ...asset,
-            borrowAPR: asset.borrowAPR,
-            supplyAPY: asset.supplyAPY,
-          })) as TokenWithRates[]}
-          protocolName="Vesu"
-          collateralAsset={swapRow.supply.tokenAddress}
-          vesuContext={swapType === "debt" ? swapRow.borrowContext : swapRow.borrowContext}
-          position={PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : [])}
-          action={swapType === "debt" ? "borrow" : "deposit"}
-          onSelectToken={handleSelectSwapTarget}
-          suppressActionModals
+          kind={swapType}
+          currentToken={{
+            address: swapType === "debt" ? swapRow.borrow!.tokenAddress : swapRow.supply.tokenAddress,
+            symbol: swapType === "debt" ? swapRow.borrow!.name : swapRow.supply.name,
+            name: swapType === "debt" ? swapRow.borrow!.name : swapRow.supply.name,
+            icon: swapType === "debt" ? swapRow.borrow!.icon : swapRow.supply.icon,
+            decimals: swapType === "debt" ? (swapRow.borrow!.tokenDecimals || 18) : (swapRow.supply.tokenDecimals || 18),
+          }}
+          options={swapCandidateTokens.map(asset => {
+            const symbol = feltToString(asset.symbol);
+            return {
+              address: `0x${asset.address.toString(16).padStart(64, "0")}`,
+              symbol,
+              name: symbol,
+              icon: tokenNameToLogo(symbol.toLowerCase()),
+              decimals: asset.decimals || 18,
+            };
+          })}
+          onSelect={opt => {
+            const match = swapCandidateTokens.find(a => `0x${a.address.toString(16).padStart(64, "0")}` === opt.address);
+            if (!match) return;
+            handleSelectSwapTarget({
+              address: match.address,
+              symbol: feltToString(match.symbol),
+              decimals: match.decimals || 18,
+              borrowAPR: match.borrowAPR,
+              supplyAPY: match.supplyAPY,
+            } as unknown as TokenWithRates);
+          }}
         />
+      ) : (
+        swapRow && swapType && (
+          <TokenSelectModalStark
+            isOpen={isSwapSelectOpen}
+            onClose={closeSwapSelector}
+            tokens={swapCandidateTokens.map(asset => ({
+              ...asset,
+              borrowAPR: asset.borrowAPR,
+              supplyAPY: asset.supplyAPY,
+            })) as TokenWithRates[]}
+            protocolName="Vesu"
+            collateralAsset={swapRow.supply.tokenAddress}
+            vesuContext={swapType === "debt" ? swapRow.borrowContext : swapRow.borrowContext}
+            position={PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : [])}
+            action={swapType === "debt" ? "borrow" : "deposit"}
+            onSelectToken={handleSelectSwapTarget}
+            suppressActionModals
+          />
+        )
       )}
 
       {/* Switch debt modal */}
@@ -323,10 +367,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
             icon: swapRow.borrow!.icon,
           }}
           targetDebt={{
-            name: feltToString(selectedTarget.symbol),
+            name: selectedSymbolStr,
             address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
             decimals: selectedTarget.decimals,
-            icon: tokenNameToLogo(feltToString(selectedTarget.symbol).toLowerCase()),
+            icon: tokenNameToLogo(selectedSymbolStr.toLowerCase()),
           }}
           debtBalance={swapRow.borrow!.tokenBalance}
           collateralBalance={swapRow.supply.tokenBalance}
@@ -346,10 +390,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
             icon: swapRow.supply.icon,
           }}
           targetCollateral={{
-            name: feltToString(selectedTarget.symbol),
+            name: selectedSymbolStr,
             address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
             decimals: selectedTarget.decimals,
-            icon: tokenNameToLogo(feltToString(selectedTarget.symbol).toLowerCase()),
+            icon: tokenNameToLogo(selectedSymbolStr.toLowerCase()),
           }}
           debtToken={{
             name: swapRow.borrow?.name || "",

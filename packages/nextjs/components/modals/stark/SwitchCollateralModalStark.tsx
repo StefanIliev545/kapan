@@ -25,6 +25,7 @@ interface SwitchCollateralModalProps {
 export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({ isOpen, onClose, poolId, currentCollateral, targetCollateral, debtToken, collateralBalance, debtBalance }) => {
   const { address } = useStarkAccount();
   const [submitting, setSubmitting] = useState(false);
+  const [preparedOnce, setPreparedOnce] = useState(false);
   const { loading, error, selectedQuote, swapSummary, calls } = useVesuSwitch({
     isOpen,
     type: "collateral",
@@ -36,6 +37,10 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({ isO
     debtBalance,
     poolId,
   });
+
+  if (!preparedOnce && selectedQuote && calls.length > 0) {
+    setPreparedOnce(true);
+  }
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -109,7 +114,22 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({ isO
           </>
         )}
         <div className="mt-4 flex justify-end">
-          <button className="btn btn-ghost btn-sm" onClick={onSubmit} disabled={submitting || loading || !selectedQuote || calls.length === 0}>{submitting ? "Switching..." : "Switch Collateral"}</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={onSubmit}
+            disabled={submitting || (!preparedOnce && (loading || !selectedQuote || calls.length === 0))}
+          >
+            {submitting ? (
+              "Switching..."
+            ) : !preparedOnce && (loading || !selectedQuote || calls.length === 0) ? (
+              <span className="flex items-center gap-2"><span className="loading loading-spinner loading-xs" /> Preparing…</span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span>Switch Collateral</span>
+                {(loading || calls.length === 0) && <span className="loading loading-spinner loading-xs" />}
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </BaseModal>
