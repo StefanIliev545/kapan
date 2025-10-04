@@ -8,6 +8,7 @@ import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiPlus, FiMinus, FiRepeat, FiArrowRight } from "react-icons/fi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
@@ -116,7 +117,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       maximumFractionDigits: 2,
     }).format(Math.abs(num));
 
-  const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
+  // Use shared resolver to support keys like "vesu_v2"
+  const getProtocolLogo = (protocol: string) => getProtocolLogoUtil(protocol);
 
   const actionConfig = {
     deposit: availableActions?.deposit !== false,

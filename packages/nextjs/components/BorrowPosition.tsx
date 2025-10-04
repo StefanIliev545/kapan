@@ -11,6 +11,7 @@ import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX, FiArrowRight } from "react-icons/fi";
 import { SegmentedActionBar } from "./common/SegmentedActionBar";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
@@ -131,7 +132,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       maximumFractionDigits: 2,
     }).format(Math.abs(num));
 
-  const getProtocolLogo = (protocol: string) => tokenNameToLogo(protocol);
+  // Use shared protocol logo resolver to support keys like "vesu_v2"
+  const getProtocolLogo = (protocol: string) => getProtocolLogoUtil(protocol);
 
   const actionConfig = {
     borrow: availableActions?.borrow !== false,
