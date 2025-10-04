@@ -31,6 +31,7 @@ interface VesuPositionsSectionProps {
   isUpdating: boolean;
   onBorrowRequest: (request: BorrowSelectionRequest) => void;
   onDepositRequest: () => void;
+  protocolName?: string;
 }
 
 export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
@@ -42,6 +43,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   isUpdating,
   onBorrowRequest,
   onDepositRequest,
+  protocolName = "Vesu",
 }) => {
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [closeParams, setCloseParams] = useState<
@@ -193,7 +195,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           <div className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}>
             <SupplyPosition
               {...row.supply}
-              protocolName="Vesu"
+              protocolName={protocolName}
               networkType="starknet"
               position={positionManager}
               disableMove
@@ -207,7 +209,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
             {row.borrow ? (
               <BorrowPosition
                 {...row.borrow}
-                protocolName="Vesu"
+                protocolName={protocolName}
                 networkType="starknet"
                 position={positionManager}
                 containerClassName="rounded-none"
@@ -337,7 +339,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
               borrowAPR: asset.borrowAPR,
               supplyAPY: asset.supplyAPY,
             })) as TokenWithRates[]}
-            protocolName="Vesu"
+            protocolName={protocolName}
             collateralAsset={swapRow.supply.tokenAddress}
             vesuContext={swapType === "debt" ? swapRow.borrowContext : swapRow.borrowContext}
             position={PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : [])}

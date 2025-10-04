@@ -245,7 +245,7 @@ const findContractFile = (
   contract: string,
   fileType: "compiled_contract_class" | "contract_class"
 ): string => {
-  const targetDir = path.resolve(__dirname, "../contracts/target/dev");
+  const targetDir = path.resolve(__dirname, "../contracts/target/release");
   const files = fs.readdirSync(targetDir);
 
   const pattern = new RegExp(`.*${contract}\\.${fileType}\\.json$`);

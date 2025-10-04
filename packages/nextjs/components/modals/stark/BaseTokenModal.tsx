@@ -44,10 +44,7 @@ export interface TokenInfo {
   usdPrice?: number;
 }
 
-export interface VesuContext {
-  pool_id: bigint;
-  counterpart_token: string;
-}
+import type { VesuContext } from "~~/hooks/useLendingAction";
 
 // Different action types supported
 export type TokenActionType = "borrow" | "deposit" | "repay" | "withdraw";
@@ -139,10 +136,20 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
 
     let context = new CairoOption<BigNumberish[]>(CairoOptionVariant.None);
     if (vesuContext) {
-      context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
-        vesuContext.pool_id,
-        vesuContext.counterpart_token,
-      ]);
+      // Handle both V1 and V2 VesuContext formats
+      if ('poolId' in vesuContext) {
+        // V1 format: { poolId: bigint, counterpartToken: string }
+        context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
+          vesuContext.poolId,
+          vesuContext.counterpartToken,
+        ]);
+      } else if ('poolAddress' in vesuContext) {
+        // V2 format: { poolAddress: string, positionCounterpartToken: string }
+        context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
+          BigInt(vesuContext.poolAddress),
+          vesuContext.positionCounterpartToken,
+        ]);
+      }
     }
 
     // Create the appropriate lending instruction based on action type

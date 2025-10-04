@@ -7,7 +7,7 @@ use crate::interfaces::vesu_v2::{
     AssetPrice, IPoolDispatcher, IPoolDispatcherTrait,
     IERC4626Dispatcher, IERC4626DispatcherTrait,
     Amount, AmountDenomination, Context, ModifyPositionParams, UpdatePositionResponse,
-    IOracleDispatcher, IOracleDispatcherTrait,
+    IOracleDispatcher, IOracleDispatcherTrait, IPoolFactoryDispatcher, IPoolFactoryDispatcherTrait,
 };
 use crate::interfaces::IGateway::{
     Borrow, Deposit, ILendingInstructionProcessor, InstructionOutput, LendingInstruction, Repay, Withdraw,
@@ -134,7 +134,7 @@ mod VesuGatewayV2 {
         supported_pools: Vec<ContractAddress>,
         supported_pool_assets: Map<ContractAddress, Vec<ContractAddress>>,
         router: ContractAddress,
-        oracle: ContractAddress,
+        pool_factory: ContractAddress,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
     }
@@ -145,12 +145,12 @@ mod VesuGatewayV2 {
         default_pool: ContractAddress,
         router: ContractAddress,
         owner: ContractAddress,
-        oracle: ContractAddress,
+        pool_factory: ContractAddress,
         supported_assets: Array<ContractAddress>,
     ) {
         self.default_pool.write(default_pool);
         self.router.write(router);
-        self.oracle.write(oracle);
+        self.pool_factory.write(pool_factory);
         self.ownable.initializer(owner);
         for asset in supported_assets {
             self.supported_assets.push(asset);
@@ -268,10 +268,10 @@ mod VesuGatewayV2 {
         // --- Pool helpers ---
 
         fn get_vtoken_for_collateral(
-            self: @ContractState, collateral: ContractAddress, _pool_address: ContractAddress,
+            self: @ContractState, collateral: ContractAddress, pool_address: ContractAddress,
         ) -> ContractAddress {
-            // TODO: wire actual mapping in V2 if/when available
-            collateral
+            let pool_factory = IPoolFactoryDispatcher { contract_address: self.pool_factory.read() };
+            pool_factory.v_token_for_asset(pool_address, collateral)
         }
 
         // --- Builders (stage params like V1; execute later in merge step) ---
@@ -790,9 +790,8 @@ mod VesuGatewayV2 {
         fn get_borrow_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
             let pool_address = self.default_pool.read();
             let pool = IPoolDispatcher { contract_address: pool_address };
-            let rate_accumulator = pool.rate_accumulator(token_address);
             let utilization = pool.utilization(token_address);
-            let (asset_config, _) = pool.asset_config(token_address);
+            let asset_config = pool.asset_config(token_address);
 
             // Placeholder V2 formula (replace with the pool's exact one if different)
             let base_rate = asset_config.last_full_utilization_rate;
@@ -805,9 +804,8 @@ mod VesuGatewayV2 {
         fn get_supply_rate(ref self: ContractState, token_address: ContractAddress) -> u256 {
             let pool_address = self.default_pool.read();
             let pool = IPoolDispatcher { contract_address: pool_address };
-            let rate_accumulator = pool.rate_accumulator(token_address);
             let utilization = pool.utilization(token_address);
-            let (asset_config, _) = pool.asset_config(token_address);
+            let asset_config = pool.asset_config(token_address);
 
             let base_rate = asset_config.last_full_utilization_rate;
             let scale: u256 = pow(10, 18);
@@ -823,7 +821,7 @@ mod VesuGatewayV2 {
     // ------------------------------
     // Read‑only viewer (V2 shapes)
     // ------------------------------
-    use core::dict::{Felt252Dict, Felt252DictTrait, Felt252DictEntryTrait};
+    use core::dict::{Felt252Dict, Felt252DictTrait};
 
     #[abi(embed_v0)]
     impl IVesuViewerImpl of IVesuViewer<ContractState> {
@@ -912,24 +910,6 @@ mod VesuGatewayV2 {
                     ));
                 }
 
-                // Zero‑debt position (earn)
-                let (pos0, _, _) = pool.position(collateral_asset, Zero::zero(), user);
-                if pos0.collateral_shares > 0 {
-                    let vtoken = self.get_vtoken_for_collateral(collateral_asset, pool_address);
-                    let erc4626 = IERC4626Dispatcher { contract_address: vtoken };
-                    let collateral_amount = erc4626.convert_to_assets(pos0.collateral_shares);
-                    positions.append((
-                        collateral_asset,
-                        Zero::zero(),
-                        PositionWithAmounts {
-                            collateral_shares: pos0.collateral_shares,
-                            collateral_amount,
-                            nominal_debt: pos0.nominal_debt,
-                            is_vtoken: false,
-                        },
-                    ));
-                }
-
                 // Other debt pairs
                 for j in 0..len {
                     if i == j { continue; }
@@ -981,7 +961,9 @@ mod VesuGatewayV2 {
         }
 
         fn get_asset_price(self: @ContractState, asset: ContractAddress, pool_address: ContractAddress) -> u256 {
-            let oracle = IOracleDispatcher { contract_address: self.oracle.read() };
+            let pool = IPoolDispatcher { contract_address: pool_address };
+            let oracle_address = pool.oracle();
+            let oracle = IOracleDispatcher { contract_address: oracle_address };
             let asset_price = oracle.price(asset);
             asset_price.value
         }
@@ -994,16 +976,18 @@ mod VesuGatewayV2 {
 
             for i in 0..len {
                 let asset = self.supported_assets.at(i).read();
+                let asset_felt: felt252 = asset.into();
 
                 let symbol_felt = super::IERC20SymbolDispatcher { contract_address: asset }.symbol();
                 let decimals = IERC20MetadataDispatcher { contract_address: asset }.decimals();
 
                 let rate_accumulator = pool.rate_accumulator(asset);
                 let utilization = pool.utilization(asset);
-                let (asset_config, _) = pool.asset_config(asset);
+                let asset_config = pool.asset_config(asset);
                 let fee_rate = asset_config.fee_rate;
 
-                let oracle = IOracleDispatcher { contract_address: self.oracle.read() };
+                let oracle_address = pool.oracle();
+                let oracle = IOracleDispatcher { contract_address: oracle_address };
                 let price = oracle.price(asset);
 
                 assets.append(TokenMetadata {

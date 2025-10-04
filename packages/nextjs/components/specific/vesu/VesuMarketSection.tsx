@@ -22,6 +22,7 @@ interface VesuMarketSectionProps {
   onDeposit: () => void;
   canDeposit: boolean;
   formatCurrency: (value: number) => string;
+  protocolName?: string;
 }
 
 export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
@@ -39,6 +40,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   onDeposit,
   canDeposit,
   formatCurrency,
+  protocolName = "Vesu",
 }) => {
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
@@ -91,7 +93,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <SupplyPosition
                 key={position.tokenAddress}
                 {...position}
-                protocolName="Vesu"
+                protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
                 availableActions={{ deposit: false, withdraw: false, move: false }}
@@ -110,7 +112,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <BorrowPosition
                 key={position.tokenAddress}
                 {...position}
-                protocolName="Vesu"
+                protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
                 availableActions={{ borrow: false, repay: false, move: false }}

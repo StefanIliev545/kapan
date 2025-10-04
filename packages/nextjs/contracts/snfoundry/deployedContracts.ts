@@ -1023,7 +1023,7 @@ const contracts = {
   mainnet: {
     RouterGateway: {
       address:
-        "0x58c226f9def07d2d0f45c8f5cde9b60d19e8976ec82475caa88d7194e1abfdf",
+        "0x1e7e634bfd48f9714914a304d72ec40ed2485b898af0d3c76a6f279fad4fbe5",
       abi: [
         {
           type: "impl",
@@ -1644,7 +1644,7 @@ const contracts = {
     },
     VesuGateway: {
       address:
-        "0x47c4d8ad4451072535d12ee2a9d0229b78aab984bb3da15ed3e3307f553b0e9",
+        "0x7b3fa4e7854cf5357390104480467291dacc4944e0c3c12885d4fbd4297a2e8",
       abi: [
         {
           type: "impl",
@@ -2645,7 +2645,7 @@ const contracts = {
     },
     VesuGatewayV2: {
       address:
-        "0x5f6d2c342c5406fd597448021039d24573624a546b247124e2b6d6af82ab18e",
+        "0x46bc899f77f4320f9253d6903e907181aaca69cbb226b51c4494fde106098ea",
       abi: [
         {
           type: "impl",
@@ -3572,7 +3572,7 @@ const contracts = {
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
-              name: "oracle",
+              name: "pool_factory",
               type: "core::starknet::contract_address::ContractAddress",
             },
             {
@@ -3646,11 +3646,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x4f10835505666e3f943c22da2fbf054422e35c0a7b7a8376f62ea9958ef40ad",
+        "0x74b9a43d3c4c7455cf8c75132c543b97f534a3b9692e6f7c770fe463f06a044",
     },
     AvnuGateway: {
       address:
-        "0x20297a224b3624df10960c715d95232f25eb12cf6a2f6c23ad9d2798974b6b",
+        "0x29b02f1a4617533535147f541bcd3c5997d9d08eb1980daf663e13813a60176",
       abi: [
         {
           type: "impl",
@@ -4339,7 +4339,7 @@ const contracts = {
     },
     NostraGateway: {
       address:
-        "0x6d1af8b8f4c33346461c90a2bd0604e1c163fe1371e857569cc8c024687dd56",
+        "0x65552882e3138cdab241788750acc4aec6a0f790dc3c3b9dc0e3ddf06543bff",
       abi: [
         {
           type: "impl",
@@ -5161,7 +5161,7 @@ const contracts = {
     },
     EkuboGateway: {
       address:
-        "0x356fd0fe717cba1e831f95fe13952dac48ce431104a5a6b38a6cd65153d23da",
+        "0x604af0b189aad930d18732c19553bd027c356bfa360bc5fb5c3ee2d9b1a1410",
       abi: [
         {
           type: "impl",
@@ -5716,7 +5716,7 @@ const contracts = {
     },
     OptimalInterestRateFinder: {
       address:
-        "0x4d40bbab8f3150681c0dd85a5ca94c9bb3600f830890c67f1139d30ef4646d0",
+        "0x4cde66d5666769b35546b4143ce9a3d7c81d07abe42c950c392b1158427b86b",
       abi: [
         {
           type: "impl",
@@ -5834,7 +5834,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x796fa5b3902961be53ec140c35127654d7a1575f8fe68e7c0d49bcf90345b1e",
+        "0x71bd8805ee23574fe43996dde645452aecd1864c7251c87f591ca6f9c53c006",
       abi: [
         {
           type: "impl",

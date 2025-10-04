@@ -115,12 +115,13 @@ pub trait IERC20Symbol<TContractState> {
 // V2 Pool Interface - replaces singleton pattern
 #[starknet::interface]
 pub trait IPool<TContractState> {
+    fn oracle(self: @TContractState) -> ContractAddress;
     fn asset_config_unsafe(
         self: @TContractState, asset: ContractAddress,
-    ) -> (AssetConfig, u256);
+    ) -> AssetConfig;
     fn asset_config(
         ref self: TContractState, asset: ContractAddress,
-    ) -> (AssetConfig, u256);
+    ) -> AssetConfig;
     fn ltv_config(
         self: @TContractState,
         collateral_asset: ContractAddress,
@@ -276,4 +277,15 @@ pub trait IFlashloanReceiver<TContractState> {
     fn on_flash_loan(
         ref self: TContractState, sender: ContractAddress, asset: ContractAddress, amount: u256, data: Span<felt252>
     );
+}
+
+#[starknet::interface]
+pub trait IPoolFactory<TContractState> {
+    /// Returns the vToken address for a given collateral asset
+    /// # Arguments
+    /// * `pool` - address of the pool
+    /// * `asset` - address of the asset
+    /// # Returns
+    /// * `v_token` - address of the vToken contract
+    fn v_token_for_asset(self: @TContractState, pool: ContractAddress, asset: ContractAddress) -> ContractAddress;
 }

@@ -57,7 +57,7 @@ const deployScriptMainnet = async (): Promise<{
       default_pool: "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5", // V2_DEFAULT_POOL_ADDRESS from test
       router: routerGatewayAddress,
       owner: deployer.address,
-      oracle: "0xfe4bfb1b353ba51eb34dff963017f94af5a5cf8bdf3dfc191c504657f3c05", // V2_ORACLE_ADDRESS from test
+      pool_factory: "0x3760f903a37948f97302736f89ce30290e45f441559325026842b7a6fb388c0", // PoolFactory address
       supported_assets: supportedAssets,
     },
   });
@@ -154,7 +154,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
       default_pool: "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5", // V2_DEFAULT_POOL_ADDRESS from test
       router: routerGatewayAddress,
       owner: deployer.address,
-      oracle: "0xfe4bfb1b353ba51eb34dff963017f94af5a5cf8bdf3dfc191c504657f3c05", // V2_ORACLE_ADDRESS from test
+      pool_factory: "0x3760f903a37948f97302736f89ce30290e45f441559325026842b7a6fb388c0", // PoolFactory address
       supported_assets: supportedAssets,
     },
   });

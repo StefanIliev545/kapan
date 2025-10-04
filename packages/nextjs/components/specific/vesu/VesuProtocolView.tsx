@@ -4,12 +4,14 @@ import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectMod
 import { useAccount } from "~~/hooks/useAccount";
 import type { VesuContext } from "~~/hooks/useLendingAction";
 import { useVesuLendingPositions } from "~~/hooks/useVesuLendingPositions";
+import { useVesuV2LendingPositions } from "~~/hooks/useVesuV2LendingPositions";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { PositionManager } from "~~/utils/position";
 
 import { POOL_IDS } from "./VesuMarkets";
 import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
+import { VesuVersionToggle } from "./VesuVersionToggle";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 
 type BorrowSelectionState = {
@@ -28,7 +30,17 @@ type DepositSelectionState = {
 export const VesuProtocolView: FC = () => {
   const { address: userAddress, status } = useAccount();
   const poolId = POOL_IDS["Genesis"];
+  const poolAddress = "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5"; // V2 pool address
 
+  const [selectedVersion, setSelectedVersion] = useState<"v1" | "v2">("v1");
+
+  // V1 data
+  const v1Data = useVesuLendingPositions(userAddress, poolId);
+  
+  // V2 data
+  const v2Data = useVesuV2LendingPositions(userAddress, poolAddress);
+
+  // Use data based on selected version
   const {
     assetsWithRates,
     suppliablePositions,
@@ -39,7 +51,7 @@ export const VesuProtocolView: FC = () => {
     isLoadingAssets,
     refetchPositions,
     assetsError,
-  } = useVesuLendingPositions(userAddress, poolId);
+  } = selectedVersion === "v1" ? v1Data : v2Data;
 
   const [borrowSelection, setBorrowSelection] = useState<BorrowSelectionState>(null);
   const [depositSelection, setDepositSelection] = useState<DepositSelectionState>(null);
@@ -127,6 +139,15 @@ export const VesuProtocolView: FC = () => {
 
   return (
     <div className="flex w-full flex-col space-y-6 p-4">
+      {/* Version Toggle Header */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Vesu Protocol</h2>
+        <VesuVersionToggle
+          selectedVersion={selectedVersion}
+          onVersionChange={setSelectedVersion}
+        />
+      </div>
+
       <VesuMarketSection
         isOpen={isMarketsOpen}
         onToggle={handleToggleMarkets}
@@ -142,6 +163,7 @@ export const VesuProtocolView: FC = () => {
         onDeposit={() => openDepositModal(assetsWithRates)}
         canDeposit={assetsWithRates.length > 0}
         formatCurrency={formatCurrency}
+        protocolName={selectedVersion === "v1" ? "Vesu" : "vesu_v2"}
       />
 
       <VesuPositionsSection
@@ -155,6 +177,7 @@ export const VesuProtocolView: FC = () => {
           setBorrowSelection({ tokens, collateralAddress, vesuContext, position })
         }
         onDepositRequest={() => openDepositModal(assetsWithRates)}
+        protocolName={selectedVersion === "v1" ? "Vesu" : "vesu_v2"}
       />
 
       {borrowSelection && (
@@ -162,7 +185,7 @@ export const VesuProtocolView: FC = () => {
           isOpen={borrowSelection !== null}
           onClose={() => setBorrowSelection(null)}
           tokens={borrowSelection.tokens}
-          protocolName="Vesu"
+          protocolName={selectedVersion === "v1" ? "Vesu" : "vesu_v2"}
           collateralAsset={borrowSelection.collateralAddress}
           vesuContext={borrowSelection.vesuContext}
           position={borrowSelection.position}
@@ -173,7 +196,7 @@ export const VesuProtocolView: FC = () => {
           isOpen={depositSelection !== null}
           onClose={() => setDepositSelection(null)}
           tokens={depositSelection.tokens}
-          protocolName="Vesu"
+          protocolName={selectedVersion === "v1" ? "Vesu" : "vesu_v2"}
           vesuContext={depositSelection.vesuContext}
           position={depositSelection.position}
           action="deposit"

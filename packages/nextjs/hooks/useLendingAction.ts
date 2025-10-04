@@ -22,10 +22,17 @@ import { notification } from "~~/utils/scaffold-stark";
 
 export type Action = "Borrow" | "Deposit" | "Withdraw" | "Repay";
 
-export interface VesuContext {
+export interface VesuContextV1 {
   poolId: bigint;
   counterpartToken: string;
 }
+
+export interface VesuContextV2 {
+  poolAddress: string;
+  positionCounterpartToken: string;
+}
+
+export type VesuContext = VesuContextV1 | VesuContextV2;
 
 export const useLendingAction = (
   network: Network,
