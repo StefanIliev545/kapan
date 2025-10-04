@@ -12,13 +12,33 @@ export const feltToString = (felt: bigint): string => {
   return Buffer.from(hex, "hex").toString("ascii");
 };
 
+const wadToNumber = (value: bigint): number => Number(value) / Number(SCALE);
+
+const ratePerSecond = (interestPerSecond: bigint): number => {
+  if (interestPerSecond === 0n) return 0;
+  return wadToNumber(interestPerSecond);
+};
+
 // Rate calculation functions
 export const toAPR = (interestPerSecond: bigint): number => {
-  return (Number(interestPerSecond) * YEAR_IN_SECONDS) / Number(SCALE);
+  return ratePerSecond(interestPerSecond) * YEAR_IN_SECONDS;
 };
 
 export const toAPY = (interestPerSecond: bigint): number => {
-  return (1 + Number(interestPerSecond) / Number(SCALE)) ** YEAR_IN_SECONDS - 1;
+  const perSecond = ratePerSecond(interestPerSecond);
+  if (perSecond === 0) return 0;
+  if (perSecond <= -1) return 0;
+
+  return Math.expm1(Math.log1p(perSecond) * YEAR_IN_SECONDS);
+};
+
+const computeUtilization = (borrowed: bigint, reserve: bigint) => {
+  if (borrowed === 0n) return 0;
+  const totalAssets = borrowed + reserve;
+  if (totalAssets === 0n) return 0;
+
+  const utilizationWad = (borrowed * SCALE) / totalAssets;
+  return Number(utilizationWad) / Number(SCALE);
 };
 
 export const toAnnualRates = (
@@ -34,9 +54,15 @@ export const toAnnualRates = (
   }
 
   const borrowAPR = toAPR(interestPerSecond);
-  const totalBorrowed = Number((total_nominal_debt * last_rate_accumulator) / SCALE);
-  const reserveScale = Number((reserve * SCALE) / scale);
-  const supplyAPY = (toAPY(interestPerSecond) * totalBorrowed) / (reserveScale + totalBorrowed);
+  const totalBorrowed = (total_nominal_debt * last_rate_accumulator) / SCALE;
+  const normalisedReserve = (reserve * SCALE) / scale;
+  const utilization = computeUtilization(totalBorrowed, normalisedReserve);
+  const supplyAPY = toAPY(interestPerSecond) * utilization;
+
+  if (!Number.isFinite(supplyAPY) || !Number.isFinite(borrowAPR)) {
+    return { borrowAPR: 0, supplyAPY: 0 };
+  }
+
   return { borrowAPR, supplyAPY };
 };
 
