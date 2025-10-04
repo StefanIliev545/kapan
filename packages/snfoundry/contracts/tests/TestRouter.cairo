@@ -11,6 +11,8 @@ use kapan::gateways::vesu_gateway::{
 use kapan::gateways::VesuGatewayV2::{
     IVesuGatewayAdminDispatcher as IVesuGatewayV2AdminDispatcher,
     IVesuGatewayAdminDispatcherTrait as IVesuGatewayV2AdminDispatcherTrait,
+    IVesuViewerDispatcher,
+    IVesuViewerDispatcherTrait,
 };
 use kapan::interfaces::IGateway::{
     ILendingInstructionProcessorDispatcher, 
@@ -56,6 +58,11 @@ fn SINGLETON_ADDRESS() -> ContractAddress {
 // V2 Pool address - needs actual V2-beta pool address from Vesu documentation
 fn V2_DEFAULT_POOL_ADDRESS() -> ContractAddress {
     contract_address_const::<0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5>()
+}
+
+// Vesu V2 Oracle contract address
+fn V2_ORACLE_ADDRESS() -> ContractAddress {
+    contract_address_const::<0xfe4bfb1b353ba51eb34dff963017f94af5a5cf8bdf3dfc191c504657f3c05>()
 }
 
 // Nostra Finance tokens
@@ -162,6 +169,7 @@ fn deploy_vesu_gateway_v2(router: ContractAddress) -> ContractAddress {
     calldata.append_serde(V2_DEFAULT_POOL_ADDRESS());
     calldata.append_serde(router);
     calldata.append_serde(USER_ADDRESS());
+    calldata.append_serde(V2_ORACLE_ADDRESS());
     let mut supported_assets = array![];
     supported_assets.append(ETH_ADDRESS());
     supported_assets.append(USDC_ADDRESS());
@@ -1018,4 +1026,24 @@ fn test_v2_gateway_deployment() {
     println!("To enable full V2 testing:");
     println!("1. Update V2_DEFAULT_POOL_ADDRESS with actual V2 pool address from docs");
     println!("2. Implement the full debt migration test (code available in git history)");
+}
+
+// Test that V2 gateway can fetch ETH price from Oracle
+#[test]
+#[fork("MAINNET_LATEST")]
+fn test_v2_fetch_eth_price() {
+    let context = setup_test_context();
+    
+    let vesu_gateway_v2 = IVesuViewerDispatcher { 
+        contract_address: context.vesu_gateway_v2_address 
+    };
+    
+    // Fetch ETH price from Oracle
+    let eth_price = vesu_gateway_v2.get_asset_price(ETH_ADDRESS(), V2_DEFAULT_POOL_ADDRESS());
+    
+    // Ensure price is not zero (Oracle should return a valid price)
+    assert(eth_price > 0, 'ETH price should not be zero');
+    
+    println!("ETH price fetched successfully: {}", eth_price);
+    println!("V2 Oracle integration working correctly!");
 }

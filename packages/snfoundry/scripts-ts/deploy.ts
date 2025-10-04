@@ -13,6 +13,7 @@ import { CallData, constants } from "starknet";
 const deployScriptMainnet = async (): Promise<{
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
+  vesuGatewayV2Address: string;
   routerGatewayAddress: string;
   ekuboGatewayAddress: string;
   avnuGatewayAddress: string;
@@ -45,6 +46,18 @@ const deployScriptMainnet = async (): Promise<{
         "2198503327643286920898110335698706244522220458610657370981979460625005526824",
       router: routerGatewayAddress,
       owner: deployer.address,
+      supported_assets: supportedAssets,
+    },
+  });
+
+  // Deploy VesuGatewayV2
+  const { address: vesuGatewayV2Address } = await deployContract({
+    contract: "VesuGatewayV2",
+    constructorArgs: {
+      default_pool: "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5", // V2_DEFAULT_POOL_ADDRESS from test
+      router: routerGatewayAddress,
+      owner: deployer.address,
+      oracle: "0xfe4bfb1b353ba51eb34dff963017f94af5a5cf8bdf3dfc191c504657f3c05", // V2_ORACLE_ADDRESS from test
       supported_assets: supportedAssets,
     },
   });
@@ -95,10 +108,10 @@ const deployScriptMainnet = async (): Promise<{
 
 
 
-  return { nostraGatewayAddress, vesuGatewayAddress, routerGatewayAddress, ekuboGatewayAddress, avnuGatewayAddress };
+  return { nostraGatewayAddress, vesuGatewayAddress, vesuGatewayV2Address, routerGatewayAddress, ekuboGatewayAddress, avnuGatewayAddress };
 };
 
-const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
+const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, vesuGatewayV2Address: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
@@ -130,6 +143,18 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
         "730993554056884283224259059297934576024721456828383733531590831263129347422",
       router: routerGatewayAddress,
       owner: deployer.address,
+      supported_assets: supportedAssets,
+    },
+  });
+
+  // Deploy VesuGatewayV2 (using same addresses as mainnet for now)
+  const { address: vesuGatewayV2Address } = await deployContract({
+    contract: "VesuGatewayV2",
+    constructorArgs: {
+      default_pool: "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5", // V2_DEFAULT_POOL_ADDRESS from test
+      router: routerGatewayAddress,
+      owner: deployer.address,
+      oracle: "0xfe4bfb1b353ba51eb34dff963017f94af5a5cf8bdf3dfc191c504657f3c05", // V2_ORACLE_ADDRESS from test
       supported_assets: supportedAssets,
     },
   });
@@ -170,6 +195,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
   return {
     nostraGatewayAddress,
     vesuGatewayAddress,
+    vesuGatewayV2Address,
     routerGatewayAddress,
     ekuboGatewayAddress,
   };
@@ -178,6 +204,7 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
 const initializeContracts = async (addresses: {
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
+  vesuGatewayV2Address: string;
   routerGatewayAddress: string;
   ekuboGatewayAddress: string;
   avnuGatewayAddress: string;
@@ -348,6 +375,11 @@ const initializeContracts = async (addresses: {
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
+      calldata: ["vesu_v2", addresses.vesuGatewayV2Address],
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
       calldata: [
         "avnu",
         addresses.avnuGatewayAddress,
@@ -394,6 +426,7 @@ const initializeContracts = async (addresses: {
 const initializeContractsSepolia = async (addresses: {
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
+  vesuGatewayV2Address: string;
   routerGatewayAddress: string;
   ekuboGatewayAddress: string;
 }): Promise<void> => {
@@ -437,6 +470,11 @@ const initializeContractsSepolia = async (addresses: {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
       calldata: ["vesu", addresses.vesuGatewayAddress],
+    },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: ["vesu_v2", addresses.vesuGatewayV2Address],
     },
     {
       contractAddress: addresses.routerGatewayAddress,

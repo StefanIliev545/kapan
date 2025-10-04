@@ -261,6 +261,17 @@ pub trait IERC4626<TContractState> {
 }
 
 #[starknet::interface]
+pub trait IOracle<TContractState> {
+    /// Returns the current price for an asset and the validity status of the price.
+    /// The price can be invalid if price is too old (stale) or if the number of price sources is too low.
+    /// # Arguments
+    /// * `asset` - address of the asset
+    /// # Returns
+    /// * `AssetPrice` - latest price of the asset and its validity
+    fn price(self: @TContractState, asset: ContractAddress) -> AssetPrice;
+}
+
+#[starknet::interface]
 pub trait IFlashloanReceiver<TContractState> {
     fn on_flash_loan(
         ref self: TContractState, sender: ContractAddress, asset: ContractAddress, amount: u256, data: Span<felt252>
