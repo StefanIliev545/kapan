@@ -20,15 +20,15 @@ export function useCollateral({
   userAddress,
   isOpen,
 }: {
-  protocolName: "Vesu" | "Nostra";
+  protocolName: "Vesu" | "VesuV2" | "Nostra";
   userAddress: string;
   isOpen: boolean;
 }): { collaterals: CollateralToken[]; isLoading: boolean } {
-  const contractName = protocolName === "Vesu" ? "VesuGateway" : "NostraGateway";
+  const contractName = protocolName === "Vesu" ? "VesuGateway" : protocolName === "VesuV2" ? "VesuGatewayV2" : "NostraGateway";
   const { data, isLoading } = useScaffoldReadContract({
     contractName,
     functionName: "get_supported_assets_info",
-    args: (protocolName === "Vesu" ? [userAddress, 0n] : [userAddress]) as any,
+    args: (protocolName === "Vesu" || protocolName === "VesuV2" ? [userAddress, 0n] : [userAddress]) as any,
     enabled: isOpen && !!userAddress,
     watch: false,
     refetchOnWindowFocus: false,

@@ -107,7 +107,7 @@ export const InterestPillRow: FC<{
           <RatePill
             current={supplyRate}
             optimal={supplyOptimalDisplay}
-            color="bg-lime-500"
+            color="primary"
             logo={supplyLogo}
             alt={supplyAlt}
             sameProtocol={sameSupplyProtocol}
@@ -118,7 +118,7 @@ export const InterestPillRow: FC<{
           <RatePill
             current={borrowRate}
             optimal={borrowOptimalDisplay}
-            color="bg-orange-500"
+            color="secondary"
             logo={borrowLogo}
             alt={borrowAlt}
             sameProtocol={sameBorrowProtocol}
@@ -138,7 +138,7 @@ export const InterestPillRow: FC<{
         <RatePill
           current={supplyRate}
           optimal={supplyOptimalDisplay}
-          color="bg-lime-500"
+          color="primary"
           logo={supplyLogo}
           alt={supplyAlt}
           sameProtocol={sameSupplyProtocol}
@@ -146,7 +146,7 @@ export const InterestPillRow: FC<{
         <RatePill
           current={borrowRate}
           optimal={borrowOptimalDisplay}
-          color="bg-orange-500"
+          color="secondary"
           logo={borrowLogo}
           alt={borrowAlt}
           sameProtocol={sameBorrowProtocol}

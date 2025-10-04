@@ -13,6 +13,7 @@ import { CallData, constants } from "starknet";
 const deployScriptMainnet = async (): Promise<{
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
+  vesuGatewayV2Address: string;
   routerGatewayAddress: string;
   ekuboGatewayAddress: string;
   avnuGatewayAddress: string;
@@ -49,6 +50,29 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
+  // Deploy VesuGatewayV2
+  const { address: vesuGatewayV2Address } = await deployContract({
+    contract: "VesuGatewayV2",
+    constructorArgs: {
+      default_pool: "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5", // V2_DEFAULT_POOL_ADDRESS from test
+      router: routerGatewayAddress,
+      owner: deployer.address,
+      pool_factory: "0x3760f903a37948f97302736f89ce30290e45f441559325026842b7a6fb388c0", // PoolFactory address
+      supported_assets: supportedAssets,
+    },
+  });
+
+  // Deploy AvnuGateway
+  const { address: avnuGatewayAddress } = await deployContract({
+    contract: "AvnuGateway",
+    constructorArgs: {
+      router: "0x04270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f", // Avnu mainnet router (same as forking tests)
+      owner: "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_recipient: "0x0142e5df37fa2430c77b6dc7676f6e7ed1e7851bee42e272bc856fb89b0b12b8",
+      fee_bps: 0,
+    },
+  });
+
   // Deploy NostraGateway
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
@@ -60,11 +84,19 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
+  const { address: ekuboGatewayAddress } = await deployContract({
+    contract: "EkuboGateway",
+    constructorArgs: {
+      core: "0x00000005dd3D2F4429AF886cD1a3b08289DBcEa99A294197E9eB43b0e0325b4b",
+    },
+  });
+
   await deployContract({
     contract: "OptimalInterestRateFinder",
     constructorArgs: {
       nostra_gateway: nostraGatewayAddress,
       vesu_gateway: vesuGatewayAddress,
+      vesu_gateway_v2: vesuGatewayV2Address,
     },
   });
 
@@ -75,21 +107,12 @@ const deployScriptMainnet = async (): Promise<{
     },
   });
 
-  return {
-    nostraGatewayAddress,
-    vesuGatewayAddress,
-    routerGatewayAddress,
-    avnuGatewayAddress: "0x0000000000000000000000000000000000000000000000000000000000000000",
-    ekuboGatewayAddress: "0x0000000000000000000000000000000000000000000000000000000000000000",
-  };
+
+
+  return { nostraGatewayAddress, vesuGatewayAddress, vesuGatewayV2Address, routerGatewayAddress, ekuboGatewayAddress, avnuGatewayAddress };
 };
 
-const deployScriptSepolia = async (): Promise<{
-  nostraGatewayAddress: string;
-  vesuGatewayAddress: string;
-  routerGatewayAddress: string;
-  ekuboGatewayAddress: string;
-}> => {
+const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, vesuGatewayAddress: string, vesuGatewayV2Address: string, routerGatewayAddress: string, ekuboGatewayAddress: string }> => {
   // Deploy VesuGateway
   const supportedAssets = [
     "0x7bb0505dde7c05f576a6e08e64dadccd7797f14704763a5ad955727be25e5e9", // ETH
@@ -125,6 +148,18 @@ const deployScriptSepolia = async (): Promise<{
     },
   });
 
+  // Deploy VesuGatewayV2 (using same addresses as mainnet for now)
+  const { address: vesuGatewayV2Address } = await deployContract({
+    contract: "VesuGatewayV2",
+    constructorArgs: {
+      default_pool: "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5", // V2_DEFAULT_POOL_ADDRESS from test
+      router: routerGatewayAddress,
+      owner: deployer.address,
+      pool_factory: "0x3760f903a37948f97302736f89ce30290e45f441559325026842b7a6fb388c0", // PoolFactory address
+      supported_assets: supportedAssets,
+    },
+  });
+
   // Deploy NostraGateway
   const { address: nostraGatewayAddress } = await deployContract({
     contract: "NostraGateway",
@@ -146,8 +181,9 @@ const deployScriptSepolia = async (): Promise<{
   await deployContract({
     contract: "OptimalInterestRateFinder",
     constructorArgs: {
-      nostra_gateway: vesuGatewayAddress,
+      nostra_gateway: nostraGatewayAddress,
       vesu_gateway: vesuGatewayAddress,
+      vesu_gateway_v2: vesuGatewayV2Address,
     },
   });
 
@@ -161,6 +197,7 @@ const deployScriptSepolia = async (): Promise<{
   return {
     nostraGatewayAddress,
     vesuGatewayAddress,
+    vesuGatewayV2Address,
     routerGatewayAddress,
     ekuboGatewayAddress,
   };
@@ -169,6 +206,7 @@ const deployScriptSepolia = async (): Promise<{
 const initializeContracts = async (addresses: {
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
+  vesuGatewayV2Address: string;
   routerGatewayAddress: string;
   ekuboGatewayAddress: string;
   avnuGatewayAddress: string;
@@ -339,27 +377,44 @@ const initializeContracts = async (addresses: {
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["avnu", addresses.avnuGatewayAddress],
+      calldata: ["vesu_v2", addresses.vesuGatewayV2Address],
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["nostra", addresses.nostraGatewayAddress],
+      calldata: [
+        "avnu",
+        addresses.avnuGatewayAddress,
+      ]
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["ekubo", addresses.ekuboGatewayAddress],
+      calldata: [
+        "nostra",
+        addresses.nostraGatewayAddress,
+      ]
     },
-  ];
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "ekubo",
+        addresses.ekuboGatewayAddress,
+      ]
+    }
+  ]
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
   });
-  const result = await deployer.execute(calls, {
-    nonce: nonce,
-    resourceBounds: fee.resourceBounds,
-  });
+  const result = await deployer.execute(
+    calls,
+    {
+      nonce: nonce,
+      resourceBounds: fee.resourceBounds,
+    }
+  );
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {
@@ -373,6 +428,7 @@ const initializeContracts = async (addresses: {
 const initializeContractsSepolia = async (addresses: {
   nostraGatewayAddress: string;
   vesuGatewayAddress: string;
+  vesuGatewayV2Address: string;
   routerGatewayAddress: string;
   ekuboGatewayAddress: string;
 }): Promise<void> => {
@@ -420,22 +476,36 @@ const initializeContractsSepolia = async (addresses: {
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["nostra", addresses.nostraGatewayAddress],
+      calldata: ["vesu_v2", addresses.vesuGatewayV2Address],
     },
     {
       contractAddress: addresses.routerGatewayAddress,
       entrypoint: "add_gateway",
-      calldata: ["ekubo", addresses.ekuboGatewayAddress],
+      calldata: [
+        "nostra",
+        addresses.nostraGatewayAddress,
+      ]
     },
+    {
+      contractAddress: addresses.routerGatewayAddress,
+      entrypoint: "add_gateway",
+      calldata: [
+        "ekubo",
+        addresses.ekuboGatewayAddress,
+      ]
+    }
   ];
 
   const fee = await deployer.estimateInvokeFee(calls, {
     nonce: nonce,
   });
-  const result = await deployer.execute(calls, {
-    nonce: nonce,
-    resourceBounds: fee.resourceBounds,
-  });
+  const result = await deployer.execute(
+    calls,
+    {
+      nonce: nonce,
+      resourceBounds: fee.resourceBounds,
+    }
+  );
 
   const txR = await deployer.waitForTransaction(result.transaction_hash);
   if (!txR.isSuccess()) {

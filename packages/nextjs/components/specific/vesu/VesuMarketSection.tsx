@@ -22,6 +22,8 @@ interface VesuMarketSectionProps {
   onDeposit: () => void;
   canDeposit: boolean;
   formatCurrency: (value: number) => string;
+  protocolName?: string;
+  headerExtra?: JSX.Element;
 }
 
 export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
@@ -39,6 +41,8 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   onDeposit,
   canDeposit,
   formatCurrency,
+  protocolName = "Vesu",
+  headerExtra,
 }) => {
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
@@ -50,6 +54,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
       return (
         <div className="rounded-md bg-error/10 p-4 text-sm text-error">
           Error loading markets. Please try again later.
+          {headerExtra && <div className="ml-auto flex items-center">{headerExtra}</div>}
         </div>
       );
     }
@@ -91,7 +96,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <SupplyPosition
                 key={position.tokenAddress}
                 {...position}
-                protocolName="Vesu"
+                protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
                 availableActions={{ deposit: false, withdraw: false, move: false }}
@@ -110,7 +115,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <BorrowPosition
                 key={position.tokenAddress}
                 {...position}
-                protocolName="Vesu"
+                protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
                 availableActions={{ borrow: false, repay: false, move: false }}
@@ -169,7 +174,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 md:items-end">
+          <div className="flex flex-col gap-2 md:items-end md:ml-auto">
             {!userAddress ? (
               <span className="text-right text-xs text-base-content/70">
                 Connect your Starknet wallet to view personalized positions
@@ -187,6 +192,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <span className="mr-2">Markets</span>
               {isOpen ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
             </button>
+            {headerExtra && <div className="flex items-center justify-end">{headerExtra}</div>}
           </div>
         </div>
 

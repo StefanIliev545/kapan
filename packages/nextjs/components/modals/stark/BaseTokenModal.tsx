@@ -3,12 +3,9 @@ import Image from "next/image";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import {
-  BigNumberish,
   BlockNumber,
   ByteArray,
   CairoCustomEnum,
-  CairoOption,
-  CairoOptionVariant,
   CallData,
   RpcProvider,
   byteArray,
@@ -44,10 +41,8 @@ export interface TokenInfo {
   usdPrice?: number;
 }
 
-export interface VesuContext {
-  pool_id: bigint;
-  counterpart_token: string;
-}
+import type { VesuContext } from "~~/utils/vesu";
+import { buildVesuContextOption } from "~~/utils/vesu";
 
 // Different action types supported
 export type TokenActionType = "borrow" | "deposit" | "repay" | "withdraw";
@@ -137,13 +132,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     const parsedAmount = parseUnits(adjustedAmount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
 
-    let context = new CairoOption<BigNumberish[]>(CairoOptionVariant.None);
-    if (vesuContext) {
-      context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
-        vesuContext.pool_id,
-        vesuContext.counterpart_token,
-      ]);
-    }
+    const context = buildVesuContextOption(vesuContext);
+    console.log("token address", token.address);
 
     // Create the appropriate lending instruction based on action type
     let lendingInstruction;
@@ -250,7 +240,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
     };
-  }, [amount, userAddress, decimals, protocolName, vesuContext, actionType, token.address, isMaxAmount]);
+  }, [amount, userAddress, decimals, isMaxAmount, actionType, protocolName, vesuContext, token.address, token.protocolAmount, walletBalance]);
 
   const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
     contractName: "RouterGateway" as const,
