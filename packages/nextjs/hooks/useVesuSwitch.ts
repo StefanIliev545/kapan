@@ -20,8 +20,10 @@ const toOutputPointer = (
   output_index: BigInt(outputIndex),
 });
 
+const toFelt = (value: string | bigint) => (typeof value === "bigint" ? value : BigInt(value));
+
 const toOption = (poolId: bigint, counterpartToken: string) =>
-  new CairoOption<bigint[]>(CairoOptionVariant.Some, [poolId, BigInt(counterpartToken)]);
+  new CairoOption<bigint[]>(CairoOptionVariant.Some, [toFelt(poolId), toFelt(counterpartToken)]);
 
 export interface TokenInfo {
   name: string;
@@ -42,6 +44,7 @@ interface UseVesuSwitchArgs {
   collateralBalance: bigint;
   debtBalance: bigint;
   poolId: bigint;
+  protocolKey: "vesu" | "vesu_v2";
 }
 
 export const useVesuSwitch = ({
@@ -54,6 +57,7 @@ export const useVesuSwitch = ({
   collateralBalance,
   debtBalance,
   poolId,
+  protocolKey,
 }: UseVesuSwitchArgs) => {
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [loading, setLoading] = useState(false);
@@ -119,6 +123,7 @@ export const useVesuSwitch = ({
                 debtBalance,
                 quote,
                 avnuData: calldata,
+                protocolKey,
               })
             : buildDebtSwitchInstructions({
                 address,
@@ -130,6 +135,7 @@ export const useVesuSwitch = ({
                 debtBalance,
                 quote,
                 avnuData: calldata,
+                protocolKey,
               });
         if (!cancelled) {
           setProtocolInstructions(instructions);
@@ -157,7 +163,7 @@ export const useVesuSwitch = ({
               Reswap: undefined,
               ReswapExactIn: undefined,
             });
-            setAuthInstructions([{ protocol_name: "vesu", instructions: [withdrawOnly] }]);
+            setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly] }]);
           } else {
             // Authorize Withdraw + Borrow for debt switch
             const withdrawOnly = new CairoCustomEnum({
@@ -196,7 +202,7 @@ export const useVesuSwitch = ({
               Reswap: undefined,
               ReswapExactIn: undefined,
             });
-            setAuthInstructions([{ protocol_name: "vesu", instructions: [withdrawOnly, borrowOnly] }]);
+            setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly, borrowOnly] }]);
           }
         }
       } catch (e: any) {
@@ -219,6 +225,7 @@ export const useVesuSwitch = ({
     collateralBalance,
     debtBalance,
     poolId,
+    protocolKey,
   ]);
 
   // Fetch authorizations only for authInstructions
@@ -302,6 +309,7 @@ interface BuildInstructionArgs {
   debtBalance: bigint;
   quote: Quote;
   avnuData: bigint[];
+  protocolKey: "vesu" | "vesu_v2";
 }
 
 const buildCollateralSwitchInstructions = ({
@@ -314,6 +322,7 @@ const buildCollateralSwitchInstructions = ({
   debtBalance,
   quote,
   avnuData,
+  protocolKey,
 }: BuildInstructionArgs): BaseProtocolInstruction[] => {
   const instructions: BaseProtocolInstruction[] = [];
   const vesuFirst: CairoCustomEnum[] = [];
@@ -431,9 +440,9 @@ const buildCollateralSwitchInstructions = ({
     vesuSecond.push(reborrowInstruction);
   }
 
-  if (vesuFirst.length > 0) instructions.push({ protocol_name: "vesu", instructions: vesuFirst });
+  if (vesuFirst.length > 0) instructions.push({ protocol_name: protocolKey, instructions: vesuFirst });
   instructions.push({ protocol_name: "avnu", instructions: avnuInstructions });
-  if (vesuSecond.length > 0) instructions.push({ protocol_name: "vesu", instructions: vesuSecond });
+  if (vesuSecond.length > 0) instructions.push({ protocol_name: protocolKey, instructions: vesuSecond });
 
   return instructions;
 };
@@ -448,6 +457,7 @@ const buildDebtSwitchInstructions = ({
   debtBalance,
   quote,
   avnuData,
+  protocolKey,
 }: BuildInstructionArgs): BaseProtocolInstruction[] => {
   const instructions: BaseProtocolInstruction[] = [];
   const vesuFirst: CairoCustomEnum[] = [];
@@ -556,8 +566,8 @@ const buildDebtSwitchInstructions = ({
   });
   const avnuInstructions = [reswapInstruction];
 
-  instructions.push({ protocol_name: "vesu", instructions: vesuFirst });
-  instructions.push({ protocol_name: "vesu", instructions: vesuSecond });
+  instructions.push({ protocol_name: protocolKey, instructions: vesuFirst });
+  instructions.push({ protocol_name: protocolKey, instructions: vesuSecond });
   instructions.push({ protocol_name: "avnu", instructions: avnuInstructions });
 
   return instructions;

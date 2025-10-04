@@ -15,6 +15,7 @@ interface SwitchCollateralModalProps {
   isOpen: boolean;
   onClose: () => void;
   poolId: bigint;
+  protocolKey: "vesu" | "vesu_v2";
   currentCollateral: BasicToken; // withdraw this
   targetCollateral: BasicToken; // deposit this
   debtToken: BasicToken; // debt context remains the same
@@ -22,7 +23,17 @@ interface SwitchCollateralModalProps {
   debtBalance: bigint;
 }
 
-export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({ isOpen, onClose, poolId, currentCollateral, targetCollateral, debtToken, collateralBalance, debtBalance }) => {
+export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({
+  isOpen,
+  onClose,
+  poolId,
+  protocolKey,
+  currentCollateral,
+  targetCollateral,
+  debtToken,
+  collateralBalance,
+  debtBalance,
+}) => {
   const { address } = useStarkAccount();
   const [submitting, setSubmitting] = useState(false);
   const [preparedOnce, setPreparedOnce] = useState(false);
@@ -36,6 +47,7 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({ isO
     collateralBalance,
     debtBalance,
     poolId,
+    protocolKey,
   });
 
   if (!preparedOnce && selectedQuote && calls.length > 0) {
@@ -62,6 +74,11 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({ isO
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
+        {error && (
+          <div className="alert alert-error bg-error/10 text-error text-xs">
+            {error}
+          </div>
+        )}
         {!selectedQuote ? (
           <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
         ) : (

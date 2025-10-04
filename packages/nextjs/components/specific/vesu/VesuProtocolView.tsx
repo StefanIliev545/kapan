@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useState } from "react";
 
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 import { useVesuLendingPositions } from "~~/hooks/useVesuLendingPositions";
 import { useVesuV2LendingPositions } from "~~/hooks/useVesuV2LendingPositions";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";

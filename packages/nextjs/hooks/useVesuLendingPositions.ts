@@ -3,7 +3,7 @@ import { formatUnits } from "viem";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import type { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useVesuAssets } from "~~/hooks/useVesuAssets";
@@ -122,6 +122,8 @@ export type VesuPositionRow = {
   borrowContext: VesuContext;
   hasDebt: boolean;
   moveCollaterals?: CollateralWithAmount[];
+  poolKey: string;
+  protocolKey: "vesu" | "vesu_v2";
 };
 
 interface UseVesuLendingPositionsResult {
@@ -396,6 +398,8 @@ export const useVesuLendingPositions = (
           borrowContext,
           hasDebt,
           moveCollaterals,
+          poolKey: `0x${poolId.toString(16)}`,
+          protocolKey: "vesu",
         },
       ];
     });
