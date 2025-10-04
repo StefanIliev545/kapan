@@ -62,6 +62,8 @@ export const useLendingAction = (
         user: starkAddress,
       };
       const context = buildVesuContextOption(vesuContext);
+      console.log("token.address", tokenAddress);
+      console.log("parsedAmount", parsedAmount);
       let lendingInstruction;
       switch (action) {
         case "Deposit":

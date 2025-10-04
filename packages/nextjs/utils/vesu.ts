@@ -67,6 +67,7 @@ export const buildVesuContextOption = (
   }
 
   if (isVesuContextV2(context)) {
+    console.log("v2 context", context);
     return new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
       toBigNumberish(context.poolAddress),
       toBigNumberish(context.positionCounterpartToken),

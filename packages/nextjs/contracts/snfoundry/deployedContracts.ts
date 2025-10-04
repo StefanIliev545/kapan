@@ -1023,7 +1023,7 @@ const contracts = {
   mainnet: {
     RouterGateway: {
       address:
-        "0x1e7e634bfd48f9714914a304d72ec40ed2485b898af0d3c76a6f279fad4fbe5",
+        "0x4de392e2bde89d96a76281628fc93db9dce3d0c76432df20cf3e0f06abf5c5a",
       abi: [
         {
           type: "impl",
@@ -1644,7 +1644,7 @@ const contracts = {
     },
     VesuGateway: {
       address:
-        "0x7b3fa4e7854cf5357390104480467291dacc4944e0c3c12885d4fbd4297a2e8",
+        "0x57a736b7be47324e2ea5fa9b611ff63c48d4c3a04ba153f5fb06ed69f6ea926",
       abi: [
         {
           type: "impl",
@@ -2645,7 +2645,7 @@ const contracts = {
     },
     VesuGatewayV2: {
       address:
-        "0x46bc899f77f4320f9253d6903e907181aaca69cbb226b51c4494fde106098ea",
+        "0x4e1639778907603be097dcc600f507ba577b6e68d0840c76dc7ef932d2be0e8",
       abi: [
         {
           type: "impl",
@@ -3646,11 +3646,11 @@ const contracts = {
         },
       ],
       classHash:
-        "0x74b9a43d3c4c7455cf8c75132c543b97f534a3b9692e6f7c770fe463f06a044",
+        "0x77c814de00b7385991ab56a5ebe165ed78d2273105f095252376a5733852c41",
     },
     AvnuGateway: {
       address:
-        "0x29b02f1a4617533535147f541bcd3c5997d9d08eb1980daf663e13813a60176",
+        "0x76038722d0182a4f5d98c4b8409c4bfd73fe65f96f5d144092ba18044d965bb",
       abi: [
         {
           type: "impl",
@@ -4339,7 +4339,7 @@ const contracts = {
     },
     NostraGateway: {
       address:
-        "0x65552882e3138cdab241788750acc4aec6a0f790dc3c3b9dc0e3ddf06543bff",
+        "0x2188edf56a8eee88623b29e57b798acff9ada974f14aec3bf7754adcf8067b0",
       abi: [
         {
           type: "impl",
@@ -5161,7 +5161,7 @@ const contracts = {
     },
     EkuboGateway: {
       address:
-        "0x604af0b189aad930d18732c19553bd027c356bfa360bc5fb5c3ee2d9b1a1410",
+        "0x7e09a2e4d466d9c681f25752968a122dbf641ef345c4cb55e88ba8a161ca968",
       abi: [
         {
           type: "impl",
@@ -5716,7 +5716,7 @@ const contracts = {
     },
     OptimalInterestRateFinder: {
       address:
-        "0x4cde66d5666769b35546b4143ce9a3d7c81d07abe42c950c392b1158427b86b",
+        "0x1e71dac06284060527a8bbc35615b51aeafa16bf1f89ae048a7a44156d8e0bc",
       abi: [
         {
           type: "impl",
@@ -5834,7 +5834,7 @@ const contracts = {
     },
     UiHelper: {
       address:
-        "0x71bd8805ee23574fe43996dde645452aecd1864c7251c87f591ca6f9c53c006",
+        "0x4199ec596355c618e76ba4960885da09a6d2598e1a309794f2b0101ed3438af",
       abi: [
         {
           type: "impl",

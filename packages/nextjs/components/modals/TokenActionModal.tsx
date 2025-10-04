@@ -227,10 +227,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const afterHfEffective = isDepositNoDebtFallback ? Infinity : afterHf;
   const afterLtvEffective = isDepositNoDebtFallback ? 0 : afterLtv;
 
-  if (isOpen) {
-    console.log(`token.decimals: ${token.decimals}`);
-  }
-
   const effectiveMax = useMemo(() => {
     if (action !== "Borrow" || !position || !token.usdPrice) return max;
     const decimals = token.decimals || 18;

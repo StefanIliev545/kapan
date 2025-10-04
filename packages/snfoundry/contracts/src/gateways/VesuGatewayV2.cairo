@@ -379,7 +379,7 @@ mod VesuGatewayV2 {
             collateral_amount: i257,
         ) -> ModifyPositionParams {
             let pool = IPoolDispatcher { contract_address: pool_address };
-            let ctx: Context = pool.context(debt_asset, collateral_asset, user);
+            let ctx: Context = pool.context(collateral_asset, debt_asset, user);
 
             // Bound negative withdrawals to available
             let mut final_amount = collateral_amount;

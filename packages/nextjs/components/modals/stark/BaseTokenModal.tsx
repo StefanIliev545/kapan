@@ -133,6 +133,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     const lowerProtocolName = protocolName.toLowerCase();
 
     const context = buildVesuContextOption(vesuContext);
+    console.log("token address", token.address);
 
     // Create the appropriate lending instruction based on action type
     let lendingInstruction;
@@ -239,7 +240,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
     };
-  }, [amount, userAddress, decimals, protocolName, vesuContext, actionType, token.address, isMaxAmount]);
+  }, [amount, userAddress, decimals, isMaxAmount, actionType, protocolName, vesuContext, token.address, token.protocolAmount, walletBalance]);
 
   const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
     contractName: "RouterGateway" as const,
