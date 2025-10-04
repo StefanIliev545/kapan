@@ -60,14 +60,14 @@ export const useVesuSwitch = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [protocolInstructions, setProtocolInstructions] = useState<BaseProtocolInstruction[]>([]);
+  const [authInstructions, setAuthInstructions] = useState<BaseProtocolInstruction[]>([]);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
-  const [avnuData, setAvnuData] = useState<bigint[]>([]);
 
   useEffect(() => {
     setSelectedQuote(null);
     setProtocolInstructions([]);
     setFetchedAuthorizations([]);
-    setAvnuData([]);
+    setAuthInstructions([]);
     setError(null);
   }, [isOpen, type, targetToken?.address]);
 
@@ -106,7 +106,6 @@ export const useVesuSwitch = ({
         );
         if (!swapCall) throw new Error("Failed to extract AVNU calldata");
         const calldata = (swapCall.calldata as any[]).map(v => BigInt(v.toString()));
-        if (!cancelled) setAvnuData(calldata);
 
         const instructions =
           type === "collateral"
@@ -115,7 +114,7 @@ export const useVesuSwitch = ({
                 poolId,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken!,
+                targetToken: targetToken,
                 collateralBalance,
                 debtBalance,
                 quote,
@@ -126,13 +125,80 @@ export const useVesuSwitch = ({
                 poolId,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken!,
+                targetToken: targetToken,
                 collateralBalance,
                 debtBalance,
                 quote,
                 avnuData: calldata,
               });
-        if (!cancelled) setProtocolInstructions(instructions);
+        if (!cancelled) {
+          setProtocolInstructions(instructions);
+
+          // Build minimal authorization instruction set
+          if (type === "collateral") {
+            // Only authorize Withdraw for collateral switch
+            const withdrawOnly = new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: undefined,
+              Repay: undefined,
+              Withdraw: {
+                basic: {
+                  token: currentCollateral.address,
+                  amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)),
+                  user: address,
+                },
+                withdraw_all: true,
+                context: toOption(poolId, currentDebt.address),
+              },
+              Redeposit: undefined,
+              Reborrow: undefined,
+              Swap: undefined,
+              SwapExactIn: undefined,
+              Reswap: undefined,
+              ReswapExactIn: undefined,
+            });
+            setAuthInstructions([{ protocol_name: "vesu", instructions: [withdrawOnly] }]);
+          } else {
+            // Authorize Withdraw + Borrow for debt switch
+            const withdrawOnly = new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: undefined,
+              Repay: undefined,
+              Withdraw: {
+                basic: {
+                  token: currentCollateral.address,
+                  amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)),
+                  user: address,
+                },
+                withdraw_all: true,
+                context: toOption(poolId, currentDebt.address),
+              },
+              Redeposit: undefined,
+              Reborrow: undefined,
+              Swap: undefined,
+              SwapExactIn: undefined,
+              Reswap: undefined,
+              ReswapExactIn: undefined,
+            });
+            const borrowAmount = withBuffer(quote.sellAmount, BUFFER_BPS);
+            const borrowOnly = new CairoCustomEnum({
+              Deposit: undefined,
+              Borrow: {
+                basic: { token: targetToken.address, amount: uint256.bnToUint256(borrowAmount), user: address },
+                context: toOption(poolId, currentCollateral.address),
+              },
+              Repay: undefined,
+              Withdraw: undefined,
+              Redeposit: undefined,
+              Reborrow: undefined,
+              Swap: undefined,
+              SwapExactIn: undefined,
+              Reswap: undefined,
+              ReswapExactIn: undefined,
+            });
+            setAuthInstructions([{ protocol_name: "vesu", instructions: [withdrawOnly, borrowOnly] }]);
+          }
+        }
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? "Failed to prepare switch instructions");
       } finally {
@@ -147,24 +213,24 @@ export const useVesuSwitch = ({
     isOpen,
     address,
     type,
-    targetToken?.address,
-    currentCollateral.address,
-    currentDebt.address,
+    targetToken,
+    currentCollateral,
+    currentDebt,
     collateralBalance,
     debtBalance,
     poolId,
   ]);
 
-  // Fetch authorizations for full instruction set
+  // Fetch authorizations only for authInstructions
   useEffect(() => {
-    if (!isOpen || !isAuthReady || protocolInstructions.length === 0) {
+    if (!isOpen || !isAuthReady || authInstructions.length === 0) {
       setFetchedAuthorizations([]);
       return;
     }
     let cancelled = false;
     const run = async () => {
       try {
-        const auths = await getAuthorizations(protocolInstructions as any);
+        const auths = await getAuthorizations(authInstructions as any);
         if (!cancelled) setFetchedAuthorizations(auths);
       } catch {
         if (!cancelled) setFetchedAuthorizations([]);
@@ -174,7 +240,7 @@ export const useVesuSwitch = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isAuthReady, getAuthorizations, protocolInstructions]);
+  }, [isOpen, isAuthReady, getAuthorizations, authInstructions]);
 
   // Build final calls (auths + move_debt)
   const calls = useMemo(() => {
@@ -219,6 +285,7 @@ export const useVesuSwitch = ({
     error,
     selectedQuote,
     swapSummary,
+    authInstructions,
     protocolInstructions,
     fetchedAuthorizations,
     calls,

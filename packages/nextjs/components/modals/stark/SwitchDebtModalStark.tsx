@@ -25,7 +25,7 @@ interface SwitchDebtModalProps {
 export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({ isOpen, onClose, poolId, collateral, currentDebt, targetDebt, debtBalance, collateralBalance }) => {
   const { address } = useStarkAccount();
   const [submitting, setSubmitting] = useState(false);
-  const { loading, error, selectedQuote, swapSummary, calls } = useVesuSwitch({
+  const { loading, selectedQuote, swapSummary, calls } = useVesuSwitch({
     isOpen,
     type: "debt",
     address,
