@@ -296,6 +296,13 @@ export const useVesuV2LendingPositions = (
         const withdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
         const depositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
 
+        // Prepare borrow context targeting the collateral token (needed for vToken positions with zero-debt)
+        const borrowCtxForV2 = {
+          ...createVesuContextV2(normalizedPoolAddress, collateralAddress),
+          isVtoken: stats.is_vtoken,
+          collateralToken: collateralAddress,
+        } as const;
+
         if (!collateralAsset) {
           return null;
         }
@@ -316,7 +323,8 @@ export const useVesuV2LendingPositions = (
           },
         ];
 
-        const disabledReason = stats.is_vtoken ? "Managing vToken positions is not supported" : undefined;
+        // VesuV2 supports managing vToken positions (deposit/withdraw)
+        const disabledReason = undefined;
 
         const supplyPosition: ProtocolPosition = {
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
@@ -332,7 +340,7 @@ export const useVesuV2LendingPositions = (
             deposit: depositContext,
             withdraw: withdrawContext,
           },
-          actionsDisabled: stats.is_vtoken,
+          actionsDisabled: false, // VesuV2 supports vToken management
           actionsDisabledReason: disabledReason,
         };
 
@@ -355,12 +363,12 @@ export const useVesuV2LendingPositions = (
             tokenSymbol: debtSymbol,
             collateralValue: collateralUsd,
             vesuContext: {
-              borrow: createVesuContextV2(normalizedPoolAddress, collateralAddress),
+              borrow: borrowCtxForV2,
               ...(hasDebt
                 ? { repay: createVesuContextV2(normalizedPoolAddress, collateralAddress) }
                 : {}),
             },
-            actionsDisabled: stats.is_vtoken,
+            actionsDisabled: false, // VesuV2 supports vToken management
             actionsDisabledReason: disabledReason,
           };
 
@@ -384,7 +392,8 @@ export const useVesuV2LendingPositions = (
           debtSymbol,
           collateralAsset,
           debtAsset,
-          borrowContext: createVesuContextV2(normalizedPoolAddress, counterpartForContext),
+          // Always provide a borrow context that targets collateral for vToken migration
+          borrowContext: borrowCtxForV2,
           moveCollaterals,
           poolKey: normalizedPoolAddress,
           protocolKey: "vesu_v2" as VesuProtocolKey,

@@ -130,6 +130,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 
       {/* Render borrow modal if a token is selected */}
       {!suppressActionModals && selectedToken && action === "borrow" && (
+        // For VesuV2, enrich context with collateral metadata when available (needed for vToken migration)
+        // We do not mutate the original context; we pass an adjusted copy to the modal
+        // eslint-disable-next-line react/jsx-no-useless-fragment
         <BorrowModalStark
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}
@@ -145,7 +148,11 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             }}
           protocolName={protocolName}
           currentDebt={0}
-          vesuContext={vesuContext}
+          vesuContext={
+            protocolName === "vesu_v2" && vesuContext
+              ? { ...(vesuContext as any), collateralToken: collateralAsset, isVtoken: true }
+              : vesuContext
+          }
           position={position}
         />
       )}

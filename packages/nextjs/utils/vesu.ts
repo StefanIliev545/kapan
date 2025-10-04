@@ -17,6 +17,8 @@ export interface VesuContextV2 {
   protocolKey: "vesu_v2";
   poolAddress: string;
   positionCounterpartToken: string;
+  isVtoken?: boolean; // Metadata: indicates if this is a vToken position
+  collateralToken?: string; // Metadata: the collateral token address (for vToken positions)
 }
 
 export type VesuContext = VesuContextV1 | VesuContextV2;

@@ -114,6 +114,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
+  const amountRef = useRef("");
+  
+  // Preserve amount value across re-renders caused by collateral data changes
+  useEffect(() => {
+    if (amount) {
+      amountRef.current = amount;
+    }
+  }, [amount]);
+  
+  // Restore amount from ref if it gets reset unexpectedly
+  useEffect(() => {
+    if (!amount && amountRef.current && isOpen) {
+      setAmount(amountRef.current);
+    }
+  }, [isOpen, amount]);
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] =
     useState<CollateralWithAmount[]>([]);
   const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
@@ -799,6 +814,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setAmount("");
+      amountRef.current = "";
       setError(null);
       setStep("idle");
       setLoading(false);
@@ -1206,7 +1222,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       <label className="text-sm font-medium text-base-content/80">Target Pool</label>
                       <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                         <span className="text-base-content/70">V2 Pool:</span>
-                        <span className="font-medium ml-1">Default</span>
+                        <span className="font-medium ml-1">Prime</span>
                       </div>
                     </div>
                     <div className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between h-12">
@@ -1218,7 +1234,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                           height={32}
                           className="rounded-full min-w-[32px]"
                         />
-                        <span className="truncate font-semibold text-lg">Default Pool</span>
+                        <span className="truncate font-semibold text-lg">Prime</span>
                       </div>
                     </div>
                   </div>

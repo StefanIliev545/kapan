@@ -1,4 +1,4 @@
-import { FC, useCallback, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
@@ -92,9 +92,16 @@ const PercentInput: FC<{
   onChange: PercentOnChange;
   percentBase?: bigint;
   max?: bigint;
-}> = ({ balance, decimals, price = 0, onChange, percentBase, max }) => {
+  resetTrigger?: boolean;
+}> = ({ balance, decimals, price = 0, onChange, percentBase, max, resetTrigger }) => {
   const [amount, setAmount] = useState("");
   const [active, setActive] = useState<number | null>(null);
+  
+  // Reset amount when resetTrigger changes (modal reopens)
+  useEffect(() => {
+    setAmount("");
+    setActive(null);
+  }, [resetTrigger]);
   const setPercent = (p: number) => {
     const base = percentBase ?? balance;
     const val = (base * BigInt(p)) / 100n;
@@ -321,6 +328,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               }}
               percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
+              resetTrigger={isOpen}
             />
             {(() => {
               const hfTextColor = !Number.isFinite(afterHfEffective)

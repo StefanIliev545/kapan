@@ -151,15 +151,6 @@ export const VesuProtocolView: FC = () => {
 
   return (
     <div className="flex w-full flex-col space-y-6 p-4">
-      {/* Version Toggle Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Vesu Protocol</h2>
-        <VesuVersionToggle
-          selectedVersion={selectedVersion}
-          onVersionChange={setSelectedVersion}
-        />
-      </div>
-
       <VesuMarketSection
         isOpen={isMarketsOpen}
         onToggle={handleToggleMarkets}
@@ -176,6 +167,13 @@ export const VesuProtocolView: FC = () => {
         canDeposit={assetsWithRates.length > 0}
         formatCurrency={formatCurrency}
         protocolName={selectedVersion === "v1" ? "Vesu" : "vesu_v2"}
+        // Inline version toggle at header area
+        headerExtra={
+          <VesuVersionToggle
+            selectedVersion={selectedVersion}
+            onVersionChange={setSelectedVersion}
+          />
+        }
       />
 
       <VesuPositionsSection

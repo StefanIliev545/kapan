@@ -96,6 +96,7 @@ const deployScriptMainnet = async (): Promise<{
     constructorArgs: {
       nostra_gateway: nostraGatewayAddress,
       vesu_gateway: vesuGatewayAddress,
+      vesu_gateway_v2: vesuGatewayV2Address,
     },
   });
 
@@ -180,8 +181,9 @@ const deployScriptSepolia = async (): Promise<{ nostraGatewayAddress: string, ve
   await deployContract({
     contract: "OptimalInterestRateFinder",
     constructorArgs: {
-      nostra_gateway: vesuGatewayAddress,
+      nostra_gateway: nostraGatewayAddress,
       vesu_gateway: vesuGatewayAddress,
+      vesu_gateway_v2: vesuGatewayV2Address,
     },
   });
 
