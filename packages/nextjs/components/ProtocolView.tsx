@@ -12,7 +12,7 @@ import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 
 export interface ProtocolPosition {
   icon: string;

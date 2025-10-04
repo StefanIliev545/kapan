@@ -1,15 +1,6 @@
 import type { Network } from "./useTokenBalance";
 import { useTokenBalance } from "./useTokenBalance";
-import {
-  CairoCustomEnum,
-  CairoOption,
-  CairoOptionVariant,
-  CallData,
-  Contract,
-  num,
-  uint256,
-  Call,
-} from "starknet";
+import { CairoCustomEnum, CallData, Contract, num, uint256, Call } from "starknet";
 import { parseUnits } from "viem";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useScaffoldWriteContract as useEvmWrite } from "~~/hooks/scaffold-eth";
@@ -22,17 +13,7 @@ import { notification } from "~~/utils/scaffold-stark";
 
 export type Action = "Borrow" | "Deposit" | "Withdraw" | "Repay";
 
-export interface VesuContextV1 {
-  poolId: bigint;
-  counterpartToken: string;
-}
-
-export interface VesuContextV2 {
-  poolAddress: string;
-  positionCounterpartToken: string;
-}
-
-export type VesuContext = VesuContextV1 | VesuContextV2;
+import { buildVesuContextOption, type VesuContext } from "~~/utils/vesu";
 
 export const useLendingAction = (
   network: Network,
@@ -80,10 +61,7 @@ export const useLendingAction = (
         amount: uint256.bnToUint256(parsedAmount),
         user: starkAddress,
       };
-      let context = new CairoOption(CairoOptionVariant.None);
-      if (vesuContext) {
-        context = new CairoOption(CairoOptionVariant.Some, [vesuContext.poolId, vesuContext.counterpartToken]);
-      }
+      const context = buildVesuContextOption(vesuContext);
       let lendingInstruction;
       switch (action) {
         case "Deposit":

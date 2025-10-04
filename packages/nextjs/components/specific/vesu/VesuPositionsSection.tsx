@@ -14,6 +14,7 @@ import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModal
 import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
 import { feltToString } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { isVesuContextV1 } from "~~/utils/vesu";
 
 interface BorrowSelectionRequest {
   tokens: AssetWithRates[];
@@ -58,7 +59,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   >(null);
 
   const openCloseForRow = (row: VesuPositionRow) => {
-    if (!row.borrow || !row.borrowContext) return;
+    if (!row.borrow || !row.borrowContext || !isVesuContextV1(row.borrowContext)) return;
     setCloseParams({
       collateral: {
         name: row.supply.name,
@@ -100,6 +101,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [selectedTarget]);
 
   const openSwapSelector = (type: "debt" | "collateral", row: VesuPositionRow) => {
+    if (!row.borrowContext || !isVesuContextV1(row.borrowContext)) return;
     setSwapType(type);
     setSwapRow(row);
     setSelectedTarget(null);
@@ -177,6 +179,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
         asset => `0x${asset.address.toString(16).padStart(64, "0")}` !== row.supply.tokenAddress,
       );
       const canInitiateBorrow = !row.hasDebt && Boolean(row.borrowContext) && availableBorrowTokens.length > 0;
+      const borrowPoolContext = row.borrowContext && isVesuContextV1(row.borrowContext) ? row.borrowContext : undefined;
+      const supportsPoolDependentActions = Boolean(borrowPoolContext);
       const borrowButtonDisabled = row.supply.actionsDisabled;
 
       const handleBorrowFromSupply = (event: MouseEvent<HTMLButtonElement>) => {
@@ -201,8 +205,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
               disableMove
               subtitle={row.isVtoken ? "vToken" : undefined}
               containerClassName="rounded-none"
-              availableActions={{ deposit: true, withdraw: true, move: false, swap: true }}
-              onSwap={() => openSwapSelector("collateral", row)}
+              availableActions={{ deposit: true, withdraw: true, move: false, swap: supportsPoolDependentActions }}
+              onSwap={supportsPoolDependentActions ? () => openSwapSelector("collateral", row) : undefined}
               controlledExpanded={!!expandedRows[row.key]}
               onToggleExpanded={() => toggleRowExpanded(row.key)}
             />
@@ -213,10 +217,20 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                 networkType="starknet"
                 position={positionManager}
                 containerClassName="rounded-none"
-                availableActions={row.hasDebt ? { borrow: true, repay: true, move: true, close: true, swap: true } : { borrow: true, repay: false, move: false, swap: false, close: false }}
+                availableActions={
+                  row.hasDebt
+                    ? {
+                        borrow: true,
+                        repay: true,
+                        move: supportsPoolDependentActions,
+                        close: supportsPoolDependentActions,
+                        swap: supportsPoolDependentActions,
+                      }
+                    : { borrow: true, repay: false, move: false, swap: false, close: false }
+                }
                 showNoDebtLabel={!row.hasDebt}
-                onClosePosition={row.hasDebt ? () => openCloseForRow(row) : undefined}
-                onSwap={row.hasDebt ? () => openSwapSelector("debt", row) : undefined}
+                onClosePosition={row.hasDebt && supportsPoolDependentActions ? () => openCloseForRow(row) : undefined}
+                onSwap={row.hasDebt && supportsPoolDependentActions ? () => openSwapSelector("debt", row) : undefined}
                 controlledExpanded={!!expandedRows[row.key]}
                 onToggleExpanded={() => toggleRowExpanded(row.key)}
               />
@@ -330,7 +344,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           }}
         />
       ) : (
-        swapRow && swapType && (
+        swapRow && swapType && swapRow.borrowContext && isVesuContextV1(swapRow.borrowContext) && (
           <TokenSelectModalStark
             isOpen={isSwapSelectOpen}
             onClose={closeSwapSelector}
@@ -351,7 +365,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       )}
 
       {/* Switch debt modal */}
-      {swapType === "debt" && swapRow && selectedTarget && (
+      {swapType === "debt" && swapRow && selectedTarget && swapRow.borrowContext && isVesuContextV1(swapRow.borrowContext) && (
         <SwitchDebtModalStark
           isOpen={isSwitchDebtOpen}
           onClose={() => setIsSwitchDebtOpen(false)}
@@ -380,7 +394,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       )}
 
       {/* Switch collateral modal */}
-      {swapType === "collateral" && swapRow && selectedTarget && (
+      {swapType === "collateral" && swapRow && selectedTarget && swapRow.borrowContext && isVesuContextV1(swapRow.borrowContext) && (
         <SwitchCollateralModalStark
           isOpen={isSwitchCollateralOpen}
           onClose={() => setIsSwitchCollateralOpen(false)}

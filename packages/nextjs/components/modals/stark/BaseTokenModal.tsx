@@ -3,12 +3,9 @@ import Image from "next/image";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import {
-  BigNumberish,
   BlockNumber,
   ByteArray,
   CairoCustomEnum,
-  CairoOption,
-  CairoOptionVariant,
   CallData,
   RpcProvider,
   byteArray,
@@ -44,7 +41,8 @@ export interface TokenInfo {
   usdPrice?: number;
 }
 
-import type { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
+import { buildVesuContextOption } from "~~/utils/vesu";
 
 // Different action types supported
 export type TokenActionType = "borrow" | "deposit" | "repay" | "withdraw";
@@ -134,23 +132,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     const parsedAmount = parseUnits(adjustedAmount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
 
-    let context = new CairoOption<BigNumberish[]>(CairoOptionVariant.None);
-    if (vesuContext) {
-      // Handle both V1 and V2 VesuContext formats
-      if ('poolId' in vesuContext) {
-        // V1 format: { poolId: bigint, counterpartToken: string }
-        context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
-          vesuContext.poolId,
-          vesuContext.counterpartToken,
-        ]);
-      } else if ('poolAddress' in vesuContext) {
-        // V2 format: { poolAddress: string, positionCounterpartToken: string }
-        context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
-          BigInt(vesuContext.poolAddress),
-          vesuContext.positionCounterpartToken,
-        ]);
-      }
-    }
+    const context = buildVesuContextOption(vesuContext);
 
     // Create the appropriate lending instruction based on action type
     let lendingInstruction;

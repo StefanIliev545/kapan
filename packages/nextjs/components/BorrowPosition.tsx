@@ -17,6 +17,7 @@ import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { normalizeProtocolName } from "~~/utils/protocol";
+import { isVesuContextV1 } from "~~/utils/vesu";
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -156,7 +157,21 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const handleBorrowClick = onBorrow ?? borrowModal.open;
 
-  const movePoolId = vesuContext?.borrow?.poolId ?? vesuContext?.repay?.poolId;
+  const borrowPoolId = vesuContext?.borrow && isVesuContextV1(vesuContext.borrow)
+    ? vesuContext.borrow.poolId
+    : undefined;
+  const repayPoolId = vesuContext?.repay && isVesuContextV1(vesuContext.repay)
+    ? vesuContext.repay.poolId
+    : undefined;
+  const movePoolId = borrowPoolId ?? repayPoolId;
+
+  const moveFromProtocol: "Vesu" | "Nostra" | "VesuV2" = (() => {
+    const normalized = protocolName.toLowerCase();
+    if (normalized === "vesu") return "Vesu";
+    if (normalized === "vesu_v2") return "VesuV2";
+    if (normalized === "nostra") return "Nostra";
+    return "Vesu";
+  })();
 
   // Toggle expanded state
   const toggleExpanded = (e: React.MouseEvent) => {
@@ -461,7 +476,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <MovePositionModalStark
             isOpen={moveModal.isOpen}
             onClose={moveModal.close}
-            fromProtocol={protocolName}
+            fromProtocol={moveFromProtocol}
             position={{
               name,
               balance: tokenBalance ?? 0n,
