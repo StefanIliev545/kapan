@@ -30,13 +30,13 @@ const nextConfig = {
       // A) On the apex, send /app → app subdomain (keeps a single canonical host for the app)
       {
         source: "/app",
-        has: [{ type: "host", value: "kapan.finance" }],
+        has: [{ type: "host", key: "host", value: "kapan.finance" }],
         destination: "https://app.kapan.finance",
         permanent: PROD, // 308 in prod, 307 in dev/preview
       },
       {
         source: "/app/:path*",
-        has: [{ type: "host", value: "kapan.finance" }],
+        has: [{ type: "host", key: "host", value: "kapan.finance" }],
         destination: "https://app.kapan.finance/:path*",
         permanent: PROD,
       },
@@ -44,13 +44,13 @@ const nextConfig = {
       // B) On the subdomain, strip the /app prefix so URLs stay clean (no /app in the path)
       {
         source: "/app",
-        has: [{ type: "host", value: "app.kapan.finance" }],
+        has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
         destination: "/",
         permanent: PROD,
       },
       {
         source: "/app/:path*",
-        has: [{ type: "host", value: "app.kapan.finance" }],
+        has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
         destination: "/:path*",
         permanent: PROD,
       },
@@ -61,25 +61,25 @@ const nextConfig = {
         ? [
             {
               source: "/app",
-              has: [{ type: "host", value: "kapan.localhost:3000" }],
+              has: [{ type: "host", key: "host", value: "kapan.localhost:3000" }],
               destination: "http://app.localhost:3000",
               permanent: false,
             },
             {
               source: "/app/:path*",
-              has: [{ type: "host", value: "kapan.localhost:3000" }],
+              has: [{ type: "host", key: "host", value: "kapan.localhost:3000" }],
               destination: "http://app.localhost:3000/:path*",
               permanent: false,
             },
             {
               source: "/app",
-              has: [{ type: "host", value: "app.localhost:3000" }],
+              has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
               destination: "/",
               permanent: false,
             },
             {
               source: "/app/:path*",
-              has: [{ type: "host", value: "app.localhost:3000" }],
+              has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
               destination: "/:path*",
               permanent: false,
             },
@@ -95,7 +95,7 @@ const nextConfig = {
       beforeFiles: [
         {
           source: "/",
-          has: [{ type: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
           destination: "/app",
         },
         // Optional dev mirror for app.localhost:3000
@@ -103,7 +103,7 @@ const nextConfig = {
           ? [
               {
                 source: "/",
-                has: [{ type: "host", value: "app.localhost:3000" }],
+                has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
                 destination: "/app",
               },
             ]
@@ -114,7 +114,7 @@ const nextConfig = {
       afterFiles: [
         {
           source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-          has: [{ type: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
           destination: "/app/:path*",
         },
         // Optional dev mirror for app.localhost:3000
@@ -122,7 +122,7 @@ const nextConfig = {
           ? [
               {
                 source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-                has: [{ type: "host", value: "app.localhost:3000" }],
+                has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
                 destination: "/app/:path*",
               },
             ]
