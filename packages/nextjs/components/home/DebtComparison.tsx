@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -93,6 +93,24 @@ const DebtComparison = () => {
   const annualInterestLower = currentDebt * (lowerRate / 100);
   const totalSavings = Math.abs(annualInterestHigher - annualInterestLower);
   const savingsPercentage = higherRate > 0 ? (((higherRate - lowerRate) / higherRate) * 100).toFixed(1) : "0.0";
+
+  // Build "app.<current-host>" URL safely on client
+  const appUrl = useMemo(() => {
+    if (typeof window === "undefined") return "/app";
+    const { protocol } = window.location;
+    const host = window.location.host;
+    console.log("host", host);
+    // Local dev convenience: map anything *.localhost:3000 to app.localhost:3000
+    if (host.endsWith("localhost:3000")) {
+      return `${protocol}//app.localhost:3000`;
+    }
+    // If already on app.<host>, keep it
+    if (host.startsWith("app.")) {
+      return `${protocol}//${host}`;
+    }
+    // Default: prefix with app.
+    return `${protocol}//app.${host}`;
+  }, []);
 
   return (
     <div>
@@ -273,7 +291,7 @@ const DebtComparison = () => {
             </div>
           </AnimatedValue>
         </div>
-        <Link href="/app" className="mt-4" passHref>
+        <Link href={appUrl} className="mt-4" passHref>
           <button className="btn btn-primary dark:bg-accent dark:border-accent/70 dark:text-accent-content dark:hover:bg-accent/80 w-full">Start Saving Now</button>
         </Link>
       </div>
