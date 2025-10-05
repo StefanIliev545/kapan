@@ -13,7 +13,8 @@ import {
 import { fetchBuildExecuteTransaction, fetchQuotes } from "@avnu/avnu-sdk";
 import type { Quote } from "@avnu/avnu-sdk";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
-import { useLendingAuthorizations } from "~~/hooks/useLendingAuthorizations";
+import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
 import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
@@ -53,7 +54,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   const { address } = useStarkAccount();
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [avnuCalldata, setAvnuCalldata] = useState<bigint[]>([]);
-  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
+  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   useEffect(() => {
@@ -226,6 +227,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
 
   const calls = useMemo(() => {
     if (protocolInstructions.length === 0) return [];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(fetchedAuthorizations);
     return [
       ...(fetchedAuthorizations as any),
       {
@@ -233,6 +235,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         functionName: "move_debt" as const,
         args: CallData.compile({ instructions: protocolInstructions }),
       },
+      ...(revokeAuthorizations as any),
     ];
   }, [fetchedAuthorizations, protocolInstructions]);
 

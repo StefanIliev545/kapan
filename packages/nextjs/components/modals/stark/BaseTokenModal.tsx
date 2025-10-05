@@ -25,6 +25,8 @@ import { useAccount } from "~~/hooks/useAccount";
 import { universalErc20Abi } from "~~/utils/Constants";
 import formatPercentage from "~~/utils/formatPercentage";
 import { feltToString } from "~~/utils/protocols";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
+import type { LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 
 // Helper to convert a string to its felt representation
 const stringToFelt = (s: string): string => {
@@ -254,7 +256,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   const calls = useMemo(() => {
     if (!fullInstruction) return [];
 
-    const authorizations = [];
+    const authorizations: LendingAuthorization[] = [];
     if (protocolInstructions) {
       const instructionsArray = protocolInstructions as unknown as [bigint, bigint, bigint[]][];
       for (const instruction of instructionsArray) {
@@ -271,6 +273,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       }
     }
 
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
+
     return [
       ...(authorizations as any),
       {
@@ -278,6 +282,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         functionName: "process_protocol_instructions" as const,
         args: fullInstruction,
       },
+      ...(revokeAuthorizations as any),
     ];
   }, [fullInstruction, protocolInstructions]);
 

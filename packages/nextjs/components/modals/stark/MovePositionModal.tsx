@@ -23,6 +23,7 @@ import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -769,16 +770,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (!pairInstructions || pairInstructions.length === 0) return [];
 
     const authorizations = fetchedAuthorizations ?? [];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
+    const moveCalls = pairInstructions.map(instructions => ({
+      contractName: "RouterGateway" as const,
+      functionName: "move_debt" as const,
+      args: CallData.compile({ instructions: instructions }),
+    }));
 
     return [
       ...(authorizations as any),
-      ...pairInstructions.map(instructions => {
-        return {
-          contractName: "RouterGateway" as const,
-          functionName: "move_debt" as const,
-          args: CallData.compile({ instructions: instructions }),
-        }
-      }),
+      ...moveCalls,
+      ...(revokeAuthorizations as any),
     ];
   }, [fetchedAuthorizations, pairInstructions]);
 
@@ -788,6 +790,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
       return null;
     const authorizations = fetchedAuthorizations ?? [];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
     const moveCalls = pairInstructions.map(instructions => ({
       contractAddress: routerGateway.address,
       entrypoint: "move_debt",
@@ -796,6 +799,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return [
       ...(authorizations as any),
       ...moveCalls,
+      ...(revokeAuthorizations as any),
     ];
   }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
 

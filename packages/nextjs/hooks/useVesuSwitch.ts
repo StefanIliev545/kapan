@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, uint256 } from "starknet";
 import { fetchBuildExecuteTransaction, fetchQuotes } from "@avnu/avnu-sdk";
 import type { Quote } from "@avnu/avnu-sdk";
-import { useLendingAuthorizations, type BaseProtocolInstruction } from "~~/hooks/useLendingAuthorizations";
+import { useLendingAuthorizations, type BaseProtocolInstruction, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildVesuContextOption, createVesuContext, type VesuProtocolKey } from "~~/utils/vesu";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 
 const SLIPPAGE = 0.05;
 const BUFFER_BPS = 500n; // 5%
@@ -64,7 +65,7 @@ export const useVesuSwitch = ({
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [protocolInstructions, setProtocolInstructions] = useState<BaseProtocolInstruction[]>([]);
   const [authInstructions, setAuthInstructions] = useState<BaseProtocolInstruction[]>([]);
-  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
+  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
 
   useEffect(() => {
     setSelectedQuote(null);
@@ -251,6 +252,7 @@ export const useVesuSwitch = ({
   // Build final calls (auths + move_debt)
   const calls = useMemo(() => {
     if (protocolInstructions.length === 0) return [];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(fetchedAuthorizations);
     return [
       ...(fetchedAuthorizations as any),
       {
@@ -258,6 +260,7 @@ export const useVesuSwitch = ({
         functionName: "move_debt" as const,
         args: CallData.compile({ instructions: protocolInstructions }),
       },
+      ...(revokeAuthorizations as any),
     ];
   }, [protocolInstructions, fetchedAuthorizations]);
 

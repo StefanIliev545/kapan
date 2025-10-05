@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, uint256 } from "starknet";
 import { fetchBuildExecuteTransaction, fetchQuotes, type Quote } from "@avnu/avnu-sdk";
-import { useLendingAuthorizations, type BaseProtocolInstruction } from "~~/hooks/useLendingAuthorizations";
+import { useLendingAuthorizations, type BaseProtocolInstruction, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 
 const SLIPPAGE = 0.05;
 const BUFFER_BPS = 300n; // 3% buffer when borrowing new debt
@@ -43,7 +44,7 @@ export const useNostraDebtSwitch = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [protocolInstructions, setProtocolInstructions] = useState<BaseProtocolInstruction[]>([]);
-  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<any[]>([]);
+  const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
   const [avnuCalldata, setAvnuCalldata] = useState<bigint[]>([]);
 
   useEffect(() => {
@@ -191,6 +192,7 @@ export const useNostraDebtSwitch = ({
   const calls = useMemo(() => {
     if (protocolInstructions.length === 0) return [];
 
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(fetchedAuthorizations);
     return [
       ...(fetchedAuthorizations as any),
       {
@@ -198,6 +200,7 @@ export const useNostraDebtSwitch = ({
         functionName: "move_debt" as const,
         args: CallData.compile({ instructions: protocolInstructions }),
       },
+      ...(revokeAuthorizations as any),
     ];
   }, [protocolInstructions, fetchedAuthorizations]);
 
