@@ -293,8 +293,14 @@ export const useVesuV2LendingPositions = (
 
         const hasDebt = stats.nominal_debt > 0n;
         const counterpartForContext = hasDebt ? debtAddress : ZERO_ADDRESS;
-        const withdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
-        const depositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
+        const baseWithdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
+        const baseDepositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
+        const withdrawContext = stats.is_vtoken
+          ? { ...baseWithdrawContext, isVtoken: true, collateralToken: collateralAddress }
+          : baseWithdrawContext;
+        const depositContext = stats.is_vtoken
+          ? { ...baseDepositContext, isVtoken: true, collateralToken: collateralAddress }
+          : baseDepositContext;
 
         // Prepare borrow context targeting the collateral token (needed for vToken positions with zero-debt)
         const borrowCtxForV2 = {
