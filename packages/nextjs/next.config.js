@@ -32,6 +32,26 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          // Handle the app subdomain root explicitly so / maps to /app without relying on catch-alls.
+          source: "/",
+          has: [{ type: "host", value: "app.kapan.finance" }],
+          destination: "/app",
+        },
+        {
+          // For any other request on app.kapan.finance, serve the matching /app/:path* page.
+          // Skip Next internals, API routes, .well-known entries, and already-prefixed /app paths.
+          source:
+            "/:path((?!_next/|api/|\\.well-known/|app/|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)",
+          has: [{ type: "host", value: "app.kapan.finance" }],
+          destination: "/app/:path*",
+        },
+      ],
+    };
+  },
 };
 
 module.exports = nextConfig;
