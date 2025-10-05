@@ -3,15 +3,16 @@ import Image from "next/image";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { DepositModalStark } from "./DepositModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { VesuContext } from "~~/hooks/useLendingAction";
+import type { VesuContext } from "~~/utils/vesu";
 import formatPercentage from "~~/utils/formatPercentage";
+import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
 
-type TokenWithRates = TokenMetadata & {
-  borrowAPR?: number;
-  supplyAPY?: number;
+export type TokenWithRates = TokenMetadata & {
+  borrowAPR: number;
+  supplyAPY: number;
 };
 
 interface TokenSelectModalStarkProps {
@@ -23,6 +24,8 @@ interface TokenSelectModalStarkProps {
   vesuContext?: VesuContext;
   position?: PositionManager;
   action?: "borrow" | "deposit";
+  onSelectToken?: (token: TokenWithRates) => void;
+  suppressActionModals?: boolean;
 }
 
 export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
@@ -34,6 +37,8 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   vesuContext,
   position,
   action = "borrow",
+  onSelectToken,
+  suppressActionModals = false,
 }) => {
   const [selectedToken, setSelectedToken] = useState<TokenWithRates | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
@@ -54,6 +59,11 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 
   // Handle token selection
   const handleSelectToken = (token: TokenWithRates) => {
+    if (suppressActionModals && onSelectToken) {
+      onSelectToken(token);
+      onClose();
+      return;
+    }
     setSelectedToken(token);
     setIsTokenModalOpen(true);
   };
@@ -77,96 +87,41 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   return (
     <>
       <dialog className={`modal ${isOpen && !isTokenModalOpen ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-4xl bg-base-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-xl tracking-tight">{modalTitle}</h3>
-            <button className="btn btn-sm btn-circle btn-ghost" onClick={handleDone}>
-              ✕
-            </button>
+        <div className="modal-box max-w-md p-4 rounded-none">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-semibold text-xl">{modalTitle}</h3>
+            <button className="btn btn-sm btn-ghost" onClick={handleDone}>Close</button>
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto pr-2">
+          <div className="border border-base-300 divide-y divide-base-300 max-h-96 overflow-y-auto">
             {availableTokens.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {availableTokens.map((token, index) => {
-                  const address = `0x${BigInt(token.address).toString(16).padStart(64, "0")}`;
-                  const symbol = feltToString(token.symbol);
-                  return (
-                    <div
-                      key={address}
-                      className={`bg-base-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 
-                        ${hoveredToken === address ? "shadow-lg bg-base-300 scale-105 border-primary" : "shadow-md hover:shadow-lg border-transparent"}
-                        border transform hover:scale-105`}
-                      onClick={() => handleSelectToken(token)}
-                      onMouseEnter={() => handleTokenHover(address)}
-                      onMouseLeave={() => handleTokenHover(null)}
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animation: "fadeIn 0.3s ease-in-out forwards",
-                        opacity: 0,
-                      }}
-                    >
-                      <div className="avatar mb-3">
-                        <div
-                          className={`w-16 h-16 rounded-full bg-base-100 p-1 ring-2 
-                          ${hoveredToken === address ? "ring-primary" : "ring-base-300 dark:ring-base-content/20"}`}
-                        >
-                          <Image
-                            src={tokenNameToLogo(symbol.toLowerCase())}
-                            alt={symbol}
-                            width={64}
-                            height={64}
-                            className={`object-contain transition-transform duration-300 ${hoveredToken === address ? "scale-110" : ""}`}
-                          />
-                        </div>
-                      </div>
-                      <span className="font-bold text-lg mb-1">{symbol}</span>
-                      <div
-                        className={`badge ${hoveredToken === address ? "badge-primary" : "badge-outline"} p-3 font-medium`}
-                      >
-                        {formatPercentage(
-                          action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0,
-                          2,
-                          false,
-                        )}% {rateLabel}
-                      </div>
+              availableTokens.map(token => {
+                const address = `0x${BigInt(token.address).toString(16).padStart(64, "0")}`;
+                const symbol = feltToString(token.symbol);
+                return (
+                  <button
+                    key={address}
+                    className="w-full flex items-center justify-between p-3 hover:bg-base-200/60"
+                    onClick={() => handleSelectToken(token)}
+                    onMouseEnter={() => handleTokenHover(address)}
+                    onMouseLeave={() => handleTokenHover(null)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={16} height={16} className="w-4 h-4" />
+                      <span className="text-sm font-medium">{symbol}</span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="text-[11px] text-base-content/60">
+                      {formatPercentage(
+                        getDisplayRate(protocolName, action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0),
+                      )}% {rateLabel}
+                    </div>
+                  </button>
+                );
+              })
             ) : (
-              <div className="text-center py-12 text-base-content/70 bg-base-200/50 rounded-xl">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  className="w-12 h-12 mx-auto mb-4 opacity-50"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                  />
-                </svg>
-                <p className="text-lg">No tokens available to borrow</p>
-              </div>
+              <div className="p-6 text-center text-sm text-base-content/70">No tokens available to {action === "borrow" ? "borrow" : "deposit"}</div>
             )}
           </div>
-
-          <style jsx global>{`
-            @keyframes fadeIn {
-              from {
-                opacity: 0;
-                transform: translateY(10px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-          `}</style>
         </div>
         <form method="dialog" className="modal-backdrop" onClick={handleDone}>
           <button>close</button>
@@ -174,7 +129,10 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       </dialog>
 
       {/* Render borrow modal if a token is selected */}
-      {selectedToken && action === "borrow" && (
+      {!suppressActionModals && selectedToken && action === "borrow" && (
+        // For VesuV2, enrich context with collateral metadata when available (needed for vToken migration)
+        // We do not mutate the original context; we pass an adjusted copy to the modal
+        // eslint-disable-next-line react/jsx-no-useless-fragment
         <BorrowModalStark
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}
@@ -190,12 +148,16 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             }}
           protocolName={protocolName}
           currentDebt={0}
-          vesuContext={vesuContext}
+          vesuContext={
+            protocolName === "vesu_v2" && vesuContext
+              ? { ...(vesuContext as any), collateralToken: collateralAsset, isVtoken: true }
+              : vesuContext
+          }
           position={position}
         />
       )}
 
-      {selectedToken && action === "deposit" && (
+      {!suppressActionModals && selectedToken && action === "deposit" && (
         <DepositModalStark
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}

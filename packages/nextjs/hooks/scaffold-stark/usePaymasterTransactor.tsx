@@ -1,10 +1,11 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse, RpcProvider, Call } from "starknet";
+import { AccountInterface, InvokeFunctionResponse, Call } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 import { usePaymasterSendTransaction, usePaymasterGasTokens } from "@starknet-react/core";
 import { universalStrkAddress } from "~~/utils/Constants";
+import providerFactory from "~~/services/web3/provider";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
@@ -41,9 +42,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   }
 
   // Create provider for waiting for transaction receipts
-  const provider = new RpcProvider({
-    nodeUrl: targetNetwork.rpcUrls.public.http[0],
-  });
+  const provider = providerFactory(targetNetwork);
 
   // Determine if we should use paymaster (non-STRK token selected)
   const selectedAddr = selectedToken?.address?.toLowerCase();
@@ -136,7 +135,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
 
       // Wait for transaction receipt
       try {
-        await provider.waitForTransaction(transactionHash);
+        await provider?.waitForTransaction(transactionHash);
         console.log("Transaction confirmed:", transactionHash);
       } catch (waitError) {
         console.warn("Error waiting for transaction:", waitError);

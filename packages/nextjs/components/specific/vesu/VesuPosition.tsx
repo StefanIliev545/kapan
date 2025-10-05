@@ -11,6 +11,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
+import { createVesuContextV1 } from "~~/utils/vesu";
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -69,6 +70,22 @@ export const VesuPosition: FC<VesuPositionProps> = ({
   );
   const debtMetadata = supportedAssets.find(
     asset => `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` === debtAsset,
+  );
+
+  // Build token list with rates for selector (must be before any early returns)
+  const tokensWithRates = useMemo(
+    () =>
+      supportedAssets.map(asset => {
+        const { borrowAPR, supplyAPY } = calculateRates(
+          asset.fee_rate,
+          asset.total_nominal_debt,
+          asset.last_rate_accumulator,
+          asset.reserve,
+          asset.scale,
+        );
+        return { ...asset, borrowAPR, supplyAPY };
+      }),
+    [supportedAssets],
   );
 
   const collateralUsdPrice =
@@ -143,6 +160,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
       inputValue: formattedCollateral,
     },
   ];
+
 
   return (
     <>
@@ -315,7 +333,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               decimals: Number(collateralMetadata.decimals),
             }}
             protocolName="Vesu"
-            vesuContext={nominalDebt !== "0" ? { poolId, counterpartToken: debtAsset } : undefined}
+            vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
             position={position}
           />
 
@@ -332,17 +350,17 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             }}
             protocolName="Vesu"
             supplyBalance={BigInt(collateralAmount)}
-            vesuContext={{ poolId, counterpartToken: debtAsset }}
+            vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
             position={position}
           />
 
           <TokenSelectModalStark
             isOpen={isTokenSelectModalOpen}
             onClose={() => setIsTokenSelectModalOpen(false)}
-            tokens={supportedAssets}
+            tokens={tokensWithRates}
             protocolName="Vesu"
             collateralAsset={collateralAsset}
-            vesuContext={{ poolId, counterpartToken: collateralAsset }}
+            vesuContext={createVesuContextV1(poolId, collateralAsset)}
             position={position}
           />
 
@@ -361,7 +379,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 }}
                 protocolName="Vesu"
                 currentDebt={debtNum}
-                vesuContext={{ poolId, counterpartToken: collateralAsset }}
+                vesuContext={createVesuContextV1(poolId, collateralAsset)}
                 position={position}
               />
 
@@ -378,7 +396,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                 }}
                 protocolName="Vesu"
                 debtBalance={BigInt(nominalDebt)}
-                vesuContext={{ poolId, counterpartToken: collateralAsset }}
+                vesuContext={createVesuContextV1(poolId, collateralAsset)}
                 position={position}
               />
 

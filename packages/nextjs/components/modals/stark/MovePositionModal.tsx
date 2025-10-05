@@ -23,6 +23,7 @@ import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -48,10 +49,17 @@ const getPoolNameFromId = (poolId: bigint): string => {
   return entry ? entry[0] : "Unknown Pool";
 };
 
+type OutputPointer = { instruction_index: bigint; output_index: bigint };
+
+const toOutputPointer = (instructionIndex: number): OutputPointer => ({
+  instruction_index: BigInt(instructionIndex),
+  output_index: 0n,
+});
+
 interface MovePositionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  fromProtocol: string;
+  fromProtocol: "Nostra" | "Vesu" | "VesuV2";
   position: {
     name: string;
     balance: bigint; // USD value (display only)
@@ -64,9 +72,14 @@ interface MovePositionModalProps {
   disableCollateralSelection?: boolean;
 }
 
-type VesuContext = {
+type VesuContextV1 = {
   pool_id: bigint;
   counterpart_token: string;
+};
+
+type VesuContextV2 = {
+  pool_address: string;
+  position_counterpart_token: string;
 };
 
 type FlashLoanProvider = {
@@ -81,6 +94,9 @@ const FLASH_LOAN_PROVIDER: FlashLoanProvider = {
   version: "v1",
 } as const;
 
+// V2 Default Pool Address
+const V2_DEFAULT_POOL_ADDRESS = "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5";
+
 export const MovePositionModal: FC<MovePositionModalProps> = ({
   isOpen,
   onClose,
@@ -90,7 +106,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   disableCollateralSelection,
 }) => {
   const { address: userAddress } = useAccount();
-  const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }], []);
+  const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }, { name: "VesuV2" }], []);
   const { tokenAddress, decimals, type, name, balance, poolId: currentPoolId } = position;
 
   const [selectedProtocol, setSelectedProtocol] = useState(
@@ -99,6 +115,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
+  const amountRef = useRef("");
+  
+  // Preserve amount value across re-renders caused by collateral data changes
+  useEffect(() => {
+    if (amount) {
+      amountRef.current = amount;
+    }
+  }, [amount]);
+  
+  // Restore amount from ref if it gets reset unexpectedly
+  useEffect(() => {
+    if (!amount && amountRef.current && isOpen) {
+      setAmount(amountRef.current);
+    }
+  }, [isOpen, amount]);
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] =
     useState<CollateralWithAmount[]>([]);
   const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
@@ -111,13 +142,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
 
   const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
-    protocolName: fromProtocol as "Vesu" | "Nostra",
+    protocolName: fromProtocol as "Vesu" | "VesuV2" | "Nostra",
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
     isOpen: isOpen && !(disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu"),
   });
 
   const { collaterals: targetCollaterals, isLoading: isLoadingTargetCollaterals } = useCollateral({
-    protocolName: selectedProtocol as "Vesu" | "Nostra",
+    protocolName: selectedProtocol as "Vesu" | "VesuV2" | "Nostra",
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
     isOpen: isOpen && !!selectedProtocol,
   });
@@ -126,7 +157,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const firstCollateralsReadyRef = useRef(false);
   useEffect(() => {
     if (
-      (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") ||
+      (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) ||
       (!isLoadingSourceCollaterals && !isLoadingTargetCollaterals)
     ) {
       firstCollateralsReadyRef.current = true;
@@ -140,7 +171,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   ]);
 
   const collateralsForSelector = useMemo(() => {
-    if (disableCollateralSelection && preSelectedCollaterals && fromProtocol === "Vesu") {
+    if (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) {
       return preSelectedCollaterals.map(collateral => ({
         symbol: collateral.symbol,
         balance: Number(collateral.inputValue || collateral.amount.toString()),
@@ -152,7 +183,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
 
     let filtered = sourceCollaterals.filter(c => c.balance > 0);
-    if (fromProtocol === "Nostra" && selectedProtocol === "Vesu" && type === "borrow") {
+    if (fromProtocol === "Nostra" && (selectedProtocol === "Vesu" || selectedProtocol === "VesuV2") && type === "borrow") {
       filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
     }
 
@@ -224,8 +255,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
-    const lowerProtocolName = fromProtocol.toLowerCase();
-    const destProtocolName = selectedProtocol.toLowerCase();
+    const lowerProtocolName = fromProtocol === "VesuV2" ? "vesu_v2" : fromProtocol.toLowerCase();
+    const destProtocolName = selectedProtocol === "VesuV2" ? "vesu_v2" : selectedProtocol.toLowerCase();
 
     // Calculate proportions for multiple collaterals
     if (selectedCollateralsWithAmounts.length > 1) {
@@ -353,12 +384,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           ? (collateral.amount * BigInt(101)) / BigInt(100)
           : collateral.amount;
 
-        // Create context with paired tokens for Vesu
+        // Create context with paired tokens for Vesu (V1 or V2)
+        const poolIdOrAddress = selectedProtocol === "VesuV2" ? BigInt(V2_DEFAULT_POOL_ADDRESS) : 0n;
         const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-          0n,
+          poolIdOrAddress,
           BigInt(position.tokenAddress),
         ]);
-        const contextReborrow = new CairoOption<bigint[]>(CairoOptionVariant.Some, [0n, BigInt(collateral.token)]);
+        const contextReborrow = new CairoOption<bigint[]>(CairoOptionVariant.Some, [poolIdOrAddress, BigInt(collateral.token)]);
         const repayAll = isAmountMaxClicked && index === debtAllocations.length - 1;
         const nostraInstructions = [
           new CairoCustomEnum({
@@ -403,7 +435,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Withdraw: undefined,
             Redeposit: {
               token: collateral.token,
-              target_instruction_index: 1, // Point to corresponding withdraw instruction (offset by repay instruction)
+              target_output_pointer: toOutputPointer(1), // Point to corresponding withdraw instruction (offset by repay instruction)
               user: userAddress,
               context: contextRedeposit,
             },
@@ -417,7 +449,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Redeposit: undefined,
             Reborrow: {
               token: position.tokenAddress,
-              target_instruction_index: 0, // Point to repay instruction
+              target_output_pointer: toOutputPointer(0), // Point to repay instruction
               approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
               user: userAddress,
               context: contextReborrow,
@@ -464,8 +496,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       };
     };
 
-    // If target protocol is Vesu and we have multiple collaterals, use proportional allocation
-    if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 1) {
+    // If target protocol is Vesu (V1 or V2) and we have multiple collaterals, use proportional allocation
+    if ((selectedProtocol === "Vesu" || selectedProtocol === "VesuV2") && selectedCollateralsWithAmounts.length > 1) {
       const result = generateVesuInstructions() || {
         fullInstruction: { instructions: [] },
         authInstruction: { instructions: [] },
@@ -479,6 +511,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     // Otherwise, use the original approach for other protocols or single collateral
     let repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+    
+    // Handle V1 Vesu context
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         currentPoolId || 0n,
@@ -489,10 +523,23 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         BigInt(position.tokenAddress),
       ]);
     }
+    
+    // Handle V2 Vesu context
+    if (fromProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
+      repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(selectedCollateralsWithAmounts[0].token),
+      ]);
+      withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(position.tokenAddress),
+      ]);
+    }
 
     let borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
 
+    // Handle V1 Vesu target context
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         selectedPoolId,
@@ -500,6 +547,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       ]);
       depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         selectedPoolId,
+        BigInt(position.tokenAddress),
+      ]);
+    }
+    
+    // Handle V2 Vesu target context
+    if (selectedProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
+      borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(selectedCollateralsWithAmounts[0].token),
+      ]);
+      depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
+        BigInt(V2_DEFAULT_POOL_ADDRESS),
         BigInt(position.tokenAddress),
       ]);
     }
@@ -555,7 +614,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         Withdraw: undefined,
         Redeposit: {
           token: collateral.token,
-          target_instruction_index: 1 + index,
+          target_output_pointer: toOutputPointer(1 + index),
           user: userAddress,
           context: depositInstructionContext,
         },
@@ -571,7 +630,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Redeposit: undefined,
       Reborrow: {
         token: position.tokenAddress,
-        target_instruction_index: 0,
+        target_output_pointer: toOutputPointer(0),
         approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
         user: userAddress,
         context: borrowInstructionContext,
@@ -711,16 +770,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (!pairInstructions || pairInstructions.length === 0) return [];
 
     const authorizations = fetchedAuthorizations ?? [];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
+    const moveCalls = pairInstructions.map(instructions => ({
+      contractName: "RouterGateway" as const,
+      functionName: "move_debt" as const,
+      args: CallData.compile({ instructions: instructions }),
+    }));
 
     return [
       ...(authorizations as any),
-      ...pairInstructions.map(instructions => {
-        return {
-          contractName: "RouterGateway" as const,
-          functionName: "move_debt" as const,
-          args: CallData.compile({ instructions: instructions }),
-        }
-      }),
+      ...moveCalls,
+      ...(revokeAuthorizations as any),
     ];
   }, [fetchedAuthorizations, pairInstructions]);
 
@@ -730,6 +790,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
       return null;
     const authorizations = fetchedAuthorizations ?? [];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
     const moveCalls = pairInstructions.map(instructions => ({
       contractAddress: routerGateway.address,
       entrypoint: "move_debt",
@@ -738,6 +799,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return [
       ...(authorizations as any),
       ...moveCalls,
+      ...(revokeAuthorizations as any),
     ];
   }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
 
@@ -756,6 +818,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setAmount("");
+      amountRef.current = "";
       setError(null);
       setStep("idle");
       setLoading(false);
@@ -859,7 +922,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const handleProtocolSelection = (protocolName: string) => {
     setSelectedProtocol(protocolName);
     // Reset pool selection when changing protocols
-    if (protocolName !== "Vesu") {
+    if (protocolName !== "Vesu" && protocolName !== "VesuV2") {
       setSelectedPoolId(POOL_IDS["Genesis"]);
     }
   };
@@ -928,7 +991,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     !amount ||
     !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
     step !== "idle" ||
-    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId);
+    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId) ||
+    (fromProtocol === "VesuV2" && selectedProtocol === "VesuV2");
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -1080,7 +1144,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
                     >
                       {protocols
-                        .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu"))
+                        .filter(p => p.name !== fromProtocol || (p.name === "Vesu" && fromProtocol === "Vesu") || (p.name === "VesuV2" && fromProtocol === "VesuV2"))
                         .map(protocol => (
                           <li key={protocol.name}>
                             <button
@@ -1154,7 +1218,31 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     </ul>
                   </div>
                 </div>
-              )}
+                )}
+
+                {selectedProtocol === "VesuV2" && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm font-medium text-base-content/80">Target Pool</label>
+                      <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
+                        <span className="text-base-content/70">V2 Pool:</span>
+                        <span className="font-medium ml-1">Prime</span>
+                      </div>
+                    </div>
+                    <div className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between h-12">
+                      <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                        <Image
+                          src="/logos/vesu.svg"
+                          alt="VesuV2"
+                          width={32}
+                          height={32}
+                          className="rounded-full min-w-[32px]"
+                        />
+                        <span className="truncate font-semibold text-lg">Prime</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {fromProtocol === "Nostra" && selectedProtocol === "Vesu" && vesuPairings.length > 0 && (
                   <div className="bg-base-200/40 p-2 rounded space-y-1">
@@ -1195,33 +1283,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                   </div>
                 )}
               </div>
-
+              <div className="pt-2">
+                <button
+                  className={`btn btn-ghost w-full h-10 ${loading ? "animate-pulse" : ""}`}
+                  onClick={step === "done" ? onClose : handleMovePosition}
+                  disabled={step === "done" ? false : isActionDisabled}
+                >
+                  {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                  {actionButtonText}
+                </button>
+              </div>
             </div>
           </div>
-        <div className="flex justify-end pt-5 mt-auto">
-          <button
-            className={`btn ${actionButtonClass} btn-lg w-full h-14 flex justify-between shadow-md ${
-              loading ? "animate-pulse" : ""
-            }`}
-            onClick={step === "done" ? onClose : handleMovePosition}
-            disabled={step === "done" ? false : isActionDisabled}
-          >
-            <span>
-              {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
-              {actionButtonText}
-            </span>
-            <span className="flex items-center gap-1 text-xs">
-              <FaGasPump className="text-gray-400" />
-              {feeLoading && effectiveNative === null ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : feeError ? null : effectiveNative !== null ? (
-                <span>
-                  {effectiveNative.toFixed(4)} {effectiveCurrency ?? "STRK"}
-                </span>
-              ) : null}
-            </span>
-          </button>
-        </div>
       </div>
 
       <form

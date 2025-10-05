@@ -11,6 +11,7 @@ starknet = "2.9.4"
 # Change to just "openzeppelin" to use full features
 openzeppelin = "1.0.0"
 alexandria_math = "0.4.0"
+ekubo = { git = "https://github.com/EkuboProtocol/abis" }
 
 [dev-dependencies]
 openzeppelin_utils = "1.0.0"
@@ -31,7 +32,7 @@ threads = 1
 [[tool.snforge.fork]]
 name = "MAINNET_LATEST"
 url = "$FORK_URL"
-block_id.number = "2205419"
+block_id.number = "2663566"
 
 [scripts]
 test = "snforge test"

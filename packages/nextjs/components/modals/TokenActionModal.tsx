@@ -1,11 +1,13 @@
-import { FC, useCallback, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
+import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import type { Call } from "starknet";
 import { formatUnits, parseUnits } from "viem";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
 import formatPercentage from "~~/utils/formatPercentage";
+import { formatRate } from "~~/utils/protocols";
 import { PositionManager } from "~~/utils/position";
 
 export interface TokenInfo {
@@ -45,53 +47,61 @@ export interface TokenActionModalProps {
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
 
-const formatApy = (apy: number) => (apy < 1 ? apy.toFixed(4) : apy.toFixed(2));
+// Display APY/APR consistently as percentages
 
 const HealthFactor = ({ value }: { value: number }) => {
-  const percent = Math.min(100, Math.max(0, ((value - 1) / 3) * 100));
-  const barColor = value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
-  const textColor = value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
+  const isFiniteValue = Number.isFinite(value);
+  const percent = isFiniteValue ? Math.min(100, Math.max(0, ((value - 1) / 3) * 100)) : 100;
+  const barColor = !isFiniteValue ? "progress-success" : value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
+  const textColor = !isFiniteValue ? "text-success" : value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span>Health Factor</span>
-      <progress className={`progress w-20 ${barColor}`} value={percent} max="100"></progress>
-      <span className={textColor}>{value.toFixed(2)}</span>
+    <div className="flex flex-col text-xs">
+      <span className="mb-1">Health Factor</span>
+      <div className="flex items-center gap-2">
+        <progress className={`progress w-20 ${barColor}`} value={percent} max="100"></progress>
+        <span className={textColor}>{isFiniteValue ? value.toFixed(2) : "∞"}</span>
+      </div>
     </div>
   );
 };
 
-const Utilization = ({ value }: { value: number }) => (
-  <div className="flex items-center gap-2 text-xs">
-    <span>Utilization</span>
-    <progress className="progress progress-primary w-20" value={value} max="100"></progress>
-    <span>{formatPercentage(value)}%</span>
-  </div>
-);
-
-const LoanToValue = ({ value }: { value: number }) => (
-  <div className="flex items-center gap-2 text-xs">
-    <span>Loan to Value</span>
-    <span>{formatPercentage(value)}%</span>
+// Render a labeled bar with percentage for Loan To Value
+const LoanToValueBar = ({ value }: { value: number }) => (
+  <div className="flex flex-col text-xs">
+    <span className="mb-1">Loan To Value</span>
+    <div className="flex items-center gap-2">
+      <progress className="progress progress-primary w-20" value={value} max="100"></progress>
+      <span>{formatPercentage(value)}%</span>
+    </div>
   </div>
 );
 
 const TokenPill = ({ value, icon, name }: { value: number; icon: string; name: string }) => (
-  <div className="badge badge-outline gap-1">
+  <div className="flex items-center gap-1 text-xs text-base-content/80">
     <Image src={icon} alt={name} width={12} height={12} />
-    {format(value)}
+    <span>{format(value)}</span>
   </div>
 );
+
+type PercentOnChange = (amount: string, isMax: boolean) => void;
 
 const PercentInput: FC<{
   balance: bigint;
   decimals: number;
   price?: number;
-  onChange: (v: string, isMax: boolean) => void;
+  onChange: PercentOnChange;
   percentBase?: bigint;
   max?: bigint;
-}> = ({ balance, decimals, price = 0, onChange, percentBase, max }) => {
+  resetTrigger?: boolean;
+}> = ({ balance, decimals, price = 0, onChange, percentBase, max, resetTrigger }) => {
   const [amount, setAmount] = useState("");
   const [active, setActive] = useState<number | null>(null);
+  
+  // Reset amount when resetTrigger changes (modal reopens)
+  useEffect(() => {
+    setAmount("");
+    setActive(null);
+  }, [resetTrigger]);
   const setPercent = (p: number) => {
     const base = percentBase ?? balance;
     const val = (base * BigInt(p)) / 100n;
@@ -157,14 +167,19 @@ const LeftMetrics: FC<{
   metricLabel: string;
   metricValue: number;
   token: TokenInfo;
-}> = ({ hf, utilization, ltv, metricLabel, metricValue, token }) => (
+}> = ({ hf, ltv, metricLabel, metricValue, token }) => (
   <div className="w-full md:w-56 p-6 space-y-3 text-sm bg-base-200 border-b md:border-b-0 md:border-r border-base-300">
     <div className="font-semibold mb-2">Before</div>
-    <div className="space-y-2 text-xs">
-      <HealthFactor value={hf} />
-      <Utilization value={utilization} />
-      <LoanToValue value={ltv} />
-      <div className="flex items-center gap-2">
+    <div className="text-xs">
+      <div className="py-2">
+        <HealthFactor value={hf} />
+      </div>
+      <div className="border-t border-base-300 my-2" />
+      <div className="py-2">
+        <LoanToValueBar value={ltv} />
+      </div>
+      <div className="border-t border-base-300 my-2" />
+      <div className="py-2 flex items-center gap-2">
         <span>{metricLabel}</span>
         <TokenPill value={metricValue} icon={token.icon} name={token.name} />
       </div>
@@ -209,8 +224,15 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const beforeUtil = position ? beforePosition.utilization() : utilization;
   const beforeLtv = position ? beforePosition.loanToValue() : ltv;
   const afterHf = position ? afterPosition.healthFactor() : hf;
-  const afterUtil = position ? afterPosition.utilization() : utilization;
+  // const afterUtil = position ? afterPosition.utilization() : utilization; // not shown
   const afterLtv = position ? afterPosition.loanToValue() : ltv;
+
+  // Override defaults for Deposit with no debt: HF = ∞, LTV = 0%
+  const isDepositNoDebtFallback = action === "Deposit" && !position;
+  const beforeHfEffective = isDepositNoDebtFallback ? Infinity : beforeHf;
+  const beforeLtvEffective = isDepositNoDebtFallback ? 0 : beforeLtv;
+  const afterHfEffective = isDepositNoDebtFallback ? Infinity : afterHf;
+  const afterLtvEffective = isDepositNoDebtFallback ? 0 : afterLtv;
 
   const effectiveMax = useMemo(() => {
     if (action !== "Borrow" || !position || !token.usdPrice) return max;
@@ -239,13 +261,9 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     return buildCalls(amount, isMax);
   }, [buildCalls, amount, isMax]);
 
-  const {
-    loading: feeLoading,
-    error: feeError,
-    effectiveNative,
-    effectiveCurrency,
-  } = useGasEstimate({
-    enabled: isOpen && network === "stark",
+  // Keep gas estimation ready for future multi-action bars; not displayed in compact UI
+  useGasEstimate({
+    enabled: false && isOpen && network === "stark",
     buildCalls: buildCallsForEstimate,
     currency: "STRK",
   });
@@ -277,26 +295,26 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
       <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <LeftMetrics
-            hf={beforeHf}
+            hf={beforeHfEffective}
             utilization={beforeUtil}
-            ltv={beforeLtv}
+            ltv={beforeLtvEffective}
             metricLabel={metricLabel}
             metricValue={before}
             token={token}
           />
           <div className="flex-1 p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <Image src={token.icon} alt={token.name} width={32} height={32} />
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <h3 className="font-bold text-xl">
                   {action} {token.name}
                 </h3>
-                {protocolName && <div className="text-xs opacity-70">{protocolName}</div>}
+                <Image src={token.icon} alt={token.name} width={32} height={32} />
               </div>
+              {protocolName && <div className="text-sm text-base-content/70">{protocolName}</div>}
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="badge badge-outline">
-                {apyLabel} {formatApy(apy)}%
+            <div className="flex items-center justify-between text-xs text-base-content/70">
+              <span>
+                {apyLabel} {formatRate(apy)}%
               </span>
               <span>Balance: {format(Number(formatUnits(balance, token.decimals || 18)))}</span>
             </div>
@@ -310,44 +328,53 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               }}
               percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
+              resetTrigger={isOpen}
             />
-            <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-              <HealthFactor value={afterHf} />
-              <Utilization value={afterUtil} />
-              <LoanToValue value={afterLtv} />
-              <div className="flex items-center gap-2">
-                <span>{metricLabel}</span>
-                <TokenPill value={afterValue} icon={token.icon} name={token.name} />
-              </div>
-            </div>
+            {(() => {
+              const hfTextColor = !Number.isFinite(afterHfEffective)
+                ? "text-success"
+                : afterHfEffective >= 4
+                ? "text-success"
+                : afterHfEffective > 2
+                ? "text-warning"
+                : "text-error";
+              return (
+                <div className="text-xs pt-2">
+                  <div className="grid grid-cols-3">
+                    <div className="text-center opacity-70">Health Factor</div>
+                    <div className="text-center opacity-70 border-l border-base-300">Loan To Value</div>
+                    <div className="text-center opacity-70 border-l border-base-300">Debt</div>
+                  </div>
+                  <div className="grid grid-cols-3 items-center mt-1">
+                    <div className={`text-center ${hfTextColor}`}>{Number.isFinite(afterHfEffective) ? afterHfEffective.toFixed(2) : "∞"}</div>
+                    <div className="text-center border-l border-base-300">{formatPercentage(afterLtvEffective)}%</div>
+                    <div className="flex items-center justify-center gap-2 border-l border-base-300">
+                      <TokenPill value={afterValue} icon={token.icon} name={token.name} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="modal-action pt-2">
-              <button
-                className={`btn w-full flex justify-between ${txState === "success" ? "btn-success" : "btn-primary"}`}
-                onClick={handleConfirm}
-                disabled={txState === "pending"}
-              >
-                <span>
-                  {txState === "pending" ? (
-                    <span className="loading loading-spinner"></span>
-                  ) : txState === "success" ? (
-                    "Close"
-                  ) : (
-                    action
-                  )}
-                </span>
-                {network === "stark" && (
-                  <span className="flex items-center gap-1 text-xs">
-                    <FaGasPump className="text-gray-400" />
-                    {feeLoading && effectiveNative === null ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : feeError ? null : effectiveNative !== null ? (
-                      <span>
-                        {effectiveNative.toFixed(4)} {effectiveCurrency ?? "STRK"}
-                      </span>
-                    ) : null}
-                  </span>
-                )}
-              </button>
+              <SegmentedActionBar
+                className="w-full"
+                autoCompact
+                actions={[
+                  {
+                    key: txState === "success" ? "close" : "confirm",
+                    label: txState === "pending" ? "Submitting..." : txState === "success" ? "Close" : action,
+                    icon:
+                      txState === "pending" ? (
+                        <span className="loading loading-spinner loading-xs" />
+                      ) : network === "stark" ? (
+                        <FaGasPump className="text-gray-400" />
+                      ) : undefined,
+                    onClick: handleConfirm,
+                    disabled: txState === "pending",
+                    variant: "ghost",
+                  },
+                ]}
+              />
             </div>
           </div>
         </div>

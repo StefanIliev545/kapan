@@ -3,12 +3,9 @@ import Image from "next/image";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import {
-  BigNumberish,
   BlockNumber,
   ByteArray,
   CairoCustomEnum,
-  CairoOption,
-  CairoOptionVariant,
   CallData,
   RpcProvider,
   byteArray,
@@ -28,6 +25,8 @@ import { useAccount } from "~~/hooks/useAccount";
 import { universalErc20Abi } from "~~/utils/Constants";
 import formatPercentage from "~~/utils/formatPercentage";
 import { feltToString } from "~~/utils/protocols";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
+import type { LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 
 // Helper to convert a string to its felt representation
 const stringToFelt = (s: string): string => {
@@ -44,10 +43,8 @@ export interface TokenInfo {
   usdPrice?: number;
 }
 
-export interface VesuContext {
-  pool_id: bigint;
-  counterpart_token: string;
-}
+import type { VesuContext } from "~~/utils/vesu";
+import { buildVesuContextOption } from "~~/utils/vesu";
 
 // Different action types supported
 export type TokenActionType = "borrow" | "deposit" | "repay" | "withdraw";
@@ -137,13 +134,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
     const parsedAmount = parseUnits(adjustedAmount, Number(decimals));
     const lowerProtocolName = protocolName.toLowerCase();
 
-    let context = new CairoOption<BigNumberish[]>(CairoOptionVariant.None);
-    if (vesuContext) {
-      context = new CairoOption<BigNumberish[]>(CairoOptionVariant.Some, [
-        vesuContext.pool_id,
-        vesuContext.counterpart_token,
-      ]);
-    }
+    const context = buildVesuContextOption(vesuContext);
+    console.log("token address", token.address);
 
     // Create the appropriate lending instruction based on action type
     let lendingInstruction;
@@ -250,7 +242,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       fullInstruction: fullInstructionData,
       authInstruction: authInstructionData,
     };
-  }, [amount, userAddress, decimals, protocolName, vesuContext, actionType, token.address, isMaxAmount]);
+  }, [amount, userAddress, decimals, isMaxAmount, actionType, protocolName, vesuContext, token.address, token.protocolAmount, walletBalance]);
 
   const { data: protocolInstructions, error: protocolInstructionsError } = useScaffoldReadContract({
     contractName: "RouterGateway" as const,
@@ -264,7 +256,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
   const calls = useMemo(() => {
     if (!fullInstruction) return [];
 
-    const authorizations = [];
+    const authorizations: LendingAuthorization[] = [];
     if (protocolInstructions) {
       const instructionsArray = protocolInstructions as unknown as [bigint, bigint, bigint[]][];
       for (const instruction of instructionsArray) {
@@ -281,6 +273,8 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
       }
     }
 
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
+
     return [
       ...(authorizations as any),
       {
@@ -288,6 +282,7 @@ export const BaseTokenModal: FC<BaseTokenModalProps> = ({
         functionName: "process_protocol_instructions" as const,
         args: fullInstruction,
       },
+      ...(revokeAuthorizations as any),
     ];
   }, [fullInstruction, protocolInstructions]);
 
