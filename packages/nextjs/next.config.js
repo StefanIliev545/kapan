@@ -34,22 +34,25 @@ const nextConfig = {
   },
   async rewrites() {
     return {
+      // Handle ONLY the subdomain root early:
+      // app.kapan.finance/  →  /app
       beforeFiles: [
         {
-          // Handle the app subdomain root explicitly so / maps to /app without relying on catch-alls.
-          source: "/",
-          has: [{ type: "host", value: "app.kapan.finance" }],
-          destination: "/app",
-        },
-        {
-          // For any other request on app.kapan.finance, serve the matching /app/:path* page.
-          // Skip Next internals, API routes, .well-known entries, and already-prefixed /app paths.
-          source:
-            "/:path((?!_next/|api/|\\.well-known/|app/|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)",
-          has: [{ type: "host", value: "app.kapan.finance" }],
-          destination: "/app/:path*",
+          source: '/',
+          has: [{ type: 'host', value: 'app.kapan.finance' }],
+          destination: '/app',
         },
       ],
+      // Let Next serve real files first (public/, _next/static/, etc.),
+      // then rewrite everything else on the subdomain to /app/:path*
+      afterFiles: [
+        {
+          source: '/:path((?!_next/|api/|\\.well-known/|app/).*)',
+          has: [{ type: 'host', value: 'app.kapan.finance' }],
+          destination: '/app/:path*',
+        },
+      ],
+      // no fallback rules needed
     };
   },
 };
