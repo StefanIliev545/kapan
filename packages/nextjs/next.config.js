@@ -36,14 +36,14 @@ const prodConfig = {
       beforeFiles: [
         {
           source: "/",
-          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app",
         },
       ],
       afterFiles: [
         {
           source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app/:path*",
         },
       ],
@@ -59,14 +59,14 @@ const devConfig = {
       beforeFiles: [
         {
           source: "/",
-          has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
+          has: [{ type: "host", value: "app.localhost:3000" }],
           destination: "/app",
         },
       ],
       afterFiles: [
         {
           source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-          has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
+          has: [{ type: "host", value: "app.localhost:3000" }],
           destination: "/app/:path*",
         },
       ],
