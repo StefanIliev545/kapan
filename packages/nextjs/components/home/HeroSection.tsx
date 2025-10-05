@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -37,9 +38,9 @@ const HeroSection = () => {
               
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <div className="flex gap-2">
-                  <Link href={appUrl} passHref>
+                  <a href="/app" onClick={(e) => { e.preventDefault(); window.location.assign(appUrl); }}>
                     <button className="btn btn-primary">Launch App</button>
-                  </Link>
+                  </a>
                   <Link href="/info" passHref>
                     <button className="btn btn-outline">Learn More</button>
                   </Link>
