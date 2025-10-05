@@ -1,7 +1,12 @@
 // @ts-check
 
+/**
+ * Common, prod and dev configs are defined separately to keep Vercel from
+ * conflating different host rules. We export exactly one based on NODE_ENV.
+ */
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const commonConfig = {
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
@@ -21,24 +26,24 @@ const nextConfig = {
       { protocol: "https", hostname: "img.starkurabu.com", pathname: "/**" },
     ],
   },
+};
 
-  // 2) Host-based rewrites (keep these as you had them, but with catch-all in afterFiles)
+/** @type {import('next').NextConfig} */
+const prodConfig = {
+  ...commonConfig,
   async rewrites() {
     return {
-      // Only map the subdomain root early: app.kapan.finance/ → /app (internal; no URL change)
       beforeFiles: [
         {
           source: "/",
-          has: [{ type: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
           destination: "/app",
         },
       ],
-
-      // Let Next serve files/_next/api first, then internally map the rest to /app/:path*
       afterFiles: [
         {
           source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-          has: [{ type: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
           destination: "/app/:path*",
         },
       ],
@@ -46,5 +51,29 @@ const nextConfig = {
   },
 };
 
+/** @type {import('next').NextConfig} */
+const devConfig = {
+  ...commonConfig,
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/",
+          has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
+          destination: "/app",
+        },
+      ],
+      afterFiles: [
+        {
+          source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
+          has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
+          destination: "/app/:path*",
+        },
+      ],
+    };
+  },
+};
 
-module.exports = nextConfig;
+const finalConfig = process.env.NODE_ENV === "production" ? prodConfig : devConfig;
+
+module.exports = finalConfig;

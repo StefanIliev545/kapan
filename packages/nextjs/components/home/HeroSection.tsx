@@ -1,10 +1,21 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useMemo } from "react";
 import DebtComparison from "./DebtComparison.client";
 import StableArea from "../common/StableArea";
 
 const HeroSection = () => {
+  const appUrl = useMemo(() => {
+    if (typeof window === "undefined") return "/app";
+    const { protocol } = window.location;
+    const hostname = window.location.hostname;
+    const baseHost = hostname.replace(/^www\./, "");
+    if (window.location.host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
+    if (hostname.startsWith("app.")) return `${protocol}//${window.location.host}`;
+    return `${protocol}//app.${baseHost}`;
+  }, []);
+
   return (
     <div className="hero min-h-screen relative">
       <div className="hero-content flex-col lg:flex-row gap-8 py-16 z-10">
@@ -26,7 +37,7 @@ const HeroSection = () => {
               
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <div className="flex gap-2">
-                  <Link href="/app" passHref>
+                  <Link href={appUrl} passHref>
                     <button className="btn btn-primary">Launch App</button>
                   </Link>
                   <Link href="/info" passHref>

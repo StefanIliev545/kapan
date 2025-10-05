@@ -98,18 +98,19 @@ const DebtComparison = () => {
   const appUrl = useMemo(() => {
     if (typeof window === "undefined") return "/app";
     const { protocol } = window.location;
-    const host = window.location.host;
-    console.log("host", host);
+    // Use hostname to avoid "www." prefix in subdomain
+    const hostname = window.location.hostname; // e.g., www.kapan.finance → www.kapan.finance
+    const baseHost = hostname.replace(/^www\./, ""); // strip leading www.
     // Local dev convenience: map anything *.localhost:3000 to app.localhost:3000
-    if (host.endsWith("localhost:3000")) {
+    if (window.location.host.endsWith("localhost:3000")) {
       return `${protocol}//app.localhost:3000`;
     }
     // If already on app.<host>, keep it
-    if (host.startsWith("app.")) {
-      return `${protocol}//${host}`;
+    if (hostname.startsWith("app.")) {
+      return `${protocol}//${window.location.host}`;
     }
     // Default: prefix with app.
-    return `${protocol}//app.${host}`;
+    return `${protocol}//app.${baseHost}`;
   }, []);
 
   return (
