@@ -1,7 +1,12 @@
 // @ts-check
 
+/**
+ * Common, prod and dev configs are defined separately to keep Vercel from
+ * conflating different host rules. We export exactly one based on NODE_ENV.
+ */
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const commonConfig = {
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
@@ -9,43 +14,35 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
   },
-  // Improve build-time debuggability
   productionBrowserSourceMaps: true,
-  webpack: config => {
+  webpack: (config) => {
     config.resolve.fallback = { fs: false, net: false, tls: false };
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },
   images: {
     remotePatterns: [
-      // External image source for StarkNet ID identicons
-      {
-        protocol: "https",
-        hostname: "identicon.starknet.id",
-        pathname: "/**", // Allows all paths under this domain
-      },
-      // External image source for images hosted on Starkurabu
-      {
-        protocol: "https",
-        hostname: "img.starkurabu.com",
-        pathname: "/**",
-      },
+      { protocol: "https", hostname: "identicon.starknet.id", pathname: "/**" },
+      { protocol: "https", hostname: "img.starkurabu.com", pathname: "/**" },
     ],
   },
+};
+
+/** @type {import('next').NextConfig} */
+const prodConfig = {
+  ...commonConfig,
   async rewrites() {
     return {
       beforeFiles: [
         {
-          // Handle the app subdomain root explicitly so / maps to /app without relying on catch-alls.
           source: "/",
           has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app",
         },
+      ],
+      afterFiles: [
         {
-          // For any other request on app.kapan.finance, serve the matching /app/:path* page.
-          // Skip Next internals, API routes, .well-known entries, and already-prefixed /app paths.
-          source:
-            "/:path((?!_next/|api/|\\.well-known/|app/|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)",
+          source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
           has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app/:path*",
         },
@@ -54,4 +51,29 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+/** @type {import('next').NextConfig} */
+const devConfig = {
+  ...commonConfig,
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/",
+          has: [{ type: "host", value: "app.localhost:3000" }],
+          destination: "/app",
+        },
+      ],
+      afterFiles: [
+        {
+          source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
+          has: [{ type: "host", value: "app.localhost:3000" }],
+          destination: "/app/:path*",
+        },
+      ],
+    };
+  },
+};
+
+const finalConfig = process.env.NODE_ENV === "production" ? prodConfig : devConfig;
+
+module.exports = finalConfig;

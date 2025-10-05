@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -93,6 +93,25 @@ const DebtComparison = () => {
   const annualInterestLower = currentDebt * (lowerRate / 100);
   const totalSavings = Math.abs(annualInterestHigher - annualInterestLower);
   const savingsPercentage = higherRate > 0 ? (((higherRate - lowerRate) / higherRate) * 100).toFixed(1) : "0.0";
+
+  // Build "app.<current-host>" URL safely on client
+  const appUrl = useMemo(() => {
+    if (typeof window === "undefined") return "/app";
+    const { protocol } = window.location;
+    // Use hostname to avoid "www." prefix in subdomain
+    const hostname = window.location.hostname; // e.g., www.kapan.finance → www.kapan.finance
+    const baseHost = hostname.replace(/^www\./, ""); // strip leading www.
+    // Local dev convenience: map anything *.localhost:3000 to app.localhost:3000
+    if (window.location.host.endsWith("localhost:3000")) {
+      return `${protocol}//app.localhost:3000`;
+    }
+    // If already on app.<host>, keep it
+    if (hostname.startsWith("app.")) {
+      return `${protocol}//${window.location.host}`;
+    }
+    // Default: prefix with app.
+    return `${protocol}//app.${baseHost}`;
+  }, []);
 
   return (
     <div>
@@ -273,7 +292,7 @@ const DebtComparison = () => {
             </div>
           </AnimatedValue>
         </div>
-        <Link href="/app" className="mt-4" passHref>
+        <Link href={appUrl} className="mt-4" passHref>
           <button className="btn btn-primary dark:bg-accent dark:border-accent/70 dark:text-accent-content dark:hover:bg-accent/80 w-full">Start Saving Now</button>
         </Link>
       </div>
