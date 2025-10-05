@@ -7,7 +7,8 @@ import { useScaffoldWriteContract as useEvmWrite } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo as useEthDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo as useStarkDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useSmartTransactor } from "~~/hooks/scaffold-stark";
-import { useLendingAuthorizations, type BaseProtocolInstruction } from "~~/hooks/useLendingAuthorizations";
+import { useLendingAuthorizations, type BaseProtocolInstruction, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
+import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { feltToString } from "~~/utils/protocols";
 import { notification } from "~~/utils/scaffold-stark";
@@ -382,7 +383,7 @@ export const useLendingAction = (
         "get_authorizations_for_instructions",
         authInstruction,
       );
-      const authorizations: Call[] = [];
+      const authorizations: LendingAuthorization[] = [];
       if (Array.isArray(protocolInstructions)) {
         for (const inst of protocolInstructions as any[]) {
           const addr = num.toHexString(inst[0]);
@@ -394,12 +395,13 @@ export const useLendingAction = (
           });
         }
       }
+      const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
       authorizations.push({
         contractAddress: starkRouterGateway.address,
         entrypoint: "process_protocol_instructions",
         calldata: fullInstruction,
       });
-      return authorizations;
+      return [...authorizations, ...revokeAuthorizations];
     } catch (e) {
       console.error(e);
       return null;
