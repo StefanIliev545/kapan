@@ -29,38 +29,18 @@ const nextConfig = {
       beforeFiles: [
         {
           source: "/",
-          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app",
         },
-        // Optional dev mirror for app.localhost:3000
-        ...(process.env.NODE_ENV === "development"
-          ? [
-              {
-                source: "/",
-                has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
-                destination: "/app",
-              },
-            ]
-          : []),
       ],
 
       // Let Next serve files/_next/api first, then internally map the rest to /app/:path*
       afterFiles: [
         {
           source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-          has: [{ type: "host", key: "host", value: "app.kapan.finance" }],
+          has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app/:path*",
         },
-        // Optional dev mirror for app.localhost:3000
-        ...(process.env.NODE_ENV === "development"
-          ? [
-              {
-                source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
-                has: [{ type: "host", key: "host", value: "app.localhost:3000" }],
-                destination: "/app/:path*",
-              },
-            ]
-          : []),
       ],
     };
   },
