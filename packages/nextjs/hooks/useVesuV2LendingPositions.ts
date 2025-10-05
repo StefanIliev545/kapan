@@ -292,9 +292,16 @@ export const useVesuV2LendingPositions = (
         const debtAsset = assetMap.get(debtAddress);
 
         const hasDebt = stats.nominal_debt > 0n;
-        const counterpartForContext = hasDebt ? debtAddress : ZERO_ADDRESS;
-        const withdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
-        const depositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
+        const hasDebtCounterpart = debtAddressRaw !== 0n;
+        const counterpartForContext = hasDebtCounterpart ? debtAddress : ZERO_ADDRESS;
+        const baseWithdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
+        const baseDepositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
+        const withdrawContext = stats.is_vtoken
+          ? { ...baseWithdrawContext, isVtoken: true, collateralToken: collateralAddress }
+          : baseWithdrawContext;
+        const depositContext = stats.is_vtoken
+          ? { ...baseDepositContext, isVtoken: true, collateralToken: collateralAddress }
+          : baseDepositContext;
 
         // Prepare borrow context targeting the collateral token (needed for vToken positions with zero-debt)
         const borrowCtxForV2 = {
@@ -372,15 +379,15 @@ export const useVesuV2LendingPositions = (
             actionsDisabledReason: disabledReason,
           };
 
-        if (hasDebt) {
-          borrowPosition = {
-            ...baseBorrowPosition,
-            balance: -debtUsd,
-          };
-        } else {
-          borrowPosition = baseBorrowPosition;
+          if (hasDebt) {
+            borrowPosition = {
+              ...baseBorrowPosition,
+              balance: -debtUsd,
+            };
+          } else {
+            borrowPosition = baseBorrowPosition;
+          }
         }
-      }
 
         return {
           key: `${collateralAddress}-${debtAddress}-${index}`,

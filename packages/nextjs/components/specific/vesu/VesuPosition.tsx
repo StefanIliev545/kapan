@@ -350,7 +350,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             }}
             protocolName="Vesu"
             supplyBalance={BigInt(collateralAmount)}
-            vesuContext={createVesuContextV1(poolId, debtAsset)}
+            vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
             position={position}
           />
 
