@@ -292,7 +292,7 @@ export const useVesuV2LendingPositions = (
         const debtAsset = assetMap.get(debtAddress);
 
         const hasDebt = stats.nominal_debt > 0n;
-        const counterpartForContext = hasDebt ? debtAddress : ZERO_ADDRESS;
+        const counterpartForContext = debtAsset ? debtAddress : ZERO_ADDRESS;
         const baseWithdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
         const baseDepositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
         const withdrawContext = stats.is_vtoken
