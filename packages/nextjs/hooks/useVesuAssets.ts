@@ -43,6 +43,12 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
       last_rate_accumulator?: unknown;
       reserve?: unknown;
       scale?: unknown;
+      max_utilization?: unknown;
+      floor?: unknown;
+      last_full_utilization_rate?: unknown;
+      target_rate_percent?: unknown;
+      fee_shares?: unknown;
+      last_updated?: unknown;
     };
 
     const priceCandidate = candidate.price as { value?: unknown; is_valid?: unknown } | undefined;
@@ -82,12 +88,28 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
         last_rate_accumulator: candidate.last_rate_accumulator,
         reserve: candidate.reserve,
         scale: candidate.scale,
+        max_utilization:
+          typeof candidate.max_utilization === "bigint" ? candidate.max_utilization : undefined,
+        floor: typeof candidate.floor === "bigint" ? candidate.floor : undefined,
+        last_full_utilization_rate:
+          typeof candidate.last_full_utilization_rate === "bigint"
+            ? candidate.last_full_utilization_rate
+            : undefined,
+        target_rate_percent:
+          typeof candidate.target_rate_percent === "bigint" ? candidate.target_rate_percent : undefined,
+        fee_shares: typeof candidate.fee_shares === "bigint" ? candidate.fee_shares : undefined,
+        last_updated: typeof candidate.last_updated === "bigint" ? candidate.last_updated : undefined,
       },
     ];
   });
 };
 
-export type AssetWithRates = TokenMetadata & { borrowAPR: number; supplyAPY: number };
+export type AssetWithRates = TokenMetadata & {
+  borrowAPR: number;
+  supplyAPY: number;
+  interestRatePerSecond?: bigint;
+  targetRate?: bigint;
+};
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 

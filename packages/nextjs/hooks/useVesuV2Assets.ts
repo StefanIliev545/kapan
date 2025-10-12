@@ -3,6 +3,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import { toAnnualRates } from "~~/utils/protocols";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
+import { calculateVesuV2AnnualRates } from "~~/utils/vesuV2Rates";
 
 const normalizeDecimals = (value: unknown): number | null => {
   if (value === undefined || value === null) return 18;
@@ -43,6 +44,12 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
       last_rate_accumulator?: unknown;
       reserve?: unknown;
       scale?: unknown;
+      max_utilization?: unknown;
+      floor?: unknown;
+      last_full_utilization_rate?: unknown;
+      target_rate_percent?: unknown;
+      fee_shares?: unknown;
+      last_updated?: unknown;
     };
 
     const priceCandidate = candidate.price as { value?: unknown; is_valid?: unknown } | undefined;
@@ -82,6 +89,17 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
         last_rate_accumulator: candidate.last_rate_accumulator,
         reserve: candidate.reserve,
         scale: candidate.scale,
+        max_utilization:
+          typeof candidate.max_utilization === "bigint" ? candidate.max_utilization : undefined,
+        floor: typeof candidate.floor === "bigint" ? candidate.floor : undefined,
+        last_full_utilization_rate:
+          typeof candidate.last_full_utilization_rate === "bigint"
+            ? candidate.last_full_utilization_rate
+            : undefined,
+        target_rate_percent:
+          typeof candidate.target_rate_percent === "bigint" ? candidate.target_rate_percent : undefined,
+        fee_shares: typeof candidate.fee_shares === "bigint" ? candidate.fee_shares : undefined,
+        last_updated: typeof candidate.last_updated === "bigint" ? candidate.last_updated : undefined,
       },
     ];
   });
@@ -114,17 +132,47 @@ export const useVesuV2Assets = (poolAddress: string) => {
         return { ...asset, borrowAPR: 0, supplyAPY: 0 };
       }
 
-      const { borrowAPR, supplyAPY } = toAnnualRates(
-        asset.fee_rate,
-        asset.total_nominal_debt,
-        asset.last_rate_accumulator,
-        asset.reserve,
-        asset.scale,
-      );
+      const v2Inputs = {
+        utilization: asset.utilization,
+        zeroUtilizationRate: asset.floor ?? null,
+        fullUtilizationRate: asset.last_full_utilization_rate ?? null,
+        targetUtilization: asset.max_utilization ?? null,
+        targetRatePercent: (asset.target_rate_percent ?? asset.fee_rate) ?? null,
+      };
 
-      // For now, just return zero rates until we figure out the correct V2 calculation
-      // The V2 rate calculation is different from V1 and needs proper investigation
-      return { ...asset, borrowAPR: 0, supplyAPY: 0 };
+      const v2Rates = calculateVesuV2AnnualRates(v2Inputs);
+
+      if (!v2Rates) {
+        console.warn(
+          "Vesu V2 rate calculation skipped due to missing parameters",
+          {
+            address: asset.address.toString(16),
+            zeroUtilizationRate: asset.floor,
+            fullUtilizationRate: asset.last_full_utilization_rate,
+            targetUtilization: asset.max_utilization,
+            targetRatePercent: asset.target_rate_percent,
+          },
+        );
+
+        // Fall back to legacy calculation if possible, otherwise zero out
+        const fallback = toAnnualRates(
+          asset.fee_rate,
+          asset.total_nominal_debt,
+          asset.last_rate_accumulator,
+          asset.reserve,
+          asset.scale,
+        );
+
+        return { ...asset, borrowAPR: fallback.borrowAPR, supplyAPY: fallback.supplyAPY };
+      }
+
+      return {
+        ...asset,
+        borrowAPR: v2Rates.borrowAPR,
+        supplyAPY: v2Rates.supplyAPY,
+        interestRatePerSecond: v2Rates.interestRatePerSecond,
+        targetRate: v2Rates.targetRate,
+      };
     });
   }, [normalizedAssets]);
 
