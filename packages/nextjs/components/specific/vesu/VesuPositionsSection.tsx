@@ -33,6 +33,7 @@ interface VesuPositionsSectionProps {
   onBorrowRequest: (request: BorrowSelectionRequest) => void;
   onDepositRequest: () => void;
   protocolName?: string;
+  title?: string;
 }
 
 export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
@@ -45,6 +46,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   onBorrowRequest,
   onDepositRequest,
   protocolName = "Vesu",
+  title = "Your Vesu Positions",
 }) => {
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [closeParams, setCloseParams] = useState<
@@ -268,7 +270,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     <div className="card bg-base-100 shadow-md">
       <div className="card-body space-y-4 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h2 className="card-title text-lg">Your Vesu Positions</h2>
+          <h2 className="card-title text-lg">{title}</h2>
           {isUpdating && userAddress && (
             <div className="flex items-center text-xs text-base-content/60">
               <span className="loading loading-spinner loading-xs mr-1" /> Updating

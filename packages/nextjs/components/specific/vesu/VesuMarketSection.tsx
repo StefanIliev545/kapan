@@ -24,6 +24,9 @@ interface VesuMarketSectionProps {
   formatCurrency: (value: number) => string;
   protocolName?: string;
   headerExtra?: JSX.Element;
+  title?: string;
+  description?: string;
+  iconSrc?: string;
 }
 
 export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
@@ -43,6 +46,9 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   formatCurrency,
   protocolName = "Vesu",
   headerExtra,
+  title = "Vesu",
+  description = "Manage your Starknet lending positions",
+  iconSrc = "/logos/vesu.svg",
 }) => {
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
@@ -134,11 +140,11 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex h-12 w-12 items-center justify-center rounded-lg bg-base-200 p-1">
-              <Image src="/logos/vesu.svg" alt="Vesu icon" width={36} height={36} className="object-contain" />
+              <Image src={iconSrc} alt={`${title} icon`} width={36} height={36} className="object-contain" />
             </div>
             <div className="flex flex-col">
-              <div className="text-xl font-bold tracking-tight">Vesu</div>
-              <div className="text-xs text-base-content/70">Manage your Starknet lending positions</div>
+              <div className="text-xl font-bold tracking-tight">{title}</div>
+              <div className="text-xs text-base-content/70">{description}</div>
               {userAddress && (
                 <div className="mt-1 flex flex-col gap-1 text-xs text-base-content/70">
                   <div className="flex items-center gap-1">
