@@ -212,7 +212,13 @@ export const VesuProtocolView: FC = () => {
           netBalanceUsd={netBalanceUsdV1}
           netYield30d={netYield30dV1}
           netApyPercent={netApyPercentV1}
-          onDeposit={() => openDepositModal("v1", assetsWithRatesV1)}
+          onDeposit={() => {
+            const allow = new Set(suppliablePositionsV1.map(p => p.tokenAddress.toLowerCase()));
+            const filtered = assetsWithRatesV1.filter(a =>
+              allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+            );
+            openDepositModal("v1", filtered);
+          }}
           canDeposit={assetsWithRatesV1.length > 0}
           formatCurrency={formatCurrency}
           protocolName="Vesu"
@@ -263,7 +269,13 @@ export const VesuProtocolView: FC = () => {
                 onBorrowRequest={({ tokens, collateralAddress, vesuContext, position }) =>
                   setBorrowSelection({ version: "v1", tokens, collateralAddress, vesuContext, position })
                 }
-                onDepositRequest={() => openDepositModal("v1", data.assetsWithRates)}
+                onDepositRequest={() => {
+                  const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
+                  const filtered = data.assetsWithRates.filter(a =>
+                    allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+                  );
+                  openDepositModal("v1", filtered);
+                }}
                 protocolName="Vesu"
               />
               
@@ -286,7 +298,13 @@ export const VesuProtocolView: FC = () => {
           netBalanceUsd={netBalanceUsdV2}
           netYield30d={netYield30dV2}
           netApyPercent={netApyPercentV2}
-          onDeposit={() => openDepositModal("v2", assetsWithRatesV2)}
+          onDeposit={() => {
+            const allow = new Set(suppliablePositionsV2.map(p => p.tokenAddress.toLowerCase()));
+            const filtered = assetsWithRatesV2.filter(a =>
+              allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+            );
+            openDepositModal("v2", filtered);
+          }}
           canDeposit={assetsWithRatesV2.length > 0}
           formatCurrency={formatCurrency}
           protocolName="vesu_v2"
@@ -338,7 +356,13 @@ export const VesuProtocolView: FC = () => {
                 onBorrowRequest={({ tokens, collateralAddress, vesuContext, position }) =>
                   setBorrowSelection({ version: "v2", tokens, collateralAddress, vesuContext, position })
                 }
-                onDepositRequest={() => openDepositModal("v2", data.assetsWithRates)}
+                onDepositRequest={() => {
+                  const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
+                  const filtered = data.assetsWithRates.filter(a =>
+                    allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+                  );
+                  openDepositModal("v2", filtered);
+                }}
                 protocolName="vesu_v2"
               />
               

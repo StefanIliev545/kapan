@@ -3,6 +3,7 @@ import Image from "next/image";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { DepositModalStark } from "./DepositModalStark";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { VesuContext } from "~~/utils/vesu";
 import formatPercentage from "~~/utils/formatPercentage";
 import { getDisplayRate } from "~~/utils/protocol";
@@ -97,7 +98,8 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             {availableTokens.length > 0 ? (
               availableTokens.map(token => {
                 const address = `0x${BigInt(token.address).toString(16).padStart(64, "0")}`;
-                const symbol = feltToString(token.symbol);
+                const raw = feltToString(token.symbol);
+                const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
                 return (
                   <button
                     key={address}

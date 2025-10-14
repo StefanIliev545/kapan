@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, uint256 } from "starknet";
 import { fetchBuildExecuteTransaction, fetchQuotes } from "@avnu/avnu-sdk";
 import type { Quote } from "@avnu/avnu-sdk";
@@ -8,6 +8,7 @@ import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 
 const SLIPPAGE = 0.05;
 const BUFFER_BPS = 500n; // 5%
+const DEBOUNCE_MS = 450;
 
 const withBuffer = (amount: bigint, bufferBps: bigint = BUFFER_BPS) => {
   if (amount === 0n) return 0n;
@@ -60,6 +61,8 @@ export const useVesuSwitch = ({
   protocolKey,
 }: UseVesuSwitchArgs) => {
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
+
+  // ⚙️ Local state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -67,50 +70,93 @@ export const useVesuSwitch = ({
   const [authInstructions, setAuthInstructions] = useState<BaseProtocolInstruction[]>([]);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
 
+  // 🔒 Stabilized primitives for deps (avoid object identity churn)
+  const currentCollateralAddr = currentCollateral?.address;
+  const currentDebtAddr = currentDebt?.address;
+  const targetTokenAddr = targetToken?.address ?? null;
+
+  // 🧠 Internal refs to control request storms
+  const lastRequestKeyRef = useRef<string>("");
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runIdRef = useRef(0); // increment to invalidate previous runs
+
+  // 🔗 stabilize getAuthorizations usage
+  const getAuthRef = useRef(getAuthorizations);
+  useEffect(() => {
+    getAuthRef.current = getAuthorizations;
+  }, [getAuthorizations]);
+
+  // 🔄 Reset per open/type/target change
   useEffect(() => {
     setSelectedQuote(null);
     setProtocolInstructions([]);
     setFetchedAuthorizations([]);
     setAuthInstructions([]);
     setError(null);
-  }, [isOpen, type, targetToken?.address]);
+    lastRequestKeyRef.current = ""; // important: allow a fresh fetch next time
+  }, [isOpen, type, targetTokenAddr]);
 
-  // Fetch quote and avnu calldata
+  // 🔎 Fetch quote + AVNU calldata (debounced, deduped, cancel-safe)
   useEffect(() => {
-    if (!isOpen || !address || !targetToken) return;
-    let cancelled = false;
-    const run = async () => {
+    if (!isOpen || !address || !targetTokenAddr) return;
+
+    // Determine the "business" inputs as primitives
+    const repayAmount = debtBalance > 0n ? debtBalance : 0n;
+    const withdrawAmount = collateralBalance > 0n ? collateralBalance : 0n;
+
+    // Nothing meaningful to do — avoid noisy requests
+    const amount = type === "collateral" ? withdrawAmount : repayAmount;
+    if (amount === 0n) {
+      setSelectedQuote(null);
+      setProtocolInstructions([]);
+      setAuthInstructions([]);
+      return;
+    }
+
+    const sellTokenAddress = type === "collateral" ? currentCollateralAddr : targetTokenAddr;
+    const buyTokenAddress = type === "collateral" ? targetTokenAddr : currentDebtAddr;
+
+    if (!sellTokenAddress || !buyTokenAddress) return;
+
+    // Use a primitive-only key so identical inputs dedupe properly
+    const requestKey = `${sellTokenAddress}-${buyTokenAddress}-${amount.toString()}-${address}-${poolKey}-${protocolKey}-${type}`;
+
+    // If this exact request already produced a result and is still the last one we kicked off, skip
+    if (lastRequestKeyRef.current === requestKey) {
+      return;
+    }
+
+    // Debounce to avoid burst calls during typing / fast prop changes
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    debounceTimerRef.current = setTimeout(async () => {
+      const myRunId = ++runIdRef.current; // invalidate prior runs
+      lastRequestKeyRef.current = requestKey;
       setLoading(true);
       setError(null);
+
       try {
-        const repayAmount = debtBalance > 0n ? debtBalance : 1n;
-        const withdrawAmount = collateralBalance > 0n ? collateralBalance : 1n;
+        // Build quote request with minimal stable fields
         const quoteRequest =
           type === "collateral"
-            ? {
-                sellTokenAddress: currentCollateral.address,
-                buyTokenAddress: targetToken.address,
-                sellAmount: withdrawAmount,
-                takerAddress: address,
-              }
-            : {
-                sellTokenAddress: targetToken.address,
-                buyTokenAddress: currentDebt.address,
-                buyAmount: repayAmount,
-                takerAddress: address,
-              };
+            ? { sellTokenAddress, buyTokenAddress, sellAmount: amount, takerAddress: address }
+            : { sellTokenAddress, buyTokenAddress, buyAmount: amount, takerAddress: address };
+
         const quotes = await fetchQuotes(quoteRequest as any);
-        if (quotes.length === 0) throw new Error("Unable to fetch AVNU quote");
+        if (!quotes || quotes.length === 0) throw new Error("Unable to fetch AVNU quote");
+
         const quote = quotes[0];
-        if (!cancelled) setSelectedQuote(quote);
+        if (runIdRef.current !== myRunId) return; // outdated
 
         const tx = await fetchBuildExecuteTransaction(quote.quoteId, address, SLIPPAGE, false);
         const swapCall = tx.calls?.find((call: any) =>
           ["swap_exact_token_to", "multi_route_swap", "swap_exact_in"].includes(call.entrypoint),
         );
         if (!swapCall) throw new Error("Failed to extract AVNU calldata");
+
         const calldata = (swapCall.calldata as any[]).map(v => BigInt(v.toString()));
 
+        // Build protocol instructions (pure; safe to run multiple times)
         const instructions =
           type === "collateral"
             ? buildCollateralSwitchInstructions({
@@ -118,7 +164,7 @@ export const useVesuSwitch = ({
                 poolKey,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken,
+                targetToken: targetToken!,
                 collateralBalance,
                 debtBalance,
                 quote,
@@ -130,126 +176,138 @@ export const useVesuSwitch = ({
                 poolKey,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken,
+                targetToken: targetToken!,
                 collateralBalance,
                 debtBalance,
                 quote,
                 avnuData: calldata,
                 protocolKey,
               });
-        if (!cancelled) {
-          setProtocolInstructions(instructions);
 
-          // Build minimal authorization instruction set
-          if (type === "collateral") {
-            // Only authorize Withdraw for collateral switch
-            const withdrawOnly = new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: undefined,
-              Repay: undefined,
-              Withdraw: {
-                basic: {
-                  token: currentCollateral.address,
-                  amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)),
-                  user: address,
-                },
-                withdraw_all: true,
-                context: toContextOption(protocolKey, poolKey, currentDebt.address),
+        if (runIdRef.current !== myRunId) return; // outdated
+
+        setSelectedQuote(quote);
+        setProtocolInstructions(instructions);
+
+        // Build minimal authorization instruction set
+        if (type === "collateral") {
+          const withdrawOnly = new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: {
+              basic: {
+                token: currentCollateral.address,
+                amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)),
+                user: address,
               },
-              Redeposit: undefined,
-              Reborrow: undefined,
-              Swap: undefined,
-              SwapExactIn: undefined,
-              Reswap: undefined,
-              ReswapExactIn: undefined,
-            });
-            setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly] }]);
-          } else {
-            // Authorize Withdraw + Borrow for debt switch
-            const withdrawOnly = new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: undefined,
-              Repay: undefined,
-              Withdraw: {
-                basic: {
-                  token: currentCollateral.address,
-                  amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)),
-                  user: address,
-                },
-                withdraw_all: true,
-                context: toContextOption(protocolKey, poolKey, currentDebt.address),
+              withdraw_all: true,
+              context: toContextOption(protocolKey, poolKey, currentDebt.address),
+            },
+            Redeposit: undefined,
+            Reborrow: undefined,
+            Swap: undefined,
+            SwapExactIn: undefined,
+            Reswap: undefined,
+            ReswapExactIn: undefined,
+          });
+          setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly] }]);
+        } else {
+          const withdrawOnly = new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: undefined,
+            Repay: undefined,
+            Withdraw: {
+              basic: {
+                token: currentCollateral.address,
+                amount: uint256.bnToUint256(withBuffer(collateralBalance, 100n)),
+                user: address,
               },
-              Redeposit: undefined,
-              Reborrow: undefined,
-              Swap: undefined,
-              SwapExactIn: undefined,
-              Reswap: undefined,
-              ReswapExactIn: undefined,
-            });
-            const borrowAmount = withBuffer(quote.sellAmount, BUFFER_BPS);
-            const borrowOnly = new CairoCustomEnum({
-              Deposit: undefined,
-              Borrow: {
-                basic: { token: targetToken.address, amount: uint256.bnToUint256(borrowAmount), user: address },
-                context: toContextOption(protocolKey, poolKey, currentCollateral.address),
-              },
-              Repay: undefined,
-              Withdraw: undefined,
-              Redeposit: undefined,
-              Reborrow: undefined,
-              Swap: undefined,
-              SwapExactIn: undefined,
-              Reswap: undefined,
-              ReswapExactIn: undefined,
-            });
-            setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly, borrowOnly] }]);
-          }
+              withdraw_all: true,
+              context: toContextOption(protocolKey, poolKey, currentDebt.address),
+            },
+            Redeposit: undefined,
+            Reborrow: undefined,
+            Swap: undefined,
+            SwapExactIn: undefined,
+            Reswap: undefined,
+            ReswapExactIn: undefined,
+          });
+          const borrowAmount = withBuffer(quote.sellAmount, BUFFER_BPS);
+          const borrowOnly = new CairoCustomEnum({
+            Deposit: undefined,
+            Borrow: {
+              basic: { token: targetToken!.address, amount: uint256.bnToUint256(borrowAmount), user: address },
+              context: toContextOption(protocolKey, poolKey, currentCollateral.address),
+            },
+            Repay: undefined,
+            Withdraw: undefined,
+            Redeposit: undefined,
+            Reborrow: undefined,
+            Swap: undefined,
+            SwapExactIn: undefined,
+            Reswap: undefined,
+            ReswapExactIn: undefined,
+          });
+          setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly, borrowOnly] }]);
         }
       } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Failed to prepare switch instructions");
+        if (runIdRef.current === myRunId) {
+          setError(e?.message ?? "Failed to prepare switch instructions");
+          // Ensure subsequent attempts aren’t blocked by a failed key
+          lastRequestKeyRef.current = "";
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (runIdRef.current === myRunId) {
+          setLoading(false);
+        }
       }
-    };
-    run();
+    }, DEBOUNCE_MS);
+
+    // Cleanup: cancel scheduled work and invalidate previous run
     return () => {
-      cancelled = true;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      // Invalidate any in-flight async completions
+      runIdRef.current++;
     };
+    // ✅ Only primitive deps here
   }, [
     isOpen,
     address,
     type,
-    targetToken,
-    currentCollateral,
-    currentDebt,
+    targetTokenAddr,
+    currentCollateralAddr,
+    currentDebtAddr,
     collateralBalance,
     debtBalance,
     poolKey,
     protocolKey,
   ]);
 
-  // Fetch authorizations only for authInstructions
+  // 🔐 Fetch authorizations only when needed (stable getAuthorizations)
   useEffect(() => {
     if (!isOpen || !isAuthReady || authInstructions.length === 0) {
       setFetchedAuthorizations([]);
       return;
     }
-    let cancelled = false;
-    const run = async () => {
+    let active = true;
+    (async () => {
       try {
-        const auths = await getAuthorizations(authInstructions as any);
-        if (!cancelled) setFetchedAuthorizations(auths);
+        const auths = await getAuthRef.current(authInstructions as any);
+        if (active) setFetchedAuthorizations(auths);
       } catch {
-        if (!cancelled) setFetchedAuthorizations([]);
+        if (active) setFetchedAuthorizations([]);
       }
-    };
-    run();
+    })();
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, [isOpen, isAuthReady, getAuthorizations, authInstructions]);
+  }, [isOpen, isAuthReady, authInstructions]);
 
-  // Build final calls (auths + move_debt)
+  // 📞 Build final calls (auths + move_debt)
   const calls = useMemo(() => {
     if (protocolInstructions.length === 0) return [];
     const revokeAuthorizations = buildModifyDelegationRevokeCalls(fetchedAuthorizations);
@@ -300,6 +358,11 @@ export const useVesuSwitch = ({
     calls,
   } as const;
 };
+
+/* ---------- the two builders remain unchanged below ---------- */
+
+// ... keep buildCollateralSwitchInstructions and buildDebtSwitchInstructions as in your original file
+
 
 interface BuildInstructionArgs {
   address: string;
