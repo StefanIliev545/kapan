@@ -233,7 +233,28 @@ export const tokenNameToLogo = (tokenName: string) => {
     // stupid shit
     return "/logos/usdt.svg";
   }
-  return `/logos/${tokenName.toLowerCase()}.svg`;
+  const lower = tokenName.toLowerCase();
+
+  // Central PNG logo overrides for tokens that don't have svgs
+  const pngLogoMap: Record<string, string> = {
+    ekubo: "/logos/ekubo.png",
+    xstrk: "/logos/xstrk.png",
+    lbtc: "/logos/lbtc.png",
+    xwbtc: "/logos/xwbtc.png",
+    xtbtc: "/logos/xtbtc.png",
+    xlbtc: "/logos/xlbtc.png",
+    mre7btc: "/logos/mre7btc.png",
+    mre7yield: "/logos/mre7yield.png",
+    solvbtc: "/logos/solvbtc.png",
+    dog: "/logos/dog.png",
+    tbtc: "/logos/threshold-btc.png", // threshold’s tBTC
+    unibtc: "/logos/unibtc.png",
+    xsbtc: "/logos/xsolvbtc.png",
+  };
+
+  const png = pngLogoMap[lower];
+  if (png) return png;
+  return `/logos/${lower}.svg`;
 };
 
 export const ERC20ABI = [

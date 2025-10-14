@@ -22,6 +22,7 @@ import {
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { feltToString } from "~~/utils/protocols";
+import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAddress } from "../../specific/vesu/pools";
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 
@@ -38,16 +39,7 @@ const formatDisplayNumber = (value: string | number) => {
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
 
-// Define pool IDs
-const POOL_IDS = {
-  Genesis: 0n,
-} as const;
-
-// Helper function to get pool name from ID
-const getPoolNameFromId = (poolId: bigint): string => {
-  const entry = Object.entries(POOL_IDS).find(([_, id]) => id === poolId);
-  return entry ? entry[0] : "Unknown Pool";
-};
+// Use centralized pools from pools.ts
 
 type OutputPointer = { instruction_index: bigint; output_index: bigint };
 
@@ -94,8 +86,7 @@ const FLASH_LOAN_PROVIDER: FlashLoanProvider = {
   version: "v1",
 } as const;
 
-// V2 Default Pool Address
-const V2_DEFAULT_POOL_ADDRESS = "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5";
+// V2 pool selection handled via VESU_V2_POOLS
 
 export const MovePositionModal: FC<MovePositionModalProps> = ({
   isOpen,
@@ -112,7 +103,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [selectedProtocol, setSelectedProtocol] = useState(
     () => protocols.find(p => p.name !== fromProtocol)?.name || "",
   );
-  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(POOL_IDS["Genesis"]);
+  const [selectedPoolId, setSelectedPoolId] = useState<bigint>(VESU_V1_POOLS["Genesis"]);
+  const [selectedV2PoolAddress, setSelectedV2PoolAddress] = useState<string>(VESU_V2_POOLS["Default"]);
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
   const amountRef = useRef("");
@@ -385,7 +377,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           : collateral.amount;
 
         // Create context with paired tokens for Vesu (V1 or V2)
-        const poolIdOrAddress = selectedProtocol === "VesuV2" ? BigInt(V2_DEFAULT_POOL_ADDRESS) : 0n;
+        const poolIdOrAddress = selectedProtocol === "VesuV2" ? BigInt(selectedV2PoolAddress) : 0n;
         const contextRedeposit = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
           poolIdOrAddress,
           BigInt(position.tokenAddress),
@@ -527,11 +519,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     // Handle V2 Vesu context
     if (fromProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(selectedV2PoolAddress),
         BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(selectedV2PoolAddress),
         BigInt(position.tokenAddress),
       ]);
     }
@@ -554,11 +546,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     // Handle V2 Vesu target context
     if (selectedProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
       borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(selectedV2PoolAddress),
         BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        BigInt(V2_DEFAULT_POOL_ADDRESS),
+        BigInt(selectedV2PoolAddress),
         BigInt(position.tokenAddress),
       ]);
     }
@@ -923,7 +915,10 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     setSelectedProtocol(protocolName);
     // Reset pool selection when changing protocols
     if (protocolName !== "Vesu" && protocolName !== "VesuV2") {
-      setSelectedPoolId(POOL_IDS["Genesis"]);
+      setSelectedPoolId(VESU_V1_POOLS["Genesis"]);
+    }
+    if (protocolName === "VesuV2") {
+      setSelectedV2PoolAddress(VESU_V2_POOLS["Default"]);
     }
   };
 
@@ -1173,7 +1168,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                     {fromProtocol === "Vesu" && (
                       <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                         <span className="text-base-content/70">Current Pool:</span>
-                        <span className="font-medium ml-1">{currentPoolId !== undefined ? getPoolNameFromId(currentPoolId) : "Unknown"}</span>
+                        <span className="font-medium ml-1">{currentPoolId !== undefined ? getV1PoolNameFromId(currentPoolId) : "Unknown"}</span>
                       </div>
                     )}
                   </div>
@@ -1183,7 +1178,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between cursor-pointer h-12"
                     >
                       <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                        {Object.entries(POOL_IDS).map(([name, id]) =>
+                        {Object.entries(VESU_V1_POOLS).map(([name, id]) =>
                           id === selectedPoolId ? (
                             <span key={name} className="truncate font-semibold text-lg">
                               {name}
@@ -1199,11 +1194,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       tabIndex={0}
                       className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
                     >
-                      {Object.entries(POOL_IDS)
-                        .filter(([_, id]) => fromProtocol !== "Vesu" || id !== currentPoolId)
+                      {Object.entries(VESU_V1_POOLS)
+                        .filter(([name, id]) => fromProtocol !== "Vesu" || id !== currentPoolId)
                         .map(([name, id]) => (
                           <li key={name}>
-                            <button className="flex items-center gap-3 py-2" onClick={() => setSelectedPoolId(id)}>
+                            <button className="flex items-center gap-3 py-2" onClick={() => setSelectedPoolId(id as bigint)}>
                               <Image
                                 src="/logos/vesu.svg"
                                 alt="Vesu"
@@ -1226,20 +1221,46 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       <label className="text-sm font-medium text-base-content/80">Target Pool</label>
                       <div className="text-sm bg-base-200/60 py-1 px-3 rounded-lg flex items-center">
                         <span className="text-base-content/70">V2 Pool:</span>
-                        <span className="font-medium ml-1">Prime</span>
+                        <span className="font-medium ml-1">{getV2PoolNameFromAddress(selectedV2PoolAddress)}</span>
                       </div>
                     </div>
-                    <div className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between h-12">
-                      <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                        <Image
-                          src="/logos/vesu.svg"
-                          alt="VesuV2"
-                          width={32}
-                          height={32}
-                          className="rounded-full min-w-[32px]"
-                        />
-                        <span className="truncate font-semibold text-lg">Prime</span>
+                    <div className="dropdown w-full">
+                      <div
+                        tabIndex={0}
+                        className="border-b-2 border-base-300 py-2 px-1 flex items-center justify-between cursor-pointer h-12"
+                      >
+                        <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                          {Object.entries(VESU_V2_POOLS).map(([name, addr]) =>
+                            addr.toLowerCase() === selectedV2PoolAddress.toLowerCase() ? (
+                              <span key={name} className="truncate font-semibold text-lg">
+                                {name}
+                              </span>
+                            ) : null,
+                          )}
+                        </div>
+                        <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
+                      <ul
+                        tabIndex={0}
+                        className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                      >
+                        {Object.entries(VESU_V2_POOLS).map(([name, addr]) => (
+                          <li key={name}>
+                            <button className="flex items-center gap-3 py-2" onClick={() => setSelectedV2PoolAddress(addr)}>
+                              <Image
+                                src="/logos/vesu.svg"
+                                alt="VesuV2"
+                                width={32}
+                                height={32}
+                                className="rounded-full min-w-[32px]"
+                              />
+                              <span className="truncate text-lg">{name}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 )}

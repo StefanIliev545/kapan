@@ -2,7 +2,9 @@
 
 import { FC, useMemo, useState } from "react";
 import Image from "next/image";
-import { ContractResponse, POOL_IDS } from "../specific/vesu/VesuMarkets";
+import { ContractResponse } from "../specific/vesu/VesuMarkets";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { VESU_V1_POOLS } from "../specific/vesu/pools";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
 import { formatUnits } from "viem";
@@ -173,9 +175,10 @@ const useNostraData = (): MarketData[] => {
       const borrowAPR = Number(rate.borrowing_rate) / 1e16;
       const utilization = borrowAPR > 0 ? (supplyAPY / borrowAPR) * 100 : 0;
       const price = priceArr[idx] ? formatPrice(priceArr[idx]) : "0.00";
+      const display = symbol && symbol.trim().length > 0 ? symbol : getTokenNameFallback(address) ?? symbol;
       return {
-        icon: tokenNameToLogo(symbol.toLowerCase()),
-        name: symbol,
+        icon: tokenNameToLogo(display.toLowerCase()),
+        name: display,
         supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
         borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
         price,
@@ -227,7 +230,7 @@ const useVenusData = (): MarketData[] => {
 };
 
 const useVesuData = (): MarketData[] => {
-  const poolId = POOL_IDS["Genesis"];
+  const poolId = VESU_V1_POOLS["Genesis"];
   const { data: supportedAssets } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",

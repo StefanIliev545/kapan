@@ -44,6 +44,20 @@ const ADDR = {
       USDT: "0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8" as AddressHex,
       STRK: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" as AddressHex,
       WSTETH: "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" as AddressHex,
+      // Re7 BTC pool tokens
+      MRE7BTC: "0x04e4fb1a9ca7e84bae609b9dc0078ad7719e49187ae7e425bb47d131710eddac" as AddressHex,
+      XTBTC: "0x043a35c1425a0125ef8c171f1a75c6f31ef8648edcc8324b55ce1917db3f9b91" as AddressHex,
+      T_BTC: "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f" as AddressHex,
+      XSBTC: "0x0580f3dc564a7b82f21d40d404b3842d490ae7205e6ac07b1b7af2b4a5183dc9" as AddressHex,
+      SOLVBTC: "0x0593e034dda23eea82d2ba9a30960ed42cf4a01502cc2351dc9b9881f9931a68" as AddressHex,
+      XWBTC: "0x06a567e68c805323525fe1649adb80b03cddf92c23d2629a6779f54192dffc13" as AddressHex,
+      LBTC: "0x036834a40984312f7f7de8d31e3f6305b325389eaeea5b1c0664b2fb936461a4" as AddressHex,
+      XLBTC: "0x07dd3c80de9fcc5545f0cb83678826819c79619ed7992cc06ff81fc67cd2efe0" as AddressHex,
+      UNIBTC: "0x023a312ece4a275e38c9fc169e3be7b5613a0cb55fe1bece4422b09a88434573" as AddressHex,
+      MRE7YIELD: "0x04be8945e61dc3e19ebadd1579a6bd53b262f51ba89e6f8b0c4bc9a7e3c633fc" as AddressHex,
+      DOG: "0x040e81cfeb176bfdbc5047bbc55eb471cfab20a6b221f38d8fda134e1bfffca4" as AddressHex,
+      EKUBO: "0x075afe6402ad5a5c20dd25e10ec3b3986acaa647b77e4ae24b0cbc9a54a27a87" as AddressHex,
+      XSTRK: "0x028d709c875c0ceac3dce7065bec5328186dc89fe254527084d1689910954b0a" as AddressHex,
     },
     EXTERNALS: {
       VESU_SINGLETON:
@@ -68,10 +82,24 @@ const ADDR = {
         "3592370751539490711610556844458488648008775713878064059760995781404350938653" as FeltDec,
       ALTER_SCOPE_WSTETH_POOL_ID:
         "2612229586214495842527551768232431476062656055007024497123940017576986139174" as FeltDec,
+      CARMINE_RUNES_POOL_ID:
+        "0x05ed7f4a51687a544b1a596dc5b30743dbd0b633197e5de9f6281cdf64f8a44b" as FeltDec,
+      RE7_STARKNET_ECOSYSTEM_POOL_ID:
+        "0x06febb313566c48e30614ddab092856a9ab35b80f359868ca69b2649ca5d148d" as FeltDec,
+      RE7_XSTRK_POOL_ID:
+        "0x052fb52363939c3aa848f8f4ac28f0a51379f8d1b971d8444de25fbd77d8f161" as FeltDec,
     },
     V2: {
       DEFAULT_POOL_ADDRESS:
         "0x0451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5" as AddressHex,
+      RE7_XBTC_POOL_ADDRESS:
+        "0x03a8416bf20d036df5b1cf3447630a2e1cb04685f6b0c3a70ed7fb1473548ecf" as AddressHex,
+      RE7_USDC_CORE_POOL_ADDRESS:
+        "0x03976cac265a12609934089004df458ea29c776d77da423c96dc761d09d24124" as AddressHex,
+      RE7_USDC_PRIME_POOL_ADDRESS:
+        "0x02eef0c13b10b487ea5916b54c0a7f98ec43fb3048f60fdeedaf5b08f6f88aaf" as AddressHex,
+      RE7_USDC_STABLE_CORE_POOL_ADDRESS:
+        "0x073702fce24aba36da1eac539bd4bae62d4d6a76747b7cdd3e016da754d7a135" as AddressHex,
     },
     NOSTRA: {
       // Per-asset tuple addresses (debt/collateral/ibcollateral)
@@ -392,8 +420,11 @@ const initializeContracts = async (addresses: {
 
   const nonce = await deployer.getNonce();
 
-  const RE7_POOL = V1.RE7_POOL_ID;
   const ALTER_SCOPE_WSTETH = V1.ALTER_SCOPE_WSTETH_POOL_ID;
+  const GENESIS_POOL = V1.DEFAULT_POOL_ID;
+  const CARMINE_RUNES_POOL = V1.CARMINE_RUNES_POOL_ID;
+  const RE7_STARKNET_ECOSYSTEM_POOL = V1.RE7_STARKNET_ECOSYSTEM_POOL_ID;
+  const RE7_XSTRK_POOL = V1.RE7_XSTRK_POOL_ID;
 
   const calls = [
     // ------- Nostra supported assets -------
@@ -459,35 +490,83 @@ const initializeContracts = async (addresses: {
     },
 
     // ------- Vesu V1 pools & allowlists -------
-    { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [RE7_POOL] },
+    // Genesis Pool (DEFAULT_POOL_ID)
+    { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [GENESIS_POOL] },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_collaterals",
-      calldata: encodePoolAssets(RE7_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC]),
+      calldata: encodePoolAssets(GENESIS_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC, T.USDT]),
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_debts",
-      calldata: encodePoolAssets(RE7_POOL, [T.USDC, T.USDT]),
+      calldata: encodePoolAssets(GENESIS_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC, T.USDT]),
     },
-
-    { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [ALTER_SCOPE_WSTETH] },
-    {
-      contractAddress: addresses.vesuGatewayAddress,
-      entrypoint: "add_pool_collaterals",
-      calldata: encodePoolAssets(ALTER_SCOPE_WSTETH, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC]),
-    },
-    {
-      contractAddress: addresses.vesuGatewayAddress,
-      entrypoint: "add_pool_debts",
-      calldata: encodePoolAssets(ALTER_SCOPE_WSTETH, [T.USDC, T.USDT]),
-    },
-
     // ------- Vesu V2 default pool allowlists -------
     {
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool",
       calldata: [V2.DEFAULT_POOL_ADDRESS],
+    },
+
+    // ------- CarmineDAO Runes Pool (V1) -------
+    { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [CARMINE_RUNES_POOL] },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAssets(CARMINE_RUNES_POOL, [
+        T.WBTC,
+        T.ETH,
+        T.USDC,
+        T.STRK,
+        T.DOG,
+      ]),
+    },
+
+    // ------- Re7 Starknet Ecosystem Pool (V1) -------
+    { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [RE7_STARKNET_ECOSYSTEM_POOL] },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAssets(RE7_STARKNET_ECOSYSTEM_POOL, [
+        T.STRK,
+        T.EKUBO,
+      ]),
+    },
+
+    // ------- Re7 xSTRK Pool (V1) -------
+    { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [RE7_XSTRK_POOL] },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAssets(RE7_XSTRK_POOL, [
+        T.XSTRK,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAssets(RE7_XSTRK_POOL, [
+        T.STRK,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAssets(RE7_STARKNET_ECOSYSTEM_POOL, [
+        T.USDC,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayAddress,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAssets(CARMINE_RUNES_POOL, [
+        T.DOG,
+        T.STRK,
+        T.ETH,
+        T.WBTC,
+        T.USDC,
+      ]),
     },
     {
       contractAddress: addresses.vesuGatewayV2Address,
@@ -500,7 +579,85 @@ const initializeContracts = async (addresses: {
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAddrAssets(V2.DEFAULT_POOL_ADDRESS, [
-        T.USDC, T.USDT, T.STRK,
+        T.ETH, T.WBTC, T.USDC, T.USDT, T.STRK, T.WSTETH,
+      ]),
+    },
+
+    // ------- Re7 USDC Core Pool (V2) -------
+    { contractAddress: addresses.vesuGatewayV2Address, entrypoint: "add_pool", calldata: [V2.RE7_USDC_CORE_POOL_ADDRESS] },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAddrAssets(V2.RE7_USDC_CORE_POOL_ADDRESS, [
+        T.UNIBTC,
+        T.LBTC,
+        T.T_BTC,
+        T.SOLVBTC,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAddrAssets(V2.RE7_USDC_CORE_POOL_ADDRESS, [
+        T.USDC,
+      ]),
+    },
+
+    // ------- Re7 USDC Prime Pool (V2) -------
+    { contractAddress: addresses.vesuGatewayV2Address, entrypoint: "add_pool", calldata: [V2.RE7_USDC_PRIME_POOL_ADDRESS] },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAddrAssets(V2.RE7_USDC_PRIME_POOL_ADDRESS, [
+        T.WBTC,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAddrAssets(V2.RE7_USDC_PRIME_POOL_ADDRESS, [
+        T.USDC,
+      ]),
+    },
+
+    // ------- Re7 USDC Stable Core Pool (V2) -------
+    { contractAddress: addresses.vesuGatewayV2Address, entrypoint: "add_pool", calldata: [V2.RE7_USDC_STABLE_CORE_POOL_ADDRESS] },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAddrAssets(V2.RE7_USDC_STABLE_CORE_POOL_ADDRESS, [
+        T.MRE7YIELD,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAddrAssets(V2.RE7_USDC_STABLE_CORE_POOL_ADDRESS, [
+        T.USDC,
+      ]),
+    },
+
+    // ------- Re7 xBTC Pool (V2) -------
+    { contractAddress: addresses.vesuGatewayV2Address, entrypoint: "add_pool", calldata: [V2.RE7_XBTC_POOL_ADDRESS] },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_collaterals",
+      calldata: encodePoolAddrAssets(V2.RE7_XBTC_POOL_ADDRESS, [
+        T.MRE7BTC,
+        T.XTBTC,
+        T.XSBTC,
+        T.XWBTC,
+        T.XLBTC,
+      ]),
+    },
+    {
+      contractAddress: addresses.vesuGatewayV2Address,
+      entrypoint: "add_pool_debts",
+      calldata: encodePoolAddrAssets(V2.RE7_XBTC_POOL_ADDRESS, [
+        T.WBTC,
+        T.T_BTC,
+        T.SOLVBTC,
+        T.LBTC,
       ]),
     },
 

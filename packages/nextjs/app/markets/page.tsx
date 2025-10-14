@@ -8,7 +8,8 @@ import Spinner from "~~/components/common/Spinner";
 import { LendingSidebar } from "~~/components/LendingSidebar";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
-import { ContractResponse, POOL_IDS } from "~~/components/specific/vesu/VesuMarkets";
+import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
+import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import StableArea from "~~/components/common/StableArea";
 
@@ -51,7 +52,7 @@ const MarketsPage: NextPage = () => {
   const [search, setSearch] = useState("");
   const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
 
-  const poolId = POOL_IDS["Genesis"];
+  const poolId = VESU_V1_POOLS["Genesis"];
 
   const { data: supportedAssets } = useScaffoldReadContract({
     contractName: "VesuGateway",

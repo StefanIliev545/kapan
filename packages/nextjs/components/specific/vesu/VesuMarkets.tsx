@@ -9,10 +9,11 @@ import {
   toAnnualRates,
   type TokenMetadata,
 } from "~~/utils/protocols";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 
-export const POOL_IDS = {
-  Genesis: 2198503327643286920898110335698706244522220458610657370981979460625005526824n,
-} as const;
+import { VESU_V1_POOLS } from "./pools";
+
+export const POOL_IDS = VESU_V1_POOLS;
 
 export type ContractResponse = TokenMetadata[];
 
@@ -21,6 +22,7 @@ interface VesuMarketsProps {
   viewMode: "list" | "grid";
   search: string;
   allowDeposit?: boolean;
+  poolId?: bigint;
 }
 
 export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, search, allowDeposit = false }) => {
@@ -29,7 +31,9 @@ export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, s
     if (!supportedAssets) return [];
     return (supportedAssets as ContractResponse).map(asset => {
       const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
-      const symbol = feltToString(asset.symbol);
+      const raw = typeof (asset as any).symbol === "bigint" ? feltToString((asset as any).symbol) : String((asset as any).symbol ?? "");
+      console.log("raw:", raw, "fallback:", getTokenNameFallback(address));
+      const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
       const { borrowAPR, supplyAPY } = toAnnualRates(
         asset.fee_rate,
         asset.total_nominal_debt,

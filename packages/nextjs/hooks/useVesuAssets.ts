@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import { toAnnualRates } from "~~/utils/protocols";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 
 const normalizeDecimals = (value: unknown): number | null => {
   if (value === undefined || value === null) return 18;
@@ -102,6 +103,20 @@ export const useVesuAssets = (poolId: bigint) => {
     refetchInterval: 0,
   });
 
+  // Fetch explicit allowlists for collateral and debt to correctly mark supply/borrow capability
+  const { data: supportedCollaterals } = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_collateral_assets",
+    args: [poolId],
+    refetchInterval: 0,
+  });
+  const { data: supportedDebts } = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_debt_assets",
+    args: [poolId],
+    refetchInterval: 0,
+  });
+
   useEffect(() => {
     if (assetsError) {
       console.error("Error fetching supported assets:", assetsError);
@@ -124,6 +139,17 @@ export const useVesuAssets = (poolId: bigint) => {
         asset.scale,
       );
 
+      // Fallback for empty symbol names
+      const symbol = asset.symbol as unknown as string;
+      if (!symbol || (typeof symbol === "bigint" && symbol === 0n)) {
+        const hexAddr = toHexAddress(asset.address);
+        const fallback = getTokenNameFallback(hexAddr);
+        if (fallback) {
+          // cast to any to override type, we only use display string further downstream when bigint missing
+          (asset as any).symbol = fallback;
+        }
+      }
+
       return { ...asset, borrowAPR, supplyAPY };
     });
   }, [normalizedAssets]);
@@ -136,9 +162,31 @@ export const useVesuAssets = (poolId: bigint) => {
     return map;
   }, [assetsWithRates]);
 
+  const toHex = (v: unknown) => (typeof v === "bigint" ? `0x${v.toString(16).padStart(64, "0")}` : undefined);
+  const collateralSet = useMemo(() => {
+    if (!Array.isArray(supportedCollaterals)) return new Set<string>();
+    const set = new Set<string>();
+    for (const v of supportedCollaterals as unknown[]) {
+      const hex = toHex(v);
+      if (hex) set.add(hex);
+    }
+    return set;
+  }, [supportedCollaterals]);
+  const debtSet = useMemo(() => {
+    if (!Array.isArray(supportedDebts)) return new Set<string>();
+    const set = new Set<string>();
+    for (const v of supportedDebts as unknown[]) {
+      const hex = toHex(v);
+      if (hex) set.add(hex);
+    }
+    return set;
+  }, [supportedDebts]);
+
   return {
     assetsWithRates,
     assetMap,
+    collateralSet,
+    debtSet,
     isLoading: supportedAssets == null,
     assetsError,
   };

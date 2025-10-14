@@ -71,6 +71,8 @@ pub trait IVesuViewer<TContractState> {
         other_token: ContractAddress,
         is_debt_context: bool,
     ) -> (ContractAddress, ContractAddress, PositionWithAmounts);
+    fn get_supported_collateral_assets(self: @TContractState, pool_id: felt252) -> Array<ContractAddress>;
+    fn get_supported_debt_assets(self: @TContractState, pool_id: felt252) -> Array<ContractAddress>;
 }
 
 #[derive(Drop, Serde)]
@@ -1213,7 +1215,6 @@ impl IVesuGatewayAdminImpl of IVesuGatewayAdmin<ContractState> {
             let ulen = pool_assets.len();
             for i in 0..ulen {
                 let asset = *pool_assets.at(i);
-                let asset_felt: felt252 = asset.into();
 
                 let dispatcher = IERC20SymbolDispatcher { contract_address: asset };
                 let symbol_felt = dispatcher.symbol();
@@ -1248,6 +1249,28 @@ impl IVesuGatewayAdminImpl of IVesuGatewayAdmin<ContractState> {
                     scale: asset_config.scale,
                 };
                 assets.append(metadata.into());
+            };
+            assets
+        }
+
+        fn get_supported_collateral_assets(self: @ContractState, pool_id: felt252) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let pool_id = if pool_id == Zero::zero() { self.pool_id.read() } else { pool_id };
+            let coll_vec = self.supported_pool_collaterals.entry(pool_id);
+            for i in 0..coll_vec.len() {
+                let asset = coll_vec.at(i).read();
+                assets.append(asset);
+            };
+            assets
+        }
+
+        fn get_supported_debt_assets(self: @ContractState, pool_id: felt252) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let pool_id = if pool_id == Zero::zero() { self.pool_id.read() } else { pool_id };
+            let debts_vec = self.supported_pool_debts.entry(pool_id);
+            for i in 0..debts_vec.len() {
+                let asset = debts_vec.at(i).read();
+                assets.append(asset);
             };
             assets
         }

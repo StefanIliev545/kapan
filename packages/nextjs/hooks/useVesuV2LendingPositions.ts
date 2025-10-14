@@ -9,6 +9,7 @@ import type { CollateralWithAmount } from "~~/components/specific/collateral/Col
 import { feltToString } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { createVesuContextV2, normalizeStarknetAddress, type VesuProtocolKey } from "~~/utils/vesu";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
 
@@ -132,7 +133,7 @@ export const useVesuV2LendingPositions = (
   const refetchCounter = useRef(0);
 
   const normalizedPoolAddress = normalizeStarknetAddress(poolAddress);
-  const { assetsWithRates, assetMap, isLoading: isLoadingAssets, assetsError } = useVesuV2Assets(normalizedPoolAddress);
+  const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuV2Assets(normalizedPoolAddress);
 
   const {
     data: userPositionsPart1,
@@ -239,8 +240,14 @@ export const useVesuV2LendingPositions = (
   }, [positionsError1, positionsError2, userAddress, userPositionsPart1, userPositionsPart2]);
 
   const suppliablePositions = useMemo(() => {
-    return assetsWithRates.map(asset => {
-      const symbol = feltToString(asset.symbol);
+    return assetsWithRates
+      .filter(asset => collateralSet?.has(`0x${asset.address.toString(16).padStart(64, "0")}`))
+      .map(asset => {
+      const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
+      let symbol = feltToString(asset.symbol);
+      if (!symbol || symbol.trim().length === 0) {
+        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
+      }
       const price = normalizePrice(asset.price);
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
@@ -248,7 +255,7 @@ export const useVesuV2LendingPositions = (
         balance: 0,
         tokenBalance: 0n,
         currentRate: (asset.supplyAPY ?? 0) * 100,
-        tokenAddress: `0x${asset.address.toString(16).padStart(64, "0")}`,
+        tokenAddress: address,
         tokenDecimals: asset.decimals,
         tokenPrice: price,
         tokenSymbol: symbol,
@@ -256,12 +263,18 @@ export const useVesuV2LendingPositions = (
           deposit: createVesuContextV2(normalizedPoolAddress, ZERO_ADDRESS),
         },
       };
-    });
-  }, [assetsWithRates, normalizedPoolAddress]);
+      });
+  }, [assetsWithRates, normalizedPoolAddress, collateralSet]);
 
   const borrowablePositions = useMemo(() => {
-    return assetsWithRates.map(asset => {
-      const symbol = feltToString(asset.symbol);
+    return assetsWithRates
+      .filter(asset => debtSet?.has(`0x${asset.address.toString(16).padStart(64, "0")}`))
+      .map(asset => {
+      const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
+      let symbol = feltToString(asset.symbol);
+      if (!symbol || symbol.trim().length === 0) {
+        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
+      }
       const price = normalizePrice(asset.price);
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
@@ -269,13 +282,13 @@ export const useVesuV2LendingPositions = (
         balance: 0,
         tokenBalance: 0n,
         currentRate: (asset.borrowAPR ?? 0) * 100,
-        tokenAddress: `0x${asset.address.toString(16).padStart(64, "0")}`,
+        tokenAddress: address,
         tokenDecimals: asset.decimals,
         tokenPrice: price,
         tokenSymbol: symbol,
       };
-    });
-  }, [assetsWithRates]);
+      });
+  }, [assetsWithRates, debtSet]);
 
   const rows = useMemo(() => {
     if (!userAddress || cachedPositions.length === 0) {

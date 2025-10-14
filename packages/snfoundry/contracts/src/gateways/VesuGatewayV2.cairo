@@ -81,6 +81,8 @@ pub trait IVesuViewer<TContractState> {
         other_token: ContractAddress,
         is_debt_context: bool,
     ) -> (ContractAddress, ContractAddress, PositionWithAmounts);
+    fn get_supported_collateral_assets(self: @TContractState, pool_address: ContractAddress) -> Array<ContractAddress>;
+    fn get_supported_debt_assets(self: @TContractState, pool_address: ContractAddress) -> Array<ContractAddress>;
 }
 
 #[derive(Drop, Serde)]
@@ -1044,6 +1046,28 @@ impl IVesuGatewayAdminImpl of IVesuGatewayAdmin<ContractState> {
                     reserve: asset_config.reserve,
                     scale: asset_config.scale,
                 }.into());
+            };
+            assets
+        }
+
+        fn get_supported_collateral_assets(self: @ContractState, pool_address: ContractAddress) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let pool_address = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            let coll_vec = self.supported_pool_collaterals.entry(pool_address);
+            for i in 0..coll_vec.len() {
+                let asset = coll_vec.at(i).read();
+                assets.append(asset);
+            };
+            assets
+        }
+
+        fn get_supported_debt_assets(self: @ContractState, pool_address: ContractAddress) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let pool_address = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            let debts_vec = self.supported_pool_debts.entry(pool_address);
+            for i in 0..debts_vec.len() {
+                let asset = debts_vec.at(i).read();
+                assets.append(asset);
             };
             assets
         }
