@@ -77,6 +77,27 @@ fn setup_test_context() -> TestContext {
     println!("pre-funding address");
     prefund_address(USER_ADDRESS());
 
+    // Initialize pool allowlists
+    println!("initializing pool allowlists");
+    let admin_dispatcher = IVesuGatewayAdminDispatcher { contract_address: gateway_address };
+    
+    // Cheat caller to be the owner (USER_ADDRESS)
+    cheat_caller_address(gateway_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
+    
+    // Add pool
+    admin_dispatcher.add_pool(POOL_ID);
+    
+    // Add collaterals
+    let mut collaterals = array![];
+    collaterals.append(token_address); // ETH
+    collaterals.append(USDC_ERC20_ADDRESS()); // USDC
+    admin_dispatcher.add_pool_collaterals(POOL_ID, collaterals);
+    
+    // Add debts
+    let mut debts = array![];
+    debts.append(USDC_ERC20_ADDRESS()); // USDC
+    admin_dispatcher.add_pool_debts(POOL_ID, debts);
+
     TestContext {
         gateway_address,
         token_address,
@@ -89,9 +110,6 @@ fn setup_test_context() -> TestContext {
 }
 
 fn deploy_vesu_gateway(name: ByteArray) -> ContractAddress {
-    let eth_address = contract_address_const::<ETH_CONTRACT_ADDRESS>();
-    let usdc_address = contract_address_const::<USDC_CONTRACT_ADDRESS>();
-
     let contract_class = declare(name).unwrap().contract_class();
     let mut calldata = array![];
     calldata.append_serde(SINGLETON_ADDRESS());
@@ -99,11 +117,6 @@ fn deploy_vesu_gateway(name: ByteArray) -> ContractAddress {
     calldata.append_serde(USER_ADDRESS()); // fake router
     calldata.append_serde(USER_ADDRESS());
 
-    // Add supported assets array
-    let mut supported_assets = array![];
-    supported_assets.append(eth_address);
-    supported_assets.append(usdc_address);
-    calldata.append_serde(supported_assets);
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -391,9 +404,9 @@ fn test_get_supported_assets_ui() {
     let context = setup_test_context();
     let vesuViewerDispatcher = IVesuViewerDispatcher { contract_address: context.gateway_address };
     let assets = vesuViewerDispatcher.get_supported_assets_ui(POOL_ID);
-    let crossCheckAssets = vesuViewerDispatcher.get_supported_assets_array();
+    let crossCheckAssets = vesuViewerDispatcher.get_supported_assets_array(POOL_ID);
 
-    assert(crossCheckAssets.len() == 2, 'sumtin-wrong');
+    assert(crossCheckAssets.len() == 2, 'sumtin-wrong'); // ETH + USDC (both collaterals and debts)
     assert(assets.len() == crossCheckAssets.len(), 'assets length mismatch');
     // Verify we got some assets back
     assert(assets.len() > 0, 'no assets returned');

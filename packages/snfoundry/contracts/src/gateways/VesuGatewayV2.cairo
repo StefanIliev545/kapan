@@ -13,6 +13,7 @@ use crate::interfaces::IGateway::{
     Borrow, Deposit, ILendingInstructionProcessor, InstructionOutput, LendingInstruction, Repay, Withdraw,
 };
 use core::traits::Into;
+use core::traits::TryInto;
 use core::integer::u256;
 
 pub mod Errors {
@@ -22,9 +23,10 @@ pub mod Errors {
 
 #[starknet::interface]
 pub trait IVesuGatewayAdmin<TContractState> {
-    fn add_asset(ref self: TContractState, asset: ContractAddress);
     fn add_pool(ref self: TContractState, pool_address: ContractAddress);
-    fn add_pool_asset(ref self: TContractState, pool_address: ContractAddress, asset: ContractAddress);
+    // New: explicit allowlists per pool (batch)
+    fn add_pool_collaterals(ref self: TContractState, pool_address: ContractAddress, assets: Array<ContractAddress>);
+    fn add_pool_debts(ref self: TContractState, pool_address: ContractAddress, assets: Array<ContractAddress>);
 }
 
 #[derive(Drop, Serde)]
@@ -55,7 +57,7 @@ pub trait IVesuViewer<TContractState> {
     fn get_all_positions(
         self: @TContractState, user: ContractAddress, pool_address: ContractAddress
     ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)>;
-    fn get_supported_assets_array(self: @TContractState) -> Array<ContractAddress>;
+    fn get_supported_assets_array(self: @TContractState, pool_address: ContractAddress) -> Array<ContractAddress>;
     fn get_supported_assets_info(
         self: @TContractState, user: ContractAddress, pool_address: ContractAddress
     ) -> Array<(ContractAddress, felt252, u8, u256)>;
@@ -79,6 +81,8 @@ pub trait IVesuViewer<TContractState> {
         other_token: ContractAddress,
         is_debt_context: bool,
     ) -> (ContractAddress, ContractAddress, PositionWithAmounts);
+    fn get_supported_collateral_assets(self: @TContractState, pool_address: ContractAddress) -> Array<ContractAddress>;
+    fn get_supported_debt_assets(self: @TContractState, pool_address: ContractAddress) -> Array<ContractAddress>;
 }
 
 #[derive(Drop, Serde)]
@@ -127,17 +131,18 @@ mod VesuGatewayV2 {
     }
 
     #[storage]
-    struct Storage {
-        // V2: store a default pool address (UI/backcompat)
-        default_pool: ContractAddress,
-        supported_assets: Vec<ContractAddress>,
-        supported_pools: Vec<ContractAddress>,
-        supported_pool_assets: Map<ContractAddress, Vec<ContractAddress>>,
-        router: ContractAddress,
-        pool_factory: ContractAddress,
-        #[substorage(v0)]
-        ownable: OwnableComponent::Storage,
-    }
+struct Storage {
+    // V2: store a default pool address (UI/backcompat)
+    default_pool: ContractAddress,
+    supported_pools: Vec<ContractAddress>,
+    // Replaces prior single list with explicit allowlists
+    supported_pool_collaterals: Map<ContractAddress, Vec<ContractAddress>>,
+    supported_pool_debts: Map<ContractAddress, Vec<ContractAddress>>,
+    router: ContractAddress,
+    pool_factory: ContractAddress,
+    #[substorage(v0)]
+    ownable: OwnableComponent::Storage,
+}
 
     #[constructor]
     fn constructor(
@@ -146,15 +151,11 @@ mod VesuGatewayV2 {
         router: ContractAddress,
         owner: ContractAddress,
         pool_factory: ContractAddress,
-        supported_assets: Array<ContractAddress>,
     ) {
         self.default_pool.write(default_pool);
         self.router.write(router);
         self.pool_factory.write(pool_factory);
         self.ownable.initializer(owner);
-        for asset in supported_assets {
-            self.supported_assets.push(asset);
-        }
     }
 
     // ------------------------------
@@ -654,23 +655,24 @@ mod VesuGatewayV2 {
     // Admin
     // ------------------------------
     #[abi(embed_v0)]
-    impl IVesuGatewayAdminImpl of IVesuGatewayAdmin<ContractState> {
-        fn add_asset(ref self: ContractState, asset: ContractAddress) {
-            self.ownable.assert_only_owner();
-            self.supported_assets.push(asset);
-        }
-
-        fn add_pool(ref self: ContractState, pool_address: ContractAddress) {
-            self.ownable.assert_only_owner();
-            self.supported_pools.push(pool_address);
-        }
-
-        fn add_pool_asset(ref self: ContractState, pool_address: ContractAddress, asset: ContractAddress) {
-            self.ownable.assert_only_owner();
-            let mut supported_pool_assets = self.supported_pool_assets.entry(pool_address);
-            supported_pool_assets.push(asset);
-        }
+impl IVesuGatewayAdminImpl of IVesuGatewayAdmin<ContractState> {
+    fn add_pool(ref self: ContractState, pool_address: ContractAddress) {
+        self.ownable.assert_only_owner();
+        self.supported_pools.push(pool_address);
     }
+
+    fn add_pool_collaterals(ref self: ContractState, pool_address: ContractAddress, assets: Array<ContractAddress>) {
+        self.ownable.assert_only_owner();
+        let mut vec = self.supported_pool_collaterals.entry(pool_address);
+        for a in assets { vec.push(a); };
+    }
+
+    fn add_pool_debts(ref self: ContractState, pool_address: ContractAddress, assets: Array<ContractAddress>) {
+        self.ownable.assert_only_owner();
+        let mut vec = self.supported_pool_debts.entry(pool_address);
+        for a in assets { vec.push(a); };
+    }
+}
 
     // ------------------------------
     // Processor (combined actions)
@@ -825,10 +827,21 @@ mod VesuGatewayV2 {
 
     #[abi(embed_v0)]
     impl IVesuViewerImpl of IVesuViewer<ContractState> {
-        fn get_supported_assets_array(self: @ContractState) -> Array<ContractAddress> {
+        fn get_supported_assets_array(self: @ContractState, pool_address: ContractAddress) -> Array<ContractAddress> {
             let mut assets = array![];
-            let len = self.supported_assets.len();
-            for i in 0..len { assets.append(self.supported_assets.at(i).read()); }
+            let pool = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            // Build union(collaterals ∪ debts)
+            let mut seen: Felt252Dict<u8> = Default::default();
+            let coll_vec = self.supported_pool_collaterals.entry(pool);
+            let debts_vec = self.supported_pool_debts.entry(pool);
+            for i in 0..coll_vec.len() {
+                let a = coll_vec.at(i).read();
+                if seen.get(a.into()) == 0 { assets.append(a); seen.insert(a.into(), 1); }
+            };
+            for i in 0..debts_vec.len() {
+                let a = debts_vec.at(i).read();
+                if seen.get(a.into()) == 0 { assets.append(a); seen.insert(a.into(), 1); }
+            };
             assets
         }
 
@@ -836,19 +849,31 @@ mod VesuGatewayV2 {
             self: @ContractState, user: ContractAddress, pool_address: ContractAddress
         ) -> Array<(ContractAddress, felt252, u8, u256)> {
             let mut assets = array![];
-            let supported_assets = self.get_supported_assets_array();
-            let len = supported_assets.len();
+            let pool = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            // Build union(collaterals ∪ debts)
+            let mut seen: Felt252Dict<u8> = Default::default();
+            let mut pool_assets: Array<ContractAddress> = array![];
+            let coll_vec = self.supported_pool_collaterals.entry(pool);
+            let debts_vec = self.supported_pool_debts.entry(pool);
+            for i in 0..coll_vec.len() {
+                let a = coll_vec.at(i).read();
+                if seen.get(a.into()) == 0 { pool_assets.append(a); seen.insert(a.into(), 1); }
+            };
+            for i in 0..debts_vec.len() {
+                let a = debts_vec.at(i).read();
+                if seen.get(a.into()) == 0 { pool_assets.append(a); seen.insert(a.into(), 1); }
+            };
 
-            let positions = self.get_all_positions(user, pool_address);
+            let positions = self.get_all_positions(user, pool);
             let mut positions_map: Felt252Dict<u32> = Default::default();
-
             for n in 0..positions.len() {
                 let (coll, _, _) = positions.at(n);
                 positions_map.insert((*coll).into(), n + 1);
             };
 
-            for i in 0..len {
-                let underlying = *supported_assets.at(i);
+            let ulen = pool_assets.len();
+            for i in 0..ulen {
+                let underlying = *pool_assets.at(i);
                 let symbol = super::IERC20SymbolDispatcher { contract_address: underlying }.symbol();
                 let decimals = IERC20MetadataDispatcher { contract_address: underlying }.decimals();
                 let mut idx = positions_map.get(underlying.into());
@@ -866,9 +891,10 @@ mod VesuGatewayV2 {
         fn get_all_positions(
             self: @ContractState, user: ContractAddress, pool_address: ContractAddress
         ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
-            let assets = self.get_supported_assets_array();
-            let len = assets.len();
-            self.get_all_positions_range(user, pool_address, 0, len)
+            let pool = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            let coll = self.supported_pool_collaterals.entry(pool);
+            let len = coll.len();
+            self.get_all_positions_range(user, pool, 0, len.try_into().unwrap())
         }
 
         fn get_all_positions_range(
@@ -879,17 +905,18 @@ mod VesuGatewayV2 {
             end_index: usize,
         ) -> Array<(ContractAddress, ContractAddress, PositionWithAmounts)> {
             let mut positions = array![];
-            let supported_assets = self.get_supported_assets_array();
-            let len = supported_assets.len();
             let pool_address = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
             let pool = IPoolDispatcher { contract_address: pool_address };
 
-            let start = if start_index > len { len } else { start_index };
-            let end = if end_index > len { len } else { end_index };
+            // Collateral allowlist for this pool
+            let coll_vec = self.supported_pool_collaterals.entry(pool_address);
+            let coll_len = coll_vec.len();
+            let start = if start_index > coll_len.try_into().unwrap() { coll_len.try_into().unwrap() } else { start_index };
+            let end = if end_index > coll_len.try_into().unwrap() { coll_len.try_into().unwrap() } else { end_index };
 
             let mut i = start;
             while i != end {
-                let collateral_asset = *supported_assets.at(i);
+                let collateral_asset = coll_vec.at(i.try_into().unwrap()).read();
 
                 // vToken balance (if vToken==underlying here, this is effectively underlying balance)
                 let vtoken = self.get_vtoken_for_collateral(collateral_asset, pool_address);
@@ -910,10 +937,12 @@ mod VesuGatewayV2 {
                     ));
                 }
 
-                // Other debt pairs
-                for j in 0..len {
-                    if i == j { continue; }
-                    let debt_asset = *supported_assets.at(j);
+                // Other allowed debt pairs
+                let debts_vec = self.supported_pool_debts.entry(pool_address);
+                let dlen = debts_vec.len();
+                for j in 0..dlen {
+                    let debt_asset = debts_vec.at(j).read();
+                    if debt_asset == collateral_asset { continue; }
                     let (position, _, debt) = pool.position(collateral_asset, debt_asset, user);
                     if position.collateral_shares > 0 || position.nominal_debt > 0 {
                         let vtoken = self.get_vtoken_for_collateral(collateral_asset, pool_address);
@@ -970,13 +999,27 @@ mod VesuGatewayV2 {
 
         fn get_supported_assets_ui(self: @ContractState, pool_address: ContractAddress) -> Array<TokenMetadata> {
             let mut assets = array![];
-            let len = self.supported_assets.len();
             let pool_address = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
             let pool = IPoolDispatcher { contract_address: pool_address };
 
-            for i in 0..len {
-                let asset = self.supported_assets.at(i).read();
-                let asset_felt: felt252 = asset.into();
+            // Build union(collaterals ∪ debts) for this pool
+            let mut seen: Felt252Dict<u8> = Default::default();
+            let mut pool_assets: Array<ContractAddress> = array![];
+            let coll_vec = self.supported_pool_collaterals.entry(pool_address);
+            let debts_vec = self.supported_pool_debts.entry(pool_address);
+            for i in 0..coll_vec.len() {
+                let a = coll_vec.at(i).read();
+                if seen.get(a.into()) == 0 { pool_assets.append(a); seen.insert(a.into(), 1); }
+            };
+            for i in 0..debts_vec.len() {
+                let a = debts_vec.at(i).read();
+                if seen.get(a.into()) == 0 { pool_assets.append(a); seen.insert(a.into(), 1); }
+            };
+
+            let ulen = pool_assets.len();
+            for i in 0..ulen {
+                let asset = *pool_assets.at(i);
+                let _asset_felt: felt252 = asset.into();
 
                 let symbol_felt = super::IERC20SymbolDispatcher { contract_address: asset }.symbol();
                 let decimals = IERC20MetadataDispatcher { contract_address: asset }.decimals();
@@ -1003,6 +1046,28 @@ mod VesuGatewayV2 {
                     reserve: asset_config.reserve,
                     scale: asset_config.scale,
                 }.into());
+            };
+            assets
+        }
+
+        fn get_supported_collateral_assets(self: @ContractState, pool_address: ContractAddress) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let pool_address = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            let coll_vec = self.supported_pool_collaterals.entry(pool_address);
+            for i in 0..coll_vec.len() {
+                let asset = coll_vec.at(i).read();
+                assets.append(asset);
+            };
+            assets
+        }
+
+        fn get_supported_debt_assets(self: @ContractState, pool_address: ContractAddress) -> Array<ContractAddress> {
+            let mut assets = array![];
+            let pool_address = if pool_address == Zero::zero() { self.default_pool.read() } else { pool_address };
+            let debts_vec = self.supported_pool_debts.entry(pool_address);
+            for i in 0..debts_vec.len() {
+                let asset = debts_vec.at(i).read();
+                assets.append(asset);
             };
             assets
         }

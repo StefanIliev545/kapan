@@ -14,6 +14,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useVesuAssets } from "~~/hooks/useVesuAssets";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import { feltToString } from "~~/utils/protocols";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 
 const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
@@ -151,7 +152,7 @@ export const useVesuLendingPositions = (
   const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
   const refetchCounter = useRef(0);
 
-  const { assetsWithRates, assetMap, isLoading: isLoadingAssets, assetsError } = useVesuAssets(poolId);
+  const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuAssets(poolId);
 
   const {
     data: userPositionsPart1,
@@ -259,9 +260,14 @@ export const useVesuLendingPositions = (
 
   const suppliablePositions = useMemo<ProtocolPosition[]>(() => {
     const zeroCounterpart = normalizeStarknetAddress(0n);
-    return assetsWithRates.map(asset => {
+    return assetsWithRates
+      .filter(asset => collateralSet?.has(toHexAddress(asset.address)))
+      .map(asset => {
       const address = toHexAddress(asset.address);
-      const symbol = feltToString(asset.symbol);
+      let symbol = feltToString(asset.symbol);
+      if (!symbol || symbol.trim().length === 0) {
+        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
+      }
       const price = normalizePrice(asset.price);
 
       return {
@@ -278,13 +284,18 @@ export const useVesuLendingPositions = (
           deposit: createVesuContextV1(poolId, zeroCounterpart),
         },
       };
-    });
-  }, [assetsWithRates, poolId]);
+      });
+  }, [assetsWithRates, poolId, collateralSet]);
 
   const borrowablePositions = useMemo<ProtocolPosition[]>(() => {
-    return assetsWithRates.map(asset => {
+    return assetsWithRates
+      .filter(asset => debtSet?.has(toHexAddress(asset.address)))
+      .map(asset => {
       const address = toHexAddress(asset.address);
-      const symbol = feltToString(asset.symbol);
+      let symbol = feltToString(asset.symbol);
+      if (!symbol || symbol.trim().length === 0) {
+        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
+      }
       const price = normalizePrice(asset.price);
 
       return {
@@ -298,8 +309,8 @@ export const useVesuLendingPositions = (
         tokenPrice: price,
         tokenSymbol: symbol,
       };
-    });
-  }, [assetsWithRates]);
+      });
+  }, [assetsWithRates, debtSet]);
 
   const rows = useMemo<VesuPositionRow[]>(() => {
     if (assetMap.size === 0) return [];

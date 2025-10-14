@@ -1,9 +1,9 @@
 use core::traits::Drop;
 use starknet::{ContractAddress, contract_address_const};
 use kapan::gateways::VesuGatewayV2::{
-    IVesuViewerDispatcher, IVesuViewerDispatcherTrait,
+    IVesuViewerDispatcher, IVesuViewerDispatcherTrait, IVesuGatewayAdminDispatcher, IVesuGatewayAdminDispatcherTrait,
 };
-use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
+use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, cheat_caller_address, CheatSpan};
 use core::array::ArrayTrait;
 use openzeppelin::utils::serde::SerializedAppend;
 
@@ -57,14 +57,6 @@ fn deploy_vesu_gateway_v2(router: ContractAddress) -> ContractAddress {
     calldata.append_serde(router);
     calldata.append_serde(USER_ADDRESS());
     calldata.append_serde(V2_POOL_FACTORY_ADDRESS());
-    let mut supported_assets = array![];
-    supported_assets.append(ETH_ADDRESS());
-    supported_assets.append(WBTC_ADDRESS());
-    supported_assets.append(USDC_ADDRESS());
-    supported_assets.append(USDT_ADDRESS());
-    supported_assets.append(STRK_ADDRESS());
-    supported_assets.append(WSTETH_ADDRESS());
-    calldata.append_serde(supported_assets);
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
@@ -76,6 +68,32 @@ fn test_vesu_v2_deployment_and_assets() {
     let router = USER_ADDRESS(); // Use USER_ADDRESS as router
     let vesu_gateway_v2_address = deploy_vesu_gateway_v2(router);
     let vesu_gateway_v2 = IVesuViewerDispatcher { contract_address: vesu_gateway_v2_address };
+    
+    // Initialize pool allowlists
+    let admin_dispatcher = IVesuGatewayAdminDispatcher { contract_address: vesu_gateway_v2_address };
+    
+    // Cheat caller to be the owner (USER_ADDRESS)
+    cheat_caller_address(vesu_gateway_v2_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
+    
+    // Add pool
+    admin_dispatcher.add_pool(V2_DEFAULT_POOL_ADDRESS());
+    
+    // Add collaterals
+    let mut collaterals = array![];
+    collaterals.append(ETH_ADDRESS());
+    collaterals.append(WBTC_ADDRESS());
+    collaterals.append(USDC_ADDRESS());
+    collaterals.append(USDT_ADDRESS());
+    collaterals.append(STRK_ADDRESS());
+    collaterals.append(WSTETH_ADDRESS());
+    admin_dispatcher.add_pool_collaterals(V2_DEFAULT_POOL_ADDRESS(), collaterals);
+    
+    // Add debts
+    let mut debts = array![];
+    debts.append(USDC_ADDRESS());
+    debts.append(USDT_ADDRESS());
+    debts.append(STRK_ADDRESS());
+    admin_dispatcher.add_pool_debts(V2_DEFAULT_POOL_ADDRESS(), debts);
     
     // Test that we can get supported assets
     let supported_assets = vesu_gateway_v2.get_supported_assets_ui(V2_DEFAULT_POOL_ADDRESS());
@@ -121,6 +139,32 @@ fn test_vesu_v2_eth_price() {
     let router = USER_ADDRESS(); // Use USER_ADDRESS as router
     let vesu_gateway_v2_address = deploy_vesu_gateway_v2(router);
     let vesu_gateway_v2 = IVesuViewerDispatcher { contract_address: vesu_gateway_v2_address };
+    
+    // Initialize pool allowlists
+    let admin_dispatcher = IVesuGatewayAdminDispatcher { contract_address: vesu_gateway_v2_address };
+    
+    // Cheat caller to be the owner (USER_ADDRESS)
+    cheat_caller_address(vesu_gateway_v2_address, USER_ADDRESS(), CheatSpan::TargetCalls(3));
+    
+    // Add pool
+    admin_dispatcher.add_pool(V2_DEFAULT_POOL_ADDRESS());
+    
+    // Add collaterals
+    let mut collaterals = array![];
+    collaterals.append(ETH_ADDRESS());
+    collaterals.append(WBTC_ADDRESS());
+    collaterals.append(USDC_ADDRESS());
+    collaterals.append(USDT_ADDRESS());
+    collaterals.append(STRK_ADDRESS());
+    collaterals.append(WSTETH_ADDRESS());
+    admin_dispatcher.add_pool_collaterals(V2_DEFAULT_POOL_ADDRESS(), collaterals);
+    
+    // Add debts
+    let mut debts = array![];
+    debts.append(USDC_ADDRESS());
+    debts.append(USDT_ADDRESS());
+    debts.append(STRK_ADDRESS());
+    admin_dispatcher.add_pool_debts(V2_DEFAULT_POOL_ADDRESS(), debts);
     
     // Test ETH price fetching
     let eth_price = vesu_gateway_v2.get_asset_price(ETH_ADDRESS(), V2_DEFAULT_POOL_ADDRESS());

@@ -1,7 +1,8 @@
 import { useMemo, useEffect } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
-import { toAnnualRates } from "~~/utils/protocols";
+// import { toAnnualRates } from "~~/utils/protocols";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 
 const normalizeDecimals = (value: unknown): number | null => {
@@ -108,22 +109,35 @@ export const useVesuV2Assets = (poolAddress: string) => {
 
   const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 
+  // Fetch explicit allowlists for collateral and debt (V2 variant)
+  const { data: supportedCollaterals } = useScaffoldReadContract({
+    contractName: "VesuGatewayV2",
+    functionName: "get_supported_collateral_assets",
+    args: [poolAddress],
+    refetchInterval: 0,
+  });
+  const { data: supportedDebts } = useScaffoldReadContract({
+    contractName: "VesuGatewayV2",
+    functionName: "get_supported_debt_assets",
+    args: [poolAddress],
+    refetchInterval: 0,
+  });
+
   const assetsWithRates = useMemo<AssetWithRates[]>(() => {
     return normalizedAssets.map((asset: any) => {
       if (asset.scale === 0n) {
         return { ...asset, borrowAPR: 0, supplyAPY: 0 };
       }
 
-      const { borrowAPR, supplyAPY } = toAnnualRates(
-        asset.fee_rate,
-        asset.total_nominal_debt,
-        asset.last_rate_accumulator,
-        asset.reserve,
-        asset.scale,
-      );
-
-      // For now, just return zero rates until we figure out the correct V2 calculation
-      // The V2 rate calculation is different from V1 and needs proper investigation
+      // V2 calculation TODO; keep zeros to avoid misleading data
+      // Fallback for empty symbol names
+      const hexAddress = `0x${asset.address.toString(16).padStart(64, "0")}`;
+      if (!asset.symbol || (typeof asset.symbol === "bigint" && asset.symbol === 0n)) {
+        const fallback = getTokenNameFallback(hexAddress);
+        if (fallback) {
+          asset.symbol = fallback;
+        }
+      }
       return { ...asset, borrowAPR: 0, supplyAPY: 0 };
     });
   }, [normalizedAssets]);
@@ -137,9 +151,31 @@ export const useVesuV2Assets = (poolAddress: string) => {
     return map;
   }, [assetsWithRates]);
 
+  const toHex = (v: unknown) => (typeof v === "bigint" ? `0x${v.toString(16).padStart(64, "0")}` : typeof v === "string" ? v.toLowerCase() : undefined);
+  const collateralSet = useMemo(() => {
+    if (!Array.isArray(supportedCollaterals)) return new Set<string>();
+    const set = new Set<string>();
+    for (const v of supportedCollaterals as unknown[]) {
+      const hex = toHex(v);
+      if (hex) set.add(hex);
+    }
+    return set;
+  }, [supportedCollaterals]);
+  const debtSet = useMemo(() => {
+    if (!Array.isArray(supportedDebts)) return new Set<string>();
+    const set = new Set<string>();
+    for (const v of supportedDebts as unknown[]) {
+      const hex = toHex(v);
+      if (hex) set.add(hex);
+    }
+    return set;
+  }, [supportedDebts]);
+
   return {
     assetsWithRates,
     assetMap,
+    collateralSet,
+    debtSet,
     isLoading: supportedAssets == null,
     assetsError,
   };

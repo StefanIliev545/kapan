@@ -13,6 +13,7 @@ import SwitchTokenSelectModalStark from "~~/components/modals/stark/SwitchTokenS
 import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModalStark";
 import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
 import { feltToString } from "~~/utils/protocols";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { isVesuContextV1, type VesuProtocolKey } from "~~/utils/vesu";
 
@@ -101,7 +102,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const selectedSymbolStr = useMemo(() => {
     if (!selectedTarget) return "";
     const sym: any = (selectedTarget as any).symbol;
-    return typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
+    const raw = typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
+    if (raw && raw.trim().length > 0) return raw;
+    const addr = `0x${selectedTarget.address.toString(16).padStart(64, "0")}`;
+    return getTokenNameFallback(addr) ?? raw;
   }, [selectedTarget]);
 
   const openSwapSelector = (type: "debt" | "collateral", row: VesuPositionRow) => {
