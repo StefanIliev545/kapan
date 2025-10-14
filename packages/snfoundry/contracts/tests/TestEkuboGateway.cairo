@@ -102,10 +102,6 @@ fn deploy_vesu_gateway(router: ContractAddress) -> ContractAddress {
     calldata.append_serde(2198503327643286920898110335698706244522220458610657370981979460625005526824);
     calldata.append_serde(router);
     calldata.append_serde(USER_ADDRESS());
-    let mut supported_assets = array![];
-    supported_assets.append(ETH_ADDRESS());
-    supported_assets.append(USDC_ADDRESS());
-    calldata.append_serde(supported_assets);
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     contract_address
 }
