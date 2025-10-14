@@ -274,18 +274,7 @@ export const useVesuSwitch = ({
       runIdRef.current++;
     };
     // ✅ Only primitive deps here
-  }, [
-    isOpen,
-    address,
-    type,
-    targetTokenAddr,
-    currentCollateralAddr,
-    currentDebtAddr,
-    collateralBalance,
-    debtBalance,
-    poolKey,
-    protocolKey,
-  ]);
+  }, [isOpen, address, type, targetTokenAddr, currentCollateralAddr, currentDebtAddr, collateralBalance, debtBalance, poolKey, protocolKey, currentCollateral, currentDebt, targetToken]);
 
   // 🔐 Fetch authorizations only when needed (stable getAuthorizations)
   useEffect(() => {

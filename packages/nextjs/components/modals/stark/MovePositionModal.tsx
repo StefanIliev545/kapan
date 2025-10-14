@@ -986,8 +986,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     !amount ||
     !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
     step !== "idle" ||
-    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId) ||
-    (fromProtocol === "VesuV2" && selectedProtocol === "VesuV2");
+    // Disable V1 -> V1 when target pool equals current pool id
+    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
