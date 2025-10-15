@@ -16,6 +16,7 @@ import { feltToString } from "~~/utils/protocols";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { isVesuContextV1, type VesuProtocolKey } from "~~/utils/vesu";
+import formatPercentage from "~~/utils/formatPercentage";
 
 interface BorrowSelectionRequest {
   tokens: AssetWithRates[];
@@ -35,6 +36,10 @@ interface VesuPositionsSectionProps {
   onDepositRequest: () => void;
   protocolName?: string;
   title?: string;
+  netBalanceUsd: number;
+  netYield30d: number;
+  netApyPercent: number | null;
+  formatCurrency: (value: number) => string;
 }
 
 export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
@@ -48,6 +53,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   onDepositRequest,
   protocolName = "Vesu",
   title = "Your Vesu Positions",
+  netBalanceUsd,
+  netYield30d,
+  netApyPercent,
+  formatCurrency,
 }) => {
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [closeParams, setCloseParams] = useState<
@@ -98,6 +107,11 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const [isSwitchDebtOpen, setIsSwitchDebtOpen] = useState(false);
   const [isSwitchCollateralOpen, setIsSwitchCollateralOpen] = useState(false);
   const [useNewSelector, setUseNewSelector] = useState(true);
+
+  const formatSignedPercentage = (value: number) => {
+    const formatted = formatPercentage(Math.abs(value));
+    return `${value >= 0 ? "" : "-"}${formatted}%`;
+  };
 
   const selectedSymbolStr = useMemo(() => {
     if (!selectedTarget) return "";
@@ -274,7 +288,39 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     <div className="card bg-base-100 shadow-md">
       <div className="card-body space-y-4 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h2 className="card-title text-lg">{title}</h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="card-title text-lg">{title}</h2>
+            {userAddress && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/70">
+                <span className="flex items-center gap-1">
+                  <span>Balance:</span>
+                  <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
+                    {formatCurrency(netBalanceUsd)}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span>30D Net Yield:</span>
+                  <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                    {formatCurrency(netYield30d)}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span>Net APY:</span>
+                  <span
+                    className={`font-semibold ${
+                      netApyPercent == null
+                        ? "text-base-content"
+                        : netApyPercent >= 0
+                          ? "text-success"
+                          : "text-error"
+                    }`}
+                  >
+                    {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
           {isUpdating && userAddress && (
             <div className="flex items-center text-xs text-base-content/60">
               <span className="loading loading-spinner loading-xs mr-1" /> Updating
