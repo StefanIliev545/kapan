@@ -107,6 +107,11 @@ export type TokenMetadata = {
   target_rate_percent?: bigint;
   fee_shares?: bigint;
   last_updated?: bigint;
+  min_target_utilization?: bigint;
+  max_target_utilization?: bigint;
+  rate_half_life?: bigint;
+  max_full_utilization_rate?: bigint;
+  min_full_utilization_rate?: bigint;
   borrowAPR?: number;
   supplyAPY?: number;
 };

@@ -49,6 +49,11 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
       target_rate_percent?: unknown;
       fee_shares?: unknown;
       last_updated?: unknown;
+      min_target_utilization?: unknown;
+      max_target_utilization?: unknown;
+      rate_half_life?: unknown;
+      max_full_utilization_rate?: unknown;
+      min_full_utilization_rate?: unknown;
     };
 
     const priceCandidate = candidate.price as { value?: unknown; is_valid?: unknown } | undefined;
@@ -99,6 +104,19 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
           typeof candidate.target_rate_percent === "bigint" ? candidate.target_rate_percent : undefined,
         fee_shares: typeof candidate.fee_shares === "bigint" ? candidate.fee_shares : undefined,
         last_updated: typeof candidate.last_updated === "bigint" ? candidate.last_updated : undefined,
+        min_target_utilization:
+          typeof candidate.min_target_utilization === "bigint" ? candidate.min_target_utilization : undefined,
+        max_target_utilization:
+          typeof candidate.max_target_utilization === "bigint" ? candidate.max_target_utilization : undefined,
+        rate_half_life: typeof candidate.rate_half_life === "bigint" ? candidate.rate_half_life : undefined,
+        max_full_utilization_rate:
+          typeof candidate.max_full_utilization_rate === "bigint"
+            ? candidate.max_full_utilization_rate
+            : undefined,
+        min_full_utilization_rate:
+          typeof candidate.min_full_utilization_rate === "bigint"
+            ? candidate.min_full_utilization_rate
+            : undefined,
       },
     ];
   });

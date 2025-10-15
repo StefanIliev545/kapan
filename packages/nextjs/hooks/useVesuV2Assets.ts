@@ -50,6 +50,11 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
       target_rate_percent?: unknown;
       fee_shares?: unknown;
       last_updated?: unknown;
+      min_target_utilization?: unknown;
+      max_target_utilization?: unknown;
+      rate_half_life?: unknown;
+      max_full_utilization_rate?: unknown;
+      min_full_utilization_rate?: unknown;
     };
 
     const priceCandidate = candidate.price as { value?: unknown; is_valid?: unknown } | undefined;
@@ -100,6 +105,19 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
           typeof candidate.target_rate_percent === "bigint" ? candidate.target_rate_percent : undefined,
         fee_shares: typeof candidate.fee_shares === "bigint" ? candidate.fee_shares : undefined,
         last_updated: typeof candidate.last_updated === "bigint" ? candidate.last_updated : undefined,
+        min_target_utilization:
+          typeof candidate.min_target_utilization === "bigint" ? candidate.min_target_utilization : undefined,
+        max_target_utilization:
+          typeof candidate.max_target_utilization === "bigint" ? candidate.max_target_utilization : undefined,
+        rate_half_life: typeof candidate.rate_half_life === "bigint" ? candidate.rate_half_life : undefined,
+        max_full_utilization_rate:
+          typeof candidate.max_full_utilization_rate === "bigint"
+            ? candidate.max_full_utilization_rate
+            : undefined,
+        min_full_utilization_rate:
+          typeof candidate.min_full_utilization_rate === "bigint"
+            ? candidate.min_full_utilization_rate
+            : undefined,
       },
     ];
   });
@@ -132,15 +150,26 @@ export const useVesuV2Assets = (poolAddress: string) => {
         return { ...asset, borrowAPR: 0, supplyAPY: 0 };
       }
 
-      const v2Inputs = {
-        utilization: asset.utilization,
-        zeroUtilizationRate: asset.floor ?? null,
-        fullUtilizationRate: asset.last_full_utilization_rate ?? null,
-        targetUtilization: asset.max_utilization ?? null,
-        targetRatePercent: (asset.target_rate_percent ?? asset.fee_rate) ?? null,
-      };
-
-      const v2Rates = calculateVesuV2AnnualRates(v2Inputs);
+      const v2Rates = calculateVesuV2AnnualRates({
+        asset: {
+          total_nominal_debt: asset.total_nominal_debt,
+          last_rate_accumulator: asset.last_rate_accumulator,
+          reserve: asset.reserve,
+          scale: asset.scale,
+          last_full_utilization_rate: asset.last_full_utilization_rate ?? null,
+          last_updated: asset.last_updated ?? null,
+        },
+        interestRateConfig: {
+          zero_utilization_rate: asset.floor ?? null,
+          target_utilization: asset.max_utilization ?? null,
+          target_rate_percent: (asset.target_rate_percent ?? asset.fee_rate) ?? null,
+          min_target_utilization: asset.min_target_utilization ?? null,
+          max_target_utilization: asset.max_target_utilization ?? null,
+          rate_half_life: asset.rate_half_life ?? null,
+          max_full_utilization_rate: asset.max_full_utilization_rate ?? null,
+          min_full_utilization_rate: asset.min_full_utilization_rate ?? null,
+        },
+      });
 
       if (!v2Rates) {
         console.warn(
@@ -150,7 +179,13 @@ export const useVesuV2Assets = (poolAddress: string) => {
             zeroUtilizationRate: asset.floor,
             fullUtilizationRate: asset.last_full_utilization_rate,
             targetUtilization: asset.max_utilization,
-            targetRatePercent: asset.target_rate_percent,
+            targetRatePercent: asset.target_rate_percent ?? asset.fee_rate,
+            minTargetUtilization: asset.min_target_utilization,
+            maxTargetUtilization: asset.max_target_utilization,
+            rateHalfLife: asset.rate_half_life,
+            maxFullUtilizationRate: asset.max_full_utilization_rate,
+            minFullUtilizationRate: asset.min_full_utilization_rate,
+            lastUpdated: asset.last_updated,
           },
         );
 
