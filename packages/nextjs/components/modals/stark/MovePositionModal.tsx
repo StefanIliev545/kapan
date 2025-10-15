@@ -25,6 +25,7 @@ import { feltToString } from "~~/utils/protocols";
 import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAddress } from "../../specific/vesu/pools";
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
+import { normalizeStarknetAddress } from "~~/utils/vesu";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -108,6 +109,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
   const amountRef = useRef("");
+
+  const normalizedCurrentV2PoolAddress = useMemo(() => {
+    if (fromProtocol !== "VesuV2" || currentPoolId === undefined) {
+      return undefined;
+    }
+
+    try {
+      return normalizeStarknetAddress(currentPoolId);
+    } catch (error) {
+      console.error("Failed to normalize current V2 pool address", error);
+      return undefined;
+    }
+  }, [fromProtocol, currentPoolId]);
   
   // Preserve amount value across re-renders caused by collateral data changes
   useEffect(() => {
@@ -518,12 +532,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     
     // Handle V2 Vesu context
     if (fromProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
+      const sourcePoolAddress = normalizedCurrentV2PoolAddress ?? selectedV2PoolAddress;
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        BigInt(selectedV2PoolAddress),
+        BigInt(sourcePoolAddress),
         BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
-        BigInt(selectedV2PoolAddress),
+        BigInt(sourcePoolAddress),
         BigInt(position.tokenAddress),
       ]);
     }
@@ -918,9 +933,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setSelectedPoolId(VESU_V1_POOLS["Genesis"]);
     }
     if (protocolName === "VesuV2") {
-      setSelectedV2PoolAddress(VESU_V2_POOLS["Default"]);
+      setSelectedV2PoolAddress(
+        fromProtocol === "VesuV2" && normalizedCurrentV2PoolAddress
+          ? normalizedCurrentV2PoolAddress
+          : VESU_V2_POOLS["Default"],
+      );
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (fromProtocol === "VesuV2" && normalizedCurrentV2PoolAddress) {
+      setSelectedV2PoolAddress(normalizedCurrentV2PoolAddress);
+    }
+  }, [isOpen, fromProtocol, normalizedCurrentV2PoolAddress]);
 
   const handleMovePosition = async () => {
     try {
@@ -987,7 +1013,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
     step !== "idle" ||
     // Disable V1 -> V1 when target pool equals current pool id
-    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId);
+    (fromProtocol === "Vesu" && selectedProtocol === "Vesu" && selectedPoolId === currentPoolId) ||
+    (fromProtocol === "VesuV2" &&
+      selectedProtocol === "VesuV2" &&
+      normalizedCurrentV2PoolAddress !== undefined &&
+      normalizedCurrentV2PoolAddress === normalizeStarknetAddress(selectedV2PoolAddress));
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>

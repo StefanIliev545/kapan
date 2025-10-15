@@ -396,6 +396,10 @@ export const useVesuV2LendingPositions = (
             borrowPosition = {
               ...baseBorrowPosition,
               balance: -debtUsd,
+              moveSupport: {
+                preselectedCollaterals: moveCollaterals,
+                disableCollateralSelection: true,
+              },
             };
           } else {
             borrowPosition = baseBorrowPosition;
