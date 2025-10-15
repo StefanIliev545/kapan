@@ -79,7 +79,7 @@ export const VesuProtocolView: FC = () => {
 
   const computeMetrics = (rows: VesuPositionRow[]) => {
     if (rows.length === 0) {
-      return { netBalanceUsd: 0, netYield30d: 0, netApyPercent: 0 };
+      return { netBalanceUsd: 0, netYield30d: 0, netApyPercent: null as number | null };
     }
 
     let totalSupply = 0;
@@ -103,15 +103,6 @@ export const VesuProtocolView: FC = () => {
     return { netBalanceUsd, netYield30d, netApyPercent };
   };
 
-  const { netBalanceUsd: netBalanceUsdV1, netYield30d: netYield30dV1, netApyPercent: netApyPercentV1 } = useMemo(
-    () => computeMetrics(rowsV1),
-    [rowsV1],
-  );
-  const { netBalanceUsd: netBalanceUsdV2, netYield30d: netYield30dV2, netApyPercent: netApyPercentV2 } = useMemo(
-    () => computeMetrics(rowsV2),
-    [rowsV2],
-  );
-
   const hasPositionsV1 = rowsV1.length > 0;
   const hasPositionsV2 = rowsV2.length > 0;
 
@@ -131,6 +122,37 @@ export const VesuProtocolView: FC = () => {
     Re7USDCPrime: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Re7USDCPrime)),
     Re7USDCStableCore: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Re7USDCStableCore)),
   } as const;
+
+  const { netBalanceUsd: netBalanceUsdV1, netYield30d: netYield30dV1, netApyPercent: netApyPercentV1 } = useMemo(() => {
+    const allRows = [
+      ...v1All.Genesis.rows,
+      ...v1All.CarmineRunes.rows,
+      ...v1All.Re7StarknetEcosystem.rows,
+      ...v1All.Re7xSTRK.rows,
+    ];
+    return computeMetrics(allRows);
+  }, [
+    v1All.Genesis.rows,
+    v1All.CarmineRunes.rows,
+    v1All.Re7StarknetEcosystem.rows,
+    v1All.Re7xSTRK.rows,
+  ]);
+  const { netBalanceUsd: netBalanceUsdV2, netYield30d: netYield30dV2, netApyPercent: netApyPercentV2 } = useMemo(() => {
+    const allRows = [
+      ...v2All.Default.rows,
+      ...v2All.Re7xBTC.rows,
+      ...v2All.Re7USDCCore.rows,
+      ...v2All.Re7USDCPrime.rows,
+      ...v2All.Re7USDCStableCore.rows,
+    ];
+    return computeMetrics(allRows);
+  }, [
+    v2All.Default.rows,
+    v2All.Re7xBTC.rows,
+    v2All.Re7USDCCore.rows,
+    v2All.Re7USDCPrime.rows,
+    v2All.Re7USDCStableCore.rows,
+  ]);
 
   const formatCurrency = (amount: number) => {
     const formatter = new Intl.NumberFormat("en-US", {
@@ -255,8 +277,9 @@ export const VesuProtocolView: FC = () => {
         ).map(([rawName, data]) => {
           const disp = getV1PoolDisplay(rawName as any);
           const name = disp.name;
+          if (data.rows.length === 0) return null;
+          const metrics = computeMetrics(data.rows);
           return (
-          data.rows.length > 0 ? (
             <div key={`v1-${name}`} className="space-y-4">
               <VesuPositionsSection
                 title={`${name} Positions`}
@@ -277,10 +300,12 @@ export const VesuProtocolView: FC = () => {
                   openDepositModal("v1", filtered);
                 }}
                 protocolName="Vesu"
+                netBalanceUsd={metrics.netBalanceUsd}
+                netYield30d={metrics.netYield30d}
+                netApyPercent={metrics.netApyPercent}
+                formatCurrency={formatCurrency}
               />
-              
             </div>
-          ) : null
           );
         })}
       </div>
@@ -342,8 +367,9 @@ export const VesuProtocolView: FC = () => {
         ).map(([rawName, data]) => {
           const disp = getV2PoolDisplay(rawName as any);
           const name = disp.name;
+          if (data.rows.length === 0) return null;
+          const metrics = computeMetrics(data.rows);
           return (
-          data.rows.length > 0 ? (
             <div key={`v2-${name}`} className="space-y-4">
               <VesuPositionsSection
                 title={`${name} Positions`}
@@ -364,10 +390,12 @@ export const VesuProtocolView: FC = () => {
                   openDepositModal("v2", filtered);
                 }}
                 protocolName="vesu_v2"
+                netBalanceUsd={metrics.netBalanceUsd}
+                netYield30d={metrics.netYield30d}
+                netApyPercent={metrics.netApyPercent}
+                formatCurrency={formatCurrency}
               />
-              
             </div>
-          ) : null
           );
         })}
       </div>
