@@ -1,11 +1,11 @@
-import { FC, useCallback, useEffect, useMemo, useState } from "react";
-import { useRef } from "react";
+import { FC, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
+import { fetchBuildExecuteTransaction, fetchQuotes, type Quote } from "@avnu/avnu-sdk";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
@@ -48,6 +48,24 @@ const toOutputPointer = (instructionIndex: number): OutputPointer => ({
   instruction_index: BigInt(instructionIndex),
   output_index: 0n,
 });
+
+type TargetCollateralOption = {
+  address: string;
+  symbol: string;
+  decimals: number;
+};
+
+type CollateralSwapPlan = {
+  key: string;
+  target: TargetCollateralOption;
+  loading: boolean;
+  quote: Quote | null;
+  calldata: bigint[];
+  error: string | null;
+};
+
+const SWAP_SLIPPAGE_BPS = 500n;
+const AVNU_ENTRYPOINTS = ["swap_exact_token_to", "multi_route_swap", "swap_exact_in"] as const;
 
 interface MovePositionModalProps {
   isOpen: boolean;
@@ -139,6 +157,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] =
     useState<CollateralWithAmount[]>([]);
   const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
+  const [collateralSwapSelections, setCollateralSwapSelections] = useState<Record<string, TargetCollateralOption | null>>({});
+  const [collateralSwapPlans, setCollateralSwapPlans] = useState<Record<string, CollateralSwapPlan>>({});
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -251,6 +271,35 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     [selectedCollateralsWithAmounts, tokenToPrices],
   );
 
+  const swapBlocking = useMemo(() => {
+    return selectedCollateralsWithAmounts.some(collateral => {
+      if (collateral.supported || collateral.amount === 0n) {
+        return false;
+      }
+      const selection = collateralSwapSelections[collateral.token];
+      const plan = collateralSwapPlans[collateral.token];
+      if (!selection) return true;
+      if (!plan) return true;
+      if (plan.loading) return true;
+      if (plan.error) return true;
+      if (!plan.quote || plan.calldata.length === 0) return true;
+      return false;
+    });
+  }, [selectedCollateralsWithAmounts, collateralSwapSelections, collateralSwapPlans]);
+
+  const swapLoading = useMemo(
+    () =>
+      selectedCollateralsWithAmounts.some(
+        collateral => !collateral.supported && collateral.amount > 0n && collateralSwapPlans[collateral.token]?.loading,
+      ),
+    [selectedCollateralsWithAmounts, collateralSwapPlans],
+  );
+
+  const incompatibleCollaterals = useMemo(
+    () => selectedCollateralsWithAmounts.filter(collateral => !collateral.supported),
+    [selectedCollateralsWithAmounts],
+  );
+
   // Spinner only before first successful data render
   const isLoadingCollaterals =
     !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
@@ -263,6 +312,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     const parsedAmount = parseUnits(amount, tokenDecimals);
     const lowerProtocolName = fromProtocol === "VesuV2" ? "vesu_v2" : fromProtocol.toLowerCase();
     const destProtocolName = selectedProtocol === "VesuV2" ? "vesu_v2" : selectedProtocol.toLowerCase();
+
+    if (swapBlocking) {
+      return {
+        fullInstruction: { instructions: [] },
+        authInstruction: { instructions: [] },
+        authInstructions: [],
+        authCalldataKey: "",
+        pairInstructions: [],
+      };
+    }
 
     // Calculate proportions for multiple collaterals
     if (selectedCollateralsWithAmounts.length > 1) {
@@ -522,7 +581,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         currentPoolId || 0n,
-        BigInt(selectedCollateralsWithAmounts[0].token),
+        BigInt(primaryResolvedCollateral ?? selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         currentPoolId || 0n,
@@ -535,7 +594,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       const sourcePoolAddress = normalizedCurrentV2PoolAddress ?? selectedV2PoolAddress;
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         BigInt(sourcePoolAddress),
-        BigInt(selectedCollateralsWithAmounts[0].token),
+        BigInt(primaryResolvedCollateral ?? selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         BigInt(sourcePoolAddress),
@@ -545,6 +604,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     let borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+
+    const resolvedCollateralAddresses = selectedCollateralsWithAmounts.map(collateral => {
+      const plan = collateralSwapPlans[collateral.token];
+      if (!collateral.supported && plan && plan.quote && plan.calldata.length > 0) {
+        return plan.target.address;
+      }
+      return collateral.token;
+    });
+    const primaryResolvedCollateral = resolvedCollateralAddresses[0];
 
     // Handle V1 Vesu target context
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
@@ -613,15 +681,58 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       });
     });
 
+    const swapInstructions: CairoCustomEnum[] = [];
+    const swapInstructionIndexMap = new Map<string, number>();
+
+    selectedCollateralsWithAmounts.forEach((collateral, index) => {
+      const plan = collateralSwapPlans[collateral.token];
+      if (!collateral.supported && plan && plan.quote && plan.calldata.length > 0) {
+        const withdrawPointer = 1 + index;
+        const minOut = plan.quote.buyAmount - (plan.quote.buyAmount * SWAP_SLIPPAGE_BPS) / 10_000n;
+        const minOutClamped = minOut > 0n ? minOut : plan.quote.buyAmount;
+        const reswapExactIn = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
+          Swap: undefined,
+          SwapExactIn: undefined,
+          Reswap: undefined,
+          ReswapExactIn: {
+            exact_in: toOutputPointer(withdrawPointer),
+            min_out: uint256.bnToUint256(minOutClamped),
+            token_out: plan.target.address,
+            user: userAddress,
+            should_pay_out: false,
+            should_pay_in: false,
+            context: new CairoOption(CairoOptionVariant.Some, plan.calldata),
+          },
+        });
+        swapInstructionIndexMap.set(collateral.token, swapInstructions.length);
+        swapInstructions.push(reswapExactIn);
+      }
+    });
+
     const depositInstructions = selectedCollateralsWithAmounts.map((collateral, index) => {
+      const plan = collateralSwapPlans[collateral.token];
+      const hasSwap = !collateral.supported && plan && plan.quote && plan.calldata.length > 0;
+      const depositToken = hasSwap ? plan.target.address : collateral.token;
+      const withdrawBaseIndex = 1; // repay instruction is at index 0
+      const swapBaseIndex = withdrawBaseIndex + withdrawInstructions.length;
+      const pointerIndex = hasSwap
+        ? swapBaseIndex + (swapInstructionIndexMap.get(collateral.token) ?? 0)
+        : withdrawBaseIndex + index;
+      const pointerOutput = hasSwap ? 1 : 0;
       return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
         Repay: undefined,
         Withdraw: undefined,
         Redeposit: {
-          token: collateral.token,
-          target_output_pointer: toOutputPointer(1 + index),
+          token: depositToken,
+          target_output_pointer: toOutputPointer(pointerIndex, pointerOutput),
           user: userAddress,
           context: depositInstructionContext,
         },
@@ -644,16 +755,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       },
     });
 
-    const instructions = [
+    const instructions: { protocol_name: string; instructions: CairoCustomEnum[] }[] = [
       {
         protocol_name: lowerProtocolName,
         instructions: [repayInstruction, ...withdrawInstructions],
       },
-      {
-        protocol_name: destProtocolName,
-        instructions: [...depositInstructions, borrowInstruction],
-      },
-    ]
+    ];
+
+    if (swapInstructions.length > 0) {
+      instructions.push({
+        protocol_name: "avnu",
+        instructions: swapInstructions,
+      });
+    }
+
+    instructions.push({
+      protocol_name: destProtocolName,
+      instructions: [...depositInstructions, borrowInstruction],
+    });
 
     // Complete set of instructions for execution
     const fullInstructionData = CallData.compile({
@@ -695,7 +814,27 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       // several collaterals).
       pairInstructions: [instructions],
     };
-  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId, isOpen]);
+  }, [
+    amount,
+    userAddress,
+    routerGateway?.address,
+    position.decimals,
+    position.tokenAddress,
+    fromProtocol,
+    selectedProtocol,
+    selectedCollateralsWithAmounts,
+    collateralSwapPlans,
+    collateralSwapSelections,
+    isAmountMaxClicked,
+    tokenToPrices,
+    maxClickedCollaterals,
+    currentPoolId,
+    selectedPoolId,
+    selectedV2PoolAddress,
+    normalizedCurrentV2PoolAddress,
+    swapBlocking,
+    isOpen,
+  ]);
 
   const vesuPairings = useMemo(() => {
     if (
@@ -832,6 +971,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setSelectedCollateralsWithAmounts([]);
       setMaxClickedCollaterals({});
       setIsAmountMaxClicked(false);
+      setCollateralSwapSelections({});
+      setCollateralSwapPlans({});
     }
   }, [isOpen]);
 
@@ -877,6 +1018,154 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     });
   }, []);
 
+  // Ensure swap selections exist only for unsupported collaterals that are currently selected
+  useEffect(() => {
+    setCollateralSwapSelections(prev => {
+      const next = { ...prev };
+
+      Object.keys(next).forEach(token => {
+        const isStillUnsupported = selectedCollateralsWithAmounts.some(
+          collateral => collateral.token === token && !collateral.supported,
+        );
+        if (!isStillUnsupported) {
+          delete next[token];
+        }
+      });
+
+      selectedCollateralsWithAmounts.forEach(collateral => {
+        if (!collateral.supported && next[collateral.token] === undefined) {
+          next[collateral.token] = null;
+        }
+      });
+
+      return next;
+    });
+  }, [selectedCollateralsWithAmounts]);
+
+  // Remove swap plans when collateral becomes compatible or selection cleared
+  useEffect(() => {
+    setCollateralSwapPlans(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(token => {
+        const matchingCollateral = selectedCollateralsWithAmounts.find(
+          collateral => collateral.token === token && !collateral.supported,
+        );
+        const hasSelection = collateralSwapSelections[token];
+        if (!matchingCollateral || !hasSelection) {
+          delete next[token];
+        }
+      });
+      return next;
+    });
+  }, [selectedCollateralsWithAmounts, collateralSwapSelections]);
+
+  // Prepare AVNU swap data for unsupported collaterals that have a target selected
+  useEffect(() => {
+    if (!isOpen || !userAddress) return;
+
+    const pendingFetches = selectedCollateralsWithAmounts
+      .filter(collateral => !collateral.supported)
+      .map(collateral => {
+        const target = collateralSwapSelections[collateral.token];
+        if (!target || collateral.amount === 0n) {
+          return null;
+        }
+        const key = `${target.address.toLowerCase()}-${collateral.amount.toString()}`;
+        const existing = collateralSwapPlans[collateral.token];
+        if (existing && existing.key === key) {
+          if (existing.loading) return null;
+          if (!existing.error && existing.quote && existing.calldata.length > 0) {
+            return null;
+          }
+        }
+        return { collateral, target, key };
+      })
+      .filter((value): value is { collateral: CollateralWithAmount; target: TargetCollateralOption; key: string } => value !== null);
+
+    if (pendingFetches.length === 0) return;
+
+    pendingFetches.forEach(({ collateral, target, key }) => {
+      setCollateralSwapPlans(prev => ({
+        ...prev,
+        [collateral.token]: {
+          key,
+          target,
+          loading: true,
+          quote: null,
+          calldata: [],
+          error: null,
+        },
+      }));
+    });
+
+    let cancelled = false;
+
+    const run = async () => {
+      for (const { collateral, target, key } of pendingFetches) {
+        try {
+          const quotes = await fetchQuotes({
+            sellTokenAddress: collateral.token,
+            buyTokenAddress: target.address,
+            sellAmount: collateral.amount,
+            takerAddress: userAddress,
+          } as any);
+
+          if (!quotes || quotes.length === 0) {
+            throw new Error("No swap quote available for selected collateral");
+          }
+
+          const quote = quotes[0];
+          const tx = await fetchBuildExecuteTransaction(quote.quoteId, userAddress, 0.05, false);
+          const swapCall = tx.calls?.find((call: any) => AVNU_ENTRYPOINTS.includes(call.entrypoint));
+          if (!swapCall) {
+            throw new Error("Unable to prepare swap instruction");
+          }
+
+          const calldata = (swapCall.calldata as any[]).map((value: any) => BigInt(value.toString()));
+
+          if (cancelled) return;
+
+          setCollateralSwapPlans(prev => ({
+            ...prev,
+            [collateral.token]: {
+              key,
+              target,
+              loading: false,
+              quote,
+              calldata,
+              error: null,
+            },
+          }));
+        } catch (e: any) {
+          if (cancelled) return;
+          setCollateralSwapPlans(prev => ({
+            ...prev,
+            [collateral.token]: {
+              key,
+              target,
+              loading: false,
+              quote: null,
+              calldata: [],
+              error: e?.message ?? "Failed to fetch swap quote",
+            },
+          }));
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    userAddress,
+    selectedCollateralsWithAmounts,
+    collateralSwapSelections,
+    collateralSwapPlans,
+  ]);
+
   // Handle MAX click for a specific collateral - wrap in useCallback
   const handleCollateralMaxClick = useCallback(
     (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => {
@@ -892,6 +1181,33 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       }));
     },
     [],
+  );
+
+  const handleSwapTargetSelection = useCallback(
+    (collateralToken: string, targetAddress: string) => {
+      setCollateralSwapSelections(prev => {
+        const next = { ...prev };
+        if (!targetAddress) {
+          next[collateralToken] = null;
+          return next;
+        }
+
+        const match = targetCollaterals.find(
+          collateral => collateral.address.toLowerCase() === targetAddress.toLowerCase(),
+        );
+
+        if (match) {
+          next[collateralToken] = {
+            address: match.address,
+            symbol: match.symbol,
+            decimals: match.decimals,
+          };
+        }
+
+        return next;
+      });
+    },
+    [targetCollaterals],
   );
 
   // Add this new useCallback for amount handling
@@ -1008,6 +1324,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const isActionDisabled =
     loading ||
+    swapLoading ||
+    swapBlocking ||
     !selectedProtocol ||
     !amount ||
     !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
@@ -1110,6 +1428,100 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       setMaxClickedCollaterals(prev => ({ ...prev, [token]: isMax }))
                     }
                   />
+                  {incompatibleCollaterals.length > 0 && (
+                    <div className="mt-4 space-y-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
+                      <div className="font-semibold text-warning-700">
+                        {selectedProtocol ? `${selectedProtocol} compatibility` : "Collateral compatibility"}
+                      </div>
+                      <div className="text-xs text-warning-800">
+                        Some collateral must be swapped to assets supported by the target protocol before redepositing.
+                      </div>
+                      {incompatibleCollaterals.map(collateral => {
+                        const selection = collateralSwapSelections[collateral.token];
+                        const plan = collateralSwapPlans[collateral.token];
+                        const options = targetCollaterals.filter(
+                          token => token.address.toLowerCase() !== collateral.token.toLowerCase(),
+                        );
+                        const hasOptions = options.length > 0;
+                        const formattedSourceAmount = formatUnits(collateral.amount, collateral.decimals);
+                        const formattedTargetAmount = plan?.quote
+                          ? formatUnits(
+                              plan.quote.buyAmount,
+                              selection?.decimals ?? collateral.decimals,
+                            )
+                          : null;
+                        return (
+                          <div
+                            key={collateral.token}
+                            className="rounded-md border border-warning/40 bg-base-100/60 p-3 text-xs space-y-2"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="relative h-5 w-5">
+                                  <Image
+                                    src={tokenNameToLogo(collateral.symbol)}
+                                    alt={collateral.symbol}
+                                    fill
+                                    className="rounded-full object-contain"
+                                  />
+                                </div>
+                                <span className="font-medium">{collateral.symbol}</span>
+                                <span className="text-base-content/70">
+                                  {Number(formattedSourceAmount || 0).toLocaleString(undefined, {
+                                    maximumFractionDigits: 6,
+                                  })}
+                                </span>
+                              </div>
+                              <span className="text-warning-700">→</span>
+                              <select
+                                className="select select-bordered select-xs md:select-sm"
+                                value={selection?.address ?? ""}
+                                onChange={event => handleSwapTargetSelection(collateral.token, event.target.value)}
+                                disabled={!hasOptions}
+                              >
+                                <option value="">{hasOptions ? "Select target collateral" : "No compatible collateral"}</option>
+                                {options.map(option => (
+                                  <option key={option.address} value={option.address}>
+                                    {option.symbol}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            {plan?.loading && (
+                              <div className="flex items-center gap-2 text-warning-700">
+                                <span className="loading loading-spinner loading-xs" /> Preparing swap route…
+                              </div>
+                            )}
+                            {plan?.error && (
+                              <div className="text-error">
+                                {plan.error}
+                              </div>
+                            )}
+                            {!plan?.loading && plan?.quote && selection && (
+                              <div className="flex flex-wrap items-center gap-1 text-base-content/70">
+                                <span>Swap ready:</span>
+                                <span className="font-medium">{formattedSourceAmount}</span>
+                                <span>{collateral.symbol}</span>
+                                <span>→</span>
+                                <span className="font-medium">{formattedTargetAmount}</span>
+                                <span>{selection.symbol}</span>
+                              </div>
+                            )}
+                            {!selection && hasOptions && (
+                              <div className="text-warning-800">
+                                Select a supported collateral to enable moving this debt pair.
+                              </div>
+                            )}
+                            {!hasOptions && (
+                              <div className="text-warning-800">
+                                No compatible collateral is available in {selectedProtocol}. Choose a different target protocol.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
                     <div className="text-xs text-base-content/70 mt-2 p-2 bg-info/10 rounded">
                       <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this
