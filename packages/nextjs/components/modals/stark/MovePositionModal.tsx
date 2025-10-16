@@ -196,25 +196,86 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     isLoadingTargetCollaterals,
   ]);
 
-  const collateralsForSelector = useMemo(() => {
-    if (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) {
-      return preSelectedCollaterals.map(collateral => {
-        const isSupported =
-          targetCollaterals.length === 0
-            ? true
-            : targetCollaterals.some(
-                token => token.address.toLowerCase() === collateral.token.toLowerCase(),
-              );
+  const targetProtocolKey = useMemo(() => {
+    if (!selectedProtocol) return null;
+    return selectedProtocol === "VesuV2" ? "vesu_v2" : selectedProtocol.toLowerCase();
+  }, [selectedProtocol]);
 
-        return {
-          symbol: collateral.symbol,
-          balance: Number(collateral.inputValue || collateral.amount.toString()),
-          address: collateral.token,
-          decimals: collateral.decimals,
-          rawBalance: collateral.amount,
-          supported: isSupported,
-        };
-      });
+  const targetMarketAddress = useMemo(() => {
+    if (!selectedProtocol) return null;
+    if (selectedProtocol === "Vesu") {
+      return normalizeStarknetAddress(selectedPoolId);
+    }
+    if (selectedProtocol === "VesuV2") {
+      return normalizeStarknetAddress(selectedV2PoolAddress);
+    }
+    return position.tokenAddress;
+  }, [selectedProtocol, selectedPoolId, selectedV2PoolAddress, position.tokenAddress]);
+
+  const collateralAddressesForSupport = useMemo(() => {
+    const addresses = new Set<string>();
+
+    sourceCollaterals.forEach(collateral => addresses.add(collateral.address.toLowerCase()));
+    targetCollaterals.forEach(collateral => addresses.add(collateral.address.toLowerCase()));
+    selectedCollateralsWithAmounts.forEach(collateral => addresses.add(collateral.token.toLowerCase()));
+    preSelectedCollaterals?.forEach(collateral => addresses.add(collateral.token.toLowerCase()));
+
+    return Array.from(addresses);
+  }, [
+    sourceCollaterals,
+    targetCollaterals,
+    selectedCollateralsWithAmounts,
+    preSelectedCollaterals,
+  ]);
+
+  const supportQueryEnabled =
+    isOpen &&
+    !!targetProtocolKey &&
+    !!targetMarketAddress &&
+    collateralAddressesForSupport.length > 0;
+
+  const { isLoading: isLoadingCollateralSupport, supportedCollaterals: rawSupportedCollaterals } =
+    useCollateralSupport(
+      targetProtocolKey ?? "",
+      targetMarketAddress ?? "0x0",
+      collateralAddressesForSupport,
+      supportQueryEnabled,
+    );
+
+  const supportedCollateralsMap = useMemo(() => {
+    const entries = Object.entries(rawSupportedCollaterals ?? {});
+    if (entries.length === 0) return {} as Record<string, boolean>;
+    return entries.reduce(
+      (acc, [address, supported]) => {
+        acc[address.toLowerCase()] = supported;
+        return acc;
+      },
+      {} as Record<string, boolean>,
+    );
+  }, [rawSupportedCollaterals]);
+
+  const hasSupportResults = useMemo(
+    () => Object.keys(supportedCollateralsMap).length > 0,
+    [supportedCollateralsMap],
+  );
+
+  const collateralsForSelector = useMemo(() => {
+    const resolveSupport = (address: string) => {
+      const normalized = address.toLowerCase();
+      const support = supportedCollateralsMap[normalized];
+      if (support !== undefined) return support;
+      return !hasSupportResults;
+    };
+
+    if (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) {
+      return preSelectedCollaterals.map(collateral => ({
+        symbol: collateral.symbol,
+        balance: Number(collateral.inputValue || collateral.amount.toString()),
+        address: collateral.token,
+        decimals: collateral.decimals,
+        rawBalance: collateral.amount,
+        supported: resolveSupport(collateral.token),
+      }));
     }
 
     let filtered = sourceCollaterals.filter(c => c.balance > 0);
@@ -222,22 +283,31 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
     }
 
-    return targetCollaterals.length > 0
-      ? filtered.map(collateral => ({
-          ...collateral,
-          supported: targetCollaterals.some(tc => tc.address.toLowerCase() === collateral.address.toLowerCase()),
-        }))
-      : filtered;
+    return filtered.map(collateral => ({
+      ...collateral,
+      supported: resolveSupport(collateral.address),
+    }));
   }, [
     sourceCollaterals,
-    targetCollaterals,
     preSelectedCollaterals,
     disableCollateralSelection,
     fromProtocol,
     selectedProtocol,
     type,
     tokenAddress,
+    supportedCollateralsMap,
+    hasSupportResults,
   ]);
+
+  const poolSupportedTargetCollaterals = useMemo(() => {
+    if (!targetCollaterals.length) return targetCollaterals;
+    if (!hasSupportResults) return targetCollaterals;
+    return targetCollaterals.filter(token => {
+      const normalized = token.address.toLowerCase();
+      const support = supportedCollateralsMap[normalized];
+      return support !== false;
+    });
+  }, [targetCollaterals, supportedCollateralsMap, hasSupportResults]);
 
   const { data: tokenPrices } = useScaffoldReadContract({
     contractName: "UiHelper",
@@ -248,20 +318,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   });
 
   useEffect(() => {
-    if (isLoadingTargetCollaterals) return;
+    if (!isOpen) return;
 
     setSelectedCollateralsWithAmounts(prev => {
       if (prev.length === 0) return prev;
 
       let changed = false;
       const updated = prev.map(collateral => {
-        const isSupported = targetCollaterals.some(
-          token => token.address.toLowerCase() === collateral.token.toLowerCase(),
-        );
+        const normalized = collateral.token.toLowerCase();
+        const support = supportedCollateralsMap[normalized];
+        const resolvedSupport = support !== undefined ? support : true;
 
-        if (collateral.supported !== isSupported) {
+        if (collateral.supported !== resolvedSupport) {
           changed = true;
-          return { ...collateral, supported: isSupported };
+          return { ...collateral, supported: resolvedSupport };
         }
 
         return collateral;
@@ -269,7 +339,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
       return changed ? updated : prev;
     });
-  }, [isLoadingTargetCollaterals, targetCollaterals]);
+  }, [isOpen, supportedCollateralsMap]);
 
   const { tokenToPrices } = useMemo(() => {
     if (!tokenPrices) return { tokenToPrices: {} };
@@ -335,7 +405,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   // Spinner only before first successful data render
   const isLoadingCollaterals =
-    !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
+    !firstCollateralsReadyRef.current &&
+    (isLoadingSourceCollaterals || isLoadingTargetCollaterals || isLoadingCollateralSupport);
   // Construct instruction based on current state
   const { fullInstruction, authInstruction, authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
@@ -1225,7 +1296,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           return next;
         }
 
-        const match = targetCollaterals.find(
+        const match = poolSupportedTargetCollaterals.find(
           collateral => collateral.address.toLowerCase() === targetAddress.toLowerCase(),
         );
 
@@ -1240,7 +1311,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         return next;
       });
     },
-    [targetCollaterals],
+    [poolSupportedTargetCollaterals],
   );
 
   // Add this new useCallback for amount handling
@@ -1357,6 +1428,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const isActionDisabled =
     loading ||
+    isLoadingCollateralSupport ||
     swapLoading ||
     swapBlocking ||
     !selectedProtocol ||
@@ -1469,13 +1541,23 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       <div className="text-xs text-warning-800">
                         Some collateral must be swapped to assets supported by the target protocol before redepositing.
                       </div>
+                      {isLoadingCollateralSupport && (
+                        <div className="flex items-center gap-2 text-warning-700 text-xs">
+                          <span className="loading loading-spinner loading-xs" /> Checking collateral compatibility…
+                        </div>
+                      )}
                       {incompatibleCollaterals.map(collateral => {
                         const selection = collateralSwapSelections[collateral.token];
                         const plan = collateralSwapPlans[collateral.token];
-                        const options = targetCollaterals.filter(
+                        const options = poolSupportedTargetCollaterals.filter(
                           token => token.address.toLowerCase() !== collateral.token.toLowerCase(),
                         );
                         const hasOptions = options.length > 0;
+                        const selectPlaceholder = isLoadingCollateralSupport
+                          ? "Checking compatibility…"
+                          : hasOptions
+                            ? "Select target collateral"
+                            : "No compatible collateral";
                         const formattedSourceAmount = formatUnits(collateral.amount, collateral.decimals);
                         const formattedTargetAmount = plan?.quote
                           ? formatUnits(
@@ -1510,9 +1592,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                                 className="select select-bordered select-xs md:select-sm"
                                 value={selection?.address ?? ""}
                                 onChange={event => handleSwapTargetSelection(collateral.token, event.target.value)}
-                                disabled={!hasOptions}
+                                disabled={!hasOptions || isLoadingCollateralSupport}
                               >
-                                <option value="">{hasOptions ? "Select target collateral" : "No compatible collateral"}</option>
+                                <option value="">{selectPlaceholder}</option>
                                 {options.map(option => (
                                   <option key={option.address} value={option.address}>
                                     {option.symbol}
@@ -1540,12 +1622,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                                 <span>{selection.symbol}</span>
                               </div>
                             )}
-                            {!selection && hasOptions && (
+                            {!selection && hasOptions && !isLoadingCollateralSupport && (
                               <div className="text-warning-800">
                                 Select a supported collateral to enable moving this debt pair.
                               </div>
                             )}
-                            {!hasOptions && (
+                            {!hasOptions && !isLoadingCollateralSupport && (
                               <div className="text-warning-800">
                                 No compatible collateral is available in {selectedProtocol}. Choose a different target protocol.
                               </div>
