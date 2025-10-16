@@ -319,8 +319,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
 
   // Handle selecting a collateral
   const handleCollateralToggle = (collateral: CollateralToken) => {
-    // Don't allow selection if the collateral is not supported or has zero balance
-    if (!collateral.supported || collateral.rawBalance <= 0n) return;
+    // Don't allow selection if the collateral has zero balance. Unsupported collaterals can still
+    // be selected so they can be swapped during the move flow.
+    if (collateral.rawBalance <= 0n) return;
     
     setSelectedCollaterals(prev => {
       // Check if collateral is already selected
