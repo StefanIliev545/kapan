@@ -14,6 +14,8 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
+import { useVesuAssets } from "~~/hooks/useVesuAssets";
+import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
 import {
   useDeployedContractInfo,
   useScaffoldMultiWriteContract,
@@ -66,6 +68,17 @@ type CollateralSwapPlan = {
 
 const SWAP_SLIPPAGE_BPS = 500n;
 const AVNU_ENTRYPOINTS = ["swap_exact_token_to", "multi_route_swap", "swap_exact_in"] as const;
+
+const toSymbolString = (value: unknown, address: string) => {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (typeof value === "bigint") {
+    const resolved = feltToString(value);
+    if (resolved && resolved.length > 0) {
+      return resolved;
+    }
+  }
+  return address;
+};
 
 interface MovePositionModalProps {
   isOpen: boolean;
@@ -179,6 +192,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     isOpen: isOpen && !!selectedProtocol,
   });
 
+  const {
+    collateralSet: vesuCollateralSet,
+    assetMap: vesuAssetMap,
+    isLoading: isLoadingVesuAssets,
+  } = useVesuAssets(selectedPoolId);
+
+  const {
+    collateralSet: vesuV2CollateralSet,
+    assetMap: vesuV2AssetMap,
+    isLoading: isLoadingVesuV2Assets,
+  } = useVesuV2Assets(selectedV2PoolAddress);
+
   // Track first load completion (never reset) to avoid spinner after initial data is shown
   const firstCollateralsReadyRef = useRef(false);
   useEffect(() => {
@@ -242,7 +267,34 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       supportQueryEnabled,
     );
 
-  const supportedCollateralsMap = useMemo(() => {
+  const targetSupportedCollateralSet = useMemo(() => {
+    if (selectedProtocol === "Vesu") {
+      return vesuCollateralSet;
+    }
+    if (selectedProtocol === "VesuV2") {
+      return vesuV2CollateralSet;
+    }
+    return null;
+  }, [selectedProtocol, vesuCollateralSet, vesuV2CollateralSet]);
+
+  const targetSupportedCollateralSetNormalized = useMemo(() => {
+    if (!targetSupportedCollateralSet) return null;
+    const normalized = new Set<string>();
+    targetSupportedCollateralSet.forEach(address => normalized.add(address.toLowerCase()));
+    return normalized;
+  }, [targetSupportedCollateralSet]);
+
+  const isDeterministicCompatibilityLoading = useMemo(() => {
+    if (selectedProtocol === "Vesu") {
+      return isLoadingVesuAssets;
+    }
+    if (selectedProtocol === "VesuV2") {
+      return isLoadingVesuV2Assets;
+    }
+    return false;
+  }, [selectedProtocol, isLoadingVesuAssets, isLoadingVesuV2Assets]);
+
+  const fallbackSupportedCollateralsMap = useMemo(() => {
     const entries = Object.entries(rawSupportedCollaterals ?? {});
     if (entries.length === 0) return {} as Record<string, boolean>;
     return entries.reduce(
@@ -254,10 +306,37 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     );
   }, [rawSupportedCollaterals]);
 
-  const hasSupportResults = useMemo(
-    () => Object.keys(supportedCollateralsMap).length > 0,
-    [supportedCollateralsMap],
-  );
+  const deterministicSupportedCollateralsMap = useMemo(() => {
+    if (!targetSupportedCollateralSetNormalized || isDeterministicCompatibilityLoading) return null;
+    const map: Record<string, boolean> = {};
+    collateralAddressesForSupport.forEach(address => {
+      const normalized = address.toLowerCase();
+      map[normalized] = targetSupportedCollateralSetNormalized.has(normalized);
+    });
+    return map;
+  }, [
+    collateralAddressesForSupport,
+    isDeterministicCompatibilityLoading,
+    targetSupportedCollateralSetNormalized,
+  ]);
+
+  const supportedCollateralsMap = useMemo(() => {
+    if (deterministicSupportedCollateralsMap) {
+      return deterministicSupportedCollateralsMap;
+    }
+    return fallbackSupportedCollateralsMap;
+  }, [deterministicSupportedCollateralsMap, fallbackSupportedCollateralsMap]);
+
+  const hasSupportResults = useMemo(() => {
+    if (targetSupportedCollateralSetNormalized && !isDeterministicCompatibilityLoading) return true;
+    return Object.keys(fallbackSupportedCollateralsMap).length > 0;
+  }, [
+    fallbackSupportedCollateralsMap,
+    isDeterministicCompatibilityLoading,
+    targetSupportedCollateralSetNormalized,
+  ]);
+
+  const isCompatibilityLoading = isLoadingCollateralSupport || isDeterministicCompatibilityLoading;
 
   const collateralsForSelector = useMemo(() => {
     const resolveSupport = (address: string) => {
@@ -299,15 +378,103 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     hasSupportResults,
   ]);
 
-  const poolSupportedTargetCollaterals = useMemo(() => {
-    if (!targetCollaterals.length) return targetCollaterals;
-    if (!hasSupportResults) return targetCollaterals;
-    return targetCollaterals.filter(token => {
-      const normalized = token.address.toLowerCase();
-      const support = supportedCollateralsMap[normalized];
-      return support !== false;
+  const vesuSupportedCollateralMap = useMemo(() => {
+    const map = new Map<string, TargetCollateralOption>();
+    vesuAssetMap.forEach((asset, address) => {
+      const normalized = address.toLowerCase();
+      const symbol = toSymbolString((asset as any)?.symbol, address);
+      const decimals = typeof asset.decimals === "number" ? asset.decimals : 18;
+      map.set(normalized, {
+        address,
+        symbol,
+        decimals,
+      });
     });
-  }, [targetCollaterals, supportedCollateralsMap, hasSupportResults]);
+    return map;
+  }, [vesuAssetMap]);
+
+  const vesuV2SupportedCollateralMap = useMemo(() => {
+    const map = new Map<string, TargetCollateralOption>();
+    vesuV2AssetMap.forEach((asset, address) => {
+      const normalized = address.toLowerCase();
+      const symbol = toSymbolString((asset as any)?.symbol, address);
+      const decimals = typeof asset.decimals === "number" ? asset.decimals : 18;
+      map.set(normalized, {
+        address,
+        symbol,
+        decimals,
+      });
+    });
+    return map;
+  }, [vesuV2AssetMap]);
+
+  const poolSupportedTargetCollaterals = useMemo(() => {
+    if (targetSupportedCollateralSet && targetSupportedCollateralSetNormalized) {
+      const lookup =
+        selectedProtocol === "Vesu"
+          ? vesuSupportedCollateralMap
+          : selectedProtocol === "VesuV2"
+            ? vesuV2SupportedCollateralMap
+            : null;
+
+      const options: TargetCollateralOption[] = [];
+      targetSupportedCollateralSet.forEach(address => {
+        const normalized = address.toLowerCase();
+        const metadata = lookup?.get(normalized);
+        if (metadata) {
+          options.push({ ...metadata });
+          return;
+        }
+
+        const fallback = targetCollaterals.find(token => token.address.toLowerCase() === normalized);
+        if (fallback) {
+          options.push({
+            address: fallback.address,
+            symbol: fallback.symbol,
+            decimals: fallback.decimals,
+          });
+          return;
+        }
+
+        options.push({
+          address,
+          symbol: address,
+          decimals: 18,
+        });
+      });
+
+      return options.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    }
+
+    if (!hasSupportResults) {
+      return targetCollaterals.map(collateral => ({
+        address: collateral.address,
+        symbol: collateral.symbol,
+        decimals: collateral.decimals,
+      }));
+    }
+
+    return targetCollaterals
+      .filter(token => {
+        const normalized = token.address.toLowerCase();
+        const support = supportedCollateralsMap[normalized];
+        return support !== false;
+      })
+      .map(token => ({
+        address: token.address,
+        symbol: token.symbol,
+        decimals: token.decimals,
+      }));
+  }, [
+    targetSupportedCollateralSet,
+    targetSupportedCollateralSetNormalized,
+    selectedProtocol,
+    vesuSupportedCollateralMap,
+    vesuV2SupportedCollateralMap,
+    targetCollaterals,
+    hasSupportResults,
+    supportedCollateralsMap,
+  ]);
 
   const { data: tokenPrices } = useScaffoldReadContract({
     contractName: "UiHelper",
@@ -327,7 +494,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       const updated = prev.map(collateral => {
         const normalized = collateral.token.toLowerCase();
         const support = supportedCollateralsMap[normalized];
-        const resolvedSupport = support !== undefined ? support : true;
+        const resolvedSupport = support !== undefined ? support : !hasSupportResults;
 
         if (collateral.supported !== resolvedSupport) {
           changed = true;
@@ -339,7 +506,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
       return changed ? updated : prev;
     });
-  }, [isOpen, supportedCollateralsMap]);
+  }, [hasSupportResults, isOpen, supportedCollateralsMap]);
 
   const { tokenToPrices } = useMemo(() => {
     if (!tokenPrices) return { tokenToPrices: {} };
@@ -406,7 +573,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   // Spinner only before first successful data render
   const isLoadingCollaterals =
     !firstCollateralsReadyRef.current &&
-    (isLoadingSourceCollaterals || isLoadingTargetCollaterals || isLoadingCollateralSupport);
+    (isLoadingSourceCollaterals || isLoadingTargetCollaterals || isCompatibilityLoading);
   // Construct instruction based on current state
   const { fullInstruction, authInstruction, authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
@@ -1146,6 +1313,51 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     });
   }, [selectedCollateralsWithAmounts]);
 
+  useEffect(() => {
+    if (isCompatibilityLoading) return;
+
+    setCollateralSwapSelections(prev => {
+      let changed = false;
+      const next = { ...prev };
+
+      incompatibleCollaterals.forEach(collateral => {
+        const options = poolSupportedTargetCollaterals.filter(
+          option => option.address.toLowerCase() !== collateral.token.toLowerCase(),
+        );
+
+        if (options.length === 0) {
+          if (next[collateral.token] !== null) {
+            next[collateral.token] = null;
+            changed = true;
+          }
+          return;
+        }
+
+        const current = next[collateral.token];
+        const currentAddress = current?.address.toLowerCase();
+        const isCurrentValid = currentAddress
+          ? options.some(option => option.address.toLowerCase() === currentAddress)
+          : false;
+
+        if (!isCurrentValid) {
+          const suggestion = options[0];
+          next[collateral.token] = {
+            address: suggestion.address,
+            symbol: suggestion.symbol,
+            decimals: suggestion.decimals,
+          };
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [
+    isCompatibilityLoading,
+    incompatibleCollaterals,
+    poolSupportedTargetCollaterals,
+  ]);
+
   // Remove swap plans when collateral becomes compatible or selection cleared
   useEffect(() => {
     setCollateralSwapPlans(prev => {
@@ -1428,7 +1640,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const isActionDisabled =
     loading ||
-    isLoadingCollateralSupport ||
+    isCompatibilityLoading ||
     swapLoading ||
     swapBlocking ||
     !selectedProtocol ||
@@ -1541,7 +1753,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       <div className="text-xs text-warning-800">
                         Some collateral must be swapped to assets supported by the target protocol before redepositing.
                       </div>
-                      {isLoadingCollateralSupport && (
+                      {isCompatibilityLoading && (
                         <div className="flex items-center gap-2 text-warning-700 text-xs">
                           <span className="loading loading-spinner loading-xs" /> Checking collateral compatibility…
                         </div>
@@ -1553,7 +1765,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                           token => token.address.toLowerCase() !== collateral.token.toLowerCase(),
                         );
                         const hasOptions = options.length > 0;
-                        const selectPlaceholder = isLoadingCollateralSupport
+                        const selectPlaceholder = isCompatibilityLoading
                           ? "Checking compatibility…"
                           : hasOptions
                             ? "Select target collateral"
@@ -1592,7 +1804,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                                 className="select select-bordered select-xs md:select-sm"
                                 value={selection?.address ?? ""}
                                 onChange={event => handleSwapTargetSelection(collateral.token, event.target.value)}
-                                disabled={!hasOptions || isLoadingCollateralSupport}
+                                disabled={!hasOptions || isCompatibilityLoading}
                               >
                                 <option value="">{selectPlaceholder}</option>
                                 {options.map(option => (
@@ -1622,12 +1834,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                                 <span>{selection.symbol}</span>
                               </div>
                             )}
-                            {!selection && hasOptions && !isLoadingCollateralSupport && (
+                            {!selection && hasOptions && !isCompatibilityLoading && (
                               <div className="text-warning-800">
                                 Select a supported collateral to enable moving this debt pair.
                               </div>
                             )}
-                            {!hasOptions && !isLoadingCollateralSupport && (
+                            {!hasOptions && !isCompatibilityLoading && (
                               <div className="text-warning-800">
                                 No compatible collateral is available in {selectedProtocol}. Choose a different target protocol.
                               </div>
