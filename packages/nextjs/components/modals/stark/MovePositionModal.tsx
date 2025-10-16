@@ -44,9 +44,9 @@ type MoveStep = "idle" | "executing" | "done";
 
 type OutputPointer = { instruction_index: bigint; output_index: bigint };
 
-const toOutputPointer = (instructionIndex: number): OutputPointer => ({
+const toOutputPointer = (instructionIndex: number, outputIndex = 0): OutputPointer => ({
   instruction_index: BigInt(instructionIndex),
-  output_index: 0n,
+  output_index: BigInt(outputIndex),
 });
 
 type TargetCollateralOption = {
@@ -573,10 +573,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       return result;
     }
 
+    const resolvedCollateralAddresses = selectedCollateralsWithAmounts.map(collateral => {
+      const plan = collateralSwapPlans[collateral.token];
+      if (!collateral.supported && plan && plan.quote && plan.calldata.length > 0) {
+        return plan.target.address;
+      }
+      return collateral.token;
+    });
+    const primaryResolvedCollateral = resolvedCollateralAddresses[0];
+
     // Otherwise, use the original approach for other protocols or single collateral
     let repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-    
+
     // Handle V1 Vesu context
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
@@ -588,7 +597,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         BigInt(position.tokenAddress),
       ]);
     }
-    
+
     // Handle V2 Vesu context
     if (fromProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
       const sourcePoolAddress = normalizedCurrentV2PoolAddress ?? selectedV2PoolAddress;
@@ -604,15 +613,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     let borrowInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let depositInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-
-    const resolvedCollateralAddresses = selectedCollateralsWithAmounts.map(collateral => {
-      const plan = collateralSwapPlans[collateral.token];
-      if (!collateral.supported && plan && plan.quote && plan.calldata.length > 0) {
-        return plan.target.address;
-      }
-      return collateral.token;
-    });
-    const primaryResolvedCollateral = resolvedCollateralAddresses[0];
 
     // Handle V1 Vesu target context
     if (selectedProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
