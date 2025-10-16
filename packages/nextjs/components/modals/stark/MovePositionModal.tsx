@@ -198,14 +198,23 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const collateralsForSelector = useMemo(() => {
     if (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) {
-      return preSelectedCollaterals.map(collateral => ({
-        symbol: collateral.symbol,
-        balance: Number(collateral.inputValue || collateral.amount.toString()),
-        address: collateral.token,
-        decimals: collateral.decimals,
-        rawBalance: collateral.amount,
-        supported: true,
-      }));
+      return preSelectedCollaterals.map(collateral => {
+        const isSupported =
+          targetCollaterals.length === 0
+            ? true
+            : targetCollaterals.some(
+                token => token.address.toLowerCase() === collateral.token.toLowerCase(),
+              );
+
+        return {
+          symbol: collateral.symbol,
+          balance: Number(collateral.inputValue || collateral.amount.toString()),
+          address: collateral.token,
+          decimals: collateral.decimals,
+          rawBalance: collateral.amount,
+          supported: isSupported,
+        };
+      });
     }
 
     let filtered = sourceCollaterals.filter(c => c.balance > 0);
@@ -237,6 +246,30 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     refetchInterval: 30000, // Reduced from 5s to 30s
     enabled: !!collateralsForSelector.length && isOpen,
   });
+
+  useEffect(() => {
+    if (isLoadingTargetCollaterals) return;
+
+    setSelectedCollateralsWithAmounts(prev => {
+      if (prev.length === 0) return prev;
+
+      let changed = false;
+      const updated = prev.map(collateral => {
+        const isSupported = targetCollaterals.some(
+          token => token.address.toLowerCase() === collateral.token.toLowerCase(),
+        );
+
+        if (collateral.supported !== isSupported) {
+          changed = true;
+          return { ...collateral, supported: isSupported };
+        }
+
+        return collateral;
+      });
+
+      return changed ? updated : prev;
+    });
+  }, [isLoadingTargetCollaterals, targetCollaterals]);
 
   const { tokenToPrices } = useMemo(() => {
     if (!tokenPrices) return { tokenToPrices: {} };
