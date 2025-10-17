@@ -5,7 +5,6 @@ import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
-import { fetchBuildExecuteTransaction, fetchQuotes, type Quote } from "@avnu/avnu-sdk";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
@@ -28,6 +27,8 @@ import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAdd
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { normalizeStarknetAddress } from "~~/utils/vesu";
+import { useSwapQuote, type SwapQuoteStatus } from "~~/hooks/useSwapQuote";
+import type { AvnuQuote } from "~~/lib/swaps/avnu";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -58,16 +59,13 @@ type TargetCollateralOption = {
 };
 
 type CollateralSwapPlan = {
-  key: string;
   target: TargetCollateralOption;
-  loading: boolean;
-  quote: Quote | null;
-  calldata: bigint[];
+  status: SwapQuoteStatus;
+  quote: AvnuQuote | null;
   error: string | null;
 };
 
 const SWAP_SLIPPAGE_BPS = 500n;
-const AVNU_ENTRYPOINTS = ["swap_exact_token_to", "multi_route_swap", "swap_exact_in"] as const;
 
 const toSymbolString = (value: unknown, address: string) => {
   if (typeof value === "string" && value.length > 0) return value;
@@ -128,7 +126,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   preSelectedCollaterals,
   disableCollateralSelection,
 }) => {
-  const { address: userAddress } = useAccount();
+  const { address: userAddress, chainId } = useAccount();
   const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }, { name: "VesuV2" }], []);
   const { tokenAddress, decimals, type, name, balance, poolId: currentPoolId } = position;
 
@@ -579,9 +577,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       const plan = collateralSwapPlans[collateral.token];
       if (!selection) return true;
       if (!plan) return true;
-      if (plan.loading) return true;
       if (plan.error) return true;
-      if (!plan.quote || plan.calldata.length === 0) return true;
+      if (!plan.quote || plan.quote.calldata.length === 0) return true;
       return false;
     });
   }, [selectedCollateralsWithAmounts, collateralSwapSelections, collateralSwapPlans]);
@@ -589,7 +586,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const swapLoading = useMemo(
     () =>
       selectedCollateralsWithAmounts.some(
-        collateral => !collateral.supported && collateral.amount > 0n && collateralSwapPlans[collateral.token]?.loading,
+        collateral => {
+          if (collateral.supported || collateral.amount === 0n) {
+            return false;
+          }
+          const plan = collateralSwapPlans[collateral.token];
+          return plan ? plan.status === "loading" && !plan.quote : false;
+        },
       ),
     [selectedCollateralsWithAmounts, collateralSwapPlans],
   );
@@ -875,7 +878,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     const resolvedCollateralAddresses = selectedCollateralsWithAmounts.map(collateral => {
       const plan = collateralSwapPlans[collateral.token];
-      if (!collateral.supported && plan && plan.quote && plan.calldata.length > 0) {
+      if (!collateral.supported && plan?.quote && plan.quote.calldata.length > 0) {
         return plan.target.address;
       }
       return collateral.token;
@@ -986,10 +989,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     selectedCollateralsWithAmounts.forEach((collateral, index) => {
       const plan = collateralSwapPlans[collateral.token];
-      if (!collateral.supported && plan && plan.quote && plan.calldata.length > 0) {
+      if (!collateral.supported && plan?.quote && plan.quote.calldata.length > 0) {
         const withdrawPointer = 1 + index;
-        const minOut = plan.quote.buyAmount - (plan.quote.buyAmount * SWAP_SLIPPAGE_BPS) / 10_000n;
-        const minOutClamped = minOut > 0n ? minOut : plan.quote.buyAmount;
+        const minOutClamped = plan.quote.minOut > 0n ? plan.quote.minOut : plan.quote.rawQuote.buyAmount;
         const reswapExactIn = new CairoCustomEnum({
           Deposit: undefined,
           Borrow: undefined,
@@ -1007,7 +1009,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             user: userAddress,
             should_pay_out: false,
             should_pay_in: false,
-            context: new CairoOption(CairoOptionVariant.Some, plan.calldata),
+            context: new CairoOption(CairoOptionVariant.Some, plan.quote.calldata),
           },
         });
         swapInstructionIndexMap.set(collateral.token, swapInstructions.length);
@@ -1017,7 +1019,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
     const depositInstructions = selectedCollateralsWithAmounts.map((collateral, index) => {
       const plan = collateralSwapPlans[collateral.token];
-      const hasSwap = !collateral.supported && plan && plan.quote && plan.calldata.length > 0;
+      const hasSwap = !collateral.supported && plan?.quote && plan.quote.calldata.length > 0;
       const depositToken = hasSwap ? plan.target.address : collateral.token;
       const withdrawBaseIndex = 1; // repay instruction is at index 0
       const swapBaseIndex = withdrawBaseIndex + withdrawInstructions.length;
@@ -1404,113 +1406,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     });
   }, [selectedCollateralsWithAmounts, collateralSwapSelections]);
 
-  // Prepare AVNU swap data for unsupported collaterals that have a target selected
-  useEffect(() => {
-    if (!isOpen || !userAddress) return;
-
-    const pendingFetches = selectedCollateralsWithAmounts
-      .filter(collateral => !collateral.supported)
-      .map(collateral => {
-        const target = collateralSwapSelections[collateral.token];
-        if (!target || collateral.amount === 0n) {
-          return null;
-        }
-        const key = `${target.address.toLowerCase()}-${collateral.amount.toString()}`;
-        const existing = collateralSwapPlans[collateral.token];
-        if (existing && existing.key === key) {
-          if (existing.loading) return null;
-          if (!existing.error && existing.quote && existing.calldata.length > 0) {
-            return null;
-          }
-        }
-        return { collateral, target, key };
-      })
-      .filter((value): value is { collateral: CollateralWithAmount; target: TargetCollateralOption; key: string } => value !== null);
-
-    if (pendingFetches.length === 0) return;
-
-    pendingFetches.forEach(({ collateral, target, key }) => {
-      setCollateralSwapPlans(prev => ({
-        ...prev,
-        [collateral.token]: {
-          key,
-          target,
-          loading: true,
-          quote: null,
-          calldata: [],
-          error: null,
-        },
-      }));
-    });
-
-    let cancelled = false;
-
-    const run = async () => {
-      for (const { collateral, target, key } of pendingFetches) {
-        try {
-          const quotes = await fetchQuotes({
-            sellTokenAddress: collateral.token,
-            buyTokenAddress: target.address,
-            sellAmount: collateral.amount,
-            takerAddress: userAddress,
-          } as any);
-
-          if (!quotes || quotes.length === 0) {
-            throw new Error("No swap quote available for selected collateral");
-          }
-
-          const quote = quotes[0];
-          const tx = await fetchBuildExecuteTransaction(quote.quoteId, userAddress, 0.05, false);
-          const swapCall = tx.calls?.find((call: any) => AVNU_ENTRYPOINTS.includes(call.entrypoint));
-          if (!swapCall) {
-            throw new Error("Unable to prepare swap instruction");
-          }
-
-          const calldata = (swapCall.calldata as any[]).map((value: any) => BigInt(value.toString()));
-
-          if (cancelled) return;
-
-          setCollateralSwapPlans(prev => ({
-            ...prev,
-            [collateral.token]: {
-              key,
-              target,
-              loading: false,
-              quote,
-              calldata,
-              error: null,
-            },
-          }));
-        } catch (e: any) {
-          if (cancelled) return;
-          setCollateralSwapPlans(prev => ({
-            ...prev,
-            [collateral.token]: {
-              key,
-              target,
-              loading: false,
-              quote: null,
-              calldata: [],
-              error: e?.message ?? "Failed to fetch swap quote",
-            },
-          }));
-        }
-      }
-    };
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    isOpen,
-    userAddress,
-    selectedCollateralsWithAmounts,
-    collateralSwapSelections,
-    collateralSwapPlans,
-  ]);
-
   // Handle MAX click for a specific collateral - wrap in useCallback
   const handleCollateralMaxClick = useCallback(
     (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => {
@@ -1528,12 +1423,49 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     [],
   );
 
+  const handleCollateralSwapPlanChange = useCallback(
+    (collateralToken: string, plan: CollateralSwapPlan | null) => {
+      setCollateralSwapPlans(prev => {
+        if (!plan) {
+          if (!(collateralToken in prev)) {
+            return prev;
+          }
+          const { [collateralToken]: _, ...rest } = prev;
+          return rest;
+        }
+
+        const existing = prev[collateralToken];
+        if (
+          existing &&
+          existing.target.address.toLowerCase() === plan.target.address.toLowerCase() &&
+          existing.status === plan.status &&
+          existing.error === plan.error &&
+          existing.quote === plan.quote
+        ) {
+          return prev;
+        }
+
+        return { ...prev, [collateralToken]: plan };
+      });
+    },
+    [],
+  );
+
   const handleSwapTargetSelection = useCallback(
     (collateralToken: string, targetAddress: string) => {
+      let selectionChanged = false;
+
       setCollateralSwapSelections(prev => {
         const next = { ...prev };
+        const previousSelection = prev[collateralToken];
+        const previousAddress = previousSelection?.address?.toLowerCase() ?? "";
+
         if (!targetAddress) {
+          if (previousSelection === null) {
+            return prev;
+          }
           next[collateralToken] = null;
+          selectionChanged = true;
           return next;
         }
 
@@ -1541,16 +1473,31 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
           collateral => collateral.address.toLowerCase() === targetAddress.toLowerCase(),
         );
 
-        if (match) {
-          next[collateralToken] = {
-            address: match.address,
-            symbol: match.symbol,
-            decimals: match.decimals,
-          };
+        if (!match) {
+          return prev;
         }
 
+        const nextAddress = match.address.toLowerCase();
+        if (previousAddress === nextAddress) {
+          return prev;
+        }
+
+        next[collateralToken] = {
+          address: match.address,
+          symbol: match.symbol,
+          decimals: match.decimals,
+        };
+        selectionChanged = true;
         return next;
       });
+
+      if (selectionChanged) {
+        setCollateralSwapPlans(current => {
+          if (!(collateralToken in current)) return current;
+          const { [collateralToken]: _, ...rest } = current;
+          return rest;
+        });
+      }
     },
     [poolSupportedTargetCollaterals],
   );
@@ -1789,7 +1736,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       )}
                       {incompatibleCollaterals.map(collateral => {
                         const selection = collateralSwapSelections[collateral.token];
-                        const plan = collateralSwapPlans[collateral.token];
                         const options = poolSupportedTargetCollaterals.filter(
                           token => token.address.toLowerCase() !== collateral.token.toLowerCase(),
                         );
@@ -1799,81 +1745,22 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                           : hasOptions
                             ? "Select target collateral"
                             : "No compatible collateral";
-                        const formattedSourceAmount = formatUnits(collateral.amount, collateral.decimals);
-                        const formattedTargetAmount = plan?.quote
-                          ? formatUnits(
-                              plan.quote.buyAmount,
-                              selection?.decimals ?? collateral.decimals,
-                            )
-                          : null;
+
                         return (
-                          <div
+                          <CollateralSwapPlannerRow
                             key={collateral.token}
-                            className="rounded-md border border-warning/40 bg-base-100/60 p-3 text-xs space-y-2"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="flex items-center gap-2">
-                                <div className="relative h-5 w-5">
-                                  <Image
-                                    src={tokenNameToLogo(collateral.symbol)}
-                                    alt={collateral.symbol}
-                                    fill
-                                    className="rounded-full object-contain"
-                                  />
-                                </div>
-                                <span className="font-medium">{collateral.symbol}</span>
-                                <span className="text-base-content/70">
-                                  {Number(formattedSourceAmount || 0).toLocaleString(undefined, {
-                                    maximumFractionDigits: 6,
-                                  })}
-                                </span>
-                              </div>
-                              <span className="text-warning-700">→</span>
-                              <select
-                                className="select select-bordered select-xs md:select-sm"
-                                value={selection?.address ?? ""}
-                                onChange={event => handleSwapTargetSelection(collateral.token, event.target.value)}
-                                disabled={!hasOptions || isCompatibilityLoading}
-                              >
-                                <option value="">{selectPlaceholder}</option>
-                                {options.map(option => (
-                                  <option key={option.address} value={option.address}>
-                                    {option.symbol}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            {plan?.loading && (
-                              <div className="flex items-center gap-2 text-warning-700">
-                                <span className="loading loading-spinner loading-xs" /> Preparing swap route…
-                              </div>
-                            )}
-                            {plan?.error && (
-                              <div className="text-error">
-                                {plan.error}
-                              </div>
-                            )}
-                            {!plan?.loading && plan?.quote && selection && (
-                              <div className="flex flex-wrap items-center gap-1 text-base-content/70">
-                                <span>Swap ready:</span>
-                                <span className="font-medium">{formattedSourceAmount}</span>
-                                <span>{collateral.symbol}</span>
-                                <span>→</span>
-                                <span className="font-medium">{formattedTargetAmount}</span>
-                                <span>{selection.symbol}</span>
-                              </div>
-                            )}
-                            {!selection && hasOptions && !isCompatibilityLoading && (
-                              <div className="text-warning-800">
-                                Select a supported collateral to enable moving this debt pair.
-                              </div>
-                            )}
-                            {!hasOptions && !isCompatibilityLoading && (
-                              <div className="text-warning-800">
-                                No compatible collateral is available in {selectedProtocol}. Choose a different target protocol.
-                              </div>
-                            )}
-                          </div>
+                            collateral={collateral}
+                            selection={selection ?? null}
+                            options={options}
+                            hasOptions={hasOptions}
+                            selectPlaceholder={selectPlaceholder}
+                            isCompatibilityLoading={isCompatibilityLoading}
+                            selectedProtocol={selectedProtocol}
+                            onSelect={address => handleSwapTargetSelection(collateral.token, address)}
+                            userAddress={userAddress}
+                            chainId={chainId}
+                            onPlanChange={plan => handleCollateralSwapPlanChange(collateral.token, plan)}
+                          />
                         );
                       })}
                     </div>
@@ -2124,5 +2011,172 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         <button disabled={loading}>close</button>
       </form>
     </dialog>
+  );
+};
+
+type CollateralSwapPlannerRowProps = {
+  collateral: CollateralWithAmount;
+  selection: TargetCollateralOption | null;
+  options: TargetCollateralOption[];
+  hasOptions: boolean;
+  selectPlaceholder: string;
+  isCompatibilityLoading: boolean;
+  selectedProtocol?: string;
+  onSelect: (address: string) => void;
+  userAddress?: `0x${string}`;
+  chainId?: bigint;
+  onPlanChange: (plan: CollateralSwapPlan | null) => void;
+};
+
+const CollateralSwapPlannerRow: FC<CollateralSwapPlannerRowProps> = ({
+  collateral,
+  selection,
+  options,
+  hasOptions,
+  selectPlaceholder,
+  isCompatibilityLoading,
+  selectedProtocol,
+  onSelect,
+  userAddress,
+  chainId,
+  onPlanChange,
+}) => {
+  const normalizedChainId = typeof chainId === "bigint" ? Number(chainId) : chainId ?? 0;
+  const enabled = Boolean(selection && userAddress && normalizedChainId > 0 && collateral.amount > 0n);
+
+  const { status, data, error, refetchNow } = useSwapQuote({
+    chainId: normalizedChainId,
+    fromToken: collateral.token as `0x${string}`,
+    toToken: selection?.address as `0x${string}`,
+    amount: collateral.amount,
+    takerAddress: userAddress,
+    enabled,
+    slippageBps: Number(SWAP_SLIPPAGE_BPS),
+  });
+
+  useEffect(() => {
+    if (!selection || !enabled) {
+      onPlanChange(null);
+      return;
+    }
+
+    const errorMessage =
+      status === "error"
+        ? error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Failed to prepare swap quote"
+        : null;
+
+    onPlanChange({
+      target: selection,
+      status,
+      quote: data ?? null,
+      error: errorMessage,
+    });
+  }, [data, enabled, error, onPlanChange, selection, status]);
+
+  const formattedSourceAmount = formatUnits(collateral.amount, collateral.decimals);
+  const formattedTargetAmount =
+    data && selection
+      ? formatUnits(data.rawQuote.buyAmount, selection.decimals ?? collateral.decimals)
+      : null;
+
+  const showInitialLoading = status === "loading" && !data;
+  const showUpdating = status === "loading" && !!data;
+  const showStale = status === "stale";
+  const errorMessage =
+    status === "error"
+      ? error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "Failed to prepare swap quote"
+      : null;
+
+  return (
+    <div className="rounded-md border border-warning/40 bg-base-100/60 p-3 text-xs space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
+          <div className="relative h-5 w-5">
+            <Image
+              src={tokenNameToLogo(collateral.symbol)}
+              alt={collateral.symbol}
+              fill
+              className="rounded-full object-contain"
+            />
+          </div>
+          <span className="font-medium">{collateral.symbol}</span>
+          <span className="text-base-content/70">
+            {Number(formattedSourceAmount || 0).toLocaleString(undefined, {
+              maximumFractionDigits: 6,
+            })}
+          </span>
+        </div>
+        <span className="text-warning-700">→</span>
+        <select
+          className="select select-bordered select-xs md:select-sm"
+          value={selection?.address ?? ""}
+          onChange={event => onSelect(event.target.value)}
+          disabled={!hasOptions || isCompatibilityLoading}
+        >
+          <option value="">{selectPlaceholder}</option>
+          {options.map(option => (
+            <option key={option.address} value={option.address}>
+              {option.symbol}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {showInitialLoading && (
+        <div className="flex items-center gap-2 text-warning-700">
+          <span className="loading loading-spinner loading-xs" /> Preparing swap route…
+        </div>
+      )}
+
+      {showUpdating && (
+        <div className="flex items-center gap-2 text-warning-700">
+          <span className="loading loading-spinner loading-xs" /> Updating swap route…
+        </div>
+      )}
+
+      {showStale && (
+        <div className="flex items-center gap-2 text-warning-700">
+          <span className="loading loading-spinner loading-xs" /> Using cached route, refreshing…
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="flex flex-wrap items-center gap-2 text-error">
+          <span>{errorMessage}</span>
+          <button type="button" className="underline" onClick={refetchNow}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {data && selection && status !== "error" && (
+        <div className="flex flex-wrap items-center gap-1 text-base-content/70">
+          <span>Swap ready:</span>
+          <span className="font-medium">{formattedSourceAmount}</span>
+          <span>{collateral.symbol}</span>
+          <span>→</span>
+          <span className="font-medium">{formattedTargetAmount}</span>
+          <span>{selection.symbol}</span>
+        </div>
+      )}
+
+      {!selection && hasOptions && !isCompatibilityLoading && (
+        <div className="text-warning-800">Select a supported collateral to enable moving this debt pair.</div>
+      )}
+
+      {!hasOptions && !isCompatibilityLoading && (
+        <div className="text-warning-800">
+          No compatible collateral is available in {selectedProtocol}. Choose a different target protocol.
+        </div>
+      )}
+    </div>
   );
 };
