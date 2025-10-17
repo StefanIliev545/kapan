@@ -508,6 +508,35 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     });
   }, [hasSupportResults, isOpen, supportedCollateralsMap]);
 
+  // Once compatibility data resolves, synchronise the stored selections so
+  // unsupported collaterals immediately surface in the UI. This effect keeps the
+  // `supported` flag in sync with the current target pool allow list so the
+  // incompatibility banner renders deterministically instead of relying on user
+  // interaction to refresh the state.
+  useEffect(() => {
+    if (!hasSupportResults) return;
+
+    const compatibleSet = new Set(
+      poolSupportedTargetCollaterals.map(option => option.address.toLowerCase()),
+    );
+
+    setSelectedCollateralsWithAmounts(prev => {
+      let changed = false;
+      const next = prev.map(collateral => {
+        const normalized = collateral.token.toLowerCase();
+        const isSupported = compatibleSet.has(normalized);
+        if (collateral.supported === isSupported) {
+          return collateral;
+        }
+
+        changed = true;
+        return { ...collateral, supported: isSupported };
+      });
+
+      return changed ? next : prev;
+    });
+  }, [hasSupportResults, poolSupportedTargetCollaterals]);
+
   const { tokenToPrices } = useMemo(() => {
     if (!tokenPrices) return { tokenToPrices: {} };
     const prices = tokenPrices as unknown as bigint[];
