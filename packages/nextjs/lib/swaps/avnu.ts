@@ -18,6 +18,8 @@ export type AvnuQuote = {
   rawQuote: Quote;
   calldata: bigint[];
   minOut: bigint;
+  to: `0x${string}`;
+  entrypoint: string;
 };
 
 const toAbortError = () => new DOMException("Aborted", "AbortError");
@@ -81,10 +83,26 @@ export async function fetchAvnuQuote(
     const slippage = BigInt(slippageBps);
     const minOut = buyAmount - (buyAmount * slippage) / 10_000n;
 
+    const contractAddress = ((swapCall as any).contractAddress ?? (swapCall as any).contract_address ?? (swapCall as any).to) as
+      | `0x${string}`
+      | undefined;
+
+    if (!contractAddress) {
+      throw new Error("Unable to resolve AVNU swap contract address");
+    }
+
+    const entrypoint = String(swapCall.entrypoint || "");
+
+    if (!entrypoint) {
+      throw new Error("Unable to resolve AVNU swap entrypoint");
+    }
+
     return {
       rawQuote: quote,
       calldata,
       minOut: minOut > 0n ? minOut : buyAmount,
+      to: contractAddress,
+      entrypoint,
     };
   };
 

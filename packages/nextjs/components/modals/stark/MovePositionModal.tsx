@@ -67,6 +67,16 @@ type CollateralSwapPlan = {
 
 const SWAP_SLIPPAGE_BPS = 500n;
 
+const resolveSwapOutputIndex = (entrypoint?: string) => {
+  const normalized = entrypoint?.toLowerCase() ?? "";
+
+  if (normalized === "swap_exact_token_to") {
+    return 0;
+  }
+
+  return 1;
+};
+
 const toSymbolString = (value: unknown, address: string) => {
   if (typeof value === "string" && value.length > 0) return value;
   if (typeof value === "bigint") {
@@ -1026,7 +1036,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       const pointerIndex = hasSwap
         ? swapBaseIndex + (swapInstructionIndexMap.get(collateral.token) ?? 0)
         : withdrawBaseIndex + index;
-      const pointerOutput = hasSwap ? 1 : 0;
+      const pointerOutput = hasSwap ? resolveSwapOutputIndex(plan.quote?.entrypoint) : 0;
       return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
