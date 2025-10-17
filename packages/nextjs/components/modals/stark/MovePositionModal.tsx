@@ -66,6 +66,7 @@ type CollateralSwapPlan = {
 };
 
 const SWAP_SLIPPAGE_BPS = 500n;
+const MAX_APPROVAL_AMOUNT = (1n << 256n) - 1n;
 
 const resolveSwapOutputIndex = (entrypoint?: string) => {
   const normalized = entrypoint?.toLowerCase() ?? "";
@@ -1096,7 +1097,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         protocol_name: lowerProtocolName,
         instructions: [...withdrawInstructions],
       },
-      
+
       {
         protocol_name: destProtocolName,
         instructions: [borrowInstruction],
@@ -1222,13 +1223,65 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       cancelled = true;
     };
   }, [isOpen, isAuthReady, getAuthorizations, authCalldataKey]);
-  
+
+  const swapApprovalAuthorizations = useMemo(() => {
+    if (!routerGateway?.address) return [] as LendingAuthorization[];
+
+    const tokensNeedingApproval = new Set<string>();
+    selectedCollateralsWithAmounts.forEach(collateral => {
+      const plan = collateralSwapPlans[collateral.token];
+      if (!collateral.supported && plan?.quote && plan.quote.calldata.length > 0) {
+        try {
+          tokensNeedingApproval.add(normalizeStarknetAddress(plan.target.address));
+        } catch (err) {
+          console.error("Failed to normalize approval token address", err);
+        }
+      }
+    });
+
+    if (tokensNeedingApproval.size === 0) {
+      return [] as LendingAuthorization[];
+    }
+
+    const approvalAmount = uint256.bnToUint256(MAX_APPROVAL_AMOUNT);
+    const spenderAddress = normalizeStarknetAddress(routerGateway.address);
+    const seenAuthorizations = new Set(
+      (fetchedAuthorizations ?? []).map(authorization => `${authorization.contractAddress.toLowerCase()}::${authorization.entrypoint}`),
+    );
+
+    const approvals: LendingAuthorization[] = [];
+    tokensNeedingApproval.forEach(tokenAddress => {
+      const key = `${tokenAddress.toLowerCase()}::approve`;
+      if (seenAuthorizations.has(key)) {
+        return;
+      }
+
+      approvals.push({
+        contractAddress: tokenAddress,
+        entrypoint: "approve",
+        calldata: [
+          spenderAddress,
+          num.toHexString(approvalAmount.low),
+          num.toHexString(approvalAmount.high),
+        ],
+      });
+    });
+
+    return approvals;
+  }, [
+    routerGateway?.address,
+    selectedCollateralsWithAmounts,
+    collateralSwapPlans,
+    fetchedAuthorizations,
+  ]);
+
   // Construct calls based on current state
   const calls = useMemo(() => {
     if (!pairInstructions || pairInstructions.length === 0) return [];
 
     const authorizations = fetchedAuthorizations ?? [];
-    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
+    const combinedAuthorizations = [...authorizations, ...swapApprovalAuthorizations];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(combinedAuthorizations);
     const moveCalls = pairInstructions.map(instructions => ({
       contractName: "RouterGateway" as const,
       functionName: "move_debt" as const,
@@ -1236,11 +1289,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }));
 
     return [
-      ...(authorizations as any),
+      ...(combinedAuthorizations as any),
       ...moveCalls,
       ...(revokeAuthorizations as any),
     ];
-  }, [fetchedAuthorizations, pairInstructions]);
+  }, [fetchedAuthorizations, pairInstructions, swapApprovalAuthorizations]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -1248,18 +1301,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
       return null;
     const authorizations = fetchedAuthorizations ?? [];
-    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
+    const combinedAuthorizations = [...authorizations, ...swapApprovalAuthorizations];
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(combinedAuthorizations);
     const moveCalls = pairInstructions.map(instructions => ({
       contractAddress: routerGateway.address,
       entrypoint: "move_debt",
       calldata: CallData.compile({ instructions }),
     }));
     return [
-      ...(authorizations as any),
+      ...(combinedAuthorizations as any),
       ...moveCalls,
       ...(revokeAuthorizations as any),
     ];
-  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
+  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions, swapApprovalAuthorizations]);
 
   const {
     loading: feeLoading,
