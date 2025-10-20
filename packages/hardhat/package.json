@@ -23,7 +23,7 @@
   "dependencies": {
     "@aave/core-v3": "^1.19.3",
     "@inquirer/password": "^4.0.2",
-    "@openzeppelin/contracts": "~5.0.2",
+    "@openzeppelin/contracts": "~4.9.6",
     "@typechain/ethers-v6": "~0.5.1",
     "@venusprotocol/venus-protocol": "^9.7.0",
     "dotenv": "~16.4.5",
