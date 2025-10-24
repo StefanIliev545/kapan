@@ -6,14 +6,10 @@ use starknet::{ContractAddress};
     use crate::interfaces::IGateway::{
         LendingInstruction,
         Deposit,
-        Withdraw,
         Borrow,
         Repay,
-        Reborrow,
-        Redeposit,
         Swap,
         SwapExactIn,
-        Reswap,
         BasicInstruction,
         InstructionOutput,
         ILendingInstructionProcessorDispatcher,
@@ -46,7 +42,7 @@ mod RouterGateway {
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use super::*;
-    use starknet::{contract_address_const, get_caller_address, get_contract_address};
+    use starknet::{get_caller_address, get_contract_address};
     use crate::interfaces::vesu::{IFlashloanReceiver, IFlashloanProviderDispatcher, IFlashloanProviderDispatcherTrait};
 
     #[event]
@@ -167,7 +163,6 @@ mod RouterGateway {
                         if should_transfer {
                             assert(erc20.transfer_from(get_caller_address(), get_contract_address(), basic.amount), 'transfer failed');
                         }
-                        let balance = erc20.balance_of(get_contract_address());
                         assert(erc20.approve(gateway, basic.amount), 'approve failed');
                     },
                     LendingInstruction::Repay(repay) => {

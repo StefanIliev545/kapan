@@ -11,7 +11,6 @@ import {
   Bars3Icon,
   DocumentChartBarIcon,
   SparklesIcon,
-  WalletIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
@@ -27,11 +26,6 @@ type HeaderMenuLink = {
 };
 
 export const menuLinks: HeaderMenuLink[] = [
-  {
-    label: "Lending",
-    href: "/app",
-    icon: <WalletIcon className="h-5 w-5" />,
-  },
   {
     label: "Automate",
     href: "/automate",
