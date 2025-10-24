@@ -30,6 +30,9 @@ import { normalizeStarknetAddress } from "~~/utils/vesu";
 import { useSwapQuote, type SwapQuoteStatus } from "~~/hooks/useSwapQuote";
 import type { AvnuQuote } from "~~/lib/swaps/avnu";
 import { getVTokenForAsset } from "~~/lib/vesu";
+import { InstructionConfirmModal } from "~~/components/modals/InstructionConfirmModal";
+import type { InstructionPreview, InstructionOutputPointer } from "~~/components/debug/InstructionExplorer";
+import { useSettings } from "~~/store/settings";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -78,6 +81,13 @@ const resolveSwapOutputIndex = (entrypoint?: string) => {
 
   return 1;
 };
+
+const toPreviewPointer = (instr: number, index = 0, u256 = true): InstructionOutputPointer => ({
+  kind: "output_ptr",
+  instr,
+  index,
+  u256,
+});
 
 const toSymbolString = (value: unknown, address: string) => {
   if (typeof value === "string" && value.length > 0) return value;
@@ -186,11 +196,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
+  const { showInstructionConfirm } = useSettings();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
   const [swapApprovalSpenders, setSwapApprovalSpenders] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!showInstructionConfirm && confirmOpen) {
+      setConfirmOpen(false);
+    }
+  }, [showInstructionConfirm, confirmOpen]);
 
   const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
     protocolName: fromProtocol as "Vesu" | "VesuV2" | "Nostra",
@@ -621,9 +639,25 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     !firstCollateralsReadyRef.current &&
     (isLoadingSourceCollaterals || isLoadingTargetCollaterals || isCompatibilityLoading);
   // Construct instruction based on current state
-  const { fullInstruction, authInstruction, authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
+  const {
+    fullInstruction,
+    authInstruction,
+    authInstructions,
+    authCalldataKey,
+    pairInstructions,
+    instructionPlan,
+  } = useMemo(() => {
+    const planSteps: InstructionPreview[] = [];
+
     if (!amount || !userAddress || !routerGateway?.address)
-      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, authInstructions: [], authCalldataKey: "", pairInstructions: [] };
+      return {
+        fullInstruction: { instructions: [] },
+        authInstruction: { instructions: [] },
+        authInstructions: [],
+        authCalldataKey: "",
+        pairInstructions: [],
+        instructionPlan: planSteps,
+      };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
@@ -637,6 +671,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         authInstructions: [],
         authCalldataKey: "",
         pairInstructions: [],
+        instructionPlan: planSteps,
       };
     }
 
@@ -837,12 +872,51 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               context: contextReborrow,
             },
           }),
-        ];
-        return [
-          {
-            protocol_name: lowerProtocolName,
-            instructions: nostraInstructions,
-          },
+          ];
+
+          planSteps.push({
+            kind: "Repay",
+            token: position.tokenAddress as `0x${string}`,
+            amount: allocation.debtAmount,
+            meta: {
+              protocol: lowerProtocolName,
+              repay_all: repayAll ? "true" : "false",
+            },
+          });
+
+          planSteps.push({
+            kind: "Withdraw",
+            token: collateral.token as `0x${string}`,
+            amount: uppedAmount,
+            meta: {
+              protocol: lowerProtocolName,
+              withdraw_all: isCollateralMaxClicked ? "true" : "false",
+            },
+          });
+
+          planSteps.push({
+            kind: "Redeposit",
+            token: collateral.token as `0x${string}`,
+            amountPtr: toPreviewPointer(1, 0, true),
+            meta: {
+              protocol: destProtocolName,
+            },
+          });
+
+          planSteps.push({
+            kind: "Reborrow",
+            token: position.tokenAddress as `0x${string}`,
+            amountPtr: toPreviewPointer(0, 0, true),
+            meta: {
+              protocol: destProtocolName,
+            },
+          });
+
+          return [
+            {
+              protocol_name: lowerProtocolName,
+              instructions: nostraInstructions,
+            },
           {
             protocol_name: destProtocolName,
             instructions: vesuInstructions,
@@ -875,18 +949,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         authInstructions: filteredForAuth,
         authCalldataKey: JSON.stringify(authInstructionData),
         pairInstructions: instructions,
+        instructionPlan: planSteps,
       };
     };
 
     // If target protocol is Vesu (V1 or V2) and we have multiple collaterals, use proportional allocation
     if ((selectedProtocol === "Vesu" || selectedProtocol === "VesuV2") && selectedCollateralsWithAmounts.length > 1) {
-      const result = generateVesuInstructions() || {
-        fullInstruction: { instructions: [] },
-        authInstruction: { instructions: [] },
-        authInstructions: [],
-        authCalldataKey: "",
-        pairInstructions: [],
-      };
+      const result =
+        generateVesuInstructions() || {
+          fullInstruction: { instructions: [] },
+          authInstruction: { instructions: [] },
+          authInstructions: [],
+          authCalldataKey: "",
+          pairInstructions: [],
+          instructionPlan: planSteps,
+        };
       return result;
     }
 
@@ -972,6 +1049,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Reborrow: undefined,
     });
 
+    planSteps.push({
+      kind: "Repay",
+      token: position.tokenAddress as `0x${string}`,
+      amount: parsedAmount,
+      meta: {
+        protocol: lowerProtocolName,
+        repay_all: isAmountMaxClicked ? "true" : "false",
+      },
+    });
+
     // Auth instructions only need withdraw and borrow
     const withdrawInstructions = selectedCollateralsWithAmounts.map(collateral => {
       // Check if MAX was clicked for this collateral
@@ -979,6 +1066,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       // Add 1% buffer if MAX was clicked for this collateral
       const uppedAmount = isCollateralMaxClicked ? (collateral.amount * BigInt(101)) / BigInt(100) : collateral.amount;
       const amount = uint256.bnToUint256(uppedAmount);
+
+      planSteps.push({
+        kind: "Withdraw",
+        token: collateral.token as `0x${string}`,
+        amount: uppedAmount,
+        meta: {
+          protocol: lowerProtocolName,
+          withdraw_all: isCollateralMaxClicked ? "true" : "false",
+        },
+      });
 
       return new CairoCustomEnum({
         Deposit: undefined,
@@ -1028,6 +1125,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         });
         swapInstructionIndexMap.set(collateral.token, swapInstructions.length);
         swapInstructions.push(reswapExactIn);
+
+        planSteps.push({
+          kind: "Swap",
+          to: plan.quote.to,
+          entrypoint: plan.quote.entrypoint,
+          token: plan.target.address as `0x${string}`,
+          amountPtr: toPreviewPointer(withdrawPointer, 0, true),
+          meta: {
+            min_out: plan.quote.minOut,
+          },
+          calldata: plan.quote.calldata,
+        });
       }
     });
 
@@ -1041,6 +1150,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         ? swapBaseIndex + (swapInstructionIndexMap.get(collateral.token) ?? 0)
         : withdrawBaseIndex + index;
       const pointerOutput = hasSwap ? resolveSwapOutputIndex(plan.quote?.entrypoint) : 0;
+
+      planSteps.push({
+        kind: "Deposit",
+        token: depositToken as `0x${string}`,
+        amountPtr: toPreviewPointer(pointerIndex, pointerOutput, true),
+        meta: {
+          protocol: destProtocolName,
+          source: hasSwap ? "swap" : "withdraw",
+        },
+      });
+
       return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
@@ -1068,6 +1188,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
         user: userAddress,
         context: borrowInstructionContext,
+      },
+    });
+
+    planSteps.push({
+      kind: "Borrow",
+      token: position.tokenAddress as `0x${string}`,
+      amountPtr: toPreviewPointer(0, 0, true),
+      meta: {
+        protocol: destProtocolName,
       },
     });
 
@@ -1117,23 +1246,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       rawSelectors: false,
     });
 
-    return {
-      fullInstruction: fullInstructionData,
-      authInstruction: authInstructionData,
-      authInstructions: authInstructions,
-      authCalldataKey: JSON.stringify(authInstructionData),
-      // Wrap instructions in an array so that callers always
-      // receive a list of instruction pairs. This ensures we
-      // execute a single move_debt call when moving between
-      // Vesu and Nostra while still supporting multiple calls
-      // for scenarios that require it (e.g. Nostra -> Vesu with
-      // several collaterals).
-      pairInstructions: [instructions],
-    };
-  }, [
-    amount,
-    userAddress,
-    routerGateway?.address,
+      return {
+        fullInstruction: fullInstructionData,
+        authInstruction: authInstructionData,
+        authInstructions: authInstructions,
+        authCalldataKey: JSON.stringify(authInstructionData),
+        // Wrap instructions in an array so that callers always
+        // receive a list of instruction pairs. This ensures we
+        // execute a single move_debt call when moving between
+        // Vesu and Nostra while still supporting multiple calls
+        // for scenarios that require it (e.g. Nostra -> Vesu with
+        // several collaterals).
+        pairInstructions: [instructions],
+        instructionPlan: planSteps,
+      };
+    }, [
+      amount,
+      userAddress,
+      routerGateway?.address,
     position.decimals,
     position.tokenAddress,
     fromProtocol,
@@ -1339,6 +1469,35 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     swapApprovalSpenders,
     tokensRequiringSwapApproval,
   ]);
+
+  const approvalPreviewSteps = useMemo<InstructionPreview[]>(() => {
+    if (!swapApprovalAuthorizations || swapApprovalAuthorizations.length === 0) {
+      return [];
+    }
+
+    return swapApprovalAuthorizations.map(authorization => {
+      const spender = (authorization.calldata?.[0] ?? "0x0") as `0x${string}`;
+      const low = authorization.calldata?.[1] ? BigInt(authorization.calldata[1]) : 0n;
+      const high = authorization.calldata?.[2] ? BigInt(authorization.calldata[2]) : 0n;
+      const amount = (high << 128n) + low;
+
+      return {
+        kind: "Approve",
+        to: authorization.contractAddress as `0x${string}`,
+        entrypoint: authorization.entrypoint,
+        token: authorization.contractAddress as `0x${string}`,
+        amount,
+        meta: {
+          spender,
+        },
+      } satisfies InstructionPreview;
+    });
+  }, [swapApprovalAuthorizations]);
+
+  const instructionPreviewSteps = useMemo(
+    () => [...approvalPreviewSteps, ...(instructionPlan ?? [])],
+    [approvalPreviewSteps, instructionPlan],
+  );
 
   // Construct calls based on current state
   const calls = useMemo(() => {
@@ -1685,7 +1844,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
   }, [isOpen, fromProtocol, normalizedCurrentV2PoolAddress]);
 
-  const handleMovePosition = async () => {
+  const handleMovePosition = useCallback(async () => {
     try {
       if (!userAddress) throw new Error("Wallet not connected");
       setLoading(true);
@@ -1693,7 +1852,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setStep("executing");
 
       // Execute the transaction
-      const tx = await sendAsync();
+      await sendAsync();
 
       setStep("done");
       // Close modal after a short delay on success
@@ -1705,7 +1864,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userAddress, sendAsync, onClose]);
 
   // Get action button text based on current step
   const actionButtonText = useMemo(() => {
@@ -1758,6 +1917,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       selectedProtocol === "VesuV2" &&
       normalizedCurrentV2PoolAddress !== undefined &&
       normalizedCurrentV2PoolAddress === normalizeStarknetAddress(selectedV2PoolAddress));
+
+  const handlePrimaryAction = useCallback(async () => {
+    if (step === "done") {
+      onClose();
+      return;
+    }
+
+    if (isActionDisabled) {
+      return;
+    }
+
+    if (showInstructionConfirm) {
+      setConfirmOpen(true);
+      return;
+    }
+
+    await handleMovePosition();
+  }, [step, onClose, isActionDisabled, showInstructionConfirm, handleMovePosition]);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -2121,7 +2298,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               <div className="pt-2">
                 <button
                   className={`btn btn-ghost w-full h-10 ${loading ? "animate-pulse" : ""}`}
-                  onClick={step === "done" ? onClose : handleMovePosition}
+                  onClick={handlePrimaryAction}
                   disabled={step === "done" ? false : isActionDisabled}
                 >
                   {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
@@ -2139,6 +2316,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       >
         <button disabled={loading}>close</button>
       </form>
+      <InstructionConfirmModal
+        isOpen={confirmOpen && step !== "done"}
+        steps={instructionPreviewSteps}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={async () => {
+          setConfirmOpen(false);
+          await handleMovePosition();
+        }}
+      />
     </dialog>
   );
 };
