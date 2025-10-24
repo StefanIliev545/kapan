@@ -22,7 +22,6 @@ export const useSettings = create<SettingsState>()(
     {
       name: "kapan-settings",
       storage,
-      partialize: state => ({ showInstructionConfirm: state.showInstructionConfirm }),
     },
   ),
 );
