@@ -9,7 +9,7 @@ export async function getVTokenForAsset(
   poolAddress: `0x${string}`,
   assetAddress: `0x${string}`,
 ): Promise<`0x${string}`> {
-  const { result } = await provider.callContract(
+  const callResponse = await provider.callContract(
     {
       contractAddress: VESU_V2_POOL_FACTORY_ADDRESS,
       entrypoint: "v_token_for_asset",
@@ -18,7 +18,18 @@ export async function getVTokenForAsset(
     "pre_confirmed",
   );
 
-  const raw = result?.[0];
+  // Starknet.js v6+ returns a bare array for callContract, while older
+  // versions wrap the result in an object. Handle both to stay
+  // compatible with the app's provider typings.
+  const wrappedResponse = callResponse as unknown as { result?: unknown };
+  const maybeArray = callResponse as unknown;
+  const resultArray = Array.isArray(wrappedResponse.result)
+    ? (wrappedResponse.result as unknown[])
+    : Array.isArray(maybeArray)
+      ? (maybeArray as unknown[])
+      : [];
+
+  const raw = resultArray?.[0];
   if (!raw) {
     return "0x0" as `0x${string}`;
   }
