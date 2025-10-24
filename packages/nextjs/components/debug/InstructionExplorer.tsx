@@ -57,6 +57,15 @@ const shortenAddress = (value: string) => {
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 };
 
+const debugReplacer = (_key: string, value: unknown) => {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  return value;
+};
+
+const serializeForDebug = (value: unknown) => JSON.stringify(value, debugReplacer, 2);
+
 const renderValue = (value: InstructionValue) => {
   if (value === null || value === undefined) return "—";
   if (typeof value === "bigint") return value.toString();
@@ -81,7 +90,7 @@ const Field = ({ label, value }: { label: string; value: InstructionValue }) => 
 export const InstructionExplorer: React.FC<InstructionExplorerProps> = ({ steps, footer }) => {
   const stepCount = steps.length;
   const copyDebugJson = () => {
-    void navigator.clipboard?.writeText(JSON.stringify(steps, null, 2));
+    void navigator.clipboard?.writeText(serializeForDebug(steps));
   };
 
   return (
@@ -123,7 +132,7 @@ export const InstructionExplorer: React.FC<InstructionExplorerProps> = ({ steps,
                 <details className="mt-3">
                   <summary className="cursor-pointer text-xs text-base-content/60">calldata</summary>
                   <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-base-200/60 p-2 text-xs text-base-content/80 dark:bg-base-300/30">
-                    {JSON.stringify(step.calldata, null, 2)}
+                    {serializeForDebug(step.calldata)}
                   </pre>
                 </details>
               )}
