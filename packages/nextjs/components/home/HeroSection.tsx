@@ -23,17 +23,23 @@ const HeroSection = () => {
         <div className="lg:w-1/2">
           <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
             <div className="card-body p-6">
-              <h1 className="text-4xl font-bold mb-2">Optimize Your DeFi Debt</h1>
-              <h2 className="text-2xl mb-4">Move debts between lending protocols seamlessly</h2>
-              <p className="py-2 text-lg">
-                Now supporting Starknet alongside your favorite chains.
+              <h1 className="text-4xl font-bold mb-2">The optimal way to lend and borrow on Starknet</h1>
+              <h2 className="text-2xl mb-4">Manage all your lending positions in one place</h2>
+              <p className="py-2 text-lg flex items-center gap-2">
+                Now supporting
+                  <Image
+                    src="/logos/strk.svg"
+                    alt="Starknet Logo"
+                    width={22}
+                    height={22}
+                    className="ml-1"
+                    style={{ display: "inline-block", verticalAlign: "middle" }}
+                  />
+                  Starknet!
               </p>
               <p className="py-2 text-lg">
-                Our protocol enables users to optimize their borrowing costs by easily moving debt positions
-                between DeFi lending platforms like Vesu, Nostra, Aave, and Compound.
-              </p>
-              <p className="py-2 text-lg">
-                With a single transaction, users can take advantage of interest rate differences and save on borrowing costs.
+                Kapan allows you to refinance your debt, swap collaterals, compare rates and do everything you need to
+                manage your DeFi lending portfolio efficiently. All operations are atomic and require no additional capital thanks to flash loans.
               </p>
               
               <div className="flex flex-wrap items-center gap-4 mt-6">

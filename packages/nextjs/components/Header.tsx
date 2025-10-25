@@ -11,7 +11,6 @@ import {
   Bars3Icon,
   DocumentChartBarIcon,
   SparklesIcon,
-  WalletIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
@@ -27,11 +26,6 @@ type HeaderMenuLink = {
 };
 
 export const menuLinks: HeaderMenuLink[] = [
-  {
-    label: "Lending",
-    href: "/app",
-    icon: <WalletIcon className="h-5 w-5" />,
-  },
   {
     label: "Automate",
     href: "/automate",
@@ -234,8 +228,7 @@ export const Header = () => {
                               />
                             </div>
                             <div>
-                              <div className="font-bold text-xl font-sans text-base-content">Kapan Finance</div>
-                              <div className="text-xs text-base-content/60">Lending Made Easy</div>
+                              <div className="font-bold text-xl font-inter text-base-content">Kapan</div>
                             </div>
                           </div>
                         </div>
@@ -272,7 +265,7 @@ export const Header = () => {
             <Link href="/" className="flex items-center">
               <div className="relative flex items-center">
                 <div className="relative">
-                  <div className={`relative w-14 h-14 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                  <div className={`relative w-11 h-11 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
                     <Image
                       alt="Kapan logo"
                       className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
@@ -283,11 +276,10 @@ export const Header = () => {
                   </div>
                 </div>
                 <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                  <div className="font-bold text-lg font-sans text-base-content">Kapan Finance</div>
-                  <div className="text-[10px] text-base-content/60 -mt-1">Lending Made Easy</div>
+                  <div className="font-bold text-lg font-inter text-base-content">Kapan</div>
                 </div>
-              </div>
-            </Link>
+                </div>
+              </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex ml-10">

@@ -20,6 +20,9 @@ import { WagmiProvider } from "wagmi";
 import FloatingSocials from "~~/components/FloatingSocials";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
+import { LandingHeader } from "~~/components/LandingHeader";
+import { AppHeader } from "~~/components/AppHeader";
+import { usePathname } from "next/navigation";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
 import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
@@ -42,11 +45,23 @@ const cartridgeConnector = new ControllerConnector({
 
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
+  const pathname = usePathname();
+
+  // Determine which header to render based on the current route
+  const renderHeader = () => {
+    if (pathname.startsWith('/app')) {
+      return <AppHeader />;
+    } else if (pathname === '/' || pathname.startsWith('/info') || pathname.startsWith('/automate')) {
+      return <LandingHeader />;
+    } else {
+      return <Header />;
+    }
+  };
 
   return (
     <SelectedGasTokenProvider>
       <div className={`flex flex-col min-h-screen `}>
-        <Header />
+        {renderHeader()}
         <main className="relative flex flex-col flex-1">{children}</main>
         <Footer />
       </div>
