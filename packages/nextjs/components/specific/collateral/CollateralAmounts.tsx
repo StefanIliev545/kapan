@@ -52,7 +52,7 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
           return (
             <div
               key={c.token}
-              className={`flex items-center gap-2 ${!isSupported ? 'border border-warning/60 bg-warning/5 rounded-md px-2 py-1' : ''}`}
+              className={`flex items-center gap-2 ${!isSupported ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-2 w-32 shrink-0">
                 <div className="w-6 h-6 relative">
@@ -65,21 +65,18 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
                 </div>
                 <span className="truncate font-medium">{c.symbol}</span>
               </div>
-              {!isSupported && selectedProtocol && (
-                <span className="text-[10px] text-warning uppercase tracking-wide">
-                  Not in {selectedProtocol}
-                </span>
-              )}
               <input
                 type="text"
                 value={displayAmount}
                 onChange={e => handleAmountChange(c.token, e.target.value, c.decimals)}
                 className="flex-1 border-b-2 border-base-300 focus:border-primary bg-transparent px-2 py-1 text-right"
                 placeholder="0.00"
+                disabled={!isSupported}
               />
               <button
-                className={`text-xs font-medium px-2 py-1`}
+                className={`text-xs font-medium px-2 py-1 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => handleSetMax(c.token, c.maxAmount, c.decimals)}
+                disabled={!isSupported}
               >
                 MAX
               </button>

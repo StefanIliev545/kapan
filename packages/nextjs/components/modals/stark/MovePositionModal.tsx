@@ -1,6 +1,8 @@
-import { FC, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "~~/hooks/useAccount";
+import { useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
@@ -9,10 +11,9 @@ import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
-import { useVesuAssets } from "~~/hooks/useVesuAssets";
-import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
 import {
   useDeployedContractInfo,
   useScaffoldMultiWriteContract,
@@ -25,11 +26,6 @@ import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAdd
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { normalizeStarknetAddress } from "~~/utils/vesu";
-import { useSwapQuote, type SwapQuoteStatus } from "~~/hooks/useSwapQuote";
-import type { AvnuQuote } from "~~/lib/swaps/avnu";
-import { InstructionConfirmModal } from "~~/components/modals/InstructionConfirmModal";
-import type { InstructionPreview, InstructionOutputPointer } from "~~/components/debug/InstructionExplorer";
-import { useSettings } from "~~/store/settings";
 
 // Format number with thousands separators for display
 const formatDisplayNumber = (value: string | number) => {
@@ -48,43 +44,10 @@ type MoveStep = "idle" | "executing" | "done";
 
 type OutputPointer = { instruction_index: bigint; output_index: bigint };
 
-const toOutputPointer = (instructionIndex: number, outputIndex = 0): OutputPointer => ({
+const toOutputPointer = (instructionIndex: number): OutputPointer => ({
   instruction_index: BigInt(instructionIndex),
-  output_index: BigInt(outputIndex),
+  output_index: 0n,
 });
-
-type TargetCollateralOption = {
-  address: string;
-  symbol: string;
-  decimals: number;
-};
-
-type CollateralSwapPlan = {
-  target: TargetCollateralOption;
-  status: SwapQuoteStatus;
-  quote: AvnuQuote | null;
-  error: string | null;
-};
-
-const SWAP_SLIPPAGE_BPS = 500n;
-
-const toPreviewPointer = (instr: number, index = 0, u256 = true): InstructionOutputPointer => ({
-  kind: "output_ptr",
-  instr,
-  index,
-  u256,
-});
-
-const toSymbolString = (value: unknown, address: string) => {
-  if (typeof value === "string" && value.length > 0) return value;
-  if (typeof value === "bigint") {
-    const resolved = feltToString(value);
-    if (resolved && resolved.length > 0) {
-      return resolved;
-    }
-  }
-  return address;
-};
 
 interface MovePositionModalProps {
   isOpen: boolean;
@@ -134,7 +97,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   preSelectedCollaterals,
   disableCollateralSelection,
 }) => {
-  const { address: userAddress, chainId } = useAccount();
+  const { address: userAddress } = useAccount();
   const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }, { name: "VesuV2" }], []);
   const { tokenAddress, decimals, type, name, balance, poolId: currentPoolId } = position;
 
@@ -176,23 +139,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] =
     useState<CollateralWithAmount[]>([]);
   const [maxClickedCollaterals, setMaxClickedCollaterals] = useState<Record<string, boolean>>({});
-  const [collateralSwapSelections, setCollateralSwapSelections] = useState<Record<string, TargetCollateralOption | null>>({});
-  const [collateralSwapPlans, setCollateralSwapPlans] = useState<Record<string, CollateralSwapPlan>>({});
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
-  const { showInstructionConfirm } = useSettings();
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
-
-  useEffect(() => {
-    if (!showInstructionConfirm && confirmOpen) {
-      setConfirmOpen(false);
-    }
-  }, [showInstructionConfirm, confirmOpen]);
 
   const { collaterals: sourceCollaterals, isLoading: isLoadingSourceCollaterals } = useCollateral({
     protocolName: fromProtocol as "Vesu" | "VesuV2" | "Nostra",
@@ -205,18 +158,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     userAddress: userAddress || "0x0000000000000000000000000000000000000000",
     isOpen: isOpen && !!selectedProtocol,
   });
-
-  const {
-    collateralSet: vesuCollateralSet,
-    assetMap: vesuAssetMap,
-    isLoading: isLoadingVesuAssets,
-  } = useVesuAssets(selectedPoolId);
-
-  const {
-    collateralSet: vesuV2CollateralSet,
-    assetMap: vesuV2AssetMap,
-    isLoading: isLoadingVesuV2Assets,
-  } = useVesuV2Assets(selectedV2PoolAddress);
 
   // Track first load completion (never reset) to avoid spinner after initial data is shown
   const firstCollateralsReadyRef = useRef(false);
@@ -235,131 +176,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     isLoadingTargetCollaterals,
   ]);
 
-  const targetProtocolKey = useMemo(() => {
-    if (!selectedProtocol) return null;
-    return selectedProtocol === "VesuV2" ? "vesu_v2" : selectedProtocol.toLowerCase();
-  }, [selectedProtocol]);
-
-  const targetMarketAddress = useMemo(() => {
-    if (!selectedProtocol) return null;
-    if (selectedProtocol === "Vesu") {
-      return normalizeStarknetAddress(selectedPoolId);
-    }
-    if (selectedProtocol === "VesuV2") {
-      return normalizeStarknetAddress(selectedV2PoolAddress);
-    }
-    return position.tokenAddress;
-  }, [selectedProtocol, selectedPoolId, selectedV2PoolAddress, position.tokenAddress]);
-
-  const collateralAddressesForSupport = useMemo(() => {
-    const addresses = new Set<string>();
-
-    sourceCollaterals.forEach(collateral => addresses.add(collateral.address.toLowerCase()));
-    targetCollaterals.forEach(collateral => addresses.add(collateral.address.toLowerCase()));
-    selectedCollateralsWithAmounts.forEach(collateral => addresses.add(collateral.token.toLowerCase()));
-    preSelectedCollaterals?.forEach(collateral => addresses.add(collateral.token.toLowerCase()));
-
-    return Array.from(addresses);
-  }, [
-    sourceCollaterals,
-    targetCollaterals,
-    selectedCollateralsWithAmounts,
-    preSelectedCollaterals,
-  ]);
-
-  const supportQueryEnabled =
-    isOpen &&
-    !!targetProtocolKey &&
-    !!targetMarketAddress &&
-    collateralAddressesForSupport.length > 0;
-
-  const { isLoading: isLoadingCollateralSupport, supportedCollaterals: rawSupportedCollaterals } =
-    useCollateralSupport(
-      targetProtocolKey ?? "",
-      targetMarketAddress ?? "0x0",
-      collateralAddressesForSupport,
-      supportQueryEnabled,
-    );
-
-  const targetSupportedCollateralSet = useMemo(() => {
-    if (selectedProtocol === "Vesu") {
-      return vesuCollateralSet;
-    }
-    if (selectedProtocol === "VesuV2") {
-      return vesuV2CollateralSet;
-    }
-    return null;
-  }, [selectedProtocol, vesuCollateralSet, vesuV2CollateralSet]);
-
-  const targetSupportedCollateralSetNormalized = useMemo(() => {
-    if (!targetSupportedCollateralSet) return null;
-    const normalized = new Set<string>();
-    targetSupportedCollateralSet.forEach(address => normalized.add(address.toLowerCase()));
-    return normalized;
-  }, [targetSupportedCollateralSet]);
-
-  const isDeterministicCompatibilityLoading = useMemo(() => {
-    if (selectedProtocol === "Vesu") {
-      return isLoadingVesuAssets;
-    }
-    if (selectedProtocol === "VesuV2") {
-      return isLoadingVesuV2Assets;
-    }
-    return false;
-  }, [selectedProtocol, isLoadingVesuAssets, isLoadingVesuV2Assets]);
-
-  const fallbackSupportedCollateralsMap = useMemo(() => {
-    const entries = Object.entries(rawSupportedCollaterals ?? {});
-    if (entries.length === 0) return {} as Record<string, boolean>;
-    return entries.reduce(
-      (acc, [address, supported]) => {
-        acc[address.toLowerCase()] = supported;
-        return acc;
-      },
-      {} as Record<string, boolean>,
-    );
-  }, [rawSupportedCollaterals]);
-
-  const deterministicSupportedCollateralsMap = useMemo(() => {
-    if (!targetSupportedCollateralSetNormalized || isDeterministicCompatibilityLoading) return null;
-    const map: Record<string, boolean> = {};
-    collateralAddressesForSupport.forEach(address => {
-      const normalized = address.toLowerCase();
-      map[normalized] = targetSupportedCollateralSetNormalized.has(normalized);
-    });
-    return map;
-  }, [
-    collateralAddressesForSupport,
-    isDeterministicCompatibilityLoading,
-    targetSupportedCollateralSetNormalized,
-  ]);
-
-  const supportedCollateralsMap = useMemo(() => {
-    if (deterministicSupportedCollateralsMap) {
-      return deterministicSupportedCollateralsMap;
-    }
-    return fallbackSupportedCollateralsMap;
-  }, [deterministicSupportedCollateralsMap, fallbackSupportedCollateralsMap]);
-
-  const hasSupportResults = useMemo(() => {
-    if (targetSupportedCollateralSetNormalized && !isDeterministicCompatibilityLoading) return true;
-    return Object.keys(fallbackSupportedCollateralsMap).length > 0;
-  }, [
-    fallbackSupportedCollateralsMap,
-    isDeterministicCompatibilityLoading,
-    targetSupportedCollateralSetNormalized,
-  ]);
-
-  const isCompatibilityLoading = isLoadingCollateralSupport || isDeterministicCompatibilityLoading;
-
   const collateralsForSelector = useMemo(() => {
-    const resolveSupport = (address: string) => {
-      const normalized = address.toLowerCase();
-      const support = supportedCollateralsMap[normalized];
-      if (support !== undefined) return support;
-      return !hasSupportResults;
-    };
-
     if (disableCollateralSelection && preSelectedCollaterals && (fromProtocol === "Vesu" || fromProtocol === "VesuV2")) {
       return preSelectedCollaterals.map(collateral => ({
         symbol: collateral.symbol,
@@ -367,7 +184,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         address: collateral.token,
         decimals: collateral.decimals,
         rawBalance: collateral.amount,
-        supported: resolveSupport(collateral.token),
+        supported: true,
       }));
     }
 
@@ -376,118 +193,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       filtered = filtered.filter(c => c.address.toLowerCase() !== tokenAddress.toLowerCase());
     }
 
-    return filtered.map(collateral => ({
-      ...collateral,
-      supported: resolveSupport(collateral.address),
-    }));
+    return targetCollaterals.length > 0
+      ? filtered.map(collateral => ({
+          ...collateral,
+          supported: targetCollaterals.some(tc => tc.address.toLowerCase() === collateral.address.toLowerCase()),
+        }))
+      : filtered;
   }, [
     sourceCollaterals,
+    targetCollaterals,
     preSelectedCollaterals,
     disableCollateralSelection,
     fromProtocol,
     selectedProtocol,
     type,
     tokenAddress,
-    supportedCollateralsMap,
-    hasSupportResults,
-  ]);
-
-  const vesuSupportedCollateralMap = useMemo(() => {
-    const map = new Map<string, TargetCollateralOption>();
-    vesuAssetMap.forEach((asset, address) => {
-      const normalized = address.toLowerCase();
-      const symbol = toSymbolString((asset as any)?.symbol, address);
-      const decimals = typeof asset.decimals === "number" ? asset.decimals : 18;
-      map.set(normalized, {
-        address,
-        symbol,
-        decimals,
-      });
-    });
-    return map;
-  }, [vesuAssetMap]);
-
-  const vesuV2SupportedCollateralMap = useMemo(() => {
-    const map = new Map<string, TargetCollateralOption>();
-    vesuV2AssetMap.forEach((asset, address) => {
-      const normalized = address.toLowerCase();
-      const symbol = toSymbolString((asset as any)?.symbol, address);
-      const decimals = typeof asset.decimals === "number" ? asset.decimals : 18;
-      map.set(normalized, {
-        address,
-        symbol,
-        decimals,
-      });
-    });
-    return map;
-  }, [vesuV2AssetMap]);
-
-  const poolSupportedTargetCollaterals = useMemo(() => {
-    if (targetSupportedCollateralSet && targetSupportedCollateralSetNormalized) {
-      const lookup =
-        selectedProtocol === "Vesu"
-          ? vesuSupportedCollateralMap
-          : selectedProtocol === "VesuV2"
-            ? vesuV2SupportedCollateralMap
-            : null;
-
-      const options: TargetCollateralOption[] = [];
-      targetSupportedCollateralSet.forEach(address => {
-        const normalized = address.toLowerCase();
-        const metadata = lookup?.get(normalized);
-        if (metadata) {
-          options.push({ ...metadata });
-          return;
-        }
-
-        const fallback = targetCollaterals.find(token => token.address.toLowerCase() === normalized);
-        if (fallback) {
-          options.push({
-            address: fallback.address,
-            symbol: fallback.symbol,
-            decimals: fallback.decimals,
-          });
-          return;
-        }
-
-        options.push({
-          address,
-          symbol: address,
-          decimals: 18,
-        });
-      });
-
-      return options.sort((a, b) => a.symbol.localeCompare(b.symbol));
-    }
-
-    if (!hasSupportResults) {
-      return targetCollaterals.map(collateral => ({
-        address: collateral.address,
-        symbol: collateral.symbol,
-        decimals: collateral.decimals,
-      }));
-    }
-
-    return targetCollaterals
-      .filter(token => {
-        const normalized = token.address.toLowerCase();
-        const support = supportedCollateralsMap[normalized];
-        return support !== false;
-      })
-      .map(token => ({
-        address: token.address,
-        symbol: token.symbol,
-        decimals: token.decimals,
-      }));
-  }, [
-    targetSupportedCollateralSet,
-    targetSupportedCollateralSetNormalized,
-    selectedProtocol,
-    vesuSupportedCollateralMap,
-    vesuV2SupportedCollateralMap,
-    targetCollaterals,
-    hasSupportResults,
-    supportedCollateralsMap,
   ]);
 
   const { data: tokenPrices } = useScaffoldReadContract({
@@ -497,59 +217,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     refetchInterval: 30000, // Reduced from 5s to 30s
     enabled: !!collateralsForSelector.length && isOpen,
   });
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setSelectedCollateralsWithAmounts(prev => {
-      if (prev.length === 0) return prev;
-
-      let changed = false;
-      const updated = prev.map(collateral => {
-        const normalized = collateral.token.toLowerCase();
-        const support = supportedCollateralsMap[normalized];
-        const resolvedSupport = support !== undefined ? support : !hasSupportResults;
-
-        if (collateral.supported !== resolvedSupport) {
-          changed = true;
-          return { ...collateral, supported: resolvedSupport };
-        }
-
-        return collateral;
-      });
-
-      return changed ? updated : prev;
-    });
-  }, [hasSupportResults, isOpen, supportedCollateralsMap]);
-
-  // Once compatibility data resolves, synchronise the stored selections so
-  // unsupported collaterals immediately surface in the UI. This effect keeps the
-  // `supported` flag in sync with the current target pool allow list so the
-  // incompatibility banner renders deterministically instead of relying on user
-  // interaction to refresh the state.
-  useEffect(() => {
-    if (!hasSupportResults) return;
-
-    const compatibleSet = new Set(
-      poolSupportedTargetCollaterals.map(option => option.address.toLowerCase()),
-    );
-
-    setSelectedCollateralsWithAmounts(prev => {
-      let changed = false;
-      const next = prev.map(collateral => {
-        const normalized = collateral.token.toLowerCase();
-        const isSupported = compatibleSet.has(normalized);
-        if (collateral.supported === isSupported) {
-          return collateral;
-        }
-
-        changed = true;
-        return { ...collateral, supported: isSupported };
-      });
-
-      return changed ? next : prev;
-    });
-  }, [hasSupportResults, poolSupportedTargetCollaterals]);
 
   const { tokenToPrices } = useMemo(() => {
     if (!tokenPrices) return { tokenToPrices: {} };
@@ -584,80 +251,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     [selectedCollateralsWithAmounts, tokenToPrices],
   );
 
-  const swapBlocking = useMemo(() => {
-    return selectedCollateralsWithAmounts.some(collateral => {
-      if (collateral.supported || collateral.amount === 0n) {
-        return false;
-      }
-      const selection = collateralSwapSelections[collateral.token];
-      const plan = collateralSwapPlans[collateral.token];
-      if (!selection) return true;
-      if (!plan) return true;
-      if (plan.error) return true;
-      if (!plan.quote || plan.quote.calldata.length === 0) return true;
-      return false;
-    });
-  }, [selectedCollateralsWithAmounts, collateralSwapSelections, collateralSwapPlans]);
-
-  const swapLoading = useMemo(
-    () =>
-      selectedCollateralsWithAmounts.some(
-        collateral => {
-          if (collateral.supported || collateral.amount === 0n) {
-            return false;
-          }
-          const plan = collateralSwapPlans[collateral.token];
-          return plan ? plan.status === "loading" && !plan.quote : false;
-        },
-      ),
-    [selectedCollateralsWithAmounts, collateralSwapPlans],
-  );
-
-  const incompatibleCollaterals = useMemo(
-    () => selectedCollateralsWithAmounts.filter(collateral => !collateral.supported),
-    [selectedCollateralsWithAmounts],
-  );
-
   // Spinner only before first successful data render
   const isLoadingCollaterals =
-    !firstCollateralsReadyRef.current &&
-    (isLoadingSourceCollaterals || isLoadingTargetCollaterals || isCompatibilityLoading);
+    !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
   // Construct instruction based on current state
-  const {
-    fullInstruction,
-    authInstruction,
-    authInstructions,
-    authCalldataKey,
-    pairInstructions,
-    instructionPlan,
-  } = useMemo(() => {
-    const planSteps: InstructionPreview[] = [];
-
+  const { fullInstruction, authInstruction, authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
-      return {
-        fullInstruction: { instructions: [] },
-        authInstruction: { instructions: [] },
-        authInstructions: [],
-        authCalldataKey: "",
-        pairInstructions: [],
-        instructionPlan: planSteps,
-      };
+      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, authInstructions: [], authCalldataKey: "", pairInstructions: [] };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
     const lowerProtocolName = fromProtocol === "VesuV2" ? "vesu_v2" : fromProtocol.toLowerCase();
     const destProtocolName = selectedProtocol === "VesuV2" ? "vesu_v2" : selectedProtocol.toLowerCase();
-
-    if (swapBlocking) {
-      return {
-        fullInstruction: { instructions: [] },
-        authInstruction: { instructions: [] },
-        authInstructions: [],
-        authCalldataKey: "",
-        pairInstructions: [],
-        instructionPlan: planSteps,
-      };
-    }
 
     // Calculate proportions for multiple collaterals
     if (selectedCollateralsWithAmounts.length > 1) {
@@ -856,51 +461,12 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               context: contextReborrow,
             },
           }),
-          ];
-
-          planSteps.push({
-            kind: "Repay",
-            token: position.tokenAddress as `0x${string}`,
-            amount: allocation.debtAmount,
-            meta: {
-              protocol: lowerProtocolName,
-              repay_all: repayAll ? "true" : "false",
-            },
-          });
-
-          planSteps.push({
-            kind: "Withdraw",
-            token: collateral.token as `0x${string}`,
-            amount: uppedAmount,
-            meta: {
-              protocol: lowerProtocolName,
-              withdraw_all: isCollateralMaxClicked ? "true" : "false",
-            },
-          });
-
-          planSteps.push({
-            kind: "Redeposit",
-            token: collateral.token as `0x${string}`,
-            amountPtr: toPreviewPointer(1, 0, true),
-            meta: {
-              protocol: destProtocolName,
-            },
-          });
-
-          planSteps.push({
-            kind: "Reborrow",
-            token: position.tokenAddress as `0x${string}`,
-            amountPtr: toPreviewPointer(0, 0, true),
-            meta: {
-              protocol: destProtocolName,
-            },
-          });
-
-          return [
-            {
-              protocol_name: lowerProtocolName,
-              instructions: nostraInstructions,
-            },
+        ];
+        return [
+          {
+            protocol_name: lowerProtocolName,
+            instructions: nostraInstructions,
+          },
           {
             protocol_name: destProtocolName,
             instructions: vesuInstructions,
@@ -933,55 +499,43 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         authInstructions: filteredForAuth,
         authCalldataKey: JSON.stringify(authInstructionData),
         pairInstructions: instructions,
-        instructionPlan: planSteps,
       };
     };
 
     // If target protocol is Vesu (V1 or V2) and we have multiple collaterals, use proportional allocation
     if ((selectedProtocol === "Vesu" || selectedProtocol === "VesuV2") && selectedCollateralsWithAmounts.length > 1) {
-      const result =
-        generateVesuInstructions() || {
-          fullInstruction: { instructions: [] },
-          authInstruction: { instructions: [] },
-          authInstructions: [],
-          authCalldataKey: "",
-          pairInstructions: [],
-          instructionPlan: planSteps,
-        };
+      const result = generateVesuInstructions() || {
+        fullInstruction: { instructions: [] },
+        authInstruction: { instructions: [] },
+        authInstructions: [],
+        authCalldataKey: "",
+        pairInstructions: [],
+      };
       return result;
     }
-
-    const resolvedCollateralAddresses = selectedCollateralsWithAmounts.map(collateral => {
-      const plan = collateralSwapPlans[collateral.token];
-      if (!collateral.supported && plan?.quote && plan.quote.calldata.length > 0) {
-        return plan.target.address;
-      }
-      return collateral.token;
-    });
-    const primaryResolvedCollateral = resolvedCollateralAddresses[0];
 
     // Otherwise, use the original approach for other protocols or single collateral
     let repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
     let withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-
+    
     // Handle V1 Vesu context
     if (fromProtocol === "Vesu" && selectedCollateralsWithAmounts.length > 0) {
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         currentPoolId || 0n,
-        BigInt(primaryResolvedCollateral ?? selectedCollateralsWithAmounts[0].token),
+        BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         currentPoolId || 0n,
         BigInt(position.tokenAddress),
       ]);
     }
-
+    
     // Handle V2 Vesu context
     if (fromProtocol === "VesuV2" && selectedCollateralsWithAmounts.length > 0) {
       const sourcePoolAddress = normalizedCurrentV2PoolAddress ?? selectedV2PoolAddress;
       repayInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         BigInt(sourcePoolAddress),
-        BigInt(primaryResolvedCollateral ?? selectedCollateralsWithAmounts[0].token),
+        BigInt(selectedCollateralsWithAmounts[0].token),
       ]);
       withdrawInstructionContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [
         BigInt(sourcePoolAddress),
@@ -1033,16 +587,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Reborrow: undefined,
     });
 
-    planSteps.push({
-      kind: "Repay",
-      token: position.tokenAddress as `0x${string}`,
-      amount: parsedAmount,
-      meta: {
-        protocol: lowerProtocolName,
-        repay_all: isAmountMaxClicked ? "true" : "false",
-      },
-    });
-
     // Auth instructions only need withdraw and borrow
     const withdrawInstructions = selectedCollateralsWithAmounts.map(collateral => {
       // Check if MAX was clicked for this collateral
@@ -1050,16 +594,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       // Add 1% buffer if MAX was clicked for this collateral
       const uppedAmount = isCollateralMaxClicked ? (collateral.amount * BigInt(101)) / BigInt(100) : collateral.amount;
       const amount = uint256.bnToUint256(uppedAmount);
-
-      planSteps.push({
-        kind: "Withdraw",
-        token: collateral.token as `0x${string}`,
-        amount: uppedAmount,
-        meta: {
-          protocol: lowerProtocolName,
-          withdraw_all: isCollateralMaxClicked ? "true" : "false",
-        },
-      });
 
       return new CairoCustomEnum({
         Deposit: undefined,
@@ -1079,80 +613,15 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       });
     });
 
-    const swapInstructions: CairoCustomEnum[] = [];
-    const swapInstructionIndexMap = new Map<string, number>();
-
-    selectedCollateralsWithAmounts.forEach((collateral, index) => {
-      const plan = collateralSwapPlans[collateral.token];
-      if (!collateral.supported && plan?.quote && plan.quote.calldata.length > 0) {
-        const withdrawPointer = 1 + index;
-        const minOutClamped = plan.quote.minOut > 0n ? plan.quote.minOut : plan.quote.rawQuote.buyAmount;
-        const reswapExactIn = new CairoCustomEnum({
-          Deposit: undefined,
-          Borrow: undefined,
-          Repay: undefined,
-          Withdraw: undefined,
-          Redeposit: undefined,
-          Reborrow: undefined,
-          Swap: undefined,
-          SwapExactIn: undefined,
-          Reswap: undefined,
-          ReswapExactIn: {
-            exact_in: toOutputPointer(withdrawPointer),
-            min_out: uint256.bnToUint256(minOutClamped),
-            token_out: plan.target.address,
-            user: userAddress,
-            should_pay_out: false,
-            should_pay_in: false,
-            context: new CairoOption(CairoOptionVariant.Some, plan.quote.calldata),
-          },
-        });
-        swapInstructionIndexMap.set(collateral.token, swapInstructions.length);
-        swapInstructions.push(reswapExactIn);
-
-        planSteps.push({
-          kind: "Swap",
-          to: plan.quote.to,
-          entrypoint: plan.quote.entrypoint,
-          token: plan.target.address as `0x${string}`,
-          amountPtr: toPreviewPointer(withdrawPointer, 0, true),
-          meta: {
-            min_out: plan.quote.minOut,
-          },
-          calldata: plan.quote.calldata,
-        });
-      }
-    });
-
     const depositInstructions = selectedCollateralsWithAmounts.map((collateral, index) => {
-      const plan = collateralSwapPlans[collateral.token];
-      const hasSwap = !collateral.supported && plan?.quote && plan.quote.calldata.length > 0;
-      const depositToken = hasSwap ? plan.target.address : collateral.token;
-      const withdrawBaseIndex = 1; // repay instruction is at index 0
-      const swapBaseIndex = withdrawBaseIndex + withdrawInstructions.length;
-      const pointerIndex = hasSwap
-        ? swapBaseIndex + (swapInstructionIndexMap.get(collateral.token) ?? 0)
-        : withdrawBaseIndex + index;
-      const pointerOutput = 0;
-
-      planSteps.push({
-        kind: "Deposit",
-        token: depositToken as `0x${string}`,
-        amountPtr: toPreviewPointer(pointerIndex, pointerOutput, true),
-        meta: {
-          protocol: destProtocolName,
-          source: hasSwap ? "swap" : "withdraw",
-        },
-      });
-
       return new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
         Repay: undefined,
         Withdraw: undefined,
         Redeposit: {
-          token: depositToken,
-          target_output_pointer: toOutputPointer(pointerIndex, pointerOutput),
+          token: collateral.token,
+          target_output_pointer: toOutputPointer(1 + index),
           user: userAddress,
           context: depositInstructionContext,
         },
@@ -1175,33 +644,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       },
     });
 
-    planSteps.push({
-      kind: "Borrow",
-      token: position.tokenAddress as `0x${string}`,
-      amountPtr: toPreviewPointer(0, 0, true),
-      meta: {
-        protocol: destProtocolName,
-      },
-    });
-
-    const instructions: { protocol_name: string; instructions: CairoCustomEnum[] }[] = [
+    const instructions = [
       {
         protocol_name: lowerProtocolName,
         instructions: [repayInstruction, ...withdrawInstructions],
       },
-    ];
-
-    if (swapInstructions.length > 0) {
-      instructions.push({
-        protocol_name: "avnu",
-        instructions: swapInstructions,
-      });
-    }
-
-    instructions.push({
-      protocol_name: destProtocolName,
-      instructions: [...depositInstructions, borrowInstruction],
-    });
+      {
+        protocol_name: destProtocolName,
+        instructions: [...depositInstructions, borrowInstruction],
+      },
+    ]
 
     // Complete set of instructions for execution
     const fullInstructionData = CallData.compile({
@@ -1213,7 +665,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
         protocol_name: lowerProtocolName,
         instructions: [...withdrawInstructions],
       },
-
+      
       {
         protocol_name: destProtocolName,
         instructions: [borrowInstruction],
@@ -1230,41 +682,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       rawSelectors: false,
     });
 
-      return {
-        fullInstruction: fullInstructionData,
-        authInstruction: authInstructionData,
-        authInstructions: authInstructions,
-        authCalldataKey: JSON.stringify(authInstructionData),
-        // Wrap instructions in an array so that callers always
-        // receive a list of instruction pairs. This ensures we
-        // execute a single move_debt call when moving between
-        // Vesu and Nostra while still supporting multiple calls
-        // for scenarios that require it (e.g. Nostra -> Vesu with
-        // several collaterals).
-        pairInstructions: [instructions],
-        instructionPlan: planSteps,
-      };
-    }, [
-      amount,
-      userAddress,
-      routerGateway?.address,
-    position.decimals,
-    position.tokenAddress,
-    fromProtocol,
-    selectedProtocol,
-    selectedCollateralsWithAmounts,
-    collateralSwapPlans,
-    collateralSwapSelections,
-    isAmountMaxClicked,
-    tokenToPrices,
-    maxClickedCollaterals,
-    currentPoolId,
-    selectedPoolId,
-    selectedV2PoolAddress,
-    normalizedCurrentV2PoolAddress,
-    swapBlocking,
-    isOpen,
-  ]);
+    return {
+      fullInstruction: fullInstructionData,
+      authInstruction: authInstructionData,
+      authInstructions: authInstructions,
+      authCalldataKey: JSON.stringify(authInstructionData),
+      // Wrap instructions in an array so that callers always
+      // receive a list of instruction pairs. This ensures we
+      // execute a single move_debt call when moving between
+      // Vesu and Nostra while still supporting multiple calls
+      // for scenarios that require it (e.g. Nostra -> Vesu with
+      // several collaterals).
+      pairInstructions: [instructions],
+    };
+  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId, isOpen]);
 
   const vesuPairings = useMemo(() => {
     if (
@@ -1340,9 +771,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       cancelled = true;
     };
   }, [isOpen, isAuthReady, getAuthorizations, authCalldataKey]);
-
-  const instructionPreviewSteps = useMemo(() => instructionPlan ?? [], [instructionPlan]);
-
+  
   // Construct calls based on current state
   const calls = useMemo(() => {
     if (!pairInstructions || pairInstructions.length === 0) return [];
@@ -1403,8 +832,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setSelectedCollateralsWithAmounts([]);
       setMaxClickedCollaterals({});
       setIsAmountMaxClicked(false);
-      setCollateralSwapSelections({});
-      setCollateralSwapPlans({});
     }
   }, [isOpen]);
 
@@ -1450,92 +877,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     });
   }, []);
 
-  // Ensure swap selections exist only for unsupported collaterals that are currently selected
-  useEffect(() => {
-    setCollateralSwapSelections(prev => {
-      const next = { ...prev };
-
-      Object.keys(next).forEach(token => {
-        const isStillUnsupported = selectedCollateralsWithAmounts.some(
-          collateral => collateral.token === token && !collateral.supported,
-        );
-        if (!isStillUnsupported) {
-          delete next[token];
-        }
-      });
-
-      selectedCollateralsWithAmounts.forEach(collateral => {
-        if (!collateral.supported && next[collateral.token] === undefined) {
-          next[collateral.token] = null;
-        }
-      });
-
-      return next;
-    });
-  }, [selectedCollateralsWithAmounts]);
-
-  useEffect(() => {
-    if (isCompatibilityLoading) return;
-
-    setCollateralSwapSelections(prev => {
-      let changed = false;
-      const next = { ...prev };
-
-      incompatibleCollaterals.forEach(collateral => {
-        const options = poolSupportedTargetCollaterals.filter(
-          option => option.address.toLowerCase() !== collateral.token.toLowerCase(),
-        );
-
-        if (options.length === 0) {
-          if (next[collateral.token] !== null) {
-            next[collateral.token] = null;
-            changed = true;
-          }
-          return;
-        }
-
-        const current = next[collateral.token];
-        const currentAddress = current?.address.toLowerCase();
-        const isCurrentValid = currentAddress
-          ? options.some(option => option.address.toLowerCase() === currentAddress)
-          : false;
-
-        if (!isCurrentValid) {
-          const suggestion = options[0];
-          next[collateral.token] = {
-            address: suggestion.address,
-            symbol: suggestion.symbol,
-            decimals: suggestion.decimals,
-          };
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
-    });
-  }, [
-    isCompatibilityLoading,
-    incompatibleCollaterals,
-    poolSupportedTargetCollaterals,
-  ]);
-
-  // Remove swap plans when collateral becomes compatible or selection cleared
-  useEffect(() => {
-    setCollateralSwapPlans(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(token => {
-        const matchingCollateral = selectedCollateralsWithAmounts.find(
-          collateral => collateral.token === token && !collateral.supported,
-        );
-        const hasSelection = collateralSwapSelections[token];
-        if (!matchingCollateral || !hasSelection) {
-          delete next[token];
-        }
-      });
-      return next;
-    });
-  }, [selectedCollateralsWithAmounts, collateralSwapSelections]);
-
   // Handle MAX click for a specific collateral - wrap in useCallback
   const handleCollateralMaxClick = useCallback(
     (collateralToken: string, maxAmount: bigint, formattedMaxAmount: string) => {
@@ -1551,85 +892,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       }));
     },
     [],
-  );
-
-  const handleCollateralSwapPlanChange = useCallback(
-    (collateralToken: string, plan: CollateralSwapPlan | null) => {
-      setCollateralSwapPlans(prev => {
-        if (!plan) {
-          if (!(collateralToken in prev)) {
-            return prev;
-          }
-          const { [collateralToken]: _, ...rest } = prev;
-          return rest;
-        }
-
-        const existing = prev[collateralToken];
-        if (
-          existing &&
-          existing.target.address.toLowerCase() === plan.target.address.toLowerCase() &&
-          existing.status === plan.status &&
-          existing.error === plan.error &&
-          existing.quote === plan.quote
-        ) {
-          return prev;
-        }
-
-        return { ...prev, [collateralToken]: plan };
-      });
-    },
-    [],
-  );
-
-  const handleSwapTargetSelection = useCallback(
-    (collateralToken: string, targetAddress: string) => {
-      let selectionChanged = false;
-
-      setCollateralSwapSelections(prev => {
-        const next = { ...prev };
-        const previousSelection = prev[collateralToken];
-        const previousAddress = previousSelection?.address?.toLowerCase() ?? "";
-
-        if (!targetAddress) {
-          if (previousSelection === null) {
-            return prev;
-          }
-          next[collateralToken] = null;
-          selectionChanged = true;
-          return next;
-        }
-
-        const match = poolSupportedTargetCollaterals.find(
-          collateral => collateral.address.toLowerCase() === targetAddress.toLowerCase(),
-        );
-
-        if (!match) {
-          return prev;
-        }
-
-        const nextAddress = match.address.toLowerCase();
-        if (previousAddress === nextAddress) {
-          return prev;
-        }
-
-        next[collateralToken] = {
-          address: match.address,
-          symbol: match.symbol,
-          decimals: match.decimals,
-        };
-        selectionChanged = true;
-        return next;
-      });
-
-      if (selectionChanged) {
-        setCollateralSwapPlans(current => {
-          if (!(collateralToken in current)) return current;
-          const { [collateralToken]: _, ...rest } = current;
-          return rest;
-        });
-      }
-    },
-    [poolSupportedTargetCollaterals],
   );
 
   // Add this new useCallback for amount handling
@@ -1686,7 +948,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }
   }, [isOpen, fromProtocol, normalizedCurrentV2PoolAddress]);
 
-  const handleMovePosition = useCallback(async () => {
+  const handleMovePosition = async () => {
     try {
       if (!userAddress) throw new Error("Wallet not connected");
       setLoading(true);
@@ -1694,7 +956,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setStep("executing");
 
       // Execute the transaction
-      await sendAsync();
+      const tx = await sendAsync();
 
       setStep("done");
       // Close modal after a short delay on success
@@ -1706,7 +968,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [userAddress, sendAsync, onClose]);
+  };
 
   // Get action button text based on current step
   const actionButtonText = useMemo(() => {
@@ -1746,9 +1008,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
 
   const isActionDisabled =
     loading ||
-    isCompatibilityLoading ||
-    swapLoading ||
-    swapBlocking ||
     !selectedProtocol ||
     !amount ||
     !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
@@ -1759,24 +1018,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       selectedProtocol === "VesuV2" &&
       normalizedCurrentV2PoolAddress !== undefined &&
       normalizedCurrentV2PoolAddress === normalizeStarknetAddress(selectedV2PoolAddress));
-
-  const handlePrimaryAction = useCallback(async () => {
-    if (step === "done") {
-      onClose();
-      return;
-    }
-
-    if (isActionDisabled) {
-      return;
-    }
-
-    if (showInstructionConfirm) {
-      setConfirmOpen(true);
-      return;
-    }
-
-    await handleMovePosition();
-  }, [step, onClose, isActionDisabled, showInstructionConfirm, handleMovePosition]);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -1869,50 +1110,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       setMaxClickedCollaterals(prev => ({ ...prev, [token]: isMax }))
                     }
                   />
-                  {incompatibleCollaterals.length > 0 && (
-                    <div className="mt-4 space-y-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
-                      <div className="font-semibold text-warning-700">
-                        {selectedProtocol ? `${selectedProtocol} compatibility` : "Collateral compatibility"}
-                      </div>
-                      <div className="text-xs text-warning-800">
-                        Some collateral must be swapped to assets supported by the target protocol before redepositing.
-                      </div>
-                      {isCompatibilityLoading && (
-                        <div className="flex items-center gap-2 text-warning-700 text-xs">
-                          <span className="loading loading-spinner loading-xs" /> Checking collateral compatibility…
-                        </div>
-                      )}
-                      {incompatibleCollaterals.map(collateral => {
-                        const selection = collateralSwapSelections[collateral.token];
-                        const options = poolSupportedTargetCollaterals.filter(
-                          token => token.address.toLowerCase() !== collateral.token.toLowerCase(),
-                        );
-                        const hasOptions = options.length > 0;
-                        const selectPlaceholder = isCompatibilityLoading
-                          ? "Checking compatibility…"
-                          : hasOptions
-                            ? "Select target collateral"
-                            : "No compatible collateral";
-
-                        return (
-                          <CollateralSwapPlannerRow
-                            key={collateral.token}
-                            collateral={collateral}
-                            selection={selection ?? null}
-                            options={options}
-                            hasOptions={hasOptions}
-                            selectPlaceholder={selectPlaceholder}
-                            isCompatibilityLoading={isCompatibilityLoading}
-                            selectedProtocol={selectedProtocol}
-                            onSelect={address => handleSwapTargetSelection(collateral.token, address)}
-                            userAddress={userAddress}
-                            chainId={chainId}
-                            onPlanChange={plan => handleCollateralSwapPlanChange(collateral.token, plan)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
                   {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
                     <div className="text-xs text-base-content/70 mt-2 p-2 bg-info/10 rounded">
                       <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this
@@ -2140,7 +1337,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               <div className="pt-2">
                 <button
                   className={`btn btn-ghost w-full h-10 ${loading ? "animate-pulse" : ""}`}
-                  onClick={handlePrimaryAction}
+                  onClick={step === "done" ? onClose : handleMovePosition}
                   disabled={step === "done" ? false : isActionDisabled}
                 >
                   {loading && <span className="loading loading-spinner loading-sm mr-2"></span>}
@@ -2158,182 +1355,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       >
         <button disabled={loading}>close</button>
       </form>
-      <InstructionConfirmModal
-        isOpen={confirmOpen && step !== "done"}
-        steps={instructionPreviewSteps}
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={async () => {
-          setConfirmOpen(false);
-          await handleMovePosition();
-        }}
-      />
     </dialog>
-  );
-};
-
-type CollateralSwapPlannerRowProps = {
-  collateral: CollateralWithAmount;
-  selection: TargetCollateralOption | null;
-  options: TargetCollateralOption[];
-  hasOptions: boolean;
-  selectPlaceholder: string;
-  isCompatibilityLoading: boolean;
-  selectedProtocol?: string;
-  onSelect: (address: string) => void;
-  userAddress?: `0x${string}`;
-  chainId?: bigint;
-  onPlanChange: (plan: CollateralSwapPlan | null) => void;
-};
-
-const CollateralSwapPlannerRow: FC<CollateralSwapPlannerRowProps> = ({
-  collateral,
-  selection,
-  options,
-  hasOptions,
-  selectPlaceholder,
-  isCompatibilityLoading,
-  selectedProtocol,
-  onSelect,
-  userAddress,
-  chainId,
-  onPlanChange,
-}) => {
-  const normalizedChainId = typeof chainId === "bigint" ? Number(chainId) : chainId ?? 0;
-  const enabled = Boolean(selection && userAddress && normalizedChainId > 0 && collateral.amount > 0n);
-
-  const { status, data, error, refetchNow } = useSwapQuote({
-    chainId: normalizedChainId,
-    fromToken: collateral.token as `0x${string}`,
-    toToken: selection?.address as `0x${string}`,
-    amount: collateral.amount,
-    takerAddress: userAddress,
-    enabled,
-    slippageBps: Number(SWAP_SLIPPAGE_BPS),
-  });
-
-  useEffect(() => {
-    if (!selection || !enabled) {
-      onPlanChange(null);
-      return;
-    }
-
-    const errorMessage =
-      status === "error"
-        ? error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Failed to prepare swap quote"
-        : null;
-
-    onPlanChange({
-      target: selection,
-      status,
-      quote: data ?? null,
-      error: errorMessage,
-    });
-  }, [data, enabled, error, onPlanChange, selection, status]);
-
-  const formattedSourceAmount = formatUnits(collateral.amount, collateral.decimals);
-  const formattedTargetAmount =
-    data && selection
-      ? formatUnits(data.rawQuote.buyAmount, selection.decimals ?? collateral.decimals)
-      : null;
-
-  const showInitialLoading = status === "loading" && !data;
-  const showUpdating = status === "loading" && !!data;
-  const showStale = status === "stale";
-  const errorMessage =
-    status === "error"
-      ? error instanceof Error
-        ? error.message
-        : typeof error === "string"
-          ? error
-          : "Failed to prepare swap quote"
-      : null;
-
-  return (
-    <div className="rounded-md border border-warning/40 bg-base-100/60 p-3 text-xs space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2">
-          <div className="relative h-5 w-5">
-            <Image
-              src={tokenNameToLogo(collateral.symbol)}
-              alt={collateral.symbol}
-              fill
-              className="rounded-full object-contain"
-            />
-          </div>
-          <span className="font-medium">{collateral.symbol}</span>
-          <span className="text-base-content/70">
-            {Number(formattedSourceAmount || 0).toLocaleString(undefined, {
-              maximumFractionDigits: 6,
-            })}
-          </span>
-        </div>
-        <span className="text-warning-700">→</span>
-        <select
-          className="select select-bordered select-xs md:select-sm"
-          value={selection?.address ?? ""}
-          onChange={event => onSelect(event.target.value)}
-          disabled={!hasOptions || isCompatibilityLoading}
-        >
-          <option value="">{selectPlaceholder}</option>
-          {options.map(option => (
-            <option key={option.address} value={option.address}>
-              {option.symbol}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {showInitialLoading && (
-        <div className="flex items-center gap-2 text-warning-700">
-          <span className="loading loading-spinner loading-xs" /> Preparing swap route…
-        </div>
-      )}
-
-      {showUpdating && (
-        <div className="flex items-center gap-2 text-warning-700">
-          <span className="loading loading-spinner loading-xs" /> Updating swap route…
-        </div>
-      )}
-
-      {showStale && (
-        <div className="flex items-center gap-2 text-warning-700">
-          <span className="loading loading-spinner loading-xs" /> Using cached route, refreshing…
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="flex flex-wrap items-center gap-2 text-error">
-          <span>{errorMessage}</span>
-          <button type="button" className="underline" onClick={refetchNow}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {data && selection && status !== "error" && (
-        <div className="flex flex-wrap items-center gap-1 text-base-content/70">
-          <span>Swap ready:</span>
-          <span className="font-medium">{formattedSourceAmount}</span>
-          <span>{collateral.symbol}</span>
-          <span>→</span>
-          <span className="font-medium">{formattedTargetAmount}</span>
-          <span>{selection.symbol}</span>
-        </div>
-      )}
-
-      {!selection && hasOptions && !isCompatibilityLoading && (
-        <div className="text-warning-800">Select a supported collateral to enable moving this debt pair.</div>
-      )}
-
-      {!hasOptions && !isCompatibilityLoading && (
-        <div className="text-warning-800">
-          No compatible collateral is available in {selectedProtocol}. Choose a different target protocol.
-        </div>
-      )}
-    </div>
   );
 };
