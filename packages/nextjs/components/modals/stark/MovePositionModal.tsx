@@ -1,7 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "~~/hooks/useAccount";
-import { useProvider, useReadContract } from "@starknet-react/core";
 import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
 import { FaGasPump } from "react-icons/fa";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
@@ -10,7 +9,6 @@ import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useVesuAssets } from "~~/hooks/useVesuAssets";
@@ -29,7 +27,6 @@ import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { normalizeStarknetAddress } from "~~/utils/vesu";
 import { useSwapQuote, type SwapQuoteStatus } from "~~/hooks/useSwapQuote";
 import type { AvnuQuote } from "~~/lib/swaps/avnu";
-import { getVTokenForAsset } from "~~/lib/vesu";
 import { InstructionConfirmModal } from "~~/components/modals/InstructionConfirmModal";
 import type { InstructionPreview, InstructionOutputPointer } from "~~/components/debug/InstructionExplorer";
 import { useSettings } from "~~/store/settings";
@@ -70,17 +67,6 @@ type CollateralSwapPlan = {
 };
 
 const SWAP_SLIPPAGE_BPS = 500n;
-const MAX_APPROVAL_AMOUNT = (1n << 256n) - 1n;
-
-const resolveSwapOutputIndex = (entrypoint?: string) => {
-  const normalized = entrypoint?.toLowerCase() ?? "";
-
-  if (normalized === "swap_exact_token_to") {
-    return 0;
-  }
-
-  return 1;
-};
 
 const toPreviewPointer = (instr: number, index = 0, u256 = true): InstructionOutputPointer => ({
   kind: "output_ptr",
@@ -149,7 +135,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   disableCollateralSelection,
 }) => {
   const { address: userAddress, chainId } = useAccount();
-  const { provider } = useProvider();
   const protocols = useMemo(() => [{ name: "Nostra" }, { name: "Vesu" }, { name: "VesuV2" }], []);
   const { tokenAddress, decimals, type, name, balance, poolId: currentPoolId } = position;
 
@@ -202,7 +187,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
-  const [swapApprovalSpenders, setSwapApprovalSpenders] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!showInstructionConfirm && confirmOpen) {
@@ -1149,7 +1133,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       const pointerIndex = hasSwap
         ? swapBaseIndex + (swapInstructionIndexMap.get(collateral.token) ?? 0)
         : withdrawBaseIndex + index;
-      const pointerOutput = hasSwap ? resolveSwapOutputIndex(plan.quote?.entrypoint) : 0;
+      const pointerOutput = 0;
 
       planSteps.push({
         kind: "Deposit",
@@ -1357,155 +1341,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     };
   }, [isOpen, isAuthReady, getAuthorizations, authCalldataKey]);
 
-  const tokensRequiringSwapApproval = useMemo(() => {
-    const tokens = new Set<string>();
-
-    selectedCollateralsWithAmounts.forEach(collateral => {
-      const plan = collateralSwapPlans[collateral.token];
-      if (!collateral.supported && plan?.quote && plan.quote.calldata.length > 0) {
-        try {
-          tokens.add(normalizeStarknetAddress(plan.target.address));
-        } catch (err) {
-          console.error("Failed to normalize approval token address", err);
-        }
-      }
-    });
-
-    return Array.from(tokens);
-  }, [selectedCollateralsWithAmounts, collateralSwapPlans]);
-
-  useEffect(() => {
-    if (!provider || !routerGateway?.address) {
-      setSwapApprovalSpenders({});
-      return;
-    }
-
-    if (tokensRequiringSwapApproval.length === 0) {
-      setSwapApprovalSpenders({});
-      return;
-    }
-
-    let cancelled = false;
-    const defaultSpender = normalizeStarknetAddress(routerGateway.address);
-
-    const resolveSpenders = async () => {
-      const entries = await Promise.all(
-        tokensRequiringSwapApproval.map(async tokenAddress => {
-          let spender = defaultSpender;
-
-          if (selectedProtocol === "VesuV2") {
-            try {
-              const normalizedPool = normalizeStarknetAddress(selectedV2PoolAddress);
-              const vToken = await getVTokenForAsset(
-                provider,
-                normalizedPool as `0x${string}`,
-                tokenAddress as `0x${string}`,
-              );
-              if (vToken !== "0x0") {
-                spender = normalizeStarknetAddress(vToken);
-              }
-            } catch (err) {
-              console.warn("Failed to resolve Vesu vToken for", tokenAddress, err);
-            }
-          }
-
-          return [tokenAddress.toLowerCase(), spender] as const;
-        }),
-      );
-
-      if (!cancelled) {
-        setSwapApprovalSpenders(Object.fromEntries(entries));
-      }
-    };
-
-    resolveSpenders();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    provider,
-    routerGateway?.address,
-    selectedProtocol,
-    selectedV2PoolAddress,
-    tokensRequiringSwapApproval,
-  ]);
-
-  const swapApprovalAuthorizations = useMemo(() => {
-    if (!routerGateway?.address || tokensRequiringSwapApproval.length === 0)
-      return [] as LendingAuthorization[];
-
-    const approvalAmount = uint256.bnToUint256(MAX_APPROVAL_AMOUNT);
-    const defaultSpender = normalizeStarknetAddress(routerGateway.address);
-    const seenAuthorizations = new Set(
-      (fetchedAuthorizations ?? []).map(authorization => `${authorization.contractAddress.toLowerCase()}::${authorization.entrypoint}`),
-    );
-
-    const approvals: LendingAuthorization[] = [];
-    tokensRequiringSwapApproval.forEach(tokenAddress => {
-      const normalizedToken = tokenAddress.toLowerCase();
-      const key = `${normalizedToken}::approve`;
-      if (seenAuthorizations.has(key)) {
-        return;
-      }
-
-      const spender = swapApprovalSpenders[normalizedToken] ?? defaultSpender;
-
-      approvals.push({
-        contractAddress: tokenAddress,
-        entrypoint: "approve",
-        calldata: [
-          spender,
-          num.toHexString(approvalAmount.low),
-          num.toHexString(approvalAmount.high),
-        ],
-      });
-    });
-
-    return approvals;
-  }, [
-    routerGateway?.address,
-    fetchedAuthorizations,
-    swapApprovalSpenders,
-    tokensRequiringSwapApproval,
-  ]);
-
-  const approvalPreviewSteps = useMemo<InstructionPreview[]>(() => {
-    if (!swapApprovalAuthorizations || swapApprovalAuthorizations.length === 0) {
-      return [];
-    }
-
-    return swapApprovalAuthorizations.map(authorization => {
-      const spender = (authorization.calldata?.[0] ?? "0x0") as `0x${string}`;
-      const low = authorization.calldata?.[1] ? BigInt(authorization.calldata[1]) : 0n;
-      const high = authorization.calldata?.[2] ? BigInt(authorization.calldata[2]) : 0n;
-      const amount = (high << 128n) + low;
-
-      return {
-        kind: "Approve",
-        to: authorization.contractAddress as `0x${string}`,
-        entrypoint: authorization.entrypoint,
-        token: authorization.contractAddress as `0x${string}`,
-        amount,
-        meta: {
-          spender,
-        },
-      } satisfies InstructionPreview;
-    });
-  }, [swapApprovalAuthorizations]);
-
-  const instructionPreviewSteps = useMemo(
-    () => [...approvalPreviewSteps, ...(instructionPlan ?? [])],
-    [approvalPreviewSteps, instructionPlan],
-  );
+  const instructionPreviewSteps = useMemo(() => instructionPlan ?? [], [instructionPlan]);
 
   // Construct calls based on current state
   const calls = useMemo(() => {
     if (!pairInstructions || pairInstructions.length === 0) return [];
 
     const authorizations = fetchedAuthorizations ?? [];
-    const combinedAuthorizations = [...authorizations, ...swapApprovalAuthorizations];
-    const revokeAuthorizations = buildModifyDelegationRevokeCalls(combinedAuthorizations);
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
     const moveCalls = pairInstructions.map(instructions => ({
       contractName: "RouterGateway" as const,
       functionName: "move_debt" as const,
@@ -1513,11 +1356,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     }));
 
     return [
-      ...(combinedAuthorizations as any),
+      ...(authorizations as any),
       ...moveCalls,
       ...(revokeAuthorizations as any),
     ];
-  }, [fetchedAuthorizations, pairInstructions, swapApprovalAuthorizations]);
+  }, [fetchedAuthorizations, pairInstructions]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -1525,19 +1368,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     if (!routerGateway?.address || !pairInstructions || pairInstructions.length === 0)
       return null;
     const authorizations = fetchedAuthorizations ?? [];
-    const combinedAuthorizations = [...authorizations, ...swapApprovalAuthorizations];
-    const revokeAuthorizations = buildModifyDelegationRevokeCalls(combinedAuthorizations);
+    const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
     const moveCalls = pairInstructions.map(instructions => ({
       contractAddress: routerGateway.address,
       entrypoint: "move_debt",
       calldata: CallData.compile({ instructions }),
     }));
     return [
-      ...(combinedAuthorizations as any),
+      ...(authorizations as any),
       ...moveCalls,
       ...(revokeAuthorizations as any),
     ];
-  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions, swapApprovalAuthorizations]);
+  }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
 
   const {
     loading: feeLoading,
