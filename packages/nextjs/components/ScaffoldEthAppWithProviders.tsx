@@ -46,10 +46,19 @@ const cartridgeConnector = new ControllerConnector({
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   useInitializeNativeCurrencyPrice();
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Determine which header to render based on the current route
   const renderHeader = () => {
-    if (pathname.startsWith('/app')) {
+    // Check if hostname starts with "app." (for rewritten URLs like app.kapan.finance -> kapan.finance/app)
+    // Guarded behind client-mount to avoid SSR hydration differences on Vercel.
+    const isAppSubdomain = isClient && typeof window !== 'undefined' && window.location.hostname.startsWith('app.');
+    
+    if (pathname.startsWith('/app') || isAppSubdomain) {
       return <AppHeader />;
     } else if (pathname === '/' || pathname.startsWith('/info') || pathname.startsWith('/automate')) {
       return <LandingHeader />;
