@@ -1,6 +1,6 @@
 import React, { FC, useState, useEffect, useMemo, createRef, RefObject } from "react";
 import Image from "next/image";
-import { FiChevronDown, FiMinusCircle, FiX, FiArrowRight, FiRefreshCw, FiSearch, FiCheck } from "react-icons/fi";
+import { FiX, FiSearch, FiCheck } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { CollateralSwitchButton } from "./CollateralSwitchButton";
@@ -319,8 +319,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
 
   // Handle selecting a collateral
   const handleCollateralToggle = (collateral: CollateralToken) => {
-    // Don't allow selection if the collateral is not supported or has zero balance
-    if (!collateral.supported || collateral.rawBalance <= 0n) return;
+    // Don't allow selection if the collateral has zero balance. Unsupported collaterals can still
+    // be selected so they can be swapped during the move flow.
+    if (collateral.rawBalance <= 0n) return;
     
     setSelectedCollaterals(prev => {
       // Check if collateral is already selected
@@ -467,7 +468,11 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
           <div className="space-y-2">
             {sortedCollaterals.map(collateral => {
               const hasZeroBalance = collateral.rawBalance <= 0n;
-              const isDisabled = !collateral.supported || hasZeroBalance;
+              const tooltipMessage = hasZeroBalance
+                ? "Zero balance"
+                : !collateral.supported
+                  ? `Requires swap in ${selectedProtocol}`
+                  : undefined;
 
               return (
                 <button
@@ -476,18 +481,11 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   className={`
                     btn btn-block h-auto py-2 px-3 normal-case flex items-center gap-2 justify-start
                     ${isCollateralSelected(collateral.address) ? "btn-primary" : "btn-outline bg-base-100"}
-                    ${isDisabled ? "opacity-50 cursor-not-allowed tooltip" : ""}
+                    ${hasZeroBalance ? "opacity-50 cursor-not-allowed tooltip" : ""}
+                    ${!collateral.supported ? "border-warning/60" : ""}
                   `}
-                  disabled={isDisabled}
-                  data-tip={
-                    isDisabled
-                      ? hasZeroBalance
-                        ? "Zero balance"
-                        : !collateral.supported
-                          ? `Not supported in ${selectedProtocol}`
-                          : ""
-                      : undefined
-                  }
+                  disabled={hasZeroBalance}
+                  data-tip={tooltipMessage}
                 >
                   <div className="w-6 h-6 relative flex-shrink-0">
                     <Image
@@ -503,7 +501,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                       {formatBalance(collateral.balance)}
                     </span>
                   </div>
-                  {!collateral.supported && <span className="text-xs px-1 bg-base-300 rounded-full ml-auto">!</span>}
+                  {!collateral.supported && (
+                    <span className="text-xs px-1 bg-warning/20 text-warning ml-auto rounded-full">swap</span>
+                  )}
                   {hasZeroBalance && <span className="text-xs px-1 bg-base-300 rounded-full ml-auto">0</span>}
                 </button>
               );
@@ -537,9 +537,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
               const isSupported = collateral.supported;
               
               return (
-                <div 
-                  key={collateral.token} 
-                  className={`flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}
+                <div
+                  key={collateral.token}
+                  className={`flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm ${!isSupported ? 'border-warning/70 bg-warning/5' : ''}`}
                 >
                   {/* Left side: Token icon and info - fixed width */}
                   <div className="flex items-center gap-2 w-[160px] flex-shrink-0">
@@ -557,7 +557,9 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                         Available: {maxAmount}
                       </span>
                       {!isSupported && (
-                        <span className="text-xs text-error/80">Not supported in {selectedProtocol}</span>
+                        <span className="text-xs text-warning">
+                          Requires swap for {selectedProtocol}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -580,21 +582,19 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   
                   {/* Input field - takes remaining space */}
                   <div className="flex-1">
-                    <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all ${!isSupported ? 'opacity-50' : ''}`}>
+                    <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all`}>
                       <input
                         type="text"
                         value={displayAmount}
                         onChange={(e) => handleAmountChange(collateral.token, e.target.value, collateral.decimals)}
                         className="flex-1 bg-transparent border-none focus:outline-none px-3 py-2 h-10 text-base-content"
                         placeholder="0.00"
-                        disabled={!isSupported}
                       />
                       <button
-                        className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200`}
                         onClick={(e) => {
                           handleSetMax(collateral.token);
                         }}
-                        disabled={!isSupported}
                       >
                         MAX
                       </button>

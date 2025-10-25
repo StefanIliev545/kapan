@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { useSettings } from "~~/store/settings";
 
 const themes = ["light", "synthwave", "emerald", "dark", "retro", "forest", "valentine"];
 
@@ -11,6 +12,7 @@ export const ThemeSettings = ({ className }: { className?: string }) => {
   const [mounted, setMounted] = useState(false);
   const [lightTheme, setLightTheme] = useState("light");
   const [darkTheme, setDarkTheme] = useState("dark");
+  const { showInstructionConfirm, setShowInstructionConfirm } = useSettings();
 
   useEffect(() => {
     const storedLight = localStorage.getItem("lightTheme") ?? "light";
@@ -77,6 +79,17 @@ export const ThemeSettings = ({ className }: { className?: string }) => {
               </option>
             ))}
           </select>
+        </div>
+        <div className="form-control mt-3 border-t border-base-300 pt-3">
+          <label className="label cursor-pointer gap-2">
+            <span className="label-text text-xs leading-tight">Show instruction confirmation</span>
+            <input
+              type="checkbox"
+              className="toggle toggle-xs"
+              checked={showInstructionConfirm}
+              onChange={event => setShowInstructionConfirm(event.target.checked)}
+            />
+          </label>
         </div>
       </div>
     </div>
