@@ -140,16 +140,22 @@ export const LandingHeader = () => {
   return (
     <>
       <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
-        {/* Background with gradient border */}
-        <div
-          className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
-            scrolled ? "shadow-md" : ""
-          }`}
-          style={{ zIndex: -1 }}
-        >
-          {/* Accent line */}
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 dark:via-accent/30 to-transparent"></div>
-        </div>
+        {/* Background with blur - only visible when scrolled */}
+        <AnimatePresence>
+          {scrolled && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 bg-base-100/80 dark:bg-base-300/80 backdrop-blur-md"
+              style={{ zIndex: -1 }}
+            >
+              {/* Accent line */}
+              <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 dark:via-accent/30 to-transparent"></div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="navbar justify-between min-h-0 h-auto py-0">
@@ -216,7 +222,6 @@ export const LandingHeader = () => {
                               </div>
                               <div>
                                 <div className="font-bold text-xl font-sans text-base-content">Kapan Finance</div>
-                                <div className="text-xs text-base-content/60">Lending Made Easy</div>
                               </div>
                             </div>
                           </div>
@@ -234,7 +239,7 @@ export const LandingHeader = () => {
               <Link href="/" className="flex items-center">
                 <div className="relative flex items-center">
                   <div className="relative">
-                    <div className={`relative w-14 h-14 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                    <div className={`relative w-11 h-11 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
                       <Image
                         alt="Kapan logo"
                         className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
@@ -245,8 +250,7 @@ export const LandingHeader = () => {
                     </div>
                   </div>
                   <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                    <div className="font-bold text-lg font-sans text-base-content">Kapan Finance</div>
-                    <div className="text-[10px] text-base-content/60 -mt-1">Lending Made Easy</div>
+                    <div className="font-bold text-lg font-inter text-base-content">Kapan</div>
                   </div>
                 </div>
               </Link>
@@ -266,16 +270,6 @@ export const LandingHeader = () => {
             </div>
           </div>
         </div>
-      </div>
-      <div className="w-full bg-primary/5 dark:bg-accent/5 text-base-content/70 text-center text-xs py-1">
-        <Link
-          href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-primary dark:hover:text-accent"
-        >
-          Starknet Audit by Codespect
-        </Link>
       </div>
     </>
   );
