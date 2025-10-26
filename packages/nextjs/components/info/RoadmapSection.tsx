@@ -238,6 +238,7 @@ const RoadmapSection = () => {
       description:
         "Core features supporting basic lending operations and atomic debt migration across Aave V3, Compound V3, and Venus Protocol.",
       features: ["Supply Assets", "Repay Loans", "Atomic Debt Migration", "Cross-Protocol Rate Comparison"],
+      isActive: true,
       icon: <RocketLaunchIcon className="w-5 h-5" />,
     },
     {
@@ -255,14 +256,6 @@ const RoadmapSection = () => {
     },
     {
       phase: 3,
-      title: "Additional Protocol Integrations",
-      description:
-        "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
-      features: ["Euler Finance", "Morpho Labs"],
-      icon: <BuildingLibraryIcon className="w-5 h-5" />,
-    },
-    {
-      phase: 4,
       title: "Advanced DeFi Loan Management",
       description: "Enhanced debt management with smart routing and cross-protocol collateral operations.",
       features: [
@@ -271,7 +264,16 @@ const RoadmapSection = () => {
         "Cross-Protocol Collateral Detection",
         "Multi-step Position Refinancing",
       ],
+      isActive: true,
       icon: <ArrowsPointingOutIcon className="w-5 h-5" />,
+    },
+    {
+      phase: 4,
+      title: "Additional Protocol Integrations",
+      description:
+        "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
+      features: ["Euler Finance", "Morpho Labs"],
+      icon: <BuildingLibraryIcon className="w-5 h-5" />,
     },
     {
       phase: 5,

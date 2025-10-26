@@ -114,6 +114,7 @@ export const LandingHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolea
 export const LandingHeader = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -122,15 +123,18 @@ export const LandingHeader = () => {
     useCallback(() => setIsDrawerOpen(false), []),
   );
 
-  // Add scroll effect
+  // Set mounted after client hydration
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
+    setMounted(true);
+  }, []);
 
+  // Add scroll effect (applied only after mount for hydration safety)
+  useEffect(() => {
+    if (!mounted) return;
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [mounted]);
 
   // Close drawer when route changes
   useEffect(() => {
@@ -239,7 +243,7 @@ export const LandingHeader = () => {
               <Link href="/" className="flex items-center">
                 <div className="relative flex items-center">
                   <div className="relative">
-                    <div className={`relative w-11 h-11 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                    <div className={`relative w-11 h-11 transition-all duration-300 ${mounted && scrolled ? "scale-90" : ""}`}>
                       <Image
                         alt="Kapan logo"
                         className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
@@ -249,7 +253,7 @@ export const LandingHeader = () => {
                       />
                     </div>
                   </div>
-                  <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
+                  <div className={`ml-2 transition-all duration-300 ${mounted && scrolled ? "scale-95" : ""}`}>
                     <div className="font-bold text-lg font-inter text-base-content">Kapan</div>
                   </div>
                 </div>
