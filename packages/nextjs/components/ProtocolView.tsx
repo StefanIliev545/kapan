@@ -6,7 +6,6 @@ import type { CollateralWithAmount } from "./specific/collateral/CollateralSelec
 import { BorrowModal } from "./modals/BorrowModal";
 import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
-import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -51,6 +50,7 @@ interface ProtocolViewProps {
   forceShowAll?: boolean; // If true, always show all assets regardless of showAll toggle
   networkType: "evm" | "starknet"; // Specify which network this protocol view is for
   disableMoveSupply?: boolean;
+  readOnly?: boolean; // If true, disable all interactive actions and modals
 }
 
 // Health status indicator component that shows utilization percentage
@@ -75,33 +75,19 @@ const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercen
 export const ProtocolView: FC<ProtocolViewProps> = ({
   protocolName,
   protocolIcon,
-  ltv,
-  maxLtv,
   suppliedPositions,
   borrowedPositions,
   hideUtilization = false,
   forceShowAll = false,
   networkType,
   disableMoveSupply = false,
+  readOnly = false,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
   const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
   const [isTokenBorrowSelectModalOpen, setIsTokenBorrowSelectModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
-  // For Starknet supply modal
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [selectedSupplyToken, setSelectedSupplyToken] = useState<{
-    name: string;
-    icon: string;
-    address: string;
-    currentRate: number;
-    tokenPrice?: bigint;
-    tokenDecimals?: number;
-    vesuContext?: ProtocolPosition["vesuContext"];
-    actionsDisabled?: boolean;
-    actionsDisabledReason?: string;
-  } | null>(null);
 
   // Sync showAll with forceShowAll prop; reset when wallet connects
   useEffect(() => {
@@ -172,20 +158,37 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const effectiveShowAll = showAll || forceShowAll;
 
   // Filter positions based on showAll toggle.
-  const filteredSuppliedPositions = effectiveShowAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0);
+  const filteredSuppliedPositions = (effectiveShowAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
+    readOnly
+      ? {
+          ...p,
+          actionsDisabled: true,
+          moveSupport: p.moveSupport ? { ...p.moveSupport, disableCollateralSelection: true } : undefined,
+        }
+      : p,
+  );
 
   // For borrowed positions:
   // - If not showing all, only show positions with actual debt (negative balance)
   // - If showing all, show everything in the borrowedPositions array
-  const filteredBorrowedPositions = effectiveShowAll
-    ? borrowedPositions // Show all potential borrowable tokens
-    : borrowedPositions.filter(p => p.balance < 0); // Only show positions with debt
+  const filteredBorrowedPositions = (effectiveShowAll
+    ? borrowedPositions
+    : borrowedPositions.filter(p => p.balance < 0)).map(p =>
+    readOnly
+      ? {
+          ...p,
+          actionsDisabled: true,
+          moveSupport: p.moveSupport ? { ...p.moveSupport, disableCollateralSelection: true } : undefined,
+        }
+      : p,
+  );
 
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
-  const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
+  // const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
 
   // Handle opening the token select modal for supply
   const handleAddSupply = () => {
+    if (readOnly) return;
     setIsTokenSelectModalOpen(true);
   };
 
@@ -196,6 +199,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
   // Handle opening the token select modal for borrowing
   const handleAddBorrow = () => {
+    if (readOnly) return;
     setIsTokenBorrowSelectModalOpen(true);
   };
 
@@ -205,9 +209,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   };
 
   // Handle opening the borrow modal directly (obsolete, but keeping for reference)
-  const handleOpenBorrowModal = () => {
-    setIsTokenBorrowModalOpen(true);
-  };
+  // const handleOpenBorrowModal = () => setIsTokenBorrowModalOpen(true);
 
   // Handle closing the borrow modal
   const handleCloseBorrowModal = () => {
@@ -235,28 +237,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   }, [borrowedPositions, effectiveShowAll]);
 
   // Handle supply token selection for Starknet
-  const handleSelectSupplyToken = (token: ProtocolPosition) => {
-    if (token.actionsDisabled) return;
-    setSelectedSupplyToken({
-      name: token.name,
-      icon: token.icon,
-      address: token.tokenAddress,
-      currentRate: token.currentRate,
-      tokenPrice: token.tokenPrice,
-      tokenDecimals: token.tokenDecimals,
-      vesuContext: token.vesuContext,
-      actionsDisabled: token.actionsDisabled,
-      actionsDisabledReason: token.actionsDisabledReason,
-    });
-    setIsTokenSelectModalOpen(false);
-    setIsDepositModalOpen(true);
-  };
+  // Starknet deposit selection handled within TokenSelectModalStark in this view
 
   // Handle deposit modal close
-  const handleCloseDepositModal = () => {
-    setIsDepositModalOpen(false);
-    setSelectedSupplyToken(null);
-  };
+  // const handleCloseDepositModal = () => undefined;
 
   return (
     <div className="w-full flex flex-col hide-scrollbar p-4 space-y-4">
@@ -332,7 +316,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   />
                 </>
               )}
-              {forceShowAll && <span className="text-sm text-primary">Connect wallet to view your positions</span>}
+              {forceShowAll && !readOnly && (
+                <span className="text-sm text-primary">Connect wallet to view your positions</span>
+              )}
             </div>
           </div>
         </div>
@@ -357,25 +343,31 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         protocolName={protocolName}
                         networkType={networkType}
                         position={positionManager}
-                        disableMove={disableMoveSupply}
+                        disableMove={disableMoveSupply || readOnly}
+                        availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : undefined}
+                        suppressDisabledMessage
                       />
                     </div>
                   ))}
 
                   {/* "Add Supply" button */}
+                  {!readOnly && (
                   <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
                     <FiPlus className="w-4 h-4 mr-1" />
                     Add Supply
                   </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
                   <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
+                  {!readOnly && (
                   <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
                     <FiPlus className="w-4 h-4 mr-1" />
                     Supply Assets
                   </button>
+                  )}
                 </div>
               )}
             </div>
@@ -399,24 +391,30 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         protocolName={protocolName}
                         networkType={networkType}
                         position={positionManager}
+                        availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : undefined}
+                        suppressDisabledMessage
                       />
                     </div>
                   ))}
 
                   {/* "Add Borrow" button */}
+                  {!readOnly && (
                   <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
                     <FiPlus className="w-4 h-4 mr-1" />
                     Borrow
                   </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
                   <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
+                  {!readOnly && (
                   <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
                     <FiPlus className="w-4 h-4 mr-1" />
                     Borrow Assets
                   </button>
+                  )}
                 </div>
               )}
             </div>
@@ -425,7 +423,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       </div>
 
       {/* Modals - Conditional based on network type */}
-      {networkType === "starknet" ? (
+      {!readOnly && networkType === "starknet" ? (
         <>
           {/* Supply Token Select - unified Stark modal */}
           <TokenSelectModalStark
@@ -516,7 +514,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             />
           )}
         </>
-      ) : (
+      ) : !readOnly ? (
         <>
           {/* Token Select Modal for Supply - EVM */}
           <TokenSelectModal
@@ -572,7 +570,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             />
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 };

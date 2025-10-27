@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -118,6 +118,16 @@ export const LandingHeader = () => {
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
+  const appUrl = useMemo(() => {
+    if (typeof window === "undefined") return "/app";
+    const { protocol } = window.location;
+    const hostname = window.location.hostname;
+    const baseHost = hostname.replace(/^www\./, "");
+    if (window.location.host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
+    if (hostname.startsWith("app.")) return `${protocol}//${window.location.host}`;
+    return `${protocol}//app.${baseHost}`;
+  }, []);
+
   useOutsideClick(
     burgerMenuRef,
     useCallback(() => setIsDrawerOpen(false), []),
@@ -143,7 +153,7 @@ export const LandingHeader = () => {
 
   return (
     <>
-      <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
+      <div className={`sticky top-0 z-30 transition-all duration-300 bg-base-100 dark:bg-base-300 ${scrolled ? "py-1" : "py-2"}`}>
         {/* Background with blur - only visible when scrolled */}
         <AnimatePresence>
           {scrolled && (
@@ -267,8 +277,17 @@ export const LandingHeader = () => {
               </div>
             </div>
 
-            {/* Right section - Theme controls */}
+            {/* Right section - Launch App and Theme controls */}
             <div className="flex items-center gap-2">
+              <a
+                href="/app"
+                onClick={e => {
+                  e.preventDefault();
+                  window.location.assign(appUrl);
+                }}
+              >
+                <button className="btn btn-primary btn-xs md:btn-sm">Launch App</button>
+              </a>
               <SwitchTheme />
               <ThemeSettings />
             </div>

@@ -85,7 +85,7 @@ const TokenPill = ({ value, icon, name }: { value: number; icon: string; name: s
 
 type PercentOnChange = (amount: string, isMax: boolean) => void;
 
-const PercentInput: FC<{
+export const PercentInput: FC<{
   balance: bigint;
   decimals: number;
   price?: number;
@@ -160,7 +160,7 @@ const PercentInput: FC<{
   );
 };
 
-const LeftMetrics: FC<{
+export const LeftMetrics: FC<{
   hf: number;
   utilization: number;
   ltv: number;
@@ -338,12 +338,13 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 : afterHfEffective > 2
                 ? "text-warning"
                 : "text-error";
+              const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
               return (
                 <div className="text-xs pt-2">
                   <div className="grid grid-cols-3">
                     <div className="text-center opacity-70">Health Factor</div>
                     <div className="text-center opacity-70 border-l border-base-300">Loan To Value</div>
-                    <div className="text-center opacity-70 border-l border-base-300">Debt</div>
+                    <div className="text-center opacity-70 border-l border-base-300">{thirdLabel}</div>
                   </div>
                   <div className="grid grid-cols-3 items-center mt-1">
                     <div className={`text-center ${hfTextColor}`}>{Number.isFinite(afterHfEffective) ? afterHfEffective.toFixed(2) : "∞"}</div>
@@ -383,5 +384,137 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
         <button>close</button>
       </form>
     </dialog>
+  );
+};
+
+// Card version for demos: non-interactive confirm
+export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose"> & { disabledConfirm?: boolean }> = ({
+  action,
+  apyLabel,
+  apy,
+  token,
+  protocolName,
+  metricLabel,
+  before,
+  balance,
+  percentBase,
+  max,
+  hf = 1.9,
+  utilization = 65,
+  ltv = 75,
+  position,
+}) => {
+  const [amount, setAmount] = useState("");
+  const parsed = parseFloat(amount || "0");
+
+  const price = token.usdPrice || 0;
+  const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
+  const afterPosition = useMemo(
+    () => beforePosition.apply(action, parsed * price),
+    [beforePosition, action, parsed, price],
+  );
+
+  const beforeHf = position ? beforePosition.healthFactor() : hf;
+  const beforeUtil = position ? beforePosition.utilization() : utilization;
+  const beforeLtv = position ? beforePosition.loanToValue() : ltv;
+  const afterHf = position ? afterPosition.healthFactor() : hf;
+  const afterLtv = position ? afterPosition.loanToValue() : ltv;
+
+  const isDepositNoDebtFallback = action === "Deposit" && !position;
+  const beforeHfEffective = isDepositNoDebtFallback ? Infinity : beforeHf;
+  const beforeLtvEffective = isDepositNoDebtFallback ? 0 : beforeLtv;
+  const afterHfEffective = isDepositNoDebtFallback ? Infinity : afterHf;
+  const afterLtvEffective = isDepositNoDebtFallback ? 0 : afterLtv;
+
+  const effectiveMax = useMemo(() => {
+    if (action !== "Borrow" || !position || !token.usdPrice) return max;
+    const decimals = token.decimals || 18;
+    const freeUsd = position.freeBorrowUsd();
+    if (freeUsd <= 0 || token.usdPrice === 0) return 0n;
+    const amount = Math.floor((freeUsd / token.usdPrice) * 10 ** decimals);
+    return BigInt(amount);
+  }, [action, position, token.usdPrice, token.decimals, max]);
+
+  const afterValue = useMemo(() => {
+    switch (action) {
+      case "Borrow":
+      case "Deposit":
+        return before + parsed;
+      case "Withdraw":
+      case "Repay":
+        return Math.max(0, before - parsed);
+      default:
+        return before;
+    }
+  }, [action, before, parsed]);
+
+  return (
+    <div className="card bg-base-100 border border-base-300 rounded-none overflow-hidden">
+      <div className="flex flex-col md:flex-row">
+        <LeftMetrics
+          hf={beforeHfEffective}
+          utilization={beforeUtil}
+          ltv={beforeLtvEffective}
+          metricLabel={metricLabel}
+          metricValue={before}
+          token={token}
+        />
+        <div className="flex-1 p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-xl">{action} {token.name}</h3>
+              <Image src={token.icon} alt={token.name} width={32} height={32} />
+            </div>
+            {protocolName && <div className="text-sm text-base-content/70">{protocolName}</div>}
+          </div>
+          <div className="flex items-center justify-between text-xs text-base-content/70">
+            <span>{apyLabel} {formatRate(apy)}</span>
+            <span>Balance: {format(Number(formatUnits(balance, token.decimals || 18)))}</span>
+          </div>
+          <PercentInput
+            balance={balance}
+            decimals={token.decimals || 18}
+            price={token.usdPrice}
+            onChange={(val) => { setAmount(val); }}
+            percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
+            max={effectiveMax}
+            resetTrigger={true}
+          />
+          {(() => {
+            const hfTextColor = !Number.isFinite(afterHfEffective)
+              ? "text-success"
+              : afterHfEffective >= 4
+              ? "text-success"
+              : afterHfEffective > 2
+              ? "text-warning"
+              : "text-error";
+            const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
+            return (
+              <div className="text-xs pt-2">
+                <div className="grid grid-cols-3">
+                  <div className="text-center opacity-70">Health Factor</div>
+                  <div className="text-center opacity-70 border-l border-base-300">Loan To Value</div>
+                  <div className="text-center opacity-70 border-l border-base-300">{thirdLabel}</div>
+                </div>
+                <div className="grid grid-cols-3 items-center mt-1">
+                  <div className={`text-center ${hfTextColor}`}>{Number.isFinite(afterHfEffective) ? afterHfEffective.toFixed(2) : "∞"}</div>
+                  <div className="text-center border-l border-base-300">{formatPercentage(afterLtvEffective)}%</div>
+                  <div className="flex items-center justify-center gap-2 border-l border-base-300">
+                    <TokenPill value={afterValue} icon={token.icon} name={token.name} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <div className="pt-2">
+            <SegmentedActionBar
+              className="w-full"
+              autoCompact
+              actions={[{ key: "confirm", label: action, onClick: () => { console.debug("Demo confirm disabled"); }, disabled: true, variant: "ghost" as const }]}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

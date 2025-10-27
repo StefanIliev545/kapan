@@ -81,7 +81,7 @@ export const SegmentedActionBar: FC<SegmentedActionBarProps> = ({ actions, class
           key={action.key}
           className={`group btn btn-sm h-7 px-2 flex items-center justify-center gap-1 flex-1 basis-0 rounded-none ${variantClass(
             action.variant,
-          )}`}
+          )} ${action.disabled ? "bg-transparent hover:bg-transparent text-base-content/50" : ""}`}
           onClick={action.onClick}
           disabled={action.disabled}
           aria-label={action.ariaLabel || action.label}

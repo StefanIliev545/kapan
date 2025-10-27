@@ -1,7 +1,9 @@
 import type { NextPage } from "next";
 import HeroSection from "../components/home/HeroSection";
 import HowItWorks from "../components/home/HowItWorks";
-import TransactionFeed from "../components/TransactionFeed.client";
+import LandingSection from "../components/home/LandingSection";
+import ExplainerSection from "../components/home/ExplainerSection";
+import BuiltForConvenience from "../components/home/BuiltForConvenience";
 import BenefitsSection from "../components/info/BenefitsSection";
 import RoadmapSection from "../components/info/RoadmapSection";
 
@@ -13,14 +15,9 @@ const Home: NextPage = () => {
     <div className="flex-grow">
       {/* Main content */}
       <main className="relative z-10">
-        {/* Hero section */}
-        <HeroSection />
-
-        {/* How it works */}
-        <HowItWorks />
-
-        {/* Benefits and roadmap */}
-        <BenefitsSection />
+        <LandingSection />
+        <ExplainerSection />
+        <BuiltForConvenience />
         <RoadmapSection />
       </main>
     </div>

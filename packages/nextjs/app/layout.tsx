@@ -3,9 +3,11 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Theme } from "@radix-ui/themes";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
+import "@radix-ui/themes/styles.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 import { QueryProvider } from "~~/app/providers/QueryProvider";
 
@@ -32,11 +34,11 @@ const inter = Inter({
 const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <html suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.className}`}>
         <ThemeProvider>
-          <QueryProvider>
-            <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
-          </QueryProvider>
+            <QueryProvider>
+              <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+            </QueryProvider>
         </ThemeProvider>
         <SpeedInsights />
         <Analytics />
