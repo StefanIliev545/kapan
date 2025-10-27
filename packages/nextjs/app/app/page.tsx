@@ -11,7 +11,6 @@ import { CompoundProtocolView } from "~~/components/specific/compound/CompoundPr
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
 import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
 import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
-import { LendingSidebar } from "~~/components/LendingSidebar";
 // Define network options
 const networkOptions: NetworkOption[] = [
   {
@@ -68,12 +67,7 @@ const App: NextPage = () => {
   ];
 
   return (
-    <div className="container mx-auto flex flex-col gap-6 p-0 lg:flex-row lg:gap-10 min-h-[calc(100vh-6rem)] py-6">
-      <div className="hidden lg:block lg:flex-shrink-0">
-        <StableArea minHeight="32rem" className="sticky top-[4.5rem]">
-          <LendingSidebar />
-        </StableArea>
-      </div>
+    <div className="container mx-auto flex flex-col gap-6 p-0 min-h-[calc(100vh-6rem)] py-6">
       <div className="flex-1 space-y-6">
         <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 
