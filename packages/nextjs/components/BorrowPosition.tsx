@@ -10,7 +10,6 @@ import { MovePositionModal as MovePositionModalStark } from "./modals/stark/Move
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX, FiArrowRight } from "react-icons/fi";
 import { SegmentedActionBar } from "./common/SegmentedActionBar";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -46,6 +45,8 @@ export type BorrowPositionProps = ProtocolPosition & {
   onSwap?: () => void;
   controlledExpanded?: boolean;
   onToggleExpanded?: () => void;
+  suppressDisabledMessage?: boolean;
+  demoOptimalOverride?: { protocol: string; rate: number };
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -58,7 +59,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   tokenAddress,
   tokenPrice,
   tokenDecimals,
-  tokenSymbol,
   collateralView,
   collateralValue,
   networkType,
@@ -82,6 +82,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   onSwap,
   controlledExpanded,
   onToggleExpanded,
+  suppressDisabledMessage = false,
+  demoOptimalOverride,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -114,23 +116,27 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   });
 
   const hasOptimalProtocol = Boolean(optimalProtocol);
-  const displayedOptimalProtocol = hasOptimalProtocol ? optimalProtocol : protocolName;
-  const displayedOptimalRate = hasOptimalProtocol ? optimalRateDisplay : currentRate;
+  const displayedOptimalProtocol = (typeof demoOptimalOverride !== "undefined" && demoOptimalOverride?.protocol)
+    ? demoOptimalOverride.protocol
+    : (hasOptimalProtocol ? optimalProtocol : protocolName);
+  const displayedOptimalRate = (typeof demoOptimalOverride !== "undefined" && typeof demoOptimalOverride?.rate === "number")
+    ? demoOptimalOverride.rate
+    : (hasOptimalProtocol ? optimalRateDisplay : currentRate);
 
   // Determine if there's a better rate available on another protocol
-  const ratesAreSame = Math.abs(currentRate - optimalRateDisplay) < 0.000001;
+  const ratesAreSame = Math.abs(currentRate - displayedOptimalRate) < 0.000001;
   const hasBetterRate =
     hasBalance &&
-    optimalProtocol &&
+    displayedOptimalProtocol &&
     !ratesAreSame &&
-    normalizeProtocolName(optimalProtocol) !== normalizeProtocolName(protocolName) &&
-    optimalRateDisplay < currentRate;
+    normalizeProtocolName(displayedOptimalProtocol) !== normalizeProtocolName(protocolName) &&
+    displayedOptimalRate < currentRate;
 
-  const formatNumber = (num: number) =>
-    new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(num));
+  // const formatNumber = (num: number) =>
+  //   new Intl.NumberFormat("en-US", {
+  //     minimumFractionDigits: 2,
+  //     maximumFractionDigits: 2,
+  //   }).format(Math.abs(num));
 
   // Use shared protocol logo resolver to support keys like "vesu_v2"
   const getProtocolLogo = (protocol: string) => getProtocolLogoUtil(protocol);
@@ -391,13 +397,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
                   : []),
                 ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showMoveButton
                   ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ]}
               />
@@ -416,23 +422,23 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
                   : []),
                 ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showMoveButton
                   ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition!, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ]}
               />
             </div>
 
-            {actionsDisabled && (
-              <div className="mt-3 text-sm text-base-content/70">
-                {disabledMessage}
-              </div>
-            )}
+        {actionsDisabled && !suppressDisabledMessage && (
+          <div className="mt-3 text-sm text-base-content/50">
+            {disabledMessage}
+          </div>
+        )}
 
             {extraActions && <div className="mt-3">{extraActions}</div>}
           </div>

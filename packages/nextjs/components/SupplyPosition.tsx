@@ -7,7 +7,6 @@ import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiPlus, FiMinus, FiRepeat, FiArrowRight } from "react-icons/fi";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -43,6 +42,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   showQuickDepositButton?: boolean;
   showInfoDropdown?: boolean;
   extraActions?: ReactNode;
+  suppressDisabledMessage?: boolean;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -77,6 +77,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   showQuickDepositButton = false,
   showInfoDropdown = false,
   extraActions,
+  suppressDisabledMessage = false,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -85,7 +86,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const isExpanded = controlledExpanded ?? expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
-  const supplyAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
+  // const supplyAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -111,11 +112,11 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const displayedOptimalProtocol = hasOptimalProtocol ? optimalProtocol : protocolName;
   const displayedOptimalRate = hasOptimalProtocol ? optimalRateDisplay : currentRate;
 
-  const formatNumber = (num: number) =>
-    new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(num));
+  // const formatNumber = (num: number) =>
+  //   new Intl.NumberFormat("en-US", {
+  //     minimumFractionDigits: 2,
+  //     maximumFractionDigits: 2,
+  //   }).format(Math.abs(num));
 
   // Use shared resolver to support keys like "vesu_v2"
   const getProtocolLogo = (protocol: string) => getProtocolLogoUtil(protocol);
@@ -135,8 +136,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const visibleActionCount = [showDepositButton, showWithdrawButton, showMoveButton, showSwapButton].filter(Boolean).length;
   const hasAnyActions = visibleActionCount > 0;
 
-  const actionGridClass =
-    visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
+  // const actionGridClass =
+  //   visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
 
   const handleDepositClick = onDeposit ?? depositModal.open;
   const handleWithdrawClick = onWithdraw ?? withdrawModal.open;
@@ -310,7 +311,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                     ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: handleMoveClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move supply" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to move" : "Move supply to another protocol", variant: "ghost" as const, compactOnHover: true }]
                     : []),
                   ...(showSwapButton
-                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick!, disabled: !isWalletConnected || actionsDisabled || !hasBalance, title: !isWalletConnected ? "Connect wallet to swap collateral" : actionsDisabled ? disabledMessage : !hasBalance ? "No collateral to swap" : "Switch collateral token", variant: "ghost" as const, compactOnHover: true }]
+                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick ?? (() => { return; }), disabled: !isWalletConnected || actionsDisabled || !hasBalance, title: !isWalletConnected ? "Connect wallet to swap collateral" : actionsDisabled ? disabledMessage : !hasBalance ? "No collateral to swap" : "Switch collateral token", variant: "ghost" as const, compactOnHover: true }]
                     : []),
                 ]}
               />
@@ -318,8 +319,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           </div>
         )}
 
-        {isExpanded && actionsDisabled && (
-          <div className="mt-3 text-sm text-base-content/70" onClick={e => e.stopPropagation()}>
+        {isExpanded && actionsDisabled && !suppressDisabledMessage && (
+          <div className="mt-3 text-sm text-base-content/50" onClick={e => e.stopPropagation()}>
             {disabledMessage}
           </div>
         )}

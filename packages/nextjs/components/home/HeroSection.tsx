@@ -21,7 +21,7 @@ const HeroSection = () => {
     <div className="hero min-h-screen relative">
       <div className="hero-content flex-col lg:flex-row gap-8 py-16 z-10">
         <div className="lg:w-1/2">
-          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
+          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg text-base-content">
             <div className="card-body p-6">
               <h1 className="text-4xl font-bold mb-2">The optimal way to lend and borrow on Starknet</h1>
               <h2 className="text-2xl mb-4">Manage all your lending positions in one place</h2>
@@ -88,7 +88,7 @@ const HeroSection = () => {
         </div>
         
         <div className="lg:w-1/2">
-          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg">
+          <div className="card bg-base-100 bg-opacity-98 shadow-2xl border border-base-300 rounded-lg text-base-content">
             <div className="card-body p-6">
               {/* Debt comparison component */}
               <StableArea minHeight="26rem" innerClassName="h-full">
