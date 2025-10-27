@@ -3,6 +3,7 @@ import HeroSection from "../components/home/HeroSection";
 import HowItWorks from "../components/home/HowItWorks";
 import LandingSection from "../components/home/LandingSection";
 import ExplainerSection from "../components/home/ExplainerSection";
+import BuiltForConvenience from "../components/home/BuiltForConvenience";
 import BenefitsSection from "../components/info/BenefitsSection";
 import RoadmapSection from "../components/info/RoadmapSection";
 
@@ -16,14 +17,7 @@ const Home: NextPage = () => {
       <main className="relative z-10">
         <LandingSection />
         <ExplainerSection />
-        {/* Hero section */}
-        <HeroSection />
-
-        {/* How it works */}
-        <HowItWorks />
-
-        {/* Benefits and roadmap */}
-        <BenefitsSection />
+        <BuiltForConvenience />
         <RoadmapSection />
       </main>
     </div>
