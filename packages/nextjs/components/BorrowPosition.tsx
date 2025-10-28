@@ -294,7 +294,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
+            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${
               hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
             }`}
           >
@@ -344,7 +344,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </div>
 
           {/* Expand Indicator and quick Move action */}
-          <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end gap-2">
+          <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end gap-2">
             {hasBetterRate && showMoveButton && (
               <button
                 className="btn btn-xs btn-secondary animate-pulse"
