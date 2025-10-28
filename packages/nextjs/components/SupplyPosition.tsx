@@ -232,7 +232,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`order-2 lg:order-none lg:col-span-6 grid gap-0 items-center min-w-[200px] ${
+            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${
               hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
             }`}
           >
@@ -275,7 +275,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           </div>
 
           {/* Expand Indicator */}
-          <div className="order-3 lg:order-none lg:col-span-3 flex items-center justify-end">
+          <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end">
             {hasAnyActions && (
               <div
                 className={`flex items-center justify-center w-7 h-7 rounded-full ${

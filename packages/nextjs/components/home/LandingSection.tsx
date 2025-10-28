@@ -21,7 +21,7 @@ const LandingSection = () => {
   }, [starknet.isConnected]);
   return (
     <section className="w-full pt-3 pb-3 lg:py-5 relative overflow-hidden bg-gradient-to-b from-base-100 to-base-200 dark:from-base-200 dark:to-base-300">
-      <div className="container mx-auto px-5 relative">
+      <div className="container mx-auto max-w-screen-2xl px-5 relative">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
