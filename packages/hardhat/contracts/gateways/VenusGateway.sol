@@ -147,14 +147,25 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
      */
     function borrow(address token, address user, uint256 amount) external override onlyRouterOrSelf(user) nonReentrant {
         address vTokenAddress = getVTokenForUnderlying(token);
-        
-        // User must have entered the market already to borrow
-        // The borrowed tokens will go directly to the user
-        uint result = VTokenInterface(vTokenAddress).borrowBehalf(user, amount);
+
+        uint borrowAmount = amount;
+        if (borrowAmount == type(uint256).max) {
+            (, uint liquidity, ) = comptroller.getAccountLiquidity(user);
+            uint price = oracle.getUnderlyingPrice(vTokenAddress);
+            if (price > 0) {
+                borrowAmount = liquidity * 1e18 / price;
+            } else {
+                borrowAmount = 0;
+            }
+        }
+        if (borrowAmount == 0) {
+            return;
+        }
+
+        uint result = VTokenInterface(vTokenAddress).borrowBehalf(user, borrowAmount);
         require(result == 0, "VenusGateway: borrow failed");
-        
-        // Transfer borrowed tokens to the user
-        IERC20(token).safeTransfer(msg.sender, amount);
+
+        IERC20(token).safeTransfer(msg.sender, borrowAmount);
     }
     
     /**
@@ -165,15 +176,20 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
      */
     function repay(address token, address user, uint256 amount) external override onlyRouter nonReentrant {
         address vTokenAddress = getVTokenForUnderlying(token);
-        
-        // Transfer tokens from msg.sender to this contract
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        
-        // Approve vToken contract to take the tokens
-        IERC20(token).approve(vTokenAddress, amount);
-        
-        // Repay borrow on behalf of the user
-        uint result = VTokenInterface(vTokenAddress).repayBorrowBehalf(user, amount);
+
+        uint256 debt = VTokenInterface(vTokenAddress).borrowBalanceCurrent(user);
+        uint256 repayAmount = amount;
+        if (repayAmount == type(uint256).max || repayAmount > debt) {
+            repayAmount = debt;
+        }
+        if (repayAmount == 0) {
+            return;
+        }
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), repayAmount);
+        IERC20(token).approve(vTokenAddress, repayAmount);
+
+        uint result = VTokenInterface(vTokenAddress).repayBorrowBehalf(user, repayAmount);
         require(result == 0, "VenusGateway: repay failed");
     }
     
@@ -615,24 +631,36 @@ contract VenusGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         address market,
         address collateral,
         address user,
-        uint256 underlyingAmount // now amount is specified in underlying units
+        uint256 underlyingAmount
     ) external override onlyRouterOrSelf(user) nonReentrant returns (address, uint256) {
         address vTokenAddress = this.getVTokenForUnderlying(collateral);
         VTokenInterface vToken = VTokenInterface(vTokenAddress);
         address underlying = vToken.underlying();
         uint256 exchangeRate = vToken.exchangeRateCurrent();
 
-        // Calculate the required amount of vTokens to redeem the desired underlying amount.
-        // rounds up.
-        uint256 requiredVTokenAmount = (underlyingAmount * 1e18 + exchangeRate - 1) / exchangeRate;
+        uint256 vTokenBalance = vToken.balanceOf(user);
+        uint256 requestedUnderlying = underlyingAmount;
+        if (requestedUnderlying == type(uint256).max) {
+            requestedUnderlying = (vTokenBalance * exchangeRate) / 1e18;
+        }
+        uint256 requiredVTokenAmount = (requestedUnderlying * 1e18 + exchangeRate - 1) / exchangeRate;
+        if (requiredVTokenAmount > vTokenBalance) {
+            requiredVTokenAmount = vTokenBalance;
+            requestedUnderlying = (requiredVTokenAmount * exchangeRate) / 1e18;
+        }
+        uint256 allowance = vToken.allowance(user, address(this));
+        if (requiredVTokenAmount > allowance) {
+            requiredVTokenAmount = allowance;
+            requestedUnderlying = (requiredVTokenAmount * exchangeRate) / 1e18;
+        }
+        if (requiredVTokenAmount == 0) {
+            return (underlying, 0);
+        }
 
-
-        // Transfer the vTokens from the user to this contract.
         vToken.transferFrom(user, address(this), requiredVTokenAmount);
-        // Redeem the required vTokens to get the underlying tokens.
         vToken.redeem(requiredVTokenAmount);
-        IERC20(underlying).safeTransfer(msg.sender, underlyingAmount);
-        return (underlying, underlyingAmount);
+        IERC20(underlying).safeTransfer(msg.sender, requestedUnderlying);
+        return (underlying, requestedUnderlying);
     }
 
     
