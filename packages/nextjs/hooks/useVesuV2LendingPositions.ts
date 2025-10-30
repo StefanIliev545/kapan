@@ -366,10 +366,15 @@ export const useVesuV2LendingPositions = (
 
         let borrowPosition: ProtocolPosition | undefined;
         let debtSymbol: string | undefined;
+        let ltvPercent: number | null = null;
+        let debtUsd: number | null = null;
         if (debtAsset) {
           debtSymbol = feltToString(debtAsset.symbol);
           const debtPrice = normalizePrice(debtAsset.price);
-          const debtUsd = computeUsdValue(stats.nominal_debt, debtAsset.decimals, debtPrice);
+          debtUsd = computeUsdValue(stats.nominal_debt, debtAsset.decimals, debtPrice);
+          if (collateralUsd > 0 && debtUsd > 0) {
+            ltvPercent = (debtUsd / collateralUsd) * 100;
+          }
 
           const baseBorrowPosition: ProtocolPosition = {
             icon: tokenNameToLogo(debtSymbol.toLowerCase()),
@@ -395,7 +400,7 @@ export const useVesuV2LendingPositions = (
           if (hasDebt) {
             borrowPosition = {
               ...baseBorrowPosition,
-              balance: -debtUsd,
+              balance: -(debtUsd ?? 0),
               moveSupport: {
                 preselectedCollaterals: moveCollaterals,
                 disableCollateralSelection: true,
@@ -418,6 +423,7 @@ export const useVesuV2LendingPositions = (
           debtAsset,
           // Always provide a borrow context that targets collateral for vToken migration
           borrowContext: borrowCtxForV2,
+          ltvPercent,
           moveCollaterals,
           poolKey: normalizedPoolAddress,
           protocolKey: "vesu_v2" as VesuProtocolKey,

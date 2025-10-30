@@ -16,6 +16,11 @@ import { PositionManager } from "~~/utils/position";
 import { SegmentedActionBar } from "./common/SegmentedActionBar";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
+type ExtraStat = {
+  label: string;
+  value: ReactNode;
+};
+
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
   afterInfoContent?: ReactNode;
@@ -43,6 +48,8 @@ export type SupplyPositionProps = ProtocolPosition & {
   showInfoDropdown?: boolean;
   extraActions?: ReactNode;
   suppressDisabledMessage?: boolean;
+  extraStats?: ExtraStat[];
+  showExpandIndicator?: boolean;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -78,6 +85,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   showInfoDropdown = false,
   extraActions,
   suppressDisabledMessage = false,
+  extraStats = [],
+  showExpandIndicator = true,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -192,6 +201,90 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
 
+  const baseStatColumns = hideBalanceColumn ? 2 : 3;
+  const totalStatColumns = baseStatColumns + extraStats.length;
+  const statColumnClassMap: Record<number, string> = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+    5: "grid-cols-5",
+    6: "grid-cols-6",
+  };
+  const statGridClass = statColumnClassMap[totalStatColumns] ?? "grid-cols-3";
+
+  const statColumns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
+
+  if (!hideBalanceColumn) {
+    statColumns.push({
+      key: "balance",
+      hasBorder: true,
+      content: (
+        <>
+          <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
+          <div className="text-sm font-medium h-6 line-clamp-1">
+            <FiatBalance
+              tokenAddress={tokenAddress}
+              rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              price={tokenPrice}
+              decimals={tokenDecimals}
+              tokenSymbol={name}
+              className="text-green-500"
+            />
+          </div>
+        </>
+      ),
+    });
+  }
+
+  statColumns.push({
+    key: "apy",
+    hasBorder: true,
+    content: (
+      <>
+        <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
+        <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
+          {formatPercentage(currentRate)}%
+        </div>
+      </>
+    ),
+  });
+
+  statColumns.push({
+    key: "best-apy",
+    content: (
+      <>
+        <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
+        <div className="font-medium flex items-center h-6">
+          <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
+            {formatPercentage(displayedOptimalRate)}%
+          </span>
+          <Image
+            src={getProtocolLogo(displayedOptimalProtocol)}
+            alt={displayedOptimalProtocol}
+            width={displayedOptimalProtocol == "vesu" ? 35 : 16}
+            height={displayedOptimalProtocol == "vesu" ? 35 : 16}
+            className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
+          />
+        </div>
+      </>
+    ),
+  });
+
+  extraStats.forEach((stat, index) => {
+    const isLast = index === extraStats.length - 1;
+    statColumns.push({
+      key: `extra-${index}`,
+      hasBorder: !isLast,
+      content: (
+        <>
+          <div className="text-sm text-base-content/70 overflow-hidden h-6">{stat.label}</div>
+          <div className="font-medium h-6 flex items-center">{stat.value}</div>
+        </>
+      ),
+    });
+  });
+
   return (
     <>
       {/* Outer container - clickable to expand/collapse */}
@@ -232,51 +325,22 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${
-              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
-            }`}
+            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${statGridClass}`}
           >
-            {!hideBalanceColumn && (
-              <div className="px-2 border-r border-base-300">
-                <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-                <div className="text-sm font-medium h-6 line-clamp-1">
-                  <FiatBalance
-                    tokenAddress={tokenAddress}
-                    rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-                    price={tokenPrice}
-                    decimals={tokenDecimals}
-                    tokenSymbol={name}
-                    className="text-green-500"
-                  />
+            {statColumns.map((column, index) => {
+              const isLast = index === statColumns.length - 1;
+              const borderClass = !isLast && column.hasBorder !== false ? "border-r border-base-300" : "";
+              return (
+                <div key={column.key} className={`px-2 ${borderClass}`}>
+                  {column.content}
                 </div>
-              </div>
-            )}
-            <div className="px-2 border-r border-base-300">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
-              <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
-                {formatPercentage(currentRate)}%
-              </div>
-            </div>
-            <div className="px-2">
-              <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
-              <div className="font-medium flex items-center h-6">
-                <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
-                  {formatPercentage(displayedOptimalRate)}%
-                </span>
-                <Image
-                  src={getProtocolLogo(displayedOptimalProtocol)}
-                  alt={displayedOptimalProtocol}
-                  width={displayedOptimalProtocol == "vesu" ? 35 : 16}
-                  height={displayedOptimalProtocol == "vesu" ? 35 : 16}
-                  className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
-                />
-              </div>
-            </div>
+              );
+            })}
           </div>
 
           {/* Expand Indicator */}
           <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end">
-            {hasAnyActions && (
+            {hasAnyActions && showExpandIndicator && (
               <div
                 className={`flex items-center justify-center w-7 h-7 rounded-full ${
                   isExpanded ? "bg-primary/20" : "bg-base-300/50"

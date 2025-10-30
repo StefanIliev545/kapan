@@ -196,6 +196,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     return rows.map(row => {
       const positionManager = PositionManager.fromPositions([row.supply], row.borrow ? [row.borrow] : []);
       const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
+      const ltvDisplayValue = row.ltvPercent != null ? `${formatPercentage(row.ltvPercent, 1)}%` : "--";
 
       const availableBorrowTokens = assetsWithRates.filter(
         asset => `0x${asset.address.toString(16).padStart(64, "0")}` !== row.supply.tokenAddress,
@@ -217,7 +218,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       };
 
       return (
-        <div key={row.key} className="overflow-hidden rounded-md border border-base-300">
+        <div
+          key={row.key}
+          className="relative overflow-hidden rounded-md border border-base-300"
+        >
           <div className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}>
             <SupplyPosition
               {...row.supply}
@@ -231,6 +235,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
               onSwap={supportsPoolDependentActions ? () => openSwapSelector("collateral", row) : undefined}
               controlledExpanded={!!expandedRows[row.key]}
               onToggleExpanded={() => toggleRowExpanded(row.key)}
+              extraStats={[{ label: "LTV", value: ltvDisplayValue }]}
+              showExpandIndicator={false}
             />
             {row.borrow ? (
               <BorrowPosition
