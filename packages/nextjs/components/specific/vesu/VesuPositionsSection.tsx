@@ -196,6 +196,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     return rows.map(row => {
       const positionManager = PositionManager.fromPositions([row.supply], row.borrow ? [row.borrow] : []);
       const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
+      const showLtvCrown = Boolean(row.borrow && row.ltvPercent != null);
 
       const availableBorrowTokens = assetsWithRates.filter(
         asset => `0x${asset.address.toString(16).padStart(64, "0")}` !== row.supply.tokenAddress,
@@ -217,7 +218,16 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       };
 
       return (
-        <div key={row.key} className="overflow-hidden rounded-md border border-base-300">
+        <div
+          key={row.key}
+          className={`relative overflow-hidden rounded-md border border-base-300 ${showLtvCrown ? "pt-6" : ""}`}
+        >
+          {showLtvCrown && (
+            <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-base-300 bg-base-100 px-3 py-1 text-xs font-semibold text-base-content shadow-sm">
+              <span className="mr-1 text-[10px] uppercase tracking-wide text-base-content/60">LTV</span>
+              <span>{formatPercentage(row.ltvPercent ?? 0, 1)}%</span>
+            </div>
+          )}
           <div className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}>
             <SupplyPosition
               {...row.supply}

@@ -127,6 +127,7 @@ export type VesuPositionRow = {
   debtAsset?: AssetWithRates;
   borrowContext: VesuContext;
   hasDebt: boolean;
+  ltvPercent?: number | null;
   moveCollaterals?: CollateralWithAmount[];
   poolKey: string;
   protocolKey: VesuProtocolKey;
@@ -368,10 +369,17 @@ export const useVesuLendingPositions = (
 
       let borrowPosition: ProtocolPosition | undefined;
       let debtSymbol: string | undefined;
+      let ltvPercent: number | null = null;
+      let debtUsd: number | null = null;
 
       if (debtMetadata) {
         debtSymbol = feltToString(debtMetadata.symbol);
         const debtPrice = normalizePrice(debtMetadata.price);
+
+        debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
+        if (collateralUsd > 0 && debtUsd > 0) {
+          ltvPercent = (debtUsd / collateralUsd) * 100;
+        }
 
         const baseBorrowPosition: ProtocolPosition = {
           icon: tokenNameToLogo(debtSymbol.toLowerCase()),
@@ -393,11 +401,9 @@ export const useVesuLendingPositions = (
         };
 
         if (hasDebt) {
-          const debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
-
           borrowPosition = {
             ...baseBorrowPosition,
-            balance: -debtUsd,
+            balance: -(debtUsd ?? 0),
             moveSupport: {
               preselectedCollaterals: moveCollaterals,
               disableCollateralSelection: true,
@@ -420,6 +426,7 @@ export const useVesuLendingPositions = (
           debtAsset: debtMetadata,
           borrowContext,
           hasDebt,
+          ltvPercent,
           moveCollaterals,
           poolKey: `0x${poolId.toString(16)}`,
           protocolKey: "vesu",
