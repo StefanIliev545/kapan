@@ -194,11 +194,13 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
                 No active positions yet – explore the markets below
               </span>
             )}
-            <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={onToggle}>
-              <span className="mr-2">Markets</span>
-              {isOpen ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
-            </button>
-            {headerExtra && <div className="flex items-center justify-end">{headerExtra}</div>}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={onToggle}>
+                <span className="mr-2">Markets</span>
+                {isOpen ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
+              </button>
+              {headerExtra && <div className="flex items-center justify-end">{headerExtra}</div>}
+            </div>
           </div>
         </div>
 
