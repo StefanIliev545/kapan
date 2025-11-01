@@ -245,7 +245,6 @@ export const VesuProtocolView: FC = () => {
           formatCurrency={formatCurrency}
           protocolName="Vesu"
           title="Vesu V1"
-          description={`Manage ${getV1PoolNameFromId(selectedV1PoolId)} pool positions`}
           headerExtra={
             <div className="flex items-center gap-2">
               <img src="/logos/vesu.svg" alt="Vesu" className="w-4 h-4" />
@@ -334,7 +333,6 @@ export const VesuProtocolView: FC = () => {
           formatCurrency={formatCurrency}
           protocolName="vesu_v2"
           title="Vesu V2"
-          description={`Manage ${getV2PoolNameFromAddress(selectedV2PoolAddress)} pool positions`}
           headerExtra={
             <div className="flex items-center gap-2">
               <img src="/logos/vesu.svg" alt="Vesu" className="w-4 h-4" />
