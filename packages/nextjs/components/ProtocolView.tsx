@@ -260,35 +260,33 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
               <div className="flex flex-col">
                 <div className="text-xl font-bold tracking-tight">{protocolName}</div>
-                <div className="text-base-content/70 flex flex-col gap-1 text-sm">
-                  <div className="flex items-center gap-1">
+                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70">
+                  <span className="flex items-center gap-1">
                     <span>Balance:</span>
-                    <span className={`font-medium ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+                    <span className={`font-semibold ${netBalance >= 0 ? "text-success" : "text-error"}`}>
                       {formatCurrency(netBalance)}
                     </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                    <span className="flex items-center gap-1">
-                      <span>30D Net Yield:</span>
-                      <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
-                        {formatCurrency(netYield30d)}
-                      </span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span>30D Net Yield:</span>
+                    <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                      {formatCurrency(netYield30d)}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <span>Net APY:</span>
-                      <span
-                        className={`font-semibold ${
-                          netApyPercent == null
-                            ? "text-base-content"
-                            : netApyPercent >= 0
-                              ? "text-success"
-                              : "text-error"
-                        }`}
-                      >
-                        {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
-                      </span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span>Net APY:</span>
+                    <span
+                      className={`font-semibold ${
+                        netApyPercent == null
+                          ? "text-base-content"
+                          : netApyPercent >= 0
+                            ? "text-success"
+                            : "text-error"
+                      }`}
+                    >
+                      {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
                     </span>
-                  </div>
+                  </span>
                 </div>
               </div>
             </div>
