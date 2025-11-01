@@ -31,11 +31,21 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
+        version: "0.8.30",
+        settings: {
+          evmVersion: "cancun",
+          optimizer: {
+            enabled: true,
+            // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
+            runs: 200,
+          },
+        },
+      },
+      {
         version: "0.8.20",
         settings: {
           optimizer: {
             enabled: true,
-            // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
             runs: 200,
           },
         },
@@ -53,6 +63,7 @@ const config: HardhatUserConfig = {
     // View the networks that are pre-configured.
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
+      hardfork: "cancun",
       forking: {
         url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
         blockNumber: 317601997,

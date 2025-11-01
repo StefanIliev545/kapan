@@ -3,8 +3,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "../interfaces/IGateway.sol";
 import "../interfaces/ICompoundComet.sol";
-import {FeedRegistryInterface} from "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
-import {Denominations} from "@chainlink/contracts/src/v0.8/Denominations.sol";
+import {IDecimalAggregator} from "@chainlink/contracts/src/v0.8/data-feeds/interfaces/IDecimalAggregator.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -21,7 +20,6 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
 
 
     mapping(address => ICompoundComet) public tokenToComet;
-    FeedRegistryInterface public priceFeed;
     mapping(address => AggregatorV3Interface) public overrideFeeds;
 
     modifier whenCometExists(address token) {
@@ -38,7 +36,6 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
     constructor(
         address router,
         ICompoundComet[] memory _comets,
-        FeedRegistryInterface _priceFeed,
         address _owner
     ) ProtocolGateway(router) Ownable(_owner) {
         for (uint256 i = 0; i < _comets.length; i++) {
@@ -46,7 +43,6 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
                 tokenToComet[address(_comets[i].baseToken())] = _comets[i];
             }
         }
-        priceFeed = _priceFeed;
     }
 
     function overrideFeed(address token, AggregatorV3Interface feed) external onlyOwner {
@@ -190,11 +186,6 @@ contract CompoundGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard 
     function getPrice(address token) public view returns (uint256) {
         if (address(overrideFeeds[token]) != address(0)) {
             (, int256 price,,,) = overrideFeeds[token].latestRoundData();
-            return uint256(price);
-        }
-
-        if (address(priceFeed) != address(0)) {
-            (, int256 price,,,) = priceFeed.latestRoundData(token, Denominations.USD);
             return uint256(price);
         }
 
