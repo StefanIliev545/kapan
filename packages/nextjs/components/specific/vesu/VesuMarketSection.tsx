@@ -25,7 +25,6 @@ interface VesuMarketSectionProps {
   protocolName?: string;
   headerExtra?: JSX.Element;
   title?: string;
-  description?: string;
   iconSrc?: string;
 }
 
@@ -47,7 +46,6 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   protocolName = "Vesu",
   headerExtra,
   title = "Vesu",
-  description = "Manage your Starknet lending positions",
   iconSrc = "/logos/vesu.svg",
 }) => {
   const formatSignedPercentage = (value: number) => {
@@ -144,43 +142,40 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
             </div>
             <div className="flex flex-col">
               <div className="text-xl font-bold tracking-tight">{title}</div>
-              <div className="text-xs text-base-content/70">{description}</div>
               {userAddress && (
-                <div className="mt-1 flex flex-col gap-1 text-xs text-base-content/70">
-                  <div className="flex items-center gap-1">
+                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70">
+                  <span className="flex items-center gap-1">
                     <span>Balance:</span>
                     <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
                       {formatCurrency(netBalanceUsd)}
                     </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span className="flex items-center gap-1">
-                      <span>30D Net Yield:</span>
-                      <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
-                        {formatCurrency(netYield30d)}
-                      </span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span>30D Net Yield:</span>
+                    <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                      {formatCurrency(netYield30d)}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <span>Net APY:</span>
-                      <span
-                        className={`font-semibold ${
-                          netApyPercent == null
-                            ? "text-base-content"
-                            : netApyPercent >= 0
-                              ? "text-success"
-                              : "text-error"
-                        }`}
-                      >
-                        {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
-                      </span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span>Net APY:</span>
+                    <span
+                      className={`font-semibold ${
+                        netApyPercent == null
+                          ? "text-base-content"
+                          : netApyPercent >= 0
+                            ? "text-success"
+                            : "text-error"
+                      }`}
+                    >
+                      {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
                     </span>
-                  </div>
+                  </span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 md:items-end md:ml-auto">
+          <div className="flex flex-col gap-2 md:ml-auto md:items-end">
             {!userAddress ? (
               <span className="text-right text-xs text-base-content/70">
                 Connect your Starknet wallet to view personalized positions
@@ -194,11 +189,13 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
                 No active positions yet – explore the markets below
               </span>
             )}
-            <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={onToggle}>
-              <span className="mr-2">Markets</span>
-              {isOpen ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
-            </button>
-            {headerExtra && <div className="flex items-center justify-end">{headerExtra}</div>}
+            <div className="flex flex-wrap items-center justify-end gap-2 md:flex-nowrap">
+              <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={onToggle}>
+                <span className="mr-2">Markets</span>
+                {isOpen ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
+              </button>
+              {headerExtra && <div className="flex items-center justify-end">{headerExtra}</div>}
+            </div>
           </div>
         </div>
 
