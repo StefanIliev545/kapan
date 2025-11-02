@@ -152,10 +152,40 @@ export function createAaveInstruction(
   token: string,
   user: string,
   amount: bigint,
-  context: string,
-  inputIndex: number
+  context: string = "0x",
+  inputIndex: number = 999
 ): { protocolName: string; data: string } {
   return createProtocolInstruction("aave", encodeLendingInstruction(op, token, user, amount, context, inputIndex));
+}
+
+/**
+ * Helper to create a GetSupplyBalance instruction
+ * This queries the user's supply/deposit balance and produces an output
+ */
+export function createGetSupplyBalanceInstruction(
+  protocolName: string,
+  token: string,
+  user: string
+): { protocolName: string; data: string } {
+  return createProtocolInstruction(
+    protocolName,
+    encodeLendingInstruction(LendingOp.GetSupplyBalance, token, user, 0n, "0x", 999)
+  );
+}
+
+/**
+ * Helper to create a GetBorrowBalance instruction
+ * This queries the user's borrow/debt balance and produces an output
+ */
+export function createGetBorrowBalanceInstruction(
+  protocolName: string,
+  token: string,
+  user: string
+): { protocolName: string; data: string } {
+  return createProtocolInstruction(
+    protocolName,
+    encodeLendingInstruction(LendingOp.GetBorrowBalance, token, user, 0n, "0x", 999)
+  );
 }
 
 /**
