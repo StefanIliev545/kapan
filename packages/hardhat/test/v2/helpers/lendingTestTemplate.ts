@@ -119,7 +119,20 @@ export async function setupLendingTest(config: LendingTestConfig): Promise<TestS
 
   // Deploy gateway
   const GatewayFactory = await ethers.getContractFactory(config.gateway.factoryName);
-  const gateway = await GatewayFactory.deploy(await router.getAddress(), ...config.gateway.deployArgs);
+  let gateway;
+  
+  // Different gateways have different constructor arg orders
+  if (config.gateway.type === "venus") {
+    // Venus: (comptroller, router, owner)
+    gateway = await GatewayFactory.deploy(
+      config.gateway.deployArgs[0], // comptroller
+      await router.getAddress(),
+      await deployer.getAddress() // owner
+    );
+  } else {
+    // Aave/Compound: (router, ...deployArgs)
+    gateway = await GatewayFactory.deploy(await router.getAddress(), ...config.gateway.deployArgs);
+  }
   await gateway.waitForDeployment();
 
   // Register gateway with router
@@ -138,7 +151,15 @@ export async function setupApprovals(
 ) {
   const { user, router, gateway, collateralToken, debtToken } = setup;
 
-  // Gateway approvals (for borrow delegation and withdraw approval)
+  // Gateway approvals (for deposit/borrow/withdraw operations)
+  const depObj = {
+    op: LendingOp.DepositCollateral,
+    token: config.collateralToken.address,
+    user: await user.getAddress(),
+    amount: amounts.deposit,
+    context: "0x",
+    input: { index: 0 },
+  };
   const borObj = {
     op: LendingOp.Borrow,
     token: config.debtToken.address,
@@ -156,7 +177,7 @@ export async function setupApprovals(
     input: { index: 0 },
   };
 
-  const [gatewayTargets, gatewayDatas] = await gateway.authorize([borObj, witObj], await user.getAddress());
+  const [gatewayTargets, gatewayDatas] = await gateway.authorize([depObj, borObj, witObj], await user.getAddress());
   console.log("Gateway authorizations:");
   for (let i = 0; i < gatewayTargets.length; i++) {
     if (!gatewayTargets[i] || gatewayDatas[i].length === 0) continue;
@@ -242,7 +263,9 @@ export async function createLendingFlowInstructions(
     createProtocolInstr(LendingOp.Repay, config.debtToken.address, 0n, 4), // Uses UTXO[4], produces UTXO[6]
 
     // Withdraw flow: Withdraw + Push
-    createProtocolInstr(LendingOp.WithdrawCollateral, config.collateralToken.address, withdrawAmt, 0), // Produces UTXO[7]
+    // Note: Use inputIndex 999 (invalid) to force using the withdraw amount parameter directly
+    // This avoids issues with consumed/modified UTXOs and ensures proper withdraw amount
+    createProtocolInstr(LendingOp.WithdrawCollateral, config.collateralToken.address, withdrawAmt, 999), // Produces UTXO[7]
     createRouterInstruction(encodePushToken(7, userAddr)), // Push UTXO[7] to user
   ];
 }

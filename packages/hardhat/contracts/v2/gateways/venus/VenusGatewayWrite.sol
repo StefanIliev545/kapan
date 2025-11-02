@@ -99,7 +99,8 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         uint256 count; for (uint256 i; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
             if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) count++;
-            else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral || ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) count++;
+            else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) count += 2; // approve + enterMarkets
+            else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) count++;
             else if (ins.op == ProtocolTypes.LendingOp.Borrow) count++;
         }
         targets = new address[](count); data = new bytes[](count); uint256 k;
@@ -108,8 +109,12 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
             if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
                 targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); k++;
             } else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
-                address col = ins.token;
+                address col = ins.token; address vToken = _getVTokenForUnderlying(col);
+                // First: approve gateway to spend tokens
                 targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); k++;
+                // Second: enter market so vTokens can be used as collateral
+                address[] memory markets = new address[](1); markets[0] = vToken;
+                targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets); k++;
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address col = ins.token; address vToken = _getVTokenForUnderlying(col);
                 targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max); k++;
