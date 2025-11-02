@@ -12,7 +12,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const useCollateralValue = (baseToken?: string, userAddress?: string) => {
   const { data: collateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getDepositedCollaterals",
     args: [baseToken, userAddress],
     query: {
@@ -26,7 +26,7 @@ const useCollateralValue = (baseToken?: string, userAddress?: string) => {
   );
 
   const { data: collateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getPrices",
     args: [baseToken, collateralAddresses],
     query: {
@@ -44,7 +44,7 @@ const useCollateralValue = (baseToken?: string, userAddress?: string) => {
   });
 
   const { data: baseTokenPrice } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getPrice",
     args: [baseToken],
     query: {
@@ -103,25 +103,25 @@ export const CompoundProtocolView: FC = () => {
   // getCompoundData returns a tuple: [supplyRate, borrowRate, balance, borrowBalance]
   const { data: wethCompoundData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [wethAddress, queryAddress],
   });
   const { data: usdcCompoundData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdcAddress, queryAddress],
   });
   const { data: usdtCompoundData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdtAddress, queryAddress],
   });
   const { data: usdcECompoundData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdcEAddress, queryAddress],
   });

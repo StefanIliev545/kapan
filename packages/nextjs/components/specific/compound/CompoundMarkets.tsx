@@ -28,25 +28,25 @@ export const CompoundMarkets: FC<CompoundMarketsProps> = ({ viewMode, search }) 
 
   const { data: wethData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [weth?.address, ZERO_ADDRESS],
   });
   const { data: usdcData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdc?.address, ZERO_ADDRESS],
   });
   const { data: usdtData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdt?.address, ZERO_ADDRESS],
   });
   const { data: usdcEData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdcE?.address, ZERO_ADDRESS],
   });

@@ -1,196 +1,327 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IPoolAddressesProvider} from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import {IUiPoolDataProviderV3} from "../../../interfaces/aave/IUiDataProvider.sol";
 import {IPoolDataProvider} from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
-import {IAToken} from "@aave/core-v3/contracts/interfaces/IAToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-interface IAaveGatewayView {
-    struct TokenInfo { address token; uint256 supplyRate; uint256 borrowRate; string name; string symbol; uint256 price; uint256 borrowBalance; uint256 balance; address aToken; }
-    struct Collateral { address token; uint256 amount; }
-    function getAllTokensInfo(address user) external view returns (TokenInfo[] memory);
-    function getBorrowRate(address token) external view returns (uint256 rate, bool found);
-    function getSupplyRate(address token) external view returns (uint256 rate, bool found);
-    function getBalance(address token, address user) external view returns (uint256);
-    function getBorrowBalance(address token, address user) external view returns (uint256);
-    function getBorrowBalanceCurrent(address token, address user) external view returns (uint256);
-    function borrowedTokens(address user) external view returns (address[] memory);
-    function getPossibleCollaterals(address token, address user) external view returns (address[] memory collateralAddresses, uint256[] memory balances, string[] memory symbols, uint8[] memory decimals);
-    function getEncodedCollateralApprovals(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
-    function getEncodedDebtApproval(address token, uint256 amount, address user) external view returns (address[] memory target, bytes[] memory data);
-    function getAToken(address underlyingToken) external view returns (address);
-    function getUnderlyingToken(address aToken) external view returns (address);
-    function isCollateralSupported(address market, address collateral) external view returns (bool isSupported);
-    function getSupportedCollaterals(address market) external view returns (address[] memory collateralAddresses);
-    function getInboundCollateralActions(address token, Collateral[] calldata collaterals) external view returns (address[] memory target, bytes[] memory data);
-}
-
-contract AaveGatewayView is IAaveGatewayView {
+/**
+ * @title AaveGatewayView
+ * @notice View-only gateway for Aave v3 protocol
+ * @dev Contains all read/view functions from v1, separate from write operations
+ */
+contract AaveGatewayView {
     IPoolAddressesProvider public immutable poolAddressesProvider;
     IUiPoolDataProviderV3 public immutable uiPoolDataProvider;
-    address public immutable writeGateway;
 
-    constructor(address _writeGateway, address _poolAddressesProvider, address _uiPoolDataProvider) {
-        writeGateway = _writeGateway;
+    constructor(address _poolAddressesProvider, address _uiPoolDataProvider) {
         poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
         uiPoolDataProvider = IUiPoolDataProviderV3(_uiPoolDataProvider);
     }
 
-    function getAllTokensInfo(address user) external view override returns (TokenInfo[] memory) {
-        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+    struct TokenInfo {
+        address token;
+        uint256 supplyRate;
+        uint256 borrowRate;
+        string name;
+        string symbol;
+        uint256 price;
+        uint256 borrowBalance;
+        uint256 balance;
+        address aToken;
+    }
+
+    /// @notice Returns all token info for a given user.
+    /// @dev This function caches the reserves and user reserves data to avoid multiple heavy calls.
+    function getAllTokensInfo(address user) external view returns (TokenInfo[] memory) {
+        // Fetch reserves data once.
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+        // Fetch user reserves data once.
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+
         TokenInfo[] memory tokens = new TokenInfo[](reserves.length);
         for (uint256 i = 0; i < reserves.length; i++) {
-            uint256 bal = _getBalanceFromReserveData(reserves[i], user, userReserves);
-            uint256 debt = _getBorrowBalanceFromReserveData(reserves[i], user, userReserves);
-            tokens[i] = TokenInfo(reserves[i].underlyingAsset, reserves[i].liquidityRate, reserves[i].variableBorrowRate, reserves[i].name, reserves[i].symbol, reserves[i].priceInMarketReferenceCurrency, debt, bal, reserves[i].aTokenAddress);
+            uint256 balance = _getBalanceFromReserveData(reserves[i], user, userReserves);
+            uint256 borrowBalance = _getBorrowBalanceFromReserveData(reserves[i], user, userReserves);
+            tokens[i] = TokenInfo(
+                reserves[i].underlyingAsset,
+                reserves[i].liquidityRate,
+                reserves[i].variableBorrowRate,
+                reserves[i].name,
+                reserves[i].symbol,
+                reserves[i].priceInMarketReferenceCurrency,
+                borrowBalance,
+                balance,
+                reserves[i].aTokenAddress
+            );
         }
         return tokens;
     }
 
-    function getBorrowRate(address token) external view override returns (uint256, bool) {
-        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+    function getBorrowRate(address token) external view returns (uint256, bool) {
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = 
+            uiPoolDataProvider.getReservesData(poolAddressesProvider);
         for (uint256 i = 0; i < reserves.length; i++) {
-            if (reserves[i].underlyingAsset == token) return (reserves[i].variableBorrowRate, true);
+            if (reserves[i].underlyingAsset == token) {
+                return (reserves[i].variableBorrowRate, true);
+            }
         }
         return (0, false);
     }
 
-    function getSupplyRate(address token) external view override returns (uint256, bool) {
-        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+    function getSupplyRate(address token) external view returns (uint256, bool) {
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = 
+            uiPoolDataProvider.getReservesData(poolAddressesProvider);
         for (uint256 i = 0; i < reserves.length; i++) {
-            if (reserves[i].underlyingAsset == token) return (reserves[i].liquidityRate, true);
+            if (reserves[i].underlyingAsset == token) {
+                return (reserves[i].liquidityRate, true);
+            }
         }
         return (0, false);
     }
 
-    function getBalance(address token, address user) public view override returns (uint256) {
-        (address aToken,,) = _getReserveTokens(token);
-        if (aToken != address(0)) {
-            try IERC20(aToken).balanceOf(user) returns (uint256 bal) { return bal; } catch {}
+    /// @notice Gets the balance for a given token and user.
+    /// @dev First attempts to call balanceOf on the associated aToken; if that fails, falls back to user reserves data.
+    function getBalance(address token, address user) public view returns (uint256) {
+        (address aToken, , bool found) = _getReserveAddresses(token);
+        if (found && aToken != address(0)) {
+            try IERC20(aToken).balanceOf(user) returns (uint256 bal) {
+                return bal;
+            } catch {
+            }
         }
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+        // Fallback: use user reserves data
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
         for (uint256 i = 0; i < userReserves.length; i++) {
-            if (userReserves[i].underlyingAsset == token) return userReserves[i].scaledATokenBalance;
+            if (userReserves[i].underlyingAsset == token) {
+                return userReserves[i].scaledATokenBalance;
+            }
         }
         return 0;
     }
 
-    function getBorrowBalance(address token, address user) public view override returns (uint256) {
-        (,, address vDebt) = _getReserveTokens(token);
-        if (vDebt != address(0)) {
-            try IERC20(vDebt).balanceOf(user) returns (uint256 bal) { return bal; } catch {}
+    /// @notice Gets the borrow balance for a given token and user.
+    /// @dev First attempts to call balanceOf on the associated variable debt token; if that fails, falls back to user reserves data.
+    function getBorrowBalance(address token, address user) public view returns (uint256) {
+        (, address variableDebtToken, bool found) = _getReserveAddresses(token);
+        if (found && variableDebtToken != address(0)) {
+            try IERC20(variableDebtToken).balanceOf(user) returns (uint256 bal) {
+                return bal;
+            } catch {
+            }
         }
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+        // Fallback: use user reserves data
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
         for (uint256 i = 0; i < userReserves.length; i++) {
-            if (userReserves[i].underlyingAsset == token) return userReserves[i].scaledVariableDebt;
+            if (userReserves[i].underlyingAsset == token) {
+                return userReserves[i].scaledVariableDebt;
+            }
         }
         return 0;
     }
 
-    function getBorrowBalanceCurrent(address token, address user) external view override returns (uint256) {
+    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
         return getBorrowBalance(token, user);
     }
 
-    function borrowedTokens(address user) external view override returns (address[] memory) {
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
-        uint256 count; for (uint256 i = 0; i < userReserves.length; i++) if (userReserves[i].scaledVariableDebt > 0) count++;
-        address[] memory tokens = new address[](count); uint256 idx;
-        for (uint256 i = 0; i < userReserves.length; i++) if (userReserves[i].scaledVariableDebt > 0) tokens[idx++] = userReserves[i].underlyingAsset;
+    /// @notice Returns the list of tokens that the user has borrowed.
+    function borrowedTokens(address user) external view returns (address[] memory) {
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+        uint256 count = 0;
+        for (uint256 i = 0; i < userReserves.length; i++) {
+            if (userReserves[i].scaledVariableDebt > 0) {
+                count++;
+            }
+        }
+        address[] memory tokens = new address[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < userReserves.length; i++) {
+            if (userReserves[i].scaledVariableDebt > 0) {
+                tokens[index++] = userReserves[i].underlyingAsset;
+            }
+        }
         return tokens;
     }
 
-    function getPossibleCollaterals(address /*token*/, address user)
-        external view override
-        returns (address[] memory collateralAddresses, uint256[] memory balances, string[] memory symbols, uint8[] memory decimals)
-    {
+    /// @dev Internal helper to get both the aToken and variable debt token for a given underlying asset.
+    function _getReserveAddresses(address token) internal view returns (address aToken, address variableDebtToken, bool found) {
+        try uiPoolDataProvider.getReservesData(poolAddressesProvider) returns (
+            IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,
+            IUiPoolDataProviderV3.BaseCurrencyInfo memory
+        ) {
+            for (uint256 i = 0; i < reserves.length; i++) {
+                if (reserves[i].underlyingAsset == token) {
+                    return (reserves[i].aTokenAddress, reserves[i].variableDebtTokenAddress, true);
+                }
+            }
+        } catch {
+        }
+        return (address(0), address(0), false);
+    }
+
+    /// @dev Internal helper to fetch balance from reserve data, with fallback to user reserves.
+    function _getBalanceFromReserveData(
+        IUiPoolDataProviderV3.AggregatedReserveData memory reserve,
+        address user,
+        IUiPoolDataProviderV3.UserReserveData[] memory userReserves
+    ) internal view returns (uint256) {
+        if (reserve.aTokenAddress != address(0)) {
+            try IERC20(reserve.aTokenAddress).balanceOf(user) returns (uint256 bal) {
+                return bal;
+            } catch {
+                // Fallback below
+            }
+        }
+        for (uint256 i = 0; i < userReserves.length; i++) {
+            if (userReserves[i].underlyingAsset == reserve.underlyingAsset) {
+                return userReserves[i].scaledATokenBalance;
+            }
+        }
+        return 0;
+    }
+
+    /// @dev Internal helper to fetch borrow balance from reserve data, with fallback to user reserves.
+    function _getBorrowBalanceFromReserveData(
+        IUiPoolDataProviderV3.AggregatedReserveData memory reserve,
+        address user,
+        IUiPoolDataProviderV3.UserReserveData[] memory userReserves
+    ) internal view returns (uint256) {
+        if (reserve.variableDebtTokenAddress != address(0)) {
+            try IERC20(reserve.variableDebtTokenAddress).balanceOf(user) returns (uint256 bal) {
+                return bal;
+            } catch {
+                // Fallback below
+            }
+        }
+        for (uint256 i = 0; i < userReserves.length; i++) {
+            if (userReserves[i].underlyingAsset == reserve.underlyingAsset) {
+                return userReserves[i].scaledVariableDebt;
+            }
+        }
+        return 0;
+    }
+    
+    function getPossibleCollaterals(address token, address user) external view returns (
+        address[] memory collateralAddresses,
+        uint256[] memory balances,
+        string[] memory symbols,
+        uint8[] memory decimals
+    ) {
+        // If user is zero address, get all possible tokens but with zero balances
         if (user == address(0)) {
             (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
-            uint256 n = reserves.length;
-            collateralAddresses = new address[](n); balances = new uint256[](n); symbols = new string[](n); decimals = new uint8[](n);
-            for (uint256 i = 0; i < n; i++) {
+            
+            // Initialize arrays with all reserves
+            uint256 tokenCountX = reserves.length;
+            collateralAddresses = new address[](tokenCountX);
+            balances = new uint256[](tokenCountX); // All zeros by default
+            symbols = new string[](tokenCountX);
+            decimals = new uint8[](tokenCountX);
+            
+            // Fill arrays with token data (zero balances)
+            for (uint256 i = 0; i < tokenCountX; i++) {
                 collateralAddresses[i] = reserves[i].underlyingAsset;
                 symbols[i] = reserves[i].symbol;
-                try ERC20(reserves[i].underlyingAsset).decimals() returns (uint8 dec) { decimals[i] = dec; } catch { decimals[i] = 18; }
+                // Get decimals directly from token
+                try ERC20(reserves[i].underlyingAsset).decimals() returns (uint8 dec) {
+                    decimals[i] = dec;
+                } catch {
+                    decimals[i] = 18; // Default to 18 if call fails
+                }
             }
+            
             return (collateralAddresses, balances, symbols, decimals);
         }
-        TokenInfo[] memory all = this.getAllTokensInfo(user);
-        uint256 count; for (uint256 i = 0; i < all.length; i++) if (all[i].balance > 0) count++;
-        collateralAddresses = new address[](count); balances = new uint256[](count); symbols = new string[](count); decimals = new uint8[](count);
-        uint256 idx; for (uint256 i = 0; i < all.length; i++) if (all[i].balance > 0) {
-            collateralAddresses[idx] = all[i].token; balances[idx] = all[i].balance; symbols[idx] = all[i].symbol;
-            try ERC20(all[i].token).decimals() returns (uint8 dec) { decimals[idx] = dec; } catch { decimals[idx] = 18; }
-            idx++;
+        
+        // For connected wallets, get all tokens with actual balances
+        TokenInfo[] memory allTokens = this.getAllTokensInfo(user);
+
+        // Count tokens with non-zero balance
+        uint256 tokenCount = 0;
+        for (uint256 i = 0; i < allTokens.length; i++) {
+            if (allTokens[i].balance > 0) {
+                tokenCount++;
+            }
+        }
+
+        // Initialize arrays with the correct size
+        collateralAddresses = new address[](tokenCount);
+        balances = new uint256[](tokenCount);
+        symbols = new string[](tokenCount);
+        decimals = new uint8[](tokenCount);
+
+        // Fill arrays with tokens that have balance
+        uint256 index = 0;
+        for (uint256 i = 0; i < allTokens.length; i++) {
+            if (allTokens[i].balance > 0) {
+                collateralAddresses[index] = allTokens[i].token;
+                balances[index] = allTokens[i].balance;
+                symbols[index] = allTokens[i].symbol;
+                try ERC20(allTokens[i].token).decimals() returns (uint8 dec) {
+                    decimals[index] = dec;
+                } catch {
+                    decimals[index] = 18; // Default to 18 if call fails
+                }
+                index++;
+            }
         }
         return (collateralAddresses, balances, symbols, decimals);
     }
 
-    function getEncodedCollateralApprovals(address /*token*/, Collateral[] calldata collaterals)
-        external view override returns (address[] memory target, bytes[] memory data)
-    {
-        target = new address[](collaterals.length); data = new bytes[](collaterals.length);
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            address aToken = getAToken(collaterals[i].token);
-            target[i] = aToken;
-            data[i] = abi.encodeWithSelector(IERC20.approve.selector, writeGateway, collaterals[i].amount);
-        }
-    }
-
-    function getEncodedDebtApproval(address token, uint256 /*amount*/, address /*user*/)
-        external view override returns (address[] memory target, bytes[] memory data)
-    {
-        (, , address vDebt) = _getReserveTokens(token);
-        require(vDebt != address(0), "Token not listed");
-        target = new address[](1); data = new bytes[](1); target[0] = vDebt;
-        data[0] = abi.encodeWithSignature("approveDelegation(address,uint256)", writeGateway, type(uint256).max);
-    }
-
-    function getAToken(address underlyingToken) public view override returns (address) {
-        IPoolDataProvider dataProvider = IPoolDataProvider(poolAddressesProvider.getPoolDataProvider());
+    function getAToken(address underlyingToken) public view returns (address) {
+        IPoolDataProvider dataProvider = IPoolDataProvider(IPoolAddressesProvider(poolAddressesProvider).getPoolDataProvider());
         (address aTokenAddress, , ) = dataProvider.getReserveTokensAddresses(underlyingToken);
         return aTokenAddress;
     }
-    function getUnderlyingToken(address aToken) external view override returns (address) {
-        try IAToken(aToken).UNDERLYING_ASSET_ADDRESS() returns (address u) { return u; } catch { return address(0); }
+
+    function getUnderlyingToken(address aToken) external view returns (address) {
+        IPoolDataProvider dataProvider = IPoolDataProvider(IPoolAddressesProvider(poolAddressesProvider).getPoolDataProvider());
+        (address underlyingToken, , ) = dataProvider.getReserveTokensAddresses(aToken);
+        return underlyingToken;
     }
 
-    function isCollateralSupported(address /*market*/, address collateral) external view override returns (bool isSupported) {
+    function isCollateralSupported(address market, address collateral) external view returns (bool isSupported) {
+        // In Aave, we need to check if the token is a supported reserve and if it can be used as collateral
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        for (uint256 i = 0; i < reserves.length; i++) if (reserves[i].underlyingAsset == collateral) return reserves[i].usageAsCollateralEnabled; return false;
+        
+        for (uint256 i = 0; i < reserves.length; i++) {
+            if (reserves[i].underlyingAsset == collateral) {
+                // Check if the token can be used as collateral in Aave
+                return reserves[i].usageAsCollateralEnabled;
+            }
+        }
+        
+        return false;
     }
-
-    function getSupportedCollaterals(address /*market*/) external view override returns (address[] memory collateralAddresses) {
+    
+    function getSupportedCollaterals(address market) external view returns (address[] memory collateralAddresses) {
+        // Get all Aave reserves
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        uint256 count; for (uint256 i = 0; i < reserves.length; i++) if (reserves[i].usageAsCollateralEnabled) count++;
-        collateralAddresses = new address[](count); uint256 idx;
-        for (uint256 i = 0; i < reserves.length; i++) if (reserves[i].usageAsCollateralEnabled) collateralAddresses[idx++] = reserves[i].underlyingAsset;
-    }
-
-    function getInboundCollateralActions(address /*token*/, Collateral[] calldata /*collaterals*/)
-        external pure override returns (address[] memory target, bytes[] memory data)
-    { return (new address[](0), new bytes[](0)); }
-
-    function _getReserveTokens(address underlying) internal view returns (address aToken, address sDebt, address vDebt) {
-        IPoolDataProvider dataProvider = IPoolDataProvider(poolAddressesProvider.getPoolDataProvider());
-        (aToken, sDebt, vDebt) = dataProvider.getReserveTokensAddresses(underlying);
-    }
-
-    function _getBalanceFromReserveData(IUiPoolDataProviderV3.AggregatedReserveData memory reserve, address user, IUiPoolDataProviderV3.UserReserveData[] memory userReserves) internal view returns (uint256) {
-        if (reserve.aTokenAddress != address(0)) {
-            try IERC20(reserve.aTokenAddress).balanceOf(user) returns (uint256 bal) { return bal; } catch {}
+        
+        // Count eligible collaterals
+        uint256 collateralCount = 0;
+        for (uint256 i = 0; i < reserves.length; i++) {
+            if (reserves[i].usageAsCollateralEnabled) {
+                collateralCount++;
+            }
         }
-        for (uint256 i = 0; i < userReserves.length; i++) if (userReserves[i].underlyingAsset == reserve.underlyingAsset) return userReserves[i].scaledATokenBalance; return 0;
-    }
-    function _getBorrowBalanceFromReserveData(IUiPoolDataProviderV3.AggregatedReserveData memory reserve, address user, IUiPoolDataProviderV3.UserReserveData[] memory userReserves) internal view returns (uint256) {
-        if (reserve.variableDebtTokenAddress != address(0)) {
-            try IERC20(reserve.variableDebtTokenAddress).balanceOf(user) returns (uint256 bal) { return bal; } catch {}
+        
+        // Create and populate array with eligible collaterals
+        collateralAddresses = new address[](collateralCount);
+        uint256 index = 0;
+        for (uint256 i = 0; i < reserves.length; i++) {
+            if (reserves[i].usageAsCollateralEnabled) {
+                collateralAddresses[index] = reserves[i].underlyingAsset;
+                index++;
+            }
         }
-        for (uint256 i = 0; i < userReserves.length; i++) if (userReserves[i].underlyingAsset == reserve.underlyingAsset) return userReserves[i].scaledVariableDebt; return 0;
+        
+        return collateralAddresses;
     }
 }
-
-

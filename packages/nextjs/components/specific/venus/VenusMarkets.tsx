@@ -32,14 +32,14 @@ interface VenusMarketsProps {
 
 export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search }) => {
   const { data: marketDetails } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getAllVenusMarkets",
   });
 
   const vTokens = marketDetails?.[0];
 
   const { data: ratesData } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getMarketRates",
     args: [vTokens],
   });

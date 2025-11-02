@@ -51,7 +51,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         } else { revert("Venus: unknown op"); }
     }
 
-    function deposit(address token, address user, uint256 amount) public nonReentrant {
+    function deposit(address token, address user, uint256 amount) public onlyRouter nonReentrant {
         address vToken = _getVTokenForUnderlying(token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).approve(vToken, 0);
@@ -79,7 +79,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function repay(address token, address user, uint256 amount) public nonReentrant returns (uint256 refund) {
+    function repay(address token, address user, uint256 amount) public onlyRouter nonReentrant returns (uint256 refund) {
         address vToken = _getVTokenForUnderlying(token);
         uint256 pre = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);

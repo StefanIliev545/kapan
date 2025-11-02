@@ -1,6 +1,7 @@
 import { supportedChains as snchains } from "./supportedChains";
 import { Chain as SNChain } from "@starknet-react/chains";
 import * as chains from "viem/chains";
+import { defineChain } from "viem";
 
 export type ScaffoldConfig = {
   targetEVMNetworks: readonly chains.Chain[];
@@ -15,9 +16,31 @@ export type ScaffoldConfig = {
 
 export const DEFAULT_ALCHEMY_API_KEY = "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 
+// Custom localhost chain that matches Hardhat's chainId (31337)
+// This allows deploying to --network hardhat (which uses chainId 31337) 
+// while using localhost in the frontend config
+const localhost = defineChain({
+  id: 31337,
+  name: "Hardhat",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH",
+  },
+  rpcUrls: {
+    default: {
+      http: ["http://127.0.0.1:8545"],
+    },
+    public: {
+      http: ["http://127.0.0.1:8545"],
+    },
+  },
+});
+
 const scaffoldConfig = {
   // The networks on which your DApp is live
-  targetEVMNetworks: [chains.arbitrum],
+  // Using custom localhost chain with chainId 31337 to match Hardhat network deployments
+  targetEVMNetworks: [localhost],
   targetSNNetworks: [snchains.mainnet],
   // The interval at which your front-end polls the RPC servers for new data
   // it has no effect if you only target the local network (default is 4000)

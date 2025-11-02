@@ -22,7 +22,7 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search }) => {
 
   const { data: allTokensInfo } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "AaveGateway",
+    contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
   });

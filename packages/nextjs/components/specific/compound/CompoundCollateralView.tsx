@@ -82,7 +82,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   // Fetch collateral data directly in this component
   const { data: collateralData } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getDepositedCollaterals",
     args: [baseToken, queryAddress],
     query: {
@@ -98,7 +98,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   // Fetch prices for collateral tokens (in terms of baseToken)
   const { data: collateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getPrices",
     args: [baseToken, collateralAddresses],
     query: {
@@ -118,7 +118,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   // Fetch the baseToken price in USD
   const { data: baseTokenPrice } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getPrice",
     args: [baseToken],
     query: {

@@ -104,7 +104,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         }
     }
 
-    function deposit(address token, address onBehalfOf, uint256 amount) public nonReentrant {
+    function deposit(address token, address onBehalfOf, uint256 amount) public onlyRouter nonReentrant {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -113,7 +113,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         comet.supplyTo(onBehalfOf, token, amount);
     }
 
-    function depositCollateral(address market, address collateral, uint256 amount, address receiver) public nonReentrant {
+    function depositCollateral(address market, address collateral, uint256 amount, address receiver) public onlyRouter nonReentrant {
         ICompoundComet comet = tokenToComet[market];
         require(address(comet) != address(0), "Compound: market comet not found");
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
@@ -139,7 +139,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function repay(address token, address user, uint256 amount) public nonReentrant {
+    function repay(address token, address user, uint256 amount) public onlyRouter nonReentrant {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);

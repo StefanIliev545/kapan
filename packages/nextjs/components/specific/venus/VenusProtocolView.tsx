@@ -39,9 +39,9 @@ type VenusSupplyPosition = SupplyPositionProps;
 export const VenusProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
  
-  // Get Comptroller address from VenusGateway
+  // Get Comptroller address from VenusGatewayView
   const { data: comptrollerAddress } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "comptroller",
   });
 
@@ -88,33 +88,33 @@ export const VenusProtocolView: FC = () => {
 
   // Step 1: Get basic token info from getAllVenusMarkets
   const { data: vTokenAddresses, isLoading: isLoadingVTokens } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getAllMarkets"
   });
 
   // Step 2: Get detailed market information including prices from oracles
   const { data: marketDetails, isLoading: isLoadingMarketDetails } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getAllVenusMarkets"
   });
   
   // Step 3: Get market rates after we have the vToken addresses
   const { data: ratesData, isLoading: isLoadingRates } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getMarketRates",
     args: [vTokenAddresses]
   });
   
   // Step 4: Get user balances if wallet is connected
   const { data: userBalances, isLoading: isLoadingBalances } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getUserBalances",
     args: [vTokenAddresses, connectedAddress]
   });
   
   // Step 5: Get collateral status if wallet is connected
   const { data: collateralStatus, isLoading: isLoadingCollateral } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getCollateralStatus",
     args: [vTokenAddresses, connectedAddress]
   });

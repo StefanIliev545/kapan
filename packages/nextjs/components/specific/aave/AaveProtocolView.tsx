@@ -9,8 +9,8 @@ import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContrac
 export const AaveProtocolView: FC = () => {
   const { address: connectedAddress } = useAccount();
 
-  // Get the AaveGateway contract info to use its address as a fallback
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGateway" });
+  // Get the AaveGatewayView contract info to use its address as a fallback
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView" });
 
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
@@ -24,7 +24,7 @@ export const AaveProtocolView: FC = () => {
   // Get all token info, including supply and borrow balances, using query address
   const { data: allTokensInfo } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "AaveGateway",
+    contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
   });

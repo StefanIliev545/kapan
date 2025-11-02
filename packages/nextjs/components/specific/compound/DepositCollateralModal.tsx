@@ -34,12 +34,12 @@ export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({ isOpen
 
   // Get CompoundGateway contract
   const { data: compoundGateway } = useScaffoldContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
   });
 
   // Write functions
   const { writeContractAsync: writeContractAsync } = useScaffoldWriteContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
   });
   const { writeContractAsync: writeErc20Async } = useWriteContract();
 

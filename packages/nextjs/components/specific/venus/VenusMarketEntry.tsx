@@ -63,7 +63,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
 
   // Check membership status using VenusGateway
   const { data: membershipStatus, isLoading: isCheckingMembership, refetch: refetchMembership } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "checkMembership",
     args: [userAddress || "0x0000000000000000000000000000000000000000", vTokenAddress || "0x0000000000000000000000000000000000000000"],
   });
