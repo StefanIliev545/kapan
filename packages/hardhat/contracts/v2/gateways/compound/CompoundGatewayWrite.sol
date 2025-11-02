@@ -172,7 +172,8 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
                 address base = market != address(0) ? market : ins.token; ICompoundComet comet = tokenToComet[base];
                 targets[k] = address(comet); data[k] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true); k++;
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                ICompoundComet comet = tokenToComet[ins.token]; targets[k] = address(comet);
+                ICompoundComet comet = tokenToComet[ins.token];
+                targets[k] = address(comet);
                 data[k] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true); k++;
             }
         }

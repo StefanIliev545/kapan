@@ -244,33 +244,35 @@ describe("v2 Refinance Positions (fork)", function () {
         // After flash loan callback resumes (creates UTXO[0] with flash loan amount):
         // 1. Query actual Aave debt balance -> UTXO[1] (exact current debt amount)
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
-        // 2. Approve Aave gateway for flash loan UTXO[0] (for repay)
+        // 2. Approve Aave gateway for flash loan UTXO[0] (for repay) -> UTXO[2] (empty)
         createRouterInstruction(encodeApprove(0, "aave")),
-        // 3. Repay Aave debt using exact queried balance from UTXO[1] -> UTXO[2] (repay refund, if any)
+        // 3. Repay Aave debt using exact queried balance from UTXO[1] -> UTXO[3] (repay refund, if any)
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Repay, USDC, userAddress, 0n, "0x", 1)),
-        // 4. Withdraw Aave collateral -> UTXO[3]
+        // 4. Withdraw Aave collateral -> UTXO[4] (WETH collateral - separate from USDC refund)
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.WithdrawCollateral, WETH, userAddress, depositAmt, "0x", 999)),
-        // 5. Approve Compound gateway for UTXO[3] (collateral) -> UTXO[4] (empty)
-        createRouterInstruction(encodeApprove(3, "compound")),
-        // 6. Deposit collateral to Compound (consumes UTXO[3], no output)
-        createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.DepositCollateral, WETH, userAddress, 0n, marketContext, 3)),
-        // 7. Borrow from Compound using exact debt amount from UTXO[1] -> UTXO[7] (borrowed amount)
+        // 5. Approve Compound gateway for UTXO[4] (WETH collateral) -> UTXO[5] (empty)
+        createRouterInstruction(encodeApprove(4, "compound")),
+        // 6. Deposit collateral to Compound (consumes UTXO[4], no output)
+        // Context encodes the debt market (USDC Comet) to differentiate from supply
+        createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.DepositCollateral, WETH, userAddress, 0n, marketContext, 4)),
+        // 7. Borrow from Compound using exact debt amount from UTXO[1] -> UTXO[6] (borrowed amount)
+        // USDC is the base token, so no context needed - tokenToComet[USDC] will find the Comet
         // Use inputIndex 1 to get exact debt amount from GetBorrowBalance (UTXO[1] should still exist)
-        createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddress, 0n, marketContext, 1)),
-        // Flash loan repayment: Balancer v3 will use UTXO[4] (borrowed amount) to repay the flash loan
+        createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddress, 0n, "0x", 1)),
+        // Flash loan repayment: Balancer v3 will use UTXO[6] (borrowed amount) to repay the flash loan
         // The borrowed amount matches the exact debt we repaid, ensuring atomic refinance
       ];
 
       console.log("Instructions:");
       console.log("  0. FlashLoanV3(USDC, with buffer) -> UTXO[0]");
       console.log("  1. GetBorrowBalance(Aave) -> UTXO[1] (exact debt)");
-      console.log("  2. Approve Aave (for UTXO[0]) -> UTXO[2]");
+      console.log("  2. Approve Aave (for UTXO[0]) -> UTXO[2] (empty)");
       console.log("  3. Repay Aave (using UTXO[1] exact debt) -> UTXO[3] (refund if any)");
-      console.log("  4. Withdraw from Aave -> UTXO[3]");
-      console.log("  5. Approve Compound (for UTXO[3]) -> UTXO[4] (empty)");
-      console.log("  6. Deposit to Compound (consumes UTXO[3], no output)");
-      console.log("  7. Borrow from Compound (using UTXO[1] exact amount) -> UTXO[5]");
-      console.log("  Flash loan repayment uses borrowed amount (UTXO[5] or original flash loan amount)");
+      console.log("  4. Withdraw from Aave -> UTXO[4] (WETH collateral)");
+      console.log("  5. Approve Compound (for UTXO[4]) -> UTXO[5] (empty)");
+      console.log("  6. Deposit to Compound (consumes UTXO[4], no output)");
+      console.log("  7. Borrow from Compound (using UTXO[1] exact amount) -> UTXO[6]");
+      console.log("  Flash loan repayment uses borrowed amount (UTXO[6] or original flash loan amount)");
 
       const userWethBefore = await weth.balanceOf(userAddress);
       const userUsdcBefore = await usdc.balanceOf(userAddress);
@@ -293,7 +295,7 @@ describe("v2 Refinance Positions (fork)", function () {
       // Query Compound balances (should have position)
       const checkCompoundBalances = [
         createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetSupplyBalance, WETH, userAddress, 0n, marketContext, 999)),
-        createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, marketContext, 999)),
+        createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
       ];
       const compoundCheckTx = await router.connect(user).processProtocolInstructions(checkCompoundBalances);
       const compoundCheckReceipt = await compoundCheckTx.wait();
