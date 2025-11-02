@@ -124,6 +124,25 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
     }
   }
 
+  // Set override feeds if provided (matching v1 deployment)
+  const WETH_ADDRESS = process.env.WETH_ADDRESS || "0x0000000000000000000000000000000000000000";
+  const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED || "0x0000000000000000000000000000000000000000";
+  
+  if (WETH_ADDRESS !== "0x0000000000000000000000000000000000000000" && WETH_PRICE_FEED !== "0x0000000000000000000000000000000000000000") {
+    try {
+      await execute(
+        "CompoundGatewayView",
+        { from: deployer },
+        "overrideFeed",
+        WETH_ADDRESS,
+        WETH_PRICE_FEED,
+      );
+      console.log(`Set override feed for WETH: ${WETH_ADDRESS} -> ${WETH_PRICE_FEED}`);
+    } catch (error) {
+      console.warn(`Failed to set override feed for WETH:`, error);
+    }
+  }
+
   // Register write gateway with KapanRouter (view gateway is not registered)
   await execute("KapanRouter", { from: deployer }, "addGateway", "compound", compoundGatewayWrite.address);
   console.log(`CompoundGatewayWrite registered with KapanRouter as "compound"`);
