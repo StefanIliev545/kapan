@@ -100,25 +100,29 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         } else if (routerInstruction.instructionType == RouterInstructionType.PullToken) {
             processPullToken(routerInstruction);
         } else if (routerInstruction.instructionType == RouterInstructionType.PushToken) {
-            processPushToken(routerInstruction);
+            processPushToken(instruction);
         } else if (routerInstruction.instructionType == RouterInstructionType.ToOutput) {
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount });
             _appendOutputs(out);
         } else if (routerInstruction.instructionType == RouterInstructionType.Approve) {
-            // data layout: abi.encode(uint256 inputIndex, string targetName)
-            (uint256 idx, string memory targetName) = abi.decode(instruction.data, (uint256, string));
+            // instruction.data encodes: (RouterInstruction, string targetProtocol, InputPtr input)
+            (, string memory targetProtocol, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(instruction.data, (RouterInstruction, string, ProtocolTypes.InputPtr));
             ProtocolTypes.Output[] memory inputs = _getOutputs();
-            require(idx < inputs.length, "Approve: bad index");
+            require(inputPtr.index < inputs.length, "Approve: bad index");
             address target;
-            if (keccak256(abi.encode(targetName)) == keccak256(abi.encode("router"))) {
+            if (keccak256(abi.encode(targetProtocol)) == keccak256(abi.encode("router"))) {
                 target = address(this);
             } else {
-                target = address(gateways[targetName]);
+                target = address(gateways[targetProtocol]);
             }
-            require(target != address(0), "Approve: target");
-            IERC20(inputs[idx].token).approve(target, 0);
-            IERC20(inputs[idx].token).approve(target, inputs[idx].amount);
+            require(target != address(0), "Approve: target not found");
+            IERC20(inputs[inputPtr.index].token).approve(target, 0);
+            IERC20(inputs[inputPtr.index].token).approve(target, inputs[inputPtr.index].amount);
+            // Always produce an output (even if empty) to ensure consistent indexing
+            ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
+            out[0] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            _appendOutputs(out);
         }
         return false;
     }
@@ -138,8 +142,22 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         _appendOutputs(out);
     }
 
-    function processPushToken(RouterInstruction memory routerInstruction) internal {
-        IERC20(routerInstruction.token).safeTransfer(routerInstruction.user, routerInstruction.amount);
+    function processPushToken(ProtocolTypes.ProtocolInstruction memory instruction) internal {
+        // instruction.data encodes: (RouterInstruction, ProtocolTypes.InputPtr input)
+        (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(instruction.data, (RouterInstruction, ProtocolTypes.InputPtr));
+        ProtocolTypes.Output[] memory inputs = _getOutputs();
+        require(inputPtr.index < inputs.length, "PushToken: bad index");
+        ProtocolTypes.Output memory output = inputs[inputPtr.index];
+        require(output.token != address(0), "PushToken: zero token");
+        require(output.amount > 0, "PushToken: zero amount");
+        // Extract user from RouterInstruction in data
+        RouterInstruction memory routerInstruction;
+        (routerInstruction, ) = abi.decode(instruction.data, (RouterInstruction, ProtocolTypes.InputPtr));
+        IERC20(output.token).safeTransfer(routerInstruction.user, output.amount);
+        // Consume the UTXO by clearing it (set to zero)
+        // Note: We don't remove it from the array to maintain index consistency
+        inputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+        TBytes.set(OUTPUTS_SLOT, abi.encode(inputs));
     }
 
     modifier authorize(RouterInstruction memory routerInstruction) {

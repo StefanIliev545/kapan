@@ -1,5 +1,12 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
+import {
+  encodeFlashLoanV2,
+  encodeFlashLoanV3,
+  encodeMockInstruction,
+  createRouterInstruction,
+  createProtocolInstruction,
+} from "./helpers/instructionHelpers";
 
 const V2 = (process.env.BALANCER_VAULT2 || "").toLowerCase();
 const V3 = (process.env.BALANCER_VAULT3 || "").toLowerCase();
@@ -30,15 +37,12 @@ describe("KapanRouter flashloan fork callbacks", function () {
     await mock.waitForDeployment();
     await (await router.addGateway("mock", await mock.getAddress())).wait();
 
-    const coder = ethers.AbiCoder.defaultAbiCoder();
     const amount = 10n ** 15n; // 0.001 WETH
-    const routerInstr = coder.encode([
-      "tuple(uint256 amount,address token,address user,uint8 instructionType)"
-    ], [[amount, WETH, await deployer.getAddress(), 0]]); // FlashLoanV2
+    const userAddress = await deployer.getAddress();
 
-    const i0 = { protocolName: "router", data: routerInstr };
-    const i1 = { protocolName: "mock", data: coder.encode(["uint256"], [1n]) };
-    const i2 = { protocolName: "mock", data: coder.encode(["uint256"], [2n]) };
+    const i0 = createRouterInstruction(encodeFlashLoanV2(amount, WETH, userAddress));
+    const i1 = createProtocolInstruction("mock", encodeMockInstruction(false));
+    const i2 = createProtocolInstruction("mock", encodeMockInstruction(false));
 
     // Trigger flash loan through router
     const tx = await router.processProtocolInstructions([i0, i1, i2]);
@@ -86,15 +90,12 @@ describe("KapanRouter flashloan fork callbacks", function () {
     await mock.waitForDeployment();
     await (await router.addGateway("mock", await mock.getAddress())).wait();
 
-    const coder = ethers.AbiCoder.defaultAbiCoder();
     const amount = 1_000_000n; // 1 USDC (6 decimals)
-    const routerInstr = coder.encode([
-      "tuple(uint256 amount,address token,address user,uint8 instructionType)"
-    ], [[amount, USDC, await deployer.getAddress(), 1]]); // FlashLoanV3
+    const userAddress = await deployer.getAddress();
 
-    const i0 = { protocolName: "router", data: routerInstr };
-    const i1 = { protocolName: "mock", data: coder.encode(["uint256"], [1n]) };
-    const i2 = { protocolName: "mock", data: coder.encode(["uint256"], [2n]) };
+    const i0 = createRouterInstruction(encodeFlashLoanV3(amount, USDC, userAddress));
+    const i1 = createProtocolInstruction("mock", encodeMockInstruction(false));
+    const i2 = createProtocolInstruction("mock", encodeMockInstruction(false));
 
     // Ensure v3 vault holds enough USDC to send (like v1 tests)
     await network.provider.request({ method: "hardhat_impersonateAccount", params: [USDC_WHALE] });
