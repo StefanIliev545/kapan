@@ -38,11 +38,11 @@ const convertCompoundRate = (ratePerSecond: bigint): number => {
 
 const useAaveData = (): MarketData[] => {
   const { address: connectedAddress } = useAccount();
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGateway" });
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView" });
   const queryAddress = connectedAddress || contractInfo?.address;
   const { data: allTokensInfo } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "AaveGateway",
+    contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
   });
@@ -77,25 +77,25 @@ const useCompoundData = (): MarketData[] => {
 
   const { data: wethData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [weth?.address, ZERO_ADDRESS],
   });
   const { data: usdcData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdc?.address, ZERO_ADDRESS],
   });
   const { data: usdtData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdt?.address, ZERO_ADDRESS],
   });
   const { data: usdcEData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdcE?.address, ZERO_ADDRESS],
   });
@@ -193,12 +193,12 @@ const useNostraData = (): MarketData[] => {
 
 const useVenusData = (): MarketData[] => {
   const { data: marketDetails } = useEvmReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getAllVenusMarkets",
   });
   const vTokens = marketDetails?.[0];
   const { data: ratesData } = useEvmReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getMarketRates",
     args: [vTokens],
   });

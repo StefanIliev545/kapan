@@ -57,6 +57,7 @@ export const AaveProtocolView: FC = () => {
         currentRate: supplyAPY,
         tokenAddress: token.token,
         tokenPrice: token.price,
+        tokenDecimals: decimals,
         tokenSymbol: token.symbol,
       });
 
@@ -71,6 +72,7 @@ export const AaveProtocolView: FC = () => {
         currentRate: borrowAPY,
         tokenAddress: token.token,
         tokenPrice: token.price,
+        tokenDecimals: decimals,
         tokenSymbol: token.symbol,
       });
     });

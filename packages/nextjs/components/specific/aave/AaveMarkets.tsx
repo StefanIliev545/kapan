@@ -17,7 +17,7 @@ interface AaveMarketsProps {
 
 export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search }) => {
   const { address: connectedAddress } = useAccount();
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGateway" });
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView" });
   const queryAddress = connectedAddress || contractInfo?.address;
 
   const { data: allTokensInfo } = useNetworkAwareReadContract({
