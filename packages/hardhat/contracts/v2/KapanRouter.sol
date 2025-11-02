@@ -16,6 +16,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
     bytes32 constant INSTRUCTION_STACK = keccak256("KapanRouter:instructionStack");
     bytes32 constant OUTPUTS_SLOT = keccak256("KapanRouter:outputs");
+    bytes32 constant FLASHLOAN_DATA_SLOT = keccak256("KapanRouter:flashloanData");
     mapping(string => IGateway) public gateways;
 
     constructor(address owner) Ownable(owner) {
@@ -128,10 +129,14 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function processFlashLoanV2(RouterInstruction memory routerInstruction) internal {
+        // Store flash loan details for callback to create UTXO
+        TBytes.set(FLASHLOAN_DATA_SLOT, abi.encode(routerInstruction.token, routerInstruction.amount));
         _requestBalancerV2(routerInstruction.token, routerInstruction.amount, bytes(""));
     }
 
     function processFlashLoanV3(RouterInstruction memory routerInstruction) internal {
+        // Store flash loan details for callback to create UTXO
+        TBytes.set(FLASHLOAN_DATA_SLOT, abi.encode(routerInstruction.token, routerInstruction.amount));
         _requestBalancerV3(routerInstruction.token, routerInstruction.amount);
     }
 
@@ -165,7 +170,19 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         _;
     }
 
-    function _afterFlashLoan(bytes calldata /*userData*/) internal override { runStack(); }
+    function _afterFlashLoan(bytes calldata /*userData*/) internal override {
+        // Create UTXO from flash loan
+        bytes memory flashData = TBytes.get(FLASHLOAN_DATA_SLOT);
+        if (flashData.length > 0) {
+            (address token, uint256 amount) = abi.decode(flashData, (address, uint256));
+            ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
+            out[0] = ProtocolTypes.Output({ token: token, amount: amount });
+            _appendOutputs(out);
+            // Clear flash loan data
+            TBytes.set(FLASHLOAN_DATA_SLOT, bytes(""));
+        }
+        runStack();
+    }
 
     // --------- Router-side authorize encoder ---------
     // Returns user-side approval calls required for router instructions
