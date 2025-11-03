@@ -1,5 +1,5 @@
 import "@rainbow-me/rainbowkit/styles.css";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -36,12 +36,19 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
     <html suppressHydrationWarning>
       <body className={`${inter.className}`}>
         <ThemeProvider>
-            <QueryProvider>
-              <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
-            </QueryProvider>
+          <QueryProvider>
+            <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+          </QueryProvider>
         </ThemeProvider>
         <SpeedInsights />
-        <Analytics />
+        <Analytics
+          beforeSend={(event: BeforeSendEvent) => {
+            if (event.data && typeof event.data === "object" && "address" in event.data) {
+              delete (event.data as Record<string, unknown>).address;
+            }
+            return event;
+          }}
+        />
       </body>
     </html>
   );
