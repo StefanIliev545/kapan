@@ -344,6 +344,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         disableMove={disableMoveSupply || readOnly}
                         availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : undefined}
                         suppressDisabledMessage
+                        defaultExpanded={index === 0}
                       />
                     </div>
                   ))}
@@ -391,6 +392,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         position={positionManager}
                         availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : undefined}
                         suppressDisabledMessage
+                        defaultExpanded={index === 0}
                       />
                     </div>
                   ))}
