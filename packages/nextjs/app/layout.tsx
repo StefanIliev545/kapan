@@ -1,5 +1,4 @@
 import "@rainbow-me/rainbowkit/styles.css";
-import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -10,6 +9,7 @@ import "~~/styles/globals.css";
 import "@radix-ui/themes/styles.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 import { QueryProvider } from "~~/app/providers/QueryProvider";
+import { RedactedAnalytics } from "~~/components/RedactedAnalytics";
 
 const baseMetadata = getMetadata({
   title: "Kapan Finance | DeFi Lending Aggregator",
@@ -41,14 +41,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
           </QueryProvider>
         </ThemeProvider>
         <SpeedInsights />
-        <Analytics
-          beforeSend={(event: BeforeSendEvent) => {
-            if (event.data && typeof event.data === "object" && "address" in event.data) {
-              delete (event.data as Record<string, unknown>).address;
-            }
-            return event;
-          }}
-        />
+        <RedactedAnalytics />
       </body>
     </html>
   );
