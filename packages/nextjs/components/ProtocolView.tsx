@@ -51,6 +51,7 @@ interface ProtocolViewProps {
   networkType: "evm" | "starknet"; // Specify which network this protocol view is for
   disableMoveSupply?: boolean;
   readOnly?: boolean; // If true, disable all interactive actions and modals
+  expandFirstPositions?: boolean; // If true, expand the first supply and borrow rows by default
 }
 
 // Health status indicator component that shows utilization percentage
@@ -82,6 +83,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   networkType,
   disableMoveSupply = false,
   readOnly = false,
+  expandFirstPositions = true,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -344,6 +346,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         disableMove={disableMoveSupply || readOnly}
                         availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : undefined}
                         suppressDisabledMessage
+                        defaultExpanded={expandFirstPositions && index === 0}
                       />
                     </div>
                   ))}
@@ -391,6 +394,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         position={positionManager}
                         availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : undefined}
                         suppressDisabledMessage
+                        defaultExpanded={expandFirstPositions && index === 0}
                       />
                     </div>
                   ))}

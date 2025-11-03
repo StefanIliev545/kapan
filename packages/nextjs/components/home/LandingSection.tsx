@@ -58,6 +58,7 @@ const LandingSection = () => {
                   networkType="starknet"
                   readOnly
                   forceShowAll
+                  expandFirstPositions={false}
                 />
               </motion.div>
               <div className="mt-1" />
@@ -76,6 +77,7 @@ const LandingSection = () => {
                   networkType="starknet"
                   readOnly
                   forceShowAll
+                  expandFirstPositions={false}
                 />
               </motion.div>
             </>
@@ -96,6 +98,7 @@ const LandingSection = () => {
                   networkType="evm"
                   readOnly
                   forceShowAll
+                  expandFirstPositions={false}
                 />
               </motion.div>
               <div className="mt-1" />
@@ -114,6 +117,7 @@ const LandingSection = () => {
                   networkType="evm"
                   readOnly
                   forceShowAll
+                  expandFirstPositions={false}
                 />
               </motion.div>
             </>

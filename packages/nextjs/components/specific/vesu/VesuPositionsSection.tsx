@@ -1,5 +1,5 @@
 import type { FC, MouseEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiPlus } from "react-icons/fi";
 
 import { BorrowPosition } from "~~/components/BorrowPosition";
@@ -166,8 +166,49 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
   // Shared expand state per row.key
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const toggleRowExpanded = (key: string) =>
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+
+  const defaultExpandedKey = useMemo(() => {
+    if (rows.length === 0) return null;
+
+    const isV1Protocol = protocolName?.toLowerCase() === "vesu";
+    if (isV1Protocol) {
+      const firstNonVtoken = rows.find(row => !row.isVtoken);
+      return (firstNonVtoken ?? rows[0])?.key ?? null;
+    }
+
+    return rows[0]?.key ?? null;
+  }, [rows, protocolName]);
+
+  useEffect(() => {
+    if (rows.length === 0) {
+      if (Object.keys(expandedRows).length === 0) return;
+      setExpandedRows({});
+      return;
+    }
+
+    if (hasUserInteracted) {
+      if (defaultExpandedKey && !(defaultExpandedKey in expandedRows)) {
+        setHasUserInteracted(false);
+      }
+      return;
+    }
+
+    const hasExpandedVisibleRow = rows.some(row => expandedRows[row.key]);
+    if (hasExpandedVisibleRow) return;
+
+    if (!defaultExpandedKey) return;
+
+    setExpandedRows(prev => {
+      if (prev[defaultExpandedKey]) return prev;
+      return { ...prev, [defaultExpandedKey]: true };
+    });
+  }, [rows, expandedRows, defaultExpandedKey, hasUserInteracted]);
+
+  const toggleRowExpanded = (key: string) => {
+    setHasUserInteracted(true);
     setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
+  };
   const renderPositions = () => {
     if (accountStatus === "connecting" || (userAddress && !hasLoadedOnce)) {
       return (

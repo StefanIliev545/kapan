@@ -47,6 +47,7 @@ export type BorrowPositionProps = ProtocolPosition & {
   onToggleExpanded?: () => void;
   suppressDisabledMessage?: boolean;
   demoOptimalOverride?: { protocol: string; rate: number };
+  defaultExpanded?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -84,11 +85,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   onToggleExpanded,
   suppressDisabledMessage = false,
   demoOptimalOverride,
+  defaultExpanded = false,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
   const borrowModal = useModal();
-  const expanded = useToggle();
+  const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
