@@ -3,6 +3,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
+import { track } from "@vercel/analytics";
 import DebtComparison from "./DebtComparison.client";
 import StableArea from "../common/StableArea";
 
@@ -44,7 +45,14 @@ const HeroSection = () => {
               
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <div className="flex gap-2">
-                  <a href="/app" onClick={(e) => { e.preventDefault(); window.location.assign(appUrl); }}>
+                  <a
+                    href="/app"
+                    onClick={e => {
+                      e.preventDefault();
+                      track("Application launched", { source: "landing_page" });
+                      window.location.assign(appUrl);
+                    }}
+                  >
                     <button className="btn btn-primary">Launch App</button>
                   </a>
                   <Link href="/info" passHref>
