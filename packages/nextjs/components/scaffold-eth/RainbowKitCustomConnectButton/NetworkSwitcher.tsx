@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { Chain } from "viem/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import { track } from "@vercel/analytics";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { getNetworkColor } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
@@ -100,6 +101,10 @@ export const NetworkSwitcher = () => {
                   className={`w-full px-4 py-3 text-left hover:bg-base-300/50 ${isActive ? "bg-base-300/70" : ""} flex items-center gap-3`}
                   onClick={() => {
                     if (!isActive) {
+                      track("Network switched event", {
+                        network: network.name,
+                        chainId: network.id,
+                      });
                       switchChain?.({ chainId: network.id });
                     }
                     setIsOpen(false);
