@@ -1,9 +1,10 @@
-import { FC } from "react";
+import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
-import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { notification } from "~~/utils/scaffold-stark/notification";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -23,22 +24,44 @@ export const RepayModal: FC<RepayModalProps> = ({
   position,
 }) => {
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
-  const { execute, buildTx } = useLendingAction(
-    "evm",
-    "Repay",
-    token.address,
-    protocolName,
-    decimals,
-    undefined,
-    debtBalance,
-    walletBalance,
-  );
+  const { buildRepayFlow, executeInstructions, isPending, isConfirming, isConfirmed } = useKapanRouterV2();
+  
   if (token.decimals == null) {
     token.decimals = decimals;
   }
+  
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = walletBalance < bump ? walletBalance : bump;
+
+  const handleRepay = useCallback(async (amount: string, isMax?: boolean) => {
+    try {
+      const instructions = buildRepayFlow(
+        protocolName.toLowerCase(),
+        token.address,
+        amount,
+        token.decimals || decimals || 18
+      );
+      
+      if (instructions.length === 0) {
+        notification.error("Failed to build repay instructions");
+        return;
+      }
+
+      await executeInstructions(instructions);
+      notification.success("Repay transaction sent");
+    } catch (error: any) {
+      console.error("Repay error:", error);
+      notification.error(error.message || "Failed to repay");
+    }
+  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlow, executeInstructions]);
+
+  useEffect(() => {
+    if (isConfirmed && isOpen) {
+      onClose();
+    }
+  }, [isConfirmed, isOpen, onClose]);
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -54,9 +77,8 @@ export const RepayModal: FC<RepayModalProps> = ({
       percentBase={debtBalance}
       max={maxInput}
       network="evm"
-      buildTx={buildTx}
       position={position}
-      onConfirm={execute}
+      onConfirm={handleRepay}
     />
   );
 };

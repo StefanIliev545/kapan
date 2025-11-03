@@ -11,6 +11,10 @@ import { verifyContract } from "../utils/verification";
  * @param hre HardhatRuntimeEnvironment object.
  */
 const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  // V1 contracts are deprecated - use v2 deployments instead
+  console.log("Skipping v1 VenusGateway deployment - use v2 VenusGatewayWrite/View instead");
+  return;
+
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 
@@ -50,19 +54,31 @@ const deployVenusGateway: DeployFunction = async function (hre: HardhatRuntimeEn
   await execute("RouterGateway", { from: deployer }, "addGateway", "venus", venusGateway.address);
   
   // Also register the gateway with the OptimalInterestRateFinder
+  // Try to use v2 view gateway if it exists, otherwise use v1 gateway
   try {
     const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
-    console.log(`Registering VenusGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
+    let gatewayToRegister = venusGateway.address;
+    
+    // Check if v2 view gateway exists and use it instead
+    try {
+      const venusGatewayView = await get("VenusGatewayView");
+      gatewayToRegister = venusGatewayView.address;
+      console.log(`Using v2 VenusGatewayView for OptimalInterestRateFinder: ${gatewayToRegister}`);
+    } catch {
+      console.log(`Using v1 VenusGateway for OptimalInterestRateFinder: ${gatewayToRegister}`);
+    }
+
+    console.log(`Registering gateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
     
     await execute(
       "OptimalInterestRateFinder", 
       { from: deployer, log: true }, 
       "registerGateway", 
       "venus", 
-      venusGateway.address
+      gatewayToRegister
     );
     
-    console.log("VenusGateway registered with OptimalInterestRateFinder");
+    console.log("Gateway registered with OptimalInterestRateFinder");
   } catch (error) {
     console.warn("Failed to register with OptimalInterestRateFinder:", error);
   }

@@ -1,8 +1,9 @@
-import { FC } from "react";
+import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { notification } from "~~/utils/scaffold-stark/notification";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -22,10 +23,40 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
-  const { execute, buildTx } = useLendingAction("evm", "Borrow", token.address, protocolName, decimals);
+  const { buildBorrowFlow, executeInstructions, isPending, isConfirming, isConfirmed } = useKapanRouterV2();
+  
   if (token.decimals == null) {
     token.decimals = decimals;
   }
+
+  const handleBorrow = useCallback(async (amount: string, isMax?: boolean) => {
+    try {
+      const instructions = buildBorrowFlow(
+        protocolName.toLowerCase(),
+        token.address,
+        amount,
+        token.decimals || decimals || 18
+      );
+      
+      if (instructions.length === 0) {
+        notification.error("Failed to build borrow instructions");
+        return;
+      }
+
+      await executeInstructions(instructions);
+      notification.success("Borrow transaction sent");
+    } catch (error: any) {
+      console.error("Borrow error:", error);
+      notification.error(error.message || "Failed to borrow");
+    }
+  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeInstructions]);
+
+  useEffect(() => {
+    if (isConfirmed && isOpen) {
+      onClose();
+    }
+  }, [isConfirmed, isOpen, onClose]);
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -39,9 +70,8 @@ export const BorrowModal: FC<BorrowModalProps> = ({
       before={currentDebt}
       balance={balance}
       network="evm"
-      buildTx={buildTx}
       position={position}
-      onConfirm={execute}
+      onConfirm={handleBorrow}
     />
   );
 };

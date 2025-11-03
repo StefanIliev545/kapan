@@ -11,6 +11,10 @@ import { verifyContract } from "../utils/verification";
  * @param hre HardhatRuntimeEnvironment object.
  */
 const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  // V1 contracts are deprecated - use v2 deployments instead
+  console.log("Skipping v1 AaveGateway deployment - use v2 AaveGatewayWrite/View instead");
+  return;
+
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 
@@ -46,19 +50,31 @@ const deployAaveGateway: DeployFunction = async function (hre: HardhatRuntimeEnv
   await execute("RouterGateway", { from: deployer }, "addGateway", "aave v3", aaveGateway.address);
 
   // Also register with OptimalInterestRateFinder
+  // Try to use v2 view gateway if it exists, otherwise use v1 gateway
   try {
     const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
-    console.log(`Registering AaveGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
+    let gatewayToRegister = aaveGateway.address;
+    
+    // Check if v2 view gateway exists and use it instead
+    try {
+      const aaveGatewayView = await get("AaveGatewayView");
+      gatewayToRegister = aaveGatewayView.address;
+      console.log(`Using v2 AaveGatewayView for OptimalInterestRateFinder: ${gatewayToRegister}`);
+    } catch {
+      console.log(`Using v1 AaveGateway for OptimalInterestRateFinder: ${gatewayToRegister}`);
+    }
+
+    console.log(`Registering gateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
 
     await execute(
       "OptimalInterestRateFinder",
       { from: deployer, log: true },
       "registerGateway",
       "aave",
-      aaveGateway.address,
+      gatewayToRegister,
     );
 
-    console.log("AaveGateway registered with OptimalInterestRateFinder");
+    console.log("Gateway registered with OptimalInterestRateFinder");
   } catch (error) {
     console.warn("Failed to register with OptimalInterestRateFinder:", error);
   }

@@ -10,6 +10,10 @@ import { verifyContract } from "../utils/verification";
  * @param hre HardhatRuntimeEnvironment object.
  */
 const deployOptimalInterestRateFinder: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  // V1 contracts are deprecated - use v2 deployments instead
+  console.log("Skipping v1 OptimalInterestRateFinder deployment - use v2 deployment instead");
+  return;
+
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 

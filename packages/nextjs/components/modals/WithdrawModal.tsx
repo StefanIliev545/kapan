@@ -1,8 +1,9 @@
-import { FC } from "react";
+import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
-import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { PositionManager } from "~~/utils/position";
+import { notification } from "~~/utils/scaffold-stark/notification";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -22,20 +23,43 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   position,
 }) => {
   const decimals = token.decimals;
-  const { execute, buildTx } = useLendingAction(
-    "evm",
-    "Withdraw",
-    token.address,
-    protocolName,
-    decimals,
-    undefined,
-    supplyBalance,
-  );
+  const { buildWithdrawFlow, executeInstructions, isPending, isConfirming, isConfirmed } = useKapanRouterV2();
+  
   if (token.decimals == null) {
     token.decimals = decimals;
   }
+  
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
+
+  const handleWithdraw = useCallback(async (amount: string, isMax?: boolean) => {
+    try {
+      const instructions = buildWithdrawFlow(
+        protocolName.toLowerCase(),
+        token.address,
+        amount,
+        token.decimals || decimals || 18
+      );
+      
+      if (instructions.length === 0) {
+        notification.error("Failed to build withdraw instructions");
+        return;
+      }
+
+      await executeInstructions(instructions);
+      notification.success("Withdraw transaction sent");
+    } catch (error: any) {
+      console.error("Withdraw error:", error);
+      notification.error(error.message || "Failed to withdraw");
+    }
+  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeInstructions]);
+
+  useEffect(() => {
+    if (isConfirmed && isOpen) {
+      onClose();
+    }
+  }, [isConfirmed, isOpen, onClose]);
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -51,9 +75,8 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       percentBase={supplyBalance}
       max={maxInput}
       network="evm"
-      buildTx={buildTx}
       position={position}
-      onConfirm={execute}
+      onConfirm={handleWithdraw}
     />
   );
 };
