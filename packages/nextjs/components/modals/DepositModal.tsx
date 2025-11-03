@@ -15,13 +15,13 @@ interface DepositModalProps {
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position }) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
-  const { buildDepositFlow, executeInstructions, isPending, isConfirming, isConfirmed } = useKapanRouterV2();
+  const { buildDepositFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
   }
 
-  const handleDeposit = useCallback(async (amount: string, isMax?: boolean) => {
+  const handleDeposit = useCallback(async (amount: string) => {
     try {
       const instructions = buildDepositFlow(
         protocolName.toLowerCase(),
@@ -35,7 +35,8 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
         return;
       }
 
-      await executeInstructions(instructions);
+      // Use executeFlowWithApprovals to handle approvals automatically
+      await executeFlowWithApprovals(instructions);
       notification.success("Deposit transaction sent");
       
       if (isConfirmed) {
@@ -45,9 +46,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       console.error("Deposit error:", error);
       notification.error(error.message || "Failed to deposit");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeInstructions, isConfirmed, onClose]);
-
-  const isLoading = isPending || isConfirming;
+  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowWithApprovals, isConfirmed, onClose]);
 
   return (
     <TokenActionModal

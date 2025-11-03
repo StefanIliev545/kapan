@@ -141,6 +141,19 @@ export function createProtocolInstruction(protocolName: string, data: string): P
 }
 
 /**
+ * Normalize protocol names to match gateway registration
+ * Converts "Aave V3" -> "aave", "Compound V3" -> "compound", etc.
+ */
+export function normalizeProtocolName(protocolName: string): string {
+  let normalized = protocolName.toLowerCase();
+  // Remove version suffixes like " v3", " v2", etc.
+  normalized = normalized.replace(/\s+v\d+$/i, "");
+  // Remove all spaces
+  normalized = normalized.replace(/\s+/g, "");
+  return normalized;
+}
+
+/**
  * Helper to create a lending instruction for Aave
  */
 export function createAaveInstruction(

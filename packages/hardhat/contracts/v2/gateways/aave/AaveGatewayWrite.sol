@@ -13,6 +13,8 @@ import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IPoolDataProvider} from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 
+import "hardhat/console.sol";
+
 interface IVariableDebtToken { function borrowAllowance(address fromUser, address spender) external view returns (uint256); }
 
 contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
@@ -129,32 +131,67 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         view
         returns (address[] memory targets, bytes[] memory data)
     {
-        // Worst-case two approvals per instruction
+        console.log("AaveGatewayWrite.authorize: Starting", instrs.length, "instruction(s)");
+        console.log("AaveGatewayWrite.authorize: Caller", uint256(uint160(caller)));
+        
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                // Approve underlying for this gateway
-                targets[i] = ins.token;
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount);
-            } else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
-                targets[i] = ins.token;
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount);
-            } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                // Approve aToken for this gateway to pull from user
+            
+            console.log("AaveGatewayWrite.authorize: Processing instruction", i);
+            console.log("AaveGatewayWrite.authorize: Op", uint256(ins.op));
+            console.log("AaveGatewayWrite.authorize: Token", uint256(uint160(ins.token)));
+            console.log("AaveGatewayWrite.authorize: User", uint256(uint160(ins.user)));
+            console.log("AaveGatewayWrite.authorize: Amount", ins.amount);
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                console.log("AaveGatewayWrite.authorize: WithdrawCollateral detected");
+                // User must approve aToken → gateway for withdraw
                 address aToken = _getAToken(ins.token);
+                console.log("AaveGatewayWrite.authorize: aToken", aToken);
                 targets[i] = aToken;
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount);
+                // Ask for max so withdraw-all / accrued interest cases don't need another approval
+                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
+                console.log("AaveGatewayWrite.authorize: Generated approval for aToken");
+
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                // Approve delegation on variable debt token to this gateway
-                (, , address vDebt) = _getReserveTokens(ins.token);
-                targets[i] = vDebt;
-                data[i] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), type(uint256).max);
+                console.log("AaveGatewayWrite.authorize: Borrow detected");
+                // User must approveDelegation(vDebt → gateway) for borrow
+                (address aToken, address sToken, address vDebt) = _getReserveTokens(ins.token);
+                console.log("AaveGatewayWrite.authorize: aToken", uint256(uint160(aToken)));
+                console.log("AaveGatewayWrite.authorize: sToken", uint256(uint160(sToken)));
+                console.log("AaveGatewayWrite.authorize: vDebt", uint256(uint160(vDebt)));
+                
+                if (vDebt == address(0)) {
+                    console.log("AaveGatewayWrite.authorize: ERROR - vDebt is zero address!");
+                } else {
+                    targets[i] = vDebt;
+                    data[i] = abi.encodeWithSignature(
+                        "approveDelegation(address,uint256)",
+                        address(this),
+                        type(uint256).max
+                    );
+                    console.log("AaveGatewayWrite.authorize: Generated approveDelegation for vDebt");
+                    console.log("AaveGatewayWrite.authorize: Target", uint256(uint160(targets[i])));
+                    console.log("AaveGatewayWrite.authorize: Data length", data[i].length);
+                }
+
             } else {
+                console.log("AaveGatewayWrite.authorize: Other op (Deposit/Repay/DepositCollateral) - no user approval needed");
+                // Deposit / Repay / DepositCollateral: user approvals not needed
+                // (router handles pull + router->gateway approve)
                 targets[i] = address(0);
                 data[i] = bytes("");
             }
+        }
+        
+        console.log("AaveGatewayWrite.authorize: Returning", targets.length, "authorization(s)");
+        for (uint256 i = 0; i < targets.length; i++) {
+            console.log("AaveGatewayWrite.authorize: Auth", i);
+            console.log("AaveGatewayWrite.authorize: Target", uint256(uint160(targets[i])));
+            console.log("AaveGatewayWrite.authorize: Data length", data[i].length);
         }
     }
 

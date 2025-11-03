@@ -23,13 +23,13 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "evm");
-  const { buildBorrowFlow, executeInstructions, isPending, isConfirming, isConfirmed } = useKapanRouterV2();
+  const { buildBorrowFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
   }
 
-  const handleBorrow = useCallback(async (amount: string, isMax?: boolean) => {
+  const handleBorrow = useCallback(async (amount: string) => {
     try {
       const instructions = buildBorrowFlow(
         protocolName.toLowerCase(),
@@ -43,13 +43,14 @@ export const BorrowModal: FC<BorrowModalProps> = ({
         return;
       }
 
-      await executeInstructions(instructions);
+      // Use executeFlowWithApprovals to handle gateway authorizations (e.g., Aave credit delegation)
+      await executeFlowWithApprovals(instructions);
       notification.success("Borrow transaction sent");
     } catch (error: any) {
       console.error("Borrow error:", error);
       notification.error(error.message || "Failed to borrow");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeInstructions]);
+  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowWithApprovals]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

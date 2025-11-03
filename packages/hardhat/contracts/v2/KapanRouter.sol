@@ -10,6 +10,8 @@ import {IGateway} from "./interfaces/IGateway.sol";
 import {ProtocolTypes} from "./interfaces/ProtocolTypes.sol";
 import {FlashLoanConsumerBase} from "./flashloans/FlashLoanConsumerBase.sol";
 
+import "hardhat/console.sol";
+
 
 contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     using SafeERC20 for IERC20;
@@ -206,6 +208,121 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                 k++;
             }
         }
+    }
+
+    // --------- Aggregate authorization for ProtocolInstructions ---------
+    // Returns all user-side approval calls required for protocol instructions
+    // One element per ProtocolInstruction, preserving order
+    function authorizeInstructions(
+        ProtocolTypes.ProtocolInstruction[] calldata instructions,
+        address caller
+    )
+        external
+        view
+        returns (address[] memory targets, bytes[] memory data)
+    {
+        console.log("KapanRouter.authorizeInstructions: Starting", instructions.length, "instruction(s)");
+        console.log("KapanRouter.authorizeInstructions: Caller", uint256(uint160(caller)));
+        
+        // One slot per ProtocolInstruction, preserve order
+        address[] memory tmpTargets = new address[](instructions.length);
+        bytes[] memory tmpData = new bytes[](instructions.length);
+        uint256 k;
+
+        for (uint256 i = 0; i < instructions.length; i++) {
+            ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
+            
+            console.log("KapanRouter.authorizeInstructions: Processing instruction", i);
+            console.log("KapanRouter.authorizeInstructions: Data length", pi.data.length);
+
+            // Router step
+            if (keccak256(abi.encode(pi.protocolName)) == keccak256(abi.encode("router"))) {
+                console.log("KapanRouter.authorizeInstructions: Router instruction detected");
+                // data is RouterInstruction
+                RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
+                console.log("KapanRouter.authorizeInstructions: Router instruction type", uint256(r.instructionType));
+                console.log("KapanRouter.authorizeInstructions: Router instruction user", uint256(uint160(r.user)));
+                console.log("KapanRouter.authorizeInstructions: Router instruction token", uint256(uint160(r.token)));
+                console.log("KapanRouter.authorizeInstructions: Router instruction amount", r.amount);
+                
+                if (r.instructionType == RouterInstructionType.PullToken && r.user == caller) {
+                    console.log("KapanRouter.authorizeInstructions: PullToken for caller - generating approval");
+                    // User must approve router to pull 'token' for 'amount'
+                    tmpTargets[k] = r.token;
+                    tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), r.amount);
+                    console.log("KapanRouter.authorizeInstructions: Generated router approval");
+                } else {
+                    console.log("KapanRouter.authorizeInstructions: Not PullToken or not for caller - skipping");
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                }
+                k++;
+                continue;
+            }
+
+            // Protocol step => delegate to gateway.authorize one-by-one
+            console.log("KapanRouter.authorizeInstructions: Protocol instruction - looking up gateway");
+            IGateway gw = gateways[pi.protocolName];
+            console.log("KapanRouter.authorizeInstructions: Gateway address", uint256(uint160(address(gw))));
+            
+            if (address(gw) == address(0)) {
+                console.log("KapanRouter.authorizeInstructions: WARNING - Gateway not found for protocol", pi.protocolName);
+                // Unknown gateway; leave empty slot, but keep order
+                tmpTargets[k] = address(0);
+                tmpData[k] = bytes("");
+                k++;
+                continue;
+            }
+
+            // Kapan encodes a single LendingInstruction in ProtocolInstruction.data
+            console.log("KapanRouter.authorizeInstructions: Decoding LendingInstruction");
+            ProtocolTypes.LendingInstruction memory li =
+                abi.decode(pi.data, (ProtocolTypes.LendingInstruction));
+            
+            console.log("KapanRouter.authorizeInstructions: Decoded op", uint256(li.op));
+            console.log("KapanRouter.authorizeInstructions: Decoded token", uint256(uint160(li.token)));
+            console.log("KapanRouter.authorizeInstructions: Decoded user", uint256(uint160(li.user)));
+            console.log("KapanRouter.authorizeInstructions: Decoded amount", li.amount);
+
+            ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
+            one[0] = li;
+
+            console.log("KapanRouter.authorizeInstructions: Calling gateway.authorize");
+            (address[] memory t, bytes[] memory d) = gw.authorize(one, caller);
+            console.log("KapanRouter.authorizeInstructions: Gateway returned", t.length, "authorization(s)");
+
+            // Gateway.authorize returns one element for 'one'
+            if (t.length > 0 && t[0] != address(0) && d[0].length > 0) {
+                console.log("KapanRouter.authorizeInstructions: Valid gateway authorization found");
+                console.log("KapanRouter.authorizeInstructions: Gateway target", uint256(uint160(t[0])));
+                console.log("KapanRouter.authorizeInstructions: Gateway data length", d[0].length);
+                tmpTargets[k] = t[0];
+                tmpData[k] = d[0];
+            } else {
+                console.log("KapanRouter.authorizeInstructions: No valid gateway authorization (empty or zero address)");
+                if (t.length > 0) {
+                    console.log("KapanRouter.authorizeInstructions: Gateway target was", uint256(uint160(t[0])));
+                    console.log("KapanRouter.authorizeInstructions: Gateway data length was", d[0].length);
+                } else {
+                    console.log("KapanRouter.authorizeInstructions: Gateway returned empty arrays");
+                }
+                tmpTargets[k] = address(0);
+                tmpData[k] = bytes("");
+            }
+            k++;
+        }
+
+        console.log("KapanRouter.authorizeInstructions: Total authorizations collected", k);
+        
+        // Compact to exact length (optional; keeps ABI tidy)
+        targets = new address[](k);
+        data = new bytes[](k);
+        for (uint256 i = 0; i < k; i++) {
+            targets[i] = tmpTargets[i];
+            data[i] = tmpData[i];
+        }
+        
+        console.log("KapanRouter.authorizeInstructions: Returning", targets.length, "authorization(s)");
     }
 
     function _getOutputs() internal view returns (ProtocolTypes.Output[] memory out) {

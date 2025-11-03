@@ -45,6 +45,16 @@ contract MockGateway is IGateway {
             outputs = new ProtocolTypes.Output[](0);
         }
     }
+
+    function authorize(ProtocolTypes.LendingInstruction[] calldata /* instrs */, address /* caller */)
+        external
+        pure
+        returns (address[] memory targets, bytes[] memory data)
+    {
+        // Mock gateway doesn't require any user-side approvals
+        targets = new address[](0);
+        data = new bytes[](0);
+    }
 }
 
 

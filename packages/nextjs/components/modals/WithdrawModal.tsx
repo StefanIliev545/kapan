@@ -23,7 +23,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   position,
 }) => {
   const decimals = token.decimals;
-  const { buildWithdrawFlow, executeInstructions, isPending, isConfirming, isConfirmed } = useKapanRouterV2();
+  const { buildWithdrawFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -38,7 +38,8 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
         protocolName.toLowerCase(),
         token.address,
         amount,
-        token.decimals || decimals || 18
+        token.decimals || decimals || 18,
+        isMax || false
       );
       
       if (instructions.length === 0) {
@@ -46,13 +47,14 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
         return;
       }
 
-      await executeInstructions(instructions);
+      // Use executeFlowWithApprovals to handle approvals automatically
+      await executeFlowWithApprovals(instructions);
       notification.success("Withdraw transaction sent");
     } catch (error: any) {
       console.error("Withdraw error:", error);
       notification.error(error.message || "Failed to withdraw");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeInstructions]);
+  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowWithApprovals]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

@@ -381,7 +381,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xf8FF42Aa39e7d440B30939900DA6b54079b81e2c",
+      address: "0x3d2574DB219f140be7F7Aa0Db8B961A8384d0efD",
       abi: [
         {
           inputs: [
@@ -713,6 +713,7 @@ const contracts = {
         },
       ],
       inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
         processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
@@ -1455,7 +1456,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xB6Ac22A8cd5063bAF27cA80644a551B116f712f5",
+      address: "0x2541DAf73558e5E094ffbEb40b575930977E55A3",
       abi: [
         {
           inputs: [
@@ -1964,6 +1965,7 @@ const contracts = {
         },
       ],
       inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
         processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
         owner: "@openzeppelin/contracts/access/Ownable.sol",
@@ -1972,7 +1974,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x1077717F2AA5f14F9280Ef2c4695A18235f107E6",
+      address: "0x575760dA40344259B1f190162253d1E44661407a",
       abi: [
         {
           inputs: [
@@ -2085,6 +2087,47 @@ const contracts = {
           name: "addGateway",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "string",
+                  name: "protocolName",
+                  type: "string",
+                },
+                {
+                  internalType: "bytes",
+                  name: "data",
+                  type: "bytes",
+                },
+              ],
+              internalType: "struct ProtocolTypes.ProtocolInstruction[]",
+              name: "instructions",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "caller",
+              type: "address",
+            },
+          ],
+          name: "authorizeInstructions",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -3361,7 +3404,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x00Af2ae94f7343D96afeDF85fe37496CE550E29B",
+      address: "0x504D235949Da9f5E2CA33B24eb21332D6DcDe6C1",
       abi: [
         {
           inputs: [
@@ -3767,6 +3810,7 @@ const contracts = {
         },
       ],
       inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
         processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
         owner: "@openzeppelin/contracts/access/Ownable.sol",
