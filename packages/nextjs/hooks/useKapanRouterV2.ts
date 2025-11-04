@@ -51,21 +51,22 @@ export const useKapanRouterV2 = () => {
 
   // Refresh Wagmi queries when transaction completes
   useEffect(() => {
-    if (isConfirmed && hash) {
-      // Invalidate all Wagmi queries to refresh balances, positions, etc.
-      // Wagmi queries are prefixed with 'wagmi' in the query key
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          // Invalidate Wagmi queries (they start with ['wagmi', ...])
-          const queryKey = query.queryKey;
-          return Array.isArray(queryKey) && queryKey[0] === 'wagmi';
-        },
-      });
-      
-      // Also dispatch a custom event for any listeners that might need it
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("txCompleted"));
-      }
+    if (!isConfirmed || !hash) return;
+
+    // Use refetchQueries instead of invalidateQueries for faster refresh
+    // This only refetches active/mounted queries instead of marking all as stale
+    Promise.all([
+      queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
+    ]).catch(error => {
+      console.warn('Error refetching queries after transaction:', error);
+    });
+
+    // Also dispatch a custom event for any listeners that might need it
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("txCompleted"));
     }
   }, [isConfirmed, hash, queryClient]);
 
