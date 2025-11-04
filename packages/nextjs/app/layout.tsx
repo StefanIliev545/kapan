@@ -1,6 +1,7 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import { Theme } from "@radix-ui/themes";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
@@ -31,13 +32,18 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"],
 });
 
-const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
+const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
+  const headersList = await headers();
+  const initialHost = headersList.get("host");
+
   return (
     <html suppressHydrationWarning>
       <body className={`${inter.className}`}>
         <ThemeProvider>
           <QueryProvider>
-            <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+            <ScaffoldEthAppWithProviders initialHost={initialHost}>
+              {children}
+            </ScaffoldEthAppWithProviders>
           </QueryProvider>
         </ThemeProvider>
         <SpeedInsights />
