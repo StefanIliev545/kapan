@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
@@ -118,23 +118,25 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
       explorer={starkscan}
       autoConnect={true}
     >
-      <AccountProvider>
-        <WagmiProvider config={wagmiConfig}>
-          <BlockNumberProvider>
-            <StarkBlockNumberProvider>
-              <ProgressBar height="3px" color="#2299dd" />
-              <RainbowKitProvider
-                avatar={BlockieAvatar}
-                theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-              >
-                <StarknetWalletAnalytics />
-                <WalletAnalytics />
-                <ScaffoldEthApp>{children}</ScaffoldEthApp>
-              </RainbowKitProvider>
-            </StarkBlockNumberProvider>
-          </BlockNumberProvider>
-        </WagmiProvider>
-      </AccountProvider>
+      <Suspense fallback={null}>
+        <AccountProvider>
+          <WagmiProvider config={wagmiConfig}>
+            <BlockNumberProvider>
+              <StarkBlockNumberProvider>
+                <ProgressBar height="3px" color="#2299dd" />
+                <RainbowKitProvider
+                  avatar={BlockieAvatar}
+                  theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+                >
+                  <StarknetWalletAnalytics />
+                  <WalletAnalytics />
+                  <ScaffoldEthApp>{children}</ScaffoldEthApp>
+                </RainbowKitProvider>
+              </StarkBlockNumberProvider>
+            </BlockNumberProvider>
+          </WagmiProvider>
+        </AccountProvider>
+      </Suspense>
     </StarknetConfig>
   );
 };
