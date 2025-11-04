@@ -1,5 +1,4 @@
-import { UseAccountResult } from "@starknet-react/core";
-import { useAccountContext } from "~~/contexts/AccountContext";
+import { EnhancedUseAccountResult, useAccountContext } from "~~/contexts/AccountContext";
 
 /**
  * Wrapper around starknet-react's useAccount hook to fix inconsistencies and provide workarounds.
@@ -17,6 +16,6 @@ import { useAccountContext } from "~~/contexts/AccountContext";
  *   - All other properties from starknet-react's useAccount
  */
 
-export function useAccount(): UseAccountResult {
+export function useAccount(): EnhancedUseAccountResult {
   return useAccountContext();
 }

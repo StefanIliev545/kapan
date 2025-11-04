@@ -17,7 +17,7 @@ const LandingSection = () => {
     if (typeof window === "undefined") return;
     const anyWin = window as any;
     const detected = Boolean(anyWin?.starknet) || Boolean(anyWin?.argentX) || Boolean(anyWin?.braavos);
-    setHasStarknetWallet(detected || starknet.isConnected);
+    setHasStarknetWallet(detected || Boolean(starknet.isConnected));
   }, [starknet.isConnected]);
   return (
     <section className="w-full pt-3 pb-3 lg:py-5 relative overflow-hidden bg-gradient-to-b from-base-100 to-base-200 dark:from-base-200 dark:to-base-300">

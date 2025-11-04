@@ -67,14 +67,14 @@ const computeUsdValue = (amount: bigint, decimals: number, priceWithEightDecimal
 };
 
 export const useNostraLendingPositions = () => {
-  const { address } = useAccount();
+  const { viewingAddress } = useAccount();
 
   const { assets, rateMap, priceMap, decimalsMap, isLoading: isLoadingAssets } = useNostraAssets();
 
   const userPositionsQuery = useScaffoldReadContract({
     contractName: "NostraGateway",
     functionName: "get_user_positions",
-    args: [address],
+    args: [viewingAddress],
     refetchInterval: 10000,
   });
 

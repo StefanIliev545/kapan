@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -11,12 +11,15 @@ import {
   XMarkIcon,
   RectangleStackIcon,
   BanknotesIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
 import { GasTokenSelector } from "~~/components/GasTokenSelector";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { useAccount } from "~~/hooks/useAccount";
+import { normalizeUserAddress } from "~~/utils/address";
 
 type HeaderMenuLink = {
   label: string;
@@ -101,6 +104,94 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
     </>
   );
 };
+
+const AddressSearchBar = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { viewingAddress, address: connectedAddress } = useAccount();
+  const [value, setValue] = useState<string>(viewingAddress ?? "");
+  const [hasSubmittedInvalid, setHasSubmittedInvalid] = useState(false);
+
+  const currentOverride = searchParams?.get("address") ?? undefined;
+  const hasOverride = useMemo(() => Boolean(currentOverride), [currentOverride]);
+
+  useEffect(() => {
+    setValue(viewingAddress ?? "");
+  }, [viewingAddress]);
+
+  const updateUrlWithAddress = useCallback(
+    (addressValue?: `0x${string}`) => {
+      const params = new URLSearchParams(searchParams?.toString());
+
+      if (addressValue) {
+        params.set("address", addressValue);
+      } else {
+        params.delete("address");
+      }
+
+      const query = params.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const handleSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const normalized = normalizeUserAddress(value);
+
+      if (!normalized) {
+        setHasSubmittedInvalid(true);
+        return;
+      }
+
+      setHasSubmittedInvalid(false);
+      setValue(normalized);
+      updateUrlWithAddress(normalized);
+    },
+    [updateUrlWithAddress, value],
+  );
+
+  const handleClear = useCallback(() => {
+    updateUrlWithAddress(undefined);
+    setHasSubmittedInvalid(false);
+    setValue(connectedAddress ?? "");
+  }, [connectedAddress, updateUrlWithAddress]);
+
+  const isInvalid = hasSubmittedInvalid && !normalizeUserAddress(value);
+
+  return (
+    <form onSubmit={handleSubmit} className="relative w-full max-w-xl">
+      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base-content/60">
+        <MagnifyingGlassIcon className="h-5 w-5" />
+      </span>
+      <input
+        value={value}
+        onChange={event => {
+          setValue(event.target.value);
+          if (hasSubmittedInvalid) {
+            setHasSubmittedInvalid(false);
+          }
+        }}
+        placeholder="Search address"
+        className={`input input-bordered w-full bg-base-200 pl-10 pr-12 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 dark:focus:ring-accent/40 ${
+          isInvalid ? "input-error" : ""
+        }`}
+      />
+      {hasOverride && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="absolute inset-y-0 right-2 flex items-center rounded-full p-1 text-base-content/60 transition-colors hover:text-error"
+          aria-label="Clear address override"
+        >
+          <XMarkIcon className="h-5 w-5" />
+        </button>
+      )}
+    </form>
+  );
+};
 /**
  * App header for /app/app page with wallet connection and settings
  */
@@ -109,6 +200,7 @@ export const AppHeader = () => {
   const [scrolled, setScrolled] = useState(false);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const isPositionsPage = pathname === "/app";
 
   useOutsideClick(
     burgerMenuRef,
@@ -145,9 +237,9 @@ export const AppHeader = () => {
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="navbar justify-between min-h-0 h-auto py-0">
+          <div className="navbar justify-between min-h-0 h-auto py-0 gap-4">
             {/* Left section - Logo */}
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <div
                 className="lg:hidden dropdown z-50 mr-2"
                 ref={burgerMenuRef}
@@ -268,6 +360,11 @@ export const AppHeader = () => {
               </div>
             </div>
 
+            {/* Middle section - Address search */}
+            <div className="flex-1 hidden md:flex justify-center">
+              {isPositionsPage && <AddressSearchBar />}
+            </div>
+
             {/* Right section - Wallet connection and settings */}
             <div className="flex items-center gap-4">
               {/* Connect button */}
@@ -299,6 +396,11 @@ export const AppHeader = () => {
           </div>
         </div>
       </div>
+      {isPositionsPage && (
+        <div className="px-4 pb-2 md:hidden">
+          <AddressSearchBar />
+        </div>
+      )}
       <div className="w-full bg-primary/5 dark:bg-accent/5 text-base-content/70 text-center text-xs py-1">
         <Link
           href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
