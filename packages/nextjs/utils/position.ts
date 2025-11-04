@@ -13,7 +13,12 @@ export class PositionManager {
   ): PositionManager {
     const suppliedTotal = supplied.reduce((acc, p) => acc + p.balance, 0);
     const collateralTotal = borrowed.reduce((acc, p) => acc + (p.collateralValue || 0), 0);
-    const totalSupplied = suppliedTotal > 0 ? suppliedTotal : collateralTotal;
+
+    // When protocols expose the collateral value that actually counts towards
+    // borrowing power, prefer it over the raw supplied balance. This keeps the
+    // "max" borrow calculations aligned with on-chain limits (e.g. Compound or
+    // Aave collateral factors) so the UI doesn't request more than allowed.
+    const totalSupplied = collateralTotal > 0 ? collateralTotal : suppliedTotal;
     const borrowedTotal = borrowed.reduce((acc, p) => acc + Math.abs(p.balance), 0);
     return new PositionManager(totalSupplied, borrowedTotal);
   }
