@@ -156,11 +156,12 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         require(inputPtr.index < inputs.length, "PushToken: bad index");
         ProtocolTypes.Output memory output = inputs[inputPtr.index];
         require(output.token != address(0), "PushToken: zero token");
-        require(output.amount > 0, "PushToken: zero amount");
         // Extract user from RouterInstruction in data
-        RouterInstruction memory routerInstruction;
-        (routerInstruction, ) = abi.decode(instruction.data, (RouterInstruction, ProtocolTypes.InputPtr));
-        IERC20(output.token).safeTransfer(routerInstruction.user, output.amount);
+        if (output.amount != 0) {
+            RouterInstruction memory routerInstruction;
+            (routerInstruction, ) = abi.decode(instruction.data, (RouterInstruction, ProtocolTypes.InputPtr));
+            IERC20(output.token).safeTransfer(routerInstruction.user, output.amount);
+        }
         // Consume the UTXO by clearing it (set to zero)
         // Note: We don't remove it from the array to maintain index consistency
         inputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });

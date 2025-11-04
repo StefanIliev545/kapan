@@ -24,7 +24,7 @@ export const RepayModal: FC<RepayModalProps> = ({
   position,
 }) => {
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
-  const { buildRepayFlow, executeFlowWithApprovals, isPending, isConfirming, isConfirmed, isApproving } = useKapanRouterV2();
+  const { buildRepayFlowAsync, executeFlowWithApprovals, isPending, isConfirming, isConfirmed, isApproving } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -36,7 +36,8 @@ export const RepayModal: FC<RepayModalProps> = ({
 
   const handleRepay = useCallback(async (amount: string, isMax?: boolean) => {
     try {
-      const instructions = buildRepayFlow(
+      // Use async version for max repayments to safely read wallet balance
+      const instructions = await buildRepayFlowAsync(
         protocolName.toLowerCase(),
         token.address,
         amount,
@@ -45,7 +46,7 @@ export const RepayModal: FC<RepayModalProps> = ({
       );
       
       if (instructions.length === 0) {
-        notification.error("Failed to build repay instructions");
+        notification.error("Failed to build repay instructions or no balance to repay");
         return;
       }
 
@@ -56,7 +57,7 @@ export const RepayModal: FC<RepayModalProps> = ({
       console.error("Repay error:", error);
       notification.error(error.message || "Failed to repay");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlow, executeFlowWithApprovals]);
+  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowWithApprovals]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

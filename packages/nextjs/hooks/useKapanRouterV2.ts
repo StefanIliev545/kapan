@@ -148,30 +148,98 @@ export const useKapanRouterV2 = () => {
     if (!userAddress) return [];
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
-    // For max repayments, pull a bit more than needed to cover interest accrual
-    // The repay instruction will use MaxUint256 to repay all debt, and refund excess
-    const amountBigInt = isMax || amount.toLowerCase() === "max"
-      ? (2n ** 256n - 1n) // MaxUint256 for PullToken - we'll pull max available
-      : parseUnits(amount, decimals);
+    // NEVER use MaxUint256 for PullToken - it will always revert!
+    // Use buildRepayFlowAsync for max repayments to safely read wallet balance
+    if (isMax || amount.toLowerCase() === "max") {
+      console.warn("buildRepayFlow: isMax=true is deprecated. Use buildRepayFlowAsync instead.");
+      return []; // Return empty to prevent invalid flow
+    }
 
-    // For max repay, the repay instruction should use MaxUint256 to signal "repay all"
-    const repayAmount = isMax || amount.toLowerCase() === "max" ? (2n ** 256n - 1n) : 0n;
+    const amountBigInt = parseUnits(amount, decimals);
 
+    // UTXO sequence:
+    // 0: PullToken creates UTXO[0] with pulled tokens
+    // 1: Approve creates UTXO[1] (dummy zero output to maintain index alignment)
+    // 2: Repay consumes UTXO[0], creates UTXO[2] with refund (if any)
+    // So refund is at index 2, not 1!
     return [
-      // Pull tokens from user to router (use MaxUint256 for max repay to pull all available)
+      // Pull tokens from user to router (creates UTXO[0] with pulled tokens)
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
       // Approve gateway to pull tokens from router (UTXO[0])
+      // This creates UTXO[1] (dummy zero output)
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-      // Repay debt (uses UTXO[0] as input, creates UTXO[1] with refund if any)
-      // For max repay, use MaxUint256 in amount parameter - protocol will repay all debt
+      // Repay debt (uses UTXO[0] as input, creates UTXO[2] with refund if any)
+      // Gateway will use UTXO[0].token and UTXO[0].amount when inputIndex < inputs.length
+      // The amount parameter (0n) is ignored when inputIndex is used
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, repayAmount, "0x", 0)
+        encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, "0x", 0)
       ),
-      // Push refund to user if any (UTXO[1])
-      createRouterInstruction(encodePushToken(1, userAddress)),
+      // Push refund to user if any (UTXO[2] contains refund from repay)
+      createRouterInstruction(encodePushToken(2, userAddress)),
     ];
   }, [userAddress]);
+
+  /**
+   * Build a repay flow with async wallet balance check for max repayments
+   * This safely handles "max" repayments by reading the user's wallet balance instead of using MaxUint256
+   * @param protocolName - Protocol to repay to
+   * @param tokenAddress - Token address to repay
+   * @param amount - Amount to repay (as string) or "max" for full wallet balance
+   * @param decimals - Token decimals (default: 18)
+   * @param isMax - Whether to repay maximum (uses wallet balance, not MaxUint256)
+   */
+  const buildRepayFlowAsync = useCallback(async (
+    protocolName: string,
+    tokenAddress: string,
+    amount: string,
+    decimals = 18,
+    isMax = false
+  ): Promise<ProtocolInstruction[]> => {
+    if (!userAddress || !publicClient) return [];
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+
+    // For max repayments, pull 1% more than wallet balance to account for interest accrual
+    // during transaction travel. GetBorrowBalance will provide the exact debt amount.
+    let pullAmount: bigint;
+    if (isMax || amount.toLowerCase() === "max") {
+      // For max repayments, pull 1% more to account for interest accrual/variation
+      pullAmount = (parseUnits(amount, decimals) * 101n) / 100n;
+    } else {
+      pullAmount = parseUnits(amount, decimals);
+    }
+
+    // UTXO sequence:
+    // 0: PullToken creates UTXO[0] with pulled tokens (wallet balance * 1.01)
+    // 1: Approve creates UTXO[1] (dummy zero output to maintain index alignment)
+    // 2: GetBorrowBalance creates UTXO[2] with exact debt amount
+    // 3: Repay consumes UTXO[0] (or UTXO[2] for max), creates UTXO[3] with refund (if any)
+    // So refund is at index 3!
+    return [
+      // Pull tokens from user to router (wallet balance * 1.01 for max repayments)
+      createRouterInstruction(encodePullToken(pullAmount, tokenAddress, userAddress)),
+      // Approve gateway to pull tokens from router (UTXO[0])
+      // This creates UTXO[1] (dummy zero output)
+      createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+      // Get exact borrow balance (creates UTXO[2] with current debt amount)
+      // This ensures we repay exactly what's owed, accounting for interest accrual
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.GetBorrowBalance, tokenAddress, userAddress, 0n, "0x", 999)
+      ),
+      // Repay debt:
+      // - For max: uses UTXO[2] (GetBorrowBalance output) for exact debt amount
+      // - For regular: uses UTXO[0] (pulled amount) for specified amount
+      // Creates UTXO[3] with refund (if pulled amount > debt amount)
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, "0x", isMax ? 2 : 0)
+      ),
+      // Push refund to user if any (UTXO[3] contains refund from repay)
+      createRouterInstruction(encodePushToken(3, userAddress)),
+    ];
+  }, [userAddress, publicClient]);
 
   /**
    * Build a basic withdraw flow: Withdraw -> PushToken
@@ -418,6 +486,7 @@ export const useKapanRouterV2 = () => {
     buildDepositFlow,
     buildBorrowFlow,
     buildRepayFlow,
+    buildRepayFlowAsync, // Use this for max repayments
     buildWithdrawFlow,
     // Execution functions
     executeInstructions,
