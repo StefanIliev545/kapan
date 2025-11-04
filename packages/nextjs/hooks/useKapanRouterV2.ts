@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { parseUnits, type Address } from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import {
@@ -38,6 +39,7 @@ export const useKapanRouterV2 = () => {
   const { data: routerContract } = useDeployedContractInfo({ contractName: "KapanRouter" });
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const queryClient = useQueryClient();
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
   
@@ -46,6 +48,26 @@ export const useKapanRouterV2 = () => {
   });
 
   const [isApproving, setIsApproving] = useState(false);
+
+  // Refresh Wagmi queries when transaction completes
+  useEffect(() => {
+    if (isConfirmed && hash) {
+      // Invalidate all Wagmi queries to refresh balances, positions, etc.
+      // Wagmi queries are prefixed with 'wagmi' in the query key
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          // Invalidate Wagmi queries (they start with ['wagmi', ...])
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) && queryKey[0] === 'wagmi';
+        },
+      });
+      
+      // Also dispatch a custom event for any listeners that might need it
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("txCompleted"));
+      }
+    }
+  }, [isConfirmed, hash, queryClient]);
 
   /**
    * Build a basic deposit flow: PullToken -> Approve -> Deposit
@@ -174,14 +196,20 @@ export const useKapanRouterV2 = () => {
       ? (2n ** 256n - 1n) // MaxUint256
       : parseUnits(amount, decimals);
 
+    
+
     return [
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenAddress, userAddress, 0n, "0x", 0)
+      ),
       // Withdraw collateral (creates UTXO[0] with withdrawn tokens)
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.WithdrawCollateral, tokenAddress, userAddress, amountBigInt, "0x", 999)
+        encodeLendingInstruction(LendingOp.WithdrawCollateral, tokenAddress, userAddress, amountBigInt, "0x", isMax ? 0 : 999)
       ),
       // Push withdrawn tokens to user (UTXO[0])
-      createRouterInstruction(encodePushToken(0, userAddress)),
+      createRouterInstruction(encodePushToken(1, userAddress)),
     ];
   }, [userAddress]);
 
@@ -350,13 +378,23 @@ export const useKapanRouterV2 = () => {
 
         // Execute the approval call directly using the encoded data from authorizeInstructions
         // The router has already encoded the approve(address spender, uint256 amount) call
+        // Fetch the current nonce explicitly to avoid MetaMask nonce issues with Hardhat
+        const currentNonce = await publicClient.getTransactionCount({
+          address: userAddress as Address,
+        });
+        
         const approveHash = await walletClient.sendTransaction({
           to: authCall.target,
           data: authCall.data,
+          nonce: currentNonce, // Explicitly set nonce to prevent MetaMask caching issues
         });
 
         // Wait for approval confirmation (crucial for mobile wallets)
+        // Add a small delay after receipt to ensure Hardhat processes the nonce update
         await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        
+        // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         notification.success(`${tokenSymbol} approved ✅`);
         setIsApproving(false);

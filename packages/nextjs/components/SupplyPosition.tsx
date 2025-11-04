@@ -3,6 +3,7 @@ import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
+import { WithdrawModal } from "./modals/WithdrawModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
@@ -468,6 +469,21 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
+            position={position}
+          />
+          <WithdrawModal
+            isOpen={withdrawModal.isOpen}
+            onClose={withdrawModal.close}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              usdPrice,
+              decimals: tokenDecimals || 18,
+            }}
+            protocolName={protocolName}
+            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
           />
         </>
