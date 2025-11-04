@@ -72,8 +72,8 @@ export const VesuProtocolView: FC = () => {
   const [borrowSelection, setBorrowSelection] = useState<BorrowSelectionState>(null);
   const [depositSelection, setDepositSelection] = useState<DepositSelectionState>(null);
   const [isMarketsOpen, setIsMarketsOpen] = useState(() => ({
-    v1: !userAddress,
-    v2: !userAddress,
+    v1: false,
+    v2: false,
   }));
   const [marketsManuallyToggled, setMarketsManuallyToggled] = useState(() => ({ v1: false, v2: false }));
 
@@ -167,7 +167,7 @@ export const VesuProtocolView: FC = () => {
 
   useEffect(() => {
     if (!userAddress) {
-      setIsMarketsOpen({ v1: true, v2: true });
+      setIsMarketsOpen({ v1: false, v2: false });
       setMarketsManuallyToggled({ v1: false, v2: false });
       return;
     }
@@ -265,6 +265,14 @@ export const VesuProtocolView: FC = () => {
             </div>
           }
         />
+        {!userAddress && (
+          <div className="rounded-xl border border-base-300 bg-base-100 p-6 text-center text-base-content/80">
+            <h3 className="text-lg font-semibold text-base-content">Connect a wallet to view your Vesu V1 positions</h3>
+            <p className="mt-2 text-sm text-base-content/70">
+              Connect a Starknet wallet to load your deposits and borrows.
+            </p>
+          </div>
+        )}
         {/* V1 Positions across all pools */}
         {(
           [
@@ -353,6 +361,14 @@ export const VesuProtocolView: FC = () => {
             </div>
           }
         />
+        {!userAddress && (
+          <div className="rounded-xl border border-base-300 bg-base-100 p-6 text-center text-base-content/80">
+            <h3 className="text-lg font-semibold text-base-content">Connect a wallet to view your Vesu V2 positions</h3>
+            <p className="mt-2 text-sm text-base-content/70">
+              Connect a Starknet wallet to load your deposits and borrows.
+            </p>
+          </div>
+        )}
         {/* V2 Positions across all pools */}
         {(
           [
