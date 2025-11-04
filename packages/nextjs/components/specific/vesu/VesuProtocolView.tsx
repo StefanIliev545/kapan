@@ -75,7 +75,6 @@ export const VesuProtocolView: FC = () => {
     v1: false,
     v2: false,
   }));
-  const [marketsManuallyToggled, setMarketsManuallyToggled] = useState(() => ({ v1: false, v2: false }));
 
   const computeMetrics = (rows: VesuPositionRow[]) => {
     if (rows.length === 0) {
@@ -168,24 +167,8 @@ export const VesuProtocolView: FC = () => {
   useEffect(() => {
     if (!userAddress) {
       setIsMarketsOpen({ v1: false, v2: false });
-      setMarketsManuallyToggled({ v1: false, v2: false });
-      return;
     }
-
-    setMarketsManuallyToggled({ v1: false, v2: false });
   }, [userAddress]);
-
-  useEffect(() => {
-    if (!userAddress || marketsManuallyToggled.v1) return;
-    const desired = !hasPositionsV1;
-    setIsMarketsOpen(prev => (prev.v1 === desired ? prev : { ...prev, v1: desired }));
-  }, [userAddress, hasPositionsV1, marketsManuallyToggled.v1]);
-
-  useEffect(() => {
-    if (!userAddress || marketsManuallyToggled.v2) return;
-    const desired = !hasPositionsV2;
-    setIsMarketsOpen(prev => (prev.v2 === desired ? prev : { ...prev, v2: desired }));
-  }, [userAddress, hasPositionsV2, marketsManuallyToggled.v2]);
 
   useEffect(() => {
     const handler = () => {
@@ -200,7 +183,6 @@ export const VesuProtocolView: FC = () => {
 
   const handleToggleMarkets = (version: VesuVersionKey) => {
     setIsMarketsOpen(previous => ({ ...previous, [version]: !previous[version] }));
-    setMarketsManuallyToggled(previous => ({ ...previous, [version]: true }));
   };
 
   const openDepositModal = (
