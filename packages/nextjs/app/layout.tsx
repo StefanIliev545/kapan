@@ -1,5 +1,4 @@
 import "@rainbow-me/rainbowkit/styles.css";
-import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -10,6 +9,7 @@ import "~~/styles/globals.css";
 import "@radix-ui/themes/styles.css";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 import { QueryProvider } from "~~/app/providers/QueryProvider";
+import { RedactedAnalytics } from "~~/components/RedactedAnalytics";
 
 const baseMetadata = getMetadata({
   title: "Kapan Finance | DeFi Lending Aggregator",
@@ -36,12 +36,12 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
     <html suppressHydrationWarning>
       <body className={`${inter.className}`}>
         <ThemeProvider>
-            <QueryProvider>
-              <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
-            </QueryProvider>
+          <QueryProvider>
+            <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
+          </QueryProvider>
         </ThemeProvider>
         <SpeedInsights />
-        <Analytics />
+        <RedactedAnalytics />
       </body>
     </html>
   );

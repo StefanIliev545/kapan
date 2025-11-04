@@ -50,6 +50,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   suppressDisabledMessage?: boolean;
   extraStats?: ExtraStat[];
   showExpandIndicator?: boolean;
+  defaultExpanded?: boolean;
 };
 
 export const SupplyPosition: FC<SupplyPositionProps> = ({
@@ -87,11 +88,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   suppressDisabledMessage = false,
   extraStats = [],
   showExpandIndicator = true,
+  defaultExpanded = false,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
   const withdrawModal = useModal();
-  const expanded = useToggle();
+  const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;

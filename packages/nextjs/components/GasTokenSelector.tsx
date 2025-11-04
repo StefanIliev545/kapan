@@ -12,11 +12,32 @@ import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 // Default gas token (STRK)
 const DEFAULT_GAS_TOKEN = {
   name: "STRK",
-  symbol: "STRK", 
+  symbol: "STRK",
   icon: "/logos/strk.svg",
   address: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK mainnet address
   balance: "0.00"
 };
+
+const normalizeAddress = (address: string): string => {
+  if (!address) return "";
+  let normalized = address.toLowerCase();
+  if (!normalized.startsWith("0x")) {
+    normalized = `0x${normalized}`;
+  }
+  const stripped = normalized.slice(2).replace(/^0+/, "");
+  return `0x${stripped || "0"}`;
+};
+
+const ALLOWED_GAS_TOKEN_ADDRESSES = new Set(
+  [
+    "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b",
+    "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+    "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
+    "0x0498edfaf50ca5855666a700c25dd629d577eb9afccdf3b5977aec79aee55ada",
+    "0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8",
+    "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+  ].map(normalizeAddress),
+);
 
 
 interface TokenInfo {
@@ -39,14 +60,19 @@ export const GasTokenSelector = () => {
 
   // Normalize token list from paymaster to get addresses and decimals
   const availableTokens: TokenInfo[] = useMemo(() => {
-    const paymaster = (paymasterTokens || []).map((token: any) => ({
-      address: token.token_address || "",
-      decimals: Number(token.decimals ?? 18),
-    })).filter(t => t.address);
+    const paymaster = (paymasterTokens || [])
+      .map((token: any) => ({
+        address: token.token_address || "",
+        decimals: Number(token.decimals ?? 18),
+      }))
+      .filter(
+        (token) =>
+          token.address && ALLOWED_GAS_TOKEN_ADDRESSES.has(normalizeAddress(token.address)),
+      );
 
     // If no paymaster tokens, default to STRK
-    return paymaster.length > 0 
-      ? paymaster 
+    return paymaster.length > 0
+      ? paymaster
       : [{ address: DEFAULT_GAS_TOKEN.address, decimals: 18 }];
   }, [paymasterTokens]);
 

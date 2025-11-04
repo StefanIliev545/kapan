@@ -6,6 +6,7 @@ import { useSwitchChain } from "@starknet-react/core";
 import { useAccount } from "~~/hooks/useAccount";
 import { useEffect, useMemo } from "react";
 import { constants } from "starknet";
+import { track } from "@vercel/analytics";
 
 type NetworkOptionsProps = {
   hidden?: boolean;
@@ -39,11 +40,16 @@ export const NetworkOptions = ({ hidden = false }: NetworkOptionsProps) => {
             <button
               className="menu-item btn-sm !rounded-xl flex gap-3 py-3 whitespace-nowrap"
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const nextChainId = allowedNetworksMapping[allowedNetwork.network];
+                track("Network switched event", {
+                  network: allowedNetwork.name,
+                  chainId: nextChainId,
+                });
                 switchChain({
-                  chainId: allowedNetworksMapping[allowedNetwork.network],
-                })
-              }
+                  chainId: nextChainId,
+                });
+              }}
             >
               <ArrowsRightLeftIcon className="h-6 w-4 ml-2 sm:ml-0" />
               <span>

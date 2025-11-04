@@ -22,6 +22,8 @@ import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { LandingHeader } from "~~/components/LandingHeader";
 import { AppHeader } from "~~/components/AppHeader";
+import { WalletAnalytics } from "~~/components/WalletAnalytics";
+import { StarknetWalletAnalytics } from "~~/components/StarknetWalletAnalytics";
 import { usePathname } from "next/navigation";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
@@ -125,6 +127,8 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
                 avatar={BlockieAvatar}
                 theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
               >
+                <StarknetWalletAnalytics />
+                <WalletAnalytics />
                 <ScaffoldEthApp>{children}</ScaffoldEthApp>
               </RainbowKitProvider>
             </StarkBlockNumberProvider>
