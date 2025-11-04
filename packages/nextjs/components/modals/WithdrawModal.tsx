@@ -35,7 +35,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
     token.decimals = decimals;
   }
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
-  const maxInput = (supplyBalance * 101n) / 100n;
+  const maxInput = supplyBalance;
   return (
     <TokenActionModal
       isOpen={isOpen}
