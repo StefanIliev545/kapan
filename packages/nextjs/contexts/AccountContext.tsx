@@ -11,8 +11,15 @@ import {
   useAccount as useStarknetReactAccount,
 } from "@starknet-react/core";
 import { AccountInterface, constants } from "starknet";
+import { useSearchParams } from "next/navigation";
+import { normalizeUserAddress } from "~~/utils/address";
 
-const AccountContext = createContext<UseAccountResult | null>(null);
+export type EnhancedUseAccountResult = UseAccountResult & {
+  viewingAddress?: `0x${string}`;
+  isViewingOtherAddress: boolean;
+};
+
+const AccountContext = createContext<EnhancedUseAccountResult | null>(null);
 
 type AccountProviderProps = {
   children: ReactNode;
@@ -21,6 +28,7 @@ type AccountProviderProps = {
 export const AccountProvider = ({ children }: AccountProviderProps) => {
   const starknetAccount = useStarknetReactAccount();
   const { account, address, status } = starknetAccount;
+  const searchParams = useSearchParams();
 
   const correctedStatus = useMemo(() => {
     if (status === "connected" && !account) {
@@ -31,6 +39,13 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
   }, [status, account]);
 
   const [accountChainId, setAccountChainId] = useState<bigint>(0n);
+  const [overrideAddress, setOverrideAddress] = useState<`0x${string}` | undefined>();
+
+  const addressParam = searchParams?.get("address");
+
+  useEffect(() => {
+    setOverrideAddress(normalizeUserAddress(addressParam));
+  }, [addressParam]);
 
   useEffect(() => {
     let ignore = false;
@@ -95,14 +110,42 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
     return account;
   }, [status, address, account]);
 
-  const contextValue = useMemo<UseAccountResult>(() => {
+  const viewingAddress = overrideAddress ?? (address as `0x${string}` | undefined);
+  const isViewingOtherAddress = useMemo(() => {
+    if (!overrideAddress) {
+      return false;
+    }
+
+    if (!address) {
+      return true;
+    }
+
+    return overrideAddress.toLowerCase() !== address.toLowerCase();
+  }, [overrideAddress, address]);
+
+  const derivedIsConnected = useMemo(() => {
+    return Boolean(starknetAccount.isConnected && !isViewingOtherAddress);
+  }, [starknetAccount.isConnected, isViewingOtherAddress]);
+
+  const contextValue = useMemo<EnhancedUseAccountResult>(() => {
     return {
       ...starknetAccount,
       account: patchedAccount,
       status: correctedStatus,
       chainId: accountChainId,
-    } as UseAccountResult;
-  }, [starknetAccount, patchedAccount, correctedStatus, accountChainId]);
+      isConnected: derivedIsConnected,
+      viewingAddress,
+      isViewingOtherAddress,
+    } as EnhancedUseAccountResult;
+  }, [
+    starknetAccount,
+    patchedAccount,
+    correctedStatus,
+    accountChainId,
+    derivedIsConnected,
+    viewingAddress,
+    isViewingOtherAddress,
+  ]);
 
   return (
     <AccountContext.Provider value={contextValue}>
@@ -111,7 +154,7 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
   );
 };
 
-export const useAccountContext = (): UseAccountResult => {
+export const useAccountContext = (): EnhancedUseAccountResult => {
   const context = useContext(AccountContext);
 
   if (!context) {

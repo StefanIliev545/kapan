@@ -18,7 +18,7 @@ export const useWalletConnection = () => {
     },
     starknet: {
       address: starkAccount.address,
-      isConnected: starkAccount.status === "connected",
+      isConnected: starkAccount.isConnected,
       status: starkAccount.status,
     },
   };

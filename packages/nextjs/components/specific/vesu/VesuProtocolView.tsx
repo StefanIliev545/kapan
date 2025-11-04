@@ -37,7 +37,8 @@ type DepositSelectionState = {
 } | null;
 
 export const VesuProtocolView: FC = () => {
-  const { address: userAddress, status } = useAccount();
+  const { viewingAddress, status, isViewingOtherAddress } = useAccount();
+  const userAddress = viewingAddress;
   const [selectedV1PoolId, setSelectedV1PoolId] = useState<bigint>(VESU_V1_POOLS["Genesis"]);
   const [selectedV2PoolAddress, setSelectedV2PoolAddress] = useState<string>(VESU_V2_POOLS["Default"]);
   const normalizedPoolAddress = normalizeStarknetAddress(selectedV2PoolAddress);
@@ -208,7 +209,7 @@ export const VesuProtocolView: FC = () => {
     tokens: AssetWithRates[],
     options?: { vesuContext?: VesuContext; position?: PositionManager },
   ) => {
-    if (tokens.length === 0) return;
+    if (tokens.length === 0 || isViewingOtherAddress) return;
     const zeroCounterpart = normalizeStarknetAddress(0n);
     const inferredContext =
       options?.vesuContext ??
@@ -235,13 +236,14 @@ export const VesuProtocolView: FC = () => {
           netYield30d={netYield30dV1}
           netApyPercent={netApyPercentV1}
           onDeposit={() => {
+            if (isViewingOtherAddress) return;
             const allow = new Set(suppliablePositionsV1.map(p => p.tokenAddress.toLowerCase()));
             const filtered = assetsWithRatesV1.filter(a =>
               allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
             );
             openDepositModal("v1", filtered);
           }}
-          canDeposit={assetsWithRatesV1.length > 0}
+          canDeposit={!isViewingOtherAddress && assetsWithRatesV1.length > 0}
           formatCurrency={formatCurrency}
           protocolName="Vesu"
           title="Vesu V1"
@@ -296,7 +298,9 @@ export const VesuProtocolView: FC = () => {
                   const filtered = data.assetsWithRates.filter(a =>
                     allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
                   );
-                  openDepositModal("v1", filtered);
+                  if (!isViewingOtherAddress) {
+                    openDepositModal("v1", filtered);
+                  }
                 }}
                 protocolName="Vesu"
                 netBalanceUsd={metrics.netBalanceUsd}
@@ -323,13 +327,14 @@ export const VesuProtocolView: FC = () => {
           netYield30d={netYield30dV2}
           netApyPercent={netApyPercentV2}
           onDeposit={() => {
+            if (isViewingOtherAddress) return;
             const allow = new Set(suppliablePositionsV2.map(p => p.tokenAddress.toLowerCase()));
             const filtered = assetsWithRatesV2.filter(a =>
               allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
             );
             openDepositModal("v2", filtered);
           }}
-          canDeposit={assetsWithRatesV2.length > 0}
+          canDeposit={!isViewingOtherAddress && assetsWithRatesV2.length > 0}
           formatCurrency={formatCurrency}
           protocolName="vesu_v2"
           title="Vesu V2"
@@ -385,7 +390,9 @@ export const VesuProtocolView: FC = () => {
                   const filtered = data.assetsWithRates.filter(a =>
                     allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
                   );
-                  openDepositModal("v2", filtered);
+                  if (!isViewingOtherAddress) {
+                    openDepositModal("v2", filtered);
+                  }
                 }}
                 protocolName="vesu_v2"
                 netBalanceUsd={metrics.netBalanceUsd}

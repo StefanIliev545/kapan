@@ -5,7 +5,7 @@ import { useAccount } from "~~/hooks/useAccount";
 import { useNostraLendingPositions } from "~~/hooks/useNostraLendingPositions";
 
 export const NostraProtocolView: FC = () => {
-  const { address: connectedAddress } = useAccount();
+  const { viewingAddress, isViewingOtherAddress } = useAccount();
   const { suppliedPositions, borrowedPositions } = useNostraLendingPositions();
 
   return (
@@ -16,9 +16,10 @@ export const NostraProtocolView: FC = () => {
       maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
-      forceShowAll={!connectedAddress}
+      forceShowAll={!viewingAddress}
       networkType="starknet"
       disableMoveSupply
+      readOnly={isViewingOtherAddress}
     />
   );
 };
