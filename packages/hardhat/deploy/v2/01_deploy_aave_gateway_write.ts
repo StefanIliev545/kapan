@@ -52,6 +52,8 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
 
   console.log(`AaveGatewayWrite deployed to: ${aaveGatewayWrite.address}`);
 
+  // On Base, deploy the Base-specific view implementation but keep the deployment name "AaveGatewayView"
+  const isBaseChain = chainId === 8453 || chainId === 84532;
   const aaveGatewayView = await deploy("AaveGatewayView", {
     from: deployer,
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],
@@ -59,6 +61,8 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
     autoMine: true,
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
     waitConfirmations: WAIT,
+    // Use Base-specific contract artifact on Base chains
+    ...(isBaseChain ? { contract: "AaveGatewayViewBase" } : {}),
   });
 
   console.log(`AaveGatewayView deployed to: ${aaveGatewayView.address}`);

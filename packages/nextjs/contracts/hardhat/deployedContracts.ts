@@ -8,7 +8,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const contracts = {
   8453: {
     AaveGatewayView: {
-      address: "0x47bB0A7AeaC2ffd48EC6Aa3190Bfa84748F800d5",
+      address: "0xdfdca91451c4Da48226bFbBd47e76b3B8AE88C78",
       abi: [
         {
           inputs: [
@@ -19,7 +19,7 @@ const contracts = {
             },
             {
               internalType: "address",
-              name: "_uiPoolDataProvider",
+              name: "",
               type: "address",
             },
           ],
@@ -122,7 +122,7 @@ const contracts = {
                   type: "address",
                 },
               ],
-              internalType: "struct AaveGatewayView.TokenInfo[]",
+              internalType: "struct AaveGatewayViewBase.TokenInfo[]",
               name: "",
               type: "tuple[]",
             },
@@ -230,7 +230,7 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "token",
+              name: "",
               type: "address",
             },
             {
@@ -293,7 +293,7 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "market",
+              name: "",
               type: "address",
             },
           ],
@@ -331,7 +331,7 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "market",
+              name: "",
               type: "address",
             },
             {
@@ -357,19 +357,6 @@ const contracts = {
           outputs: [
             {
               internalType: "contract IPoolAddressesProvider",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [],
-          name: "uiPoolDataProvider",
-          outputs: [
-            {
-              internalType: "contract IUiPoolDataProviderV3",
               name: "",
               type: "address",
             },

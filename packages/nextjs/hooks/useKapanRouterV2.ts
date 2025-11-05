@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseUnits, decodeAbiParameters, encodeAbiParameters, type Address } from "viem";
+import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, type Address } from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import {
   ProtocolInstruction,
@@ -426,19 +426,33 @@ export const useKapanRouterV2 = () => {
 
         // Decode and check if approval amount is zero (ERC20 approve(address,uint256))
         try {
-          const decoded = decodeAbiParameters(
-            [{ type: "address" }, { type: "uint256" }],
-            authCall.data.slice(10) as `0x${string}` // Remove function selector (4 bytes)
-          );
-          const amount = decoded[1] as bigint;
-          if (amount === 0n) {
-            console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
-            continue; // Skip zero-amount approvals
+          const decoded = decodeFunctionData({ abi: ERC20ABI, data: authCall.data });
+          if (decoded.functionName === "approve") {
+            const amount = decoded.args?.[1] as bigint;
+            if (amount === 0n) {
+              console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
+              continue; // Skip zero-amount approvals
+            }
           }
         } catch (e) {
-          // If decoding fails, it might not be an ERC20 approve call (could be approveDelegation, etc.)
-          // In that case, proceed with the approval
-          console.log(`executeFlowWithApprovals: Could not decode approval amount, proceeding anyway`, e);
+          // If ABI-aware decoding fails, fall back to selector-based check
+          try {
+            const selector = authCall.data.slice(0, 10).toLowerCase(); // 4-byte selector
+            const APPROVE_SELECTOR = "0x095ea7b3"; // approve(address,uint256)
+            if (selector === APPROVE_SELECTOR) {
+              const decodedParams = decodeAbiParameters(
+                [{ type: "address" }, { type: "uint256" }],
+                authCall.data.slice(10) as `0x${string}`
+              );
+              const amount = decodedParams[1] as bigint;
+              if (amount === 0n) {
+                console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
+                continue;
+              }
+            }
+          } catch (e2) {
+            console.log(`executeFlowWithApprovals: Could not decode approval amount, proceeding anyway`, e2);
+          }
         }
 
         console.log(`executeFlowWithApprovals: Processing approval ${i + 1}/${authCalls.length}`, {
