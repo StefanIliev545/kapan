@@ -93,7 +93,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         }
     }
 
-    function authorize(ProtocolTypes.LendingInstruction[] calldata instrs, address /*caller*/)
+    function authorize(ProtocolTypes.LendingInstruction[] calldata instrs, address caller)
         external view returns (address[] memory targets, bytes[] memory data)
     {
         uint256 count; for (uint256 i; i < instrs.length; i++) {
@@ -107,19 +107,56 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         for (uint256 i; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
             if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); k++;
+                // User token approval to gateway, only if insufficient
+                uint256 cur = IERC20(ins.token).allowance(caller, address(this));
+                if (ins.amount != 0 && cur >= ins.amount) {
+                    targets[k] = address(0); data[k] = bytes("");
+                } else {
+                    targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount);
+                }
+                k++;
             } else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
                 address col = ins.token; address vToken = _getVTokenForUnderlying(col);
-                // First: approve gateway to spend tokens
-                targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); k++;
-                // Second: enter market so vTokens can be used as collateral
-                address[] memory markets = new address[](1); markets[0] = vToken;
-                targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets); k++;
+                // First: approve gateway to spend tokens (only if insufficient)
+                uint256 cur = IERC20(col).allowance(caller, address(this));
+                if (ins.amount != 0 && cur >= ins.amount) {
+                    targets[k] = address(0); data[k] = bytes("");
+                } else {
+                    targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount);
+                }
+                k++;
+                // Second: enter market so vTokens can be used as collateral (only if not already a member)
+                bool member = false;
+                try comptroller.checkMembership(caller, vToken) returns (bool m) { member = m; } catch {}
+                if (member) {
+                    targets[k] = address(0); data[k] = bytes("");
+                } else {
+                    address[] memory markets = new address[](1); markets[0] = vToken;
+                    targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets);
+                }
+                k++;
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address col = ins.token; address vToken = _getVTokenForUnderlying(col);
-                targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max); k++;
+                // Compute required vTokens from underlying using exchangeRateStored; if amount==0, require max
+                uint rate = VTokenInterface(vToken).exchangeRateStored();
+                uint requiredV = ins.amount == 0 ? type(uint256).max : (ins.amount * 1e18 + rate - 1) / rate;
+                uint256 curV = IERC20(vToken).allowance(caller, address(this));
+                if ((ins.amount != 0 && curV >= requiredV) || (ins.amount == 0 && curV == type(uint256).max)) {
+                    targets[k] = address(0); data[k] = bytes("");
+                } else {
+                    targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
+                }
+                k++;
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.updateDelegate.selector, address(this), true); k++;
+                // Only updateDelegate if not already approved
+                bool approved = false;
+                try comptroller.approvedDelegates(caller, address(this)) returns (bool a) { approved = a; } catch {}
+                if (approved) {
+                    targets[k] = address(0); data[k] = bytes("");
+                } else {
+                    targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.updateDelegate.selector, address(this), true);
+                }
+                k++;
             }
         }
     }

@@ -185,7 +185,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         comet.supplyTo(user, token, amount);
     }
 
-    function authorize(ProtocolTypes.LendingInstruction[] calldata instrs, address /*caller*/)
+    function authorize(ProtocolTypes.LendingInstruction[] calldata instrs, address caller)
         external view returns (address[] memory targets, bytes[] memory data)
     {
         uint256 count;
@@ -201,17 +201,29 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
             address market = _decodeMarket(ins.context);
             if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); k++;
+                // Approve underlying to gateway only if insufficient allowance
+                uint256 cur = IERC20(ins.token).allowance(caller, address(this));
+                if (ins.amount != 0 && cur >= ins.amount) { targets[k] = address(0); data[k] = bytes(""); }
+                else { targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); }
+                k++;
             } else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral || (ins.op == ProtocolTypes.LendingOp.Deposit && market != address(0) && market != ins.token)) {
                 address col = ins.token;
-                targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); k++;
+                uint256 cur = IERC20(col).allowance(caller, address(this));
+                if (ins.amount != 0 && cur >= ins.amount) { targets[k] = address(0); data[k] = bytes(""); }
+                else { targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); }
+                k++;
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address base = market != address(0) ? market : ins.token; ICompoundComet comet = tokenToComet[base];
-                targets[k] = address(comet); data[k] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true); k++;
+                bool permitted = comet.isAllowed(caller, address(this));
+                if (permitted) { targets[k] = address(0); data[k] = bytes(""); }
+                else { targets[k] = address(comet); data[k] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true); }
+                k++;
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
                 ICompoundComet comet = tokenToComet[ins.token];
-                targets[k] = address(comet);
-                data[k] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true); k++;
+                bool permitted = comet.isAllowed(caller, address(this));
+                if (permitted) { targets[k] = address(0); data[k] = bytes(""); }
+                else { targets[k] = address(comet); data[k] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true); }
+                k++;
             }
         }
     }

@@ -78,8 +78,13 @@ const App: NextPage = () => {
         <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
 
         {selectedNetwork === "arbitrum" && (
-          <div className="my-4 text-sm text-warning">
+          <div className="my-4 text-sm text-warning text-center">
             Arbitrum support is experimental and pre-audit.
+          </div>
+        )}
+        {selectedNetwork === "base" && (
+          <div className="my-4 text-sm text-warning text-center">
+            Base support is experimental and pre-audit.
           </div>
         )}
 

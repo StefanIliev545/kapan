@@ -32,7 +32,7 @@ export const NetworkFilter: React.FC<NetworkFilterProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-base-200 rounded-lg">
+    <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
       <div className="flex items-center gap-2">
         {networks.map((network) => (
           <button

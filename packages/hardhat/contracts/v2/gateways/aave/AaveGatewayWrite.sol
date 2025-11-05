@@ -183,10 +183,17 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 // User must approve aToken → gateway for withdraw
                 address aToken = _getAToken(ins.token);
                 console.log("AaveGatewayWrite.authorize: aToken", aToken);
-                targets[i] = aToken;
-                // Ask for max so withdraw-all / accrued interest cases don't need another approval
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
-                console.log("AaveGatewayWrite.authorize: Generated approval for aToken");
+                uint256 cur = IERC20(aToken).allowance(caller, address(this));
+                if (cur >= ins.amount && ins.amount != 0) {
+                    // Already sufficient allowance for this withdrawal
+                    targets[i] = address(0);
+                    data[i] = bytes("");
+                } else {
+                    targets[i] = aToken;
+                    // Ask for max so withdraw-all / accrued interest cases don't need another approval
+                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
+                    console.log("AaveGatewayWrite.authorize: Generated approval for aToken");
+                }
 
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
                 console.log("AaveGatewayWrite.authorize: Borrow detected");
@@ -199,15 +206,22 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 if (vDebt == address(0)) {
                     console.log("AaveGatewayWrite.authorize: ERROR - vDebt is zero address!");
                 } else {
-                    targets[i] = vDebt;
-                    data[i] = abi.encodeWithSignature(
-                        "approveDelegation(address,uint256)",
-                        address(this),
-                        type(uint256).max
-                    );
-                    console.log("AaveGatewayWrite.authorize: Generated approveDelegation for vDebt");
-                    console.log("AaveGatewayWrite.authorize: Target", uint256(uint160(targets[i])));
-                    console.log("AaveGatewayWrite.authorize: Data length", data[i].length);
+                    uint256 cur = IVariableDebtToken(vDebt).borrowAllowance(caller, address(this));
+                    if (cur >= ins.amount && ins.amount != 0) {
+                        // Already sufficient delegation
+                        targets[i] = address(0);
+                        data[i] = bytes("");
+                    } else {
+                        targets[i] = vDebt;
+                        data[i] = abi.encodeWithSignature(
+                            "approveDelegation(address,uint256)",
+                            address(this),
+                            type(uint256).max
+                        );
+                        console.log("AaveGatewayWrite.authorize: Generated approveDelegation for vDebt");
+                        console.log("AaveGatewayWrite.authorize: Target", uint256(uint160(targets[i])));
+                        console.log("AaveGatewayWrite.authorize: Data length", data[i].length);
+                    }
                 }
 
             } else {

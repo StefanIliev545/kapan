@@ -15,6 +15,7 @@ interface ICompoundComet {
     
     function baseToken() external view returns (address);
     function allow(address manager, bool isAllowed) external;
+    function isAllowed(address owner, address manager) external view returns (bool);
 
     // Supply/withdraw APIs
     function supplyTo(address dst, address asset, uint amount) external;

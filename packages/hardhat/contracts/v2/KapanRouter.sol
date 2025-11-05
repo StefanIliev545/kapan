@@ -310,9 +310,15 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                 // data is RouterInstruction
                 RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
                 if (r.instructionType == RouterInstructionType.PullToken && r.user == caller) {
-                    // User must approve router to pull 'token' for 'amount'
-                    tmpTargets[k] = r.token;
-                    tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), r.amount);
+                    // User must approve router to pull 'token' for 'amount' IF not already allowed
+                    uint256 current = IERC20(r.token).allowance(caller, address(this));
+                    if (current < r.amount) {
+                        tmpTargets[k] = r.token;
+                        tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), r.amount);
+                    } else {
+                        tmpTargets[k] = address(0);
+                        tmpData[k] = bytes("");
+                    }
                 } else {
                     tmpTargets[k] = address(0);
                     tmpData[k] = bytes("");
