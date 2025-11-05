@@ -26,6 +26,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
 
     function addGateway(string calldata protocolName, address gateway) external onlyOwner {
+        if (address(gateways[protocolName]) == gateway) {
+            return;
+        }
         require(address(gateways[protocolName]) == address(0), "Gateway already exists");
         gateways[protocolName] = IGateway(gateway);
     }

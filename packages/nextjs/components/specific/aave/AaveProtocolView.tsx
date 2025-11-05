@@ -6,11 +6,11 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
-export const AaveProtocolView: FC = () => {
+export const AaveProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
   const { address: connectedAddress } = useAccount();
 
   // Get the AaveGatewayView contract info to use its address as a fallback
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView" });
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView", chainId: chainId as any });
 
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
@@ -27,6 +27,7 @@ export const AaveProtocolView: FC = () => {
     contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
+    chainId,
   });
 
   // Aggregate positions by iterating over the returned tokens.
@@ -100,6 +101,7 @@ export const AaveProtocolView: FC = () => {
       borrowedPositions={filteredBorrowedPositions}
       forceShowAll={forceShowAll}
       networkType="evm"
+      chainId={chainId}
     />
   );
 };

@@ -27,6 +27,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   afterInfoContent?: ReactNode;
   renderName?: (name: string) => ReactNode;
   networkType: "evm" | "starknet";
+  chainId?: number;
   position?: PositionManager;
   disableMove?: boolean;
   containerClassName?: string;
@@ -57,7 +58,6 @@ export type SupplyPositionProps = ProtocolPosition & {
 export const SupplyPosition: FC<SupplyPositionProps> = ({
   icon,
   name,
-  balance,
   tokenBalance,
   currentRate,
   protocolName,
@@ -67,6 +67,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   afterInfoContent,
   renderName,
   networkType,
+  chainId,
   position,
   disableMove = false,
   vesuContext,
@@ -470,6 +471,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             }}
             protocolName={protocolName}
             position={position}
+            chainId={chainId}
           />
           <WithdrawModal
             isOpen={withdrawModal.isOpen}

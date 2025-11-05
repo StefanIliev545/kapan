@@ -13,6 +13,7 @@ interface RepayModalProps {
   protocolName: string;
   debtBalance: bigint;
   position?: PositionManager;
+  chainId?: number;
 }
 
 export const RepayModal: FC<RepayModalProps> = ({
@@ -22,8 +23,9 @@ export const RepayModal: FC<RepayModalProps> = ({
   protocolName,
   debtBalance,
   position,
+  chainId,
 }) => {
-  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
+  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildRepayFlowAsync, executeFlowWithApprovals, isPending, isConfirming, isConfirmed, isApproving } = useKapanRouterV2();
   
   if (token.decimals == null) {

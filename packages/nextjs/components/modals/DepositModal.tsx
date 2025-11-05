@@ -11,10 +11,11 @@ interface DepositModalProps {
   token: TokenInfo;
   protocolName: string;
   position?: PositionManager;
+  chainId?: number;
 }
 
-export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "evm");
+export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId }) => {
+  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildDepositFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {

@@ -43,6 +43,7 @@ interface CompoundCollateralViewProps {
   compoundData: any;
   isVisible?: boolean; // New prop to indicate if the collateral view is visible
   initialShowAll?: boolean; // Prop to control initial showAll state
+  chainId?: number;
 }
 
 export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
@@ -51,6 +52,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   compoundData,
   isVisible = false, // Default to false if not provided
   initialShowAll = undefined, // Default to undefined (use component logic) if not provided
+  chainId,
 }) => {
   const [showAll, setShowAll] = useState(initialShowAll === undefined ? false : initialShowAll);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
@@ -85,6 +87,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "CompoundGatewayView",
     functionName: "getDepositedCollaterals",
     args: [baseToken, queryAddress],
+    chainId: chainId as any,
     query: {
       enabled: shouldFetch,
     },
@@ -101,6 +104,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "CompoundGatewayView",
     functionName: "getPrices",
     args: [baseToken, collateralAddresses],
+    chainId: chainId as any,
     query: {
       enabled: shouldFetch && collateralAddresses.length > 0,
     },
@@ -111,6 +115,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "UiHelper",
     functionName: "getDecimals",
     args: [collateralAddresses],
+    chainId: chainId as any,
     query: {
       enabled: shouldFetch && collateralAddresses.length > 0,
     },
@@ -121,6 +126,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     contractName: "CompoundGatewayView",
     functionName: "getPrice",
     args: [baseToken],
+    chainId: chainId as any,
     query: {
       enabled: shouldFetch,
     },

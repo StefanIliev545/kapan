@@ -12,6 +12,7 @@ interface BorrowModalProps {
   protocolName: string;
   currentDebt: number;
   position?: PositionManager;
+  chainId?: number;
 }
 
 export const BorrowModal: FC<BorrowModalProps> = ({
@@ -21,8 +22,9 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   protocolName,
   currentDebt,
   position,
+  chainId,
 }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "evm");
+  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildBorrowFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {

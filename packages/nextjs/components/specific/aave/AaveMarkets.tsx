@@ -13,11 +13,12 @@ const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 interface AaveMarketsProps {
   viewMode: "list" | "grid";
   search: string;
+  chainId?: number;
 }
 
-export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search }) => {
+export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId }) => {
   const { address: connectedAddress } = useAccount();
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView" });
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView", chainId: chainId as any });
   const queryAddress = connectedAddress || contractInfo?.address;
 
   const { data: allTokensInfo } = useNetworkAwareReadContract({
@@ -25,6 +26,7 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search }) => {
     contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
+    chainId,
   });
 
   const markets: MarketData[] = useMemo(() => {

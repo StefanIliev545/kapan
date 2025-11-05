@@ -36,13 +36,14 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
 
-export const VenusProtocolView: FC = () => {
+export const VenusProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
   const { address: connectedAddress } = useAccount();
  
   // Get Comptroller address from VenusGatewayView
   const { data: comptrollerAddress } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
     functionName: "comptroller",
+    chainId: chainId as any,
   });
 
   const isWalletConnected = !!connectedAddress;
@@ -102,21 +103,24 @@ export const VenusProtocolView: FC = () => {
   const { data: ratesData, isLoading: isLoadingRates } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
     functionName: "getMarketRates",
-    args: [vTokenAddresses]
+    args: [vTokenAddresses],
+    chainId: chainId as any,
   });
   
   // Step 4: Get user balances if wallet is connected
   const { data: userBalances, isLoading: isLoadingBalances } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
     functionName: "getUserBalances",
-    args: [vTokenAddresses, connectedAddress]
+    args: [vTokenAddresses, connectedAddress],
+    chainId: chainId as any,
   });
   
   // Step 5: Get collateral status if wallet is connected
   const { data: collateralStatus, isLoading: isLoadingCollateral } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
     functionName: "getCollateralStatus",
-    args: [vTokenAddresses, connectedAddress]
+    args: [vTokenAddresses, connectedAddress],
+    chainId: chainId as any,
   });
 
   // Combine all the data to create supply and borrow positions
@@ -255,6 +259,7 @@ export const VenusProtocolView: FC = () => {
       borrowedPositions={filteredBorrowedPositions}
       forceShowAll={forceShowAll}
       networkType="evm"
+      chainId={chainId}
     />
   );
 };

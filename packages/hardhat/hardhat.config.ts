@@ -65,8 +65,10 @@ const config: HardhatUserConfig = {
     hardhat: {
       hardfork: "cancun",
       forking: {
-        url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        blockNumber: 396136412,
+       // url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+        url: `https://base-mainnet.g.alchemy.com/v2/yPPyKMaWVp9thvurm46PcIf3-NroyUd-`,
+//        blockNumber: 396136412,
+        blockNumber: 37791583,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
     },

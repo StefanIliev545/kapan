@@ -2,7 +2,7 @@
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { verifyContract } from "../../utils/verification";
+// import { verifyContract } from "../../utils/verification";
 
 /**
  * Deploys the UiHelper contract
@@ -13,6 +13,7 @@ import { verifyContract } from "../../utils/verification";
 const deployUiHelper: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
+  const WAIT = 3;
 
   // Deploy UiHelper (no constructor arguments needed)
   const uiHelper = await deploy("UiHelper", {
@@ -21,14 +22,15 @@ const deployUiHelper: DeployFunction = async function (hre: HardhatRuntimeEnviro
     log: true,
     autoMine: true,
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    waitConfirmations: WAIT,
   });
 
   console.log(`UiHelper deployed to: ${uiHelper.address}`);
 
   // Skip verification on local networks
-  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+ /* if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     await verifyContract(hre, uiHelper.address, []);
-  }
+  }*/
 };
 
 export default deployUiHelper;

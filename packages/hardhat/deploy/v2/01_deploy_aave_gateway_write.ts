@@ -5,54 +5,73 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 
 /**
- * Deploys the AaveGatewayWrite v2 contract using the deployer account and
- * registers it with the KapanRouter
- *
- * @param hre HardhatRuntimeEnvironment object.
+ * Gate deployment by a per-chain address map only.
+ * If the current chainId isn't present, we skip deployment.
  */
 const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const chainId = Number(await hre.getChainId());
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  const POOL_ADDRESSES_PROVIDER =
-    process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
-  const UI_POOL_DATA_PROVIDER = process.env.AAVE_UI_POOL_DATA_PROVIDER || "0x5c5228aC8BC1528482514aF3e27E692495148717";
-  const REFERRAL_CODE = process.env.AAVE_REFERRAL_CODE || "0";
+  // ---- Address map (Arbitrum + Base). No chain in map => skip.
+  const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
+    42161: {
+      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
+      UI:       "0x5c5228aC8BC1528482514aF3e27E692495148717", // Arbitrum UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
+    8453: {
+      PROVIDER: "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d", // Base v3 PoolAddressesProvider
+      UI:       "0x174446a6741300cD2E7C1b1A636Fee99c8F83502", // Base UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
+  };
+
+  const entry = MAP[chainId];
+  if (!entry) {
+    console.warn(`Aave: no address map for chainId=${chainId}. Skipping deployment.`);
+    return;
+  }
+
+  // Env can override addresses for recognized chains
+  const POOL_ADDRESSES_PROVIDER = process.env.AAVE_POOL_ADDRESSES_PROVIDER || entry.PROVIDER;
+  const UI_POOL_DATA_PROVIDER  = process.env.AAVE_UI_POOL_DATA_PROVIDER || entry.UI;
+  const REFERRAL_CODE = Number(process.env.AAVE_REFERRAL_CODE ?? entry.REFERRAL);
 
   const kapanRouter = await get("KapanRouter");
+  const WAIT = 3;
 
   const aaveGatewayWrite = await deploy("AaveGatewayWrite", {
     from: deployer,
-    args: [kapanRouter.address, POOL_ADDRESSES_PROVIDER, parseInt(REFERRAL_CODE)],
+    args: [kapanRouter.address, POOL_ADDRESSES_PROVIDER, REFERRAL_CODE],
     log: true,
     autoMine: true,
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    waitConfirmations: WAIT,
   });
 
   console.log(`AaveGatewayWrite deployed to: ${aaveGatewayWrite.address}`);
 
-  // Deploy view gateway (not registered to router)
   const aaveGatewayView = await deploy("AaveGatewayView", {
     from: deployer,
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],
     log: true,
     autoMine: true,
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    waitConfirmations: WAIT,
   });
 
   console.log(`AaveGatewayView deployed to: ${aaveGatewayView.address}`);
 
-  // Register write gateway with KapanRouter (view gateway is not registered)
-  await execute("KapanRouter", { from: deployer }, "addGateway", "aave", aaveGatewayWrite.address);
+  await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "aave", aaveGatewayWrite.address);
   console.log(`AaveGatewayWrite registered with KapanRouter as "aave"`);
 
-  // Skip verification on local networks
-  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-    // Verify the contracts on Etherscan
+  // Temporarily disable Etherscan verification for v2 deploys
+  if (false && !["hardhat", "localhost"].includes(hre.network.name)) {
     await verifyContract(hre, aaveGatewayWrite.address, [
       kapanRouter.address,
       POOL_ADDRESSES_PROVIDER,
-      parseInt(REFERRAL_CODE),
+      REFERRAL_CODE,
     ]);
     await verifyContract(hre, aaveGatewayView.address, [
       POOL_ADDRESSES_PROVIDER,
@@ -65,4 +84,3 @@ export default deployAaveGatewayWrite;
 
 deployAaveGatewayWrite.tags = ["AaveGatewayWrite", "v2"];
 deployAaveGatewayWrite.dependencies = ["KapanRouter"];
-

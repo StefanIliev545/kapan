@@ -11,9 +11,7 @@ import { verifyContract } from "../utils/verification";
  */
 const deployOptimalInterestRateFinder: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // V1 contracts are deprecated - use v2 deployments instead
-  console.log("Skipping v1 OptimalInterestRateFinder deployment - use v2 deployment instead");
   return;
-
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 
@@ -56,6 +54,6 @@ export default deployOptimalInterestRateFinder;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags OptimalInterestRateFinder
-deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder"];
+deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder_OLD"];
 // No dependencies - this should be deployed first
 deployOptimalInterestRateFinder.dependencies = [];

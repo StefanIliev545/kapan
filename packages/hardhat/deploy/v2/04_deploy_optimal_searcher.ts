@@ -2,7 +2,7 @@
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { verifyContract } from "../../utils/verification";
+// import { verifyContract } from "../../utils/verification";
 
 /**
  * Deploys the OptimalInterestRateFinder contract
@@ -13,6 +13,7 @@ import { verifyContract } from "../../utils/verification";
 const deployOptimalInterestRateFinder: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
+  const WAIT = 3;
 
   // Deploy OptimalInterestRateFinder (no constructor arguments needed)
   const optimalFinder = await deploy("OptimalInterestRateFinder", {
@@ -21,6 +22,7 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
     log: true,
     autoMine: true,
     deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    waitConfirmations: WAIT,
   });
 
   console.log(`OptimalInterestRateFinder deployed to: ${optimalFinder.address}`);
@@ -37,7 +39,7 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
       const gateway = await get(viewGateway);
       await execute(
         "OptimalInterestRateFinder",
-        { from: deployer, log: true },
+        { from: deployer, log: true, waitConfirmations: 5 },
         "registerGateway",
         name,
         gateway.address,
@@ -49,14 +51,14 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
   }
 
   // Skip verification on local networks
-  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
+  /*if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     await verifyContract(hre, optimalFinder.address, []);
-  }
+  }*/
 };
 
 export default deployOptimalInterestRateFinder;
 
 deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder", "v2"];
 // Optional dependencies - view gateways might not exist yet
-deployOptimalInterestRateFinder.dependencies = [];
+deployOptimalInterestRateFinder.dependencies = ["AaveGatewayView", "CompoundGatewayView", "VenusGatewayView"];
 

@@ -70,6 +70,48 @@ contract CompoundGatewayView is Ownable {
 
     function allComets() external view returns (address[] memory) { return _comets; }
 
+    /// @notice Get all base tokens for registered Comets
+    function allBaseTokens() external view returns (address[] memory) {
+        address[] memory baseTokens = new address[](_comets.length);
+        for (uint256 i = 0; i < _comets.length; i++) {
+            baseTokens[i] = ICompoundComet(_comets[i]).baseToken();
+        }
+        return baseTokens;
+    }
+
+    /// @notice Get all active Comets (union of local + write gateway registries)
+    function allActiveComets() public view returns (address[] memory comets) {
+        address[] memory local = _comets;
+        address[] memory remote = writeGateway == address(0)
+            ? new address[](0)
+            : IWriteGateway(writeGateway).allComets();
+
+        // Upper bound, then de-dupe
+        comets = new address[](local.length + remote.length);
+        uint256 k = 0;
+
+        for (uint256 i = 0; i < local.length; i++) comets[k++] = local[i];
+
+        for (uint256 j = 0; j < remote.length; j++) {
+            address c = remote[j];
+            bool seen = false;
+            for (uint256 i = 0; i < k; i++) {
+                if (comets[i] == c) { seen = true; break; }
+            }
+            if (!seen) comets[k++] = c;
+        }
+        assembly { mstore(comets, k) } // shrink
+    }
+
+    /// @notice Get all active base tokens (from allActiveComets)
+    function allActiveBaseTokens() external view returns (address[] memory bases) {
+        address[] memory comets = allActiveComets();
+        bases = new address[](comets.length);
+        for (uint256 i = 0; i < comets.length; i++) {
+            bases[i] = ICompoundComet(comets[i]).baseToken();
+        }
+    }
+
     function overrideFeed(address token, AggregatorV3Interface feed) external onlyOwner {
         overrideFeeds[token] = feed;
     }
@@ -170,16 +212,16 @@ contract CompoundGatewayView is Ownable {
         return comet.borrowBalanceOf(user);
     }
 
-    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
+    function getBorrowBalanceCurrent(address token, address user) external view returns (uint256) {
         return getBorrowBalance(token, user);
     }
 
-    function getLtv(address token, address user) external view returns (uint256) {
+    function getLtv(address /* token */, address /* user */) external pure returns (uint256) {
         // TODO: Implement
         return 0;
     }
 
-    function getMaxLtv(address token) external view returns (uint256) {
+    function getMaxLtv(address /* token */) external pure returns (uint256) {
         // TODO: Implement
         return 0;
     }

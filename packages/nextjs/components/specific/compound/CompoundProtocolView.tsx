@@ -1,255 +1,231 @@
 import { FC, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
-import { formatUnits } from "viem";
-import { useAccount, useWalletClient } from "wagmi";
+import { Address, formatUnits } from "viem";
+import { useAccount, useReadContracts } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { Abi } from "abitype";
+
+// Minimal ERC20 read ABI for symbol
+const ERC20_META_ABI = [
+  { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+] as const;
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-const useCollateralValue = (baseToken?: string, userAddress?: string) => {
-  const { data: collateralData } = useScaffoldReadContract({
-    contractName: "CompoundGatewayView",
-    functionName: "getDepositedCollaterals",
-    args: [baseToken, userAddress],
-    query: {
-      enabled: !!baseToken && !!userAddress,
-    },
-  });
-
-  const collateralAddresses = useMemo(
-    () => (collateralData?.[0] as string[] | undefined) || [],
-    [collateralData],
-  );
-
-  const { data: collateralPrices } = useScaffoldReadContract({
-    contractName: "CompoundGatewayView",
-    functionName: "getPrices",
-    args: [baseToken, collateralAddresses],
-    query: {
-      enabled: !!baseToken && collateralAddresses.length > 0,
-    },
-  });
-
-  const { data: collateralDecimals } = useScaffoldReadContract({
-    contractName: "UiHelper",
-    functionName: "getDecimals",
-    args: [collateralAddresses],
-    query: {
-      enabled: collateralAddresses.length > 0,
-    },
-  });
-
-  const { data: baseTokenPrice } = useScaffoldReadContract({
-    contractName: "CompoundGatewayView",
-    functionName: "getPrice",
-    args: [baseToken],
-    query: {
-      enabled: !!baseToken,
-    },
-  });
-
-  return useMemo(() => {
-    if (!collateralData || !baseTokenPrice) return 0;
-
-    const addresses = collateralData[0] as string[];
-    const balances = collateralData[1] as bigint[];
-
-    let total = 0;
-
-    for (let i = 0; i < addresses.length; i++) {
-      const balanceRaw = balances[i];
-      const decimals =
-        collateralDecimals && i < collateralDecimals.length ? Number(collateralDecimals[i]) : 18;
-      const balance = Number(formatUnits(balanceRaw, decimals));
-      const collateralPrice = collateralPrices && i < collateralPrices.length ? collateralPrices[i] : 0n;
-      if (collateralPrice > 0n && baseTokenPrice > 0n) {
-        const scaleFactor = 10n ** 8n;
-        const usdPrice = (collateralPrice * baseTokenPrice) / scaleFactor;
-        total += balance * Number(formatUnits(usdPrice, 8));
-      }
-    }
-
-    return total;
-  }, [collateralData, collateralPrices, collateralDecimals, baseTokenPrice]);
+// Helper: derive decimals from a priceScale bigint (e.g., 1e8 -> 8)
+const decimalsFromScale = (scale: bigint) => {
+  if (scale <= 1n) return 0;
+  let s = scale;
+  let d = 0;
+  while (s % 10n === 0n) { s /= 10n; d++; }
+  return d;
 };
 
-export const CompoundProtocolView: FC = () => {
-  const { address: connectedAddress } = useAccount();
-  const { data: walletClient } = useWalletClient();
+// (collateral value is computed via batch reads in the component below)
 
+export const CompoundProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
+  const { address: connectedAddress } = useAccount();
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
 
   // Determine the address to use for queries
-  const queryAddress = connectedAddress || ZERO_ADDRESS;
+  const queryAddress = (connectedAddress || ZERO_ADDRESS) as Address;
 
-  // Load token contracts via useScaffoldContract.
-  const { data: usdc } = useScaffoldContract({ contractName: "USDC", walletClient });
-  const { data: usdt } = useScaffoldContract({ contractName: "USDT", walletClient });
-  const { data: usdcE } = useScaffoldContract({ contractName: "USDCe", walletClient });
-  const { data: weth } = useScaffoldContract({ contractName: "eth", walletClient });
+  // Contracts via scaffold-eth registry
+  const { data: gateway } = useScaffoldContract({ contractName: "CompoundGatewayView", chainId: chainId as any });
+  const gatewayAddress = gateway?.address as Address | undefined;
+  const { data: uiHelper } = useScaffoldContract({ contractName: "UiHelper", chainId: chainId as any });
+  const uiHelperAddress = uiHelper?.address as Address | undefined;
 
-  // Extract token addresses.
-  const wethAddress = weth?.address;
-  const usdcAddress = usdc?.address;
-  const usdtAddress = usdt?.address;
-  const usdcEAddress = usdcE?.address;
-
-  // For each token, call the aggregated getCompoundData function.
-  // getCompoundData returns a tuple: [supplyRate, borrowRate, balance, borrowBalance]
-  const { data: wethCompoundData } = useNetworkAwareReadContract({
-    networkType: "evm",
+  // Fetch active base tokens from view helper (unions view + write gateway on-chain)
+  const { data: activeBaseTokens } = useScaffoldReadContract({
     contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [wethAddress, queryAddress],
+    functionName: "allActiveBaseTokens",
+    chainId: chainId as any,
   });
-  const { data: usdcCompoundData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdcAddress, queryAddress],
-  });
-  const { data: usdtCompoundData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdtAddress, queryAddress],
-  });
-  const { data: usdcECompoundData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdcEAddress, queryAddress],
-  });
+  const baseTokens: Address[] = useMemo(() => ((activeBaseTokens as Address[] | undefined) || []) as Address[], [activeBaseTokens]);
 
-  // Fetch decimals for each token.
-  const { data: wethDecimals } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "eth",
-    functionName: "decimals",
-  });
-  const { data: usdcDecimals } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "USDC",
-    functionName: "decimals",
-  });
-  const { data: usdtDecimals } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "USDT",
-    functionName: "decimals",
-  });
-  const { data: usdcEDecimals } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "USDCe",
-    functionName: "decimals",
-  });
+  const noMarkets = !gatewayAddress || baseTokens.length === 0;
 
-  // Fetch total collateral value for each market
-  const wethCollateralValue = useCollateralValue(wethAddress, queryAddress);
-  const usdcCollateralValue = useCollateralValue(usdcAddress, queryAddress);
-  const usdtCollateralValue = useCollateralValue(usdtAddress, queryAddress);
-  const usdcECollateralValue = useCollateralValue(usdcEAddress, queryAddress);
+  // Batch symbols + decimals
+  const symbolCalls = useMemo(() => {
+    return baseTokens.map(t => ({ address: t, abi: ERC20_META_ABI, functionName: "symbol" as const, args: [] }));
+  }, [baseTokens]);
+  const { data: symbolResults } = useReadContracts({ allowFailure: true, contracts: symbolCalls, query: { enabled: symbolCalls.length > 0 } });
+  const symbols: string[] = useMemo(() => (symbolResults || []).map(r => (r?.result as string) || ""), [symbolResults]);
+
+  const { data: baseTokenDecimalsRaw } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "getDecimals",
+    args: [baseTokens],
+    chainId: chainId as any,
+    query: { enabled: !!uiHelperAddress && baseTokens.length > 0 },
+  });
+  const baseTokenDecimals: number[] = useMemo(() => (baseTokenDecimalsRaw || []).map((d: any) => Number(d)), [baseTokenDecimalsRaw]);
+
+  // Batch market data getCompoundData(baseToken, user)
+  const compoundCalls = useMemo(() => {
+    if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
+    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getCompoundData" as const, args: [t, queryAddress] }));
+  }, [gatewayAddress, gateway, baseTokens, queryAddress]);
+  const { data: compoundResults } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
+
+// Batch collateral data per market
+  const depositedCalls = useMemo(() => {
+    if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
+    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getDepositedCollaterals" as const, args: [t, queryAddress] }));
+  }, [gatewayAddress, gateway, baseTokens, queryAddress]);
+  const { data: depositedResults } = useReadContracts({ allowFailure: true, contracts: depositedCalls, query: { enabled: depositedCalls.length > 0 } });
+
+  const pricesCalls = useMemo(() => {
+    if (!gatewayAddress || !gateway || !depositedResults) return [] as any[];
+    const calls: any[] = [];
+    (depositedResults as any[]).forEach((res, i) => {
+      const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
+      if (colls.length > 0) {
+        calls.push({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getPrices" as const, args: [baseTokens[i], colls] });
+      }
+    });
+    return calls;
+  }, [gatewayAddress, gateway, depositedResults, baseTokens]);
+  const { data: pricesResults } = useReadContracts({ allowFailure: true, contracts: pricesCalls, query: { enabled: pricesCalls.length > 0 } });
+
+  const collDecimalsCalls = useMemo(() => {
+    if (!uiHelperAddress || !uiHelper || !depositedResults) return [] as any[];
+    const calls: any[] = [];
+    (depositedResults as any[]).forEach(res => {
+      const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
+      if (colls.length > 0) {
+        calls.push({ address: uiHelperAddress, abi: uiHelper.abi as Abi, functionName: "getDecimals" as const, args: [colls] });
+      }
+    });
+    return calls;
+  }, [uiHelperAddress, uiHelper, depositedResults]);
+  const { data: collDecimalsResults } = useReadContracts({ allowFailure: true, contracts: collDecimalsCalls, query: { enabled: collDecimalsCalls.length > 0 } });
 
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
-    const SECONDS_PER_YEAR = 60 * 60 * 24 * 365; // as a number
-    const SCALE = 1e18; // as a number
-    return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
+    const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
+    return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / 1e18;
   };
 
-  // Aggregate positions using useMemo.
+  // Aggregate positions dynamically
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
+    if (noMarkets) return { suppliedPositions: supplied, borrowedPositions: borrowed };
 
-    const computePosition = (
-      tokenName: string,
-      tokenAddress: string | undefined,
-      compoundData: any,
-      decimalsRaw: any,
-      collateralValue: number,
-    ) => {
-      if (!tokenAddress || !compoundData || !decimalsRaw) return;
-      const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, price, priceScale] = compoundData;
-      const decimals = Number(decimalsRaw);
-      const supplyAPR = supplyRate ? convertRateToAPR(BigInt(supplyRate)) : 0;
-      const borrowAPR = borrowRate ? convertRateToAPR(BigInt(borrowRate)) : 0;
+    baseTokens.forEach((base, idx) => {
+      const compound = (compoundResults?.[idx]?.result as [bigint, bigint, bigint, bigint, bigint, bigint] | undefined);
+      const symbol = symbols[idx] || "";
+      const decimals = Number((baseTokenDecimals?.[idx] as unknown as bigint) ?? 18n);
+      if (!compound) return;
 
-      const balance = balanceRaw ? Number(formatUnits(balanceRaw, decimals)) : 0;
-      const usdBalance = balance * Number(formatUnits(price, 8));
+      const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, priceRaw, priceScale] = compound;
+      const priceDecimals = decimalsFromScale(priceScale ?? 1n);
+      const price = Number(formatUnits(priceRaw, priceDecimals));
+      const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
+      const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
-      const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
-      const usdBorrowBalance = borrowBalance * Number(formatUnits(price, 8));
+      const tokenBalance = Number(formatUnits(balanceRaw ?? 0n, decimals));
+      const usdBalance = tokenBalance * price;
+      const tokenBorrow = Number(formatUnits(borrowBalanceRaw ?? 0n, decimals));
+      const usdBorrow = tokenBorrow * price;
 
-      // Always add to borrowed positions list, regardless of whether there's debt
-      borrowed.push({
-        icon: tokenNameToLogo(tokenName),
-        name: tokenName,
-        // Set negative balance if there's debt, otherwise zero balance
-        balance: borrowBalanceRaw && borrowBalanceRaw > 0n ? -usdBorrowBalance : 0,
-        collateralValue,
-        tokenBalance: borrowBalanceRaw || 0n,
-        currentRate: borrowAPR,
-        tokenAddress: tokenAddress,
-        tokenPrice: price,
-        tokenDecimals: decimals,
-        tokenSymbol: tokenName,
-        collateralView: (
-          <CompoundCollateralView baseToken={tokenAddress} baseTokenDecimals={decimals} compoundData={compoundData} />
-        ),
-      });
+      // Collateral value for this base token
+      let collateralValue = 0;
+      const depRes = depositedResults?.[idx]?.result as [Address[], bigint[], string[]] | undefined;
+      const colls = depRes?.[0] ?? [];
+      const balances = depRes?.[1] ?? [];
+
+      // locate prices/decimals array index among non-empty markets
+      const locateRank = (): number => {
+        if (!depositedResults) return -1;
+        let rank = -1;
+        let seen = 0;
+        for (let i = 0; i < depositedResults.length; i++) {
+          const r = depositedResults[i]?.result as [Address[], bigint[], string[]] | undefined;
+          if ((r?.[0]?.length ?? 0) > 0) {
+            if (i === idx) { rank = seen; break; }
+            seen++;
+          }
+        }
+        return rank;
+      };
+
+      let marketPrices: bigint[] = [];
+      let collDecs: bigint[] = [];
+      const nonEmptyRank = locateRank();
+      if (nonEmptyRank >= 0) {
+        marketPrices = (pricesResults?.[nonEmptyRank]?.result as bigint[] | undefined) ?? [];
+        collDecs = (collDecimalsResults?.[nonEmptyRank]?.result as bigint[] | undefined) ?? [];
+      }
+
+      for (let i = 0; i < colls.length; i++) {
+        const balRaw = balances[i] ?? 0n;
+        const dec = Number(collDecs[i] ?? 18n);
+        const bal = Number(formatUnits(balRaw, dec));
+        const collateralPriceInBase = Number(formatUnits(marketPrices[i] ?? 0n, priceDecimals));
+        collateralValue += bal * collateralPriceInBase * price;
+      }
+
+      const safeName = (symbol || "").replace("₮", "T");
+      const icon = tokenNameToLogo(safeName) || "/logos/token.svg";
 
       supplied.push({
-        icon: tokenNameToLogo(tokenName),
-        name: tokenName,
+        icon,
+        name: safeName || "Token",
         balance: usdBalance,
-        tokenBalance: balanceRaw,
+        tokenBalance: balanceRaw ?? 0n,
         currentRate: supplyAPR,
-        tokenAddress: tokenAddress,
-        tokenPrice: price,
+        tokenAddress: base,
+        tokenPrice: priceRaw,
         tokenDecimals: decimals,
-        tokenSymbol: tokenName,
+        tokenSymbol: safeName,
       });
-    };
 
-    computePosition("WETH", wethAddress, wethCompoundData, wethDecimals, wethCollateralValue);
-    computePosition("USDC", usdcAddress, usdcCompoundData, usdcDecimals, usdcCollateralValue);
-    computePosition("USDT", usdtAddress, usdtCompoundData, usdtDecimals, usdtCollateralValue);
-    computePosition("USDC.e", usdcEAddress, usdcECompoundData, usdcEDecimals, usdcECollateralValue);
+      borrowed.push({
+        icon,
+        name: safeName || "Token",
+        balance: (borrowBalanceRaw && borrowBalanceRaw > 0n) ? -usdBorrow : 0,
+        collateralValue,
+        tokenBalance: borrowBalanceRaw ?? 0n,
+        currentRate: borrowAPR,
+        tokenAddress: base,
+        tokenPrice: priceRaw,
+        tokenDecimals: decimals,
+        tokenSymbol: safeName,
+        collateralView: (
+          <CompoundCollateralView baseToken={base} baseTokenDecimals={decimals} compoundData={compound} chainId={chainId} />
+        ),
+      });
+    });
 
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
   }, [
-    wethAddress,
-    wethCompoundData,
-    wethDecimals,
-    usdcAddress,
-    usdcCompoundData,
-    usdcDecimals,
-    usdtAddress,
-    usdtCompoundData,
-    usdtDecimals,
-    usdcEAddress,
-    usdcECompoundData,
-    usdcEDecimals,
-    wethCollateralValue,
-    usdcCollateralValue,
-    usdtCollateralValue,
-    usdcECollateralValue,
+    noMarkets,
+    baseTokens,
+    compoundResults,
+    symbols,
+    baseTokenDecimals,
+    depositedResults,
+    pricesResults,
+    collDecimalsResults,
+    chainId,
   ]);
 
-  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
-  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
+  const tokenFilter = new Set(["BTC", "ETH", "WETH", "USDC", "USDT", "USDC.E"]);
+  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
   const filteredSuppliedPositions = isWalletConnected
     ? suppliedPositions
-    : suppliedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+    : suppliedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+    : borrowedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
 
   // Hardcode current LTV (or fetch from contract if needed).
   const currentLtv = 75;
@@ -259,13 +235,14 @@ export const CompoundProtocolView: FC = () => {
       <ProtocolView
         protocolName="Compound V3"
         protocolIcon="/logos/compound.svg"
-        ltv={currentLtv}
-        maxLtv={90}
+        ltv={currentLtv as any}
+        maxLtv={undefined as any}
         suppliedPositions={filteredSuppliedPositions}
         borrowedPositions={filteredBorrowedPositions}
         hideUtilization={true}
         forceShowAll={forceShowAll}
         networkType="evm"
+        chainId={chainId}
       />
     </div>
   );

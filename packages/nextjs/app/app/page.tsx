@@ -9,6 +9,7 @@ import StableArea from "~~/components/common/StableArea";
 import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
+import { arbitrum, base } from "wagmi/chains";
 import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
 import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
 // Define network options
@@ -22,6 +23,11 @@ const networkOptions: NetworkOption[] = [
     id: "arbitrum",
     name: "Arbitrum",
     logo: "/logos/arb.svg",
+  },
+  {
+    id: "base",
+    name: "Base",
+    logo: "/logos/base.svg",
   },
 ];
 
@@ -81,13 +87,26 @@ const App: NextPage = () => {
         {selectedNetwork === "arbitrum" && (
           <div className="space-y-6">
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView />
+              <AaveProtocolView chainId={arbitrum.id} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView />
+              <CompoundProtocolView chainId={arbitrum.id} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView />
+              <VenusProtocolView chainId={arbitrum.id} />
+            </StableArea>
+          </div>
+        )}
+        {selectedNetwork === "base" && (
+          <div className="space-y-6">
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <AaveProtocolView chainId={base.id} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <CompoundProtocolView chainId={base.id} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <VenusProtocolView chainId={base.id} />
             </StableArea>
           </div>
         )}
