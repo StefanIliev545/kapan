@@ -11,6 +11,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+import "hardhat/console.sol";
+
 contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -54,41 +56,74 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         external
         returns (ProtocolTypes.Output[] memory outputs)
     {
+        console.log("CompoundGatewayWrite: processLendingInstruction called");
+        console.log("CompoundGatewayWrite: inputs count", inputs.length);
+        for (uint256 i = 0; i < inputs.length; i++) {
+            console.log("CompoundGatewayWrite: input[", i, "] token", uint256(uint160(inputs[i].token)));
+            console.log("CompoundGatewayWrite: input[", i, "] amount", inputs[i].amount);
+        }
+        console.log("CompoundGatewayWrite: data length", data.length);
+        
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
+        console.log("CompoundGatewayWrite: op", uint256(ins.op));
+        console.log("CompoundGatewayWrite: token", uint256(uint160(ins.token)));
+        console.log("CompoundGatewayWrite: user", uint256(uint160(ins.user)));
+        console.log("CompoundGatewayWrite: amount", ins.amount);
+        console.log("CompoundGatewayWrite: input.index", ins.input.index);
+        
         address market = _decodeMarket(ins.context);
+        console.log("CompoundGatewayWrite: market", uint256(uint160(market)));
         address token = ins.token;
         uint256 amount = ins.amount;
         if (ins.input.index < inputs.length) {
             token = inputs[ins.input.index].token;
             amount = inputs[ins.input.index].amount;
+            console.log("CompoundGatewayWrite: using UTXO - token", uint256(uint160(token)));
+            console.log("CompoundGatewayWrite: using UTXO - amount", amount);
+        } else {
+            console.log("CompoundGatewayWrite: using instruction params");
         }
+        
         if (ins.op == ProtocolTypes.LendingOp.Deposit) {
+            console.log("CompoundGatewayWrite: executing Deposit");
             if (market != address(0) && market != token) depositCollateral(market, token, amount, ins.user);
             else deposit(token, ins.user, amount);
             outputs = new ProtocolTypes.Output[](0);
+            console.log("CompoundGatewayWrite: Deposit completed, 0 outputs");
         } else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
+            console.log("CompoundGatewayWrite: executing DepositCollateral");
             address base = market != address(0) ? market : token;
             depositCollateral(base, token, amount, ins.user);
             outputs = new ProtocolTypes.Output[](0);
+            console.log("CompoundGatewayWrite: DepositCollateral completed, 0 outputs");
         } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+            console.log("CompoundGatewayWrite: executing WithdrawCollateral");
             address base = market != address(0) ? market : token;
             (address u, uint256 amt) = withdrawCollateral(base, token, ins.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({token: u, amount: amt});
+            console.log("CompoundGatewayWrite: WithdrawCollateral completed, token", uint256(uint160(u)), "amount", amt);
         } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+            console.log("CompoundGatewayWrite: executing Borrow");
             borrow(token, ins.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({token: token, amount: amount});
+            console.log("CompoundGatewayWrite: Borrow completed, token", uint256(uint160(token)), "amount", amount);
         } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
+            console.log("CompoundGatewayWrite: executing Repay");
             repay(token, ins.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({token: token, amount: 0});
+            console.log("CompoundGatewayWrite: Repay completed, 0 refund");
         } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
+            console.log("CompoundGatewayWrite: executing GetBorrowBalance");
             ICompoundComet comet = tokenToComet[token];
             uint256 bal = address(comet) == address(0) ? 0 : comet.borrowBalanceOf(ins.user);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({token: token, amount: bal});
+            console.log("CompoundGatewayWrite: GetBorrowBalance completed, balance", bal);
         } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
+            console.log("CompoundGatewayWrite: executing GetSupplyBalance");
             uint256 bal;
             if (market != address(0) && market != token) {
                 ICompoundComet comet = tokenToComet[market];
@@ -99,7 +134,9 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
             }
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({token: token, amount: bal});
+            console.log("CompoundGatewayWrite: GetSupplyBalance completed, balance", bal);
         } else {
+            console.log("CompoundGatewayWrite: ERROR - unknown op", uint256(ins.op));
             revert("Compound: unknown op");
         }
     }

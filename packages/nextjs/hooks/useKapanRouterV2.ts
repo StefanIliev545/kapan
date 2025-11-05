@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseUnits, type Address } from "viem";
+import { parseUnits, decodeAbiParameters, encodeAbiParameters, type Address } from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import {
   ProtocolInstruction,
@@ -11,6 +11,8 @@ import {
   encodeApprove,
   encodePushToken,
   encodeLendingInstruction,
+  encodeFlashLoanV2,
+  encodeFlashLoanV3,
   LendingOp,
   normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
@@ -316,12 +318,13 @@ export const useKapanRouterV2 = () => {
       });
 
       // Call the router's authorizeInstructions function which aggregates all authorizations
-      const [targets, data] = await publicClient.readContract({
+      const result = await publicClient.readContract({
         address: routerContract.address as Address,
         abi: routerContract.abi,
         functionName: "authorizeInstructions",
         args: [protocolInstructions, userAddress as Address],
-      }) as [Address[], `0x${string}`[]];
+      });
+      const [targets, data] = result as unknown as [Address[], `0x${string}`[]];
 
       // Combine targets and data into AuthorizationCall array, filtering out empty ones
       const authCalls: AuthorizationCall[] = [];
@@ -421,6 +424,23 @@ export const useKapanRouterV2 = () => {
           continue; // Skip invalid auth calls
         }
 
+        // Decode and check if approval amount is zero (ERC20 approve(address,uint256))
+        try {
+          const decoded = decodeAbiParameters(
+            [{ type: "address" }, { type: "uint256" }],
+            authCall.data.slice(10) as `0x${string}` // Remove function selector (4 bytes)
+          );
+          const amount = decoded[1] as bigint;
+          if (amount === 0n) {
+            console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
+            continue; // Skip zero-amount approvals
+          }
+        } catch (e) {
+          // If decoding fails, it might not be an ERC20 approve call (could be approveDelegation, etc.)
+          // In that case, proceed with the approval
+          console.log(`executeFlowWithApprovals: Could not decode approval amount, proceeding anyway`, e);
+        }
+
         console.log(`executeFlowWithApprovals: Processing approval ${i + 1}/${authCalls.length}`, {
           target: authCall.target,
           dataLength: authCall.data.length,
@@ -481,6 +501,339 @@ export const useKapanRouterV2 = () => {
     }
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions]);
 
+  // --- Types for modular move position builder ---
+  type FlashConfig = {
+    version: "v3" | "v2";
+    premiumBps?: number; // Aave v3 default often 9 bps; fetch from on-chain ideally
+    bufferBps?: number;  // small headroom between GetBorrowBalance and real repay (default 10)
+  };
+
+  type BuildUnlockDebtParams = {
+    fromProtocol: string;
+    debtToken: Address;
+    expectedDebt: string;       // user-selected amount; used to size flash & later borrow
+    debtDecimals?: number;
+    fromContext?: `0x${string}`;
+    flash: FlashConfig;
+  };
+
+  type BuildMoveCollateralParams = {
+    fromProtocol: string;
+    toProtocol: string;
+    collateralToken: Address;
+    withdraw: { max: true } | { amount: string };
+    collateralDecimals?: number;
+    fromContext?: `0x${string}`;
+    toContext?: `0x${string}`;
+  };
+
+  type BuildBorrowParams =
+    | {
+        // Borrow an exact amount (generic)
+        mode: "exact";
+        toProtocol: string;
+        token: Address;
+        amount: string;
+        decimals?: number;
+        approveToRouter?: boolean; // default true
+        toContext?: `0x${string}`;
+      }
+    | {
+        // Borrow just enough to repay all flash obligations for this token
+        mode: "coverFlash";
+        toProtocol: string;
+        token: Address;
+        decimals?: number;
+        extraBps?: number;        // extra headroom on top of premium-augmented need
+        approveToRouter?: boolean; // default true
+        toContext?: `0x${string}`;
+      };
+
+  // Internal: how much we still owe the router to close flash loans, by token
+  type FlashDebtBucket = {
+    // What user asked in unlock steps (sum of expectedDebt per token)
+    expectedSum: bigint;
+    // Premium owed across all unlocks for this token
+    premiumSum: bigint;
+    // We also keep count of flash calls in case you want to reconcile later
+    flashCalls: number;
+  };
+
+  type MoveFlowBuilder = {
+    // chunk builders
+    buildUnlockDebt: (p: BuildUnlockDebtParams) => void;
+    buildMoveCollateral: (p: BuildMoveCollateralParams) => void;
+    buildBorrow: (p: BuildBorrowParams) => void;
+    // Compound-specific helpers
+    setCompoundMarket: (debtToken: Address) => void;
+    // raw accessors
+    build: () => ProtocolInstruction[];
+    getFlashObligations: () => Record<Address, { expectedSum: bigint; premiumSum: bigint }>;
+  };
+
+  /**
+   * Helper to encode Compound market context
+   * Context format: abi.encode(address marketBaseToken)
+   */
+  const encodeCompoundMarket = (marketAddress: Address): `0x${string}` => {
+    return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;
+  };
+
+  /**
+   * Create a composable move-flow session builder.
+   * Allows building unlock debt, move collateral, and borrow steps incrementally.
+   * 
+   * Usage:
+   * ```typescript
+   * const b = createMoveBuilder();
+   * b.buildUnlockDebt({ fromProtocol: "Aave V3", debtToken: USDC, expectedDebt: "1000", ... });
+   * b.buildMoveCollateral({ fromProtocol: "Aave V3", toProtocol: "Compound V3", ... });
+   * b.buildBorrow({ mode: "coverFlash", toProtocol: "Compound V3", token: USDC, ... });
+   * await executeFlowWithApprovals(b.build());
+   * ```
+   */
+  const createMoveBuilder = useCallback((): MoveFlowBuilder => {
+    if (!userAddress) {
+      // Return a no-op builder; you can also throw if you prefer hard-fail
+      const noOp = () => {
+        // No-op: user address not available
+      };
+      return {
+        buildUnlockDebt: noOp,
+        buildMoveCollateral: noOp,
+        buildBorrow: noOp,
+        setCompoundMarket: noOp,
+        build: () => [],
+        getFlashObligations: () => ({}),
+      };
+    }
+
+    const instructions: ProtocolInstruction[] = [];
+    const flashDebts = new Map<Address, FlashDebtBucket>();
+    let compoundMarket: Address | null = null; // Track Compound market (debt token/base token)
+    let utxoCount = 0; // Track UTXO count as we build instructions
+
+    // Tiny helpers
+    const add = (inst: ProtocolInstruction, createsUtxo = false) => {
+      instructions.push(inst);
+      if (createsUtxo) {
+        utxoCount++;
+      }
+      return instructions.length - 1;
+    };
+
+    const addRouter = (data: `0x${string}`, createsUtxo = false) => add(createRouterInstruction(data), createsUtxo);
+    const addProto = (protocol: string, data: `0x${string}`, createsUtxo = false) =>
+      add(createProtocolInstruction(protocol, data), createsUtxo);
+
+    const ensureBucket = (token: Address) => {
+      if (!flashDebts.has(token)) {
+        flashDebts.set(token, { expectedSum: 0n, premiumSum: 0n, flashCalls: 0 });
+      }
+      const bucket = flashDebts.get(token);
+      if (!bucket) {
+        throw new Error("Failed to ensure flash debt bucket");
+      }
+      return bucket;
+    };
+
+    /**
+     * Get context for a protocol operation
+     * For Compound, returns encoded market address if set
+     */
+    const getContext = (protocol: string, defaultContext: `0x${string}` = "0x"): `0x${string}` => {
+      if (protocol === "compound" && compoundMarket) {
+        return encodeCompoundMarket(compoundMarket);
+      }
+      return defaultContext;
+    };
+
+    const builder: MoveFlowBuilder = {
+      // 1) UNLOCK DEBT (one call per debt asset you want to migrate)
+      buildUnlockDebt: ({
+        fromProtocol,
+        debtToken,
+        expectedDebt,
+        debtDecimals = 18,
+        fromContext = "0x",
+        flash: { version, premiumBps = 9, bufferBps = 10 },
+      }) => {
+        const from = normalizeProtocolName(fromProtocol);
+        const expected = parseUnits(expectedDebt, debtDecimals);
+
+        // Validate expected debt amount
+        if (expected === 0n) {
+          throw new Error(`Invalid debt amount: ${expectedDebt}. Cannot create flash loan with zero amount.`);
+        }
+
+        // [0] GetBorrowBalance(source) -> used as the *exact* repay amount
+        // For Compound, use market context if fromProtocol is Compound
+        const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(debtToken)) : getContext(from, fromContext as `0x${string}`);
+        const utxoIndexForGetBorrow = utxoCount; // Track UTXO index before adding GetBorrowBalance
+        addProto(
+          from,
+          encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`,
+          true, // GetBorrowBalance creates 1 UTXO
+        );
+
+        // [1] FlashLoan: bring debt tokens into the router (principal includes a tiny buffer)
+        const principal = (expected * BigInt(10000 + bufferBps)) / 10000n;
+        
+        // Double-check principal is not zero (shouldn't happen if expected > 0)
+        if (principal === 0n) {
+          throw new Error(`Calculated flash loan principal is zero. Expected debt: ${expectedDebt}, Parsed: ${expected.toString()}`);
+        }
+
+        const flashData =
+          version === "v3"
+            ? encodeFlashLoanV3(principal, debtToken, userAddress)
+            : encodeFlashLoanV2(principal, debtToken, userAddress);
+        const iFlash = addRouter(flashData as `0x${string}`, true); // FlashLoan creates 1 UTXO
+
+        // [2] Approve flash tokens to the *source* gateway so it can pull for Repay
+        addRouter(encodeApprove(iFlash, from) as `0x${string}`, true); // Approve creates 1 dummy UTXO
+
+        // [3] Repay(source): uses GetBorrowBalance UTXO so the amount is exact on-chain
+        addProto(
+          from,
+          encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`,
+          true, // Repay creates 1 UTXO (refund)
+        );
+
+        // Record the future amount we must borrow on target to return flash:
+        // Need at least (expected + premium) — the buffer remains in router after repay.
+        const premium = (expected * BigInt(premiumBps)) / 10000n;
+        const bucket = ensureBucket(debtToken);
+        bucket.expectedSum += expected;
+        bucket.premiumSum += premium;
+        bucket.flashCalls += 1;
+      },
+
+      // 2) MOVE COLLATERAL (withdraw from source -> deposit into dest)
+      buildMoveCollateral: ({
+        fromProtocol,
+        toProtocol,
+        collateralToken,
+        withdraw,
+        collateralDecimals = 18,
+        fromContext = "0x",
+        toContext = "0x",
+      }) => {
+        const from = normalizeProtocolName(fromProtocol);
+        const to = normalizeProtocolName(toProtocol);
+
+        // Get contexts for both protocols (Compound needs market context)
+        const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(collateralToken)) : getContext(from, fromContext as `0x${string}`);
+        const toCtx = to === "compound" && compoundMarket ? getContext(to, encodeCompoundMarket(compoundMarket)) : getContext(to, toContext as `0x${string}`);
+
+        // Optional GetSupplyBalance if max
+        let utxoIndexForGetSupply: number | undefined;
+        if ("max" in withdraw && withdraw.max) {
+          // Record the UTXO index where GetSupplyBalance will create its output
+          utxoIndexForGetSupply = utxoCount;
+          addProto(
+            from,
+            encodeLendingInstruction(LendingOp.GetSupplyBalance, collateralToken, userAddress, 0n, fromCtx, 999) as `0x${string}`,
+            true, // GetSupplyBalance creates 1 UTXO
+          );
+        }
+
+        // Withdraw
+        const withdrawAmt =
+          "amount" in withdraw ? parseUnits(withdraw.amount, collateralDecimals) : 0n;
+        // Track UTXO index where WithdrawCollateral will create its output
+        const utxoIndexForWithdraw = utxoCount;
+        addProto(
+          from,
+          encodeLendingInstruction(
+            LendingOp.WithdrawCollateral,
+            collateralToken,
+            userAddress,
+            withdrawAmt,
+            fromCtx,
+            "max" in withdraw && withdraw.max && utxoIndexForGetSupply !== undefined ? utxoIndexForGetSupply : 999,
+          ) as `0x${string}`,
+          true, // WithdrawCollateral creates 1 UTXO
+        );
+
+        // Approve withdrawn collateral to *target* gateway (use UTXO index, not instruction index)
+        addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true); // Approve creates 1 dummy UTXO
+
+        // Deposit on target using the withdraw UTXO (use UTXO index, not instruction index)
+        addProto(
+          to,
+          encodeLendingInstruction(LendingOp.Deposit, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`,
+          false, // Deposit doesn't create UTXO
+        );
+      },
+
+      // 3) BORROW (either exact amount or "cover all flash obligations for this token")
+      buildBorrow: (p: BuildBorrowParams) => {
+        const {
+          toProtocol,
+          token,
+          toContext = "0x",
+          approveToRouter = true,
+        } = p as any;
+
+        const to = normalizeProtocolName(toProtocol);
+
+        let borrowAmt: bigint;
+
+        if (p.mode === "exact") {
+          borrowAmt = parseUnits(p.amount, p.decimals ?? 18);
+        } else {
+          // coverFlash mode
+          const bucket = flashDebts.get(token);
+          if (!bucket) {
+            // Nothing to repay for this token; no-op
+            return;
+          }
+
+          const base = bucket.expectedSum + bucket.premiumSum; // need >= expected + premium
+          const extraBps = p.extraBps ?? 0;
+          borrowAmt = (base * BigInt(10000 + extraBps)) / 10000n;
+        }
+
+        // Get context for target protocol (Compound needs market context)
+        const toCtx = to === "compound" && compoundMarket ? getContext(to, encodeCompoundMarket(compoundMarket)) : getContext(to, toContext as `0x${string}`);
+
+        // Track UTXO index where Borrow will create its output
+        const utxoIndexForBorrow = utxoCount;
+
+        // Borrow on target
+        addProto(
+          to,
+          encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, 999) as `0x${string}`,
+          true, // Borrow creates 1 UTXO
+        );
+
+        // Approve borrowed tokens to the router so it can settle flash principal+premium (use UTXO index, not instruction index)
+        if (approveToRouter) {
+          addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true); // Approve creates 1 dummy UTXO
+        }
+      },
+
+      // Set Compound market (debt token/base token address)
+      // This should be called before building operations involving Compound
+      setCompoundMarket: (debtToken: Address) => {
+        compoundMarket = debtToken;
+      },
+
+      build: () => instructions,
+
+      getFlashObligations: () => {
+        const obj: Record<Address, { expectedSum: bigint; premiumSum: bigint }> = {};
+        for (const [token, b] of flashDebts.entries()) {
+          obj[token] = { expectedSum: b.expectedSum, premiumSum: b.premiumSum };
+        }
+        return obj;
+      },
+    };
+
+    return builder;
+  }, [userAddress]);
+
   return {
     // Builder functions
     buildDepositFlow,
@@ -488,6 +841,7 @@ export const useKapanRouterV2 = () => {
     buildRepayFlow,
     buildRepayFlowAsync, // Use this for max repayments
     buildWithdrawFlow,
+    createMoveBuilder, // Modular move position builder
     // Execution functions
     executeInstructions,
     executeFlowWithApprovals,

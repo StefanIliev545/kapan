@@ -34,37 +34,69 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         external
         returns (ProtocolTypes.Output[] memory outputs)
     {
+        console.log("AaveGatewayWrite: processLendingInstruction called");
+        console.log("AaveGatewayWrite: inputs count", inputs.length);
+        for (uint256 i = 0; i < inputs.length; i++) {
+            console.log("AaveGatewayWrite: input[", i, "] token", uint256(uint160(inputs[i].token)));
+            console.log("AaveGatewayWrite: input[", i, "] amount", inputs[i].amount);
+        }
+        console.log("AaveGatewayWrite: data length", data.length);
+        
         ProtocolTypes.LendingInstruction memory instr = abi.decode(data, (ProtocolTypes.LendingInstruction));
+        console.log("AaveGatewayWrite: op", uint256(instr.op));
+        console.log("AaveGatewayWrite: token", uint256(uint160(instr.token)));
+        console.log("AaveGatewayWrite: user", uint256(uint160(instr.user)));
+        console.log("AaveGatewayWrite: amount", instr.amount);
+        console.log("AaveGatewayWrite: input.index", instr.input.index);
+        
         address token = instr.token;
         uint256 amount = instr.amount;
         if (instr.input.index < inputs.length) {
             token = inputs[instr.input.index].token;
             amount = inputs[instr.input.index].amount;
+            console.log("AaveGatewayWrite: using UTXO - token", uint256(uint160(token)));
+            console.log("AaveGatewayWrite: using UTXO - amount", amount);
+        } else {
+            console.log("AaveGatewayWrite: using instruction params");
         }
+        
         if (instr.op == ProtocolTypes.LendingOp.Deposit || instr.op == ProtocolTypes.LendingOp.DepositCollateral) {
+            console.log("AaveGatewayWrite: executing Deposit");
             deposit(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](0);
+            console.log("AaveGatewayWrite: Deposit completed, 0 outputs");
         } else if (instr.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+            console.log("AaveGatewayWrite: executing WithdrawCollateral");
             (address u, uint256 amt) = withdraw(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: u, amount: amt });
+            console.log("AaveGatewayWrite: WithdrawCollateral completed, token", uint256(uint160(u)), "amount", amt);
         } else if (instr.op == ProtocolTypes.LendingOp.Borrow) {
+            console.log("AaveGatewayWrite: executing Borrow");
             borrow(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: amount });
+            console.log("AaveGatewayWrite: Borrow completed, token", uint256(uint160(token)), "amount", amount);
         } else if (instr.op == ProtocolTypes.LendingOp.Repay) {
+            console.log("AaveGatewayWrite: executing Repay");
             uint256 refund = repay(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: refund });
+            console.log("AaveGatewayWrite: Repay completed, refund", refund);
         } else if (instr.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
+            console.log("AaveGatewayWrite: executing GetBorrowBalance");
             uint256 bal = _getBorrowBalance(token, instr.user);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
+            console.log("AaveGatewayWrite: GetBorrowBalance completed, balance", bal);
         } else if (instr.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
+            console.log("AaveGatewayWrite: executing GetSupplyBalance");
             uint256 bal = _getSupplyBalance(token, instr.user);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
+            console.log("AaveGatewayWrite: GetSupplyBalance completed, balance", bal);
         } else {
+            console.log("AaveGatewayWrite: ERROR - unknown op", uint256(instr.op));
             revert("Unknown op");
         }
     }

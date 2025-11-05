@@ -1,13 +1,13 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
-import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
-import { formatUnits, parseUnits } from "viem";
+import { FiAlertTriangle, FiLock } from "react-icons/fi";
+import { formatUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useMoveDebtScaffold } from "~~/hooks/kapan/moveDebt";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
@@ -54,8 +54,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     FLASH_LOAN_PROVIDERS[0],
   );
   const [isRepayingAll, setIsRepayingAll] = useState(false);
-  const [hasProviderSufficientBalance, setHasProviderSufficientBalance] = useState<boolean | null>(null);
-  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -94,9 +92,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     );
   }, [fetchedCollaterals, supportedCollaterals]);
 
-  // Fetch USD prices for debt token and selected collaterals using Starknet helper
+  // Fetch USD prices for debt token and selected collaterals using EVM helper
   const { data: tokenPrices } = useNetworkAwareReadContract({
-    networkType: "starknet",
+    networkType: "evm",
     contractName: "UiHelper",
     functionName: "get_asset_prices",
     args: [[...collateralsForSelector.map(c => c.address), position.tokenAddress]],
@@ -118,15 +116,24 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     };
   }, [tokenPrices, collateralsForSelector, position.tokenAddress]);
 
-  // Move debt hook.
-  const { moveDebt } = useMoveDebtScaffold();
+  // Move position hook with modular builder
+  const { createMoveBuilder, executeFlowWithApprovals } = useKapanRouterV2();
 
-  // Read on-chain borrow balance.
+  // Map protocol names to gateway view contract names
+  const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
+    aave: "AaveGatewayView",
+    compound: "CompoundGatewayView",
+    venus: "VenusGatewayView",
+  };
+
+  // Read on-chain borrow balance using gateway view contract
+  const normalizedFromProtocol = fromProtocol.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+  const gatewayContractName = PROTOCOL_TO_GATEWAY_MAP[normalizedFromProtocol] || "AaveGatewayView"; // Default fallback
+
   const { data: tokenBalance } = useScaffoldReadContract({
-    contractName: "RouterGateway",
+    contractName: gatewayContractName,
     functionName: "getBorrowBalance",
     args: [
-      fromProtocol.toLowerCase(),
       position.tokenAddress,
       userAddress || "0x0000000000000000000000000000000000000000",
     ],
@@ -145,15 +152,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     },
   });
 
-  // Check flash loan provider balance.
-  const { data: flashLoanProviderBalance } = useScaffoldReadContract({
-    contractName: "RouterGateway",
-    functionName: "getFlashLoanProviderBalance",
-    args: [position.tokenAddress, selectedFlashLoanProvider.version],
-    query: {
-      enabled: isOpen,
-    },
-  });
+  // Note: Flash loan provider balance check removed - the new builder handles flash loans internally
+  // Flash loan availability is managed by the router contract
 
   // Reset the state when the modal is closed
   useEffect(() => {
@@ -167,41 +167,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     }
   }, [isOpen]);
 
-  // Effect for checking provider balance.
-  useEffect(() => {
-    // Early return if dependencies are missing
-    if (!flashLoanProviderBalance || !decimals || !amount || !tokenBalance) {
-      setHasProviderSufficientBalance(null);
-      return;
-    }
-
-    // Using state updater function to avoid closure over stale state
-    setIsCheckingBalance(true);
-
-    // Create a stable reference to the current values
-    const currentFlashLoanProviderBalance = flashLoanProviderBalance;
-    const currentAmount = amount;
-    const currentDecimals = decimals;
-    const currentTokenBalance = tokenBalance;
-    const currentIsRepayingAll = isRepayingAll;
-
-    const checkBalanceTimeout = setTimeout(() => {
-      try {
-        const requestedAmount = currentIsRepayingAll
-          ? (currentTokenBalance as bigint)
-          : parseUnits(currentAmount, currentDecimals as number);
-        setHasProviderSufficientBalance(currentFlashLoanProviderBalance >= requestedAmount);
-      } catch (error) {
-        console.error("Error checking provider balance:", error);
-        setHasProviderSufficientBalance(null);
-      } finally {
-        setIsCheckingBalance(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(checkBalanceTimeout);
-    // Explicit dependencies, without isCheckingBalance which would cause a loop
-  }, [flashLoanProviderBalance, amount, decimals, isRepayingAll, tokenBalance]);
+  // Note: Flash loan provider balance check removed - handled by router
 
   // Memoize formatted token balance.
   const formattedTokenBalance = useMemo(() => {
@@ -253,39 +219,84 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     try {
       if (!userAddress) throw new Error("Wallet not connected");
       if (!decimals) throw new Error("Token decimals not loaded");
+      if (!selectedProtocol) throw new Error("Please select a destination protocol");
       setLoading(true);
       setError(null);
       setStep("executing");
 
-      let computedDebtAmount: bigint;
-      if (isRepayingAll) {
-        computedDebtAmount = tokenBalance as bigint;
-      } else {
-        computedDebtAmount = parseUnits(amount, decimals as number);
+      // Create the modular builder
+      const builder = createMoveBuilder();
+
+      // Normalize protocol names for comparison
+      const normalizedSelectedProtocol = selectedProtocol.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+      const normalizedFromProtocol = fromProtocol.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+
+      // For Compound, set the market (debt token = base token = market)
+      if (normalizedSelectedProtocol === "compound" || normalizedFromProtocol === "compound") {
+        builder.setCompoundMarket(position.tokenAddress as `0x${string}`);
       }
 
-      const selectedCollateralArray = selectedCollateralsWithAmounts.map(c => {
-        return { token: c.token, amount: c.amount };
-      });
-
       if (position.type === "borrow") {
-        await moveDebt({
-          user: userAddress,
-          debtToken: position.tokenAddress,
-          debtAmount: computedDebtAmount,
-          collaterals: selectedCollateralArray,
-          fromProtocol: fromProtocol.toLowerCase(),
-          toProtocol: selectedProtocol.toLowerCase(),
-          flashLoanVersion: selectedFlashLoanProvider.version,
-          repayAll: isRepayingAll,
+        // Calculate debt amount
+        const debtAmountStr = isRepayingAll 
+          ? formatUnits(tokenBalance as bigint, decimals as number)
+          : amount;
+
+        // Validate debt amount
+        if (!debtAmountStr || debtAmountStr === "0" || debtAmountStr === "0.0" || parseFloat(debtAmountStr) <= 0) {
+          throw new Error("Invalid debt amount. Please enter a valid amount or ensure you have outstanding debt.");
+        }
+
+        // Validate token balance for max repay
+        if (isRepayingAll && (!tokenBalance || tokenBalance === 0n)) {
+          throw new Error("No outstanding debt found. Cannot move position.");
+        }
+
+        // 1) Unlock debt using flash loan
+        builder.buildUnlockDebt({
+          fromProtocol,
+          debtToken: position.tokenAddress as `0x${string}`,
+          expectedDebt: debtAmountStr,
+          debtDecimals: decimals as number,
+          flash: {
+            version: selectedFlashLoanProvider.version === "v2" ? "v2" : "v3",
+            premiumBps: 9, // TODO: Fetch from on-chain for Aave v3
+            bufferBps: 10, // Small buffer for interest accrual
+          },
         });
+
+        // 2) Move each collateral from source to target protocol
+        for (const collateral of selectedCollateralsWithAmounts) {
+          // Check if user selected max by comparing amount to maxAmount
+          const isMax = collateral.amount === collateral.maxAmount;
+          builder.buildMoveCollateral({
+            fromProtocol,
+            toProtocol: selectedProtocol,
+            collateralToken: collateral.token as `0x${string}`,
+            withdraw: isMax ? { max: true } : { amount: formatUnits(collateral.amount, collateral.decimals) },
+            collateralDecimals: collateral.decimals,
+          });
+        }
+
+        // 3) Borrow to cover flash loan repayment
+        builder.buildBorrow({
+          mode: "coverFlash",
+          toProtocol: selectedProtocol,
+          token: position.tokenAddress as `0x${string}`,
+          decimals: decimals as number,
+          extraBps: 5, // Small extra headroom
+          approveToRouter: true,
+        });
+
+        // Execute the flow with automatic approvals
+        await executeFlowWithApprovals(builder.build());
 
         setStep("done");
         // Close modal after a short delay on success
         setTimeout(() => onClose(), 2000);
       } else {
-        setError("Supply move not implemented in this hook");
-        console.log("Supply move not implemented in this hook");
+        setError("Supply move not implemented yet");
+        console.log("Supply move not implemented yet");
       }
     } catch (err: any) {
       console.error("Move debt failed:", err);
@@ -333,7 +344,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     !amount ||
     !!(tokenBalance && decimals && parseFloat(amount) > parseFloat(formattedTokenBalance)) ||
     !!(position.type === "borrow" && selectedCollateralsWithAmounts.length === 0) ||
-    hasProviderSufficientBalance === false ||
     step !== "idle";
 
   return (
@@ -503,7 +513,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                       className="rounded-full min-w-[32px]"
                     />
                     <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
-                    {isCheckingBalance && <span className="loading loading-spinner loading-xs ml-2"></span>}
                   </div>
                   <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -534,25 +543,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               </div>
             </div>
 
-            {hasProviderSufficientBalance !== null && amount && (
-              <div
-                className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
-                  hasProviderSufficientBalance ? "bg-success/10 text-success" : "bg-error/10 text-error"
-                }`}
-              >
-                {hasProviderSufficientBalance ? (
-                  <>
-                    <FiCheck className="w-5 h-5" /> Flash loan provider has sufficient {position.name} for this
-                    transaction.
-                  </>
-                ) : (
-                  <>
-                    <FiAlertTriangle className="w-5 h-5" /> This provider does not have enough {position.name} for your
-                    flash loan.
-                  </>
-                )}
-              </div>
-            )}
+            {/* Note: Flash loan provider balance check UI removed - handled by router */}
           </div>
         </div>
         <div className="flex justify-end pt-6 mt-auto">

@@ -6,6 +6,13 @@ interface CollateralSupportResult {
   supportedCollaterals: Record<string, boolean>; // Address -> supported mapping
 }
 
+// Map protocol names to gateway view contract names
+const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
+  aave: "AaveGatewayView",
+  compound: "CompoundGatewayView",
+  venus: "VenusGatewayView",
+};
+
 /**
  * Hook to check which collaterals are supported in a target protocol
  * @param protocolName The target protocol name
@@ -21,11 +28,15 @@ export const useCollateralSupport = (
 ): CollateralSupportResult => {
   const [supportedCollaterals, setSupportedCollaterals] = useState<Record<string, boolean>>({});
 
+  // Normalize protocol name and get gateway contract name
+  const normalizedProtocol = protocolName.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+  const gatewayContractName = PROTOCOL_TO_GATEWAY_MAP[normalizedProtocol] || "AaveGatewayView";
+
   // Get all supported collaterals for the target protocol
   const { data: supportedCollateralsList, isLoading } = useScaffoldReadContract({
-    contractName: "RouterGateway",
+    contractName: gatewayContractName,
     functionName: "getSupportedCollaterals",
-    args: [protocolName.toLowerCase(), marketAddress],
+    args: [marketAddress],
     query: {
       enabled,
     },
