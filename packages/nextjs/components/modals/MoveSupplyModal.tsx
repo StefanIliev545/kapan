@@ -57,7 +57,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     }
   }, [isOpen, chainId, chain?.id, switchChain]);
 
-  const { createMoveBuilder, executeFlowWithApprovals } = useKapanRouterV2();
+  const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2();
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
   // Debug token balance (can be removed in production)
@@ -256,9 +256,11 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
         collateralDecimals: decimals,
       });
       
-      // Execute the flow with automatic approvals
-      const txHash = await executeFlowWithApprovals(builder.build());
+      // Execute the flow with automatic approvals (batched when supported)
+      const result = await executeFlowBatchedIfPossible(builder.build());
       
+      // Extract hash/id from result (batch id or tx hash)
+      const txHash = result?.kind === "tx" ? result.hash : result?.kind === "batch" ? result.id : undefined;
       setTransactionHash(txHash ? txHash : null);
       setStatus(MoveStatus.Success);
       notification.success("Position moved successfully!");

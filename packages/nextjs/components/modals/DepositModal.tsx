@@ -21,7 +21,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildDepositFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
+  const { buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -62,18 +62,18 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
         return;
       }
 
-      // Use executeFlowWithApprovals to handle approvals automatically
-      await executeFlowWithApprovals(instructions);
+      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+      await executeFlowBatchedIfPossible(instructions);
       notification.success("Deposit transaction sent");
       
-      if (isConfirmed) {
+      if (isAnyConfirmed) {
         onClose();
       }
     } catch (error: any) {
       console.error("Deposit error:", error);
       notification.error(error.message || "Failed to deposit");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowWithApprovals, isConfirmed, onClose, chain?.id, chainId, switchChain, market]);
+  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed, onClose, chain?.id, chainId, switchChain, market]);
 
   return (
     <TokenActionModal

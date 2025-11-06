@@ -119,7 +119,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   }, [tokenPrices, collateralsForSelector, position.tokenAddress]);
 
   // Move position hook with modular builder
-  const { createMoveBuilder, executeFlowWithApprovals } = useKapanRouterV2();
+  const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2();
 
   // Map protocol names to gateway view contract names
   const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
@@ -310,8 +310,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           approveToRouter: true,
         });
 
-        // Execute the flow with automatic approvals
-        await executeFlowWithApprovals(builder.build());
+        // Execute the flow with automatic approvals (batched when supported)
+        await executeFlowBatchedIfPossible(builder.build());
 
         setStep("done");
         // Close modal after a short delay on success

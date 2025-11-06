@@ -31,7 +31,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const decimals = token.decimals;
-  const { buildWithdrawFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
+  const { buildWithdrawFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -76,20 +76,20 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
         return;
       }
 
-      // Use executeFlowWithApprovals to handle approvals automatically
-      await executeFlowWithApprovals(instructions);
+      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+      await executeFlowBatchedIfPossible(instructions);
       notification.success("Withdraw transaction sent");
     } catch (error: any) {
       console.error("Withdraw error:", error);
       notification.error(error.message || "Failed to withdraw");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowWithApprovals, chain?.id, chainId, switchChain, market]);
+  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, market]);
 
   useEffect(() => {
-    if (isConfirmed && isOpen) {
+    if (isAnyConfirmed && isOpen) {
       onClose();
     }
-  }, [isConfirmed, isOpen, onClose]);
+  }, [isAnyConfirmed, isOpen, onClose]);
 
   return (
     <TokenActionModal

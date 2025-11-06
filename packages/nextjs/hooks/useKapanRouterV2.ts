@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient, useChainId } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient, useChainId, useSendCalls, useWaitForCallsStatus, useCapabilities } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, type Address } from "viem";
+import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, encodeFunctionData, type Address, type Hex } from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import {
   ProtocolInstruction,
@@ -54,27 +54,38 @@ export const useKapanRouterV2 = () => {
   });
 
   const [isApproving, setIsApproving] = useState(false);
+  const [batchId, setBatchId] = useState<string | undefined>(undefined);
 
-  // Refresh Wagmi queries when transaction completes
+  // EIP-5792 capability detection for atomic batching
+  const { data: capabilities } = useCapabilities({ account: userAddress });
+  const chainIdHex = `0x${chainId.toString(16)}`;
+  const atomicStatus = (capabilities as Record<string, { atomic?: { status?: string } }> | undefined)?.[chainIdHex]?.atomic?.status as
+    | "supported" | "ready" | "unsupported" | undefined;
+  const canDoAtomicBatch = atomicStatus === "supported" || atomicStatus === "ready";
+
+  // Batch execution hooks
+  const { sendCallsAsync } = useSendCalls();
+  const { data: batchStatus, isSuccess: isBatchConfirmed } = useWaitForCallsStatus({
+    id: batchId,
+    query: { enabled: !!batchId },
+  });
+
+  // Refresh Wagmi queries when transaction completes (both single tx and batch)
   useEffect(() => {
-    if (!isConfirmed || !hash) return;
+    const complete = isConfirmed || isBatchConfirmed;
+    if (!complete) return;
 
-    // Use refetchQueries instead of invalidateQueries for faster refresh
-    // This only refetches active/mounted queries instead of marking all as stale
     Promise.all([
       queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
-    ]).catch(error => {
-      console.warn('Error refetching queries after transaction:', error);
-    });
+    ]).catch(e => console.warn("Post-tx refetch err:", e));
 
-    // Also dispatch a custom event for any listeners that might need it
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("txCompleted"));
     }
-  }, [isConfirmed, hash, queryClient]);
+  }, [isConfirmed, isBatchConfirmed, queryClient]);
 
   /**
    * Helper to encode Compound market context
@@ -510,6 +521,7 @@ export const useKapanRouterV2 = () => {
         });
         
         const approveHash = await walletClient.sendTransaction({
+          account: userAddress as Address,
           to: authCall.target,
           data: authCall.data,
           nonce: currentNonce, // Explicitly set nonce to prevent MetaMask caching issues
@@ -537,6 +549,79 @@ export const useKapanRouterV2 = () => {
       throw error;
     }
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations]);
+
+  /**
+   * Execute instructions with atomic batching support (EIP-5792)
+   * Attempts to batch all approvals + router call atomically if wallet supports it.
+   * Falls back to sequential execution if batching is unavailable.
+   * 
+   * @param instructions - Array of ProtocolInstructions to execute
+   * @returns Object indicating whether batch or sequential tx was used, with id/hash
+   */
+  const executeFlowBatchedIfPossible = useCallback(async (
+    instructions: ProtocolInstruction[]
+  ): Promise<{ kind: "batch", id: string } | { kind: "tx", hash: string } | undefined> => {
+    if (!routerContract || !userAddress || !publicClient || !walletClient) {
+      throw new Error("Missing router/user/public/wallet context");
+    }
+
+    // 1) Final router calldata
+    const protocolInstructions = instructions.map(inst => ({
+      protocolName: inst.protocolName,
+      data: inst.data as `0x${string}`,
+    }));
+    const routerCalldata = encodeFunctionData({
+      abi: routerContract.abi,
+      functionName: "processProtocolInstructions",
+      args: [protocolInstructions],
+    });
+
+    // 2) Gather approvals (router aggregates them)
+    const authCalls = await getAuthorizations(instructions);
+
+    // 3) Filter zero-amount approvals (same logic as sequential path)
+    const APPROVE_SELECTOR = "0x095ea7b3";
+    const filteredAuthCalls = authCalls.filter(({ data }) => {
+      if (!data) return false;
+      // Only filter approve calls
+      if (data.slice(0, 10).toLowerCase() !== APPROVE_SELECTOR) return true;
+      try {
+        const [, amount] = decodeAbiParameters(
+          [{ type: "address" }, { type: "uint256" }],
+          data.slice(10) as `0x${string}`
+        );
+        return (amount as bigint) !== 0n;
+      } catch {
+        return true; // If decode fails, include it (safer)
+      }
+    });
+
+    // 4) Compose calls: filtered approvals… then router call
+    const calls = [
+      ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
+      { to: routerContract.address as Address, data: routerCalldata as Hex },
+    ];
+
+    // 5) Try atomic batch first
+    try {
+      const { id } = await sendCallsAsync({
+        calls,
+        experimental_fallback: true, // runs sequentially if wallet can't batch
+      });
+
+      setBatchId(id);
+      notification.info("Batch sent — waiting for confirmation...");
+      return { kind: "batch", id };
+    } catch (err) {
+      console.warn("Batch send failed, falling back:", err);
+    }
+
+
+    // 6) Fallback: your existing sequential helper
+    notification.info("Executing sequential approvals + router call...");
+    const hash = await executeFlowWithApprovals(instructions);
+    return hash ? { kind: "tx", hash } : undefined;
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, canDoAtomicBatch, executeFlowWithApprovals]);
 
   // --- Types for modular move position builder ---
   type FlashConfig = {
@@ -863,6 +948,9 @@ export const useKapanRouterV2 = () => {
     return builder;
   }, [userAddress, encodeCompoundMarket]);
 
+  // Combined confirmation state (either single tx or batch)
+  const isAnyConfirmed = isConfirmed || isBatchConfirmed;
+
   return {
     // Builder functions
     buildDepositFlow,
@@ -873,7 +961,8 @@ export const useKapanRouterV2 = () => {
     createMoveBuilder, // Modular move position builder
     // Execution functions
     executeInstructions,
-    executeFlowWithApprovals,
+    executeFlowWithApprovals, // Sequential execution (fallback - use executeFlowBatchedIfPossible instead)
+    executeFlowBatchedIfPossible, // Batched execution (preferred - use this as default)
     getAuthorizations,
     // Transaction state
     hash,
@@ -882,6 +971,12 @@ export const useKapanRouterV2 = () => {
     isConfirmed,
     isApproving,
     writeContract,
+    // Batch state (EIP-5792)
+    batchId,
+    batchStatus,
+    isBatchConfirmed,
+    // Combined confirmation state (use this in modals)
+    isAnyConfirmed,
   };
 };
 

@@ -28,7 +28,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildBorrowFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
+  const { buildBorrowFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -70,20 +70,20 @@ export const BorrowModal: FC<BorrowModalProps> = ({
         return;
       }
 
-      // Use executeFlowWithApprovals to handle gateway authorizations (e.g., Aave credit delegation)
-      await executeFlowWithApprovals(instructions);
+      // Use executeFlowBatchedIfPossible to handle gateway authorizations (batched when supported)
+      await executeFlowBatchedIfPossible(instructions);
       notification.success("Borrow transaction sent");
     } catch (error: any) {
       console.error("Borrow error:", error);
       notification.error(error.message || "Failed to borrow");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowWithApprovals, chain?.id, chainId, switchChain]);
+  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain]);
 
   useEffect(() => {
-    if (isConfirmed && isOpen) {
+    if (isAnyConfirmed && isOpen) {
       onClose();
     }
-  }, [isConfirmed, isOpen, onClose]);
+  }, [isAnyConfirmed, isOpen, onClose]);
 
   return (
     <TokenActionModal

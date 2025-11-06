@@ -29,7 +29,7 @@ export const RepayModal: FC<RepayModalProps> = ({
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildRepayFlowAsync, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
+  const { buildRepayFlowAsync, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -75,20 +75,20 @@ export const RepayModal: FC<RepayModalProps> = ({
         return;
       }
 
-      // Use executeFlowWithApprovals to handle approvals automatically
-      await executeFlowWithApprovals(instructions);
+      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+      await executeFlowBatchedIfPossible(instructions);
       notification.success("Repay transaction sent");
     } catch (error: any) {
       console.error("Repay error:", error);
       notification.error(error.message || "Failed to repay");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowWithApprovals, chain?.id, chainId, switchChain]);
+  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain]);
 
   useEffect(() => {
-    if (isConfirmed && isOpen) {
+    if (isAnyConfirmed && isOpen) {
       onClose();
     }
-  }, [isConfirmed, isOpen, onClose]);
+  }, [isAnyConfirmed, isOpen, onClose]);
 
   return (
     <TokenActionModal
