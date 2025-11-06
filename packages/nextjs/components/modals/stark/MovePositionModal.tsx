@@ -105,7 +105,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     () => protocols.find(p => p.name !== fromProtocol)?.name || "",
   );
   const [selectedPoolId, setSelectedPoolId] = useState<bigint>(VESU_V1_POOLS["Genesis"]);
-  const [selectedV2PoolAddress, setSelectedV2PoolAddress] = useState<string>(VESU_V2_POOLS["Default"]);
+  const [selectedV2PoolAddress, setSelectedV2PoolAddress] = useState<string>(VESU_V2_POOLS["Prime"]);
   const [amount, setAmount] = useState("");
   const [isAmountMaxClicked, setIsAmountMaxClicked] = useState(false);
   const amountRef = useRef("");
@@ -936,7 +936,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setSelectedV2PoolAddress(
         fromProtocol === "VesuV2" && normalizedCurrentV2PoolAddress
           ? normalizedCurrentV2PoolAddress
-          : VESU_V2_POOLS["Default"],
+          : VESU_V2_POOLS["Prime"],
       );
     }
   };
