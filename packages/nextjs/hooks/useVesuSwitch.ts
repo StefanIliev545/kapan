@@ -76,9 +76,11 @@ export const useVesuSwitch = ({
   const targetTokenAddr = targetToken?.address ?? null;
 
   // 🧠 Internal refs to control request storms
-  const lastRequestKeyRef = useRef<string>("");
+  // Track the currently in-flight request key to dedupe only while active.
+  const inflightKeyRef = useRef<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runIdRef = useRef(0); // increment to invalidate previous runs
+  const pendingCountRef = useRef(0); // number of active async runs
 
   // 🔗 stabilize getAuthorizations usage
   const getAuthRef = useRef(getAuthorizations);
@@ -93,12 +95,17 @@ export const useVesuSwitch = ({
     setFetchedAuthorizations([]);
     setAuthInstructions([]);
     setError(null);
-    lastRequestKeyRef.current = ""; // important: allow a fresh fetch next time
+    inflightKeyRef.current = null; // ensure no stale dedupe blocks
+    setLoading(false); // avoid inheriting a stuck spinner when reopening
   }, [isOpen, type, targetTokenAddr]);
 
   // 🔎 Fetch quote + AVNU calldata (debounced, deduped, cancel-safe)
   useEffect(() => {
-    if (!isOpen || !address || !targetTokenAddr) return;
+    if (!isOpen || !address || !targetTokenAddr) {
+      // nothing to do, guarantee not loading
+      setLoading(false);
+      return;
+    }
 
     // Determine the "business" inputs as primitives
     const repayAmount = debtBalance > 0n ? debtBalance : 0n;
@@ -110,6 +117,7 @@ export const useVesuSwitch = ({
       setSelectedQuote(null);
       setProtocolInstructions([]);
       setAuthInstructions([]);
+      setLoading(false);
       return;
     }
 
@@ -121,8 +129,8 @@ export const useVesuSwitch = ({
     // Use a primitive-only key so identical inputs dedupe properly
     const requestKey = `${sellTokenAddress}-${buyTokenAddress}-${amount.toString()}-${address}-${poolKey}-${protocolKey}-${type}`;
 
-    // If this exact request already produced a result and is still the last one we kicked off, skip
-    if (lastRequestKeyRef.current === requestKey) {
+    // If an identical request is already in-flight, skip scheduling another
+    if (inflightKeyRef.current === requestKey) {
       return;
     }
 
@@ -131,7 +139,8 @@ export const useVesuSwitch = ({
 
     debounceTimerRef.current = setTimeout(async () => {
       const myRunId = ++runIdRef.current; // invalidate prior runs
-      lastRequestKeyRef.current = requestKey;
+      inflightKeyRef.current = requestKey;
+      pendingCountRef.current += 1;
       setLoading(true);
       setError(null);
 
@@ -252,15 +261,16 @@ export const useVesuSwitch = ({
           setAuthInstructions([{ protocol_name: protocolKey, instructions: [withdrawOnly, borrowOnly] }]);
         }
       } catch (e: any) {
+        // Always surface the latest error; stale ones are harmless
         if (runIdRef.current === myRunId) {
           setError(e?.message ?? "Failed to prepare switch instructions");
-          // Ensure subsequent attempts aren’t blocked by a failed key
-          lastRequestKeyRef.current = "";
         }
       } finally {
-        if (runIdRef.current === myRunId) {
-          setLoading(false);
-        }
+        // Clear in-flight key if it belongs to this run
+        if (inflightKeyRef.current === requestKey) inflightKeyRef.current = null;
+        // Decrement pending and update loading accordingly (prevents stuck spinner)
+        pendingCountRef.current = Math.max(0, pendingCountRef.current - 1);
+        if (pendingCountRef.current === 0) setLoading(false);
       }
     }, DEBOUNCE_MS);
 
@@ -273,8 +283,9 @@ export const useVesuSwitch = ({
       // Invalidate any in-flight async completions
       runIdRef.current++;
     };
-    // ✅ Only primitive deps here
-  }, [isOpen, address, type, targetTokenAddr, currentCollateralAddr, currentDebtAddr, collateralBalance, debtBalance, poolKey, protocolKey, currentCollateral, currentDebt, targetToken]);
+    // ✅ Only primitive deps here (objects removed to avoid identity churn)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, address, type, targetTokenAddr, currentCollateralAddr, currentDebtAddr, collateralBalance, debtBalance, poolKey, protocolKey]);
 
   // 🔐 Fetch authorizations only when needed (stable getAuthorizations)
   useEffect(() => {
