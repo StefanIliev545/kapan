@@ -1,4 +1,5 @@
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useLocalRateProvider } from "~~/hooks/useLocalRateProvider";
+import { Address } from "viem";
 
 interface ProtocolRate {
   protocol: string;
@@ -8,43 +9,58 @@ interface ProtocolRate {
 }
 
 export const useProtocolRates = (tokenAddress: string) => {
-  // Get all protocol rates
-  const { data: allRates, isLoading: ratesLoading } = useScaffoldReadContract({
-    contractName: "OptimalInterestRateFinder",
-    functionName: "getAllProtocolRates",
-    args: [tokenAddress],
-  });
+  // Use local rate provider instead of OptimalInterestRateFinder
+  const supplyRates = useLocalRateProvider(tokenAddress as Address, "supply");
+  const borrowRates = useLocalRateProvider(tokenAddress as Address, "borrow");
 
   // Transform the data into a consistent format
   const rates: ProtocolRate[] = [];
 
-  if (allRates) {
-    const [protocols, rateValues, successFlags] = allRates;
+  // Combine supply and borrow rates
+  const protocolMap = new Map<string, { supplyRate: number; borrowRate: number }>();
 
-    // Find the highest rate among successful responses
-    let maxRate = 0n;
-    for (let i = 0; i < protocols.length; i++) {
-      if (successFlags[i] && rateValues[i] > maxRate) {
-        maxRate = rateValues[i];
-      }
-    }
+  // Add supply rates
+  supplyRates.rates.forEach(rate => {
+    protocolMap.set(rate.protocol, {
+      supplyRate: rate.rate,
+      borrowRate: 0, // Will be filled by borrow rates
+    });
+  });
 
-    // Create rate objects and mark the highest as optimal
-    for (let i = 0; i < protocols.length; i++) {
-      if (successFlags[i]) {
-        rates.push({
-          protocol: protocols[i],
-          supplyRate: Number(rateValues[i]) / 1e8, // Already converted in contract
-          borrowRate: 0, // We'll add this when needed
-          isOptimal: rateValues[i] === maxRate,
-        });
-      }
+  // Add borrow rates
+  borrowRates.rates.forEach(rate => {
+    const existing = protocolMap.get(rate.protocol);
+    if (existing) {
+      existing.borrowRate = rate.rate;
+    } else {
+      protocolMap.set(rate.protocol, {
+        supplyRate: 0,
+        borrowRate: rate.rate,
+      });
     }
-  }
+  });
+
+  // Find the highest supply rate for optimal marking
+  let maxSupplyRate = 0;
+  protocolMap.forEach(({ supplyRate }) => {
+    if (supplyRate > maxSupplyRate) {
+      maxSupplyRate = supplyRate;
+    }
+  });
+
+  // Convert to array format
+  protocolMap.forEach(({ supplyRate, borrowRate }, protocol) => {
+    rates.push({
+      protocol,
+      supplyRate,
+      borrowRate,
+      isOptimal: supplyRate === maxSupplyRate && supplyRate > 0,
+    });
+  });
 
   return {
     data: rates,
-    isLoading: ratesLoading,
+    isLoading: supplyRates.isLoading || borrowRates.isLoading,
     error: null,
   };
 };
