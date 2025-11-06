@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import { track } from "@vercel/analytics";
 import toast from "react-hot-toast";
@@ -7,27 +7,26 @@ import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
 
 const ConnectModal = () => {
   const { connectAsync, connectors } = useConnect();
-  const availableConnectors = useMemo(() => {
-    return (connectors ?? []).filter((connector) => {
-      const availableFn = (connector as { available?: () => boolean }).available;
-      if (typeof availableFn === "function") {
-        try {
-          return availableFn();
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error("[Starknet connect] connector availability error:", error);
-          return false;
-        }
+  const availableConnectors = (connectors ?? []).filter((connector) => {
+    const availableFn = (connector as { available?: () => boolean }).available;
+    if (typeof availableFn === "function") {
+      try {
+        return availableFn();
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[Starknet connect] connector availability error:", error);
+        return false;
       }
+    }
 
-      return true;
-    });
-  }, [connectors]);
+    return true;
+  });
   const { starknetkitConnectModal } = useStarknetkitConnectModal({
     connectors: availableConnectors as StarknetkitConnector[],
   });
 
   const [isConnecting, setIsConnecting] = useState(false);
+  const [showInstallHint, setShowInstallHint] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const guardRef = useRef(false);
 
@@ -41,6 +40,12 @@ const ConnectModal = () => {
   useEffect(() => {
     return () => clearTimer();
   }, []);
+
+  useEffect(() => {
+    if (availableConnectors.length > 0 && showInstallHint) {
+      setShowInstallHint(false);
+    }
+  }, [availableConnectors.length, showInstallHint]);
 
   const resetState = () => {
     clearTimer();
@@ -64,6 +69,7 @@ const ConnectModal = () => {
 
     if (availableConnectors.length === 0) {
       toast.error("No Starknet wallet detected. Install a wallet and try again.");
+      setShowInstallHint(true);
       guardRef.current = false;
       return;
     }
@@ -135,7 +141,7 @@ const ConnectModal = () => {
         {isConnecting && <span className="loading loading-spinner loading-xs"></span>}
         <span>Connect Starknet</span>
       </button>
-      {availableConnectors.length === 0 && (
+      {showInstallHint && (
         <p className="text-xs opacity-70">
           No Starknet wallet detected. Install Ready (Argent) or Braavos, then try again.
         </p>
