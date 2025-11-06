@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 // import { verifyContract } from "../../utils/verification";
+import { deterministicSalt } from "../../utils/deploySalt";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -18,6 +19,9 @@ const DEFAULT_COMETS: Record<number, string[]> = {
   8453: [
     "0xb125E6687d4313864e53df431d5425969c15Eb2F", // cUSDCv3 (native USDC)
     "0x46e6b214b524310239732D51387075E0e70970bf", // cWETHv3
+    "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // cUSDbCv3
+    "0x784efeB622244d2348d4F2522f8860B96fbEcE89", // cAEROv3
+    "0x2c776041ccfe903071af44aa147368a9c8eea518", // cUSDSv3
   ],
 };
 
@@ -64,7 +68,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
     args: [kapanRouter.address, deployer], // router, owner
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    deterministicDeployment: deterministicSalt(hre, "CompoundGatewayWrite"),
     waitConfirmations: WAIT,
   });
 
@@ -101,7 +105,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
     args: [deployer], // owner
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424243",
+    deterministicDeployment: deterministicSalt(hre, "CompoundGatewayView"),
     waitConfirmations: WAIT,
   });
 

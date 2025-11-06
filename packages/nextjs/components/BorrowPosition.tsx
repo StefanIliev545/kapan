@@ -552,6 +552,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               tokenAddress,
               decimals: tokenDecimals || 18,
             }}
+            chainId={chainId}
           />
         </>
       )}

@@ -34,6 +34,7 @@ contract AaveGatewayViewBase {
         uint256 borrowBalance;
         uint256 balance;
         address aToken;
+        uint8 decimals;
     }
 
     /// @notice Returns all token info for a given user.
@@ -62,6 +63,8 @@ contract AaveGatewayViewBase {
             string memory symbol = "";
             try IERC20Metadata(reserves[i]).name() returns (string memory n) { name = n; } catch {}
             try IERC20Metadata(reserves[i]).symbol() returns (string memory s) { symbol = s; } catch {}
+            uint8 dec = 18;
+            try ERC20(reserves[i]).decimals() returns (uint8 d) { dec = d; } catch {}
 
             tokens[i] = TokenInfo({
                 token: reserves[i],
@@ -72,7 +75,8 @@ contract AaveGatewayViewBase {
                 price: oracle.getAssetPrice(reserves[i]),
                 borrowBalance: borrowBalance,
                 balance: balance,
-                aToken: aToken
+                aToken: aToken,
+                decimals: dec
             });
         }
         return tokens;

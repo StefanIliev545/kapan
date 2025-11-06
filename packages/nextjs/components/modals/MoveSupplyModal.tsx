@@ -2,7 +2,7 @@ import { ChangeEvent, FC, KeyboardEvent, useCallback, useEffect, useMemo, useRef
 import Image from "next/image";
 import { BaseModal } from "./BaseModal";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { useMoveSupply } from "~~/hooks/kapan/moveSupply";
@@ -24,6 +24,7 @@ interface MoveSupplyModalProps {
     price?: bigint;
   };
   fromProtocol: string;
+  chainId?: number;
 }
 
 enum MoveStatus {
@@ -34,7 +35,7 @@ enum MoveStatus {
   Error,
 }
 
-export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol }) => {
+export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol, chainId }) => {
   const [status, setStatus] = useState<MoveStatus>(MoveStatus.Initial);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [selectedProtocol, setSelectedProtocol] = useState<string>("");
@@ -43,7 +44,19 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const [inputValue, setInputValue] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const isFocusingRef = useRef<boolean>(false);
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
 
   const { moveSupply } = useMoveSupply();
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
@@ -209,6 +222,14 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const handleMove = async () => {
     if (!selectedProtocol || !address) return;
     try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       setStatus(MoveStatus.Approving);
       const collaterals = [{ token: token.address, amount: transferAmount }];
       const txHash = await moveSupply({

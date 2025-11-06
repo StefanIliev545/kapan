@@ -4,6 +4,7 @@ import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
+import { useAccount, useSwitchChain } from "wagmi";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface WithdrawModalProps {
   protocolName: string;
   supplyBalance: bigint;
   position?: PositionManager;
+  chainId?: number;
 }
 
 export const WithdrawModal: FC<WithdrawModalProps> = ({
@@ -21,7 +23,10 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   protocolName,
   supplyBalance,
   position,
+  chainId,
 }) => {
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const decimals = token.decimals;
   const { buildWithdrawFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
@@ -32,8 +37,28 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
 
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
   const handleWithdraw = useCallback(async (amount: string, isMax?: boolean) => {
     try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       const instructions = buildWithdrawFlow(
         protocolName.toLowerCase(),
         token.address,
@@ -54,7 +79,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       console.error("Withdraw error:", error);
       notification.error(error.message || "Failed to withdraw");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowWithApprovals]);
+  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowWithApprovals, chain?.id, chainId, switchChain]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

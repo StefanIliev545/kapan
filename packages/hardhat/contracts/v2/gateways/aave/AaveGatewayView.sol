@@ -31,6 +31,7 @@ contract AaveGatewayView {
         uint256 borrowBalance;
         uint256 balance;
         address aToken;
+        uint8 decimals;
     }
 
     /// @notice Returns all token info for a given user.
@@ -46,17 +47,24 @@ contract AaveGatewayView {
         for (uint256 i = 0; i < reserves.length; i++) {
             uint256 balance = _getBalanceFromReserveData(reserves[i], user, userReserves);
             uint256 borrowBalance = _getBorrowBalanceFromReserveData(reserves[i], user, userReserves);
-            tokens[i] = TokenInfo(
-                reserves[i].underlyingAsset,
-                reserves[i].liquidityRate,
-                reserves[i].variableBorrowRate,
-                reserves[i].name,
-                reserves[i].symbol,
-                reserves[i].priceInMarketReferenceCurrency,
-                borrowBalance,
-                balance,
-                reserves[i].aTokenAddress
-            );
+            uint8 dec = 18;
+            // Read decimals from the underlying token; default to 18 on failure
+            try ERC20(reserves[i].underlyingAsset).decimals() returns (uint8 d) {
+                dec = d;
+            } catch {
+            }
+            tokens[i] = TokenInfo({
+                token: reserves[i].underlyingAsset,
+                supplyRate: reserves[i].liquidityRate,
+                borrowRate: reserves[i].variableBorrowRate,
+                name: reserves[i].name,
+                symbol: reserves[i].symbol,
+                price: reserves[i].priceInMarketReferenceCurrency,
+                borrowBalance: borrowBalance,
+                balance: balance,
+                aToken: reserves[i].aTokenAddress,
+                decimals: dec
+            });
         }
         return tokens;
     }

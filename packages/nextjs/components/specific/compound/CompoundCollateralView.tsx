@@ -474,6 +474,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
             address: selectedCollateral.address,
           }}
           market={baseToken}
+          chainId={chainId}
         />
       )}
     </>

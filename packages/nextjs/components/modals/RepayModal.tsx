@@ -5,6 +5,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
+import { useAccount, useSwitchChain } from "wagmi";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -25,8 +26,10 @@ export const RepayModal: FC<RepayModalProps> = ({
   position,
   chainId,
 }) => {
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildRepayFlowAsync, executeFlowWithApprovals, isPending, isConfirming, isConfirmed, isApproving } = useKapanRouterV2();
+  const { buildRepayFlowAsync, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -36,8 +39,28 @@ export const RepayModal: FC<RepayModalProps> = ({
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = walletBalance < bump ? walletBalance : bump;
 
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
   const handleRepay = useCallback(async (amount: string, isMax?: boolean) => {
     try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       // Use async version for max repayments to safely read wallet balance
       const instructions = await buildRepayFlowAsync(
         protocolName.toLowerCase(),
@@ -59,7 +82,7 @@ export const RepayModal: FC<RepayModalProps> = ({
       console.error("Repay error:", error);
       notification.error(error.message || "Failed to repay");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowWithApprovals]);
+  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowWithApprovals, chain?.id, chainId, switchChain]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

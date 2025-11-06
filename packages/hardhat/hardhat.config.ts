@@ -65,8 +65,8 @@ const config: HardhatUserConfig = {
     hardhat: {
       hardfork: "cancun",
       forking: {
-       // url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        url: `https://base-mainnet.g.alchemy.com/v2/yPPyKMaWVp9thvurm46PcIf3-NroyUd-`,
+        // Default to Base mainnet Alchemy; override via ALCHEMY_API_KEY
+        url: `https://base-mainnet.g.alchemy.com/v2/${providerApiKey}`,
 //        blockNumber: 396136412,
         blockNumber: 37791583,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
@@ -157,7 +157,7 @@ const config: HardhatUserConfig = {
       accounts: [deployerPrivateKey],
     },
     base: {
-      url: "https://mainnet.base.org",
+      url: `https://base-mainnet.g.alchemy.com/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey],
       verify: {
         etherscan: {
@@ -167,7 +167,7 @@ const config: HardhatUserConfig = {
       },
     },
     baseSepolia: {
-      url: "https://sepolia.base.org",
+      url: `https://base-sepolia.g.alchemy.com/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey],
       verify: {
         etherscan: {

@@ -530,6 +530,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             protocolName={protocolName}
             isBorrow={false}
             position={positionManager}
+            chainId={chainId}
           />
 
           {/* Token Select Modal for Borrow - EVM */}
@@ -540,6 +541,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             protocolName={protocolName}
             isBorrow={true}
             position={positionManager}
+            chainId={chainId}
           />
 
           {/* Borrow Modal - EVM */}

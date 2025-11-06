@@ -487,6 +487,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             protocolName={protocolName}
             supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
+            chainId={chainId}
           />
         </>
       )}
@@ -505,6 +506,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             price: tokenPrice,
           }}
           fromProtocol={protocolName}
+          chainId={chainId}
         />
       )}
     </>

@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
+import { deterministicSalt } from "../../utils/deploySalt";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -43,7 +44,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
     args: [VENUS_COMPTROLLER, kapanRouter.address, deployer], // comptroller, router, owner
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    deterministicDeployment: deterministicSalt(hre, "VenusGatewayWrite"),
     waitConfirmations: WAIT,
   });
 
@@ -56,7 +57,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
       args: [VENUS_COMPTROLLER, VENUS_ORACLE, deployer], // comptroller, oracle, owner
       log: true,
       autoMine: true,
-      deterministicDeployment: "0x4242424242424242424242424242424242424242",
+      deterministicDeployment: deterministicSalt(hre, "VenusGatewayView"),
       waitConfirmations: WAIT,
     });
 

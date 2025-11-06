@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 // import { verifyContract } from "../../utils/verification";
+import { deterministicSalt } from "../../utils/deploySalt";
 
 /**
  * Deploys the UiHelper contract
@@ -21,7 +22,7 @@ const deployUiHelper: DeployFunction = async function (hre: HardhatRuntimeEnviro
     args: [],
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    deterministicDeployment: deterministicSalt(hre, "UiHelper"),
     waitConfirmations: WAIT,
   });
 

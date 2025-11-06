@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 // import { verifyContract } from "../../utils/verification";
+import { deterministicSalt } from "../../utils/deploySalt";
 
 /**
  * Deploys the OptimalInterestRateFinder contract
@@ -21,7 +22,7 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
     args: [],
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    deterministicDeployment: deterministicSalt(hre, "OptimalInterestRateFinder"),
     waitConfirmations: WAIT,
   });
 

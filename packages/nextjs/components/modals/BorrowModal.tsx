@@ -4,6 +4,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
+import { useAccount, useSwitchChain } from "wagmi";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   position,
   chainId,
 }) => {
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildBorrowFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
@@ -31,8 +34,30 @@ export const BorrowModal: FC<BorrowModalProps> = ({
     token.decimals = decimals;
   }
 
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        // Non-blocking; user can still switch manually
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
   const handleBorrow = useCallback(async (amount: string) => {
     try {
+      // If a target chain is provided and wallet is on a different chain, switch first
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       const instructions = buildBorrowFlow(
         protocolName.toLowerCase(),
         token.address,
@@ -52,7 +77,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
       console.error("Borrow error:", error);
       notification.error(error.message || "Failed to borrow");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowWithApprovals]);
+  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowWithApprovals, chain?.id, chainId, switchChain]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

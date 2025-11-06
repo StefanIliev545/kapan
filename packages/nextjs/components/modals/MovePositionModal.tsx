@@ -3,7 +3,7 @@ import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { FiAlertTriangle, FiLock } from "react-icons/fi";
 import { formatUnits } from "viem";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContract, useSwitchChain } from "wagmi";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -28,6 +28,7 @@ interface MovePositionModalProps {
     tokenAddress: string;
     decimals: number;
   };
+  chainId?: number;
 }
 
 type FlashLoanProvider = {
@@ -42,8 +43,9 @@ const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
 ] as const;
 
 // Extend the collateral type with rawBalance
-export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position }) => {
-  const { address: userAddress } = useAccount();
+export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position, chainId }) => {
+  const { address: userAddress, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const protocols = [{ name: "Aave V3" }, { name: "Compound V3" }, { name: "Venus" }];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
@@ -167,6 +169,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     }
   }, [isOpen]);
 
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
   // Note: Flash loan provider balance check removed - handled by router
 
   // Memoize formatted token balance.
@@ -217,6 +231,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   const handleMoveDebt = async () => {
     try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          setError("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       if (!userAddress) throw new Error("Wallet not connected");
       if (!decimals) throw new Error("Token decimals not loaded");
       if (!selectedProtocol) throw new Error("Please select a destination protocol");

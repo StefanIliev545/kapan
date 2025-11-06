@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
+import { deterministicSalt } from "../../utils/deploySalt";
 
 /**
  * Router is chain-agnostic; we deploy it always.
@@ -30,7 +31,7 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     args: [deployer], // owner
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4342424242424242424242424242424242424343",
+    deterministicDeployment: deterministicSalt(hre, "KapanRouter"),
     waitConfirmations: WAIT,
   });
 

@@ -3,6 +3,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
+import { deterministicSalt } from "../../utils/deploySalt";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -46,7 +47,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
     args: [kapanRouter.address, POOL_ADDRESSES_PROVIDER, REFERRAL_CODE],
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    deterministicDeployment: deterministicSalt(hre, "AaveGatewayWrite"),
     waitConfirmations: WAIT,
   });
 
@@ -59,7 +60,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424242",
+    deterministicDeployment: deterministicSalt(hre, "AaveGatewayView"),
     waitConfirmations: WAIT,
     // Use Base-specific contract artifact on Base chains
     ...(isBaseChain ? { contract: "AaveGatewayViewBase" } : {}),

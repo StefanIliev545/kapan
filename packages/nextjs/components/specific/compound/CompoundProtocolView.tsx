@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, useEffect, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { Address, formatUnits } from "viem";
@@ -6,6 +6,7 @@ import { useAccount, useReadContracts } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { Abi } from "abitype";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -30,6 +31,7 @@ export const CompoundProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
   const { address: connectedAddress } = useAccount();
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
+  const queryClient = useQueryClient();
 
   // Determine the address to use for queries
   const queryAddress = (connectedAddress || ZERO_ADDRESS) as Address;
@@ -65,6 +67,22 @@ export const CompoundProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
     query: { enabled: !!uiHelperAddress && baseTokens.length > 0 },
   });
   const baseTokenDecimals: number[] = useMemo(() => (baseTokenDecimalsRaw || []).map((d: any) => Number(d)), [baseTokenDecimalsRaw]);
+
+  // Refetch contract reads when a transaction completes
+  useEffect(() => {
+    const handler = () => {
+      queryClient.refetchQueries({ queryKey: ["readContract"], type: "active" });
+      queryClient.refetchQueries({ queryKey: ["readContracts"], type: "active" });
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("txCompleted", handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("txCompleted", handler);
+      }
+    };
+  }, [queryClient]);
 
   // Batch market data getCompoundData(baseToken, user)
   const compoundCalls = useMemo(() => {

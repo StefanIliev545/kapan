@@ -38,9 +38,12 @@ export const AaveProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
     if (!allTokensInfo) return { suppliedPositions: supplied, borrowedPositions: borrowed };
 
     allTokensInfo.forEach((token: any) => {
-      let decimals = 18;
-      if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
-        decimals = 6;
+      // Prefer on-chain decimals provided by the gateway; fallback for legacy deployments
+      let decimals = typeof token.decimals !== "undefined" ? Number(token.decimals) : 18;
+      if (typeof token.decimals === "undefined") {
+        if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
+          decimals = 6;
+        }
       }
 
       const supplyAPY = convertRateToAPY(token.supplyRate);

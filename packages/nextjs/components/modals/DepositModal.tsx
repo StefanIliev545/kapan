@@ -1,9 +1,10 @@
-import { FC, useCallback } from "react";
+import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
+import { useAccount, useSwitchChain } from "wagmi";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface DepositModalProps {
 }
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId }) => {
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildDepositFlow, executeFlowWithApprovals, isConfirmed } = useKapanRouterV2();
   
@@ -22,8 +25,28 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
     token.decimals = decimals;
   }
 
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
   const handleDeposit = useCallback(async (amount: string) => {
     try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       const instructions = buildDepositFlow(
         protocolName.toLowerCase(),
         token.address,
@@ -47,7 +70,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       console.error("Deposit error:", error);
       notification.error(error.message || "Failed to deposit");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowWithApprovals, isConfirmed, onClose]);
+  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowWithApprovals, isConfirmed, onClose, chain?.id, chainId, switchChain]);
 
   return (
     <TokenActionModal

@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient, useChainId } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, type Address } from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
@@ -42,11 +42,15 @@ export const useKapanRouterV2 = () => {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const queryClient = useQueryClient();
+  const chainId = useChainId();
+  const opStackChainIds = new Set([10, 420, 8453, 84531, 84532, 11155420]);
+  const effectiveConfirmations = opStackChainIds.has(chainId) ? 2 : 1;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
   
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
+    confirmations: effectiveConfirmations,
   });
 
   const [isApproving, setIsApproving] = useState(false);
@@ -494,7 +498,7 @@ export const useKapanRouterV2 = () => {
 
         // Wait for approval confirmation (crucial for mobile wallets)
         // Add a small delay after receipt to ensure Hardhat processes the nonce update
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash, confirmations: effectiveConfirmations });
         
         // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -513,7 +517,7 @@ export const useKapanRouterV2 = () => {
       notification.error(error.message || "Failed to execute flow with approvals");
       throw error;
     }
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions]);
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations]);
 
   // --- Types for modular move position builder ---
   type FlashConfig = {

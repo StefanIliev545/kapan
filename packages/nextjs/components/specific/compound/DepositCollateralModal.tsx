@@ -2,7 +2,7 @@ import { FC, useEffect, useState } from "react";
 import Image from "next/image";
 import { FiAlertTriangle, FiArrowRight, FiCheck, FiDollarSign } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount, usePublicClient, useReadContract, useWalletClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWalletClient, useWriteContract, useSwitchChain } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -21,10 +21,12 @@ interface DepositCollateralModalProps {
     currentRate?: number; // Optional APY rate
   };
   market: string; // The debt token address (market in Compound)
+  chainId?: number;
 }
 
-export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({ isOpen, onClose, token, market }) => {
-  const { address: userAddress } = useAccount();
+export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({ isOpen, onClose, token, market, chainId }) => {
+  const { address: userAddress, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const [amount, setAmount] = useState("");
@@ -77,6 +79,18 @@ export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({ isOpen
     }
   }, [isOpen]);
 
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
   // Format number with thousands separators for display
   const formatDisplayNumber = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
@@ -94,6 +108,14 @@ export const DepositCollateralModal: FC<DepositCollateralModalProps> = ({ isOpen
     }
 
     try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          setError("Please switch to the selected network to proceed");
+          return;
+        }
+      }
       setIsLoading(true);
       setError(null);
       setStep("approving");
