@@ -1,9 +1,8 @@
-import React, { FC, useState, useEffect, useMemo, createRef, RefObject } from "react";
+import React, { FC, useState, useEffect, useMemo } from "react";
 import Image from "next/image";
-import { FiChevronDown, FiMinusCircle, FiX, FiArrowRight, FiRefreshCw, FiSearch, FiCheck } from "react-icons/fi";
+import { FiX } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { CollateralSwitchButton } from "./CollateralSwitchButton";
 
 // Define types for collateral
 export interface CollateralToken {
@@ -24,178 +23,6 @@ export interface CollateralWithAmount {
   inputValue?: string; // For in-progress decimal inputs
   supported: boolean;
 }
-
-// New interface for the token switcher dropdown
-interface TokenSwitcherDropdownProps {
-  isOpen: boolean;
-  onClose: () => void;
-  targetCollateral: string; // Current collateral token address
-  availableTokens: CollateralToken[]; // List of tokens that can be switched to
-  onSelectToken: (tokenAddress: string) => void; // Callback when a token is selected
-  anchorRef: RefObject<HTMLButtonElement>; // Reference to the button that triggered the dropdown
-}
-
-// CONCEPTUAL COMPONENT: Token Switcher Dropdown
-const TokenSwitcherDropdown: FC<TokenSwitcherDropdownProps> = ({
-  isOpen,
-  onClose,
-  targetCollateral,
-  availableTokens,
-  onSelectToken,
-  anchorRef,
-}) => {
-  const [search, setSearch] = useState("");
-  const [position, setPosition] = useState<'top' | 'bottom'>('bottom');
-  
-  // Calculate position on mount
-  useEffect(() => {
-    if (!isOpen || !anchorRef.current) return;
-    
-    // Get button position and modal boundaries
-    const buttonRect = anchorRef.current.getBoundingClientRect();
-    const modalElement = anchorRef.current.closest('.modal-box') as HTMLElement;
-    
-    if (modalElement) {
-      const modalRect = modalElement.getBoundingClientRect();
-      
-      // Estimate dropdown height (max 350px or content height)
-      const estimatedDropdownHeight = Math.min(
-        350,
-        // Estimate height based on number of items (70px per item) plus header/footer (100px)
-        availableTokens.length * 70 + 100
-      );
-      
-      // Check available space below
-      const spaceBelow = modalRect.bottom - buttonRect.bottom;
-      
-      // If not enough space below, position above
-      if (spaceBelow < estimatedDropdownHeight) {
-        setPosition('top');
-      } else {
-        setPosition('bottom');
-      }
-    }
-  }, [isOpen, anchorRef, availableTokens.length]);
-  
-  // Filter tokens based on search input
-  const filteredTokens = useMemo(() => {
-    if (!search.trim()) return availableTokens;
-    
-    const searchLower = search.toLowerCase();
-    return availableTokens.filter(token => 
-      token.symbol.toLowerCase().includes(searchLower)
-    );
-  }, [availableTokens, search]);
-  
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        anchorRef.current && 
-        !anchorRef.current.contains(event.target as Node) &&
-        !(event.target as Element).closest('.token-switcher-dropdown')
-      ) {
-        onClose();
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose, anchorRef]);
-  
-  if (!isOpen) return null;
-  
-  // Compute styles based on position
-  const dropdownStyles = position === 'top' 
-    ? { 
-        position: 'absolute' as const,
-        bottom: '100%',
-        left: 0,
-        marginBottom: '8px',
-      }
-    : {
-        position: 'absolute' as const,
-        top: '100%',
-        left: 0,
-        marginTop: '8px',
-      };
-  
-  return (
-    <div 
-      className="token-switcher-dropdown absolute z-50 bg-base-100 rounded-lg shadow-xl border border-base-300 w-[280px] max-h-[350px] overflow-hidden flex flex-col"
-      style={dropdownStyles}
-    >
-      <div className="p-3 border-b border-base-200">
-        <h3 className="font-medium mb-2">Switch Collateral</h3>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search tokens..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input input-sm input-bordered w-full pl-8"
-            autoFocus
-          />
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50" />
-        </div>
-      </div>
-      
-      <div className="overflow-y-auto flex-1 p-2">
-        {filteredTokens.length > 0 ? (
-          <div className="space-y-1">
-            {filteredTokens.map(token => (
-              <button
-                key={token.address}
-                className={`w-full py-2 px-3 rounded-md flex items-center gap-2 hover:bg-base-200 transition-colors ${
-                  token.address === targetCollateral ? 'bg-primary/10 text-primary' : ''
-                }`}
-                onClick={() => {
-                  onSelectToken(token.address);
-                  onClose();
-                }}
-              >
-                <div className="w-6 h-6 relative flex-shrink-0">
-                  <Image
-                    src={tokenNameToLogo(token.symbol)}
-                    alt={token.symbol}
-                    fill
-                    className="rounded-full object-contain"
-                  />
-                </div>
-                <div className="flex-1 flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">{token.symbol}</div>
-                    <div className="text-xs text-base-content/60">
-                      {token.balance > 0 ? `Balance: ${token.balance.toFixed(2)}` : 'No balance'}
-                    </div>
-                  </div>
-                  {token.address === targetCollateral && (
-                    <FiCheck className="text-primary" />
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-base-content/50">
-            No tokens found matching &quot;{search}&quot;
-          </div>
-        )}
-      </div>
-      
-      <div className="p-2 border-t border-base-200">
-        <button
-          className="btn btn-sm btn-block btn-ghost"
-          onClick={onClose}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-};
 
 interface CollateralSelectorProps {
   collaterals: CollateralToken[];
@@ -232,11 +59,6 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSelectedCollaterals]);
   
-  // For the token switcher dropdown
-  const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [activeTokenForSwitch, setActiveTokenForSwitch] = useState<string | null>(null);
-  const switchButtonRefs = new Map<string, RefObject<HTMLButtonElement>>();
-  
   // Create a memoized version of the collateral support mapping
   const collateralSupportMap = useMemo(() => {
     return collaterals.reduce((acc, collateral) => {
@@ -244,23 +66,6 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       return acc;
     }, {} as Record<string, boolean>);
   }, [collaterals]);
-  
-  // Prepare refs for all selected collaterals
-  selectedCollaterals.forEach(collateral => {
-    if (!switchButtonRefs.has(collateral.token)) {
-      switchButtonRefs.set(collateral.token, createRef<HTMLButtonElement>());
-    }
-  });
-  
-  // Example function for when a new token is selected from the dropdown
-  const handleSwitchToken = (currentToken: string, newToken: string) => {
-    // This would be implemented to handle the actual token switch
-    console.log(`Switch from ${currentToken} to ${newToken}`);
-    
-    // Close the dropdown
-    setSwitcherOpen(false);
-    setActiveTokenForSwitch(null);
-  };
   
   // Sort collaterals to show selectable ones first, then by balance, then alphabetically
   const sortedCollaterals = useMemo(() => {
@@ -283,16 +88,6 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
     });
   }, [collaterals]);
   
-  // Format number with thousands separators for display
-  const formatDisplayNumber = (value: string | number) => {
-    const num = typeof value === "string" ? parseFloat(value) : value;
-    if (isNaN(num)) return "0.00";
-    return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4,
-    }).format(num);
-  };
-
   // Format max amount with fewer decimals
   const formatMaxAmount = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
@@ -562,22 +357,6 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                     </div>
                   </div>
                   
-                  {/* Switch button - fixed position */}
-                  <div className="flex-shrink-0 relative">
-                    <CollateralSwitchButton
-                      currentCollateral={{
-                        token: collateral.token,
-                        symbol: collateral.symbol
-                      }}
-                      protocol={selectedProtocol || ""}
-                      marketToken={marketToken}
-                      onCollateralSwitch={(newToken, newSymbol) => {
-                        // In a real implementation, this would switch the collateral
-                        console.log(`Switch from ${collateral.symbol} to ${newSymbol}`);
-                      }}
-                    />
-                  </div>
-                  
                   {/* Input field - takes remaining space */}
                   <div className="flex-1">
                     <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all ${!isSupported ? 'opacity-50' : ''}`}>
@@ -591,7 +370,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                       />
                       <button
                         className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={(e) => {
+                        onClick={() => {
                           handleSetMax(collateral.token);
                         }}
                         disabled={!isSupported}

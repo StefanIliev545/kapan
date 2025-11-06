@@ -5,7 +5,7 @@ import { formatUnits, parseUnits } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "~~/components/FiatBalance";
-import { useMoveSupply } from "~~/hooks/kapan/moveSupply";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
 import formatPercentage from "~~/utils/formatPercentage";
 import { getProtocolLogo } from "~~/utils/protocol";
@@ -29,8 +29,7 @@ interface MoveSupplyModalProps {
 
 enum MoveStatus {
   Initial,
-  Approving,
-  Moving,
+  Executing,
   Success,
   Error,
 }
@@ -58,7 +57,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     }
   }, [isOpen, chainId, chain?.id, switchChain]);
 
-  const { moveSupply } = useMoveSupply();
+  const { createMoveBuilder, executeFlowWithApprovals } = useKapanRouterV2();
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
   // Debug token balance (can be removed in production)
@@ -230,16 +229,37 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
           return;
         }
       }
-      setStatus(MoveStatus.Approving);
-      const collaterals = [{ token: token.address, amount: transferAmount }];
-      const txHash = await moveSupply({
-        user: address,
-        debtToken: token.address,
-        collaterals,
-        fromProtocol: fromProtocol.toLowerCase(),
-        toProtocol: selectedProtocol.toLowerCase(),
+      setStatus(MoveStatus.Executing);
+      
+      // Create move builder
+      const builder = createMoveBuilder();
+      
+      // Normalize protocol names
+      const normalizedFromProtocol = normalizeProtocolName(fromProtocol);
+      const normalizedToProtocol = normalizeProtocolName(selectedProtocol);
+      
+      // For Compound, set the market (token address = market for supply positions)
+      if (normalizedFromProtocol === "compound" || normalizedToProtocol === "compound") {
+        builder.setCompoundMarket(token.address as `0x${string}`);
+      }
+      
+      // Check if moving max amount
+      const isMax = transferAmount === token.rawBalance;
+      const decimals = token.decimals || 18;
+      
+      // Build move collateral instruction (withdraw from source, deposit to target)
+      builder.buildMoveCollateral({
+        fromProtocol: fromProtocol,
+        toProtocol: selectedProtocol,
+        collateralToken: token.address as `0x${string}`,
+        withdraw: isMax ? { max: true } : { amount: formatUnits(transferAmount, decimals) },
+        collateralDecimals: decimals,
       });
-      setTransactionHash(txHash as string);
+      
+      // Execute the flow with automatic approvals
+      const txHash = await executeFlowWithApprovals(builder.build());
+      
+      setTransactionHash(txHash ? txHash : null);
       setStatus(MoveStatus.Success);
       notification.success("Position moved successfully!");
     } catch (error) {
@@ -546,7 +566,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     if (status === MoveStatus.Success || status === MoveStatus.Error) {
       return <StatusContent />;
     }
-    const isLoading = status === MoveStatus.Approving || status === MoveStatus.Moving;
+    const isLoading = status === MoveStatus.Executing;
     const yieldData = calculateAnnualYield();
 
     return (
@@ -621,7 +641,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
           {isLoading ? (
             <>
               <span className="loading loading-spinner loading-sm"></span>
-              {status === MoveStatus.Approving ? "Approving..." : "Moving Position..."}
+              Moving Position...
             </>
           ) : (
             "Move Position"
