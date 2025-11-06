@@ -13,8 +13,6 @@ import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IPoolDataProvider} from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 
-import "hardhat/console.sol";
-
 interface IVariableDebtToken { function borrowAllowance(address fromUser, address spender) external view returns (uint256); }
 
 contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
@@ -34,69 +32,37 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         external
         returns (ProtocolTypes.Output[] memory outputs)
     {
-        console.log("AaveGatewayWrite: processLendingInstruction called");
-        console.log("AaveGatewayWrite: inputs count", inputs.length);
-        for (uint256 i = 0; i < inputs.length; i++) {
-            console.log("AaveGatewayWrite: input[", i, "] token", uint256(uint160(inputs[i].token)));
-            console.log("AaveGatewayWrite: input[", i, "] amount", inputs[i].amount);
-        }
-        console.log("AaveGatewayWrite: data length", data.length);
-        
         ProtocolTypes.LendingInstruction memory instr = abi.decode(data, (ProtocolTypes.LendingInstruction));
-        console.log("AaveGatewayWrite: op", uint256(instr.op));
-        console.log("AaveGatewayWrite: token", uint256(uint160(instr.token)));
-        console.log("AaveGatewayWrite: user", uint256(uint160(instr.user)));
-        console.log("AaveGatewayWrite: amount", instr.amount);
-        console.log("AaveGatewayWrite: input.index", instr.input.index);
-        
         address token = instr.token;
         uint256 amount = instr.amount;
         if (instr.input.index < inputs.length) {
             token = inputs[instr.input.index].token;
             amount = inputs[instr.input.index].amount;
-            console.log("AaveGatewayWrite: using UTXO - token", uint256(uint160(token)));
-            console.log("AaveGatewayWrite: using UTXO - amount", amount);
-        } else {
-            console.log("AaveGatewayWrite: using instruction params");
         }
-        
         if (instr.op == ProtocolTypes.LendingOp.Deposit || instr.op == ProtocolTypes.LendingOp.DepositCollateral) {
-            console.log("AaveGatewayWrite: executing Deposit");
             deposit(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](0);
-            console.log("AaveGatewayWrite: Deposit completed, 0 outputs");
         } else if (instr.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-            console.log("AaveGatewayWrite: executing WithdrawCollateral");
             (address u, uint256 amt) = withdraw(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: u, amount: amt });
-            console.log("AaveGatewayWrite: WithdrawCollateral completed, token", uint256(uint160(u)), "amount", amt);
         } else if (instr.op == ProtocolTypes.LendingOp.Borrow) {
-            console.log("AaveGatewayWrite: executing Borrow");
             borrow(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: amount });
-            console.log("AaveGatewayWrite: Borrow completed, token", uint256(uint160(token)), "amount", amount);
         } else if (instr.op == ProtocolTypes.LendingOp.Repay) {
-            console.log("AaveGatewayWrite: executing Repay");
             uint256 refund = repay(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: refund });
-            console.log("AaveGatewayWrite: Repay completed, refund", refund);
         } else if (instr.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
-            console.log("AaveGatewayWrite: executing GetBorrowBalance");
             uint256 bal = _getBorrowBalance(token, instr.user);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
-            console.log("AaveGatewayWrite: GetBorrowBalance completed, balance", bal);
         } else if (instr.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
-            console.log("AaveGatewayWrite: executing GetSupplyBalance");
             uint256 bal = _getSupplyBalance(token, instr.user);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
-            console.log("AaveGatewayWrite: GetSupplyBalance completed, balance", bal);
         } else {
-            console.log("AaveGatewayWrite: ERROR - unknown op", uint256(instr.op));
             revert("Unknown op");
         }
     }
@@ -162,27 +128,16 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         external
         view
         returns (address[] memory targets, bytes[] memory data)
-    {
-        console.log("AaveGatewayWrite.authorize: Starting", instrs.length, "instruction(s)");
-        console.log("AaveGatewayWrite.authorize: Caller", uint256(uint160(caller)));
-        
+    { 
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
 
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            
-            console.log("AaveGatewayWrite.authorize: Processing instruction", i);
-            console.log("AaveGatewayWrite.authorize: Op", uint256(ins.op));
-            console.log("AaveGatewayWrite.authorize: Token", uint256(uint160(ins.token)));
-            console.log("AaveGatewayWrite.authorize: User", uint256(uint160(ins.user)));
-            console.log("AaveGatewayWrite.authorize: Amount", ins.amount);
 
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                console.log("AaveGatewayWrite.authorize: WithdrawCollateral detected");
                 // User must approve aToken → gateway for withdraw
                 address aToken = _getAToken(ins.token);
-                console.log("AaveGatewayWrite.authorize: aToken", aToken);
                 uint256 cur = IERC20(aToken).allowance(caller, address(this));
                 if (cur >= ins.amount && ins.amount != 0) {
                     // Already sufficient allowance for this withdrawal
@@ -192,19 +147,14 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                     targets[i] = aToken;
                     // Ask for max so withdraw-all / accrued interest cases don't need another approval
                     data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
-                    console.log("AaveGatewayWrite.authorize: Generated approval for aToken");
                 }
 
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                console.log("AaveGatewayWrite.authorize: Borrow detected");
                 // User must approveDelegation(vDebt → gateway) for borrow
                 (address aToken, address sToken, address vDebt) = _getReserveTokens(ins.token);
-                console.log("AaveGatewayWrite.authorize: aToken", uint256(uint160(aToken)));
-                console.log("AaveGatewayWrite.authorize: sToken", uint256(uint160(sToken)));
-                console.log("AaveGatewayWrite.authorize: vDebt", uint256(uint160(vDebt)));
                 
                 if (vDebt == address(0)) {
-                    console.log("AaveGatewayWrite.authorize: ERROR - vDebt is zero address!");
+                    revert("vDebt is zero address");
                 } else {
                     uint256 cur = IVariableDebtToken(vDebt).borrowAllowance(caller, address(this));
                     if (cur >= ins.amount && ins.amount != 0) {
@@ -218,26 +168,15 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                             address(this),
                             type(uint256).max
                         );
-                        console.log("AaveGatewayWrite.authorize: Generated approveDelegation for vDebt");
-                        console.log("AaveGatewayWrite.authorize: Target", uint256(uint160(targets[i])));
-                        console.log("AaveGatewayWrite.authorize: Data length", data[i].length);
                     }
                 }
 
             } else {
-                console.log("AaveGatewayWrite.authorize: Other op (Deposit/Repay/DepositCollateral) - no user approval needed");
                 // Deposit / Repay / DepositCollateral: user approvals not needed
                 // (router handles pull + router->gateway approve)
                 targets[i] = address(0);
                 data[i] = bytes("");
             }
-        }
-        
-        console.log("AaveGatewayWrite.authorize: Returning", targets.length, "authorization(s)");
-        for (uint256 i = 0; i < targets.length; i++) {
-            console.log("AaveGatewayWrite.authorize: Auth", i);
-            console.log("AaveGatewayWrite.authorize: Target", uint256(uint160(targets[i])));
-            console.log("AaveGatewayWrite.authorize: Data length", data[i].length);
         }
     }
 

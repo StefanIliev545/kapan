@@ -24,6 +24,10 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
       COMPTROLLER: "0x0C7973F9598AA62f9e03B94E92C967fD5437426C",
       ORACLE:      "0xcBBf58bD5bAdE357b634419B70b215D5E9d6FbeD",
     },
+    130: {
+      COMPTROLLER: "0xe22af1e6b78318e1Fe1053Edbd7209b8Fc62c4Fe",
+      ORACLE:      "0x86D04d6FE928D888076851122dc6739551818f7E",
+    },    
   };
 
   const entry = VENUS[chainId];

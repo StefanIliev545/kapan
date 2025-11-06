@@ -10,8 +10,6 @@ import {IGateway} from "./interfaces/IGateway.sol";
 import {ProtocolTypes} from "./interfaces/ProtocolTypes.sol";
 import {FlashLoanConsumerBase} from "./flashloans/FlashLoanConsumerBase.sol";
 
-import "hardhat/console.sol";
-
 
 contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     using SafeERC20 for IERC20;
@@ -72,7 +70,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function processProtocolInstructions(ProtocolTypes.ProtocolInstruction[] calldata instructions) external {
-        console.log("KapanRouter: processProtocolInstructions called with", instructions.length, "instruction(s)");
         convertToStack(instructions);
         runStack();
     }
@@ -80,108 +77,67 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     function runStack() internal {
         (ProtocolTypes.ProtocolInstruction memory instruction, bool isEmpty) = popStack();
         if (bytes(instruction.protocolName).length == 0) {
-            console.log("KapanRouter: runStack - empty instruction, returning");
             return;
         }
         uint256 instructionIndex = 0;
         while (true) {
-            console.log("KapanRouter: runStack - processing instruction", instructionIndex);
-            console.log("KapanRouter: protocolName", instruction.protocolName);
-            console.log("KapanRouter: data length", instruction.data.length);
-            
             ProtocolTypes.Output[] memory currentOutputs = _getOutputs();
-            console.log("KapanRouter: current UTXO count before instruction", currentOutputs.length);
-            for (uint256 i = 0; i < currentOutputs.length; i++) {
-                console.log("KapanRouter: UTXO[", i, "] token", uint256(uint160(currentOutputs[i].token)));
-                console.log("KapanRouter: UTXO[", i, "] amount", currentOutputs[i].amount);
-            }
             
             if (keccak256(abi.encode(instruction.protocolName)) == keccak256(abi.encode("router"))) {
-                console.log("KapanRouter: processing router instruction");
                 bool halt = processRouterInstruction(instruction);
                 if (halt) {
-                    console.log("KapanRouter: router instruction halted (flash loan callback)");
                     return;
                 }
             } else {
-                console.log("KapanRouter: processing protocol instruction for gateway", instruction.protocolName);
                 IGateway gw = gateways[instruction.protocolName];
-                console.log("KapanRouter: gateway address", uint256(uint160(address(gw))));
                 if (address(gw) == address(0)) {
-                    console.log("KapanRouter: ERROR - gateway not found for protocol", instruction.protocolName);
                     revert("Gateway not found");
                 }
                 ProtocolTypes.Output[] memory inputs = _getOutputs();
-                console.log("KapanRouter: passing", inputs.length, "input UTXO(s) to gateway");
                 ProtocolTypes.Output[] memory produced = gw.processLendingInstruction(inputs, instruction.data);
-                console.log("KapanRouter: gateway returned", produced.length, "output UTXO(s)");
                 if (produced.length > 0) { 
                     _appendOutputs(produced); 
                 }
             }
             
             ProtocolTypes.Output[] memory outputsAfter = _getOutputs();
-            console.log("KapanRouter: UTXO count after instruction", outputsAfter.length);
-            for (uint256 i = 0; i < outputsAfter.length; i++) {
-                console.log("KapanRouter: UTXO[", i, "] token", uint256(uint160(outputsAfter[i].token)));
-                console.log("KapanRouter: UTXO[", i, "] amount", outputsAfter[i].amount);
-            }
             
             if (isEmpty) {
-                console.log("KapanRouter: stack empty, breaking");
                 break;
             }
             instructionIndex++;
             (instruction, isEmpty) = popStack();
         }
-        console.log("KapanRouter: runStack completed");
     }
 
     function processRouterInstruction(ProtocolTypes.ProtocolInstruction memory instruction) internal returns (bool halt) {
         RouterInstruction memory routerInstruction = abi.decode(instruction.data, (RouterInstruction));
-        console.log("KapanRouter: processRouterInstruction - type", uint256(routerInstruction.instructionType));
-        console.log("KapanRouter: processRouterInstruction - token", uint256(uint160(routerInstruction.token)));
-        console.log("KapanRouter: processRouterInstruction - amount", routerInstruction.amount);
-        console.log("KapanRouter: processRouterInstruction - user", uint256(uint160(routerInstruction.user)));
-        
         if (routerInstruction.instructionType == RouterInstructionType.FlashLoanV2) {
-            console.log("KapanRouter: executing FlashLoanV2");
             processFlashLoanV2(routerInstruction);
             return true; // halt to wait for callback
         } else if (routerInstruction.instructionType == RouterInstructionType.FlashLoanV3) {
-            console.log("KapanRouter: executing FlashLoanV3");
             processFlashLoanV3(routerInstruction);
             return true; // halt to wait for callback
         } else if (routerInstruction.instructionType == RouterInstructionType.PullToken) {
-            console.log("KapanRouter: executing PullToken");
             processPullToken(routerInstruction);
         } else if (routerInstruction.instructionType == RouterInstructionType.PushToken) {
-            console.log("KapanRouter: executing PushToken");
             processPushToken(instruction);
         } else if (routerInstruction.instructionType == RouterInstructionType.ToOutput) {
-            console.log("KapanRouter: executing ToOutput");
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount });
             _appendOutputs(out);
         } else if (routerInstruction.instructionType == RouterInstructionType.Approve) {
-            console.log("KapanRouter: executing Approve");
             // instruction.data encodes: (RouterInstruction, string targetProtocol, InputPtr input)
             (, string memory targetProtocol, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(instruction.data, (RouterInstruction, string, ProtocolTypes.InputPtr));
-            console.log("KapanRouter: Approve - targetProtocol", targetProtocol);
-            console.log("KapanRouter: Approve - inputIndex", inputPtr.index);
             ProtocolTypes.Output[] memory inputs = _getOutputs();
             require(inputPtr.index < inputs.length, "Approve: bad index");
             address target;
             if (keccak256(abi.encode(targetProtocol)) == keccak256(abi.encode("router"))) {
                 target = address(this);
-                console.log("KapanRouter: Approve - target is router");
             } else {
                 target = address(gateways[targetProtocol]);
-                console.log("KapanRouter: Approve - target is gateway", uint256(uint160(target)));
             }
             require(target != address(0), "Approve: target not found");
-            console.log("KapanRouter: Approve - token", uint256(uint160(inputs[inputPtr.index].token)));
-            console.log("KapanRouter: Approve - amount", inputs[inputPtr.index].amount);
             IERC20(inputs[inputPtr.index].token).approve(target, 0);
             IERC20(inputs[inputPtr.index].token).approve(target, inputs[inputPtr.index].amount);
             // Always produce an output (even if empty) to ensure consistent indexing
@@ -205,33 +161,24 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function processPullToken(RouterInstruction memory routerInstruction) internal authorize(routerInstruction) {
-        console.log("KapanRouter: PullToken - transferring", routerInstruction.amount, "from user", uint256(uint160(routerInstruction.user)));
-        console.log("KapanRouter: PullToken - token", uint256(uint160(routerInstruction.token)));
         IERC20(routerInstruction.token).safeTransferFrom(msg.sender, address(this), routerInstruction.amount);
         ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
         out[0] = ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount });
         _appendOutputs(out);
-        console.log("KapanRouter: PullToken - created UTXO with token", uint256(uint160(out[0].token)), "amount", out[0].amount);
     }
 
     function processPushToken(ProtocolTypes.ProtocolInstruction memory instruction) internal {
         // instruction.data encodes: (RouterInstruction, ProtocolTypes.InputPtr input)
         (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(instruction.data, (RouterInstruction, ProtocolTypes.InputPtr));
-        console.log("KapanRouter: PushToken - inputIndex", inputPtr.index);
         ProtocolTypes.Output[] memory inputs = _getOutputs();
         require(inputPtr.index < inputs.length, "PushToken: bad index");
         ProtocolTypes.Output memory output = inputs[inputPtr.index];
-        console.log("KapanRouter: PushToken - token", uint256(uint160(output.token)));
-        console.log("KapanRouter: PushToken - amount", output.amount);
         require(output.token != address(0), "PushToken: zero token");
         // Extract user from RouterInstruction in data
         if (output.amount != 0) {
             RouterInstruction memory routerInstruction;
             (routerInstruction, ) = abi.decode(instruction.data, (RouterInstruction, ProtocolTypes.InputPtr));
-            console.log("KapanRouter: PushToken - transferring to user", uint256(uint160(routerInstruction.user)));
             IERC20(output.token).safeTransfer(routerInstruction.user, output.amount);
-        } else {
-            console.log("KapanRouter: PushToken - zero amount, skipping transfer");
         }
         // Consume the UTXO by clearing it (set to zero)
         // Note: We don't remove it from the array to maintain index consistency
@@ -245,17 +192,13 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function _afterFlashLoan(bytes calldata /*userData*/) internal override {
-        console.log("KapanRouter: _afterFlashLoan callback received");
         // Create UTXO from flash loan
         bytes memory flashData = TBytes.get(FLASHLOAN_DATA_SLOT);
         if (flashData.length > 0) {
             (address token, uint256 amount) = abi.decode(flashData, (address, uint256));
-            console.log("KapanRouter: _afterFlashLoan - token", uint256(uint160(token)));
-            console.log("KapanRouter: _afterFlashLoan - amount", amount);
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: token, amount: amount });
             _appendOutputs(out);
-            console.log("KapanRouter: _afterFlashLoan - created UTXO, continuing stack");
             // Clear flash loan data
             TBytes.set(FLASHLOAN_DATA_SLOT, bytes(""));
         }

@@ -19,7 +19,7 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
   // Deploy OptimalInterestRateFinder (no constructor arguments needed)
   const optimalFinder = await deploy("OptimalInterestRateFinder", {
     from: deployer,
-    args: [],
+    args: [deployer],
     log: true,
     autoMine: true,
     deterministicDeployment: deterministicSalt(hre, "OptimalInterestRateFinder"),
@@ -33,11 +33,14 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
     { name: "aave", viewGateway: "AaveGatewayView" },
     { name: "compound", viewGateway: "CompoundGatewayView" },
     { name: "venus", viewGateway: "VenusGatewayView" },
+    { name: "aave v3", viewGateway: "AaveGatewayView" },
+    { name: "compound v3", viewGateway: "CompoundGatewayView" },
   ];
 
   for (const { name, viewGateway } of protocols) {
     try {
       const gateway = await get(viewGateway);
+      console.log(`Registering ${viewGateway} with address ${gateway.address} with OptimalInterestRateFinder as "${name}"`);
       await execute(
         "OptimalInterestRateFinder",
         { from: deployer, log: true, waitConfirmations: 5 },
@@ -60,6 +63,6 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
 export default deployOptimalInterestRateFinder;
 
 deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder", "v2"];
-// Optional dependencies - view gateways might not exist yet
-deployOptimalInterestRateFinder.dependencies = ["AaveGatewayView", "CompoundGatewayView", "VenusGatewayView"];
+// Dependencies: wait for gateway deployments (which deploy both Write and View contracts)
+deployOptimalInterestRateFinder.dependencies = ["AaveGatewayWrite", "CompoundGatewayWrite", "VenusGatewayWrite"];
 

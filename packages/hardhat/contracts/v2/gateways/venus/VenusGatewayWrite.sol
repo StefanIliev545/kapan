@@ -69,8 +69,11 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         uint requiredV = (underlyingAmount * 1e18 + exchangeRate - 1) / exchangeRate;
         VTokenInterface(vToken).transferFrom(user, address(this), requiredV);
         uint err = VTokenInterface(vToken).redeem(requiredV); require(err == 0, "Venus: redeem failed");
-        IERC20(collateral).safeTransfer(msg.sender, underlyingAmount);
-        return (collateral, underlyingAmount);
+        // Transfer the full redeemed amount to avoid dust accumulation
+        // The round-up may result in slightly more underlying than requested, which we transfer out
+        uint256 actualRedeemed = IERC20(collateral).balanceOf(address(this));
+        IERC20(collateral).safeTransfer(msg.sender, actualRedeemed);
+        return (collateral, actualRedeemed);
     }
 
     function borrow(address token, address user, uint256 amount) public onlyRouterOrSelf(user) nonReentrant {

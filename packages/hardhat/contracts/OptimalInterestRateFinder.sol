@@ -29,7 +29,7 @@ contract OptimalInterestRateFinder is Ownable {
     event GatewayRegistered(string name, address gateway);
     event GatewayRemoved(string name);
 
-    constructor() Ownable(msg.sender) {
+    constructor(address owner) Ownable(owner) {
         // Empty constructor - gateways will be registered separately
     }
     
