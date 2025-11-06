@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, useEffect, useState } from "react";
 import Image from "next/image";
 import { BaseModal } from "../BaseModal";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
@@ -9,6 +9,8 @@ import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
 import { useVesuSwitch } from "~~/hooks/useVesuSwitch";
 import type { VesuProtocolKey } from "~~/utils/vesu";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 
 type BasicToken = { name: string; address: string; decimals: number; icon: string };
 
@@ -51,10 +53,12 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({
     protocolKey,
   });
 
-  // Mark prepared after first successful build
-  if (!preparedOnce && selectedQuote && calls.length > 0) {
-    setPreparedOnce(true);
-  }
+  // Mark prepared after first successful build (avoid setState in render)
+  useEffect(() => {
+    if (!preparedOnce && selectedQuote && calls.length > 0) {
+      setPreparedOnce(true);
+    }
+  }, [preparedOnce, selectedQuote, calls.length]);
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
@@ -73,6 +77,15 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({
 
   const formatUsd = (value?: number) => (value == null ? "-" : (() => { try { return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }); } catch { return `$${value.toFixed(2)}`; } })());
 
+  // Resolve display name/icon with fallbacks (handles tokens like xSTRK)
+  const resolveDisplay = (t: BasicToken | undefined | null) => {
+    if (!t) return { name: "", icon: "" };
+    const raw = t.name || "";
+    const name = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(t.address) ?? raw;
+    const icon = tokenNameToLogo((name || "").toLowerCase());
+    return { name, icon };
+  };
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
@@ -88,20 +101,22 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between bg-base-200/40 p-2 rounded">
                 <div className="flex items-center gap-2">
-                  <Image src={swapSummary?.buyToken?.icon || currentDebt.icon} alt={(swapSummary?.buyToken?.name || currentDebt.name)} width={24} height={24} className="w-6 h-6" />
+                  {(() => { const d = resolveDisplay((swapSummary as any)?.buyToken || currentDebt); return (
+                    <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" /> ); })()}
                   <div>
                     <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken?.decimals || currentDebt.decimals))} {swapSummary?.buyToken?.name || currentDebt.name}
+                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken?.decimals || currentDebt.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || currentDebt).name}
                     </div>
                     <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
                   </div>
                 </div>
                 <div className="text-gray-400">→</div>
                 <div className="flex items-center gap-2">
-                  <Image src={swapSummary?.sellToken?.icon || targetDebt.icon} alt={(swapSummary?.sellToken?.name || targetDebt.name)} width={24} height={24} className="w-6 h-6" />
+                  {(() => { const d = resolveDisplay((swapSummary as any)?.sellToken || targetDebt); return (
+                    <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" /> ); })()}
                   <div className="text-right">
                     <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken?.decimals || targetDebt.decimals))} {swapSummary?.sellToken?.name || targetDebt.name}
+                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken?.decimals || targetDebt.decimals))} {resolveDisplay((swapSummary as any)?.sellToken || targetDebt).name}
                     </div>
                     <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
                   </div>
@@ -111,7 +126,7 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({
                 <div className="flex justify-between text-[12px]">
                   <span className="text-gray-600">AVNU fee</span>
                   <span>
-                    {formatTokenAmount(selectedQuote.avnuFees.toString(), (swapSummary?.buyToken.decimals || currentDebt.decimals))} {swapSummary?.buyToken.name || currentDebt.name}
+                    {formatTokenAmount(selectedQuote.avnuFees.toString(), (swapSummary?.buyToken.decimals || currentDebt.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || currentDebt).name}
                     <span className="text-gray-500"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
                   </span>
                 </div>
@@ -119,7 +134,7 @@ export const SwitchDebtModalStark: FC<SwitchDebtModalProps> = ({
                   <div className="flex justify-between text-[12px]">
                     <span className="text-gray-600">Integrator fee</span>
                     <span>
-                      {formatTokenAmount(selectedQuote.integratorFees.toString(), (swapSummary?.buyToken.decimals || currentDebt.decimals))} {swapSummary?.buyToken.name || currentDebt.name}
+                      {formatTokenAmount(selectedQuote.integratorFees.toString(), (swapSummary?.buyToken.decimals || currentDebt.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || currentDebt).name}
                       <span className="text-gray-500"> · {formatUsd(selectedQuote.integratorFeesInUsd)}</span>
                     </span>
                   </div>

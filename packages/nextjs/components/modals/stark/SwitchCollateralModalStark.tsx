@@ -9,6 +9,8 @@ import { notification } from "~~/utils/scaffold-stark";
 import { formatTokenAmount } from "~~/utils/protocols";
 import { useVesuSwitch } from "~~/hooks/useVesuSwitch";
 import type { VesuProtocolKey } from "~~/utils/vesu";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 
 type BasicToken = { name: string; address: string; decimals: number; icon: string };
 
@@ -72,6 +74,15 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({
 
   const formatUsd = (value?: number) => (value == null ? "-" : (() => { try { return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }); } catch { return `$${value.toFixed(2)}`; } })());
 
+  // Resolve display name/icon with fallbacks (handles tokens like xSTRK)
+  const resolveDisplay = (t: BasicToken | undefined | null) => {
+    if (!t) return { name: "", icon: "" };
+    const raw = t.name || "";
+    const name = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(t.address) ?? raw;
+    const icon = tokenNameToLogo((name || "").toLowerCase());
+    return { name, icon };
+  };
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
@@ -87,20 +98,22 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between bg-base-200/40 p-2 rounded">
                 <div className="flex items-center gap-2">
-                  <Image src={swapSummary?.sellToken.icon || currentCollateral.icon} alt={swapSummary?.sellToken.name || currentCollateral.name} width={24} height={24} className="w-6 h-6" />
+                  {(() => { const d = resolveDisplay((swapSummary as any)?.sellToken || currentCollateral); return (
+                    <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" /> ); })()}
                   <div>
                     <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken.decimals || currentCollateral.decimals))} {swapSummary?.sellToken.name || currentCollateral.name}
+                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken.decimals || currentCollateral.decimals))} {resolveDisplay((swapSummary as any)?.sellToken || currentCollateral).name}
                     </div>
                     <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
                   </div>
                 </div>
                 <div className="text-gray-400">→</div>
                 <div className="flex items-center gap-2">
-                  <Image src={swapSummary?.buyToken.icon || targetCollateral.icon} alt={swapSummary?.buyToken.name || targetCollateral.name} width={24} height={24} className="w-6 h-6" />
+                  {(() => { const d = resolveDisplay((swapSummary as any)?.buyToken || targetCollateral); return (
+                    <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" /> ); })()}
                   <div className="text-right">
                     <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {swapSummary?.buyToken.name || targetCollateral.name}
+                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || targetCollateral).name}
                     </div>
                     <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
                   </div>
@@ -110,7 +123,7 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({
                 <div className="flex justify-between text-[12px]">
                   <span className="text-gray-600">AVNU fee</span>
                   <span>
-                    {formatTokenAmount(selectedQuote.avnuFees.toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {swapSummary?.buyToken.name || targetCollateral.name}
+                    {formatTokenAmount(selectedQuote.avnuFees.toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || targetCollateral).name}
                     <span className="text-gray-500"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
                   </span>
                 </div>
@@ -118,7 +131,7 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({
                   <div className="flex justify-between text-[12px]">
                     <span className="text-gray-600">Integrator fee</span>
                     <span>
-                      {formatTokenAmount(selectedQuote.integratorFees.toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {swapSummary?.buyToken.name || targetCollateral.name}
+                      {formatTokenAmount(selectedQuote.integratorFees.toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || targetCollateral).name}
                       <span className="text-gray-500"> · {formatUsd(selectedQuote.integratorFeesInUsd)}</span>
                     </span>
                   </div>

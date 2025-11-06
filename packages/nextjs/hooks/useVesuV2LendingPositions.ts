@@ -327,7 +327,10 @@ export const useVesuV2LendingPositions = (
           return null;
         }
 
-        const collateralSymbol = feltToString(collateralAsset.symbol);
+        let collateralSymbol = feltToString(collateralAsset.symbol);
+        if (!collateralSymbol || collateralSymbol.trim().length === 0) {
+          collateralSymbol = getTokenNameFallback(collateralAddress) ?? "UNKNOWN";
+        }
         const collateralPrice = normalizePrice(collateralAsset.price);
         const collateralUsd = computeUsdValue(stats.collateral_amount, collateralAsset.decimals, collateralPrice);
         const formattedCollateral = formatUnits(stats.collateral_amount, collateralAsset.decimals ?? 18);
@@ -369,7 +372,11 @@ export const useVesuV2LendingPositions = (
         let ltvPercent: number | null = null;
         let debtUsd: number | null = null;
         if (debtAsset) {
-          debtSymbol = feltToString(debtAsset.symbol);
+          let resolvedDebtSymbol = feltToString(debtAsset.symbol);
+          if (!resolvedDebtSymbol || resolvedDebtSymbol.trim().length === 0) {
+            resolvedDebtSymbol = getTokenNameFallback(debtAddress) ?? "UNKNOWN";
+          }
+          debtSymbol = resolvedDebtSymbol;
           const debtPrice = normalizePrice(debtAsset.price);
           debtUsd = computeUsdValue(stats.nominal_debt, debtAsset.decimals, debtPrice);
           if (collateralUsd > 0 && debtUsd > 0) {
