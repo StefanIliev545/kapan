@@ -40,7 +40,7 @@ export const VesuProtocolView: FC = () => {
   const { viewingAddress, status, isViewingOtherAddress } = useAccount();
   const userAddress = viewingAddress;
   const [selectedV1PoolId, setSelectedV1PoolId] = useState<bigint>(VESU_V1_POOLS["Genesis"]);
-  const [selectedV2PoolAddress, setSelectedV2PoolAddress] = useState<string>(VESU_V2_POOLS["Default"]);
+  const [selectedV2PoolAddress, setSelectedV2PoolAddress] = useState<string>(VESU_V2_POOLS["Prime"]);
   const normalizedPoolAddress = normalizeStarknetAddress(selectedV2PoolAddress);
 
   const v1Data = useVesuLendingPositions(userAddress, selectedV1PoolId);
@@ -116,7 +116,7 @@ export const VesuProtocolView: FC = () => {
 
   // Fetch positions for all V2 pools (for the positions list below)
   const v2All = {
-    Default: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Default)),
+    Prime: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Prime)),
     Re7xBTC: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Re7xBTC)),
     Re7USDCCore: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Re7USDCCore)),
     Re7USDCPrime: useVesuV2LendingPositions(userAddress, normalizeStarknetAddress(VESU_V2_POOLS.Re7USDCPrime)),
@@ -139,7 +139,7 @@ export const VesuProtocolView: FC = () => {
   ]);
   const { netBalanceUsd: netBalanceUsdV2, netYield30d: netYield30dV2, netApyPercent: netApyPercentV2 } = useMemo(() => {
     const allRows = [
-      ...v2All.Default.rows,
+      ...v2All.Prime.rows,
       ...v2All.Re7xBTC.rows,
       ...v2All.Re7USDCCore.rows,
       ...v2All.Re7USDCPrime.rows,
@@ -147,7 +147,7 @@ export const VesuProtocolView: FC = () => {
     ];
     return computeMetrics(allRows);
   }, [
-    v2All.Default.rows,
+    v2All.Prime.rows,
     v2All.Re7xBTC.rows,
     v2All.Re7USDCCore.rows,
     v2All.Re7USDCPrime.rows,
@@ -359,7 +359,7 @@ export const VesuProtocolView: FC = () => {
         {/* V2 Positions across all pools */}
         {(
           [
-            ["Default", v2All.Default] as const,
+            ["Prime", v2All.Prime] as const,
             ["Re7xBTC", v2All.Re7xBTC] as const,
             ["Re7USDCCore", v2All.Re7USDCCore] as const,
             ["Re7USDCPrime", v2All.Re7USDCPrime] as const,
