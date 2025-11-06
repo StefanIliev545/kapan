@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback, useTransition } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
 import Image from "next/image";
@@ -26,7 +26,7 @@ const NETWORK_TO_CHAIN_ID: Record<string, number> = {
   optimism: 10,
 };
 
-export const NetworkFilter: React.FC<NetworkFilterProps> = ({
+const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   networks,
   defaultNetwork = networks[0]?.id,
   onNetworkChange,
@@ -198,5 +198,38 @@ export const NetworkFilter: React.FC<NetworkFilterProps> = ({
         })}
       </div>
     </div>
+  );
+};
+
+// Wrapper component that handles Suspense boundary for useSearchParams
+export const NetworkFilter: React.FC<NetworkFilterProps> = (props) => {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
+        <div className="flex items-center gap-2">
+          {props.networks.map((network) => (
+            <button
+              key={network.id}
+              type="button"
+              disabled
+              className="btn btn-sm normal-case flex items-center gap-2 btn-ghost opacity-50"
+            >
+              <div className="w-5 h-5 relative">
+                <Image
+                  src={network.logo}
+                  alt={network.name}
+                  fill
+                  sizes="20px"
+                  className="object-contain"
+                />
+              </div>
+              <span>{network.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    }>
+      <NetworkFilterInner {...props} />
+    </Suspense>
   );
 };
