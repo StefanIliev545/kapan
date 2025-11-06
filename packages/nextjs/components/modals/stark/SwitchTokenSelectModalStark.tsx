@@ -38,6 +38,7 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
   };
 
   const current = resolveDisplay(currentToken);
+  const showScrollHint = options.length > 8;
 
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
@@ -51,28 +52,40 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
           </div>
         </div>
 
-        <div className="border border-base-300 divide-y divide-base-300 rounded-none max-h-80 overflow-y-auto">
-          {options.map(opt => { const o = resolveDisplay(opt); return (
-            <button
-              key={o.address}
-              className="w-full flex items-center justify-between p-3 hover:bg-base-200/60 transition-colors"
-              onClick={() => onSelect(o)}
-            >
-              <div className="flex items-center gap-2 opacity-80">
-                <Image src={current.icon} alt={current.name} width={16} height={16} className="w-4 h-4" />
-                <span className="text-xs">{current.symbol}</span>
-              </div>
-              <div className="mx-3 text-base-content/50">→</div>
-              <div className="flex items-center gap-2 min-w-0">
-                <Image src={o.icon} alt={o.name} width={16} height={16} className="w-4 h-4" />
-                <div className="flex flex-col items-start min-w-0">
-                  <span className="text-sm font-medium truncate">{o.name}</span>
-                  <span className="text-[11px] text-base-content/60 truncate">{o.symbol}</span>
+        <div className="relative">
+          <div className="border border-base-300 divide-y divide-base-300 rounded-none max-h-80 overflow-y-auto" aria-label="Scrollable token options list">
+            {options.map(opt => { const o = resolveDisplay(opt); return (
+              <button
+                key={o.address}
+                className="w-full flex items-center justify-between p-3 hover:bg-base-200/60 transition-colors"
+                onClick={() => onSelect(o)}
+              >
+                <div className="flex items-center gap-2 opacity-80">
+                  <Image src={current.icon} alt={current.name} width={16} height={16} className="w-4 h-4" />
+                  <span className="text-xs">{current.symbol}</span>
                 </div>
-              </div>
-            </button>
-          ); })}
+                <div className="mx-3 text-base-content/50">→</div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Image src={o.icon} alt={o.name} width={16} height={16} className="w-4 h-4" />
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-sm font-medium truncate">{o.name}</span>
+                    <span className="text-[11px] text-base-content/60 truncate">{o.symbol}</span>
+                  </div>
+                </div>
+              </button>
+            ); })}
+          </div>
+          {showScrollHint && (
+            <>
+              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-base-100 to-transparent" />
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-base-100 to-transparent" />
+            </>
+          )}
         </div>
+
+        {showScrollHint && (
+          <div className="text-[11px] text-base-content/60 text-center">Scroll to see more options</div>
+        )}
       </div>
     </BaseModal>
   );
