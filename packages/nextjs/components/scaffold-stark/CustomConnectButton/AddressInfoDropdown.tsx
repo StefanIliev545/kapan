@@ -3,6 +3,7 @@ import { default as NextImage } from "next/image";
 import { NetworkOptions } from "./NetworkOptions";
 import { Address } from "@starknet-react/chains";
 import { useConnect, useDisconnect, useNetwork } from "@starknet-react/core";
+import { track } from "@vercel/analytics";
 import { useTheme } from "next-themes";
 import CopyToClipboard from "react-copy-to-clipboard";
 import { createPortal } from "react-dom";
@@ -47,6 +48,16 @@ export const AddressInfoDropdown = ({
   const closeDropdown = () => {
     setSelectingNetwork(false);
     dropdownRef.current?.removeAttribute("open");
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      track("wallet_disconnect_click", { network: "starknet" });
+      await disconnect();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[Starknet disconnect] error:", error);
+    }
   };
 
   useOutsideClick(dropdownRef, closeDropdown);
@@ -107,7 +118,7 @@ export const AddressInfoDropdown = ({
           ) : null}
 
           <li className={selectingNetwork ? "hidden" : ""}>
-            <button className="menu-item text-secondary-content btn-sm !rounded-xl flex gap-3 py-3" type="button" onClick={() => disconnect()}>
+            <button className="menu-item text-secondary-content btn-sm !rounded-xl flex gap-3 py-3" type="button" onClick={handleDisconnect}>
               <ArrowLeftEndOnRectangleIcon className="h-6 w-4 ml-2 sm:ml-0" /> <span>Disconnect</span>
             </button>
           </li>
