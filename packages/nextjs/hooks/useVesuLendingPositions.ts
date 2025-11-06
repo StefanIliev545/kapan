@@ -324,7 +324,10 @@ export const useVesuLendingPositions = (
       const collateralMetadata = assetMap.get(collateralAddress);
       if (!collateralMetadata) return [];
 
-      const collateralSymbol = feltToString(collateralMetadata.symbol);
+      let collateralSymbol = feltToString(collateralMetadata.symbol);
+      if (!collateralSymbol || collateralSymbol.trim().length === 0) {
+        collateralSymbol = getTokenNameFallback(collateralAddress) ?? "UNKNOWN";
+      }
       const collateralPrice = normalizePrice(collateralMetadata.price);
       const collateralUsd = computeUsdValue(positionData.collateral_amount, collateralMetadata.decimals, collateralPrice);
       const formattedCollateral = formatUnits(positionData.collateral_amount, collateralMetadata.decimals);
@@ -373,7 +376,11 @@ export const useVesuLendingPositions = (
       let debtUsd: number | null = null;
 
       if (debtMetadata) {
-        debtSymbol = feltToString(debtMetadata.symbol);
+        let resolvedDebtSymbol = feltToString(debtMetadata.symbol);
+        if (!resolvedDebtSymbol || resolvedDebtSymbol.trim().length === 0) {
+          resolvedDebtSymbol = getTokenNameFallback(debtAddress) ?? "UNKNOWN";
+        }
+        debtSymbol = resolvedDebtSymbol;
         const debtPrice = normalizePrice(debtMetadata.price);
 
         debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);
