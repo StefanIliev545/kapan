@@ -1,0 +1,692 @@
+{
+  "address": "0xE3921c67D5A495BfB35EfCD7494470Af43E215b9",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_comptroller",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_oracle",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "owner_",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "vToken",
+          "type": "address"
+        }
+      ],
+      "name": "checkMembership",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "comptroller",
+      "outputs": [
+        {
+          "internalType": "contract ComptrollerInterface",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getAccountLiquidity",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getAllMarkets",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getAllVenusMarkets",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "vTokens",
+          "type": "address[]"
+        },
+        {
+          "internalType": "address[]",
+          "name": "tokens",
+          "type": "address[]"
+        },
+        {
+          "internalType": "string[]",
+          "name": "symbols",
+          "type": "string[]"
+        },
+        {
+          "internalType": "string[]",
+          "name": "names",
+          "type": "string[]"
+        },
+        {
+          "internalType": "uint8[]",
+          "name": "decimals",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "prices",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getAssetsIn",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getBorrowBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getBorrowBalanceCurrent",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "getBorrowRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "vTokens",
+          "type": "address[]"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getCollateralStatus",
+      "outputs": [
+        {
+          "internalType": "bool[]",
+          "name": "isCollateral",
+          "type": "bool[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getLtv",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "vTokens",
+          "type": "address[]"
+        }
+      ],
+      "name": "getMarketRates",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "prices",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "supplyRates",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "borrowRates",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getPossibleCollaterals",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "collateralAddresses",
+          "type": "address[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "balances",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "string[]",
+          "name": "symbols",
+          "type": "string[]"
+        },
+        {
+          "internalType": "uint8[]",
+          "name": "decimals",
+          "type": "uint8[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "getSupplyRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "market",
+          "type": "address"
+        }
+      ],
+      "name": "getSupportedCollaterals",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "collateralAddresses",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "vTokens",
+          "type": "address[]"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "getUserBalances",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "balances",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "borrowBalances",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "underlyingToken",
+          "type": "address"
+        }
+      ],
+      "name": "getVTokenForUnderlying",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "market",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "collateral",
+          "type": "address"
+        }
+      ],
+      "name": "isCollateralSupported",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "isSupported",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "oracle",
+      "outputs": [
+        {
+          "internalType": "contract ResilientOracleInterface",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_comptroller",
+          "type": "address"
+        }
+      ],
+      "name": "setComptroller",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_oracle",
+          "type": "address"
+        }
+      ],
+      "name": "setOracle",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "args": [
+    "0x0C7973F9598AA62f9e03B94E92C967fD5437426C",
+    "0xcBBf58bD5bAdE357b634419B70b215D5E9d6FbeD",
+    "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "82bd55032c9f338f8bcdd798842a911e",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_comptroller\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_oracle\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"owner_\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"vToken\",\"type\":\"address\"}],\"name\":\"checkMembership\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"comptroller\",\"outputs\":[{\"internalType\":\"contract ComptrollerInterface\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"getAccountLiquidity\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllMarkets\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllVenusMarkets\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"vTokens\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"string[]\",\"name\":\"symbols\",\"type\":\"string[]\"},{\"internalType\":\"string[]\",\"name\":\"names\",\"type\":\"string[]\"},{\"internalType\":\"uint8[]\",\"name\":\"decimals\",\"type\":\"uint8[]\"},{\"internalType\":\"uint256[]\",\"name\":\"prices\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"getAssetsIn\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getBorrowBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getBorrowBalanceCurrent\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getBorrowRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"vTokens\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"getCollateralStatus\",\"outputs\":[{\"internalType\":\"bool[]\",\"name\":\"isCollateral\",\"type\":\"bool[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getLtv\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"vTokens\",\"type\":\"address[]\"}],\"name\":\"getMarketRates\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"prices\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256[]\",\"name\":\"supplyRates\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256[]\",\"name\":\"borrowRates\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getPossibleCollaterals\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"collateralAddresses\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"balances\",\"type\":\"uint256[]\"},{\"internalType\":\"string[]\",\"name\":\"symbols\",\"type\":\"string[]\"},{\"internalType\":\"uint8[]\",\"name\":\"decimals\",\"type\":\"uint8[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getSupplyRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"market\",\"type\":\"address\"}],\"name\":\"getSupportedCollaterals\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"collateralAddresses\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"vTokens\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"getUserBalances\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"balances\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256[]\",\"name\":\"borrowBalances\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"underlyingToken\",\"type\":\"address\"}],\"name\":\"getVTokenForUnderlying\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"market\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateral\",\"type\":\"address\"}],\"name\":\"isCollateralSupported\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"isSupported\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"oracle\",\"outputs\":[{\"internalType\":\"contract ResilientOracleInterface\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_comptroller\",\"type\":\"address\"}],\"name\":\"setComptroller\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_oracle\",\"type\":\"address\"}],\"name\":\"setOracle\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Contains all read/view functions from v1, separate from write operations\",\"errors\":{\"OwnableInvalidOwner(address)\":[{\"details\":\"The owner is not a valid owner account. (eg. `address(0)`)\"}],\"OwnableUnauthorizedAccount(address)\":[{\"details\":\"The caller account is not authorized to perform an operation.\"}]},\"kind\":\"dev\",\"methods\":{\"owner()\":{\"details\":\"Returns the address of the current owner.\"},\"renounceOwnership()\":{\"details\":\"Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner.\"},\"transferOwnership(address)\":{\"details\":\"Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner.\"}},\"title\":\"VenusGatewayView\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"notice\":\"View-only gateway for Venus protocol\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/gateways/venus/VenusGatewayView.sol\":\"VenusGatewayView\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/access/Ownable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (access/Ownable.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {Context} from \\\"../utils/Context.sol\\\";\\n\\n/**\\n * @dev Contract module which provides a basic access control mechanism, where\\n * there is an account (an owner) that can be granted exclusive access to\\n * specific functions.\\n *\\n * The initial owner is set to the address provided by the deployer. This can\\n * later be changed with {transferOwnership}.\\n *\\n * This module is used through inheritance. It will make available the modifier\\n * `onlyOwner`, which can be applied to your functions to restrict their use to\\n * the owner.\\n */\\nabstract contract Ownable is Context {\\n    address private _owner;\\n\\n    /**\\n     * @dev The caller account is not authorized to perform an operation.\\n     */\\n    error OwnableUnauthorizedAccount(address account);\\n\\n    /**\\n     * @dev The owner is not a valid owner account. (eg. `address(0)`)\\n     */\\n    error OwnableInvalidOwner(address owner);\\n\\n    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);\\n\\n    /**\\n     * @dev Initializes the contract setting the address provided by the deployer as the initial owner.\\n     */\\n    constructor(address initialOwner) {\\n        if (initialOwner == address(0)) {\\n            revert OwnableInvalidOwner(address(0));\\n        }\\n        _transferOwnership(initialOwner);\\n    }\\n\\n    /**\\n     * @dev Throws if called by any account other than the owner.\\n     */\\n    modifier onlyOwner() {\\n        _checkOwner();\\n        _;\\n    }\\n\\n    /**\\n     * @dev Returns the address of the current owner.\\n     */\\n    function owner() public view virtual returns (address) {\\n        return _owner;\\n    }\\n\\n    /**\\n     * @dev Throws if the sender is not the owner.\\n     */\\n    function _checkOwner() internal view virtual {\\n        if (owner() != _msgSender()) {\\n            revert OwnableUnauthorizedAccount(_msgSender());\\n        }\\n    }\\n\\n    /**\\n     * @dev Leaves the contract without owner. It will not be possible to call\\n     * `onlyOwner` functions. Can only be called by the current owner.\\n     *\\n     * NOTE: Renouncing ownership will leave the contract without an owner,\\n     * thereby disabling any functionality that is only available to the owner.\\n     */\\n    function renounceOwnership() public virtual onlyOwner {\\n        _transferOwnership(address(0));\\n    }\\n\\n    /**\\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\\n     * Can only be called by the current owner.\\n     */\\n    function transferOwnership(address newOwner) public virtual onlyOwner {\\n        if (newOwner == address(0)) {\\n            revert OwnableInvalidOwner(address(0));\\n        }\\n        _transferOwnership(newOwner);\\n    }\\n\\n    /**\\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\\n     * Internal function without access restriction.\\n     */\\n    function _transferOwnership(address newOwner) internal virtual {\\n        address oldOwner = _owner;\\n        _owner = newOwner;\\n        emit OwnershipTransferred(oldOwner, newOwner);\\n    }\\n}\\n\",\"keccak256\":\"0xff6d0bb2e285473e5311d9d3caacb525ae3538a80758c10649a4d61029b017bb\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0xc6a8ff0ea489379b61faa647490411b80102578440ab9d84e9a957cc12164e70\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Metadata.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC20} from \\\"../IERC20.sol\\\";\\n\\n/**\\n * @dev Interface for the optional metadata functions from the ERC20 standard.\\n */\\ninterface IERC20Metadata is IERC20 {\\n    /**\\n     * @dev Returns the name of the token.\\n     */\\n    function name() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the symbol of the token.\\n     */\\n    function symbol() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the decimals places of the token.\\n     */\\n    function decimals() external view returns (uint8);\\n}\\n\",\"keccak256\":\"0xaa761817f6cd7892fcf158b3c776b34551cde36f48ff9703d53898bc45a94ea2\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/Context.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Provides information about the current execution context, including the\\n * sender of the transaction and its data. While these are generally available\\n * via msg.sender and msg.data, they should not be accessed in such a direct\\n * manner, since when dealing with meta-transactions the account sending and\\n * paying for execution may not be the actual sender (as far as an application\\n * is concerned).\\n *\\n * This contract is only required for intermediate, library-like contracts.\\n */\\nabstract contract Context {\\n    function _msgSender() internal view virtual returns (address) {\\n        return msg.sender;\\n    }\\n\\n    function _msgData() internal view virtual returns (bytes calldata) {\\n        return msg.data;\\n    }\\n\\n    function _contextSuffixLength() internal view virtual returns (uint256) {\\n        return 0;\\n    }\\n}\\n\",\"keccak256\":\"0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2\",\"license\":\"MIT\"},\"contracts/interfaces/venus/ComptrollerInterface.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.10;\\n\\nimport \\\"./VTokenInterface.sol\\\";\\n\\n/**\\n * @title Venus's Comptroller Interface\\n * @notice Interface for interacting with Venus Comptroller\\n * @dev Adapted for compatibility with Solidity ^0.8.10 from Venus v4 documentation\\n * @dev Source: https://docs-v4.venus.io/technical-reference/reference-core-pool/comptroller/diamond/facets/market-facet\\n */\\ninterface ComptrollerInterface {\\n    /**\\n     * @notice Indicator that this is a Comptroller contract (for inspection)\\n     */\\n    function isComptroller() external pure returns (bool);\\n    \\n    /**\\n     * @notice Enters a list of markets (vTokens)\\n     * @param vTokens The list of addresses of the vToken markets to enter\\n     * @return success A list of error codes (0=success, otherwise a failure)\\n     */\\n    function enterMarkets(address[] calldata vTokens) external returns (uint[] memory);\\n    \\n    /**\\n     * @notice Exits a vToken market\\n     * @param vTokenAddress Address of the vToken market to exit\\n     * @return success 0=success, otherwise a failure\\n     */\\n    function exitMarket(address vTokenAddress) external returns (uint);\\n    \\n    /**\\n     * @notice Returns the list of vToken markets an account has entered\\n     * @param account The address of the account to query\\n     * @return The list of vToken markets the account has entered\\n     */\\n    function getAssetsIn(address account) external view returns (VTokenInterface[] memory);\\n    \\n    /**\\n     * @notice Checks if an account is entered into a specific market\\n     * @param account The address of the account to check\\n     * @param vToken The vToken market to check\\n     * @return True if the account is in the market, otherwise false\\n     */\\n    function checkMembership(address account, address vToken) external view returns (bool);\\n    \\n    /**\\n     * @notice Returns a list of all vToken markets\\n     * @return A list of all vToken market addresses\\n     */\\n    function getAllMarkets() external view returns (VTokenInterface[] memory);\\n    \\n    /**\\n     * @notice Determine the amount of vToken that could be seized in a liquidation\\n     * @param vTokenBorrowed The borrowed vToken\\n     * @param vTokenCollateral The collateral vToken\\n     * @param actualRepayAmount The amount of vTokenBorrowed underlying to repay\\n     * @return errorCode 0=success, otherwise a failure\\n     * @return seizeTokens The number of vTokenCollateral tokens to seize\\n     */\\n    function liquidateCalculateSeizeTokens(\\n        address vTokenBorrowed,\\n        address vTokenCollateral,\\n        uint actualRepayAmount\\n    ) external view returns (uint, uint);\\n    \\n    /**\\n     * @notice Calculate amount of tokens to seize in a VAI liquidation\\n     * @param vTokenCollateral The collateral vToken\\n     * @param actualRepayAmount The amount of VAI to repay\\n     * @return errorCode 0=success, otherwise a failure\\n     * @return seizeTokens The number of vTokenCollateral tokens to seize\\n     */\\n    function liquidateVAICalculateSeizeTokens(address vTokenCollateral, uint actualRepayAmount) external view returns (uint, uint);\\n    \\n    /**\\n     * @notice Update delegate status to allow/disallow borrowing on behalf\\n     * @param delegate The delegate address\\n     * @param allowBorrows Whether to allow the delegate to borrow\\n     */\\n    function updateDelegate(address delegate, bool allowBorrows) external;\\n    \\n    function approvedDelegates(address user, address delegate) external view returns (bool);\\n    \\n    /**\\n     * @notice Return information about a specific market\\n     * @param vToken The vToken address to get market data for\\n     * @return isListed Whether the market is listed\\n     * @return collateralFactorMantissa The collateral factor for the market\\n     * @return isComped Whether the market is included in XVS distribution\\n     */\\n    function markets(address vToken) external view returns (bool isListed, uint collateralFactorMantissa, bool isComped);\\n    \\n    /**\\n     * @notice Get the account liquidity information\\n     * @param account The address of the account\\n     * @return error Error code (0=success, otherwise a failure)\\n     * @return liquidity The USD value borrowable by the account\\n     * @return shortfall The USD value of collateral needed to meet obligations\\n     */\\n    function getAccountLiquidity(address account) external view returns (uint, uint, uint);\\n    \\n    /**\\n     * @notice Check if a specific action is allowed\\n     * @param vToken The vToken market to check\\n     * @param action The action to check (mint=1, redeem=2, borrow=3, repay=4, etc.)\\n     * @return True if the action is allowed\\n     */\\n    function actionAllowed(address vToken, uint8 action) external view returns (bool);\\n    \\n    /**\\n     * @notice Checks if a borrow is allowed\\n     * @param vToken The vToken market to check\\n     * @param borrower The account borrowing\\n     * @param borrowAmount The amount of underlying to borrow\\n     * @return 0=success, otherwise a failure\\n     */\\n    function borrowAllowed(address vToken, address borrower, uint borrowAmount) external returns (uint);\\n    \\n    /**\\n     * @notice Checks if a mint is allowed\\n     * @param vToken The vToken market to check\\n     * @param minter The account minting\\n     * @param mintAmount The amount of underlying to mint\\n     * @return 0=success, otherwise a failure\\n     */\\n    function mintAllowed(address vToken, address minter, uint mintAmount) external returns (uint);\\n    \\n    /**\\n     * @notice Checks if a redeem is allowed\\n     * @param vToken The vToken market to check\\n     * @param redeemer The account redeeming\\n     * @param redeemTokens The amount of vTokens to redeem\\n     * @return 0=success, otherwise a failure\\n     */\\n    function redeemAllowed(address vToken, address redeemer, uint redeemTokens) external returns (uint);\\n    \\n    /**\\n     * @notice Checks if a repay is allowed\\n     * @param vToken The vToken market to check\\n     * @param payer The account paying\\n     * @param borrower The account having their loan repaid\\n     * @param repayAmount The amount of underlying to repay\\n     * @return 0=success, otherwise a failure\\n     */\\n    function repayBorrowAllowed(address vToken, address payer, address borrower, uint repayAmount) external returns (uint);\\n\\n    /**\\n     * @notice Returns the price oracle used by the comptroller\\n     * @return The address of the oracle\\n     */\\n    function oracle() external view returns (address);\\n}\\n\",\"keccak256\":\"0xc823ce998d744f2c70ed6aaf75fc708b4ba0fb981299fa01ab653f7e9e4f809e\",\"license\":\"MIT\"},\"contracts/interfaces/venus/ResilientOracleInterface.sol\":{\"content\":\"// SPDX-License-Identifier: BSD-3-Clause\\npragma solidity ^0.8.10;\\n\\ninterface OracleInterface {\\n    function getPrice(address asset) external view returns (uint256);\\n}\\n\\ninterface ResilientOracleInterface is OracleInterface {\\n    function getUnderlyingPrice(address vToken) external view returns (uint256);\\n}\",\"keccak256\":\"0x3066680deb62e100d1492fdee35d47c4ceb964c81bbf19afa31e1b9eb67e2b16\",\"license\":\"BSD-3-Clause\"},\"contracts/interfaces/venus/VTokenInterface.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.10;\\n\\n/**\\n * @title Venus's VToken Interface\\n * @notice Interface for interacting with Venus VTokens\\n * @dev Adapted for compatibility with Solidity ^0.8.10 from Venus documentation\\n */\\ninterface VTokenInterface {\\n    /*** Market Events ***/\\n    event AccrueInterest(uint cashPrior, uint interestAccumulated, uint borrowIndex, uint totalBorrows);\\n    event Mint(address minter, uint mintAmount, uint mintTokens);\\n    event Redeem(address redeemer, uint redeemAmount, uint redeemTokens);\\n    event Borrow(address borrower, uint borrowAmount, uint accountBorrows, uint totalBorrows);\\n    event RepayBorrow(address payer, address borrower, uint repayAmount, uint accountBorrows, uint totalBorrows);\\n    event LiquidateBorrow(address liquidator, address borrower, uint repayAmount, address vTokenCollateral, uint seizeTokens);\\n    \\n    /*** VToken State ***/\\n    function underlying() external view returns (address);\\n    function decimals() external view returns (uint8);\\n    function totalSupply() external view returns (uint);\\n    function totalBorrows() external view returns (uint);\\n    function totalReserves() external view returns (uint);\\n    function exchangeRateStored() external view returns (uint);\\n    function accrualBlockNumber() external view returns (uint);\\n    function comptroller() external view returns (address);\\n    function symbol() external view returns (string memory);\\n    function name() external view returns (string memory);\\n    function reserveFactorMantissa() external view returns (uint);\\n    function getCash() external view returns (uint);\\n    function borrowIndex() external view returns (uint);\\n    \\n    /*** User Account Functions ***/\\n    function balanceOf(address owner) external view returns (uint);\\n    function allowance(address owner, address spender) external view returns (uint);\\n    function approve(address spender, uint amount) external returns (bool);\\n    function transfer(address dst, uint amount) external returns (bool);\\n    function transferFrom(address src, address dst, uint amount) external returns (bool);\\n    \\n    /*** VToken Market Functions ***/\\n    function mint(uint mintAmount) external returns (uint);\\n    function redeem(uint redeemTokens) external returns (uint);\\n    function redeemUnderlying(uint redeemAmount) external returns (uint);\\n    function borrow(uint borrowAmount) external returns (uint);\\n    function borrowBehalf(address borrower, uint borrowAmount) external returns (uint);\\n    function repayBorrow(uint repayAmount) external returns (uint);\\n    function repayBorrowBehalf(address borrower, uint repayAmount) external returns (uint);\\n    \\n    /*** Borrow-Related Functions ***/\\n    function borrowBalanceCurrent(address account) external returns (uint);\\n    function borrowBalanceStored(address account) external view returns (uint);\\n    function supplyRatePerBlock() external view returns (uint);\\n    function borrowRatePerBlock() external view returns (uint);\\n    function exchangeRateCurrent() external returns (uint);\\n    function accrueInterest() external returns (uint);\\n    \\n    /*** Liquidation Functions ***/\\n    function liquidateBorrow(address borrower, uint repayAmount, address vTokenCollateral) external returns (uint);\\n    \\n    /*** Admin Functions ***/\\n    function _setReserveFactor(uint newReserveFactorMantissa) external returns (uint);\\n    function _reduceReserves(uint reduceAmount) external returns (uint);\\n    function _setInterestRateModel(address newInterestRateModel) external returns (uint);\\n} \",\"keccak256\":\"0x06450e966b937d0dfd3b3b071063871433623fd889615950517044fe6276decb\",\"license\":\"MIT\"},\"contracts/v2/gateways/venus/VenusGatewayView.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport {ComptrollerInterface} from \\\"../../../interfaces/venus/ComptrollerInterface.sol\\\";\\nimport {VTokenInterface} from \\\"../../../interfaces/venus/VTokenInterface.sol\\\";\\nimport {ResilientOracleInterface} from \\\"../../../interfaces/venus/ResilientOracleInterface.sol\\\";\\nimport {IERC20} from \\\"@openzeppelin/contracts/token/ERC20/IERC20.sol\\\";\\nimport {IERC20Metadata} from \\\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\\\";\\nimport {Ownable} from \\\"@openzeppelin/contracts/access/Ownable.sol\\\";\\n\\n/**\\n * @title VenusGatewayView\\n * @notice View-only gateway for Venus protocol\\n * @dev Contains all read/view functions from v1, separate from write operations\\n */\\ncontract VenusGatewayView is Ownable {\\n    ComptrollerInterface public comptroller;\\n    ResilientOracleInterface public oracle;\\n\\n    constructor(address _comptroller, address _oracle, address owner_) Ownable(owner_) {\\n        comptroller = ComptrollerInterface(_comptroller);\\n        oracle = ResilientOracleInterface(_oracle);\\n    }\\n    \\n    function setComptroller(address _comptroller) external onlyOwner {\\n        comptroller = ComptrollerInterface(_comptroller);\\n    }\\n\\n    function setOracle(address _oracle) external onlyOwner {\\n        oracle = ResilientOracleInterface(_oracle);\\n    }\\n\\n    function getVTokenForUnderlying(address underlyingToken) public view returns (address) {\\n        address[] memory vTokenAddresses = this.getAllMarkets();\\n        \\n        for (uint i = 0; i < vTokenAddresses.length; i++) {\\n            address vTokenAddress = vTokenAddresses[i];\\n            \\n            try VTokenInterface(vTokenAddress).underlying() returns (address underlying) {\\n                if (underlying == underlyingToken) {\\n                    return vTokenAddress;\\n                }\\n            } catch {\\n                // Skip if there's an error (e.g., for vBNB which might not have an underlying() function)\\n                continue;\\n            }\\n        }\\n        \\n        revert(\\\"VenusGateway: vToken not found for underlying token\\\");\\n    }\\n    \\n    function getAssetsIn(address account) external view returns (address[] memory) {\\n        VTokenInterface[] memory vTokens = comptroller.getAssetsIn(account);\\n        address[] memory vTokenAddresses = new address[](vTokens.length);\\n        \\n        for (uint i = 0; i < vTokens.length; i++) {\\n            vTokenAddresses[i] = address(vTokens[i]);\\n        }\\n        \\n        return vTokenAddresses;\\n    }\\n    \\n    function checkMembership(address account, address vToken) external view returns (bool) {\\n        return comptroller.checkMembership(account, vToken);\\n    }\\n    \\n    function getAllMarkets() external view returns (address[] memory) {\\n        VTokenInterface[] memory vTokens = comptroller.getAllMarkets();\\n        address[] memory vTokenAddresses = new address[](vTokens.length);\\n        \\n        for (uint i = 0; i < vTokens.length; i++) {\\n            vTokenAddresses[i] = address(vTokens[i]);\\n        }\\n        \\n        return vTokenAddresses;\\n    }\\n    \\n    function getAccountLiquidity(address account) public view returns (uint, uint, uint) {\\n        return comptroller.getAccountLiquidity(account);\\n    }\\n    \\n    function getBalance(address token, address user) external view returns (uint256) {\\n        address vTokenAddress = getVTokenForUnderlying(token);\\n        \\n        // Get vToken balance\\n        uint vTokenBalance = VTokenInterface(vTokenAddress).balanceOf(user);\\n        \\n        // Convert to underlying amount using exchange rate\\n        uint exchangeRate = VTokenInterface(vTokenAddress).exchangeRateStored();\\n        \\n        // Calculate underlying value\\n        return (vTokenBalance * exchangeRate) / 1e18;\\n    }\\n    \\n    function getBorrowBalance(address token, address user) external view returns (uint256) {\\n        address vTokenAddress = getVTokenForUnderlying(token);\\n        return VTokenInterface(vTokenAddress).borrowBalanceStored(user);\\n    }\\n\\n    function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {\\n        address vTokenAddress = getVTokenForUnderlying(token);\\n        return VTokenInterface(vTokenAddress).borrowBalanceCurrent(user);\\n    }\\n    \\n    function getBorrowRate(address token) external view returns (uint256, bool) {\\n        address vTokenAddress = getVTokenForUnderlying(token);\\n        uint borrowRate = VTokenInterface(vTokenAddress).borrowRatePerBlock();\\n        return (borrowRate, true);\\n    }\\n    \\n    function getSupplyRate(address token) external view returns (uint256, bool) {\\n        address vTokenAddress = getVTokenForUnderlying(token);\\n        uint supplyRate = VTokenInterface(vTokenAddress).supplyRatePerBlock();\\n        return (supplyRate, true);\\n    }\\n    \\n    function getAllVenusMarkets() external view returns (\\n        address[] memory vTokens,\\n        address[] memory tokens,\\n        string[] memory symbols,\\n        string[] memory names,\\n        uint8[] memory decimals,\\n        uint256[] memory prices\\n    ) {\\n        // Get all markets from the comptroller\\n        vTokens = this.getAllMarkets();\\n        uint256 marketsCount = vTokens.length;\\n        \\n        // Initialize arrays\\n        tokens = new address[](marketsCount);\\n        symbols = new string[](marketsCount);\\n        names = new string[](marketsCount);\\n        decimals = new uint8[](marketsCount);\\n        prices = new uint256[](marketsCount);\\n        \\n        // Populate arrays with basic token information\\n        for (uint i = 0; i < marketsCount; i++) {\\n            address vTokenAddress = vTokens[i];\\n            VTokenInterface vToken = VTokenInterface(vTokenAddress);\\n            \\n            // Get underlying token address directly\\n            try vToken.underlying() returns (address underlyingToken) {\\n                tokens[i] = underlyingToken;\\n                \\n                // Get token metadata\\n                IERC20Metadata underlying = IERC20Metadata(underlyingToken);\\n                \\n                // Try to get symbol from underlying, fallback to vToken\\n                try underlying.symbol() returns (string memory s) {\\n                    symbols[i] = s;\\n                } catch {\\n                    symbols[i] = vToken.symbol();\\n                }\\n                \\n                // Try to get name from underlying, fallback to vToken\\n                try underlying.name() returns (string memory n) {\\n                    names[i] = n;\\n                } catch {\\n                    names[i] = vToken.name();\\n                }\\n                \\n                // Try to get decimals from underlying, fallback to vToken\\n                try underlying.decimals() returns (uint8 d) {\\n                    decimals[i] = d;\\n                } catch {\\n                    decimals[i] = vToken.decimals();\\n                }\\n            } catch {\\n                // For tokens like vBNB that might not have an underlying() function\\n                tokens[i] = address(0);\\n                symbols[i] = vToken.symbol();\\n                names[i] = vToken.name();\\n                decimals[i] = vToken.decimals();\\n            }\\n            prices[i] = oracle.getUnderlyingPrice(vTokenAddress);\\n        }\\n        \\n        return (vTokens, tokens, symbols, names, decimals, prices);\\n    }\\n    \\n    function getMarketRates(address[] calldata vTokens) external view returns (\\n        uint256[] memory prices,\\n        uint256[] memory supplyRates,\\n        uint256[] memory borrowRates\\n    ) {\\n        uint256 marketsCount = vTokens.length;\\n        \\n        // Initialize arrays\\n        prices = new uint256[](marketsCount);\\n        supplyRates = new uint256[](marketsCount);\\n        borrowRates = new uint256[](marketsCount);\\n        \\n        // Populate arrays with rate information\\n        for (uint i = 0; i < marketsCount; i++) {\\n            address vTokenAddress = vTokens[i];\\n            VTokenInterface vToken = VTokenInterface(vTokenAddress);\\n            \\n            // Get rates\\n            supplyRates[i] = vToken.supplyRatePerBlock();\\n            borrowRates[i] = vToken.borrowRatePerBlock();\\n            prices[i] = oracle.getUnderlyingPrice(vTokenAddress);\\n        }\\n        \\n        return (prices, supplyRates, borrowRates);\\n    }\\n    \\n    function getUserBalances(address[] calldata vTokens, address account) external view returns (\\n        uint256[] memory balances,\\n        uint256[] memory borrowBalances\\n    ) {\\n        require(account != address(0), \\\"VenusGateway: zero address not allowed\\\");\\n        \\n        uint256 marketsCount = vTokens.length;\\n        \\n        // Initialize arrays\\n        balances = new uint256[](marketsCount);\\n        borrowBalances = new uint256[](marketsCount);\\n        \\n        // Populate arrays with user balance information\\n        for (uint i = 0; i < marketsCount; i++) {\\n            address vTokenAddress = vTokens[i];\\n            VTokenInterface vToken = VTokenInterface(vTokenAddress);\\n            \\n            // Get user balances\\n            try vToken.balanceOf(account) returns (uint256 b) {\\n                // Convert vToken balance to underlying using exchange rate\\n                uint256 exchangeRate = vToken.exchangeRateStored();\\n                balances[i] = (b * exchangeRate) / 1e18;\\n            } catch {\\n                balances[i] = 0;\\n            }\\n            \\n            try vToken.borrowBalanceStored(account) returns (uint256 bb) {\\n                borrowBalances[i] = bb;\\n            } catch {\\n                borrowBalances[i] = 0;\\n            }\\n        }\\n        \\n        return (balances, borrowBalances);\\n    }\\n    \\n    function getCollateralStatus(address[] calldata vTokens, address account) external view returns (\\n        bool[] memory isCollateral\\n    ) {\\n        require(account != address(0), \\\"VenusGateway: zero address not allowed\\\");\\n        \\n        uint256 marketsCount = vTokens.length;\\n        isCollateral = new bool[](marketsCount);\\n        \\n        // Get the list of markets the user has entered (used as collateral)\\n        address[] memory enteredMarkets = this.getAssetsIn(account);\\n        \\n        // Check each market if it's being used as collateral\\n        for (uint i = 0; i < marketsCount; i++) {\\n            address vTokenAddress = vTokens[i];\\n            \\n            // Linear search through entered markets\\n            for (uint j = 0; j < enteredMarkets.length; j++) {\\n                if (enteredMarkets[j] == vTokenAddress) {\\n                    isCollateral[i] = true;\\n                    break;\\n                }\\n            }\\n        }\\n        \\n        return isCollateral;\\n    }\\n    \\n    function getPossibleCollaterals(address token, address user) external view returns (\\n        address[] memory collateralAddresses,\\n        uint256[] memory balances,\\n        string[] memory symbols,\\n        uint8[] memory decimals\\n    ) {\\n        // Get all Venus markets information\\n        (\\n            address[] memory vTokens, \\n            address[] memory tokens, \\n            string[] memory tokenSymbols, \\n            string[] memory names, \\n            uint8[] memory tokenDecimals,\\n            uint256[] memory prices\\n        ) = this.getAllVenusMarkets();\\n        \\n        // Create arrays for return values\\n        collateralAddresses = new address[](tokens.length);\\n        symbols = new string[](tokens.length);\\n        decimals = new uint8[](tokens.length);\\n        balances = new uint256[](tokens.length); // Initialize with all zeros by default\\n        \\n        // If user address is provided and not zero, get their balances\\n        if (user != address(0)) {\\n            // Get user balances for all markets\\n            (uint256[] memory userBalances, ) = this.getUserBalances(vTokens, user);\\n            balances = userBalances;\\n        }\\n        \\n        // Copy token information to return arrays\\n        for (uint i = 0; i < tokens.length; i++) {\\n            collateralAddresses[i] = tokens[i];\\n            symbols[i] = tokenSymbols[i];\\n            decimals[i] = tokenDecimals[i];\\n        }\\n        \\n        return (collateralAddresses, balances, symbols, decimals);\\n    }\\n    \\n    function isCollateralSupported(address market, address collateral) external view returns (bool isSupported) {\\n        // Get all Venus markets information\\n        (\\n            ,  // vTokens (not needed)\\n            address[] memory tokens, \\n            , // symbols (not needed)\\n            , // names (not needed)\\n            , // decimals (not needed)\\n              // prices (not needed)\\n        ) = this.getAllVenusMarkets();\\n        \\n        // First check that both market and collateral are valid tokens in Venus\\n        bool marketFound = false;\\n        bool collateralFound = false;\\n        \\n        for (uint i = 0; i < tokens.length; i++) {\\n            if (tokens[i] == market) {\\n                marketFound = true;\\n            }\\n            if (tokens[i] == collateral) {\\n                collateralFound = true;\\n            }\\n            \\n            // Early exit if both are found\\n            if (marketFound && collateralFound) {\\n                break;\\n            }\\n        }\\n        \\n        // In Venus, any valid token can be collateral for any other valid token\\n        return marketFound && collateralFound;\\n    }\\n    \\n    function getSupportedCollaterals(address market) external view returns (address[] memory collateralAddresses) {\\n        // Get all Venus markets information\\n        (\\n            ,  // vTokens (not needed)\\n            address[] memory tokens, \\n            ,  // symbols (not needed)\\n            ,  // names (not needed)\\n            ,// decimals (not needed)\\n            // prices (not needed)\\n        ) = this.getAllVenusMarkets();\\n        \\n        // Check if market is a valid token in Venus\\n        bool marketFound = false;\\n        for (uint i = 0; i < tokens.length; i++) {\\n            if (tokens[i] == market) {\\n                marketFound = true;\\n                break;\\n            }\\n        }\\n        \\n        // If market is not found, return empty array\\n        if (!marketFound) {\\n            return new address[](0);\\n        }\\n        \\n        // In Venus, all tokens can be collateral for any other token\\n        // So we return all tokens except the market itself\\n        collateralAddresses = new address[](tokens.length - 1);\\n        \\n        uint index = 0;\\n        for (uint i = 0; i < tokens.length; i++) {\\n            // Skip the market token itself\\n            if (tokens[i] != market) {\\n                collateralAddresses[index] = tokens[i];\\n                index++;\\n            }\\n        }\\n        \\n        return collateralAddresses;\\n    }\\n    \\n    function getLtv(address token, address user) external view returns (uint256) {\\n        // For Venus, LTV is typically around 50-75% depending on the asset\\n        // We would ideally get this from the Comptroller's collateralFactors for the specific vToken\\n        \\n        // Get the vToken address for this token\\n        address vTokenAddress;\\n        try this.getVTokenForUnderlying(token) returns (address vToken) {\\n            vTokenAddress = vToken;\\n        } catch {\\n            // If token is not found in Venus, return 0 LTV\\n            return 0;\\n        }\\n        \\n        // In a real implementation, we would get the collateral factor from Comptroller:\\n        // (, uint collateralFactorMantissa) = comptroller.markets(vTokenAddress);\\n        \\n        // For simplicity, we'll return a default LTV of 75% (expressed as 0.75 * 1e18)\\n        // In a production environment, this should be replaced with the actual collateral factor\\n        return 75 * 1e16; // 75% * 1e18 = 75 * 1e16\\n    }\\n}\\n\\n\",\"keccak256\":\"0x149744605eae1b758087665aa71913936c66a0aa59663524e6d82b6b00e444cc\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x608060405234801561000f575f5ffd5b50604051612dc8380380612dc883398101604081905261002e91610102565b806001600160a01b03811661005c57604051631e4fbdf760e01b81525f600482015260240160405180910390fd5b61006581610098565b5050600180546001600160a01b039384166001600160a01b03199182161790915560028054929093169116179055610142565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b80516001600160a01b03811681146100fd575f5ffd5b919050565b5f5f5f60608486031215610114575f5ffd5b61011d846100e7565b925061012b602085016100e7565b9150610139604085016100e7565b90509250925092565b612c798061014f5f395ff3fe608060405234801561000f575f5ffd5b506004361061016d575f3560e01c806381906b80116100d9578063bad1935011610093578063e94201c71161006e578063e94201c714610397578063f2fde38b146103aa578063f5125d3f146103bd578063f639ecd2146103d0575f5ffd5b8063bad1935014610351578063d4fac45d14610371578063d71275f614610384575f5ffd5b806381906b80146102df5780638bad38dd146103005780638da5cb5b14610313578063929fe9a114610323578063abfceffc14610336578063b0772d0b14610349575f5ffd5b806366e2d09b1161012a57806366e2d09b146102445780636b5441a914610264578063715018a61461028c57806378466113146102965780637adbf973146102b95780637dc0d1d0146102cc575f5ffd5b8063104e999d14610171578063118e31b71461019d5780632b7be8e8146101be5780635ec88c79146101e95780635fe3b56714610217578063646121321461022a575b5f5ffd5b61018461017f3660046121ec565b6103f2565b6040516101949493929190612343565b60405180910390f35b6101b06101ab3660046121ec565b6106f2565b604051908152602001610194565b6101d16101cc36600461239a565b610773565b6040516001600160a01b039091168152602001610194565b6101fc6101f736600461239a565b6108fc565b60408051938452602084019290925290820152606001610194565b6001546101d1906001600160a01b031681565b61023261097b565b604051610194969594939291906123b5565b61025761025236600461239a565b61118b565b6040516101949190612436565b61027761027236600461239a565b611357565b60408051928352901515602083015201610194565b6102946113d2565b005b6102a96102a43660046121ec565b6113e5565b6040519015158152602001610194565b6102946102c736600461239a565b6114fa565b6002546101d1906001600160a01b031681565b6102f26102ed36600461248f565b611524565b6040516101949291906124e1565b61029461030e36600461239a565b6117f7565b5f546001600160a01b03166101d1565b6102a96103313660046121ec565b611821565b61025761034436600461239a565b61189c565b6102576119b5565b61036461035f36600461248f565b611ad4565b604051610194919061250e565b6101b061037f3660046121ec565b611c64565b61027761039236600461239a565b611d5e565b6101b06103a53660046121ec565b611da9565b6102946103b836600461239a565b611dfd565b6101b06103cb3660046121ec565b611e3a565b6103e36103de366004612552565b611ebd565b60405161019493929190612590565b6060806060805f5f5f5f5f5f306001600160a01b031663646121326040518163ffffffff1660e01b81526004015f60405180830381865afa158015610439573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610460919081019061285c565b95509550955095509550955084516001600160401b03811115610485576104856125c8565b6040519080825280602002602001820160405280156104ae578160200160208202803683370190505b50995084516001600160401b038111156104ca576104ca6125c8565b6040519080825280602002602001820160405280156104fd57816020015b60608152602001906001900390816104e85790505b50975084516001600160401b03811115610519576105196125c8565b604051908082528060200260200182016040528015610542578160200160208202803683370190505b50965084516001600160401b0381111561055e5761055e6125c8565b604051908082528060200260200182016040528015610587578160200160208202803683370190505b5098506001600160a01b038b161561060e575f306001600160a01b03166381906b80888e6040518363ffffffff1660e01b81526004016105c8929190612962565b5f60405180830381865afa1580156105e2573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610609919081019061298b565b509950505b5f5b85518110156106e25785818151811061062b5761062b6129ee565b60200260200101518b8281518110610645576106456129ee565b60200260200101906001600160a01b031690816001600160a01b031681525050848181518110610677576106776129ee565b6020026020010151898281518110610691576106916129ee565b60200260200101819052508281815181106106ae576106ae6129ee565b60200260200101518882815181106106c8576106c86129ee565b60ff90921660209283029190910190910152600101610610565b5050505050505092959194509250565b5f5f6106fd84610773565b6040516395dd919360e01b81526001600160a01b038581166004830152919250908216906395dd919390602401602060405180830381865afa158015610745573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906107699190612a02565b9150505b92915050565b5f5f306001600160a01b031663b0772d0b6040518163ffffffff1660e01b81526004015f60405180830381865afa1580156107b0573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f191682016040526107d79190810190612a19565b90505f5b8151811015610892575f8282815181106107f7576107f76129ee565b60200260200101519050806001600160a01b0316636f307dc36040518163ffffffff1660e01b8152600401602060405180830381865afa92505050801561085b575060408051601f3d908101601f1916820190925261085891810190612a4a565b60015b610865575061088a565b856001600160a01b0316816001600160a01b0316036108875750949350505050565b50505b6001016107db565b5060405162461bcd60e51b815260206004820152603360248201527f56656e7573476174657761793a2076546f6b656e206e6f7420666f756e64206660448201527237b9103ab73232b9363cb4b733903a37b5b2b760691b60648201526084015b60405180910390fd5b600154604051635ec88c7960e01b81526001600160a01b0383811660048301525f928392839290911690635ec88c7990602401606060405180830381865afa15801561094a573d5f5f3e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061096e9190612a65565b9250925092509193909250565b606080606080606080306001600160a01b031663b0772d0b6040518163ffffffff1660e01b81526004015f60405180830381865afa1580156109bf573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f191682016040526109e69190810190612a19565b8051909650806001600160401b03811115610a0357610a036125c8565b604051908082528060200260200182016040528015610a2c578160200160208202803683370190505b509550806001600160401b03811115610a4757610a476125c8565b604051908082528060200260200182016040528015610a7a57816020015b6060815260200190600190039081610a655790505b509450806001600160401b03811115610a9557610a956125c8565b604051908082528060200260200182016040528015610ac857816020015b6060815260200190600190039081610ab35790505b509350806001600160401b03811115610ae357610ae36125c8565b604051908082528060200260200182016040528015610b0c578160200160208202803683370190505b509250806001600160401b03811115610b2757610b276125c8565b604051908082528060200260200182016040528015610b50578160200160208202803683370190505b5091505f5b81811015611181575f888281518110610b7057610b706129ee565b602002602001015190505f819050806001600160a01b0316636f307dc36040518163ffffffff1660e01b8152600401602060405180830381865afa925050508015610bd8575060408051601f3d908101601f19168201909252610bd591810190612a4a565b60015b610d98575f898481518110610bef57610bef6129ee565b60200260200101906001600160a01b031690816001600160a01b031681525050806001600160a01b03166395d89b416040518163ffffffff1660e01b81526004015f60405180830381865afa158015610c4a573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610c719190810190612a90565b888481518110610c8357610c836129ee565b6020026020010181905250806001600160a01b03166306fdde036040518163ffffffff1660e01b81526004015f60405180830381865afa158015610cc9573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610cf09190810190612a90565b878481518110610d0257610d026129ee565b6020026020010181905250806001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa158015610d49573d5f5f3e3d5ffd5b505050506040513d601f19601f82011682018060405250810190610d6d9190612ac1565b868481518110610d7f57610d7f6129ee565b602002602001019060ff16908160ff16815250506110ee565b808a8581518110610dab57610dab6129ee565b60200260200101906001600160a01b031690816001600160a01b0316815250505f819050806001600160a01b03166395d89b416040518163ffffffff1660e01b81526004015f60405180830381865afa925050508015610e2c57506040513d5f823e601f3d908101601f19168201604052610e299190810190612a90565b60015b610eb457826001600160a01b03166395d89b416040518163ffffffff1660e01b81526004015f60405180830381865afa158015610e6b573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610e929190810190612a90565b8a8681518110610ea457610ea46129ee565b6020026020010181905250610ed4565b808b8781518110610ec757610ec76129ee565b6020026020010181905250505b806001600160a01b03166306fdde036040518163ffffffff1660e01b81526004015f60405180830381865afa925050508015610f3157506040513d5f823e601f3d908101601f19168201604052610f2e9190810190612a90565b60015b610fb957826001600160a01b03166306fdde036040518163ffffffff1660e01b81526004015f60405180830381865afa158015610f70573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610f979190810190612a90565b898681518110610fa957610fa96129ee565b6020026020010181905250610fd9565b808a8781518110610fcc57610fcc6129ee565b6020026020010181905250505b806001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa925050508015611033575060408051601f3d908101601f1916820190925261103091810190612ac1565b60015b6110c257826001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa158015611073573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906110979190612ac1565b8886815181106110a9576110a96129ee565b602002602001019060ff16908160ff16815250506110eb565b808987815181106110d5576110d56129ee565b602002602001019060ff16908160ff1681525050505b50505b60025460405163fc57d4df60e01b81526001600160a01b0384811660048301529091169063fc57d4df90602401602060405180830381865afa158015611136573d5f5f3e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061115a9190612a02565b85848151811061116c5761116c6129ee565b60209081029190910101525050600101610b55565b5050909192939495565b60605f306001600160a01b031663646121326040518163ffffffff1660e01b81526004015f60405180830381865afa1580156111c9573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f191682016040526111f0919081019061285c565b509294505f935083925050505b825181101561124957846001600160a01b0316838281518110611222576112226129ee565b60200260200101516001600160a01b0316036112415760019150611249565b6001016111fd565b5080611265575050604080515f81526020810190915292915050565b600182516112739190612aee565b6001600160401b0381111561128a5761128a6125c8565b6040519080825280602002602001820160405280156112b3578160200160208202803683370190505b5092505f805b835181101561134e57856001600160a01b03168482815181106112de576112de6129ee565b60200260200101516001600160a01b03161461134657838181518110611306576113066129ee565b6020026020010151858381518110611320576113206129ee565b6001600160a01b03909216602092830291909101909101528161134281612b01565b9250505b6001016112b9565b50505050919050565b5f5f5f61136384610773565b90505f816001600160a01b031663ae9d70b06040518163ffffffff1660e01b8152600401602060405180830381865afa1580156113a2573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906113c69190612a02565b95600195509350505050565b6113da61215d565b6113e35f612189565b565b5f5f306001600160a01b031663646121326040518163ffffffff1660e01b81526004015f60405180830381865afa158015611422573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052611449919081019061285c565b509294505f9350839250829150505b83518110156114e557866001600160a01b031684828151811061147d5761147d6129ee565b60200260200101516001600160a01b03160361149857600192505b856001600160a01b03168482815181106114b4576114b46129ee565b60200260200101516001600160a01b0316036114cf57600191505b8280156114d95750815b6114e557600101611458565b508180156114f05750805b9695505050505050565b61150261215d565b600280546001600160a01b0319166001600160a01b0392909216919091179055565b6060806001600160a01b03831661154d5760405162461bcd60e51b81526004016108f390612b19565b83806001600160401b03811115611566576115666125c8565b60405190808252806020026020018201604052801561158f578160200160208202803683370190505b509250806001600160401b038111156115aa576115aa6125c8565b6040519080825280602002602001820160405280156115d3578160200160208202803683370190505b5091505f5b818110156117ed575f8787838181106115f3576115f36129ee565b9050602002016020810190611608919061239a565b6040516370a0823160e01b81526001600160a01b03888116600483015291925082918216906370a0823190602401602060405180830381865afa92505050801561166f575060408051601f3d908101601f1916820190925261166c91810190612a02565b60015b611697575f868481518110611686576116866129ee565b602002602001018181525050611738565b5f826001600160a01b031663182df0f56040518163ffffffff1660e01b8152600401602060405180830381865afa1580156116d4573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906116f89190612a02565b9050670de0b6b3a764000061170d8284612b5f565b6117179190612b76565b888681518110611729576117296129ee565b60200260200101818152505050505b6040516395dd919360e01b81526001600160a01b0388811660048301528216906395dd919390602401602060405180830381865afa92505050801561179a575060408051601f3d908101601f1916820190925261179791810190612a02565b60015b6117c2575f8584815181106117b1576117b16129ee565b6020026020010181815250506117e3565b808685815181106117d5576117d56129ee565b602002602001018181525050505b50506001016115d8565b5050935093915050565b6117ff61215d565b600180546001600160a01b0319166001600160a01b0392909216919091179055565b60015460405163929fe9a160e01b81526001600160a01b03848116600483015283811660248301525f92169063929fe9a190604401602060405180830381865afa158015611871573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906118959190612b95565b9392505050565b600154604051632aff3bff60e21b81526001600160a01b0383811660048301526060925f9291169063abfceffc906024015f60405180830381865afa1580156118e7573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f1916820160405261190e9190810190612bb4565b90505f81516001600160401b0381111561192a5761192a6125c8565b604051908082528060200260200182016040528015611953578160200160208202803683370190505b5090505f5b82518110156119ad57828181518110611973576119736129ee565b602002602001015182828151811061198d5761198d6129ee565b6001600160a01b0390921660209283029190910190910152600101611958565b509392505050565b60605f60015f9054906101000a90046001600160a01b03166001600160a01b031663b0772d0b6040518163ffffffff1660e01b81526004015f60405180830381865afa158015611a07573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052611a2e9190810190612bb4565b90505f81516001600160401b03811115611a4a57611a4a6125c8565b604051908082528060200260200182016040528015611a73578160200160208202803683370190505b5090505f5b8251811015611acd57828181518110611a9357611a936129ee565b6020026020010151828281518110611aad57611aad6129ee565b6001600160a01b0390921660209283029190910190910152600101611a78565b5092915050565b60606001600160a01b038216611afc5760405162461bcd60e51b81526004016108f390612b19565b82806001600160401b03811115611b1557611b156125c8565b604051908082528060200260200182016040528015611b3e578160200160208202803683370190505b50604051632aff3bff60e21b81526001600160a01b03851660048201529092505f90309063abfceffc906024015f60405180830381865afa158015611b85573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052611bac9190810190612a19565b90505f5b82811015611c5a575f878783818110611bcb57611bcb6129ee565b9050602002016020810190611be0919061239a565b90505f5b8351811015611c5057816001600160a01b0316848281518110611c0957611c096129ee565b60200260200101516001600160a01b031603611c48576001868481518110611c3357611c336129ee565b91151560209283029190910190910152611c50565b600101611be4565b5050600101611bb0565b5050509392505050565b5f5f611c6f84610773565b6040516370a0823160e01b81526001600160a01b0385811660048301529192505f918316906370a0823190602401602060405180830381865afa158015611cb8573d5f5f3e3d5ffd5b505050506040513d601f19601f82011682018060405250810190611cdc9190612a02565b90505f826001600160a01b031663182df0f56040518163ffffffff1660e01b8152600401602060405180830381865afa158015611d1b573d5f5f3e3d5ffd5b505050506040513d601f19601f82011682018060405250810190611d3f9190612a02565b9050670de0b6b3a7640000611d548284612b5f565b6114f09190612b76565b5f5f5f611d6a84610773565b90505f816001600160a01b031663f8f9da286040518163ffffffff1660e01b8152600401602060405180830381865afa1580156113a2573d5f5f3e3d5ffd5b5f5f611db484610773565b6040516305eff7ef60e21b81526001600160a01b038581166004830152919250908216906317bfdfbc906024016020604051808303815f875af1158015610745573d5f5f3e3d5ffd5b611e0561215d565b6001600160a01b038116611e2e57604051631e4fbdf760e01b81525f60048201526024016108f3565b611e3781612189565b50565b60405163056f7d1d60e31b81526001600160a01b03831660048201525f9081903090632b7be8e890602401602060405180830381865afa925050508015611e9e575060408051601f3d908101601f19168201909252611e9b91810190612a4a565b60015b611eab575f91505061076d565b50670a688906bd8b0000949350505050565b6060808083806001600160401b03811115611eda57611eda6125c8565b604051908082528060200260200182016040528015611f03578160200160208202803683370190505b509350806001600160401b03811115611f1e57611f1e6125c8565b604051908082528060200260200182016040528015611f47578160200160208202803683370190505b509250806001600160401b03811115611f6257611f626125c8565b604051908082528060200260200182016040528015611f8b578160200160208202803683370190505b5091505f5b81811015612154575f878783818110611fab57611fab6129ee565b9050602002016020810190611fc0919061239a565b90505f819050806001600160a01b031663ae9d70b06040518163ffffffff1660e01b8152600401602060405180830381865afa158015612002573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906120269190612a02565b868481518110612038576120386129ee565b602002602001018181525050806001600160a01b031663f8f9da286040518163ffffffff1660e01b8152600401602060405180830381865afa158015612080573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906120a49190612a02565b8584815181106120b6576120b66129ee565b602090810291909101015260025460405163fc57d4df60e01b81526001600160a01b0384811660048301529091169063fc57d4df90602401602060405180830381865afa158015612109573d5f5f3e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061212d9190612a02565b87848151811061213f5761213f6129ee565b60209081029190910101525050600101611f90565b50509250925092565b5f546001600160a01b031633146113e35760405163118cdaa760e01b81523360048201526024016108f3565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6001600160a01b0381168114611e37575f5ffd5b5f5f604083850312156121fd575f5ffd5b8235612208816121d8565b91506020830135612218816121d8565b809150509250929050565b5f8151808452602084019350602083015f5b8281101561225c5781516001600160a01b0316865260209586019590910190600101612235565b5093949350505050565b5f8151808452602084019350602083015f5b8281101561225c578151865260209586019590910190600101612278565b5f82825180855260208501945060208160051b830101602085015f5b8381101561230457601f19858403018852815180518085528060208301602087015e5f602082870101526020601f19601f830116860101945050506020820191506020880197506001810190506122b2565b50909695505050505050565b5f8151808452602084019350602083015f5b8281101561225c57815160ff16865260209586019590910190600101612322565b608081525f6123556080830187612223565b82810360208401526123678187612266565b9050828103604084015261237b8186612296565b9050828103606084015261238f8185612310565b979650505050505050565b5f602082840312156123aa575f5ffd5b8135611895816121d8565b60c081525f6123c760c0830189612223565b82810360208401526123d98189612223565b905082810360408401526123ed8188612296565b905082810360608401526124018187612296565b905082810360808401526124158186612310565b905082810360a08401526124298185612266565b9998505050505050505050565b602081525f6118956020830184612223565b5f5f83601f840112612458575f5ffd5b5081356001600160401b0381111561246e575f5ffd5b6020830191508360208260051b8501011115612488575f5ffd5b9250929050565b5f5f5f604084860312156124a1575f5ffd5b83356001600160401b038111156124b6575f5ffd5b6124c286828701612448565b90945092505060208401356124d6816121d8565b809150509250925092565b604081525f6124f36040830185612266565b82810360208401526125058185612266565b95945050505050565b602080825282518282018190525f918401906040840190835b818110156125475783511515835260209384019390920191600101612527565b509095945050505050565b5f5f60208385031215612563575f5ffd5b82356001600160401b03811115612578575f5ffd5b61258485828601612448565b90969095509350505050565b606081525f6125a26060830186612266565b82810360208401526125b48186612266565b905082810360408401526114f08185612266565b634e487b7160e01b5f52604160045260245ffd5b604051601f8201601f191681016001600160401b0381118282101715612604576126046125c8565b604052919050565b5f6001600160401b03821115612624576126246125c8565b5060051b60200190565b5f82601f83011261263d575f5ffd5b815161265061264b8261260c565b6125dc565b8082825260208201915060208360051b860101925085831115612671575f5ffd5b602085015b83811015612697578051612689816121d8565b835260209283019201612676565b5095945050505050565b5f82601f8301126126b0575f5ffd5b81516001600160401b038111156126c9576126c96125c8565b6126dc601f8201601f19166020016125dc565b8181528460208386010111156126f0575f5ffd5b8160208501602083015e5f918101602001919091529392505050565b5f82601f83011261271b575f5ffd5b815161272961264b8261260c565b8082825260208201915060208360051b86010192508583111561274a575f5ffd5b602085015b838110156126975780516001600160401b0381111561276c575f5ffd5b61277b886020838a01016126a1565b8452506020928301920161274f565b805160ff8116811461279a575f5ffd5b919050565b5f82601f8301126127ae575f5ffd5b81516127bc61264b8261260c565b8082825260208201915060208360051b8601019250858311156127dd575f5ffd5b602085015b83811015612697576127f38161278a565b8352602092830192016127e2565b5f82601f830112612810575f5ffd5b815161281e61264b8261260c565b8082825260208201915060208360051b86010192508583111561283f575f5ffd5b602085015b83811015612697578051835260209283019201612844565b5f5f5f5f5f5f60c08789031215612871575f5ffd5b86516001600160401b03811115612886575f5ffd5b61289289828a0161262e565b96505060208701516001600160401b038111156128ad575f5ffd5b6128b989828a0161262e565b95505060408701516001600160401b038111156128d4575f5ffd5b6128e089828a0161270c565b94505060608701516001600160401b038111156128fb575f5ffd5b61290789828a0161270c565b93505060808701516001600160401b03811115612922575f5ffd5b61292e89828a0161279f565b92505060a08701516001600160401b03811115612949575f5ffd5b61295589828a01612801565b9150509295509295509295565b604081525f6129746040830185612223565b905060018060a01b03831660208301529392505050565b5f5f6040838503121561299c575f5ffd5b82516001600160401b038111156129b1575f5ffd5b6129bd85828601612801565b92505060208301516001600160401b038111156129d8575f5ffd5b6129e485828601612801565b9150509250929050565b634e487b7160e01b5f52603260045260245ffd5b5f60208284031215612a12575f5ffd5b5051919050565b5f60208284031215612a29575f5ffd5b81516001600160401b03811115612a3e575f5ffd5b6107698482850161262e565b5f60208284031215612a5a575f5ffd5b8151611895816121d8565b5f5f5f60608486031215612a77575f5ffd5b5050815160208301516040909301519094929350919050565b5f60208284031215612aa0575f5ffd5b81516001600160401b03811115612ab5575f5ffd5b610769848285016126a1565b5f60208284031215612ad1575f5ffd5b6118958261278a565b634e487b7160e01b5f52601160045260245ffd5b8181038181111561076d5761076d612ada565b5f60018201612b1257612b12612ada565b5060010190565b60208082526026908201527f56656e7573476174657761793a207a65726f2061646472657373206e6f7420616040820152651b1b1bddd95960d21b606082015260800190565b808202811582820484141761076d5761076d612ada565b5f82612b9057634e487b7160e01b5f52601260045260245ffd5b500490565b5f60208284031215612ba5575f5ffd5b81518015158114611895575f5ffd5b5f60208284031215612bc4575f5ffd5b81516001600160401b03811115612bd9575f5ffd5b8201601f81018413612be9575f5ffd5b8051612bf761264b8261260c565b8082825260208201915060208360051b850101925086831115612c18575f5ffd5b6020840193505b828410156114f0578351612c32816121d8565b825260209384019390910190612c1f56fea2646970667358221220a512bbc0737e11ae3a5ff1f45870de8f1bdce37baf98f12559942ac0237bcc3364736f6c634300081e0033",
+  "deployedBytecode": "0x608060405234801561000f575f5ffd5b506004361061016d575f3560e01c806381906b80116100d9578063bad1935011610093578063e94201c71161006e578063e94201c714610397578063f2fde38b146103aa578063f5125d3f146103bd578063f639ecd2146103d0575f5ffd5b8063bad1935014610351578063d4fac45d14610371578063d71275f614610384575f5ffd5b806381906b80146102df5780638bad38dd146103005780638da5cb5b14610313578063929fe9a114610323578063abfceffc14610336578063b0772d0b14610349575f5ffd5b806366e2d09b1161012a57806366e2d09b146102445780636b5441a914610264578063715018a61461028c57806378466113146102965780637adbf973146102b95780637dc0d1d0146102cc575f5ffd5b8063104e999d14610171578063118e31b71461019d5780632b7be8e8146101be5780635ec88c79146101e95780635fe3b56714610217578063646121321461022a575b5f5ffd5b61018461017f3660046121ec565b6103f2565b6040516101949493929190612343565b60405180910390f35b6101b06101ab3660046121ec565b6106f2565b604051908152602001610194565b6101d16101cc36600461239a565b610773565b6040516001600160a01b039091168152602001610194565b6101fc6101f736600461239a565b6108fc565b60408051938452602084019290925290820152606001610194565b6001546101d1906001600160a01b031681565b61023261097b565b604051610194969594939291906123b5565b61025761025236600461239a565b61118b565b6040516101949190612436565b61027761027236600461239a565b611357565b60408051928352901515602083015201610194565b6102946113d2565b005b6102a96102a43660046121ec565b6113e5565b6040519015158152602001610194565b6102946102c736600461239a565b6114fa565b6002546101d1906001600160a01b031681565b6102f26102ed36600461248f565b611524565b6040516101949291906124e1565b61029461030e36600461239a565b6117f7565b5f546001600160a01b03166101d1565b6102a96103313660046121ec565b611821565b61025761034436600461239a565b61189c565b6102576119b5565b61036461035f36600461248f565b611ad4565b604051610194919061250e565b6101b061037f3660046121ec565b611c64565b61027761039236600461239a565b611d5e565b6101b06103a53660046121ec565b611da9565b6102946103b836600461239a565b611dfd565b6101b06103cb3660046121ec565b611e3a565b6103e36103de366004612552565b611ebd565b60405161019493929190612590565b6060806060805f5f5f5f5f5f306001600160a01b031663646121326040518163ffffffff1660e01b81526004015f60405180830381865afa158015610439573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610460919081019061285c565b95509550955095509550955084516001600160401b03811115610485576104856125c8565b6040519080825280602002602001820160405280156104ae578160200160208202803683370190505b50995084516001600160401b038111156104ca576104ca6125c8565b6040519080825280602002602001820160405280156104fd57816020015b60608152602001906001900390816104e85790505b50975084516001600160401b03811115610519576105196125c8565b604051908082528060200260200182016040528015610542578160200160208202803683370190505b50965084516001600160401b0381111561055e5761055e6125c8565b604051908082528060200260200182016040528015610587578160200160208202803683370190505b5098506001600160a01b038b161561060e575f306001600160a01b03166381906b80888e6040518363ffffffff1660e01b81526004016105c8929190612962565b5f60405180830381865afa1580156105e2573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610609919081019061298b565b509950505b5f5b85518110156106e25785818151811061062b5761062b6129ee565b60200260200101518b8281518110610645576106456129ee565b60200260200101906001600160a01b031690816001600160a01b031681525050848181518110610677576106776129ee565b6020026020010151898281518110610691576106916129ee565b60200260200101819052508281815181106106ae576106ae6129ee565b60200260200101518882815181106106c8576106c86129ee565b60ff90921660209283029190910190910152600101610610565b5050505050505092959194509250565b5f5f6106fd84610773565b6040516395dd919360e01b81526001600160a01b038581166004830152919250908216906395dd919390602401602060405180830381865afa158015610745573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906107699190612a02565b9150505b92915050565b5f5f306001600160a01b031663b0772d0b6040518163ffffffff1660e01b81526004015f60405180830381865afa1580156107b0573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f191682016040526107d79190810190612a19565b90505f5b8151811015610892575f8282815181106107f7576107f76129ee565b60200260200101519050806001600160a01b0316636f307dc36040518163ffffffff1660e01b8152600401602060405180830381865afa92505050801561085b575060408051601f3d908101601f1916820190925261085891810190612a4a565b60015b610865575061088a565b856001600160a01b0316816001600160a01b0316036108875750949350505050565b50505b6001016107db565b5060405162461bcd60e51b815260206004820152603360248201527f56656e7573476174657761793a2076546f6b656e206e6f7420666f756e64206660448201527237b9103ab73232b9363cb4b733903a37b5b2b760691b60648201526084015b60405180910390fd5b600154604051635ec88c7960e01b81526001600160a01b0383811660048301525f928392839290911690635ec88c7990602401606060405180830381865afa15801561094a573d5f5f3e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061096e9190612a65565b9250925092509193909250565b606080606080606080306001600160a01b031663b0772d0b6040518163ffffffff1660e01b81526004015f60405180830381865afa1580156109bf573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f191682016040526109e69190810190612a19565b8051909650806001600160401b03811115610a0357610a036125c8565b604051908082528060200260200182016040528015610a2c578160200160208202803683370190505b509550806001600160401b03811115610a4757610a476125c8565b604051908082528060200260200182016040528015610a7a57816020015b6060815260200190600190039081610a655790505b509450806001600160401b03811115610a9557610a956125c8565b604051908082528060200260200182016040528015610ac857816020015b6060815260200190600190039081610ab35790505b509350806001600160401b03811115610ae357610ae36125c8565b604051908082528060200260200182016040528015610b0c578160200160208202803683370190505b509250806001600160401b03811115610b2757610b276125c8565b604051908082528060200260200182016040528015610b50578160200160208202803683370190505b5091505f5b81811015611181575f888281518110610b7057610b706129ee565b602002602001015190505f819050806001600160a01b0316636f307dc36040518163ffffffff1660e01b8152600401602060405180830381865afa925050508015610bd8575060408051601f3d908101601f19168201909252610bd591810190612a4a565b60015b610d98575f898481518110610bef57610bef6129ee565b60200260200101906001600160a01b031690816001600160a01b031681525050806001600160a01b03166395d89b416040518163ffffffff1660e01b81526004015f60405180830381865afa158015610c4a573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610c719190810190612a90565b888481518110610c8357610c836129ee565b6020026020010181905250806001600160a01b03166306fdde036040518163ffffffff1660e01b81526004015f60405180830381865afa158015610cc9573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610cf09190810190612a90565b878481518110610d0257610d026129ee565b6020026020010181905250806001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa158015610d49573d5f5f3e3d5ffd5b505050506040513d601f19601f82011682018060405250810190610d6d9190612ac1565b868481518110610d7f57610d7f6129ee565b602002602001019060ff16908160ff16815250506110ee565b808a8581518110610dab57610dab6129ee565b60200260200101906001600160a01b031690816001600160a01b0316815250505f819050806001600160a01b03166395d89b416040518163ffffffff1660e01b81526004015f60405180830381865afa925050508015610e2c57506040513d5f823e601f3d908101601f19168201604052610e299190810190612a90565b60015b610eb457826001600160a01b03166395d89b416040518163ffffffff1660e01b81526004015f60405180830381865afa158015610e6b573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610e929190810190612a90565b8a8681518110610ea457610ea46129ee565b6020026020010181905250610ed4565b808b8781518110610ec757610ec76129ee565b6020026020010181905250505b806001600160a01b03166306fdde036040518163ffffffff1660e01b81526004015f60405180830381865afa925050508015610f3157506040513d5f823e601f3d908101601f19168201604052610f2e9190810190612a90565b60015b610fb957826001600160a01b03166306fdde036040518163ffffffff1660e01b81526004015f60405180830381865afa158015610f70573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052610f979190810190612a90565b898681518110610fa957610fa96129ee565b6020026020010181905250610fd9565b808a8781518110610fcc57610fcc6129ee565b6020026020010181905250505b806001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa925050508015611033575060408051601f3d908101601f1916820190925261103091810190612ac1565b60015b6110c257826001600160a01b031663313ce5676040518163ffffffff1660e01b8152600401602060405180830381865afa158015611073573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906110979190612ac1565b8886815181106110a9576110a96129ee565b602002602001019060ff16908160ff16815250506110eb565b808987815181106110d5576110d56129ee565b602002602001019060ff16908160ff1681525050505b50505b60025460405163fc57d4df60e01b81526001600160a01b0384811660048301529091169063fc57d4df90602401602060405180830381865afa158015611136573d5f5f3e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061115a9190612a02565b85848151811061116c5761116c6129ee565b60209081029190910101525050600101610b55565b5050909192939495565b60605f306001600160a01b031663646121326040518163ffffffff1660e01b81526004015f60405180830381865afa1580156111c9573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f191682016040526111f0919081019061285c565b509294505f935083925050505b825181101561124957846001600160a01b0316838281518110611222576112226129ee565b60200260200101516001600160a01b0316036112415760019150611249565b6001016111fd565b5080611265575050604080515f81526020810190915292915050565b600182516112739190612aee565b6001600160401b0381111561128a5761128a6125c8565b6040519080825280602002602001820160405280156112b3578160200160208202803683370190505b5092505f805b835181101561134e57856001600160a01b03168482815181106112de576112de6129ee565b60200260200101516001600160a01b03161461134657838181518110611306576113066129ee565b6020026020010151858381518110611320576113206129ee565b6001600160a01b03909216602092830291909101909101528161134281612b01565b9250505b6001016112b9565b50505050919050565b5f5f5f61136384610773565b90505f816001600160a01b031663ae9d70b06040518163ffffffff1660e01b8152600401602060405180830381865afa1580156113a2573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906113c69190612a02565b95600195509350505050565b6113da61215d565b6113e35f612189565b565b5f5f306001600160a01b031663646121326040518163ffffffff1660e01b81526004015f60405180830381865afa158015611422573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052611449919081019061285c565b509294505f9350839250829150505b83518110156114e557866001600160a01b031684828151811061147d5761147d6129ee565b60200260200101516001600160a01b03160361149857600192505b856001600160a01b03168482815181106114b4576114b46129ee565b60200260200101516001600160a01b0316036114cf57600191505b8280156114d95750815b6114e557600101611458565b508180156114f05750805b9695505050505050565b61150261215d565b600280546001600160a01b0319166001600160a01b0392909216919091179055565b6060806001600160a01b03831661154d5760405162461bcd60e51b81526004016108f390612b19565b83806001600160401b03811115611566576115666125c8565b60405190808252806020026020018201604052801561158f578160200160208202803683370190505b509250806001600160401b038111156115aa576115aa6125c8565b6040519080825280602002602001820160405280156115d3578160200160208202803683370190505b5091505f5b818110156117ed575f8787838181106115f3576115f36129ee565b9050602002016020810190611608919061239a565b6040516370a0823160e01b81526001600160a01b03888116600483015291925082918216906370a0823190602401602060405180830381865afa92505050801561166f575060408051601f3d908101601f1916820190925261166c91810190612a02565b60015b611697575f868481518110611686576116866129ee565b602002602001018181525050611738565b5f826001600160a01b031663182df0f56040518163ffffffff1660e01b8152600401602060405180830381865afa1580156116d4573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906116f89190612a02565b9050670de0b6b3a764000061170d8284612b5f565b6117179190612b76565b888681518110611729576117296129ee565b60200260200101818152505050505b6040516395dd919360e01b81526001600160a01b0388811660048301528216906395dd919390602401602060405180830381865afa92505050801561179a575060408051601f3d908101601f1916820190925261179791810190612a02565b60015b6117c2575f8584815181106117b1576117b16129ee565b6020026020010181815250506117e3565b808685815181106117d5576117d56129ee565b602002602001018181525050505b50506001016115d8565b5050935093915050565b6117ff61215d565b600180546001600160a01b0319166001600160a01b0392909216919091179055565b60015460405163929fe9a160e01b81526001600160a01b03848116600483015283811660248301525f92169063929fe9a190604401602060405180830381865afa158015611871573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906118959190612b95565b9392505050565b600154604051632aff3bff60e21b81526001600160a01b0383811660048301526060925f9291169063abfceffc906024015f60405180830381865afa1580156118e7573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f1916820160405261190e9190810190612bb4565b90505f81516001600160401b0381111561192a5761192a6125c8565b604051908082528060200260200182016040528015611953578160200160208202803683370190505b5090505f5b82518110156119ad57828181518110611973576119736129ee565b602002602001015182828151811061198d5761198d6129ee565b6001600160a01b0390921660209283029190910190910152600101611958565b509392505050565b60605f60015f9054906101000a90046001600160a01b03166001600160a01b031663b0772d0b6040518163ffffffff1660e01b81526004015f60405180830381865afa158015611a07573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052611a2e9190810190612bb4565b90505f81516001600160401b03811115611a4a57611a4a6125c8565b604051908082528060200260200182016040528015611a73578160200160208202803683370190505b5090505f5b8251811015611acd57828181518110611a9357611a936129ee565b6020026020010151828281518110611aad57611aad6129ee565b6001600160a01b0390921660209283029190910190910152600101611a78565b5092915050565b60606001600160a01b038216611afc5760405162461bcd60e51b81526004016108f390612b19565b82806001600160401b03811115611b1557611b156125c8565b604051908082528060200260200182016040528015611b3e578160200160208202803683370190505b50604051632aff3bff60e21b81526001600160a01b03851660048201529092505f90309063abfceffc906024015f60405180830381865afa158015611b85573d5f5f3e3d5ffd5b505050506040513d5f823e601f3d908101601f19168201604052611bac9190810190612a19565b90505f5b82811015611c5a575f878783818110611bcb57611bcb6129ee565b9050602002016020810190611be0919061239a565b90505f5b8351811015611c5057816001600160a01b0316848281518110611c0957611c096129ee565b60200260200101516001600160a01b031603611c48576001868481518110611c3357611c336129ee565b91151560209283029190910190910152611c50565b600101611be4565b5050600101611bb0565b5050509392505050565b5f5f611c6f84610773565b6040516370a0823160e01b81526001600160a01b0385811660048301529192505f918316906370a0823190602401602060405180830381865afa158015611cb8573d5f5f3e3d5ffd5b505050506040513d601f19601f82011682018060405250810190611cdc9190612a02565b90505f826001600160a01b031663182df0f56040518163ffffffff1660e01b8152600401602060405180830381865afa158015611d1b573d5f5f3e3d5ffd5b505050506040513d601f19601f82011682018060405250810190611d3f9190612a02565b9050670de0b6b3a7640000611d548284612b5f565b6114f09190612b76565b5f5f5f611d6a84610773565b90505f816001600160a01b031663f8f9da286040518163ffffffff1660e01b8152600401602060405180830381865afa1580156113a2573d5f5f3e3d5ffd5b5f5f611db484610773565b6040516305eff7ef60e21b81526001600160a01b038581166004830152919250908216906317bfdfbc906024016020604051808303815f875af1158015610745573d5f5f3e3d5ffd5b611e0561215d565b6001600160a01b038116611e2e57604051631e4fbdf760e01b81525f60048201526024016108f3565b611e3781612189565b50565b60405163056f7d1d60e31b81526001600160a01b03831660048201525f9081903090632b7be8e890602401602060405180830381865afa925050508015611e9e575060408051601f3d908101601f19168201909252611e9b91810190612a4a565b60015b611eab575f91505061076d565b50670a688906bd8b0000949350505050565b6060808083806001600160401b03811115611eda57611eda6125c8565b604051908082528060200260200182016040528015611f03578160200160208202803683370190505b509350806001600160401b03811115611f1e57611f1e6125c8565b604051908082528060200260200182016040528015611f47578160200160208202803683370190505b509250806001600160401b03811115611f6257611f626125c8565b604051908082528060200260200182016040528015611f8b578160200160208202803683370190505b5091505f5b81811015612154575f878783818110611fab57611fab6129ee565b9050602002016020810190611fc0919061239a565b90505f819050806001600160a01b031663ae9d70b06040518163ffffffff1660e01b8152600401602060405180830381865afa158015612002573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906120269190612a02565b868481518110612038576120386129ee565b602002602001018181525050806001600160a01b031663f8f9da286040518163ffffffff1660e01b8152600401602060405180830381865afa158015612080573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906120a49190612a02565b8584815181106120b6576120b66129ee565b602090810291909101015260025460405163fc57d4df60e01b81526001600160a01b0384811660048301529091169063fc57d4df90602401602060405180830381865afa158015612109573d5f5f3e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061212d9190612a02565b87848151811061213f5761213f6129ee565b60209081029190910101525050600101611f90565b50509250925092565b5f546001600160a01b031633146113e35760405163118cdaa760e01b81523360048201526024016108f3565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6001600160a01b0381168114611e37575f5ffd5b5f5f604083850312156121fd575f5ffd5b8235612208816121d8565b91506020830135612218816121d8565b809150509250929050565b5f8151808452602084019350602083015f5b8281101561225c5781516001600160a01b0316865260209586019590910190600101612235565b5093949350505050565b5f8151808452602084019350602083015f5b8281101561225c578151865260209586019590910190600101612278565b5f82825180855260208501945060208160051b830101602085015f5b8381101561230457601f19858403018852815180518085528060208301602087015e5f602082870101526020601f19601f830116860101945050506020820191506020880197506001810190506122b2565b50909695505050505050565b5f8151808452602084019350602083015f5b8281101561225c57815160ff16865260209586019590910190600101612322565b608081525f6123556080830187612223565b82810360208401526123678187612266565b9050828103604084015261237b8186612296565b9050828103606084015261238f8185612310565b979650505050505050565b5f602082840312156123aa575f5ffd5b8135611895816121d8565b60c081525f6123c760c0830189612223565b82810360208401526123d98189612223565b905082810360408401526123ed8188612296565b905082810360608401526124018187612296565b905082810360808401526124158186612310565b905082810360a08401526124298185612266565b9998505050505050505050565b602081525f6118956020830184612223565b5f5f83601f840112612458575f5ffd5b5081356001600160401b0381111561246e575f5ffd5b6020830191508360208260051b8501011115612488575f5ffd5b9250929050565b5f5f5f604084860312156124a1575f5ffd5b83356001600160401b038111156124b6575f5ffd5b6124c286828701612448565b90945092505060208401356124d6816121d8565b809150509250925092565b604081525f6124f36040830185612266565b82810360208401526125058185612266565b95945050505050565b602080825282518282018190525f918401906040840190835b818110156125475783511515835260209384019390920191600101612527565b509095945050505050565b5f5f60208385031215612563575f5ffd5b82356001600160401b03811115612578575f5ffd5b61258485828601612448565b90969095509350505050565b606081525f6125a26060830186612266565b82810360208401526125b48186612266565b905082810360408401526114f08185612266565b634e487b7160e01b5f52604160045260245ffd5b604051601f8201601f191681016001600160401b0381118282101715612604576126046125c8565b604052919050565b5f6001600160401b03821115612624576126246125c8565b5060051b60200190565b5f82601f83011261263d575f5ffd5b815161265061264b8261260c565b6125dc565b8082825260208201915060208360051b860101925085831115612671575f5ffd5b602085015b83811015612697578051612689816121d8565b835260209283019201612676565b5095945050505050565b5f82601f8301126126b0575f5ffd5b81516001600160401b038111156126c9576126c96125c8565b6126dc601f8201601f19166020016125dc565b8181528460208386010111156126f0575f5ffd5b8160208501602083015e5f918101602001919091529392505050565b5f82601f83011261271b575f5ffd5b815161272961264b8261260c565b8082825260208201915060208360051b86010192508583111561274a575f5ffd5b602085015b838110156126975780516001600160401b0381111561276c575f5ffd5b61277b886020838a01016126a1565b8452506020928301920161274f565b805160ff8116811461279a575f5ffd5b919050565b5f82601f8301126127ae575f5ffd5b81516127bc61264b8261260c565b8082825260208201915060208360051b8601019250858311156127dd575f5ffd5b602085015b83811015612697576127f38161278a565b8352602092830192016127e2565b5f82601f830112612810575f5ffd5b815161281e61264b8261260c565b8082825260208201915060208360051b86010192508583111561283f575f5ffd5b602085015b83811015612697578051835260209283019201612844565b5f5f5f5f5f5f60c08789031215612871575f5ffd5b86516001600160401b03811115612886575f5ffd5b61289289828a0161262e565b96505060208701516001600160401b038111156128ad575f5ffd5b6128b989828a0161262e565b95505060408701516001600160401b038111156128d4575f5ffd5b6128e089828a0161270c565b94505060608701516001600160401b038111156128fb575f5ffd5b61290789828a0161270c565b93505060808701516001600160401b03811115612922575f5ffd5b61292e89828a0161279f565b92505060a08701516001600160401b03811115612949575f5ffd5b61295589828a01612801565b9150509295509295509295565b604081525f6129746040830185612223565b905060018060a01b03831660208301529392505050565b5f5f6040838503121561299c575f5ffd5b82516001600160401b038111156129b1575f5ffd5b6129bd85828601612801565b92505060208301516001600160401b038111156129d8575f5ffd5b6129e485828601612801565b9150509250929050565b634e487b7160e01b5f52603260045260245ffd5b5f60208284031215612a12575f5ffd5b5051919050565b5f60208284031215612a29575f5ffd5b81516001600160401b03811115612a3e575f5ffd5b6107698482850161262e565b5f60208284031215612a5a575f5ffd5b8151611895816121d8565b5f5f5f60608486031215612a77575f5ffd5b5050815160208301516040909301519094929350919050565b5f60208284031215612aa0575f5ffd5b81516001600160401b03811115612ab5575f5ffd5b610769848285016126a1565b5f60208284031215612ad1575f5ffd5b6118958261278a565b634e487b7160e01b5f52601160045260245ffd5b8181038181111561076d5761076d612ada565b5f60018201612b1257612b12612ada565b5060010190565b60208082526026908201527f56656e7573476174657761793a207a65726f2061646472657373206e6f7420616040820152651b1b1bddd95960d21b606082015260800190565b808202811582820484141761076d5761076d612ada565b5f82612b9057634e487b7160e01b5f52601260045260245ffd5b500490565b5f60208284031215612ba5575f5ffd5b81518015158114611895575f5ffd5b5f60208284031215612bc4575f5ffd5b81516001600160401b03811115612bd9575f5ffd5b8201601f81018413612be9575f5ffd5b8051612bf761264b8261260c565b8082825260208201915060208360051b850101925086831115612c18575f5ffd5b6020840193505b828410156114f0578351612c32816121d8565b825260209384019390910190612c1f56fea2646970667358221220a512bbc0737e11ae3a5ff1f45870de8f1bdce37baf98f12559942ac0237bcc3364736f6c634300081e0033",
+  "devdoc": {
+    "details": "Contains all read/view functions from v1, separate from write operations",
+    "errors": {
+      "OwnableInvalidOwner(address)": [
+        {
+          "details": "The owner is not a valid owner account. (eg. `address(0)`)"
+        }
+      ],
+      "OwnableUnauthorizedAccount(address)": [
+        {
+          "details": "The caller account is not authorized to perform an operation."
+        }
+      ]
+    },
+    "kind": "dev",
+    "methods": {
+      "owner()": {
+        "details": "Returns the address of the current owner."
+      },
+      "renounceOwnership()": {
+        "details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
+      },
+      "transferOwnership(address)": {
+        "details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
+      }
+    },
+    "title": "VenusGatewayView",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "notice": "View-only gateway for Venus protocol",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 1478,
+        "contract": "contracts/v2/gateways/venus/VenusGatewayView.sol:VenusGatewayView",
+        "label": "_owner",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_address"
+      },
+      {
+        "astId": 9302,
+        "contract": "contracts/v2/gateways/venus/VenusGatewayView.sol:VenusGatewayView",
+        "label": "comptroller",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_contract(ComptrollerInterface)4066"
+      },
+      {
+        "astId": 9305,
+        "contract": "contracts/v2/gateways/venus/VenusGatewayView.sol:VenusGatewayView",
+        "label": "oracle",
+        "offset": 0,
+        "slot": "2",
+        "type": "t_contract(ResilientOracleInterface)4086"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_contract(ComptrollerInterface)4066": {
+        "encoding": "inplace",
+        "label": "contract ComptrollerInterface",
+        "numberOfBytes": "20"
+      },
+      "t_contract(ResilientOracleInterface)4086": {
+        "encoding": "inplace",
+        "label": "contract ResilientOracleInterface",
+        "numberOfBytes": "20"
+      }
+    }
+  }
+}

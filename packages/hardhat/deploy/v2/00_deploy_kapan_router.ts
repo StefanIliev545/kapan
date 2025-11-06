@@ -30,7 +30,7 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     args: [deployer], // owner
     log: true,
     autoMine: true,
-    deterministicDeployment: "0x4242424242424242424242424242424242424343",
+    deterministicDeployment: "0x4342424242424242424242424242424242424343",
     waitConfirmations: WAIT,
   });
 
