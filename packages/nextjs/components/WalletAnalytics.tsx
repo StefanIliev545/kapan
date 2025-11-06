@@ -5,8 +5,9 @@ import { useAccountEffect } from "wagmi";
 
 export function WalletAnalytics() {
   useAccountEffect({
-    onConnect({ chainId, connector, isReconnected }) {
+    onConnect({ address, chainId, connector, isReconnected }) {
       track("wallet_connected", {
+        address,
         chainId,
         connector: connector?.name ?? "unknown",
         isReconnected,
