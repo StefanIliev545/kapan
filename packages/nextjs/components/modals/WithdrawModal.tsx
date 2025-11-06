@@ -5,6 +5,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { useAccount, useSwitchChain } from "wagmi";
+import type { Address } from "viem";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface WithdrawModalProps {
   supplyBalance: bigint;
   position?: PositionManager;
   chainId?: number;
+  market?: Address; // Market address for Compound (baseToken/comet address)
 }
 
 export const WithdrawModal: FC<WithdrawModalProps> = ({
@@ -24,6 +26,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   supplyBalance,
   position,
   chainId,
+  market,
 }) => {
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
@@ -64,7 +67,8 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
         token.address,
         amount,
         token.decimals || decimals || 18,
-        isMax || false
+        isMax || false,
+        market
       );
       
       if (instructions.length === 0) {
@@ -79,7 +83,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       console.error("Withdraw error:", error);
       notification.error(error.message || "Failed to withdraw");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowWithApprovals, chain?.id, chainId, switchChain]);
+  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowWithApprovals, chain?.id, chainId, switchChain, market]);
 
   useEffect(() => {
     if (isConfirmed && isOpen) {

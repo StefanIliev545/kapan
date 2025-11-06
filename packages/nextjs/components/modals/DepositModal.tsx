@@ -5,6 +5,7 @@ import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { useAccount, useSwitchChain } from "wagmi";
+import type { Address } from "viem";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -13,9 +14,10 @@ interface DepositModalProps {
   protocolName: string;
   position?: PositionManager;
   chainId?: number;
+  market?: Address; // Market address for Compound (baseToken/comet address)
 }
 
-export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId }) => {
+export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId, market }) => {
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
@@ -51,7 +53,8 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
         protocolName.toLowerCase(),
         token.address,
         amount,
-        token.decimals || decimals || 18
+        token.decimals || decimals || 18,
+        market
       );
       
       if (instructions.length === 0) {
@@ -70,7 +73,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       console.error("Deposit error:", error);
       notification.error(error.message || "Failed to deposit");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowWithApprovals, isConfirmed, onClose, chain?.id, chainId, switchChain]);
+  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowWithApprovals, isConfirmed, onClose, chain?.id, chainId, switchChain, market]);
 
   return (
     <TokenActionModal

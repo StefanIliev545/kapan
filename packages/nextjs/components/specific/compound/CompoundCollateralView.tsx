@@ -1,7 +1,8 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { DepositCollateralModal } from "./DepositCollateralModal";
-import { formatUnits, parseUnits } from "viem";
+import { DepositModal } from "~~/components/modals/DepositModal";
+import { WithdrawModal } from "~~/components/modals/WithdrawModal";
+import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -56,6 +57,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 }) => {
   const [showAll, setShowAll] = useState(initialShowAll === undefined ? false : initialShowAll);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
+  const [selectedAction, setSelectedAction] = useState<"deposit" | "withdraw" | null>(null);
   const { address: connectedAddress } = useAccount();
 
   // Use ZERO_ADDRESS when wallet is not connected
@@ -296,9 +298,15 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
       : allCollateralPositions.filter((pos: CollateralPosition) => pos.balance > 0);
   }, [allCollateralPositions, showAll]);
 
-  // Handle clicking on a collateral token
-  const handleCollateralClick = (position: CollateralPosition) => {
+  // Open deposit/withdraw modals for a collateral token
+  const openDeposit = (position: CollateralPosition) => {
     setSelectedCollateral(position);
+    setSelectedAction("deposit");
+  };
+
+  const openWithdraw = (position: CollateralPosition) => {
+    setSelectedCollateral(position);
+    setSelectedAction("withdraw");
   };
 
   // Handle closing the deposit modal
@@ -387,12 +395,11 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
               {collateralPositions.map((position: CollateralPosition) => (
                 <div
                   key={position.address}
-                  className={`bg-base-100 rounded-lg p-2 shadow-sm hover:shadow-md transition-all duration-200 border 
+                  className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border 
                     ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"} 
-                    cursor-pointer hover:bg-base-200/50 active:scale-95`}
-                  onClick={() => handleCollateralClick(position)}
+                    hover:bg-base-200/50 flex items-center overflow-hidden`}
                 >
-                  <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="flex items-center gap-2 overflow-hidden flex-1 p-2">
                     <div className="avatar flex-shrink-0">
                       <div className="w-7 h-7 rounded-full bg-base-200 p-1.5 flex items-center justify-center overflow-hidden">
                         <Image
@@ -409,7 +416,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                       <div className="flex flex-col">
                         {position.balance > 0 ? (
                           <>
-                            {/* Single FiatBalance component showing USD value by default, raw amount on hover */}
                             <span className="text-xs text-success truncate">
                               <FiatBalance
                                 tokenAddress={position.address}
@@ -428,6 +434,36 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                         )}
                       </div>
                     </div>
+                  </div>
+                  <div className="join join-vertical">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openDeposit(position); }}
+                      className="join-item group btn btn-xs btn-ghost px-2 h-7 min-h-0 flex items-center justify-center overflow-hidden rounded-none rounded-tr-lg hover:bg-primary/20 hover:text-primary transition-colors"
+                      aria-label={`Deposit ${position.name}`}
+                      title="Deposit"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 flex-shrink-0">
+                        <path d="M12 5c.414 0 .75.336.75.75V11.25H18.25a.75.75 0 010 1.5H12.75V18.25a.75.75 0 01-1.5 0V12.75H5.75a.75.75 0 010-1.5H11.25V5.75c0-.414.336-.75.75-.75z" />
+                      </svg>
+                      <span className="ml-1 max-w-0 group-hover:max-w-[90px] transition-all duration-200 overflow-hidden whitespace-nowrap">
+                        Deposit
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openWithdraw(position); }}
+                      className="join-item group btn btn-xs btn-ghost px-2 h-7 min-h-0 flex items-center justify-center overflow-hidden rounded-none rounded-br-lg hover:bg-primary/20 hover:text-primary transition-colors"
+                      aria-label={`Withdraw ${position.name}`}
+                      title="Withdraw"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 flex-shrink-0">
+                        <path d="M5.75 12a.75.75 0 01.75-.75h11a.75.75 0 010 1.5h-11a.75.75 0 01-.75-.75z" />
+                      </svg>
+                      <span className="ml-1 max-w-0 group-hover:max-w-[90px] transition-all duration-200 overflow-hidden whitespace-nowrap">
+                        Withdraw
+                      </span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -463,18 +499,38 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
         </div>
       </div>
 
-      {/* Deposit Collateral Modal */}
-      {selectedCollateral && (
-        <DepositCollateralModal
+      {/* New Deposit / Withdraw Modals */}
+      {selectedCollateral && selectedAction === "deposit" && (
+        <DepositModal
           isOpen={!!selectedCollateral}
           onClose={handleCloseModal}
           token={{
             name: selectedCollateral.name,
             icon: selectedCollateral.icon,
             address: selectedCollateral.address,
+            decimals: selectedCollateral.decimals,
+            currentRate: 0,
           }}
-          market={baseToken}
+          protocolName="compound"
           chainId={chainId}
+          market={baseToken as `0x${string}`}
+        />
+      )}
+      {selectedCollateral && selectedAction === "withdraw" && (
+        <WithdrawModal
+          isOpen={!!selectedCollateral}
+          onClose={handleCloseModal}
+          token={{
+            name: selectedCollateral.name,
+            icon: selectedCollateral.icon,
+            address: selectedCollateral.address,
+            decimals: selectedCollateral.decimals,
+            currentRate: 0,
+          }}
+          protocolName="compound"
+          supplyBalance={selectedCollateral.balanceRaw}
+          chainId={chainId}
+          market={baseToken as `0x${string}`}
         />
       )}
     </>

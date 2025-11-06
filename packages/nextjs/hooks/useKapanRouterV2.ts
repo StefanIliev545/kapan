@@ -77,22 +77,37 @@ export const useKapanRouterV2 = () => {
   }, [isConfirmed, hash, queryClient]);
 
   /**
+   * Helper to encode Compound market context
+   * Context format: abi.encode(address marketBaseToken)
+   */
+  const encodeCompoundMarket = useCallback((marketAddress: Address): `0x${string}` => {
+    return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;
+  }, []);
+
+  /**
    * Build a basic deposit flow: PullToken -> Approve -> Deposit
    * @param protocolName - Protocol to deposit to (e.g., "aave", "compound", "venus")
    * @param tokenAddress - Token address to deposit
    * @param amount - Amount to deposit (as string, e.g., "100.5")
    * @param decimals - Token decimals (default: 18)
+   * @param market - Market address for Compound (baseToken/comet address). Required for Compound collateral deposits.
    */
   const buildDepositFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
     amount: string,
-    decimals = 18
+    decimals = 18,
+    market?: Address
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = parseUnits(amount, decimals);
+    
+    // For Compound, use DepositCollateral and encode market context
+    const isCompound = normalizedProtocol === "compound";
+    const lendingOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     return [
       // Pull tokens from user to router
@@ -102,10 +117,10 @@ export const useKapanRouterV2 = () => {
       // Deposit tokens (uses UTXO[0] as input)
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Deposit, tokenAddress, userAddress, 0n, "0x", 0)
+        encodeLendingInstruction(lendingOp, tokenAddress, userAddress, 0n, context, 0)
       ),
     ];
-  }, [userAddress]);
+  }, [userAddress, encodeCompoundMarket]);
 
   /**
    * Build a basic borrow flow: Borrow -> PushToken
@@ -254,13 +269,15 @@ export const useKapanRouterV2 = () => {
    * @param amount - Amount to withdraw (as string). Use "max" or MaxUint256 string for full withdrawal
    * @param decimals - Token decimals (default: 18)
    * @param isMax - Whether to withdraw the maximum available amount (uses MaxUint256 sentinel)
+   * @param market - Market address for Compound (baseToken/comet address). Required for Compound collateral withdrawals.
    */
   const buildWithdrawFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
     amount: string,
     decimals = 18,
-    isMax = false
+    isMax = false,
+    market?: Address
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
@@ -271,22 +288,24 @@ export const useKapanRouterV2 = () => {
       ? (2n ** 256n - 1n) // MaxUint256
       : parseUnits(amount, decimals);
 
-    
+    // For Compound, encode market context
+    const isCompound = normalizedProtocol === "compound";
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     return [
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenAddress, userAddress, 0n, "0x", 0)
+        encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenAddress, userAddress, 0n, context, 0)
       ),
       // Withdraw collateral (creates UTXO[0] with withdrawn tokens)
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.WithdrawCollateral, tokenAddress, userAddress, amountBigInt, "0x", isMax ? 0 : 999)
+        encodeLendingInstruction(LendingOp.WithdrawCollateral, tokenAddress, userAddress, amountBigInt, context, isMax ? 0 : 999)
       ),
       // Push withdrawn tokens to user (UTXO[0])
       createRouterInstruction(encodePushToken(1, userAddress)),
     ];
-  }, [userAddress]);
+  }, [userAddress, encodeCompoundMarket]);
 
   /**
    * Get authorization calls required for a set of instructions
@@ -590,14 +609,6 @@ export const useKapanRouterV2 = () => {
   };
 
   /**
-   * Helper to encode Compound market context
-   * Context format: abi.encode(address marketBaseToken)
-   */
-  const encodeCompoundMarket = (marketAddress: Address): `0x${string}` => {
-    return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;
-  };
-
-  /**
    * Create a composable move-flow session builder.
    * Allows building unlock debt, move collateral, and borrow steps incrementally.
    * 
@@ -850,7 +861,7 @@ export const useKapanRouterV2 = () => {
     };
 
     return builder;
-  }, [userAddress]);
+  }, [userAddress, encodeCompoundMarket]);
 
   return {
     // Builder functions
