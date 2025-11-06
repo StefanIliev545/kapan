@@ -23,12 +23,12 @@ const DEFAULT_COMETS: Record<number, string[]> = {
     "0x784efeB622244d2348d4F2522f8860B96fbEcE89", // cAEROv3
     "0x2c776041ccfe903071af44aa147368a9c8eea518", // cUSDSv3
   ],
+  10: [
+    "0x2e44e174f7D53F0212823acC11C01A11d58c5bCB", // cUSDCv3
+    "0x995E394b8B2437aC8Ce61Ee0bC610D617962B214", // cUSDTv3
+    "0xE36A30D249f7761327fd973001A32010b521b6Fd", // cWETHv3
+  ],
 };
-
-function parseAddressList(raw?: string): string[] {
-  if (!raw) return [];
-  return raw.split(/[,\s]+/g).map((s) => s.trim()).filter(Boolean);
-}
 
 const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
@@ -42,18 +42,66 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
     return;
   }
 
-  // Optional single override list for recognized chains
-  const envOverride = parseAddressList(process.env.COMPOUND_COMETS);
-  const list = envOverride.length ? envOverride : DEFAULT_COMETS[chainId];
+  // Enhanced list resolution with logging and validation
+  function parseAddressList(raw?: string): string[] {
+    if (!raw) return [];
+    
+    // Try JSON array first
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        return arr.map((s) => String(s).trim()).filter(Boolean);
+      }
+    } catch {/* not JSON, continue */}
+    
+    // Fallback: CSV / whitespace
+    return raw
+      .replace(/[\[\]\n\r'"]/g, " ")
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
 
+  const rawEnv = process.env.COMPOUND_COMETS;
+  const envParsed = parseAddressList(rawEnv);
+
+  const normalize = (a: string) => (ethers.isAddress(a) ? ethers.getAddress(a) : a);
   const isAddr = (a: string) => ethers.isAddress(a) && a !== ZERO;
-  const COMET_ADDRESSES = [
-    ...new Set(
-      list
-        .map((a) => (ethers.isAddress(a) ? ethers.getAddress(a) : a))
-        .filter(isAddr)
-    ),
-  ];
+
+  const defaultsRaw = DEFAULT_COMETS[chainId] || [];
+  const defaults = defaultsRaw.map(normalize).filter(isAddr);
+
+  // Only use env if it yields at least 1 valid address
+  const envCandidates = envParsed.map(normalize).filter(isAddr);
+  const source = envCandidates.length > 0 ? "env" : "defaults";
+  const COMET_ADDRESSES = [...new Set((envCandidates.length > 0 ? envCandidates : defaults))];
+
+  console.log("Compound list resolution", {
+    chainId,
+    envPresent: rawEnv != null && rawEnv !== "",
+    rawEnv,
+    envParsed,
+    envCandidates,
+    defaultsCount: defaults.length,
+    finalCount: COMET_ADDRESSES.length,
+    source,
+    COMET_ADDRESSES,
+  });
+
+  // Optional safety rails: if you *expect* N markets on this chain, enforce it:
+  if (chainId === 10 /* Optimism */) {
+    if (COMET_ADDRESSES.length < 3) {
+      console.warn(
+        `⚠️ Expected ~3 Comets on OP, resolved only ${COMET_ADDRESSES.length}. ` +
+        `Check DEFAULT_COMETS[10] in the compiled file and your environment.`
+      );
+    }
+  }
+
+  // Bail out if an env var is present but yields zero valid addrs
+  if (rawEnv && envCandidates.length === 0) {
+    throw new Error("COMPOUND_COMETS provided but no valid addresses parsed.");
+  }
 
   if (COMET_ADDRESSES.length === 0) {
     console.warn(`Compound: empty Comet list for chainId=${chainId}. Skipping deployment.`);

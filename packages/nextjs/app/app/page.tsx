@@ -9,7 +9,7 @@ import StableArea from "~~/components/common/StableArea";
 import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
 import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
 import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
-import { arbitrum, base } from "wagmi/chains";
+import { arbitrum, base, optimism } from "wagmi/chains";
 import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
 import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
 // Define network options
@@ -28,6 +28,11 @@ const networkOptions: NetworkOption[] = [
     id: "base",
     name: "Base",
     logo: "/logos/base.svg",
+  },
+  {
+    id: "optimism",
+    name: "Optimism",
+    logo: "/logos/optimism.svg",
   },
 ];
 
@@ -87,6 +92,11 @@ const App: NextPage = () => {
             Base support is experimental and pre-audit.
           </div>
         )}
+        {selectedNetwork === "optimism" && (
+          <div className="my-4 text-sm text-warning text-center">
+            Optimism support is experimental and pre-audit.
+          </div>
+        )}
 
         {/* Protocol Views */}
         {selectedNetwork === "arbitrum" && (
@@ -122,6 +132,16 @@ const App: NextPage = () => {
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <NostraProtocolView />
+            </StableArea>
+          </div>
+        )}
+        {selectedNetwork === "optimism" && (
+          <div className="space-y-6">
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <AaveProtocolView chainId={optimism.id} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <CompoundProtocolView chainId={optimism.id} />
             </StableArea>
           </div>
         )}

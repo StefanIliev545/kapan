@@ -24,6 +24,10 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
       VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
     },
+    10: {
+      VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
+    },
   };
 
   const kapanRouter = await deploy("KapanRouter", {
