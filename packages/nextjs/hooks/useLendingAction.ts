@@ -434,10 +434,10 @@ export const useLendingAction = (
     let parsed = parseUnits(amount || "0", decimals);
     if (isMax) {
       if (action === "Repay") {
-        const bumped = maxAmount !== undefined ? (maxAmount * 101n) / 100n : (parsed * 101n) / 100n;
-        parsed = bumped > evmWalletBalance ? evmWalletBalance : bumped;
+        const target = maxAmount ?? parsed;
+        parsed = target > evmWalletBalance ? evmWalletBalance : target;
       } else if (action === "Withdraw" && maxAmount !== undefined) {
-        parsed = (maxAmount * 101n) / 100n;
+        parsed = maxAmount;
       }
     }
     return {

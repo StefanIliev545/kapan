@@ -37,8 +37,7 @@ export const RepayModal: FC<RepayModalProps> = ({
     token.decimals = decimals;
   }
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
-  const bump = (debtBalance * 101n) / 100n;
-  const maxInput = walletBalance < bump ? walletBalance : bump;
+  const maxInput = walletBalance < debtBalance ? walletBalance : debtBalance;
   return (
     <TokenActionModal
       isOpen={isOpen}
