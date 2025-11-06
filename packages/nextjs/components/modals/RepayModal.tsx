@@ -2,6 +2,7 @@ import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
@@ -30,6 +31,7 @@ export const RepayModal: FC<RepayModalProps> = ({
   const { switchChain } = useSwitchChain();
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildRepayFlowAsync, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -76,13 +78,13 @@ export const RepayModal: FC<RepayModalProps> = ({
       }
 
       // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-      await executeFlowBatchedIfPossible(instructions);
+      await executeFlowBatchedIfPossible(instructions, preferBatching);
       notification.success("Repay transaction sent");
     } catch (error: any) {
       console.error("Repay error:", error);
       notification.error(error.message || "Failed to repay");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain]);
+  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
 
   useEffect(() => {
     if (isAnyConfirmed && isOpen) {
@@ -107,6 +109,19 @@ export const RepayModal: FC<RepayModalProps> = ({
       network="evm"
       position={position}
       onConfirm={handleRepay}
+      renderExtraContent={() => isPreferenceLoaded ? (
+        <div className="pt-2 pb-1">
+          <label className="label cursor-pointer gap-2 justify-start">
+            <input
+              type="checkbox"
+              checked={preferBatching}
+              onChange={(e) => setPreferBatching(e.target.checked)}
+              className="checkbox checkbox-sm"
+            />
+            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+          </label>
+        </div>
+      ) : null}
     />
   );
 };

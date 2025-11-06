@@ -6,6 +6,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
 import formatPercentage from "~~/utils/formatPercentage";
 import { getProtocolLogo } from "~~/utils/protocol";
@@ -58,6 +59,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   }, [isOpen, chainId, chain?.id, switchChain]);
 
   const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
   // Debug token balance (can be removed in production)
@@ -257,7 +259,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
       });
       
       // Execute the flow with automatic approvals (batched when supported)
-      const result = await executeFlowBatchedIfPossible(builder.build());
+      const result = await executeFlowBatchedIfPossible(builder.build(), preferBatching);
       
       // Extract hash/id from result (batch id or tx hash)
       const txHash = result?.kind === "tx" ? result.hash : result?.kind === "batch" ? result.id : undefined;
@@ -649,6 +651,19 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
             "Move Position"
           )}
         </button>
+        {isPreferenceLoaded && (
+          <div className="pt-2 pb-1 border-t border-base-300 mt-4">
+            <label className="label cursor-pointer gap-2 justify-start">
+              <input
+                type="checkbox"
+                checked={preferBatching}
+                onChange={(e) => setPreferBatching(e.target.checked)}
+                className="checkbox checkbox-sm"
+              />
+              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+            </label>
+          </div>
+        )}
       </>
     );
   };

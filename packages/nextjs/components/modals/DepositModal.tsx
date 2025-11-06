@@ -2,6 +2,7 @@ import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -22,6 +23,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
   const { switchChain } = useSwitchChain();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
   const { buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -63,7 +65,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       }
 
       // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-      await executeFlowBatchedIfPossible(instructions);
+      await executeFlowBatchedIfPossible(instructions, preferBatching);
       notification.success("Deposit transaction sent");
       
       if (isAnyConfirmed) {
@@ -73,7 +75,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       console.error("Deposit error:", error);
       notification.error(error.message || "Failed to deposit");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed, onClose, chain?.id, chainId, switchChain, market]);
+  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed, onClose, chain?.id, chainId, switchChain, market, preferBatching]);
 
   return (
     <TokenActionModal
@@ -90,6 +92,19 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       network="evm"
       position={position}
       onConfirm={handleDeposit}
+      renderExtraContent={() => isPreferenceLoaded ? (
+        <div className="pt-2 pb-1">
+          <label className="label cursor-pointer gap-2 justify-start">
+            <input
+              type="checkbox"
+              checked={preferBatching}
+              onChange={(e) => setPreferBatching(e.target.checked)}
+              className="checkbox checkbox-sm"
+            />
+            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+          </label>
+        </div>
+      ) : null}
     />
   );
 };

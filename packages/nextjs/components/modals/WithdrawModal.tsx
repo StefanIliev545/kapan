@@ -2,6 +2,7 @@ import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { PositionManager } from "~~/utils/position";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -32,6 +33,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   const { switchChain } = useSwitchChain();
   const decimals = token.decimals;
   const { buildWithdrawFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
   
   if (token.decimals == null) {
     token.decimals = decimals;
@@ -77,13 +79,13 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       }
 
       // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-      await executeFlowBatchedIfPossible(instructions);
+      await executeFlowBatchedIfPossible(instructions, preferBatching);
       notification.success("Withdraw transaction sent");
     } catch (error: any) {
       console.error("Withdraw error:", error);
       notification.error(error.message || "Failed to withdraw");
     }
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, market]);
+  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, market, preferBatching]);
 
   useEffect(() => {
     if (isAnyConfirmed && isOpen) {
@@ -108,6 +110,19 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       network="evm"
       position={position}
       onConfirm={handleWithdraw}
+      renderExtraContent={() => isPreferenceLoaded ? (
+        <div className="pt-2 pb-1">
+          <label className="label cursor-pointer gap-2 justify-start">
+            <input
+              type="checkbox"
+              checked={preferBatching}
+              onChange={(e) => setPreferBatching(e.target.checked)}
+              className="checkbox checkbox-sm"
+            />
+            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+          </label>
+        </div>
+      ) : null}
     />
   );
 };

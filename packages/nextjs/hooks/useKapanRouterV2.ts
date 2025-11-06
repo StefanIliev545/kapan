@@ -559,7 +559,8 @@ export const useKapanRouterV2 = () => {
    * @returns Object indicating whether batch or sequential tx was used, with id/hash
    */
   const executeFlowBatchedIfPossible = useCallback(async (
-    instructions: ProtocolInstruction[]
+    instructions: ProtocolInstruction[],
+    preferBatching = false
   ): Promise<{ kind: "batch", id: string } | { kind: "tx", hash: string } | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
       throw new Error("Missing router/user/public/wallet context");
@@ -602,23 +603,24 @@ export const useKapanRouterV2 = () => {
       { to: routerContract.address as Address, data: routerCalldata as Hex },
     ];
 
-    // 5) Try atomic batch first
-    try {
-      const { id } = await sendCallsAsync({
-        calls,
-        experimental_fallback: true, // runs sequentially if wallet can't batch
-      });
+    // 5) Try atomic batch if preference is enabled and wallet supports it
+    if (preferBatching) {
+      try {
+        const { id } = await sendCallsAsync({
+          calls,
+          experimental_fallback: true, // runs sequentially if wallet can't batch
+        });
 
-      setBatchId(id);
-      notification.info("Batch sent — waiting for confirmation...");
-      return { kind: "batch", id };
-    } catch (err) {
-      console.warn("Batch send failed, falling back:", err);
+        setBatchId(id);
+        notification.info("Batch sent — waiting for confirmation...", { duration: 2000});
+        return { kind: "batch", id };
+      } catch (err) {
+        console.warn("Batch send failed, falling back:", err);
+      }
     }
 
 
     // 6) Fallback: your existing sequential helper
-    notification.info("Executing sequential approvals + router call...");
     const hash = await executeFlowWithApprovals(instructions);
     return hash ? { kind: "tx", hash } : undefined;
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, canDoAtomicBatch, executeFlowWithApprovals]);
@@ -975,6 +977,7 @@ export const useKapanRouterV2 = () => {
     batchId,
     batchStatus,
     isBatchConfirmed,
+    canDoAtomicBatch, // Export capability detection for UI
     // Combined confirmation state (use this in modals)
     isAnyConfirmed,
   };

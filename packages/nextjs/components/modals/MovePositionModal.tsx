@@ -8,6 +8,7 @@ import { CollateralAmounts } from "~~/components/specific/collateral/CollateralA
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
@@ -120,6 +121,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   // Move position hook with modular builder
   const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
 
   // Map protocol names to gateway view contract names
   const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
@@ -311,7 +313,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         });
 
         // Execute the flow with automatic approvals (batched when supported)
-        await executeFlowBatchedIfPossible(builder.build());
+        await executeFlowBatchedIfPossible(builder.build(), preferBatching);
 
         setStep("done");
         // Close modal after a short delay on success
@@ -585,6 +587,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </span>
           </button>
         </div>
+        {isPreferenceLoaded && (
+          <div className="pt-2 pb-1 border-t border-base-300">
+            <label className="label cursor-pointer gap-2 justify-start">
+              <input
+                type="checkbox"
+                checked={preferBatching}
+                onChange={(e) => setPreferBatching(e.target.checked)}
+                className="checkbox checkbox-sm"
+              />
+              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+            </label>
+          </div>
+        )}
       </div>
 
       <form
