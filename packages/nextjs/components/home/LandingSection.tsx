@@ -34,10 +34,10 @@ const LandingSection = () => {
             align="center"
             className="font-extrabold font-display mb-4 tracking-tight text-gradient bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent drop-shadow-md"
           >
-            Lend everywhere. <br className="hidden md:inline" />
+            The Unified Lending Experience. <br className="hidden md:inline" />
             <span className="text-primary">Borrow anytime.</span>
             <br className="hidden md:inline" />
-            All in Kapan.
+            Lend everywhere.
           </Heading>
         </motion.div>
         <div className="relative fade-bottom-mask">

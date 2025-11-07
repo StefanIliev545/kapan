@@ -65,13 +65,30 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         public onlyRouterOrSelf(user) nonReentrant returns (address, uint256)
     {
         address vToken = _getVTokenForUnderlying(collateral);
+
+        uint256 borrowBalance = VTokenInterface(vToken).borrowBalanceCurrent(user);
+        if (underlyingAmount >= borrowBalance) {
+            underlyingAmount = borrowBalance;
+            uint256 balance = VTokenInterface(vToken).balanceOf(user);
+            VTokenInterface(vToken).transferFrom(user, address(this), balance);
+            uint256 pre = IERC20(collateral).balanceOf(address(this));
+            uint err = VTokenInterface(vToken).redeem(balance); require(err == 0, "Venus: redeem failed");
+            require(err == 0, "Venus: redeem failed");
+            uint256 balanceAfter = IERC20(collateral).balanceOf(address(this));
+            uint256 redeemed = balanceAfter - pre;
+            IERC20(collateral).safeTransfer(msg.sender, redeemed);
+            return (collateral, redeemed);
+        }
+     
         uint exchangeRate = VTokenInterface(vToken).exchangeRateCurrent();
         uint requiredV = (underlyingAmount * 1e18 + exchangeRate - 1) / exchangeRate;
         VTokenInterface(vToken).transferFrom(user, address(this), requiredV);
+
+        uint256 balanceBefore = IERC20(collateral).balanceOf(address(this));
         uint err = VTokenInterface(vToken).redeem(requiredV); require(err == 0, "Venus: redeem failed");
         // Transfer the full redeemed amount to avoid dust accumulation
         // The round-up may result in slightly more underlying than requested, which we transfer out
-        uint256 actualRedeemed = IERC20(collateral).balanceOf(address(this));
+        uint256 actualRedeemed = IERC20(collateral).balanceOf(address(this)) - balanceBefore;
         IERC20(collateral).safeTransfer(msg.sender, actualRedeemed);
         return (collateral, actualRedeemed);
     }

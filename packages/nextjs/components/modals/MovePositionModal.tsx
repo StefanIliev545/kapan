@@ -570,7 +570,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             {/* Note: Flash loan provider balance check UI removed - handled by router */}
           </div>
         </div>
-        <div className="flex justify-end pt-6 mt-auto">
+        <div className="flex flex-col items-end gap-3 pt-6 mt-auto">
+          {isPreferenceLoaded && (
+            <div className="pb-1">
+              <label className="label cursor-pointer gap-2 justify-end">
+                <input
+                  type="checkbox"
+                  checked={preferBatching}
+                  onChange={(e) => setPreferBatching(e.target.checked)}
+                  className="checkbox checkbox-sm"
+                />
+                <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+              </label>
+            </div>
+          )}
           <button
             className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${
               loading ? "animate-pulse" : ""
@@ -587,19 +600,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </span>
           </button>
         </div>
-        {isPreferenceLoaded && (
-          <div className="pt-2 pb-1 border-t border-base-300">
-            <label className="label cursor-pointer gap-2 justify-start">
-              <input
-                type="checkbox"
-                checked={preferBatching}
-                onChange={(e) => setPreferBatching(e.target.checked)}
-                className="checkbox checkbox-sm"
-              />
-              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-            </label>
-          </div>
-        )}
       </div>
 
       <form
