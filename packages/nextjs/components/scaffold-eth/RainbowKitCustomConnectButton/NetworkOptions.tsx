@@ -11,7 +11,9 @@ const allowedNetworks = getTargetNetworks();
 const networkLogos: Record<string, string> = {
   Arbitrum: "/logos/arb.svg",
   Ethereum: "/logos/ethereum.svg",
-  Optimism: "/logos/eth.svg",  // Placeholder
+  Optimism: "/logos/optimism.svg",
+  Base: "/logos/base.svg",
+  Linea: "/logos/linea.svg",
   "Arbitrum Sepolia": "/logos/arb.svg",
   // Add more networks as needed
 };

@@ -59,7 +59,7 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
   }
 
   // Temporarily disable Etherscan verification for v2 deploys
-  if (false && !["hardhat", "localhost"].includes(hre.network.name)) {
+  if (!["hardhat", "localhost"].includes(hre.network.name)) {
     await verifyContract(hre, kapanRouter.address, [deployer]);
   }
 };

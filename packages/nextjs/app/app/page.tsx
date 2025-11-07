@@ -8,7 +8,7 @@ import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
-import { arbitrum, base, optimism } from "wagmi/chains";
+import { arbitrum, base, optimism, linea } from "wagmi/chains";
 
 // ---- Lazy-load heavy protocol views (client-only) ----
 const AaveProtocolView = dynamic(
@@ -42,6 +42,7 @@ const networkOptions: NetworkOption[] = [
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
+  { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
 ];
 
 const App: NextPage = () => {
@@ -84,6 +85,7 @@ const App: NextPage = () => {
     arbitrum: "Arbitrum support is experimental and pre-audit.",
     base: "Base support is experimental and pre-audit.",
     optimism: "Optimism support is experimental and pre-audit.",
+    linea: "Linea support is experimental and pre-audit.",
   }), []);
 
   const sections: CallToActionSectionProps[] = [
@@ -132,7 +134,7 @@ const App: NextPage = () => {
         {/* ---- Cached panes: once mounted, never unmount; just hide/show ---- */}
         {/* ARBITRUM */}
         {mounted.has("arbitrum") && (
-          <div className={selectedNetwork === "arbitrum" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "arbitrum"}>
+          <div className={selectedNetwork === "arbitrum" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "arbitrum"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={arbitrum.id} />
             </StableArea>
@@ -147,7 +149,7 @@ const App: NextPage = () => {
 
         {/* BASE */}
         {mounted.has("base") && (
-          <div className={selectedNetwork === "base" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "base"}>
+          <div className={selectedNetwork === "base" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "base"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={base.id} />
             </StableArea>
@@ -162,7 +164,7 @@ const App: NextPage = () => {
 
         {/* STARKNET */}
         {mounted.has("starknet") && (
-          <div className={selectedNetwork === "starknet" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "starknet"}>
+          <div className={selectedNetwork === "starknet" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "starknet"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <VesuProtocolView />
             </StableArea>
@@ -174,12 +176,24 @@ const App: NextPage = () => {
 
         {/* OPTIMISM */}
         {mounted.has("optimism") && (
-          <div className={selectedNetwork === "optimism" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "optimism"}>
+          <div className={selectedNetwork === "optimism" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "optimism"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={optimism.id} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <CompoundProtocolView chainId={optimism.id} />
+            </StableArea>
+          </div>
+        )}
+
+        {/* LINEA */}
+        {mounted.has("linea") && (
+          <div className={selectedNetwork === "linea" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "linea"}>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <AaveProtocolView chainId={linea.id} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <CompoundProtocolView chainId={linea.id} />
             </StableArea>
           </div>
         )}

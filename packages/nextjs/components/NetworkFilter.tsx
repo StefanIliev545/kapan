@@ -24,6 +24,7 @@ const NETWORK_TO_CHAIN_ID: Record<string, number> = {
   arbitrum: 42161,
   base: 8453,
   optimism: 10,
+  linea: 59144,
 };
 
 // --- tweakable behavior flags ---

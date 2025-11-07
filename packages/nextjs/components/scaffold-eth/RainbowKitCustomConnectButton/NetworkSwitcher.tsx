@@ -16,7 +16,9 @@ const networkLogos: Record<string, string> = {
   Arbitrum: "/logos/arb.svg",
   "Arbitrum One": "/logos/arb.svg",  // The actual chain name from Wagmi
   Ethereum: "/logos/ethereum.svg", 
-  Optimism: "/logos/eth.svg",  // Placeholder
+  Optimism: "/logos/optimism.svg",
+  Base: "/logos/base.svg",
+  Linea: "/logos/linea.svg",
   "Arbitrum Sepolia": "/logos/arb.svg",
   // Add more networks as needed
 };
@@ -39,9 +41,11 @@ const getNetworkLogo = (chain: Chain | null | undefined): string => {
     case 1: // Ethereum Mainnet
       return "/logos/ethereum.svg";
     case 10: // Optimism
-      return "/logos/optimism.svg"; // Using ETH as placeholder
+      return "/logos/optimism.svg";
     case 8453: // Base
       return "/logos/base.svg";
+    case 59144: // Linea
+      return "/logos/linea.svg";
     case 130: // Base Sepolia
       return "/logos/unichain.svg";
     default:
