@@ -6,7 +6,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
-export const AaveProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
+export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
   const { address: connectedAddress } = useAccount();
 
   // Get the AaveGatewayView contract info to use its address as a fallback
@@ -98,6 +98,7 @@ export const AaveProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
     <ProtocolView
       protocolName="Aave V3"
       protocolIcon="/logos/aave.svg"
+      enabledFeatures={enabledFeatures}
       ltv={75}
       maxLtv={90}
       suppliedPositions={filteredSuppliedPositions}

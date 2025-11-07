@@ -3862,7 +3862,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nomicfoundation/hardhat-verify@npm:~2.0.10":
+"@nomicfoundation/hardhat-verify@npm:~2.0.14":
   version: 2.0.14
   resolution: "@nomicfoundation/hardhat-verify@npm:2.0.14"
   dependencies:
@@ -6181,7 +6181,7 @@ __metadata:
     "@nomicfoundation/hardhat-chai-matchers": ~2.0.7
     "@nomicfoundation/hardhat-ethers": ~3.0.8
     "@nomicfoundation/hardhat-network-helpers": ~1.0.11
-    "@nomicfoundation/hardhat-verify": ~2.0.10
+    "@nomicfoundation/hardhat-verify": ~2.0.14
     "@openzeppelin/contracts": ~5.0.2
     "@typechain/ethers-v5": ~11.1.2
     "@typechain/ethers-v6": ~0.5.1

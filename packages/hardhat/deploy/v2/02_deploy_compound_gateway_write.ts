@@ -2,7 +2,7 @@
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-// import { verifyContract } from "../../utils/verification";
+import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -27,6 +27,10 @@ const DEFAULT_COMETS: Record<number, string[]> = {
     "0x2e44e174f7D53F0212823acC11C01A11d58c5bCB", // cUSDCv3
     "0x995E394b8B2437aC8Ce61Ee0bC610D617962B214", // cUSDTv3
     "0xE36A30D249f7761327fd973001A32010b521b6Fd", // cWETHv3
+  ],
+  59144: [
+    "0x8D38A3d6B3c3B7d96D6536DA7Eef94A9d7dbC991", // cUSDCv3 (Comet proxy)
+    "0x60F2058379716A64a7A5d29219397e79bC552194", // cWETHv3 (Comet proxy)
   ],
 };
 
@@ -184,10 +188,10 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   }
   console.log(`CompoundGatewayWrite registered with KapanRouter as "compound"`);
 
-  /*if (!["hardhat", "localhost"].includes(network.name)) {
+  if (!["hardhat", "localhost"].includes(hre.network.name)) {
     await verifyContract(hre, compoundGatewayWrite.address, [kapanRouter.address, deployer]);
     await verifyContract(hre, compoundGatewayView.address, [deployer]);
-  }*/
+  }
 };
 
 export default deployCompoundGatewayWrite;

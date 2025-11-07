@@ -27,7 +27,7 @@ const decimalsFromScale = (scale: bigint) => {
 
 // (collateral value is computed via batch reads in the component below)
 
-export const CompoundProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
+export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
   const { address: connectedAddress } = useAccount();
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
@@ -261,6 +261,7 @@ export const CompoundProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
         forceShowAll={forceShowAll}
         networkType="evm"
         chainId={chainId}
+        enabledFeatures={enabledFeatures}
       />
     </div>
   );

@@ -31,6 +31,11 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
       UI:       "0xE92cd6164CE7DC68e740765BC1f2a091B6CBc3e4", // UiPoolDataProviderV3
       REFERRAL: 0,
     },
+    59144: {
+      PROVIDER: "0x89502c3731F69DDC95B65753708A07F8Cd0373F4", // Linea v3 PoolAddressesProvider
+      UI:       "0xf751969521E20A972A0776CDB0497Fad0F773F1F", // Linea UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
   };
 
   const entry = MAP[chainId];
@@ -77,7 +82,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   console.log(`AaveGatewayWrite registered with KapanRouter as "aave"`);
 
   // Temporarily disable Etherscan verification for v2 deploys
-  if (false && !["hardhat", "localhost"].includes(hre.network.name)) {
+  if (!["hardhat", "localhost"].includes(hre.network.name)) {
     await verifyContract(hre, aaveGatewayWrite.address, [
       kapanRouter.address,
       POOL_ADDRESSES_PROVIDER,

@@ -20,7 +20,7 @@ const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr2
 const deployerPrivateKey =
   process.env.__RUNTIME_DEPLOYER_PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 // If not set, it uses our block explorers default API keys.
-const etherscanApiKey = process.env.ETHERSCAN_MAINNET_API_KEY || "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW";
+const etherscanApiKey = process.env.ETHERSCAN_API_KEY || "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW";
 const etherscanOptimisticApiKey = process.env.ETHERSCAN_OPTIMISTIC_API_KEY || "RM62RDISS1RH448ZY379NX625ASG1N633R";
 const basescanApiKey = process.env.BASESCAN_API_KEY || "ZZZEIPMT1MNJ8526VV2Y744CA7TNZR64G6";
 const arbiscanApiKey = process.env.ARBISCAN_API_KEY || "";
@@ -120,6 +120,11 @@ const config: HardhatUserConfig = {
           apiKey: etherscanOptimisticApiKey,
         },
       },
+    },
+    linea: {
+      url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 59144,
+      accounts: [deployerPrivateKey],
     },
     polygon: {
       url: `https://polygon-mainnet.g.alchemy.com/v2/${providerApiKey}`,
@@ -222,22 +227,10 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  // configuration for harhdat-verify plugin
+  // configuration for hardhat-verify plugin (Etherscan V2 API)
+  // V2 API uses a single apiKey for all networks - the plugin automatically adds chainId
   etherscan: {
-    apiKey: {
-      mainnet: etherscanApiKey,
-      sepolia: etherscanApiKey,
-      optimisticEthereum: etherscanOptimisticApiKey,
-      optimisticSepolia: etherscanOptimisticApiKey,
-      arbitrumOne: arbiscanApiKey,
-      arbitrumSepolia: arbiscanApiKey,
-      polygon: polygonscanApiKey,
-      polygonMumbai: polygonscanApiKey,
-      base: basescanApiKey,
-      baseSepolia: basescanApiKey,
-      bnb: bscscanApiKey,
-      bnbTestnet: bscscanApiKey,
-    },
+    apiKey: etherscanApiKey,  // Single Etherscan.io API key for V2 API
     customChains: [
       {
         network: "base",
@@ -245,6 +238,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api.basescan.org/api",
           browserURL: "https://basescan.org",
+        },
+      },
+      {
+        network: "linea",
+        chainId: 59144,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
+          browserURL: "https://lineascan.build",
         },
       },
       {
