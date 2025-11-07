@@ -36,7 +36,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
 
-export const VenusProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
+export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
   const { address: connectedAddress } = useAccount();
  
   // Get Comptroller address from VenusGatewayView
@@ -260,6 +260,7 @@ export const VenusProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
       forceShowAll={forceShowAll}
       networkType="evm"
       chainId={chainId}
+      enabledFeatures={enabledFeatures}
     />
   );
 };

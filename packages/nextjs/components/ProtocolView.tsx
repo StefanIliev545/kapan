@@ -53,6 +53,10 @@ interface ProtocolViewProps {
   readOnly?: boolean; // If true, disable all interactive actions and modals
   expandFirstPositions?: boolean; // If true, expand the first supply and borrow rows by default
   chainId?: number;
+  enabledFeatures?: {
+    swap?: boolean;
+    move?: boolean;
+  };
 }
 
 // Health status indicator component that shows utilization percentage
@@ -86,6 +90,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   readOnly = false,
   expandFirstPositions = true,
   chainId,
+  enabledFeatures = { swap: false, move: true },
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -347,7 +352,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     chainId={chainId}
                         position={positionManager}
                         disableMove={disableMoveSupply || readOnly}
-                        availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : undefined}
+                        availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
                         suppressDisabledMessage
                         defaultExpanded={expandFirstPositions && index === 0}
                       />
@@ -396,7 +401,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         networkType={networkType}
                     chainId={chainId}
                         position={positionManager}
-                        availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : undefined}
+                        availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: false, swap: enabledFeatures.swap ?? false }}
                         suppressDisabledMessage
                         defaultExpanded={expandFirstPositions && index === 0}
                       />
