@@ -95,7 +95,8 @@ export const PercentInput: FC<{
   percentBase?: bigint;
   max?: bigint;
   resetTrigger?: boolean;
-}> = ({ balance, decimals, price = 0, onChange, percentBase, max, resetTrigger }) => {
+  insufficientFunds?: boolean;
+}> = ({ balance, decimals, price = 0, onChange, percentBase, max, resetTrigger, insufficientFunds }) => {
   const [amount, setAmount] = useState("");
   const [active, setActive] = useState<number | null>(null);
   
@@ -144,6 +145,11 @@ export const PercentInput: FC<{
           placeholder="0.0"
           className="input input-bordered w-full pr-24"
         />
+        {insufficientFunds && (
+          <div className="absolute -top-4 right-1 z-10">
+            <span className="badge badge-error badge-sm whitespace-nowrap">Insufficient funds</span>
+          </div>
+        )}
         <div className="absolute inset-y-0 right-3 flex items-center divide-x divide-base-300 text-xs">
           {[25, 50, 100].map(p => (
             <button
@@ -246,6 +252,20 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     return BigInt(amount);
   }, [action, position, token.usdPrice, token.decimals, max]);
 
+  // Check if user has insufficient funds for Repay action
+  // Re-checks whenever amount, balance, or token decimals change
+  const insufficientFunds = useMemo(() => {
+    if (action !== "Repay" || !amount || amount.trim() === "") return false;
+    const decimals = token.decimals || 18;
+    try {
+      const parsedAmount = parseUnits(amount, decimals);
+      return parsedAmount > balance;
+    } catch {
+      // If parsing fails (invalid input), don't show insufficient funds
+      return false;
+    }
+  }, [action, amount, balance, token.decimals]);
+
   const afterValue = useMemo(() => {
     switch (action) {
       case "Borrow":
@@ -332,6 +352,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
               resetTrigger={isOpen}
+              insufficientFunds={insufficientFunds}
             />
             {(() => {
               const hfTextColor = !Number.isFinite(afterHfEffective)
@@ -375,7 +396,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                         <FaGasPump className="text-gray-400" />
                       ) : undefined,
                     onClick: handleConfirm,
-                    disabled: txState === "pending",
+                    disabled: txState === "pending" || insufficientFunds,
                     variant: "ghost",
                   },
                 ]}
