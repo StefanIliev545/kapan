@@ -20,10 +20,8 @@ const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr2
 const deployerPrivateKey =
   process.env.__RUNTIME_DEPLOYER_PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 // If not set, it uses our block explorers default API keys.
+// Etherscan V2 API uses a single API key for all supported chains
 const etherscanApiKey = process.env.ETHERSCAN_API_KEY || "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW";
-const etherscanOptimisticApiKey = process.env.ETHERSCAN_OPTIMISTIC_API_KEY || "RM62RDISS1RH448ZY379NX625ASG1N633R";
-const basescanApiKey = process.env.BASESCAN_API_KEY || "ZZZEIPMT1MNJ8526VV2Y744CA7TNZR64G6";
-const arbiscanApiKey = process.env.ARBISCAN_API_KEY || "";
 const polygonscanApiKey = process.env.POLYGONSCAN_API_KEY || "";
 const bscscanApiKey = process.env.BSCSCAN_API_KEY || "";
 
@@ -83,43 +81,23 @@ const config: HardhatUserConfig = {
     },
     arbitrum: {
       url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 42161,
       accounts: [deployerPrivateKey],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api.arbiscan.io",
-          apiKey: arbiscanApiKey,
-        },
-      },
     },
     arbitrumSepolia: {
       url: `https://arb-sepolia.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 421614,
       accounts: [deployerPrivateKey],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-sepolia.arbiscan.io",
-          apiKey: arbiscanApiKey,
-        },
-      },
     },
     optimism: {
       url: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 10,
       accounts: [deployerPrivateKey],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-optimistic.etherscan.io",
-          apiKey: etherscanOptimisticApiKey,
-        },
-      },
     },
     optimismSepolia: {
       url: `https://opt-sepolia.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 11155420,
       accounts: [deployerPrivateKey],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-sepolia-optimistic.etherscan.io",
-          apiKey: etherscanOptimisticApiKey,
-        },
-      },
     },
     linea: {
       url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
@@ -164,23 +142,13 @@ const config: HardhatUserConfig = {
     },
     base: {
       url: `https://base-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 8453,
       accounts: [deployerPrivateKey],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api.basescan.org",
-          apiKey: basescanApiKey,
-        },
-      },
     },
     baseSepolia: {
       url: `https://base-sepolia.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 84532,
       accounts: [deployerPrivateKey],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-sepolia.basescan.org",
-          apiKey: basescanApiKey,
-        },
-      },
     },
     scrollSepolia: {
       url: "https://sepolia-rpc.scroll.io",
@@ -236,7 +204,7 @@ const config: HardhatUserConfig = {
         network: "base",
         chainId: 8453,
         urls: {
-          apiURL: "https://api.basescan.org/api",
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
           browserURL: "https://basescan.org",
         },
       },
@@ -252,23 +220,39 @@ const config: HardhatUserConfig = {
         network: "baseSepolia",
         chainId: 84532,
         urls: {
-          apiURL: "https://api-sepolia.basescan.org/api",
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
           browserURL: "https://sepolia.basescan.org",
+        },
+      },
+      {
+        network: "arbitrum",
+        chainId: 42161,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
+          browserURL: "https://arbiscan.io",
         },
       },
       {
         network: "arbitrumSepolia",
         chainId: 421614,
         urls: {
-          apiURL: "https://api-sepolia.arbiscan.io/api",
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
           browserURL: "https://sepolia.arbiscan.io",
+        },
+      },
+      {
+        network: "optimism",
+        chainId: 10,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
+          browserURL: "https://optimistic.etherscan.io",
         },
       },
       {
         network: "optimisticSepolia",
         chainId: 11155420,
         urls: {
-          apiURL: "https://api-sepolia-optimistic.etherscan.io/api",
+          apiURL: "https://api.etherscan.io/v2/api",  // V2 aggregator - plugin adds chainId automatically
           browserURL: "https://sepolia-optimistic.etherscan.io",
         },
       },

@@ -43,8 +43,25 @@ export const useKapanRouterV2 = () => {
   const { data: walletClient } = useWalletClient();
   const queryClient = useQueryClient();
   const chainId = useChainId();
-  const opStackChainIds = new Set([10, 420, 8453, 84531, 84532, 11155420]);
-  const effectiveConfirmations = opStackChainIds.has(chainId) ? 2 : 1;
+  
+  // Confirmation count per chain
+  // Base and Optimism (OpStack chains) use 2 confirmations for safety
+  // Arbitrum and Linea use 1 confirmation for faster UX
+  // Default to 1 for other chains
+  const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
+    8453: 2,   // Base mainnet
+    84531: 2,  // Base Sepolia
+    84532: 2,  // Base Sepolia (alternative)
+    10: 2,     // Optimism mainnet
+    420: 2,    // Optimism Goerli
+    11155420: 2, // Optimism Sepolia
+    42161: 0,  // Arbitrum One
+    421614: 1, // Arbitrum Sepolia
+    59144: 0,  // Linea mainnet
+    59141: 1,  // Linea Sepolia
+  };
+  
+  const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
   
@@ -623,7 +640,7 @@ export const useKapanRouterV2 = () => {
     // 6) Fallback: your existing sequential helper
     const hash = await executeFlowWithApprovals(instructions);
     return hash ? { kind: "tx", hash } : undefined;
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, canDoAtomicBatch, executeFlowWithApprovals]);
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals]);
 
   // --- Types for modular move position builder ---
   type FlashConfig = {
