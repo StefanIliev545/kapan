@@ -2,9 +2,6 @@ import type { Network } from "./useTokenBalance";
 import { useTokenBalance } from "./useTokenBalance";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, Contract, num, uint256, Call } from "starknet";
 import { parseUnits } from "viem";
-import { useAccount as useEvmAccount } from "wagmi";
-import { useScaffoldWriteContract as useEvmWrite } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo as useEthDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo as useStarkDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useSmartTransactor } from "~~/hooks/scaffold-stark";
 import { useLendingAuthorizations, type BaseProtocolInstruction, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
@@ -73,13 +70,6 @@ export const useLendingAction = (
     isVesuV2 && action === "Withdraw" && isVTokenPositionCheck
   );
 
-  // EVM hooks
-  const { address: evmAddress } = useEvmAccount();
-  const { balance: evmWalletBalanceHook = 0n } = useTokenBalance(tokenAddress, "evm");
-  const { writeContractAsync } = useEvmWrite({ contractName: "RouterGateway" });
-  const { data: evmRouterGateway } = useEthDeployedContractInfo({ contractName: "RouterGateway" });
-  const evmWalletBalance = walletBalanceParam ?? evmWalletBalanceHook;
-
   // Build Starknet calls
   const buildStarkCalls = async (amount: string, isMax = false): Promise<Call[] | null> => {
     if (!starkAddress || !starkAccount || !decimals) return null;
@@ -91,34 +81,9 @@ export const useLendingAction = (
     
     // For VesuV2 borrow against vToken: need to migrate shares to lending position
     const shouldMigrateVTokenToBorrow = isVesuV2 && vtokenAddress && isVTokenPositionCheck && action === "Borrow";
-    
-    console.log("VesuV2 Debug:", {
-      isVesuV2,
-      action,
-      vesuContext,
-      isVTokenPositionCheck,
-      shouldUseDirectVault,
-      shouldMigrateVTokenToBorrow,
-      protocolName,
-      vtokenAddress: vtokenAddress ? "found" : "not found",
-      poolAddress,
-      tokenAddress,
-      collateralTokenAddress,
-      collateralVTokenAddress,
-      vesuGatewayV2: !!vesuGatewayV2,
-      vTokenBalance: vTokenBalance ? "found" : "not found"
-    });
-    
     // Handle vToken to lending position migration for borrow
     if (shouldMigrateVTokenToBorrow) {
-      console.log("Migrating vToken position to lending position for borrow");
       if (!collateralVTokenAddress || !starkRouterGateway || !vesuContext || vTokenBalance === undefined) {
-        console.log("Missing required data for vToken migration", {
-          collateralVTokenAddress,
-          starkRouterGateway: !!starkRouterGateway,
-          vesuContext,
-          vTokenBalance
-        });
         return null;
       }
       
@@ -421,43 +386,6 @@ export const useLendingAction = (
     }
   };
 
-  // EVM tx build/execute
-  const fnMap: Record<Action, string> = {
-    Borrow: "borrow",
-    Deposit: "supply",
-    Repay: "repay",
-    Withdraw: "withdraw",
-  };
-
-  const buildEvmTx = (amount: string, isMax = false) => {
-    if (!decimals || !evmAddress || !evmRouterGateway) return undefined;
-    let parsed = parseUnits(amount || "0", decimals);
-    if (isMax) {
-      if (action === "Repay") {
-        const bumped = maxAmount !== undefined ? (maxAmount * 101n) / 100n : (parsed * 101n) / 100n;
-        parsed = bumped > evmWalletBalance ? evmWalletBalance : bumped;
-      } else if (action === "Withdraw" && maxAmount !== undefined) {
-        parsed = (maxAmount * 101n) / 100n;
-      }
-    }
-    return {
-      address: evmRouterGateway.address as `0x${string}`,
-      abi: evmRouterGateway.abi,
-      functionName: fnMap[action],
-      args: [protocolName.toLowerCase(), tokenAddress, evmAddress, parsed] as const,
-    };
-  };
-
-  const executeEvm = async (amount: string, isMax = false) => {
-    const tx = buildEvmTx(amount, isMax);
-    if (!tx) return;
-    await writeContractAsync(tx as any);
-  };
-
-  // Select by network
-  if (network === "stark") {
-    return { execute: executeStark, buildTx: undefined, buildCalls: buildStarkCalls };
-  }
-
-  return { execute: executeEvm, buildTx: buildEvmTx };
+  // Always return Starknet functions (network parameter kept for API compatibility)
+  return { execute: executeStark, buildTx: undefined, buildCalls: buildStarkCalls };
 };

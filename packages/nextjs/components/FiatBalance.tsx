@@ -40,7 +40,7 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
   // If token is USDT, we try to fetch the price from CompoundGateway.
   const shouldUseCompoundGatewayPrice = tokenSymbol?.toUpperCase() === "USD₮0";
   const { data: compoundGatewayPrice } = useScaffoldReadContract({
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getPrice",
     args: [tokenAddress],
     query: { enabled: shouldUseCompoundGatewayPrice },

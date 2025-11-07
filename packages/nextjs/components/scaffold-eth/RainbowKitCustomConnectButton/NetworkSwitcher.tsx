@@ -39,7 +39,11 @@ const getNetworkLogo = (chain: Chain | null | undefined): string => {
     case 1: // Ethereum Mainnet
       return "/logos/ethereum.svg";
     case 10: // Optimism
-      return "/logos/eth.svg"; // Using ETH as placeholder
+      return "/logos/optimism.svg"; // Using ETH as placeholder
+    case 8453: // Base
+      return "/logos/base.svg";
+    case 130: // Base Sepolia
+      return "/logos/unichain.svg";
     default:
       return "/logos/eth.svg";
   }

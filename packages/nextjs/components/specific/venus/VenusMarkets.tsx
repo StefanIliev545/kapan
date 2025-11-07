@@ -28,20 +28,23 @@ const getTokenDisplay = (tokenAddress: string, originalSymbol: string) => {
 interface VenusMarketsProps {
   viewMode: "list" | "grid";
   search: string;
+  chainId?: number;
 }
 
-export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search }) => {
+export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId }) => {
   const { data: marketDetails } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getAllVenusMarkets",
+    chainId: chainId as any,
   });
 
   const vTokens = marketDetails?.[0];
 
   const { data: ratesData } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "getMarketRates",
     args: [vTokens],
+    chainId: chainId as any,
   });
 
   const markets: MarketData[] = useMemo(() => {

@@ -1,4 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
@@ -43,6 +44,7 @@ export interface TokenActionModalProps {
   ltv?: number;
   position?: PositionManager;
   onConfirm?: (amount: string, isMax?: boolean) => Promise<unknown> | void;
+  renderExtraContent?: () => ReactNode; // Optional content to render before action button
 }
 
 const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
@@ -207,6 +209,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   position,
   buildCalls,
   onConfirm,
+  renderExtraContent,
 }) => {
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
@@ -356,6 +359,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 </div>
               );
             })()}
+            {renderExtraContent && renderExtraContent()}
             <div className="modal-action pt-2">
               <SegmentedActionBar
                 className="w-full"

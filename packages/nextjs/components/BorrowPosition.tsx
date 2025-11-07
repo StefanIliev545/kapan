@@ -23,6 +23,7 @@ import { isVesuContextV1, isVesuContextV2 } from "~~/utils/vesu";
 export type BorrowPositionProps = ProtocolPosition & {
   protocolName: string;
   networkType: "evm" | "starknet";
+  chainId?: number;
   position?: PositionManager;
   containerClassName?: string;
   hideBalanceColumn?: boolean;
@@ -63,6 +64,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   collateralView,
   collateralValue,
   networkType,
+  chainId,
   position,
   vesuContext,
   moveSupport,
@@ -521,6 +523,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             currentDebt={debtAmount}
             position={position}
+            chainId={chainId}
           />
           <RepayModal
             isOpen={repayModal.isOpen}
@@ -536,6 +539,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
+            chainId={chainId}
           />
           <MovePositionModal
             isOpen={moveModal.isOpen}
@@ -548,6 +552,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               tokenAddress,
               decimals: tokenDecimals || 18,
             }}
+            chainId={chainId}
           />
         </>
       )}

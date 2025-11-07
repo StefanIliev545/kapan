@@ -16,39 +16,44 @@ const convertRateToAPR = (ratePerSecond: bigint): number => {
 interface CompoundMarketsProps {
   viewMode: "list" | "grid";
   search: string;
+  chainId?: number;
 }
 
-export const CompoundMarkets: FC<CompoundMarketsProps> = ({ viewMode, search }) => {
+export const CompoundMarkets: FC<CompoundMarketsProps> = ({ viewMode, search, chainId }) => {
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-  const { data: weth } = useDeployedContractInfo({ contractName: "eth" });
-  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC" });
-  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT" });
-  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe" });
+  const { data: weth } = useDeployedContractInfo({ contractName: "eth", chainId: chainId as any });
+  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC", chainId: chainId as any });
+  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT", chainId: chainId as any });
+  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe", chainId: chainId as any });
 
   const { data: wethData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [weth?.address, ZERO_ADDRESS],
+    chainId,
   });
   const { data: usdcData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdc?.address, ZERO_ADDRESS],
+    chainId,
   });
   const { data: usdtData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdt?.address, ZERO_ADDRESS],
+    chainId,
   });
   const { data: usdcEData } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "CompoundGateway",
+    contractName: "CompoundGatewayView",
     functionName: "getCompoundData",
     args: [usdcE?.address, ZERO_ADDRESS],
+    chainId,
   });
 
   const markets: MarketData[] = useMemo(() => {

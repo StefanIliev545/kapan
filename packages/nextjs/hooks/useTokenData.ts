@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useScaffoldReadContract } from "./scaffold-eth";
 import { useInterval } from "usehooks-ts";
 import externalContracts from "~~/contracts/externalContracts";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
+import { useLocalRateProvider } from "./useLocalRateProvider";
+import { Address } from "viem";
 
 interface TokenData {
   symbol: string;
@@ -37,12 +38,11 @@ export const useTokenData = () => {
     protocols: [],
   });
 
-  // Get all protocol rates from OptimalInterestRateFinder
-  const { data: protocolRates } = useScaffoldReadContract({
-    contractName: "OptimalInterestRateFinder",
-    functionName: "getAllProtocolBorrowRates",
-    args: [tokenData.address],
-  });
+  // Get all protocol rates from local rate provider (replaces OptimalInterestRateFinder)
+  const { optimal, allRates, isLoading: ratesLoading } = useLocalRateProvider(tokenData.address as Address, "borrow");
+  
+  // Format for compatibility with existing code
+  const protocolRates = allRates;
 
   // Update rates when they change
   useEffect(() => {

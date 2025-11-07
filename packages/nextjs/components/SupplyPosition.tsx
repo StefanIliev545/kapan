@@ -3,6 +3,7 @@ import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
+import { WithdrawModal } from "./modals/WithdrawModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
@@ -26,6 +27,7 @@ export type SupplyPositionProps = ProtocolPosition & {
   afterInfoContent?: ReactNode;
   renderName?: (name: string) => ReactNode;
   networkType: "evm" | "starknet";
+  chainId?: number;
   position?: PositionManager;
   disableMove?: boolean;
   containerClassName?: string;
@@ -56,7 +58,6 @@ export type SupplyPositionProps = ProtocolPosition & {
 export const SupplyPosition: FC<SupplyPositionProps> = ({
   icon,
   name,
-  balance,
   tokenBalance,
   currentRate,
   protocolName,
@@ -66,6 +67,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   afterInfoContent,
   renderName,
   networkType,
+  chainId,
   position,
   disableMove = false,
   vesuContext,
@@ -469,6 +471,23 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             }}
             protocolName={protocolName}
             position={position}
+            chainId={chainId}
+          />
+          <WithdrawModal
+            isOpen={withdrawModal.isOpen}
+            onClose={withdrawModal.close}
+            token={{
+              name,
+              icon,
+              address: tokenAddress,
+              currentRate,
+              usdPrice,
+              decimals: tokenDecimals || 18,
+            }}
+            protocolName={protocolName}
+            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            position={position}
+            chainId={chainId}
           />
         </>
       )}
@@ -487,6 +506,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             price: tokenPrice,
           }}
           fromProtocol={protocolName}
+          chainId={chainId}
         />
       )}
     </>

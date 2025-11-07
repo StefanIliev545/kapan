@@ -39,6 +39,9 @@ export const useNetworkAwareReadContract = <
     args: args as any,
     ...readConfig,
     query: {
+      // Shorter staleTime for protocol queries (10-30 seconds per docs)
+      // This allows faster refresh after transactions
+      staleTime: 10_000, // 10 seconds
       ...readConfig.query,
       enabled: networkType === "evm",
     },

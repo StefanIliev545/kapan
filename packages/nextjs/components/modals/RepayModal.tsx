@@ -1,9 +1,12 @@
-import { FC } from "react";
+import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
-import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { notification } from "~~/utils/scaffold-stark/notification";
+import { useAccount, useSwitchChain } from "wagmi";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -12,6 +15,7 @@ interface RepayModalProps {
   protocolName: string;
   debtBalance: bigint;
   position?: PositionManager;
+  chainId?: number;
 }
 
 export const RepayModal: FC<RepayModalProps> = ({
@@ -21,24 +25,73 @@ export const RepayModal: FC<RepayModalProps> = ({
   protocolName,
   debtBalance,
   position,
+  chainId,
 }) => {
-  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm");
-  const { execute, buildTx } = useLendingAction(
-    "evm",
-    "Repay",
-    token.address,
-    protocolName,
-    decimals,
-    undefined,
-    debtBalance,
-    walletBalance,
-  );
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
+  const { buildRepayFlowAsync, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
+  
   if (token.decimals == null) {
     token.decimals = decimals;
   }
+  
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = walletBalance < bump ? walletBalance : bump;
+
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
+  const handleRepay = useCallback(async (amount: string, isMax?: boolean) => {
+    try {
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
+      // Use async version for max repayments to safely read wallet balance
+      const instructions = await buildRepayFlowAsync(
+        protocolName.toLowerCase(),
+        token.address,
+        amount,
+        token.decimals || decimals || 18,
+        isMax || false
+      );
+      
+      if (instructions.length === 0) {
+        notification.error("Failed to build repay instructions or no balance to repay");
+        return;
+      }
+
+      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+      await executeFlowBatchedIfPossible(instructions, preferBatching);
+      notification.success("Repay transaction sent");
+    } catch (error: any) {
+      console.error("Repay error:", error);
+      notification.error(error.message || "Failed to repay");
+    }
+  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
+
+  useEffect(() => {
+    if (isAnyConfirmed && isOpen) {
+      onClose();
+    }
+  }, [isAnyConfirmed, isOpen, onClose]);
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -54,9 +107,21 @@ export const RepayModal: FC<RepayModalProps> = ({
       percentBase={debtBalance}
       max={maxInput}
       network="evm"
-      buildTx={buildTx}
       position={position}
-      onConfirm={execute}
+      onConfirm={handleRepay}
+      renderExtraContent={() => isPreferenceLoaded ? (
+        <div className="pt-2 pb-1">
+          <label className="label cursor-pointer gap-2 justify-start">
+            <input
+              type="checkbox"
+              checked={preferBatching}
+              onChange={(e) => setPreferBatching(e.target.checked)}
+              className="checkbox checkbox-sm"
+            />
+            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+          </label>
+        </div>
+      ) : null}
     />
   );
 };

@@ -6,11 +6,11 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
-export const AaveProtocolView: FC = () => {
+export const AaveProtocolView: FC<{ chainId?: number }> = ({ chainId }) => {
   const { address: connectedAddress } = useAccount();
 
-  // Get the AaveGateway contract info to use its address as a fallback
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGateway" });
+  // Get the AaveGatewayView contract info to use its address as a fallback
+  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView", chainId: chainId as any });
 
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
@@ -24,9 +24,10 @@ export const AaveProtocolView: FC = () => {
   // Get all token info, including supply and borrow balances, using query address
   const { data: allTokensInfo } = useNetworkAwareReadContract({
     networkType: "evm",
-    contractName: "AaveGateway",
+    contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
+    chainId,
   });
 
   // Aggregate positions by iterating over the returned tokens.
@@ -37,9 +38,12 @@ export const AaveProtocolView: FC = () => {
     if (!allTokensInfo) return { suppliedPositions: supplied, borrowedPositions: borrowed };
 
     allTokensInfo.forEach((token: any) => {
-      let decimals = 18;
-      if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
-        decimals = 6;
+      // Prefer on-chain decimals provided by the gateway; fallback for legacy deployments
+      let decimals = typeof token.decimals !== "undefined" ? Number(token.decimals) : 18;
+      if (typeof token.decimals === "undefined") {
+        if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
+          decimals = 6;
+        }
       }
 
       const supplyAPY = convertRateToAPY(token.supplyRate);
@@ -57,6 +61,7 @@ export const AaveProtocolView: FC = () => {
         currentRate: supplyAPY,
         tokenAddress: token.token,
         tokenPrice: token.price,
+        tokenDecimals: decimals,
         tokenSymbol: token.symbol,
       });
 
@@ -71,6 +76,7 @@ export const AaveProtocolView: FC = () => {
         currentRate: borrowAPY,
         tokenAddress: token.token,
         tokenPrice: token.price,
+        tokenDecimals: decimals,
         tokenSymbol: token.symbol,
       });
     });
@@ -98,6 +104,7 @@ export const AaveProtocolView: FC = () => {
       borrowedPositions={filteredBorrowedPositions}
       forceShowAll={forceShowAll}
       networkType="evm"
+      chainId={chainId}
     />
   );
 };

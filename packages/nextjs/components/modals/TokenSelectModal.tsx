@@ -13,6 +13,7 @@ interface TokenSelectModalProps {
   protocolName: string;
   isBorrow?: boolean;
   position?: PositionManager;
+  chainId?: number;
 }
 
 export const TokenSelectModal: FC<TokenSelectModalProps> = ({
@@ -22,6 +23,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
   protocolName,
   isBorrow = false,
   position,
+  chainId,
 }) => {
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
@@ -160,6 +162,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
             }}
             protocolName={protocolName}
+            chainId={chainId}
             currentDebt={
               selectedToken.tokenBalance
                 ? Number(selectedToken.tokenBalance) / 10 ** (selectedToken.tokenDecimals || 18)
@@ -180,6 +183,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
             }}
             protocolName={protocolName}
             position={position}
+            chainId={chainId}
           />
         ))}
     </>

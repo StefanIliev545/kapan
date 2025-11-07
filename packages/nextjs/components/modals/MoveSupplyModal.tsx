@@ -2,10 +2,11 @@ import { ChangeEvent, FC, KeyboardEvent, useCallback, useEffect, useMemo, useRef
 import Image from "next/image";
 import { BaseModal } from "./BaseModal";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "~~/components/FiatBalance";
-import { useMoveSupply } from "~~/hooks/kapan/moveSupply";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
 import formatPercentage from "~~/utils/formatPercentage";
 import { getProtocolLogo } from "~~/utils/protocol";
@@ -24,17 +25,17 @@ interface MoveSupplyModalProps {
     price?: bigint;
   };
   fromProtocol: string;
+  chainId?: number;
 }
 
 enum MoveStatus {
   Initial,
-  Approving,
-  Moving,
+  Executing,
   Success,
   Error,
 }
 
-export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol }) => {
+export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, token, fromProtocol, chainId }) => {
   const [status, setStatus] = useState<MoveStatus>(MoveStatus.Initial);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [selectedProtocol, setSelectedProtocol] = useState<string>("");
@@ -43,9 +44,22 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const [inputValue, setInputValue] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const isFocusingRef = useRef<boolean>(false);
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
 
-  const { moveSupply } = useMoveSupply();
+  const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
   // Debug token balance (can be removed in production)
@@ -209,16 +223,47 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const handleMove = async () => {
     if (!selectedProtocol || !address) return;
     try {
-      setStatus(MoveStatus.Approving);
-      const collaterals = [{ token: token.address, amount: transferAmount }];
-      const txHash = await moveSupply({
-        user: address,
-        debtToken: token.address,
-        collaterals,
-        fromProtocol: fromProtocol.toLowerCase(),
-        toProtocol: selectedProtocol.toLowerCase(),
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
+      setStatus(MoveStatus.Executing);
+      
+      // Create move builder
+      const builder = createMoveBuilder();
+      
+      // Normalize protocol names
+      const normalizedFromProtocol = normalizeProtocolName(fromProtocol);
+      const normalizedToProtocol = normalizeProtocolName(selectedProtocol);
+      
+      // For Compound, set the market (token address = market for supply positions)
+      if (normalizedFromProtocol === "compound" || normalizedToProtocol === "compound") {
+        builder.setCompoundMarket(token.address as `0x${string}`);
+      }
+      
+      // Check if moving max amount
+      const isMax = transferAmount === token.rawBalance;
+      const decimals = token.decimals || 18;
+      
+      // Build move collateral instruction (withdraw from source, deposit to target)
+      builder.buildMoveCollateral({
+        fromProtocol: fromProtocol,
+        toProtocol: selectedProtocol,
+        collateralToken: token.address as `0x${string}`,
+        withdraw: isMax ? { max: true } : { amount: formatUnits(transferAmount, decimals) },
+        collateralDecimals: decimals,
       });
-      setTransactionHash(txHash as string);
+      
+      // Execute the flow with automatic approvals (batched when supported)
+      const result = await executeFlowBatchedIfPossible(builder.build(), preferBatching);
+      
+      // Extract hash/id from result (batch id or tx hash)
+      const txHash = result?.kind === "tx" ? result.hash : result?.kind === "batch" ? result.id : undefined;
+      setTransactionHash(txHash ? txHash : null);
       setStatus(MoveStatus.Success);
       notification.success("Position moved successfully!");
     } catch (error) {
@@ -525,7 +570,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     if (status === MoveStatus.Success || status === MoveStatus.Error) {
       return <StatusContent />;
     }
-    const isLoading = status === MoveStatus.Approving || status === MoveStatus.Moving;
+    const isLoading = status === MoveStatus.Executing;
     const yieldData = calculateAnnualYield();
 
     return (
@@ -600,12 +645,25 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
           {isLoading ? (
             <>
               <span className="loading loading-spinner loading-sm"></span>
-              {status === MoveStatus.Approving ? "Approving..." : "Moving Position..."}
+              Moving Position...
             </>
           ) : (
             "Move Position"
           )}
         </button>
+        {isPreferenceLoaded && (
+          <div className="pt-2 pb-1 border-t border-base-300 mt-4">
+            <label className="label cursor-pointer gap-2 justify-start">
+              <input
+                type="checkbox"
+                checked={preferBatching}
+                onChange={(e) => setPreferBatching(e.target.checked)}
+                className="checkbox checkbox-sm"
+              />
+              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+            </label>
+          </div>
+        )}
       </>
     );
   };

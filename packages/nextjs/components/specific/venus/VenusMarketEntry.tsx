@@ -63,7 +63,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
 
   // Check membership status using VenusGateway
   const { data: membershipStatus, isLoading: isCheckingMembership, refetch: refetchMembership } = useScaffoldReadContract({
-    contractName: "VenusGateway",
+    contractName: "VenusGatewayView",
     functionName: "checkMembership",
     args: [userAddress || "0x0000000000000000000000000000000000000000", vTokenAddress || "0x0000000000000000000000000000000000000000"],
   });
@@ -131,11 +131,12 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
 
   // If the user is a member, show a clickable green checkmark
   if (isMember) {
+    const tip = `${tokenSymbol}: Enabled as collateral.\nClick to disable (exit market).`;
     return (
       <div 
-        className="ml-2 flex items-center cursor-pointer" 
+        className="ml-2 flex items-center cursor-pointer tooltip"
         onClick={handleMarketExit}
-        title={`Exit ${tokenSymbol} market (remove as collateral)`}
+        aria-label={tip}
       >
         <div className={`w-5 h-5 rounded-full ${isExiting || isPending ? 'bg-warning/20' : 'bg-success/20'} ${isExiting || isPending ? 'text-warning' : 'text-success'} flex items-center justify-center transition-colors hover:bg-base-300`}>
           {isExiting || isPending ? (
@@ -149,11 +150,12 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
   }
 
   // If not a member, show an actionable red X
+  const tip = `${tokenSymbol}: Not enabled as collateral.\nClick to enable (enter market).`;
   return (
     <div 
-      className="ml-2 flex items-center cursor-pointer" 
+      className="ml-2 flex items-center cursor-pointer tooltip"
       onClick={handleMarketEntry}
-      title={`Enter ${tokenSymbol} market to use as collateral`}
+      aria-label={tip}
     >
       <div className={`w-5 h-5 rounded-full ${isEntering || isPending ? 'bg-warning/20' : 'bg-error/20'} ${isEntering || isPending ? 'text-warning' : 'text-error'} flex items-center justify-center transition-colors hover:bg-base-300`}>
         {isEntering || isPending ? (

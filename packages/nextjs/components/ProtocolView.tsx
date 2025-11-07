@@ -52,6 +52,7 @@ interface ProtocolViewProps {
   disableMoveSupply?: boolean;
   readOnly?: boolean; // If true, disable all interactive actions and modals
   expandFirstPositions?: boolean; // If true, expand the first supply and borrow rows by default
+  chainId?: number;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -84,6 +85,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   disableMoveSupply = false,
   readOnly = false,
   expandFirstPositions = true,
+  chainId,
 }) => {
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -342,6 +344,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         {...position}
                         protocolName={protocolName}
                         networkType={networkType}
+                    chainId={chainId}
                         position={positionManager}
                         disableMove={disableMoveSupply || readOnly}
                         availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : undefined}
@@ -391,6 +394,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         {...position}
                         protocolName={protocolName}
                         networkType={networkType}
+                    chainId={chainId}
                         position={positionManager}
                         availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : undefined}
                         suppressDisabledMessage
@@ -526,6 +530,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             protocolName={protocolName}
             isBorrow={false}
             position={positionManager}
+            chainId={chainId}
           />
 
           {/* Token Select Modal for Borrow - EVM */}
@@ -536,6 +541,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             protocolName={protocolName}
             isBorrow={true}
             position={positionManager}
+            chainId={chainId}
           />
 
           {/* Borrow Modal - EVM */}
@@ -569,6 +575,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     : 0
               }
               position={positionManager}
+              chainId={chainId}
             />
           )}
         </>

@@ -3,6 +3,8 @@ import Image from "next/image";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatRate } from "~~/utils/protocols";
+import { useLocalRateProvider } from "~~/hooks/useLocalRateProvider";
+import { Address } from "viem";
 
 export const RatePill: FC<{
   current: string;
@@ -34,6 +36,11 @@ export const InterestPillRow: FC<{
   className?: string;
   labels?: "between" | "center";
 }> = ({ supplyRate, borrowRate, address, networkType, protocol, className = "", labels = "between" }) => {
+  // For EVM, use local rate provider instead of OptimalInterestRateFinder
+  const localSupplyRates = useLocalRateProvider(address as Address, "supply");
+  const localBorrowRates = useLocalRateProvider(address as Address, "borrow");
+
+  // For Starknet, still use the contract
   const { data: optimalSupplyRateData } = useNetworkAwareReadContract({
     contractName: "OptimalInterestRateFinder",
     functionName: "findOptimalSupplyRate",
@@ -52,36 +59,30 @@ export const InterestPillRow: FC<{
 
   let optimalSupplyProtocol = "";
   let optimalSupplyRate = 0;
-  if (optimalSupplyRateData) {
-    let proto: string;
-    let rate: number;
-    if (networkType === "starknet") {
-      proto = feltToString(BigInt(optimalSupplyRateData?.[0]?.toString() || "0"));
-      rate = Number(optimalSupplyRateData?.[1]?.toString() || "0");
-    } else {
-      proto = optimalSupplyRateData?.[0]?.toString() || "";
-      rate = Number(optimalSupplyRateData?.[1]?.toString() || "0");
-    }
+  if (networkType === "evm") {
+    // Use local rate provider for EVM
+    optimalSupplyProtocol = localSupplyRates.optimal.protocol;
+    optimalSupplyRate = localSupplyRates.optimal.rate;
+  } else if (optimalSupplyRateData) {
+    // Starknet path
+    const proto = feltToString(BigInt(optimalSupplyRateData?.[0]?.toString() || "0"));
+    const rate = Number(optimalSupplyRateData?.[1]?.toString() || "0");
     optimalSupplyProtocol = proto;
-    const divisor = networkType === "starknet" ? 1e16 : 1e8;
-    optimalSupplyRate = rate / divisor / 100;
+    optimalSupplyRate = rate / 1e16 / 100;
   }
 
   let optimalBorrowProtocol = "";
   let optimalBorrowRate = 0;
-  if (optimalBorrowRateData) {
-    let proto: string;
-    let rate: number;
-    if (networkType === "starknet") {
-      proto = feltToString(BigInt(optimalBorrowRateData?.[0]?.toString() || "0"));
-      rate = Number(optimalBorrowRateData?.[1]?.toString() || "0");
-    } else {
-      proto = optimalBorrowRateData?.[0]?.toString() || "";
-      rate = Number(optimalBorrowRateData?.[1]?.toString() || "0");
-    }
+  if (networkType === "evm") {
+    // Use local rate provider for EVM
+    optimalBorrowProtocol = localBorrowRates.optimal.protocol;
+    optimalBorrowRate = localBorrowRates.optimal.rate;
+  } else if (optimalBorrowRateData) {
+    // Starknet path
+    const proto = feltToString(BigInt(optimalBorrowRateData?.[0]?.toString() || "0"));
+    const rate = Number(optimalBorrowRateData?.[1]?.toString() || "0");
     optimalBorrowProtocol = proto;
-    const divisor = networkType === "starknet" ? 1e16 : 1e8;
-    optimalBorrowRate = rate / divisor / 100;
+    optimalBorrowRate = rate / 1e16 / 100;
   }
 
   const hasOptimalSupply = optimalSupplyRate > 0;

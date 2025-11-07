@@ -3,6 +3,10 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../utils/verification";
 
 const deployRouterGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  // V1 contracts are deprecated - use v2 deployments instead
+  console.log("Skipping v1 RouterGateway deployment - use v2 KapanRouter instead");
+  return;
+
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 

@@ -9,11 +9,22 @@ interface CollateralToken {
   decimals: number;
 }
 
+// Map protocol names to gateway view contract names
+const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
+  aave: "AaveGatewayView",
+  compound: "CompoundGatewayView",
+  venus: "VenusGatewayView",
+};
+
 export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean) => {
+  // Normalize protocol name and get gateway contract name
+  const normalizedProtocol = protocolName.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+  const gatewayContractName = PROTOCOL_TO_GATEWAY_MAP[normalizedProtocol] || "AaveGatewayView";
+
   const { data, isLoading } = useScaffoldReadContract({
-    contractName: "RouterGateway",
+    contractName: gatewayContractName,
     functionName: "getPossibleCollaterals",
-    args: [tokenAddress, protocolName.toLowerCase(), userAddress],
+    args: [tokenAddress, userAddress],
     query: {
       enabled,
     },

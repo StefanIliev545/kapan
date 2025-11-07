@@ -1,8 +1,11 @@
-import { FC } from "react";
+import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { useLendingAction } from "~~/hooks/useLendingAction";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import { notification } from "~~/utils/scaffold-stark/notification";
+import { useAccount, useSwitchChain } from "wagmi";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -11,6 +14,7 @@ interface BorrowModalProps {
   protocolName: string;
   currentDebt: number;
   position?: PositionManager;
+  chainId?: number;
 }
 
 export const BorrowModal: FC<BorrowModalProps> = ({
@@ -20,12 +24,69 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   protocolName,
   currentDebt,
   position,
+  chainId,
 }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "evm");
-  const { execute, buildTx } = useLendingAction("evm", "Borrow", token.address, protocolName, decimals);
+  const { chain } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
+  const { buildBorrowFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
+  
   if (token.decimals == null) {
     token.decimals = decimals;
   }
+
+  // Ensure wallet is on the correct EVM network when modal opens
+  useEffect(() => {
+    if (!isOpen || !chainId) return;
+    if (chain?.id !== chainId) {
+      try {
+        switchChain?.({ chainId });
+      } catch (e) {
+        // Non-blocking; user can still switch manually
+        console.warn("Auto network switch failed", e);
+      }
+    }
+  }, [isOpen, chainId, chain?.id, switchChain]);
+
+  const handleBorrow = useCallback(async (amount: string) => {
+    try {
+      // If a target chain is provided and wallet is on a different chain, switch first
+      if (chainId && chain?.id !== chainId) {
+        try {
+          await switchChain?.({ chainId });
+        } catch (e) {
+          notification.error("Please switch to the selected network to proceed");
+          return;
+        }
+      }
+      const instructions = buildBorrowFlow(
+        protocolName.toLowerCase(),
+        token.address,
+        amount,
+        token.decimals || decimals || 18
+      );
+      
+      if (instructions.length === 0) {
+        notification.error("Failed to build borrow instructions");
+        return;
+      }
+
+      // Use executeFlowBatchedIfPossible to handle gateway authorizations (batched when supported)
+      await executeFlowBatchedIfPossible(instructions, preferBatching);
+      notification.success("Borrow transaction sent");
+    } catch (error: any) {
+      console.error("Borrow error:", error);
+      notification.error(error.message || "Failed to borrow");
+    }
+  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
+
+  useEffect(() => {
+    if (isAnyConfirmed && isOpen) {
+      onClose();
+    }
+  }, [isAnyConfirmed, isOpen, onClose]);
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -39,9 +100,21 @@ export const BorrowModal: FC<BorrowModalProps> = ({
       before={currentDebt}
       balance={balance}
       network="evm"
-      buildTx={buildTx}
       position={position}
-      onConfirm={execute}
+      onConfirm={handleBorrow}
+      renderExtraContent={() => isPreferenceLoaded ? (
+        <div className="pt-2 pb-1">
+          <label className="label cursor-pointer gap-2 justify-start">
+            <input
+              type="checkbox"
+              checked={preferBatching}
+              onChange={(e) => setPreferBatching(e.target.checked)}
+              className="checkbox checkbox-sm"
+            />
+            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+          </label>
+        </div>
+      ) : null}
     />
   );
 };

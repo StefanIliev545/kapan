@@ -7,9 +7,16 @@ import {VenusGateway} from "./gateways/VenusGateway.sol";
 import {IGateway} from "./interfaces/IGateway.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+// Minimal interface for rate queries (works with both v1 and v2 gateways)
+interface IRateProvider {
+    function getSupplyRate(address token) external view returns (uint256, bool);
+    function getBorrowRate(address token) external view returns (uint256, bool);
+}
+
 contract OptimalInterestRateFinder is Ownable {
     // Store gateways in a mapping for dynamic registration
-    mapping(string => IGateway) public gateways;
+    // Using address instead of IGateway to support both v1 and v2 view gateways
+    mapping(string => address) public gateways;
     string[] public registeredGatewayNames;
     
     // We'll use 1e8 as our fixed point precision.
@@ -22,7 +29,7 @@ contract OptimalInterestRateFinder is Ownable {
     event GatewayRegistered(string name, address gateway);
     event GatewayRemoved(string name);
 
-    constructor() Ownable(msg.sender) {
+    constructor(address owner) Ownable(owner) {
         // Empty constructor - gateways will be registered separately
     }
     
@@ -32,11 +39,12 @@ contract OptimalInterestRateFinder is Ownable {
      * @param gateway The address of the gateway
      */
     function registerGateway(string calldata name, address gateway) external onlyOwner {
-        if (address(gateways[name]) != address(0)) {
+        require(gateway != address(0), "Gateway address cannot be zero");
+        if (gateways[name] != address(0)) {
             removeGateway(name);
         }
 
-        gateways[name] = IGateway(gateway);
+        gateways[name] = gateway;
         registeredGatewayNames.push(name);
         emit GatewayRegistered(name, gateway);
     }
@@ -46,7 +54,7 @@ contract OptimalInterestRateFinder is Ownable {
      * @param name The name of the gateway to remove
      */
     function removeGateway(string calldata name) public onlyOwner {
-        require(address(gateways[name]) != address(0), "Gateway not registered");
+        require(gateways[name] != address(0), "Gateway not registered");
         
         delete gateways[name];
         
@@ -176,12 +184,13 @@ contract OptimalInterestRateFinder is Ownable {
         // Iterate through all registered gateways
         for (uint i = 0; i < registeredGatewayNames.length; i++) {
             string memory protocol = registeredGatewayNames[i];
-            IGateway gateway = gateways[protocol];
+            address gatewayAddr = gateways[protocol];
             
             // Skip if gateway is not set
-            if (address(gateway) == address(0)) continue;
+            if (gatewayAddr == address(0)) continue;
             
-            try gateway.getSupplyRate(_token) returns (uint256 rateRaw, bool success) {
+            // Try to call getSupplyRate - works with both v1 and v2 view gateways
+            try IRateProvider(gatewayAddr).getSupplyRate(_token) returns (uint256 rateRaw, bool success) {
                 if (success) {
                     uint256 standardizedRate = convertRateToStandardized(protocol, rateRaw);
                     if (!foundValidRate || standardizedRate > bestRate) {
@@ -215,12 +224,13 @@ contract OptimalInterestRateFinder is Ownable {
         // Iterate through all registered gateways
         for (uint i = 0; i < registeredGatewayNames.length; i++) {
             string memory protocol = registeredGatewayNames[i];
-            IGateway gateway = gateways[protocol];
+            address gatewayAddr = gateways[protocol];
             
             // Skip if gateway is not set
-            if (address(gateway) == address(0)) continue;
+            if (gatewayAddr == address(0)) continue;
             
-            try gateway.getBorrowRate(_token) returns (uint256 rateRaw, bool success) {
+            // Try to call getBorrowRate - works with both v1 and v2 view gateways
+            try IRateProvider(gatewayAddr).getBorrowRate(_token) returns (uint256 rateRaw, bool success) {
                 if (success) {
                     uint256 standardizedRate = convertRateToStandardized(protocol, rateRaw);
                     if (!foundValidRate || standardizedRate < bestRate) {
@@ -280,13 +290,13 @@ contract OptimalInterestRateFinder is Ownable {
             string memory protocol = registeredGatewayNames[i];
             protocols[i] = protocol;
             
-            IGateway gateway = gateways[protocol];
-            if (address(gateway) == address(0)) {
+            address gatewayAddr = gateways[protocol];
+            if (gatewayAddr == address(0)) {
                 success[i] = false;
                 continue;
             }
             
-            try gateway.getSupplyRate(_token) returns (uint256 rateRaw, bool rateSuccess) {
+            try IRateProvider(gatewayAddr).getSupplyRate(_token) returns (uint256 rateRaw, bool rateSuccess) {
                 if (rateSuccess) {
                     rates[i] = convertRateToStandardized(protocol, rateRaw);
                     success[i] = true;
@@ -320,13 +330,13 @@ contract OptimalInterestRateFinder is Ownable {
             string memory protocol = registeredGatewayNames[i];
             protocols[i] = protocol;
             
-            IGateway gateway = gateways[protocol];
-            if (address(gateway) == address(0)) {
+            address gatewayAddr = gateways[protocol];
+            if (gatewayAddr == address(0)) {
                 success[i] = false;
                 continue;
             }
             
-            try gateway.getBorrowRate(_token) returns (uint256 rateRaw, bool rateSuccess) {
+            try IRateProvider(gatewayAddr).getBorrowRate(_token) returns (uint256 rateRaw, bool rateSuccess) {
                 if (rateSuccess) {
                     rates[i] = convertRateToStandardized(protocol, rateRaw);
                     success[i] = true;

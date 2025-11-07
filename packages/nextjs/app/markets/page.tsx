@@ -12,6 +12,7 @@ import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
 import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import StableArea from "~~/components/common/StableArea";
+import { arbitrum } from "wagmi/chains";
 
 const MarketLoader = () => (
   <div className="flex justify-center py-10">
@@ -129,13 +130,13 @@ const MarketsPage: NextPage = () => {
             {selectedNetwork === "arbitrum" && (
               <>
                 <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <AaveMarkets viewMode={viewMode} search={search} />
+                  <AaveMarkets viewMode={viewMode} search={search} chainId={arbitrum.id} />
                 </StableArea>
                 <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <CompoundMarkets viewMode={viewMode} search={search} />
+                  <CompoundMarkets viewMode={viewMode} search={search} chainId={arbitrum.id} />
                 </StableArea>
                 <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <VenusMarkets viewMode={viewMode} search={search} />
+                  <VenusMarkets viewMode={viewMode} search={search} chainId={arbitrum.id} />
                 </StableArea>
               </>
             )}

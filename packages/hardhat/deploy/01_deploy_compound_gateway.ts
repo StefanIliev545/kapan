@@ -11,6 +11,10 @@ import { verifyContract } from "../utils/verification";
  * @param hre HardhatRuntimeEnvironment object.
  */
 const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  // V1 contracts are deprecated - use v2 deployments instead
+  console.log("Skipping v1 CompoundGateway deployment - use v2 CompoundGatewayWrite/View instead");
+  return;
+
   /*
     On localhost, the deployer account is the one that comes with Hardhat, which is already funded.
 
@@ -60,19 +64,31 @@ const deployCompoundGateway: DeployFunction = async function (hre: HardhatRuntim
   await execute("RouterGateway", { from: deployer }, "addGateway", "compound v3", compoundGateway.address);
 
   // Also register the gateway with the OptimalInterestRateFinder
+  // Try to use v2 view gateway if it exists, otherwise use v1 gateway
   try {
     const optimalInterestRateFinder = await get("OptimalInterestRateFinder");
-    console.log(`Registering CompoundGateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
+    let gatewayToRegister = compoundGateway.address;
+    
+    // Check if v2 view gateway exists and use it instead
+    try {
+      const compoundGatewayView = await get("CompoundGatewayView");
+      gatewayToRegister = compoundGatewayView.address;
+      console.log(`Using v2 CompoundGatewayView for OptimalInterestRateFinder: ${gatewayToRegister}`);
+    } catch {
+      console.log(`Using v1 CompoundGateway for OptimalInterestRateFinder: ${gatewayToRegister}`);
+    }
+
+    console.log(`Registering gateway with OptimalInterestRateFinder at ${optimalInterestRateFinder.address}`);
 
     await execute(
       "OptimalInterestRateFinder",
       { from: deployer, log: true },
       "registerGateway",
       "compound",
-      compoundGateway.address,
+      gatewayToRegister,
     );
 
-    console.log("CompoundGateway registered with OptimalInterestRateFinder");
+    console.log("Gateway registered with OptimalInterestRateFinder");
   } catch (error) {
     console.warn("Failed to register with OptimalInterestRateFinder:", error);
   }
