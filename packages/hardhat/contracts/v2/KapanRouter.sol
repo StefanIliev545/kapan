@@ -70,8 +70,23 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function processProtocolInstructions(ProtocolTypes.ProtocolInstruction[] calldata instructions) external {
+        verifyInstructionAuthorization(instructions);
         convertToStack(instructions);
         runStack();
+    }
+
+    function verifyInstructionAuthorization(ProtocolTypes.ProtocolInstruction[] calldata instructions) internal view {
+        for (uint256 i = 0; i < instructions.length; i++) {
+            ProtocolTypes.ProtocolInstruction calldata instruction = instructions[i];
+            // Skip router instructions (they have their own authorization)
+            if (keccak256(abi.encode(instruction.protocolName)) != keccak256(abi.encode("router"))) {
+                ProtocolTypes.LendingInstruction memory lendingInstr = abi.decode(instruction.data, (ProtocolTypes.LendingInstruction));
+                if (lendingInstr.op == ProtocolTypes.LendingOp.Borrow || 
+                    lendingInstr.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                    require(lendingInstr.user == msg.sender, "Not authorized: sender must match user");
+                }
+            }
+        }
     }
 
     function runStack() internal {
