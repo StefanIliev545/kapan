@@ -7,32 +7,33 @@ import dynamic from "next/dynamic";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
 import StableArea from "~~/components/common/StableArea";
+import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { arbitrum, base, optimism } from "wagmi/chains";
 
 // ---- Lazy-load heavy protocol views (client-only) ----
 const AaveProtocolView = dynamic(
   () => import("~~/components/specific/aave/AaveProtocolView").then(m => m.AaveProtocolView),
-  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Aave…</StableArea> }
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Aave" /> }
 );
 
 const CompoundProtocolView = dynamic(
   () => import("~~/components/specific/compound/CompoundProtocolView").then(m => m.CompoundProtocolView),
-  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Compound…</StableArea> }
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Compound" /> }
 );
 
 const VenusProtocolView = dynamic(
   () => import("~~/components/specific/venus/VenusProtocolView").then(m => m.VenusProtocolView),
-  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Venus…</StableArea> }
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Venus" /> }
 );
 
 const VesuProtocolView = dynamic(
   () => import("~~/components/specific/vesu/VesuProtocolView").then(m => m.VesuProtocolView),
-  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Vesu…</StableArea> }
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Vesu" /> }
 );
 
 const NostraProtocolView = dynamic(
   () => import("~~/components/specific/nostra/NostraProtocolView").then(m => m.NostraProtocolView),
-  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Nostra…</StableArea> }
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Nostra" /> }
 );
 
 // Network options (memo for referential stability)
