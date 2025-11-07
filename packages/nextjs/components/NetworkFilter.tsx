@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, useCallback, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
 import Image from "next/image";
@@ -26,6 +26,10 @@ const NETWORK_TO_CHAIN_ID: Record<string, number> = {
   optimism: 10,
 };
 
+// --- tweakable behavior flags ---
+const SHALLOW_URL_SYNC = true; // ✅ don't trigger app-router navigation
+const HISTORY_MODE: "replace" | "push" = "push"; // "push" so Back works
+
 const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   networks,
   defaultNetwork = networks[0]?.id,
@@ -36,11 +40,11 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const pathname = usePathname();
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
+
   const [selectedNetwork, setSelectedNetwork] = useState<string>(defaultNetwork);
   const selectedRef = useRef(selectedNetwork);
   const didInitRef = useRef(false);
   const suppressNextUrlSyncRef = useRef(false); // guards URL->state loop
-  const [isPending, startTransition] = useTransition();
 
   // keep ref in sync
   useEffect(() => {
@@ -52,8 +56,50 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     [networks]
   );
 
-  // 1) Initialize once after mount (and when networks/default change):
-  //    URL param > cache > default
+  // Helper: write the ?network=... into the URL *without* triggering navigation
+  const shallowUpdateUrl = useCallback((networkId: string, mode: "replace" | "push") => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("network", networkId);
+    if (mode === "push") {
+      window.history.pushState({ network: networkId }, "", url.toString());
+    } else {
+      window.history.replaceState({ network: networkId }, "", url.toString());
+    }
+  }, []);
+
+  // Listen to Back/Forward and keep our state in sync (because shallow updates won't notify Next)
+  useEffect(() => {
+    if (!SHALLOW_URL_SYNC) return;
+
+    const onPopState = () => {
+      const url = new URL(window.location.href);
+      const urlNetwork = url.searchParams.get("network");
+      if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
+        setSelectedNetwork(urlNetwork!);
+        onNetworkChange(urlNetwork!);
+
+        // cache
+        try {
+          localStorage.setItem(STORAGE_KEY, urlNetwork!);
+        } catch {}
+        // non-blocking wallet network switch
+        const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+        if (chainId && chainId !== chain?.id) {
+          try {
+            void switchChain?.({ chainId });
+          } catch (e) {
+            console.warn("Auto network switch failed on popstate", e);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [SHALLOW_URL_SYNC, isValid, onNetworkChange, chain?.id, switchChain]);
+
+  // 1) Initialize once after mount (URL > cache > default)
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
@@ -67,69 +113,62 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
         if (isValid(cached)) initial = cached!;
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
 
     if (initial && initial !== selectedRef.current) {
       setSelectedNetwork(initial);
       onNetworkChange(initial);
-      
-      // Switch wallet network if it's an EVM network
+
+      // Switch wallet network if it's an EVM network (non-blocking)
       const chainId = NETWORK_TO_CHAIN_ID[initial];
       if (chainId && chainId !== chain?.id) {
         try {
-          switchChain?.({ chainId });
+          void switchChain?.({ chainId });
         } catch (e) {
-          // Non-blocking; user can still switch manually
           console.warn("Auto network switch failed on init", e);
         }
       }
     }
   }, [defaultNetwork, isValid, onNetworkChange, searchParams, chain?.id, switchChain]);
 
-  // 2) React to *external* URL param changes (e.g. user navigates, shares a link).
-  //    Guard against the change we just made ourselves via suppressNextUrlSyncRef.
+  // 2) React to *external* URL param changes driven by Next navigation only.
+  //    (If SHALLOW_URL_SYNC is true, our own URL changes won't trigger this effect.)
   useEffect(() => {
     if (suppressNextUrlSyncRef.current) {
       suppressNextUrlSyncRef.current = false;
       return;
     }
+    if (SHALLOW_URL_SYNC) return; // shallow mode: we manage URL with popstate above
+
     const urlNetwork = searchParams.get("network");
     if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
       setSelectedNetwork(urlNetwork!);
       onNetworkChange(urlNetwork!);
       try {
         localStorage.setItem(STORAGE_KEY, urlNetwork!);
-      } catch {
-        // ignore
-      }
-      
-      // Switch wallet network if it's an EVM network
+      } catch {}
       const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
       if (chainId && chainId !== chain?.id) {
         try {
-          switchChain?.({ chainId });
+          void switchChain?.({ chainId });
         } catch (e) {
-          // Non-blocking; user can still switch manually
           console.warn("Auto network switch failed on URL change", e);
         }
       }
     }
   }, [isValid, onNetworkChange, searchParams, chain?.id, switchChain]);
 
-  // 3) If the networks list changes and current selection becomes invalid, fall back.
+  // 3) Handle invalid selection if networks change
   useEffect(() => {
     if (!isValid(selectedRef.current)) {
       const fallback = (isValid(defaultNetwork) && defaultNetwork) || networks[0]?.id;
       if (fallback && fallback !== selectedRef.current) {
-        // Use the same handler so URL/cache stay consistent
         handleNetworkChange(fallback);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [networks, defaultNetwork]); // intentionally not depending on handleNetworkChange
+  }, [networks, defaultNetwork]);
 
   const handleNetworkChange = (networkId: string) => {
     if (!isValid(networkId) || networkId === selectedRef.current) return;
@@ -141,29 +180,33 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     // Persist to cache
     try {
       localStorage.setItem(STORAGE_KEY, networkId);
-    } catch {
-      // ignore
-    }
+    } catch {}
 
-    // Switch wallet network if it's an EVM network
+    // Switch wallet network if it's an EVM network (non-blocking)
     const chainId = NETWORK_TO_CHAIN_ID[networkId];
     if (chainId && chainId !== chain?.id) {
       try {
-        switchChain?.({ chainId });
+        void switchChain?.({ chainId });
       } catch (e) {
-        // Non-blocking; user can still switch manually
         console.warn("Auto network switch failed", e);
       }
     }
 
-    // Update URL param (replace to avoid history spam) only if needed
-    const params = new URLSearchParams(searchParams.toString());
+    // Update URL
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : searchParams.toString()
+    );
     if (params.get("network") !== networkId) {
-      params.set("network", networkId);
-      suppressNextUrlSyncRef.current = true; // prevent the URL effect from re-applying
-      startTransition(() => {
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-      });
+      if (SHALLOW_URL_SYNC) {
+        shallowUpdateUrl(networkId, HISTORY_MODE); // ← no navigation
+      } else {
+        // Fallback to Next navigation (rare case if you really need it)
+        const next = new URLSearchParams(searchParams.toString());
+        next.set("network", networkId);
+        suppressNextUrlSyncRef.current = true;
+        // No startTransition here; let Next handle it
+        router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+      }
     }
   };
 
@@ -177,11 +220,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
               key={network.id}
               type="button"
               aria-pressed={isActive}
-              className={`btn btn-sm normal-case flex items-center gap-2 ${
-                isActive ? "btn-primary" : "btn-ghost"
+              // Keep dimensions stable to avoid “jump” when styles change:
+              className={`btn btn-sm normal-case inline-flex items-center gap-2 ${
+                isActive ? "btn-primary" : "btn-outline" // outline keeps width/border consistent
               }`}
               onClick={() => handleNetworkChange(network.id)}
-              disabled={isPending && !isActive} // optional: avoid spamming while URL updates
+              // Don’t globally disable other buttons; let people click around quickly.
             >
               <div className="w-5 h-5 relative">
                 <Image
@@ -192,7 +236,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
                   className="object-contain"
                 />
               </div>
-              <span>{network.name}</span>
+              <span className="whitespace-nowrap">{network.name}</span>
             </button>
           );
         })}
@@ -201,34 +245,36 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   );
 };
 
-// Wrapper component that handles Suspense boundary for useSearchParams
 export const NetworkFilter: React.FC<NetworkFilterProps> = (props) => {
   return (
-    <Suspense fallback={
-      <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
-        <div className="flex items-center gap-2">
-          {props.networks.map((network) => (
-            <button
-              key={network.id}
-              type="button"
-              disabled
-              className="btn btn-sm normal-case flex items-center gap-2 btn-ghost opacity-50"
-            >
-              <div className="w-5 h-5 relative">
-                <Image
-                  src={network.logo}
-                  alt={network.name}
-                  fill
-                  sizes="20px"
-                  className="object-contain"
-                />
-              </div>
-              <span>{network.name}</span>
-            </button>
-          ))}
+    <Suspense
+      fallback={
+        <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
+          <div className="flex items-center gap-2">
+            {props.networks.map((network) => (
+              <button
+                key={network.id}
+                type="button"
+                disabled
+                // keep pointer-events enabled for other parts of the page:
+                className="btn btn-sm normal-case inline-flex items-center gap-2 btn-outline opacity-60"
+              >
+                <div className="w-5 h-5 relative">
+                  <Image
+                    src={network.logo}
+                    alt={network.name}
+                    fill
+                    sizes="20px"
+                    className="object-contain"
+                  />
+                </div>
+                <span className="whitespace-nowrap">{network.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <NetworkFilterInner {...props} />
     </Suspense>
   );

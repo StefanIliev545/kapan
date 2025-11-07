@@ -1,71 +1,102 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, startTransition } from "react";
 import Image from "next/image";
 import type { NextPage } from "next";
+import dynamic from "next/dynamic";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
 import StableArea from "~~/components/common/StableArea";
-import { AaveProtocolView } from "~~/components/specific/aave/AaveProtocolView";
-import { CompoundProtocolView } from "~~/components/specific/compound/CompoundProtocolView";
-import { VenusProtocolView } from "~~/components/specific/venus/VenusProtocolView";
 import { arbitrum, base, optimism } from "wagmi/chains";
-import { VesuProtocolView } from "~~/components/specific/vesu/VesuProtocolView";
-import { NostraProtocolView } from "~~/components/specific/nostra/NostraProtocolView";
-// Define network options
-const networkOptions: NetworkOption[] = [
-  {
-    id: "starknet",
-    name: "Starknet",
-    logo: "/logos/starknet.svg",
-  },
-  {
-    id: "arbitrum",
-    name: "Arbitrum",
-    logo: "/logos/arb.svg",
-  },
-  {
-    id: "base",
-    name: "Base",
-    logo: "/logos/base.svg",
-  },
-  {
-    id: "optimism",
-    name: "Optimism",
-    logo: "/logos/optimism.svg",
-  },
-];
 
-// Custom icon for demonstration purposes
-const DiscordIcon = () => (
-  <div className="w-5 h-5 relative">
-    <Image
-      src="/logos/discord.svg"
-      alt="Discord"
-      fill
-      className="object-contain"
-    />
-  </div>
+// ---- Lazy-load heavy protocol views (client-only) ----
+const AaveProtocolView = dynamic(
+  () => import("~~/components/specific/aave/AaveProtocolView").then(m => m.AaveProtocolView),
+  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Aave…</StableArea> }
 );
+
+const CompoundProtocolView = dynamic(
+  () => import("~~/components/specific/compound/CompoundProtocolView").then(m => m.CompoundProtocolView),
+  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Compound…</StableArea> }
+);
+
+const VenusProtocolView = dynamic(
+  () => import("~~/components/specific/venus/VenusProtocolView").then(m => m.VenusProtocolView),
+  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Venus…</StableArea> }
+);
+
+const VesuProtocolView = dynamic(
+  () => import("~~/components/specific/vesu/VesuProtocolView").then(m => m.VesuProtocolView),
+  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Vesu…</StableArea> }
+);
+
+const NostraProtocolView = dynamic(
+  () => import("~~/components/specific/nostra/NostraProtocolView").then(m => m.NostraProtocolView),
+  { ssr: false, loading: () => <StableArea minHeight="28rem">Loading Nostra…</StableArea> }
+);
+
+// Network options (memo for referential stability)
+const networkOptions: NetworkOption[] = [
+  { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
+  { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
+  { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
+];
 
 const App: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
 
-  // Example of customizing the CallToAction component
-  const customSections: CallToActionSectionProps[] = [
+  // Keep a cache of networks the user has visited so we keep their trees mounted
+  const [mounted, setMounted] = useState<Set<string>>(new Set(["starknet"]));
+  useEffect(() => {
+    setMounted(prev => {
+      if (prev.has(selectedNetwork)) return prev;
+      const next = new Set(prev);
+      next.add(selectedNetwork);
+      return next;
+    });
+  }, [selectedNetwork]);
+
+  // Tiny helper so the button click never feels blocked
+  const handleNetworkChange = (id: string) => {
+    startTransition(() => setSelectedNetwork(id));
+  };
+
+  // Optional: prefetch likely-next bundles when idle (micro-UX win)
+  useEffect(() => {
+    const idle = (cb: () => void) =>
+      ("requestIdleCallback" in window ? (window as any).requestIdleCallback(cb) : setTimeout(cb, 200));
+
+    idle(async () => {
+      if (selectedNetwork === "starknet") {
+        import("~~/components/specific/aave/AaveProtocolView");
+        import("~~/components/specific/compound/CompoundProtocolView");
+        import("~~/components/specific/venus/VenusProtocolView");
+      } else {
+        import("~~/components/specific/vesu/VesuProtocolView");
+        import("~~/components/specific/nostra/NostraProtocolView");
+      }
+    });
+  }, [selectedNetwork]);
+
+  const warnings = useMemo(() => ({
+    arbitrum: "Arbitrum support is experimental and pre-audit.",
+    base: "Base support is experimental and pre-audit.",
+    optimism: "Optimism support is experimental and pre-audit.",
+  }), []);
+
+  const sections: CallToActionSectionProps[] = [
     {
       title: "⭐ Support on X",
       description: "We're building with real purpose — your follow helps us reach more builders!",
       buttonText: "Follow @KapanFinance",
       buttonLink: "https://x.com/KapanFinance",
-      // Using the default TwitterIcon from the component
     },
     {
       title: "🌱 Fund via Giveth",
       description: "We strive to provide everything for free, but we need your help to keep going!",
       buttonText: "Support on Giveth",
       buttonLink: "https://giveth.io/project/kapan-finance-defi-lending-management-protocol",
-      // Using the default GitcoinIcon from the component
     },
     {
       title: "Join Our Community",
@@ -73,34 +104,34 @@ const App: NextPage = () => {
       buttonText: "Join Discord",
       buttonLink: "https://discord.gg/Vjk6NhkxGv",
       emoji: "💬 ",
-      icon: <DiscordIcon />,
+      icon: (
+        <div className="w-5 h-5 relative">
+          <Image src="/logos/discord.svg" alt="Discord" fill className="object-contain" />
+        </div>
+      ),
     },
   ];
 
   return (
     <div className="container mx-auto flex flex-col gap-6 p-0 min-h-[calc(100vh-6rem)] py-6">
       <div className="flex-1 space-y-6">
-        <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+        <NetworkFilter
+          networks={networkOptions}
+          defaultNetwork="starknet"
+          onNetworkChange={handleNetworkChange}
+        />
 
-        {selectedNetwork === "arbitrum" && (
+        {/* Small, non-blocking warning */}
+        {warnings[selectedNetwork as keyof typeof warnings] && (
           <div className="my-4 text-sm text-warning text-center">
-            Arbitrum support is experimental and pre-audit.
-          </div>
-        )}
-        {selectedNetwork === "base" && (
-          <div className="my-4 text-sm text-warning text-center">
-            Base support is experimental and pre-audit.
-          </div>
-        )}
-        {selectedNetwork === "optimism" && (
-          <div className="my-4 text-sm text-warning text-center">
-            Optimism support is experimental and pre-audit.
+            {warnings[selectedNetwork as keyof typeof warnings]}
           </div>
         )}
 
-        {/* Protocol Views */}
-        {selectedNetwork === "arbitrum" && (
-          <div className="space-y-6">
+        {/* ---- Cached panes: once mounted, never unmount; just hide/show ---- */}
+        {/* ARBITRUM */}
+        {mounted.has("arbitrum") && (
+          <div className={selectedNetwork === "arbitrum" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "arbitrum"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={arbitrum.id} />
             </StableArea>
@@ -112,8 +143,10 @@ const App: NextPage = () => {
             </StableArea>
           </div>
         )}
-        {selectedNetwork === "base" && (
-          <div className="space-y-6">
+
+        {/* BASE */}
+        {mounted.has("base") && (
+          <div className={selectedNetwork === "base" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "base"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={base.id} />
             </StableArea>
@@ -125,8 +158,10 @@ const App: NextPage = () => {
             </StableArea>
           </div>
         )}
-        {selectedNetwork === "starknet" && (
-          <div className="space-y-6">
+
+        {/* STARKNET */}
+        {mounted.has("starknet") && (
+          <div className={selectedNetwork === "starknet" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "starknet"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <VesuProtocolView />
             </StableArea>
@@ -135,8 +170,10 @@ const App: NextPage = () => {
             </StableArea>
           </div>
         )}
-        {selectedNetwork === "optimism" && (
-          <div className="space-y-6">
+
+        {/* OPTIMISM */}
+        {mounted.has("optimism") && (
+          <div className={selectedNetwork === "optimism" ? "space-y-6" : "space-y-6 hidden"} aria-hidden={selectedNetwork !== "optimism"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={optimism.id} />
             </StableArea>
@@ -145,8 +182,8 @@ const App: NextPage = () => {
             </StableArea>
           </div>
         )}
-        {/* Custom Call to Action with additional section */}
-        <CallToAction sections={customSections} />
+
+        <CallToAction sections={sections} />
       </div>
     </div>
   );
