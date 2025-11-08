@@ -85,6 +85,17 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
     onClose();
   };
 
+  // Resolve selected token display values with fallback (needed for tokens like xSTRK)
+  const selectedAddress = selectedToken
+    ? `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`
+    : "";
+  const selectedRawSymbol = selectedToken ? feltToString(selectedToken.symbol) : "";
+  const selectedSymbol = selectedToken
+    ? (selectedRawSymbol && selectedRawSymbol.trim().length > 0
+        ? selectedRawSymbol
+        : getTokenNameFallback(selectedAddress) ?? selectedRawSymbol)
+    : "";
+
   return (
     <>
       <dialog className={`modal ${isOpen && !isTokenModalOpen ? "modal-open" : ""}`}>
@@ -139,9 +150,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}
           token={{
-            name: feltToString(selectedToken.symbol),
-            icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
-            address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
+            name: selectedSymbol,
+            icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
+            address: selectedAddress,
             currentRate: selectedToken.borrowAPR ?? 0,
             usdPrice:
               selectedToken.price && selectedToken.price.is_valid
@@ -164,9 +175,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
           isOpen={isTokenModalOpen}
           onClose={handleModalClose}
           token={{
-            name: feltToString(selectedToken.symbol),
-            icon: tokenNameToLogo(feltToString(selectedToken.symbol).toLowerCase()),
-            address: `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`,
+            name: selectedSymbol,
+            icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
+            address: selectedAddress,
             currentRate: selectedToken.supplyAPY ?? 0,
             usdPrice:
               selectedToken.price && selectedToken.price.is_valid

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
@@ -56,28 +56,37 @@ const cartridgeConnector = new ControllerConnector({
   defaultChainId: constants.StarknetChainId.SN_MAIN,
 });
 
-const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
+const ScaffoldEthApp = ({
+  children,
+  initialHost,
+}: {
+  children: React.ReactNode;
+  initialHost?: string | null;
+}) => {
   useInitializeNativeCurrencyPrice();
   const pathname = usePathname();
-  const [isClient, setIsClient] = useState(false);
+  const [hostname, setHostname] = useState<string | null>(initialHost ?? null);
 
   useEffect(() => {
-    setIsClient(true);
+    if (typeof window !== "undefined") {
+      setHostname(window.location.hostname);
+    }
   }, []);
 
-  // Determine which header to render based on the current route
+  const isAppSubdomain = hostname?.startsWith("app.") ?? false;
+  const isAppExperience = pathname.startsWith("/app") || isAppSubdomain;
+  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/automate");
+
   const renderHeader = () => {
-    // Check if hostname starts with "app." (for rewritten URLs like app.kapan.finance -> kapan.finance/app)
-    // Guarded behind client-mount to avoid SSR hydration differences on Vercel.
-    const isAppSubdomain = isClient && typeof window !== 'undefined' && window.location.hostname.startsWith('app.');
-    
-    if (pathname.startsWith('/app') || isAppSubdomain) {
+    if (isAppExperience) {
       return <AppHeader />;
-    } else if (pathname === '/' || pathname.startsWith('/info') || pathname.startsWith('/automate')) {
-      return <LandingHeader />;
-    } else {
-      return <Header />;
     }
+
+    if (isLandingRoute) {
+      return <LandingHeader />;
+    }
+
+    return <Header />;
   };
 
   return (
@@ -93,7 +102,13 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const ScaffoldEthAppWithProviders = ({ children }: { children: React.ReactNode }) => {
+export const ScaffoldEthAppWithProviders = ({
+  children,
+  initialHost,
+}: {
+  children: React.ReactNode;
+  initialHost?: string | null;
+}) => {
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === "dark";
   const [mounted, setMounted] = useState(false);
@@ -141,7 +156,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
                 <ModalProvider>
                   <StarknetWalletAnalytics />
                   <WalletAnalytics />
-                  <ScaffoldEthApp>{children}</ScaffoldEthApp>
+                  <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
                   <UnifiedTransactionModal />
                 </ModalProvider>
               </RainbowKitProvider>

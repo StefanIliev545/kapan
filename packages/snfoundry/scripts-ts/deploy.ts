@@ -572,7 +572,7 @@ const initializeContracts = async (addresses: {
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_collaterals",
       calldata: encodePoolAddrAssets(V2.DEFAULT_POOL_ADDRESS, [
-        T.ETH, T.WBTC, T.USDC, T.USDT, T.STRK, T.WSTETH,
+        T.ETH, T.WBTC, T.USDC, T.USDT, T.STRK, T.WSTETH, T.XWBTC, T.XSTRK,
       ]),
     },
     {

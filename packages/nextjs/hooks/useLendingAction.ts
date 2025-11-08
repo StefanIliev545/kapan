@@ -36,7 +36,7 @@ export const useLendingAction = (
 
   // For VesuV2, get the vault address and pool address from context
   const isVesuV2 = protocolName === "vesu_v2";
-  const poolAddress = vesuContext && 'poolAddress' in vesuContext ? vesuContext.poolAddress : "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5"; // V2 default pool
+  const poolAddress = vesuContext && 'poolAddress' in vesuContext ? vesuContext.poolAddress : "0x451fe483d5921a2919ddd81d0de6696669bccdacd859f72a4fba7656b97c3b5"; // V2 Prime pool
   
   // Check if this is a vToken position (from context metadata or counterpart is zero address)
   const isVTokenPositionCheck = (isVesuV2 && vesuContext && 'isVtoken' in vesuContext && vesuContext.isVtoken) ||
