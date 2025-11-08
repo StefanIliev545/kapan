@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
+import { arbitrum, base, linea, optimism } from "viem/chains";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import starknetContractsData, {
   type SNContract,
@@ -53,6 +54,23 @@ const networkOptions: NetworkOption[] = [
 
 const defaultEvmNetworkId = networkOptions[0]?.id ?? "arbitrum";
 
+const evmNetworkOptionToChainId: Record<string, number | undefined> = {
+  arbitrum: arbitrum.id,
+  base: base.id,
+  optimism: optimism.id,
+  linea: linea.id,
+};
+
+const chainIdToNetworkOptionId: Record<number, string> = Object.entries(evmNetworkOptionToChainId).reduce(
+  (acc, [networkId, chainId]) => {
+    if (typeof chainId === "number") {
+      acc[chainId] = networkId;
+    }
+    return acc;
+  },
+  {} as Record<number, string>,
+);
+
 const starknetContracts: SNContractsType = starknetContractsData;
 
 export const DeployedContractsList = () => {
@@ -62,23 +80,42 @@ export const DeployedContractsList = () => {
   const setTargetEvmNetwork = useGlobalState(state => state.setTargetEVMNetwork);
   const evmNetworks = useMemo(() => getTargetNetworks(), []);
   const [selectedNetwork, setSelectedNetwork] = useState<string>(() => {
-    const activeNetworkId = targetEvmNetwork.network;
-    return activeNetworkId && networkOptions.some(option => option.id === activeNetworkId)
-      ? activeNetworkId
-      : defaultEvmNetworkId;
+    const activeNetworkId = chainIdToNetworkOptionId[targetEvmNetwork.id];
+    return activeNetworkId ?? defaultEvmNetworkId;
   });
   const [isMounted, setIsMounted] = useState(false);
+  const selectedNetworkRef = useRef(selectedNetwork);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
+    selectedNetworkRef.current = selectedNetwork;
+  }, [selectedNetwork]);
+
+  useEffect(() => {
+    if (selectedNetworkRef.current === "starknet") {
+      return;
+    }
+
+    const activeNetworkId = chainIdToNetworkOptionId[targetEvmNetwork.id];
+    if (activeNetworkId && activeNetworkId !== selectedNetworkRef.current) {
+      setSelectedNetwork(activeNetworkId);
+    }
+  }, [targetEvmNetwork.id]);
+
+  useEffect(() => {
     if (selectedNetwork === "starknet") {
       return;
     }
 
-    const matchingNetwork = evmNetworks.find(network => network.network === selectedNetwork);
+    const chainId = evmNetworkOptionToChainId[selectedNetwork];
+    if (!chainId) {
+      return;
+    }
+
+    const matchingNetwork = evmNetworks.find(network => network.id === chainId);
     if (matchingNetwork && matchingNetwork.id !== targetEvmNetwork.id) {
       setTargetEvmNetwork(matchingNetwork);
     }
