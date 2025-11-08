@@ -1,31 +1,39 @@
+"use client";
+
 import { FC, useCallback, useEffect } from "react";
-import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { useEVMTransactionModal } from "~~/hooks/useEVMTransactionModal";
-import { PositionManager } from "~~/utils/position";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import type { ModalData } from "~~/contexts/ModalContext";
 import type { Address } from "viem";
 
-interface DepositModalProps {
-  isOpen: boolean;
+interface DepositPanelProps {
+  modal: ModalData;
   onClose: () => void;
-  token: TokenInfo;
-  protocolName: string;
-  position?: PositionManager;
-  chainId?: number;
-  market?: Address; // Market address for Compound (baseToken/comet address)
 }
 
-export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId, market }) => {
+export const DepositPanel: FC<DepositPanelProps> = ({ modal, onClose }) => {
+  if (!modal.token || !modal.protocolName) return null;
+
+  const { token, protocolName, chainId, market, position } = modal;
   const { buildDepositFlow } = useKapanRouterV2();
-  const { balance, decimals, preferBatching, setPreferBatching, isPreferenceLoaded, isAnyConfirmed, executeTransaction } = useEVMTransactionModal({
-    isOpen,
+  const {
+    balance,
+    decimals,
+    preferBatching,
+    setPreferBatching,
+    isPreferenceLoaded,
+    isAnyConfirmed,
+    executeTransaction,
+  } = useEVMTransactionModal({
+    isOpen: true,
     chainId,
     tokenAddress: token.address,
     protocolName,
     market,
   });
 
-  if (token.decimals == null) {
+  if (token.decimals == null && decimals) {
     token.decimals = decimals;
   }
 
@@ -47,7 +55,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
 
   return (
     <TokenActionModal
-      isOpen={isOpen}
+      isOpen={true}
       onClose={onClose}
       action="Deposit"
       token={token}
@@ -78,3 +86,4 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
     />
   );
 };
+

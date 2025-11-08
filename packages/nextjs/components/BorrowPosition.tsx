@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -167,45 +167,48 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Render actions in a single horizontal row for both mobile and desktop
 
-  const handleBorrowClick = onBorrow ?? borrowModal.open;
+  const handleBorrowClick = useMemo(() => onBorrow ?? borrowModal.open, [onBorrow, borrowModal.open]);
 
-  const borrowPoolId = (() => {
+  const borrowPoolId = useMemo(() => {
     if (!vesuContext?.borrow) return undefined;
     if (isVesuContextV1(vesuContext.borrow)) return vesuContext.borrow.poolId;
     if (isVesuContextV2(vesuContext.borrow)) return BigInt(vesuContext.borrow.poolAddress);
     return undefined;
-  })();
-  const repayPoolId = (() => {
+  }, [vesuContext?.borrow]);
+  const repayPoolId = useMemo(() => {
     if (!vesuContext?.repay) return undefined;
     if (isVesuContextV1(vesuContext.repay)) return vesuContext.repay.poolId;
     if (isVesuContextV2(vesuContext.repay)) return BigInt(vesuContext.repay.poolAddress);
     return undefined;
-  })();
-  const movePoolId = borrowPoolId ?? repayPoolId;
+  }, [vesuContext?.repay]);
+  const movePoolId = useMemo(() => borrowPoolId ?? repayPoolId, [borrowPoolId, repayPoolId]);
 
-  const moveFromProtocol: "Vesu" | "Nostra" | "VesuV2" = (() => {
+  const moveFromProtocol: "Vesu" | "Nostra" | "VesuV2" = useMemo(() => {
     const normalized = protocolName.toLowerCase();
     if (normalized === "vesu") return "Vesu";
     if (normalized === "vesu_v2") return "VesuV2";
     if (normalized === "nostra") return "Nostra";
     return "Vesu";
-  })();
+  }, [protocolName]);
 
-  // Toggle expanded state
-  const toggleExpanded = (e: React.MouseEvent) => {
-    // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest(".dropdown")) {
-      return;
-    }
-    if (!hasAnyActions) {
-      return;
-    }
-    if (onToggleExpanded) {
-      onToggleExpanded();
-    } else {
-      expanded.toggle();
-    }
-  };
+  // Toggle expanded state - memoized to prevent re-renders
+  const toggleExpanded = useCallback(
+    (e: React.MouseEvent) => {
+      // Don't expand if clicking on the info button or its dropdown
+      if ((e.target as HTMLElement).closest(".dropdown")) {
+        return;
+      }
+      if (!hasAnyActions) {
+        return;
+      }
+      if (onToggleExpanded) {
+        onToggleExpanded();
+      } else {
+        expanded.toggle();
+      }
+    },
+    [hasAnyActions, onToggleExpanded, expanded]
+  );
 
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView

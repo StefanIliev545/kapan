@@ -1,4 +1,4 @@
-import React, { FC, ReactNode } from "react";
+import React, { FC, ReactNode, memo, useMemo } from "react";
 import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
 
 type PositionCardProps = {
@@ -16,7 +16,7 @@ type PositionCardProps = {
   footer?: React.ReactNode;
 };
 
-export const PositionCard: FC<PositionCardProps> = ({
+export const PositionCard: FC<PositionCardProps> = memo(({
   isExpanded,
   canToggle,
   onToggle,
@@ -30,11 +30,15 @@ export const PositionCard: FC<PositionCardProps> = ({
   actionSection,
   footer,
 }) => {
-  const containerClasses = `w-full p-3 rounded-md ${
-    isExpanded ? "bg-base-300" : "bg-base-200"
-  } ${
-    canToggle ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"
-  } transition-all duration-200 ${containerClassName ?? ""}`;
+  const containerClasses = useMemo(
+    () =>
+      `w-full p-3 rounded-md ${
+        isExpanded ? "bg-base-300" : "bg-base-200"
+      } ${
+        canToggle ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"
+      } transition-all duration-200 ${containerClassName ?? ""}`,
+    [isExpanded, canToggle, containerClassName]
+  );
 
   return (
     <>
@@ -67,7 +71,8 @@ export const PositionCard: FC<PositionCardProps> = ({
       {footer}
     </>
   );
-};
+});
+PositionCard.displayName = "PositionCard";
 
 type PositionInfoDropdownProps = {
   name: string;
@@ -77,7 +82,7 @@ type PositionInfoDropdownProps = {
   extraDetails?: React.ReactNode;
 };
 
-export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
+export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = memo(({
   name,
   protocolName,
   tokenAddress,
@@ -116,13 +121,14 @@ export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
       </div>
     </div>
   </div>
-);
+));
+PositionInfoDropdown.displayName = "PositionInfoDropdown";
 
 type PositionToggleIndicatorProps = {
   isExpanded: boolean;
 };
 
-export const PositionToggleIndicator: FC<PositionToggleIndicatorProps> = ({ isExpanded }) => (
+export const PositionToggleIndicator: FC<PositionToggleIndicatorProps> = memo(({ isExpanded }) => (
   <div
     className={`flex items-center justify-center w-7 h-7 rounded-full ${
       isExpanded ? "bg-primary/20" : "bg-base-300/50"
@@ -134,7 +140,8 @@ export const PositionToggleIndicator: FC<PositionToggleIndicatorProps> = ({ isEx
       <FiChevronDown className="w-4 h-4 text-base-content/70" />
     )}
   </div>
-);
+));
+PositionToggleIndicator.displayName = "PositionToggleIndicator";
 
 type PositionActionButton = {
   key: string;
@@ -151,15 +158,21 @@ type PositionActionButtonsProps = {
   actions: Array<PositionActionButton | null | undefined>;
 };
 
-export const PositionActionButtons: FC<PositionActionButtonsProps> = ({ actions }) => {
-  const visibleActions = actions.filter((action): action is PositionActionButton => Boolean(action));
+export const PositionActionButtons: FC<PositionActionButtonsProps> = memo(({ actions }) => {
+  const visibleActions = useMemo(
+    () => actions.filter((action): action is PositionActionButton => Boolean(action)),
+    [actions]
+  );
 
   if (!visibleActions.length) {
     return null;
   }
 
-  const actionGridClass =
-    visibleActions.length === 1 ? "grid-cols-1" : visibleActions.length === 2 ? "grid-cols-2" : "grid-cols-3";
+  const actionGridClass = useMemo(
+    () =>
+      visibleActions.length === 1 ? "grid-cols-1" : visibleActions.length === 2 ? "grid-cols-2" : "grid-cols-3",
+    [visibleActions.length]
+  );
 
   const renderButton = (action: PositionActionButton, variant: "mobile" | "desktop") => {
     const baseClasses = variant === "mobile" ? "btn btn-sm w-full flex justify-center items-center" : "btn btn-sm flex justify-center items-center";
@@ -191,6 +204,7 @@ export const PositionActionButtons: FC<PositionActionButtonsProps> = ({ actions 
       </div>
     </>
   );
-};
+});
+PositionActionButtons.displayName = "PositionActionButtons";
 
 export type { PositionActionButton };

@@ -34,8 +34,19 @@ import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
+import { ModalProvider } from "~~/contexts/ModalContext";
+import dynamic from "next/dynamic";
 import { ControllerConnector } from "@cartridge/connector";
 import { constants } from "starknet";
+
+// Lazy-load the unified modal component - code-split into separate chunk
+const UnifiedTransactionModal = dynamic(
+  () => import("~~/components/modals/UnifiedTransactionModal").then(m => ({ default: m.UnifiedTransactionModal })),
+  {
+    ssr: false,
+    loading: () => null, // No loading UI needed - modal only shows when open
+  }
+);
 
 const cartridgeConnector = new ControllerConnector({
   chains: [
@@ -127,9 +138,12 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
                 avatar={BlockieAvatar}
                 theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
               >
-                <StarknetWalletAnalytics />
-                <WalletAnalytics />
-                <ScaffoldEthApp>{children}</ScaffoldEthApp>
+                <ModalProvider>
+                  <StarknetWalletAnalytics />
+                  <WalletAnalytics />
+                  <ScaffoldEthApp>{children}</ScaffoldEthApp>
+                  <UnifiedTransactionModal />
+                </ModalProvider>
               </RainbowKitProvider>
             </StarkBlockNumberProvider>
           </BlockNumberProvider>

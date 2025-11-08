@@ -1,38 +1,38 @@
-import { FC, useCallback, useEffect } from "react";
-import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { formatUnits } from "viem";
-import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import { useEVMTransactionModal } from "~~/hooks/useEVMTransactionModal";
-import { PositionManager } from "~~/utils/position";
+"use client";
 
-interface RepayModalProps {
-  isOpen: boolean;
+import { FC, useCallback, useEffect } from "react";
+import { TokenActionModal } from "../TokenActionModal";
+import { useEVMTransactionModal } from "~~/hooks/useEVMTransactionModal";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { formatUnits } from "viem";
+import type { ModalData } from "~~/contexts/ModalContext";
+
+interface RepayPanelProps {
+  modal: ModalData;
   onClose: () => void;
-  token: TokenInfo;
-  protocolName: string;
-  debtBalance: bigint;
-  position?: PositionManager;
-  chainId?: number;
 }
 
-export const RepayModal: FC<RepayModalProps> = ({
-  isOpen,
-  onClose,
-  token,
-  protocolName,
-  debtBalance,
-  position,
-  chainId,
-}) => {
+export const RepayPanel: FC<RepayPanelProps> = ({ modal, onClose }) => {
+  if (!modal.token || !modal.protocolName || !modal.debtBalance) return null;
+
+  const { token, protocolName, chainId, debtBalance, position } = modal;
   const { buildRepayFlowAsync } = useKapanRouterV2();
-  const { balance: walletBalance, decimals, preferBatching, setPreferBatching, isPreferenceLoaded, isAnyConfirmed, executeTransaction } = useEVMTransactionModal({
-    isOpen,
+  const {
+    balance: walletBalance,
+    decimals,
+    preferBatching,
+    setPreferBatching,
+    isPreferenceLoaded,
+    isAnyConfirmed,
+    executeTransaction,
+  } = useEVMTransactionModal({
+    isOpen: true,
     chainId,
     tokenAddress: token.address,
     protocolName,
   });
 
-  if (token.decimals == null) {
+  if (token.decimals == null && decimals) {
     token.decimals = decimals;
   }
 
@@ -41,10 +41,10 @@ export const RepayModal: FC<RepayModalProps> = ({
   const maxInput = walletBalance < bump ? walletBalance : bump;
 
   useEffect(() => {
-    if (isAnyConfirmed && isOpen) {
+    if (isAnyConfirmed) {
       onClose();
     }
-  }, [isAnyConfirmed, isOpen, onClose]);
+  }, [isAnyConfirmed, onClose]);
 
   const handleRepay = useCallback(
     async (amount: string, isMax?: boolean) => {
@@ -65,7 +65,7 @@ export const RepayModal: FC<RepayModalProps> = ({
 
   return (
     <TokenActionModal
-      isOpen={isOpen}
+      isOpen={true}
       onClose={onClose}
       action="Repay"
       token={token}
@@ -80,19 +80,22 @@ export const RepayModal: FC<RepayModalProps> = ({
       network="evm"
       position={position}
       onConfirm={handleRepay}
-      renderExtraContent={() => isPreferenceLoaded ? (
-        <div className="pt-2 pb-1">
-          <label className="label cursor-pointer gap-2 justify-start">
-            <input
-              type="checkbox"
-              checked={preferBatching}
-              onChange={(e) => setPreferBatching(e.target.checked)}
-              className="checkbox checkbox-sm"
-            />
-            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-          </label>
-        </div>
-      ) : null}
+      renderExtraContent={() =>
+        isPreferenceLoaded ? (
+          <div className="pt-2 pb-1">
+            <label className="label cursor-pointer gap-2 justify-start">
+              <input
+                type="checkbox"
+                checked={preferBatching}
+                onChange={(e) => setPreferBatching(e.target.checked)}
+                className="checkbox checkbox-sm"
+              />
+              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+            </label>
+          </div>
+        ) : null
+      }
     />
   );
 };
+

@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -152,26 +152,29 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   // const actionGridClass =
   //   visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
 
-  const handleDepositClick = onDeposit ?? depositModal.open;
-  const handleWithdrawClick = onWithdraw ?? withdrawModal.open;
-  const handleMoveClick = onMove ?? moveModal.open;
-  const handleSwapClick = onSwap;
+  const handleDepositClick = useMemo(() => onDeposit ?? depositModal.open, [onDeposit, depositModal.open]);
+  const handleWithdrawClick = useMemo(() => onWithdraw ?? withdrawModal.open, [onWithdraw, withdrawModal.open]);
+  const handleMoveClick = useMemo(() => onMove ?? moveModal.open, [onMove, moveModal.open]);
+  const handleSwapClick = useMemo(() => onSwap, [onSwap]);
 
-  // Toggle expanded state
-  const toggleExpanded = (e: React.MouseEvent) => {
-    // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest(".dropdown")) {
-      return;
-    }
-    if (!hasAnyActions) {
-      return;
-    }
-    if (onToggleExpanded) {
-      onToggleExpanded();
-    } else {
-      expanded.toggle();
-    }
-  };
+  // Toggle expanded state - memoized to prevent re-renders
+  const toggleExpanded = useCallback(
+    (e: React.MouseEvent) => {
+      // Don't expand if clicking on the info button or its dropdown
+      if ((e.target as HTMLElement).closest(".dropdown")) {
+        return;
+      }
+      if (!hasAnyActions) {
+        return;
+      }
+      if (onToggleExpanded) {
+        onToggleExpanded();
+      } else {
+        expanded.toggle();
+      }
+    },
+    [hasAnyActions, onToggleExpanded, expanded]
+  );
 
   const defaultInfoButton = (
     <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0">
@@ -205,17 +208,23 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
 
-  const baseStatColumns = hideBalanceColumn ? 2 : 3;
-  const totalStatColumns = baseStatColumns + extraStats.length;
-  const statColumnClassMap: Record<number, string> = {
-    1: "grid-cols-1",
-    2: "grid-cols-2",
-    3: "grid-cols-3",
-    4: "grid-cols-4",
-    5: "grid-cols-5",
-    6: "grid-cols-6",
-  };
-  const statGridClass = statColumnClassMap[totalStatColumns] ?? "grid-cols-3";
+  const baseStatColumns = useMemo(() => (hideBalanceColumn ? 2 : 3), [hideBalanceColumn]);
+  const totalStatColumns = useMemo(() => baseStatColumns + extraStats.length, [baseStatColumns, extraStats.length]);
+  const statColumnClassMap: Record<number, string> = useMemo(
+    () => ({
+      1: "grid-cols-1",
+      2: "grid-cols-2",
+      3: "grid-cols-3",
+      4: "grid-cols-4",
+      5: "grid-cols-5",
+      6: "grid-cols-6",
+    }),
+    []
+  );
+  const statGridClass = useMemo(
+    () => statColumnClassMap[totalStatColumns] ?? "grid-cols-3",
+    [statColumnClassMap, totalStatColumns]
+  );
 
   const statColumns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
 

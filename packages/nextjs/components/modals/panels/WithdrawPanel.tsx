@@ -1,42 +1,39 @@
+"use client";
+
 import { FC, useCallback, useEffect } from "react";
-import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { formatUnits } from "viem";
-import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { TokenActionModal } from "../TokenActionModal";
 import { useEVMTransactionModal } from "~~/hooks/useEVMTransactionModal";
-import { PositionManager } from "~~/utils/position";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
+import { formatUnits } from "viem";
+import type { ModalData } from "~~/contexts/ModalContext";
 import type { Address } from "viem";
 
-interface WithdrawModalProps {
-  isOpen: boolean;
+interface WithdrawPanelProps {
+  modal: ModalData;
   onClose: () => void;
-  token: TokenInfo;
-  protocolName: string;
-  supplyBalance: bigint;
-  position?: PositionManager;
-  chainId?: number;
-  market?: Address; // Market address for Compound (baseToken/comet address)
 }
 
-export const WithdrawModal: FC<WithdrawModalProps> = ({
-  isOpen,
-  onClose,
-  token,
-  protocolName,
-  supplyBalance,
-  position,
-  chainId,
-  market,
-}) => {
+export const WithdrawPanel: FC<WithdrawPanelProps> = ({ modal, onClose }) => {
+  if (!modal.token || !modal.protocolName || !modal.supplyBalance) return null;
+
+  const { token, protocolName, chainId, market, supplyBalance, position } = modal;
   const { buildWithdrawFlow } = useKapanRouterV2();
-  const { decimals, preferBatching, setPreferBatching, isPreferenceLoaded, isAnyConfirmed, executeTransaction } = useEVMTransactionModal({
-    isOpen,
+  const {
+    decimals,
+    preferBatching,
+    setPreferBatching,
+    isPreferenceLoaded,
+    isAnyConfirmed,
+    executeTransaction,
+  } = useEVMTransactionModal({
+    isOpen: true,
     chainId,
     tokenAddress: token.address,
     protocolName,
     market,
   });
 
-  if (token.decimals == null) {
+  if (token.decimals == null && decimals) {
     token.decimals = decimals;
   }
 
@@ -44,10 +41,10 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   const maxInput = (supplyBalance * 101n) / 100n;
 
   useEffect(() => {
-    if (isAnyConfirmed && isOpen) {
+    if (isAnyConfirmed) {
       onClose();
     }
-  }, [isAnyConfirmed, isOpen, onClose]);
+  }, [isAnyConfirmed, onClose]);
 
   const handleWithdraw = useCallback(
     async (amount: string, isMax?: boolean) => {
@@ -69,7 +66,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
 
   return (
     <TokenActionModal
-      isOpen={isOpen}
+      isOpen={true}
       onClose={onClose}
       action="Withdraw"
       token={token}
@@ -84,19 +81,22 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       network="evm"
       position={position}
       onConfirm={handleWithdraw}
-      renderExtraContent={() => isPreferenceLoaded ? (
-        <div className="pt-2 pb-1">
-          <label className="label cursor-pointer gap-2 justify-start">
-            <input
-              type="checkbox"
-              checked={preferBatching}
-              onChange={(e) => setPreferBatching(e.target.checked)}
-              className="checkbox checkbox-sm"
-            />
-            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-          </label>
-        </div>
-      ) : null}
+      renderExtraContent={() =>
+        isPreferenceLoaded ? (
+          <div className="pt-2 pb-1">
+            <label className="label cursor-pointer gap-2 justify-start">
+              <input
+                type="checkbox"
+                checked={preferBatching}
+                onChange={(e) => setPreferBatching(e.target.checked)}
+                className="checkbox checkbox-sm"
+              />
+              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
+            </label>
+          </div>
+        ) : null
+      }
     />
   );
 };
+

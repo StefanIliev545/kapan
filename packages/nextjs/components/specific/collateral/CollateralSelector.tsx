@@ -1,4 +1,4 @@
-import React, { FC, useState, useEffect, useMemo } from "react";
+import React, { FC, useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { FiX } from "react-icons/fi";
 import { formatUnits, parseUnits } from "viem";
@@ -112,35 +112,38 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
     });
   };
 
-  // Handle selecting a collateral
-  const handleCollateralToggle = (collateral: CollateralToken) => {
-    // Don't allow selection if the collateral is not supported or has zero balance
-    if (!collateral.supported || collateral.rawBalance <= 0n) return;
-    
-    setSelectedCollaterals(prev => {
-      // Check if collateral is already selected
-      const existingIndex = prev.findIndex(c => c.token === collateral.address);
-      
-      if (existingIndex >= 0) {
-        // Remove it if already selected
-        return prev.filter(c => c.token !== collateral.address);
-      } else {
-        // Add it with default amount = 0
-        return [
-          ...prev,
-          {
-            token: collateral.address,
-            amount: 0n,
-            symbol: collateral.symbol,
-            decimals: collateral.decimals,
-            maxAmount: collateral.rawBalance,
-            // Track whether this collateral is supported in the current protocol
-            supported: collateral.supported
-          },
-        ];
-      }
-    });
-  };
+  // Handle selecting a collateral - memoized to prevent re-renders
+  const handleCollateralToggle = useCallback(
+    (collateral: CollateralToken) => {
+      // Don't allow selection if the collateral is not supported or has zero balance
+      if (!collateral.supported || collateral.rawBalance <= 0n) return;
+
+      setSelectedCollaterals(prev => {
+        // Check if collateral is already selected
+        const existingIndex = prev.findIndex(c => c.token === collateral.address);
+
+        if (existingIndex >= 0) {
+          // Remove it if already selected
+          return prev.filter(c => c.token !== collateral.address);
+        } else {
+          // Add it with default amount = 0
+          return [
+            ...prev,
+            {
+              token: collateral.address,
+              amount: 0n,
+              symbol: collateral.symbol,
+              decimals: collateral.decimals,
+              maxAmount: collateral.rawBalance,
+              // Track whether this collateral is supported in the current protocol
+              supported: collateral.supported,
+            },
+          ];
+        }
+      });
+    },
+    []
+  );
 
   // Update selected collaterals when protocol changes
   useEffect(() => {

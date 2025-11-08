@@ -51,8 +51,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const { address: userAddress, chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const protocols = [{ name: "Aave V3" }, { name: "Compound V3" }, { name: "Venus" }];
-
-  const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
+  const availableProtocols = protocols.filter(p => p.name !== fromProtocol);
+  
+  const [selectedProtocol, setSelectedProtocol] = useState(availableProtocols[0]?.name || "");
   const [amount, setAmount] = useState("");
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,7 +143,61 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     [JSON.stringify(fetchedCollaterals.map((c: any) => c.address))],
   );
 
-  // Use the hook to check collateral support.
+  // Check collateral support for each available protocol (for dropdown compatibility)
+  const aaveSupport = useCollateralSupport("Aave V3", position.tokenAddress, collateralAddresses, isOpen && position.type === "borrow");
+  const compoundSupport = useCollateralSupport("Compound V3", position.tokenAddress, collateralAddresses, isOpen && position.type === "borrow");
+  const venusSupport = useCollateralSupport("Venus", position.tokenAddress, collateralAddresses, isOpen && position.type === "borrow");
+
+  // Map protocol names to their support status
+  type ProtocolSupportMap = {
+    "Aave V3": boolean | null;
+    "Compound V3": boolean | null;
+    "Venus": boolean | null;
+  };
+  
+  const protocolSupportMap = useMemo<ProtocolSupportMap>(() => {
+    if (position.type !== "borrow") {
+      // Supply positions don't need collateral, so all protocols are compatible
+      return {
+        "Aave V3": true,
+        "Compound V3": true,
+        "Venus": true,
+      };
+    }
+    
+    const checkHasSupported = (support: { supportedCollaterals: Record<string, boolean>; isLoading: boolean }) => {
+      if (support.isLoading) return null; // Still loading
+      return Object.values(support.supportedCollaterals).some(supported => supported === true);
+    };
+
+    return {
+      "Aave V3": checkHasSupported(aaveSupport),
+      "Compound V3": checkHasSupported(compoundSupport),
+      "Venus": checkHasSupported(venusSupport),
+    };
+  }, [aaveSupport, compoundSupport, venusSupport, position.type]);
+
+  // Find a protocol with supported collaterals for default selection
+  const defaultProtocol = useMemo(() => {
+    // First try to find a protocol with supported collaterals
+    const compatibleProtocol = availableProtocols.find(p => protocolSupportMap[p.name as keyof ProtocolSupportMap] === true);
+    if (compatibleProtocol) return compatibleProtocol.name;
+    
+    // If none found, use the first available protocol
+    return availableProtocols[0]?.name || "";
+  }, [availableProtocols, protocolSupportMap]);
+
+  // Update selected protocol when default changes (e.g., when support data loads)
+  useEffect(() => {
+    if (!selectedProtocol && defaultProtocol) {
+      setSelectedProtocol(defaultProtocol);
+    } else if (selectedProtocol && protocolSupportMap[selectedProtocol as keyof ProtocolSupportMap] === false && defaultProtocol) {
+      // If current selection is incompatible and a compatible one is available, switch to it
+      setSelectedProtocol(defaultProtocol);
+    }
+  }, [defaultProtocol, selectedProtocol, protocolSupportMap, setSelectedProtocol]);
+
+  // Use the hook to check collateral support for the selected protocol.
   const { isLoading: isLoadingCollateralSupport, supportedCollaterals } = useCollateralSupport(
     selectedProtocol,
     position.tokenAddress,
@@ -161,6 +216,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       },
     );
   }, [fetchedCollaterals, supportedCollaterals]);
+
+  // Check if there are any supported collaterals available
+  const hasSupportedCollaterals = useMemo(() => {
+    if (position.type !== "borrow") return true; // Supply positions don't need collateral
+    if (isLoadingCollaterals || isLoadingCollateralSupport) return true; // Don't show error while loading
+    return collateralsForSelector.some(c => c.supported === true);
+  }, [collateralsForSelector, isLoadingCollaterals, isLoadingCollateralSupport, position.type]);
 
   // Fetch USD prices for debt token and selected collaterals using EVM helper
   const { data: tokenPrices } = useNetworkAwareReadContract({
@@ -461,14 +523,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </div>
             {position.type === "borrow" && (
               <div className="mt-6">
-                <CollateralSelector
-                  collaterals={collateralsForSelector}
-                  isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
-                  selectedProtocol={selectedProtocol}
-                  onCollateralSelectionChange={handleCollateralSelectionChange}
-                  marketToken={position.tokenAddress}
-                  hideAmounts
-                />
+                {!hasSupportedCollaterals ? (
+                  <div className="alert alert-warning">
+                    <FiAlertTriangle className="w-5 h-5" />
+                    <span>Can&apos;t move position due to no collateral being supported.</span>
+                  </div>
+                ) : (
+                  <CollateralSelector
+                    collaterals={collateralsForSelector}
+                    isLoading={isLoadingCollaterals || isLoadingCollateralSupport}
+                    selectedProtocol={selectedProtocol}
+                    onCollateralSelectionChange={handleCollateralSelectionChange}
+                    marketToken={position.tokenAddress}
+                    hideAmounts
+                  />
+                )}
               </div>
             )}
           </div>
@@ -568,13 +637,19 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                   tabIndex={0}
                   className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
                 >
-                  {protocols
-                    .filter(p => p.name !== fromProtocol)
-                    .map(protocol => (
+                  {availableProtocols.map(protocol => {
+                    const isCompatible = protocolSupportMap[protocol.name as keyof ProtocolSupportMap];
+                    const isIncompatible = isCompatible === false; // Explicitly false (not null/undefined)
+                    const isLoading = isCompatible === null; // null means still loading
+                    
+                    return (
                       <li key={protocol.name}>
                         <button
-                          className="flex items-center gap-3 py-2"
+                          className={`flex items-center gap-3 py-2 ${
+                            isIncompatible ? "opacity-50 cursor-pointer" : ""
+                          } ${isLoading ? "opacity-70" : ""}`}
                           onClick={() => setSelectedProtocol(protocol.name)}
+                          disabled={isLoading}
                         >
                           <Image
                             src={getProtocolLogo(protocol.name)}
@@ -583,10 +658,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                             height={32}
                             className="rounded-full min-w-[32px]"
                           />
-                          <span className="truncate text-lg">{protocol.name}</span>
+                          <span className={`truncate text-lg ${isIncompatible ? "text-base-content/60" : ""}`}>
+                            {protocol.name}
+                            {isIncompatible && position.type === "borrow" && (
+                              <span className="text-xs text-warning ml-2">(no supported collateral)</span>
+                            )}
+                          </span>
                         </button>
                       </li>
-                    ))}
+                    );
+                  })}
                 </ul>
               </div>
             </div>

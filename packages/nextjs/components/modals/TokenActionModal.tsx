@@ -284,6 +284,15 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     return buildCalls(amount, isMax);
   }, [buildCalls, amount, isMax]);
 
+  // Memoize onChange handler to prevent PercentInput re-renders
+  const handleAmountChange = useCallback(
+    (val: string, maxed: boolean) => {
+      setAmount(val);
+      setIsMax(maxed);
+    },
+    []
+  );
+
   // Keep gas estimation ready for future multi-action bars; not displayed in compact UI
   useGasEstimate({
     enabled: false && isOpen && network === "stark",
@@ -298,14 +307,14 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setAmount("");
     setIsMax(false);
     setTxState("idle");
     onClose();
-  };
+  }, [onClose]);
 
-  const handleConfirm = async () => {
+  const handleConfirm = useCallback(async () => {
     if (txState === "success") {
       handleClose();
       return;
@@ -318,7 +327,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
       console.error(e);
       setTxState("error");
     }
-  };
+  }, [txState, amount, isMax, onConfirm, handleClose]);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -352,10 +361,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               balance={balance}
               decimals={token.decimals || 18}
               price={token.usdPrice}
-              onChange={(val, maxed) => {
-                setAmount(val);
-                setIsMax(maxed);
-              }}
+              onChange={handleAmountChange}
               percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
               resetTrigger={isOpen}
