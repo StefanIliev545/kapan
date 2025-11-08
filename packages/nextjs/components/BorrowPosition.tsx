@@ -468,101 +468,113 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       {/* Modals */}
       {networkType === "starknet" ? (
         <>
-          <BorrowModalStark
-            isOpen={borrowModal.isOpen}
-            onClose={borrowModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            currentDebt={debtAmount}
-            position={position}
-            vesuContext={vesuContext?.borrow}
-          />
-          <RepayModalStark
-            isOpen={repayModal.isOpen}
-            onClose={repayModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            vesuContext={vesuContext?.repay}
-          />
-          <MovePositionModalStark
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={moveFromProtocol}
-            position={{
-              name,
-              balance: tokenBalance ?? 0n,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals ?? 18,
-              poolId: movePoolId,
-            }}
-            preSelectedCollaterals={moveSupport?.preselectedCollaterals}
-            disableCollateralSelection={moveSupport?.disableCollateralSelection}
-          />
+          {borrowModal.isOpen && (
+            <BorrowModalStark
+              isOpen={borrowModal.isOpen}
+              onClose={borrowModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              currentDebt={debtAmount}
+              position={position}
+              vesuContext={vesuContext?.borrow}
+            />
+          )}
+          {repayModal.isOpen && (
+            <RepayModalStark
+              isOpen={repayModal.isOpen}
+              onClose={repayModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              position={position}
+              vesuContext={vesuContext?.repay}
+            />
+          )}
+          {moveModal.isOpen && (
+            <MovePositionModalStark
+              isOpen={moveModal.isOpen}
+              onClose={moveModal.close}
+              fromProtocol={moveFromProtocol}
+              position={{
+                name,
+                balance: tokenBalance ?? 0n,
+                type: "borrow",
+                tokenAddress,
+                decimals: tokenDecimals ?? 18,
+                poolId: movePoolId,
+              }}
+              preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+              disableCollateralSelection={moveSupport?.disableCollateralSelection}
+            />
+          )}
         </>
       ) : (
         <>
-          <BorrowModal
-            isOpen={borrowModal.isOpen}
-            onClose={borrowModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            currentDebt={debtAmount}
-            position={position}
-            chainId={chainId}
-          />
-          <RepayModal
-            isOpen={repayModal.isOpen}
-            onClose={repayModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            chainId={chainId}
-          />
-          <MovePositionModal
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={protocolName}
-            position={{
-              name,
-              balance: balance ? balance : 0,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals || 18,
-            }}
-            chainId={chainId}
-          />
+          {borrowModal.isOpen && (
+            <BorrowModal
+              isOpen={borrowModal.isOpen}
+              onClose={borrowModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              currentDebt={debtAmount}
+              position={position}
+              chainId={chainId}
+            />
+          )}
+          {repayModal.isOpen && (
+            <RepayModal
+              isOpen={repayModal.isOpen}
+              onClose={repayModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              position={position}
+              chainId={chainId}
+            />
+          )}
+          {moveModal.isOpen && (
+            <MovePositionModal
+              isOpen={moveModal.isOpen}
+              onClose={moveModal.close}
+              fromProtocol={protocolName}
+              position={{
+                name,
+                balance: balance ? balance : 0,
+                type: "borrow",
+                tokenAddress,
+                decimals: tokenDecimals || 18,
+              }}
+              chainId={chainId}
+            />
+          )}
         </>
       )}
     </>

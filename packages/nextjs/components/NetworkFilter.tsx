@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
 import Image from "next/image";
@@ -43,10 +43,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const { selectedNetworkId, setSelectedNetworkId } = useNetworkContext();
-
-  // Use context value if available, otherwise fall back to local state
-  const [localSelectedNetwork, setLocalSelectedNetwork] = useState<string>(defaultNetwork);
-  const selectedNetwork = selectedNetworkId ?? localSelectedNetwork;
+  // Single source of truth: rely solely on context. Fallback to default for initial render if null.
+  const selectedNetwork = selectedNetworkId ?? defaultNetwork;
   const selectedRef = useRef(selectedNetwork);
   const didInitRef = useRef(false);
   const suppressNextUrlSyncRef = useRef(false); // guards URL->state loop
@@ -82,16 +80,16 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       const urlNetwork = url.searchParams.get("network");
       if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
         // Update context
-        setSelectedNetworkId(urlNetwork!);
-        setLocalSelectedNetwork(urlNetwork!);
-        onNetworkChange(urlNetwork!);
+        const nextId = urlNetwork as string;
+        setSelectedNetworkId(nextId);
+        onNetworkChange(nextId);
 
         // cache
         try {
-          localStorage.setItem(STORAGE_KEY, urlNetwork!);
+          localStorage.setItem(STORAGE_KEY, nextId);
         } catch {}
         // non-blocking wallet network switch
-        const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+        const chainId = NETWORK_TO_CHAIN_ID[nextId];
         if (chainId && chainId !== chain?.id) {
           try {
             void switchChain?.({ chainId });
@@ -104,7 +102,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [SHALLOW_URL_SYNC, isValid, onNetworkChange, chain?.id, switchChain, setSelectedNetworkId]);
+  }, [isValid, onNetworkChange, chain?.id, switchChain, setSelectedNetworkId]);
 
   // 1) Initialize once after mount (URL > cache > default)
   useEffect(() => {
@@ -115,18 +113,17 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     let initial = defaultNetwork;
 
     if (isValid(urlNetwork)) {
-      initial = urlNetwork!;
+      initial = urlNetwork as string;
     } else {
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
-        if (isValid(cached)) initial = cached!;
+        if (isValid(cached)) initial = (cached as string);
       } catch {}
     }
 
     if (initial && initial !== selectedRef.current) {
       // Update context
       setSelectedNetworkId(initial);
-      setLocalSelectedNetwork(initial);
       onNetworkChange(initial);
 
       // Switch wallet network if it's an EVM network (non-blocking)
@@ -152,13 +149,13 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     const urlNetwork = searchParams.get("network");
     if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
-      setSelectedNetworkId(urlNetwork!);
-      setLocalSelectedNetwork(urlNetwork!);
-      onNetworkChange(urlNetwork!);
+      const nextId = urlNetwork as string;
+      setSelectedNetworkId(nextId);
+      onNetworkChange(nextId);
       try {
-        localStorage.setItem(STORAGE_KEY, urlNetwork!);
+        localStorage.setItem(STORAGE_KEY, nextId);
       } catch {}
-      const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+      const chainId = NETWORK_TO_CHAIN_ID[nextId];
       if (chainId && chainId !== chain?.id) {
         try {
           void switchChain?.({ chainId });
@@ -187,9 +184,6 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     // Note: We update context directly here, and the parent's onNetworkChange
     // callback is only used for side effects (like analytics), not for state updates
     setSelectedNetworkId(networkId);
-
-    // Update local state for backward compatibility
-    setLocalSelectedNetwork(networkId);
 
     // Persist to cache
     try {
