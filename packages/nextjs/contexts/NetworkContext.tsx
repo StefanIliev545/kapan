@@ -122,7 +122,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   // Compute networkType from selectedNetworkId
-  const networkType = useMemo(() => {
+  const networkType = useMemo((): "evm" | "stark" => {
     return selectedNetworkId === "starknet" || selectedNetworkId === null ? "stark" : "evm";
   }, [selectedNetworkId]);
 
