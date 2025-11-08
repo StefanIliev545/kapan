@@ -42,38 +42,34 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
   }, [isOpen, chainId, chain?.id, switchChain]);
 
   const handleDeposit = useCallback(async (amount: string) => {
-    try {
-      if (chainId && chain?.id !== chainId) {
-        try {
-          await switchChain?.({ chainId });
-        } catch (e) {
-          notification.error("Please switch to the selected network to proceed");
-          return;
-        }
+    if (chainId && chain?.id !== chainId) {
+      try {
+        await switchChain?.({ chainId });
+      } catch (e) {
+        notification.error("Please switch to the selected network to proceed");
+        throw e;
       }
-      const instructions = buildDepositFlow(
-        protocolName.toLowerCase(),
-        token.address,
-        amount,
-        token.decimals || decimals || 18,
-        market
-      );
-      
-      if (instructions.length === 0) {
-        notification.error("Failed to build deposit instructions");
-        return;
-      }
+    }
+    const instructions = buildDepositFlow(
+      protocolName.toLowerCase(),
+      token.address,
+      amount,
+      token.decimals || decimals || 18,
+      market
+    );
+    
+    if (instructions.length === 0) {
+      const error = new Error("Failed to build deposit instructions");
+      notification.error(error.message);
+      throw error;
+    }
 
-      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-      await executeFlowBatchedIfPossible(instructions, preferBatching);
-      notification.success("Deposit transaction sent");
-      
-      if (isAnyConfirmed) {
-        onClose();
-      }
-    } catch (error: any) {
-      console.error("Deposit error:", error);
-      notification.error(error.message || "Failed to deposit");
+    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+    await executeFlowBatchedIfPossible(instructions, preferBatching);
+    notification.success("Deposit transaction sent");
+    
+    if (isAnyConfirmed) {
+      onClose();
     }
   }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed, onClose, chain?.id, chainId, switchChain, market, preferBatching]);
 

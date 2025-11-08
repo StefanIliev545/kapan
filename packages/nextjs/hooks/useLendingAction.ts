@@ -374,16 +374,15 @@ export const useLendingAction = (
   };
 
   const executeStark = async (amount: string, isMax = false) => {
-    if (!starkAccount) return;
-    try {
-      const calls = await buildStarkCalls(amount, isMax);
-      if (!calls) return;
-      await sendTxn(calls);
-      notification.success("Instruction sent");
-    } catch (e) {
-      console.error(e);
-      notification.error("Failed to send instruction");
+    if (!starkAccount) {
+      throw new Error("Account not connected");
     }
+    const calls = await buildStarkCalls(amount, isMax);
+    if (!calls) {
+      throw new Error("Failed to build transaction calls");
+    }
+    await sendTxn(calls);
+    notification.success("Instruction sent");
   };
 
   // Always return Starknet functions (network parameter kept for API compatibility)

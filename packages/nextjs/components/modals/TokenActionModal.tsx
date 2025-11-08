@@ -219,7 +219,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
 }) => {
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
-  const [txState, setTxState] = useState<"idle" | "pending" | "success">("idle");
+  const [txState, setTxState] = useState<"idle" | "pending" | "success" | "error">("idle");
   const parsed = parseFloat(amount || "0");
 
   const price = token.usdPrice || 0;
@@ -291,6 +291,13 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     currency: "STRK",
   });
 
+  // Reset transaction state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setTxState("idle");
+    }
+  }, [isOpen]);
+
   const handleClose = () => {
     setAmount("");
     setIsMax(false);
@@ -309,7 +316,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
       setTxState("success");
     } catch (e) {
       console.error(e);
-      setTxState("idle");
+      setTxState("error");
     }
   };
 
@@ -388,7 +395,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                 actions={[
                   {
                     key: txState === "success" ? "close" : "confirm",
-                    label: txState === "pending" ? "Submitting..." : txState === "success" ? "Close" : action,
+                    label: txState === "pending" ? "Submitting..." : txState === "success" ? "Close" : txState === "error" ? "Retry" : action,
                     icon:
                       txState === "pending" ? (
                         <span className="loading loading-spinner loading-xs" />

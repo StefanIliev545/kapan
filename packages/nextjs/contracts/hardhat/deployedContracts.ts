@@ -386,7 +386,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x32763F0971416a8cDBaF9c2c3a83a5a5B718DCE8",
+      address: "0x059E341e66593eC62D9Ae7EB732EDb31035e60C9",
       abi: [
         {
           inputs: [
@@ -1500,7 +1500,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xb201873Ae5E06FB88098a56a6d60cAF89399eaAB",
+      address: "0x4dcD4963dEe4562ae515bB3B0Da2A4Dd75a3B0DA",
       abi: [
         {
           inputs: [
@@ -2018,7 +2018,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x7e3eE2743b4322E9705931615c92b520b38dE864",
+      address: "0x5B18152cac8779935Cc2A8525D49ffda7c94ffA3",
       abi: [
         {
           inputs: [
@@ -2100,6 +2100,56 @@ const contracts = {
           anonymous: false,
           inputs: [
             {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amountWithFee",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRepaid",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRequested",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
               indexed: true,
               internalType: "address",
               name: "previousOwner",
@@ -2114,6 +2164,32 @@ const contracts = {
           ],
           name: "OwnershipTransferred",
           type: "event",
+        },
+        {
+          inputs: [],
+          name: "aaveEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "aaveV3Pool",
+          outputs: [
+            {
+              internalType: "contract IAaveV3Pool",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -2222,12 +2298,38 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "balancerV2Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "balancerV2Vault",
           outputs: [
             {
               internalType: "contract IFlashLoanProvider",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "balancerV3Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
             },
           ],
           stateMutability: "view",
@@ -2244,6 +2346,45 @@ const contracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "premium",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "initiator",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "params",
+              type: "bytes",
+            },
+          ],
+          name: "executeOperation",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -2355,6 +2496,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "pool",
+              type: "address",
+            },
+          ],
+          name: "setAaveV3",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "provider",
               type: "address",
             },
@@ -2381,6 +2535,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "factoryOrSentinel",
+              type: "address",
+            },
+          ],
+          name: "setUniswapV3Enabled",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "newOwner",
               type: "address",
             },
@@ -2390,15 +2557,74 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [],
+          name: "uniswapEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "uniswapV3FactoryOrSentinel",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "fee0",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "fee1",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "uniswapV3FlashCallback",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         owner: "@openzeppelin/contracts/access/Ownable.sol",
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        aaveEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        aaveV3Pool: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV2Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV2Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV3Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV3Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        executeOperation: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoan: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoanV3: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FactoryOrSentinel:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FlashCallback:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
     OptimalInterestRateFinder: {
@@ -3214,7 +3440,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xaD6c54fBc6FeD490AB37ed445268bB627489b132",
+      address: "0x943F487DaAD34cA25eeCe608E4CD03847930448c",
       abi: [
         {
           inputs: [
@@ -4328,7 +4554,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xC4C1611808e7260989f8E4d6C6405CbD8fdbe95F",
+      address: "0xf1fD6a7832c5daA332741bF1576a1163Ea8240fB",
       abi: [
         {
           inputs: [
@@ -4846,7 +5072,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x71b3bb9d6fF08bfa9759c95Fdb347e76031b7834",
+      address: "0x8Ae8bff63F92E9eC228579D1ecECF1f277C5bfc0",
       abi: [
         {
           inputs: [
@@ -4928,6 +5154,56 @@ const contracts = {
           anonymous: false,
           inputs: [
             {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amountWithFee",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRepaid",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRequested",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
               indexed: true,
               internalType: "address",
               name: "previousOwner",
@@ -4942,6 +5218,32 @@ const contracts = {
           ],
           name: "OwnershipTransferred",
           type: "event",
+        },
+        {
+          inputs: [],
+          name: "aaveEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "aaveV3Pool",
+          outputs: [
+            {
+              internalType: "contract IAaveV3Pool",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -5050,12 +5352,38 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "balancerV2Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "balancerV2Vault",
           outputs: [
             {
               internalType: "contract IFlashLoanProvider",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "balancerV3Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
             },
           ],
           stateMutability: "view",
@@ -5072,6 +5400,45 @@ const contracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "premium",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "initiator",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "params",
+              type: "bytes",
+            },
+          ],
+          name: "executeOperation",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -5183,6 +5550,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "pool",
+              type: "address",
+            },
+          ],
+          name: "setAaveV3",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "provider",
               type: "address",
             },
@@ -5209,6 +5589,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "factoryOrSentinel",
+              type: "address",
+            },
+          ],
+          name: "setUniswapV3Enabled",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "newOwner",
               type: "address",
             },
@@ -5218,15 +5611,74 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [],
+          name: "uniswapEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "uniswapV3FactoryOrSentinel",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "fee0",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "fee1",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "uniswapV3FlashCallback",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         owner: "@openzeppelin/contracts/access/Ownable.sol",
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        aaveEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        aaveV3Pool: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV2Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV2Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV3Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV3Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        executeOperation: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoan: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoanV3: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FactoryOrSentinel:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FlashCallback:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
     OptimalInterestRateFinder: {
@@ -6282,7 +6734,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x4cEbA9e8D24727ac9d5A4f89a20107a4cCEAaAE5",
+      address: "0xd0F8EE01c3655C560A4fc4bFa51ebF3270531204",
       abi: [
         {
           inputs: [
@@ -7493,7 +7945,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xa2a599E9c4cdE9502Ed82f4c285d99b72Ac172d4",
+      address: "0x5055ea09c90Ec905D2E0eBc8C0375849469E50aC",
       abi: [
         {
           inputs: [
@@ -8607,7 +9059,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x6B9F295cFb47450B295f18c060E85b601f7F54be",
+      address: "0x6A9a8FC1167F566F6F85Dd3B265cBC28c2c234B6",
       abi: [
         {
           inputs: [
@@ -9125,7 +9577,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xE951B26Cc88991e563E4d6427B3d30327c9c4792",
+      address: "0x117E73E7AE75Edb4A39c7caBDD683c23f5E5E689",
       abi: [
         {
           inputs: [
@@ -9207,6 +9659,56 @@ const contracts = {
           anonymous: false,
           inputs: [
             {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amountWithFee",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRepaid",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRequested",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
               indexed: true,
               internalType: "address",
               name: "previousOwner",
@@ -9221,6 +9723,32 @@ const contracts = {
           ],
           name: "OwnershipTransferred",
           type: "event",
+        },
+        {
+          inputs: [],
+          name: "aaveEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "aaveV3Pool",
+          outputs: [
+            {
+              internalType: "contract IAaveV3Pool",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -9329,12 +9857,38 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "balancerV2Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "balancerV2Vault",
           outputs: [
             {
               internalType: "contract IFlashLoanProvider",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "balancerV3Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
             },
           ],
           stateMutability: "view",
@@ -9351,6 +9905,45 @@ const contracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "premium",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "initiator",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "params",
+              type: "bytes",
+            },
+          ],
+          name: "executeOperation",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -9462,6 +10055,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "pool",
+              type: "address",
+            },
+          ],
+          name: "setAaveV3",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "provider",
               type: "address",
             },
@@ -9488,6 +10094,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "factoryOrSentinel",
+              type: "address",
+            },
+          ],
+          name: "setUniswapV3Enabled",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "newOwner",
               type: "address",
             },
@@ -9497,15 +10116,74 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [],
+          name: "uniswapEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "uniswapV3FactoryOrSentinel",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "fee0",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "fee1",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "uniswapV3FlashCallback",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         owner: "@openzeppelin/contracts/access/Ownable.sol",
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        aaveEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        aaveV3Pool: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV2Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV2Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV3Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV3Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        executeOperation: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoan: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoanV3: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FactoryOrSentinel:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FlashCallback:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
     OptimalInterestRateFinder: {
@@ -10561,7 +11239,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x91EF3C8c057C7d57303876F3F7f4Ea991Dd116bB",
+      address: "0xaa9E591BD9A2D98fab3d44d0f9637A29f688382A",
       abi: [
         {
           inputs: [
@@ -11356,7 +12034,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xcb963790DB34d172219DE8c608bF968697cB95CE",
+      address: "0xd2E8A530e5cbcA3ef25E45cbFd932Be56406e934",
       abi: [
         {
           inputs: [
@@ -12470,7 +13148,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xC9B3871962F65201430D0E0b592581443efC8a8E",
+      address: "0x90704e3A4eE27019e2Eb55957c76829027b050CA",
       abi: [
         {
           inputs: [
@@ -12988,7 +13666,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xe2D21E3E431C41C7fC78C161D9F3a7606893CB2b",
+      address: "0x0B2c84867aC6Dd369368cdd959C420A85485974E",
       abi: [
         {
           inputs: [
@@ -13070,6 +13748,56 @@ const contracts = {
           anonymous: false,
           inputs: [
             {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amountWithFee",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRepaid",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "bytes32",
+              name: "provider",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "FlashRequested",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
               indexed: true,
               internalType: "address",
               name: "previousOwner",
@@ -13084,6 +13812,32 @@ const contracts = {
           ],
           name: "OwnershipTransferred",
           type: "event",
+        },
+        {
+          inputs: [],
+          name: "aaveEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "aaveV3Pool",
+          outputs: [
+            {
+              internalType: "contract IAaveV3Pool",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -13192,12 +13946,38 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "balancerV2Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "balancerV2Vault",
           outputs: [
             {
               internalType: "contract IFlashLoanProvider",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "balancerV3Enabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
             },
           ],
           stateMutability: "view",
@@ -13214,6 +13994,45 @@ const contracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "premium",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "initiator",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "params",
+              type: "bytes",
+            },
+          ],
+          name: "executeOperation",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -13325,6 +14144,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "pool",
+              type: "address",
+            },
+          ],
+          name: "setAaveV3",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "provider",
               type: "address",
             },
@@ -13351,6 +14183,19 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "factoryOrSentinel",
+              type: "address",
+            },
+          ],
+          name: "setUniswapV3Enabled",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "newOwner",
               type: "address",
             },
@@ -13360,15 +14205,74 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [],
+          name: "uniswapEnabled",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "uniswapV3FactoryOrSentinel",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "fee0",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "fee1",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "uniswapV3FlashCallback",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         owner: "@openzeppelin/contracts/access/Ownable.sol",
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        aaveEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        aaveV3Pool: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV2Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV2Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        balancerV3Enabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         balancerV3Vault: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        executeOperation: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoan: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
         receiveFlashLoanV3: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapEnabled: "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FactoryOrSentinel:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
+        uniswapV3FlashCallback:
+          "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
     OptimalInterestRateFinder: {

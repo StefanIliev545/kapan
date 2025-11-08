@@ -1,18 +1,21 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
-  encodeFlashLoanV2,
-  encodeFlashLoanV3,
-  encodeMockInstruction,
+  encodeFlashLoan,
+  FlashLoanProvider,
+  encodeToOutput,
+  encodeLendingInstruction,
+  LendingOp,
   createRouterInstruction,
   createProtocolInstruction,
 } from "./helpers/instructionHelpers";
 
-const V2 = (process.env.BALANCER_VAULT2 || "").toLowerCase();
-const V3 = (process.env.BALANCER_VAULT3 || "").toLowerCase();
-const WETH = (process.env.WETH || process.env.WETH_ARB || "").toLowerCase();
-const USDC = (process.env.USDC || process.env.USDC_ARB || "0xaf88d065e77c8cC2239327C5EDb3A432268e5831").toLowerCase();
-const USDC_WHALE = ethers.getAddress("0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D")
+// Arbitrum One addresses (from deploy files)
+const V2 = "0xBA12222222228d8Ba445958a75a0704d566BF2C8"; // Balancer V2 Vault (same across chains)
+const V3 = "0xbA1333333333a1BA1108E8412f11850A5C319bA9"; // Balancer V3 Vault (Arbitrum)
+const WETH = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"; // WETH on Arbitrum
+const USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"; // Native USDC on Arbitrum
+const USDC_WHALE = ethers.getAddress("0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D"); // Known USDC whale on Arbitrum
 const FORK = process.env.MAINNET_FORKING_ENABLED === "true";
 
 describe("KapanRouter flashloan fork callbacks", function () {
@@ -23,8 +26,6 @@ describe("KapanRouter flashloan fork callbacks", function () {
   });
 
   it("v2: real flash loan; router receives WETH and resumes runStack", async function () {
-    if (!V2) throw new Error("BALANCER_VAULT2 not set in env");
-    if (!WETH) throw new Error("WETH or WETH_ARB not set in env");
     const [deployer] = await ethers.getSigners();
 
     const Router = await ethers.getContractFactory("TestKapanRouter");
@@ -40,12 +41,18 @@ describe("KapanRouter flashloan fork callbacks", function () {
     const amount = 10n ** 15n; // 0.001 WETH
     const userAddress = await deployer.getAddress();
 
-    const i0 = createRouterInstruction(encodeFlashLoanV2(amount, WETH, userAddress));
-    const i1 = createProtocolInstruction("mock", encodeMockInstruction(false));
-    const i2 = createProtocolInstruction("mock", encodeMockInstruction(false));
+    // Build instructions:
+    // 1. ToOutput: create UTXO with amount and token for flash loan
+    // 2. FlashLoan: use the UTXO from step 1
+    // 3. Two mock instructions to verify stack resumes
+    // Use Deposit op with amount=0 (no output) to verify stack resumes
+    const i0 = createRouterInstruction(encodeToOutput(amount, WETH));
+    const i1 = createRouterInstruction(encodeFlashLoan(FlashLoanProvider.BalancerV2, 0)); // Use UTXO index 0
+    const i2 = createProtocolInstruction("mock", encodeLendingInstruction(LendingOp.Deposit, WETH, userAddress, 0n, "0x", 999));
+    const i3 = createProtocolInstruction("mock", encodeLendingInstruction(LendingOp.Deposit, WETH, userAddress, 0n, "0x", 999));
 
     // Trigger flash loan through router
-    const tx = await router.processProtocolInstructions([i0, i1, i2]);
+    const tx = await router.processProtocolInstructions([i0, i1, i2, i3]);
     const receipt = await tx.wait();
 
     // Assert WETH was transferred from vault to router and back
@@ -76,7 +83,6 @@ describe("KapanRouter flashloan fork callbacks", function () {
   });
 
   it("v3: real flow; vault sends USDC, router repays and resumes runStack", async function () {
-    if (!V3) throw new Error("BALANCER_VAULT3 not set in env");
     // Use USDC like v1 tests do; fund vault from known whale
     const [deployer] = await ethers.getSigners();
 
@@ -93,9 +99,15 @@ describe("KapanRouter flashloan fork callbacks", function () {
     const amount = 1_000_000n; // 1 USDC (6 decimals)
     const userAddress = await deployer.getAddress();
 
-    const i0 = createRouterInstruction(encodeFlashLoanV3(amount, USDC, userAddress));
-    const i1 = createProtocolInstruction("mock", encodeMockInstruction(false));
-    const i2 = createProtocolInstruction("mock", encodeMockInstruction(false));
+    // Build instructions:
+    // 1. ToOutput: create UTXO with amount and token for flash loan
+    // 2. FlashLoan: use the UTXO from step 1
+    // 3. Two mock instructions to verify stack resumes
+    // Use Deposit op with amount=0 (no output) to verify stack resumes
+    const i0 = createRouterInstruction(encodeToOutput(amount, USDC));
+    const i1 = createRouterInstruction(encodeFlashLoan(FlashLoanProvider.BalancerV3, 0)); // Use UTXO index 0
+    const i2 = createProtocolInstruction("mock", encodeLendingInstruction(LendingOp.Deposit, USDC, userAddress, 0n, "0x", 999));
+    const i3 = createProtocolInstruction("mock", encodeLendingInstruction(LendingOp.Deposit, USDC, userAddress, 0n, "0x", 999));
 
     // Ensure v3 vault holds enough USDC to send (like v1 tests)
     await network.provider.request({ method: "hardhat_impersonateAccount", params: [USDC_WHALE] });
@@ -109,7 +121,7 @@ describe("KapanRouter flashloan fork callbacks", function () {
     await usdcFromWhale.transfer(V3, amount);
 
     // Trigger Balancer v3 flash loan through router (vault.sendTo + unlock path)
-    const tx = await router.processProtocolInstructions([i0, i1, i2]);
+    const tx = await router.processProtocolInstructions([i0, i1, i2, i3]);
     const receipt = await tx.wait();
 
     // verify transfer in and out

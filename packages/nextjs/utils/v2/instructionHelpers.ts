@@ -2,12 +2,19 @@ import { AbiCoder } from "ethers";
 
 // Router instruction types enum (matches Solidity)
 export enum RouterInstructionType {
-  FlashLoanV2 = 0,
-  FlashLoanV3 = 1,
-  PullToken = 2,
-  PushToken = 3,
-  ToOutput = 4,
-  Approve = 5,
+  FlashLoan = 0,
+  PullToken = 1,
+  PushToken = 2,
+  ToOutput = 3,
+  Approve = 4,
+}
+
+// Flash loan provider enum (matches Solidity)
+export enum FlashLoanProvider {
+  BalancerV2 = 0,
+  BalancerV3 = 1,
+  AaveV3 = 2,
+  UniswapV3 = 3,
 }
 
 // Lending operation types enum (matches Solidity)
@@ -33,22 +40,45 @@ const coder = AbiCoder.defaultAbiCoder();
 const ROUTER_INSTRUCTION_TYPE = "tuple(uint256 amount,address token,address user,uint8 instructionType)";
 
 /**
- * Encode a FlashLoanV2 router instruction
+ * Encode a FlashLoan router instruction
+ * @param provider - Flash loan provider (BalancerV2, BalancerV3, AaveV3, UniswapV3)
+ * @param inputIndex - Index of the UTXO to use as input (amount and token come from here)
+ * @param pool - Pool address (only used for UniswapV3, otherwise address(0))
  */
-export function encodeFlashLoanV2(amount: bigint, token: string, user: string): string {
+export function encodeFlashLoan(
+  provider: FlashLoanProvider,
+  inputIndex: number,
+  pool: string = "0x0000000000000000000000000000000000000000"
+): string {
+  // instruction.data encodes: (RouterInstruction, FlashLoanProvider, InputPtr, address pool)
+  // The contract first decodes as RouterInstruction, then decodes the full data as:
+  // abi.decode(instruction.data, (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address))
+  // So we encode as a flat list of types and values (like Approve does)
   return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE],
-    [[amount, token, user, RouterInstructionType.FlashLoanV2]]
+    [ROUTER_INSTRUCTION_TYPE, "uint8", "tuple(uint256 index)", "address"],
+    [[0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.FlashLoan], provider, { index: inputIndex }, pool]
   );
 }
 
 /**
- * Encode a FlashLoanV3 router instruction
+ * Encode a FlashLoanV2 router instruction (deprecated, use encodeFlashLoan)
+ * @deprecated Use encodeFlashLoan with FlashLoanProvider.BalancerV2 instead
+ */
+export function encodeFlashLoanV2(amount: bigint, token: string, user: string): string {
+  return coder.encode(
+    [ROUTER_INSTRUCTION_TYPE],
+    [[amount, token, user, RouterInstructionType.FlashLoan]]
+  );
+}
+
+/**
+ * Encode a FlashLoanV3 router instruction (deprecated, use encodeFlashLoan)
+ * @deprecated Use encodeFlashLoan with FlashLoanProvider.BalancerV3 instead
  */
 export function encodeFlashLoanV3(amount: bigint, token: string, user: string): string {
   return coder.encode(
     [ROUTER_INSTRUCTION_TYPE],
-    [[amount, token, user, RouterInstructionType.FlashLoanV3]]
+    [[amount, token, user, RouterInstructionType.FlashLoan]]
   );
 }
 

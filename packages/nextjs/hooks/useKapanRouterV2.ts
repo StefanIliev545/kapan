@@ -11,8 +11,8 @@ import {
   encodeApprove,
   encodePushToken,
   encodeLendingInstruction,
-  encodeFlashLoanV2,
-  encodeFlashLoanV3,
+  encodeFlashLoan,
+  FlashLoanProvider,
   LendingOp,
   normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
@@ -429,7 +429,22 @@ export const useKapanRouterV2 = () => {
       return hash;
     } catch (error: any) {
       console.error("Error executing instructions:", error);
-      notification.error(error.message || "Failed to execute instructions");
+      // Check for user rejection
+      const errorMessage = error?.message || "";
+      const lowerMessage = errorMessage.toLowerCase();
+      const isRejection = 
+        lowerMessage.includes("user rejected") ||
+        lowerMessage.includes("user denied") ||
+        lowerMessage.includes("user cancelled") ||
+        lowerMessage.includes("rejected") ||
+        lowerMessage.includes("denied") ||
+        lowerMessage.includes("cancelled") ||
+        error?.code === 4001 ||
+        error?.code === "ACTION_REJECTED" ||
+        error?.code === "USER_REJECTED";
+      
+      const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute instructions");
+      notification.error(message);
       throw error;
     }
   }, [routerContract, userAddress, writeContractAsync]);
@@ -562,7 +577,22 @@ export const useKapanRouterV2 = () => {
     } catch (error: any) {
       setIsApproving(false);
       console.error("Error in executeFlowWithApprovals:", error);
-      notification.error(error.message || "Failed to execute flow with approvals");
+      // Check for user rejection
+      const errorMessage = error?.message || "";
+      const lowerMessage = errorMessage.toLowerCase();
+      const isRejection = 
+        lowerMessage.includes("user rejected") ||
+        lowerMessage.includes("user denied") ||
+        lowerMessage.includes("user cancelled") ||
+        lowerMessage.includes("rejected") ||
+        lowerMessage.includes("denied") ||
+        lowerMessage.includes("cancelled") ||
+        error?.code === 4001 ||
+        error?.code === "ACTION_REJECTED" ||
+        error?.code === "USER_REJECTED";
+      
+      const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute flow with approvals");
+      notification.error(message);
       throw error;
     }
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations]);
@@ -644,9 +674,9 @@ export const useKapanRouterV2 = () => {
 
   // --- Types for modular move position builder ---
   type FlashConfig = {
-    version: "v3" | "v2";
-    premiumBps?: number; // Aave v3 default often 9 bps; fetch from on-chain ideally
-    bufferBps?: number;  // small headroom between GetBorrowBalance and real repay (default 10)
+    version: "v3" | "v2" | "aave";
+    premiumBps?: number;
+    bufferBps?: number;
   };
 
   type BuildUnlockDebtParams = {
@@ -690,16 +720,6 @@ export const useKapanRouterV2 = () => {
         toContext?: `0x${string}`;
       };
 
-  // Internal: how much we still owe the router to close flash loans, by token
-  type FlashDebtBucket = {
-    // What user asked in unlock steps (sum of expectedDebt per token)
-    expectedSum: bigint;
-    // Premium owed across all unlocks for this token
-    premiumSum: bigint;
-    // We also keep count of flash calls in case you want to reconcile later
-    flashCalls: number;
-  };
-
   type MoveFlowBuilder = {
     // chunk builders
     buildUnlockDebt: (p: BuildUnlockDebtParams) => void;
@@ -709,7 +729,7 @@ export const useKapanRouterV2 = () => {
     setCompoundMarket: (debtToken: Address) => void;
     // raw accessors
     build: () => ProtocolInstruction[];
-    getFlashObligations: () => Record<Address, { expectedSum: bigint; premiumSum: bigint }>;
+    getFlashObligations: () => Record<Address, { flashLoanUtxoIndex: number }>;
   };
 
   /**
@@ -742,7 +762,7 @@ export const useKapanRouterV2 = () => {
     }
 
     const instructions: ProtocolInstruction[] = [];
-    const flashDebts = new Map<Address, FlashDebtBucket>();
+    const flashLoanOutputs = new Map<Address, number>(); // Track flash loan output UTXO indices by token
     let compoundMarket: Address | null = null; // Track Compound market (debt token/base token)
     let utxoCount = 0; // Track UTXO count as we build instructions
 
@@ -758,17 +778,6 @@ export const useKapanRouterV2 = () => {
     const addRouter = (data: `0x${string}`, createsUtxo = false) => add(createRouterInstruction(data), createsUtxo);
     const addProto = (protocol: string, data: `0x${string}`, createsUtxo = false) =>
       add(createProtocolInstruction(protocol, data), createsUtxo);
-
-    const ensureBucket = (token: Address) => {
-      if (!flashDebts.has(token)) {
-        flashDebts.set(token, { expectedSum: 0n, premiumSum: 0n, flashCalls: 0 });
-      }
-      const bucket = flashDebts.get(token);
-      if (!bucket) {
-        throw new Error("Failed to ensure flash debt bucket");
-      }
-      return bucket;
-    };
 
     /**
      * Get context for a protocol operation
@@ -789,7 +798,7 @@ export const useKapanRouterV2 = () => {
         expectedDebt,
         debtDecimals = 18,
         fromContext = "0x",
-        flash: { version, premiumBps = 9, bufferBps = 10 },
+        flash: { version },
       }) => {
         const from = normalizeProtocolName(fromProtocol);
         const expected = parseUnits(expectedDebt, debtDecimals);
@@ -809,22 +818,25 @@ export const useKapanRouterV2 = () => {
           true, // GetBorrowBalance creates 1 UTXO
         );
 
-        // [1] FlashLoan: bring debt tokens into the router (principal includes a tiny buffer)
-        const principal = (expected * BigInt(10000 + bufferBps)) / 10000n;
-        
-        // Double-check principal is not zero (shouldn't happen if expected > 0)
-        if (principal === 0n) {
-          throw new Error(`Calculated flash loan principal is zero. Expected debt: ${expectedDebt}, Parsed: ${expected.toString()}`);
+        // [1] FlashLoan: use GetBorrowBalance UTXO to flash loan exactly what we need
+        // The flash loan will use the GetBorrowBalance output (exact debt amount)
+        let provider: FlashLoanProvider;
+        if (version === "aave") {
+          provider = FlashLoanProvider.AaveV3;
+        } else if (version === "v3") {
+          provider = FlashLoanProvider.BalancerV3;
+        } else {
+          provider = FlashLoanProvider.BalancerV2;
         }
-
-        const flashData =
-          version === "v3"
-            ? encodeFlashLoanV3(principal, debtToken, userAddress)
-            : encodeFlashLoanV2(principal, debtToken, userAddress);
-        const iFlash = addRouter(flashData as `0x${string}`, true); // FlashLoan creates 1 UTXO
+        const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
+        const flashLoanUtxoIndex = utxoCount; // Track UTXO index before adding flash loan
+        addRouter(flashData as `0x${string}`, true); // FlashLoan creates 1 UTXO (with repayment amount)
+        
+        // Store the flash loan output UTXO index for this token (normalize to lowercase for consistent lookup)
+        flashLoanOutputs.set((debtToken as Address).toLowerCase() as Address, flashLoanUtxoIndex);
 
         // [2] Approve flash tokens to the *source* gateway so it can pull for Repay
-        addRouter(encodeApprove(iFlash, from) as `0x${string}`, true); // Approve creates 1 dummy UTXO
+        addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true); // Approve creates 1 dummy UTXO
 
         // [3] Repay(source): uses GetBorrowBalance UTXO so the amount is exact on-chain
         addProto(
@@ -833,13 +845,8 @@ export const useKapanRouterV2 = () => {
           true, // Repay creates 1 UTXO (refund)
         );
 
-        // Record the future amount we must borrow on target to return flash:
-        // Need at least (expected + premium) — the buffer remains in router after repay.
-        const premium = (expected * BigInt(premiumBps)) / 10000n;
-        const bucket = ensureBucket(debtToken);
-        bucket.expectedSum += expected;
-        bucket.premiumSum += premium;
-        bucket.flashCalls += 1;
+        // Note: Flash loan output (flashLoanUtxoIndex UTXO) contains the repayment amount (principal + fee)
+        // This will be used by buildBorrow in coverFlash mode to borrow exactly what's needed
       },
 
       // 2) MOVE COLLATERAL (withdraw from source -> deposit into dest)
@@ -916,16 +923,21 @@ export const useKapanRouterV2 = () => {
         if (p.mode === "exact") {
           borrowAmt = parseUnits(p.amount, p.decimals ?? 18);
         } else {
-          // coverFlash mode
-          const bucket = flashDebts.get(token);
-          if (!bucket) {
-            // Nothing to repay for this token; no-op
-            return;
+          // coverFlash mode: use the flash loan output UTXO for this token
+          // The flash loan output contains the repayment amount (principal + fee)
+          // Normalize token address to lowercase for consistent lookup
+          const flashLoanUtxoIndex = flashLoanOutputs.get((token as Address).toLowerCase() as Address);
+          
+          if (flashLoanUtxoIndex === undefined) {
+            // No flash loan found for this token - this should not happen if buildUnlockDebt was called first
+            throw new Error(`Flash loan output not found for token ${token}. Make sure buildUnlockDebt was called before buildBorrow.`);
           }
 
-          const base = bucket.expectedSum + bucket.premiumSum; // need >= expected + premium
-          const extraBps = p.extraBps ?? 0;
-          borrowAmt = (base * BigInt(10000 + extraBps)) / 10000n;
+          // Use the flash loan output UTXO to borrow exactly what's needed to repay
+          // The flash loan output already contains the repayment amount (principal + fee)
+          // When using InputPtr, the gateway will use the UTXO amount, so we set borrowAmt to 0
+          // Set to 0 - the gateway will use the UTXO amount via InputPtr
+          borrowAmt = 0n; // Gateway will use UTXO amount via InputPtr
         }
 
         // Get context for target protocol (Compound needs market context)
@@ -935,9 +947,15 @@ export const useKapanRouterV2 = () => {
         const utxoIndexForBorrow = utxoCount;
 
         // Borrow on target
+        // In coverFlash mode, use the flash loan output UTXO to borrow exactly what's needed
+        // Normalize token address to lowercase for consistent lookup
+        const borrowInputIndex = p.mode === "coverFlash" 
+          ? (flashLoanOutputs.get((token as Address).toLowerCase() as Address) ?? 999)
+          : 999;
+        
         addProto(
           to,
-          encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, 999) as `0x${string}`,
+          encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`,
           true, // Borrow creates 1 UTXO
         );
 
@@ -953,12 +971,13 @@ export const useKapanRouterV2 = () => {
         compoundMarket = debtToken;
       },
 
-      build: () => instructions,
+        build: () => instructions,
 
       getFlashObligations: () => {
-        const obj: Record<Address, { expectedSum: bigint; premiumSum: bigint }> = {};
-        for (const [token, b] of flashDebts.entries()) {
-          obj[token] = { expectedSum: b.expectedSum, premiumSum: b.premiumSum };
+        // Return flash loan output UTXO indices by token
+        const obj: Record<Address, { flashLoanUtxoIndex: number }> = {};
+        for (const [token, utxoIndex] of flashLoanOutputs.entries()) {
+          obj[token] = { flashLoanUtxoIndex: utxoIndex };
         }
         return obj;
       },

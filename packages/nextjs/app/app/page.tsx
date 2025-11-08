@@ -190,10 +190,10 @@ const App: NextPage = () => {
         {mounted.has("linea") && (
           <div className={selectedNetwork === "linea" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "linea"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: false }} />
+              <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: false }} />
+              <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
           </div>
         )}

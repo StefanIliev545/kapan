@@ -16,7 +16,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
     bytes32 constant INSTRUCTION_STACK = keccak256("KapanRouter:instructionStack");
     bytes32 constant OUTPUTS_SLOT = keccak256("KapanRouter:outputs");
-    bytes32 constant FLASHLOAN_DATA_SLOT = keccak256("KapanRouter:flashloanData");
     mapping(string => IGateway) public gateways;
 
     constructor(address owner) Ownable(owner) {
@@ -33,8 +32,11 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
     function setBalancerV2(address provider) external onlyOwner { _setBalancerV2(provider); }
     function setBalancerV3(address vault) external onlyOwner { _setBalancerV3(vault); }
+    function setAaveV3(address pool) external onlyOwner { _setAaveV3(pool); }
+    function setUniswapV3Enabled(address factoryOrSentinel) external onlyOwner { _setUniswapV3Enabled(factoryOrSentinel); }
 
-    enum RouterInstructionType { FlashLoanV2, FlashLoanV3, PullToken, PushToken, ToOutput, Approve }
+    enum RouterInstructionType { FlashLoan, PullToken, PushToken, ToOutput, Approve }
+    enum FlashLoanProvider { BalancerV2, BalancerV3, AaveV3, UniswapV3 }
     struct RouterInstruction {
         uint256 amount;
         address token;
@@ -127,11 +129,12 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
     function processRouterInstruction(ProtocolTypes.ProtocolInstruction memory instruction) internal returns (bool halt) {
         RouterInstruction memory routerInstruction = abi.decode(instruction.data, (RouterInstruction));
-        if (routerInstruction.instructionType == RouterInstructionType.FlashLoanV2) {
-            processFlashLoanV2(routerInstruction);
-            return true; // halt to wait for callback
-        } else if (routerInstruction.instructionType == RouterInstructionType.FlashLoanV3) {
-            processFlashLoanV3(routerInstruction);
+        if (routerInstruction.instructionType == RouterInstructionType.FlashLoan) {
+            // instruction.data encodes: (RouterInstruction, FlashLoanProvider, InputPtr, address pool)
+            // pool is only used for UniswapV3, otherwise address(0)
+            (, FlashLoanProvider provider, ProtocolTypes.InputPtr memory inputPtr, address pool) = 
+                abi.decode(instruction.data, (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address));
+            processFlashLoan(provider, inputPtr, pool);
             return true; // halt to wait for callback
         } else if (routerInstruction.instructionType == RouterInstructionType.PullToken) {
             processPullToken(routerInstruction);
@@ -163,16 +166,31 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         return false;
     }
 
-    function processFlashLoanV2(RouterInstruction memory routerInstruction) internal {
-        // Store flash loan details for callback to create UTXO
-        TBytes.set(FLASHLOAN_DATA_SLOT, abi.encode(routerInstruction.token, routerInstruction.amount));
-        _requestBalancerV2(routerInstruction.token, routerInstruction.amount, bytes(""));
-    }
+    function processFlashLoan(
+        FlashLoanProvider provider,
+        ProtocolTypes.InputPtr memory inputPtr,
+        address pool
+    ) internal {
+        // Read the amount and token from the output stack using InputPtr
+        ProtocolTypes.Output[] memory inputs = _getOutputs();
+        require(inputPtr.index < inputs.length, "FlashLoan: bad index");
+        ProtocolTypes.Output memory input = inputs[inputPtr.index];
+        require(input.token != address(0), "FlashLoan: zero token");
+        require(input.amount > 0, "FlashLoan: zero amount");
 
-    function processFlashLoanV3(RouterInstruction memory routerInstruction) internal {
-        // Store flash loan details for callback to create UTXO
-        TBytes.set(FLASHLOAN_DATA_SLOT, abi.encode(routerInstruction.token, routerInstruction.amount));
-        _requestBalancerV3(routerInstruction.token, routerInstruction.amount);
+        // Route to the appropriate provider
+        if (provider == FlashLoanProvider.BalancerV2) {
+            _requestBalancerV2(input.token, input.amount, bytes(""));
+        } else if (provider == FlashLoanProvider.BalancerV3) {
+            _requestBalancerV3(input.token, input.amount);
+        } else if (provider == FlashLoanProvider.AaveV3) {
+            _requestAaveV3(input.token, input.amount, bytes(""));
+        } else if (provider == FlashLoanProvider.UniswapV3) {
+            require(pool != address(0), "FlashLoan: UniswapV3 requires pool address");
+            _requestUniswapV3(pool, input.token, input.amount, bytes(""));
+        } else {
+            revert("FlashLoan: unsupported provider");
+        }
     }
 
     function processPullToken(RouterInstruction memory routerInstruction) internal authorize(routerInstruction) {
@@ -206,17 +224,12 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         _;
     }
 
-    function _afterFlashLoan(bytes calldata /*userData*/) internal override {
-        // Create UTXO from flash loan
-        bytes memory flashData = TBytes.get(FLASHLOAN_DATA_SLOT);
-        if (flashData.length > 0) {
-            (address token, uint256 amount) = abi.decode(flashData, (address, uint256));
-            ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
-            out[0] = ProtocolTypes.Output({ token: token, amount: amount });
-            _appendOutputs(out);
-            // Clear flash loan data
-            TBytes.set(FLASHLOAN_DATA_SLOT, bytes(""));
-        }
+    function _afterFlashLoan(address token, uint256 repaymentAmount, bytes memory /*userData*/) internal override {
+        // Create UTXO from flash loan with the repayment amount (principal + fee)
+        // This ensures refinancing can borrow exactly what's needed to repay
+        ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
+        out[0] = ProtocolTypes.Output({ token: token, amount: repaymentAmount });
+        _appendOutputs(out);
         runStack();
     }
 
