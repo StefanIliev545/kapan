@@ -84,7 +84,6 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         // Update context
         setSelectedNetworkId(urlNetwork!);
         setLocalSelectedNetwork(urlNetwork!);
-        setSelectedNetwork(urlNetwork!);
         onNetworkChange(urlNetwork!);
 
         // cache
@@ -128,7 +127,6 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       // Update context
       setSelectedNetworkId(initial);
       setLocalSelectedNetwork(initial);
-      setSelectedNetwork(initial);
       onNetworkChange(initial);
 
       // Switch wallet network if it's an EVM network (non-blocking)
@@ -154,7 +152,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     const urlNetwork = searchParams.get("network");
     if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
-      setSelectedNetwork(urlNetwork!);
+      setSelectedNetworkId(urlNetwork!);
+      setLocalSelectedNetwork(urlNetwork!);
       onNetworkChange(urlNetwork!);
       try {
         localStorage.setItem(STORAGE_KEY, urlNetwork!);
@@ -168,7 +167,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         }
       }
     }
-  }, [isValid, onNetworkChange, searchParams, chain?.id, switchChain]);
+  }, [isValid, onNetworkChange, searchParams, chain?.id, switchChain, setSelectedNetworkId]);
 
   // 3) Handle invalid selection if networks change
   useEffect(() => {
@@ -189,7 +188,6 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     // Update local state for backward compatibility
     setLocalSelectedNetwork(networkId);
-    setSelectedNetwork(networkId);
     onNetworkChange(networkId);
 
     // Persist to cache
