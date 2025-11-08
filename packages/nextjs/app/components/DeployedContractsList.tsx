@@ -13,6 +13,8 @@ import { useTargetNetwork as useEvmTargetNetwork } from "~~/hooks/scaffold-eth/u
 import { useTargetNetwork as useStarknetTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-stark";
 import { GenericContract } from "~~/utils/scaffold-eth/contract";
+import { getTargetNetworks } from "~~/utils/scaffold-eth";
+import { useGlobalState } from "~~/services/store/store";
 
 type DisplayContract = {
   name: string;
@@ -28,11 +30,28 @@ const networkOptions: NetworkOption[] = [
     logo: "/logos/arb.svg",
   },
   {
+    id: "base",
+    name: "Base",
+    logo: "/logos/base.svg",
+  },
+  {
+    id: "optimism",
+    name: "Optimism",
+    logo: "/logos/optimism.svg",
+  },
+  {
+    id: "linea",
+    name: "Linea",
+    logo: "/logos/linea.svg",
+  },
+  {
     id: "starknet",
     name: "Starknet",
     logo: "/logos/starknet.svg",
   },
 ];
+
+const defaultEvmNetworkId = networkOptions[0]?.id ?? "arbitrum";
 
 const starknetContracts: SNContractsType = starknetContractsData;
 
@@ -40,12 +59,30 @@ export const DeployedContractsList = () => {
   const contractsData = useAllContracts();
   const { targetNetwork: targetEvmNetwork } = useEvmTargetNetwork();
   const { targetNetwork: targetStarknetNetwork } = useStarknetTargetNetwork();
-  const [selectedNetwork, setSelectedNetwork] = useState<string>(networkOptions[0]!.id);
+  const setTargetEvmNetwork = useGlobalState(state => state.setTargetEVMNetwork);
+  const evmNetworks = useMemo(() => getTargetNetworks(), []);
+  const [selectedNetwork, setSelectedNetwork] = useState<string>(() => {
+    const activeNetworkId = targetEvmNetwork.network;
+    return activeNetworkId && networkOptions.some(option => option.id === activeNetworkId)
+      ? activeNetworkId
+      : defaultEvmNetworkId;
+  });
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (selectedNetwork === "starknet") {
+      return;
+    }
+
+    const matchingNetwork = evmNetworks.find(network => network.network === selectedNetwork);
+    if (matchingNetwork && matchingNetwork.id !== targetEvmNetwork.id) {
+      setTargetEvmNetwork(matchingNetwork);
+    }
+  }, [evmNetworks, selectedNetwork, setTargetEvmNetwork, targetEvmNetwork.id]);
 
   const starknetContractsForTarget = useMemo<Record<string, SNContract>>(() => {
     const networkKey = targetStarknetNetwork?.network;
@@ -89,7 +126,7 @@ export const DeployedContractsList = () => {
       return;
     }
 
-    if (selectedNetwork === "arbitrum" && contractsToDisplay.length === 0) {
+    if (selectedNetwork !== "starknet" && contractsToDisplay.length === 0) {
       if (Object.keys(starknetContractsForTarget).length > 0) {
         setSelectedNetwork("starknet");
       }
