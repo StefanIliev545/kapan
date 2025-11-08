@@ -13,7 +13,6 @@ import {
   type CloseCollateralInfo,
   type CloseTokenInfo,
 } from "~~/hooks/useNostraClosePosition";
-import type { CollateralToken } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 
 const formatUsd = (value?: number) => {

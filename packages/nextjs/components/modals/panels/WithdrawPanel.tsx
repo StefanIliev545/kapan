@@ -14,8 +14,6 @@ interface WithdrawPanelProps {
 }
 
 export const WithdrawPanel: FC<WithdrawPanelProps> = ({ modal, onClose }) => {
-  if (!modal.token || !modal.protocolName || !modal.supplyBalance) return null;
-
   const { token, protocolName, chainId, market, supplyBalance, position } = modal;
   const { buildWithdrawFlow } = useKapanRouterV2();
   const {
@@ -26,19 +24,12 @@ export const WithdrawPanel: FC<WithdrawPanelProps> = ({ modal, onClose }) => {
     isAnyConfirmed,
     executeTransaction,
   } = useEVMTransactionModal({
-    isOpen: true,
+    isOpen: !!modal.token && !!modal.protocolName && !!modal.supplyBalance,
     chainId,
-    tokenAddress: token.address,
-    protocolName,
+    tokenAddress: token?.address || "",
+    protocolName: protocolName || "",
     market,
   });
-
-  if (token.decimals == null && decimals) {
-    token.decimals = decimals;
-  }
-
-  const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
-  const maxInput = (supplyBalance * 101n) / 100n;
 
   useEffect(() => {
     if (isAnyConfirmed) {
@@ -48,6 +39,7 @@ export const WithdrawPanel: FC<WithdrawPanelProps> = ({ modal, onClose }) => {
 
   const handleWithdraw = useCallback(
     async (amount: string, isMax?: boolean) => {
+      if (!token || !protocolName || !supplyBalance) return;
       await executeTransaction(
         () =>
           buildWithdrawFlow(
@@ -61,8 +53,17 @@ export const WithdrawPanel: FC<WithdrawPanelProps> = ({ modal, onClose }) => {
         "Withdraw transaction sent"
       );
     },
-    [protocolName, token.address, token.decimals, decimals, market, buildWithdrawFlow, executeTransaction]
+    [protocolName, token, decimals, market, supplyBalance, buildWithdrawFlow, executeTransaction]
   );
+
+  if (!token || !protocolName || !supplyBalance) return null;
+
+  if (token.decimals == null && decimals) {
+    token.decimals = decimals;
+  }
+
+  const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
+  const maxInput = (supplyBalance * 101n) / 100n;
 
   return (
     <TokenActionModal

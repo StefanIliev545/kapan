@@ -164,15 +164,15 @@ export const PositionActionButtons: FC<PositionActionButtonsProps> = memo(({ act
     [actions]
   );
 
-  if (!visibleActions.length) {
-    return null;
-  }
-
   const actionGridClass = useMemo(
     () =>
       visibleActions.length === 1 ? "grid-cols-1" : visibleActions.length === 2 ? "grid-cols-2" : "grid-cols-3",
     [visibleActions.length]
   );
+
+  if (!visibleActions.length) {
+    return null;
+  }
 
   const renderButton = (action: PositionActionButton, variant: "mobile" | "desktop") => {
     const baseClasses = variant === "mobile" ? "btn btn-sm w-full flex justify-center items-center" : "btn btn-sm flex justify-center items-center";

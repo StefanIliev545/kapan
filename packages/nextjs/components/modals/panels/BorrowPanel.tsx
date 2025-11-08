@@ -12,8 +12,6 @@ interface BorrowPanelProps {
 }
 
 export const BorrowPanel: FC<BorrowPanelProps> = ({ modal, onClose }) => {
-  if (!modal.token || !modal.protocolName) return null;
-
   const { token, protocolName, chainId, currentDebt, position } = modal;
   const { buildBorrowFlow } = useKapanRouterV2();
   const {
@@ -25,15 +23,11 @@ export const BorrowPanel: FC<BorrowPanelProps> = ({ modal, onClose }) => {
     isAnyConfirmed,
     executeTransaction,
   } = useEVMTransactionModal({
-    isOpen: true,
+    isOpen: !!modal.token && !!modal.protocolName,
     chainId,
-    tokenAddress: token.address,
-    protocolName,
+    tokenAddress: token?.address || "",
+    protocolName: protocolName || "",
   });
-
-  if (token.decimals == null && decimals) {
-    token.decimals = decimals;
-  }
 
   useEffect(() => {
     if (isAnyConfirmed) {
@@ -43,13 +37,20 @@ export const BorrowPanel: FC<BorrowPanelProps> = ({ modal, onClose }) => {
 
   const handleBorrow = useCallback(
     async (amount: string) => {
+      if (!token || !protocolName) return;
       await executeTransaction(
         () => buildBorrowFlow(protocolName.toLowerCase(), token.address, amount, token.decimals || decimals || 18),
         "Borrow transaction sent"
       );
     },
-    [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeTransaction]
+    [protocolName, token, decimals, buildBorrowFlow, executeTransaction]
   );
+
+  if (!token || !protocolName) return null;
+
+  if (token.decimals == null && decimals) {
+    token.decimals = decimals;
+  }
 
   return (
     <TokenActionModal

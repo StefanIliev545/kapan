@@ -33,12 +33,11 @@ const RepayPanel = dynamic(() => import("./panels/RepayPanel").then(m => ({ defa
 export const UnifiedTransactionModal: FC = () => {
   const { modalData, closeModal } = useModalContext();
 
-  if (!modalData || !modalData.token) {
-    return null;
-  }
-
   // Select the appropriate panel based on modal type
   const Panel = useMemo(() => {
+    if (!modalData || !modalData.token) {
+      return null;
+    }
     switch (modalData.type) {
       case "deposit":
         return DepositPanel;
@@ -51,9 +50,9 @@ export const UnifiedTransactionModal: FC = () => {
       default:
         return null;
     }
-  }, [modalData.type]);
+  }, [modalData]);
 
-  if (!Panel) {
+  if (!Panel || !modalData || !modalData.token) {
     return null;
   }
 

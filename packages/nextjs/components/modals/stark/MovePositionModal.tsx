@@ -255,9 +255,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
   const isLoadingCollaterals =
     !firstCollateralsReadyRef.current && (isLoadingSourceCollaterals || isLoadingTargetCollaterals);
   // Construct instruction based on current state
-  const { fullInstruction, authInstruction, authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
+  const { authInstructions, authCalldataKey, pairInstructions } = useMemo(() => {
     if (!amount || !userAddress || !routerGateway?.address)
-      return { fullInstruction: { instructions: [] }, authInstruction: { instructions: [] }, authInstructions: [], authCalldataKey: "", pairInstructions: [] };
+      return { authInstructions: [], authCalldataKey: "", pairInstructions: [] };
 
     const tokenDecimals = position.decimals ?? 18; // Use position decimals if available, otherwise default to 18
     const parsedAmount = parseUnits(amount, tokenDecimals);
@@ -494,8 +494,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       });
 
       return {
-        fullInstruction: fullInstructionData,
-        authInstruction: authInstructionData,
         authInstructions: filteredForAuth,
         authCalldataKey: JSON.stringify(authInstructionData),
         pairInstructions: instructions,
@@ -505,8 +503,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     // If target protocol is Vesu (V1 or V2) and we have multiple collaterals, use proportional allocation
     if ((selectedProtocol === "Vesu" || selectedProtocol === "VesuV2") && selectedCollateralsWithAmounts.length > 1) {
       const result = generateVesuInstructions() || {
-        fullInstruction: { instructions: [] },
-        authInstruction: { instructions: [] },
         authInstructions: [],
         authCalldataKey: "",
         pairInstructions: [],
@@ -683,8 +679,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     });
 
     return {
-      fullInstruction: fullInstructionData,
-      authInstruction: authInstructionData,
       authInstructions: authInstructions,
       authCalldataKey: JSON.stringify(authInstructionData),
       // Wrap instructions in an array so that callers always
@@ -695,7 +689,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       // several collaterals).
       pairInstructions: [instructions],
     };
-  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId, isOpen]);
+  }, [amount, userAddress, routerGateway?.address, position.decimals, position.tokenAddress, fromProtocol, selectedProtocol, selectedCollateralsWithAmounts, isAmountMaxClicked, tokenToPrices, maxClickedCollaterals, currentPoolId, selectedPoolId, normalizedCurrentV2PoolAddress, selectedV2PoolAddress, isOpen]);
 
   const vesuPairings = useMemo(() => {
     if (
@@ -770,7 +764,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isAuthReady, getAuthorizations, authCalldataKey]);
+  }, [isOpen, isAuthReady, getAuthorizations, authCalldataKey, authInstructions]);
   
   // Construct calls based on current state
   const calls = useMemo(() => {
@@ -810,12 +804,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     ];
   }, [routerGateway?.address, fetchedAuthorizations, pairInstructions]);
 
-  const {
-    loading: feeLoading,
-    error: feeError,
-    effectiveNative,
-    effectiveCurrency,
-  } = useGasEstimate({
+  useGasEstimate({
     enabled: isOpen,
     buildCalls: () => estimateCalls ?? null,
     currency: "STRK",
@@ -956,7 +945,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       setStep("executing");
 
       // Execute the transaction
-      const tx = await sendAsync();
+      await sendAsync();
 
       setStep("done");
       // Close modal after a short delay on success
@@ -988,13 +977,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
     return "Migrate";
   }, [loading, step]);
 
-  // Get action button class based on current step
-  const actionButtonClass = useMemo(() => {
-    if (step === "done") {
-      return "btn-success";
-    }
-    return "btn-primary";
-  }, [step]);
 
   // Helper function to safely format the balance
   const getFormattedBalance = useMemo(() => {
@@ -1225,7 +1207,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                       className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
                     >
                       {Object.entries(VESU_V1_POOLS)
-                        .filter(([name, id]) => fromProtocol !== "Vesu" || id !== currentPoolId)
+                        .filter(([, id]) => fromProtocol !== "Vesu" || id !== currentPoolId)
                         .map(([name, id]) => (
                           <li key={name}>
                             <button className="flex items-center gap-3 py-2" onClick={() => setSelectedPoolId(id as bigint)}>

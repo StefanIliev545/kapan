@@ -13,8 +13,6 @@ interface DepositPanelProps {
 }
 
 export const DepositPanel: FC<DepositPanelProps> = ({ modal, onClose }) => {
-  if (!modal.token || !modal.protocolName) return null;
-
   const { token, protocolName, chainId, market, position } = modal;
   const { buildDepositFlow } = useKapanRouterV2();
   const {
@@ -26,16 +24,12 @@ export const DepositPanel: FC<DepositPanelProps> = ({ modal, onClose }) => {
     isAnyConfirmed,
     executeTransaction,
   } = useEVMTransactionModal({
-    isOpen: true,
+    isOpen: !!modal.token && !!modal.protocolName,
     chainId,
-    tokenAddress: token.address,
-    protocolName,
+    tokenAddress: token?.address || "",
+    protocolName: protocolName || "",
     market,
   });
-
-  if (token.decimals == null && decimals) {
-    token.decimals = decimals;
-  }
 
   useEffect(() => {
     if (isAnyConfirmed) {
@@ -45,13 +39,20 @@ export const DepositPanel: FC<DepositPanelProps> = ({ modal, onClose }) => {
 
   const handleDeposit = useCallback(
     async (amount: string) => {
+      if (!token || !protocolName) return;
       await executeTransaction(
         () => buildDepositFlow(protocolName.toLowerCase(), token.address, amount, token.decimals || decimals || 18, market),
         "Deposit transaction sent"
       );
     },
-    [protocolName, token.address, token.decimals, decimals, market, buildDepositFlow, executeTransaction]
+    [protocolName, token, decimals, market, buildDepositFlow, executeTransaction]
   );
+
+  if (!token || !protocolName) return null;
+
+  if (token.decimals == null && decimals) {
+    token.decimals = decimals;
+  }
 
   return (
     <TokenActionModal

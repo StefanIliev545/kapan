@@ -13,8 +13,6 @@ interface RepayPanelProps {
 }
 
 export const RepayPanel: FC<RepayPanelProps> = ({ modal, onClose }) => {
-  if (!modal.token || !modal.protocolName || !modal.debtBalance) return null;
-
   const { token, protocolName, chainId, debtBalance, position } = modal;
   const { buildRepayFlowAsync } = useKapanRouterV2();
   const {
@@ -26,19 +24,11 @@ export const RepayPanel: FC<RepayPanelProps> = ({ modal, onClose }) => {
     isAnyConfirmed,
     executeTransaction,
   } = useEVMTransactionModal({
-    isOpen: true,
+    isOpen: !!modal.token && !!modal.protocolName && !!modal.debtBalance,
     chainId,
-    tokenAddress: token.address,
-    protocolName,
+    tokenAddress: token?.address || "",
+    protocolName: protocolName || "",
   });
-
-  if (token.decimals == null && decimals) {
-    token.decimals = decimals;
-  }
-
-  const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
-  const bump = (debtBalance * 101n) / 100n;
-  const maxInput = walletBalance < bump ? walletBalance : bump;
 
   useEffect(() => {
     if (isAnyConfirmed) {
@@ -48,6 +38,7 @@ export const RepayPanel: FC<RepayPanelProps> = ({ modal, onClose }) => {
 
   const handleRepay = useCallback(
     async (amount: string, isMax?: boolean) => {
+      if (!token || !protocolName || !debtBalance) return;
       await executeTransaction(
         async () =>
           await buildRepayFlowAsync(
@@ -60,8 +51,18 @@ export const RepayPanel: FC<RepayPanelProps> = ({ modal, onClose }) => {
         "Repay transaction sent"
       );
     },
-    [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeTransaction]
+    [protocolName, token, decimals, debtBalance, buildRepayFlowAsync, executeTransaction]
   );
+
+  if (!token || !protocolName || !debtBalance) return null;
+
+  if (token.decimals == null && decimals) {
+    token.decimals = decimals;
+  }
+
+  const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
+  const bump = (debtBalance * 101n) / 100n;
+  const maxInput = walletBalance < bump ? walletBalance : bump;
 
   return (
     <TokenActionModal
