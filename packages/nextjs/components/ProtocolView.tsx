@@ -95,7 +95,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 }) => {
   const { selectedChainId } = useNetworkContext();
   // Use prop if provided, otherwise fall back to context (for EVM networks)
-  const chainId = chainIdProp ?? (networkType === "evm" ? selectedChainId : undefined);
+  // Convert null to undefined to match expected type (number | undefined)
+  const chainId = chainIdProp ?? (networkType === "evm" ? (selectedChainId ?? undefined) : undefined);
 
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
