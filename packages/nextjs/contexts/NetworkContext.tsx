@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useMemo, useCallback } from "react";
-import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 
 // Map network IDs to EVM chain IDs (matching NetworkFilter)
@@ -26,14 +25,14 @@ type NetworkContextType = {
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
 export function NetworkProvider({ children }: { children: React.ReactNode }) {
-  const { chain } = useAccount();
   const queryClient = useQueryClient();
 
-  // Initialize from URL or localStorage, fallback to wallet chain, then default
+  // Initialize from URL or localStorage, fallback to default
+  // Note: We don't use useAccount() here because NetworkProvider wraps WagmiProvider
   const [selectedChainId, setSelectedChainIdState] = useState<number | null>(() => {
     if (typeof window === "undefined") {
-      // Fallback to connected wallet chain on server
-      return chain?.id ?? DEFAULT_CHAIN_ID;
+      // Default to Arbitrum on server
+      return DEFAULT_CHAIN_ID;
     }
 
     // Check URL first
@@ -50,11 +49,6 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
         return NETWORK_TO_CHAIN_ID[cached];
       }
     } catch {}
-
-    // Fallback to connected wallet chain
-    if (chain?.id && Object.values(NETWORK_TO_CHAIN_ID).includes(chain.id)) {
-      return chain.id;
-    }
 
     // Default to Arbitrum
     return DEFAULT_CHAIN_ID;
