@@ -1,6 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
-
-import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
+import dynamic from "next/dynamic";
 import { useAccount } from "~~/hooks/useAccount";
 import {
   createVesuContextV1,
@@ -18,6 +17,11 @@ import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAdd
 import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
+
+const TokenSelectModalStark = dynamic(() =>
+  import("~~/components/modals/stark/TokenSelectModalStark").then((mod) => ({ default: mod.TokenSelectModalStark })),
+  { ssr: false }
+);
 
 type VesuVersionKey = "v1" | "v2";
 

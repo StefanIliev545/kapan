@@ -1,12 +1,8 @@
 import { FC, ReactNode } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
-import { DepositModal } from "./modals/DepositModal";
-import { WithdrawModal } from "./modals/WithdrawModal";
-import { MoveSupplyModal } from "./modals/MoveSupplyModal";
-import { DepositModalStark } from "./modals/stark/DepositModalStark";
-import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
 import { FiChevronDown, FiChevronUp, FiInfo, FiPlus, FiMinus, FiRepeat, FiArrowRight } from "react-icons/fi";
 import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useModal, useToggle } from "~~/hooks/useModal";
@@ -15,6 +11,31 @@ import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { SegmentedActionBar } from "./common/SegmentedActionBar";
+
+const DepositModal = dynamic(() =>
+  import("./modals/DepositModal").then((mod) => ({ default: mod.DepositModal })),
+  { ssr: false }
+);
+
+const WithdrawModal = dynamic(() =>
+  import("./modals/WithdrawModal").then((mod) => ({ default: mod.WithdrawModal })),
+  { ssr: false }
+);
+
+const MoveSupplyModal = dynamic(() =>
+  import("./modals/MoveSupplyModal").then((mod) => ({ default: mod.MoveSupplyModal })),
+  { ssr: false }
+);
+
+const DepositModalStark = dynamic(() =>
+  import("./modals/stark/DepositModalStark").then((mod) => ({ default: mod.DepositModalStark })),
+  { ssr: false }
+);
+
+const WithdrawModalStark = dynamic(() =>
+  import("./modals/stark/WithdrawModalStark").then((mod) => ({ default: mod.WithdrawModalStark })),
+  { ssr: false }
+);
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 type ExtraStat = {
@@ -424,75 +445,83 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       {/* Modals */}
       {networkType === "starknet" ? (
         <>
-          <DepositModalStark
-            isOpen={depositModal.isOpen}
-            onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            position={position}
-            vesuContext={vesuContext?.deposit}
-          />
-          <WithdrawModalStark
-            isOpen={withdrawModal.isOpen}
-            onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            vesuContext={vesuContext?.withdraw}
-          />
+          {depositModal.isOpen && (
+            <DepositModalStark
+              isOpen={depositModal.isOpen}
+              onClose={depositModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              position={position}
+              vesuContext={vesuContext?.deposit}
+            />
+          )}
+          {withdrawModal.isOpen && (
+            <WithdrawModalStark
+              isOpen={withdrawModal.isOpen}
+              onClose={withdrawModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              position={position}
+              vesuContext={vesuContext?.withdraw}
+            />
+          )}
         </>
       ) : (
         <>
-          <DepositModal
-            isOpen={depositModal.isOpen}
-            onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            position={position}
-            chainId={chainId}
-          />
-          <WithdrawModal
-            isOpen={withdrawModal.isOpen}
-            onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            chainId={chainId}
-          />
+          {depositModal.isOpen && (
+            <DepositModal
+              isOpen={depositModal.isOpen}
+              onClose={depositModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              position={position}
+              chainId={chainId}
+            />
+          )}
+          {withdrawModal.isOpen && (
+            <WithdrawModal
+              isOpen={withdrawModal.isOpen}
+              onClose={withdrawModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              position={position}
+              chainId={chainId}
+            />
+          )}
         </>
       )}
 
-      {!disableMove && (
+      {!disableMove && moveModal.isOpen && (
         <MoveSupplyModal
           isOpen={moveModal.isOpen}
           onClose={moveModal.close}

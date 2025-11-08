@@ -1,17 +1,34 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
 import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
-import { BorrowModal } from "./modals/BorrowModal";
-import { TokenSelectModal } from "./modals/TokenSelectModal";
-import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
-import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
+
+const BorrowModal = dynamic(() =>
+  import("./modals/BorrowModal").then((mod) => ({ default: mod.BorrowModal })),
+  { ssr: false }
+);
+
+const TokenSelectModal = dynamic(() =>
+  import("./modals/TokenSelectModal").then((mod) => ({ default: mod.TokenSelectModal })),
+  { ssr: false }
+);
+
+const BorrowModalStark = dynamic(() =>
+  import("./modals/stark/BorrowModalStark").then((mod) => ({ default: mod.BorrowModalStark })),
+  { ssr: false }
+);
+
+const TokenSelectModalStark = dynamic(() =>
+  import("./modals/stark/TokenSelectModalStark").then((mod) => ({ default: mod.TokenSelectModalStark })),
+  { ssr: false }
+);
 
 export interface ProtocolPosition {
   icon: string;
@@ -437,54 +454,58 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       {!readOnly && networkType === "starknet" ? (
         <>
           {/* Supply Token Select - unified Stark modal */}
-          <TokenSelectModalStark
-            isOpen={isTokenSelectModalOpen}
-            onClose={handleCloseTokenSelectModal}
-            tokens={allSupplyPositions.map(pos => ({
-              address: BigInt(pos.tokenAddress),
-              symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")),
-              decimals: pos.tokenDecimals || 18,
-              rate_accumulator: 0n,
-              utilization: 0n,
-              fee_rate: BigInt(Math.floor(((pos.currentRate / 100) * 1e18) / (365 * 24 * 60 * 60))),
-              price: { value: BigInt(pos.tokenPrice || 0), is_valid: true },
-              total_nominal_debt: pos.tokenBalance ?? 0n,
-              last_rate_accumulator: 0n,
-              reserve: 0n,
-              scale: 0n,
-              borrowAPR: pos.currentRate,
-              supplyAPY: pos.currentRate,
-            }))}
-            protocolName={protocolName}
-            position={positionManager}
-            action="deposit"
-          />
+          {isTokenSelectModalOpen && (
+            <TokenSelectModalStark
+              isOpen={isTokenSelectModalOpen}
+              onClose={handleCloseTokenSelectModal}
+              tokens={allSupplyPositions.map(pos => ({
+                address: BigInt(pos.tokenAddress),
+                symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")),
+                decimals: pos.tokenDecimals || 18,
+                rate_accumulator: 0n,
+                utilization: 0n,
+                fee_rate: BigInt(Math.floor(((pos.currentRate / 100) * 1e18) / (365 * 24 * 60 * 60))),
+                price: { value: BigInt(pos.tokenPrice || 0), is_valid: true },
+                total_nominal_debt: pos.tokenBalance ?? 0n,
+                last_rate_accumulator: 0n,
+                reserve: 0n,
+                scale: 0n,
+                borrowAPR: pos.currentRate,
+                supplyAPY: pos.currentRate,
+              }))}
+              protocolName={protocolName}
+              position={positionManager}
+              action="deposit"
+            />
+          )}
 
           {/* Token Select Modal for Borrow - Starknet */}
-          <TokenSelectModalStark
-            isOpen={isTokenBorrowSelectModalOpen}
-            onClose={handleCloseBorrowSelectModal}
-            tokens={allBorrowPositions.map(pos => ({
-              address: BigInt(pos.tokenAddress),
-              symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")), // Convert name to felt format
-              decimals: pos.tokenDecimals || 18,
-              rate_accumulator: BigInt(0),
-              utilization: BigInt(0),
-              fee_rate: BigInt(Math.floor(((pos.currentRate / 100) * 1e18) / (365 * 24 * 60 * 60))), // Convert APR percentage to per-second rate
-              price: {
-                value: BigInt(pos.tokenPrice || 0),
-                is_valid: true,
-              },
-              total_nominal_debt: pos.tokenBalance ?? 0n,
-              last_rate_accumulator: BigInt(0),
-              reserve: BigInt(0),
-              scale: BigInt(0),
-              borrowAPR: pos.currentRate,
-              supplyAPY: pos.currentRate * 0.7, // Approximate supply APY as 70% of borrow APR
-            }))}
-            protocolName={protocolName}
-            position={positionManager}
-          />
+          {isTokenBorrowSelectModalOpen && (
+            <TokenSelectModalStark
+              isOpen={isTokenBorrowSelectModalOpen}
+              onClose={handleCloseBorrowSelectModal}
+              tokens={allBorrowPositions.map(pos => ({
+                address: BigInt(pos.tokenAddress),
+                symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")), // Convert name to felt format
+                decimals: pos.tokenDecimals || 18,
+                rate_accumulator: BigInt(0),
+                utilization: BigInt(0),
+                fee_rate: BigInt(Math.floor(((pos.currentRate / 100) * 1e18) / (365 * 24 * 60 * 60))), // Convert APR percentage to per-second rate
+                price: {
+                  value: BigInt(pos.tokenPrice || 0),
+                  is_valid: true,
+                },
+                total_nominal_debt: pos.tokenBalance ?? 0n,
+                last_rate_accumulator: BigInt(0),
+                reserve: BigInt(0),
+                scale: BigInt(0),
+                borrowAPR: pos.currentRate,
+                supplyAPY: pos.currentRate * 0.7, // Approximate supply APY as 70% of borrow APR
+              }))}
+              protocolName={protocolName}
+              position={positionManager}
+            />
+          )}
 
           {/* Deposit handled by TokenSelectModalStark after selection */}
 
@@ -528,26 +549,30 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       ) : !readOnly ? (
         <>
           {/* Token Select Modal for Supply - EVM */}
-          <TokenSelectModal
-            isOpen={isTokenSelectModalOpen}
-            onClose={handleCloseTokenSelectModal}
-            tokens={allSupplyPositions}
-            protocolName={protocolName}
-            isBorrow={false}
-            position={positionManager}
-            chainId={chainId}
-          />
+          {isTokenSelectModalOpen && (
+            <TokenSelectModal
+              isOpen={isTokenSelectModalOpen}
+              onClose={handleCloseTokenSelectModal}
+              tokens={allSupplyPositions}
+              protocolName={protocolName}
+              isBorrow={false}
+              position={positionManager}
+              chainId={chainId}
+            />
+          )}
 
           {/* Token Select Modal for Borrow - EVM */}
-          <TokenSelectModal
-            isOpen={isTokenBorrowSelectModalOpen}
-            onClose={handleCloseBorrowSelectModal}
-            tokens={allBorrowPositions}
-            protocolName={protocolName}
-            isBorrow={true}
-            position={positionManager}
-            chainId={chainId}
-          />
+          {isTokenBorrowSelectModalOpen && (
+            <TokenSelectModal
+              isOpen={isTokenBorrowSelectModalOpen}
+              onClose={handleCloseBorrowSelectModal}
+              tokens={allBorrowPositions}
+              protocolName={protocolName}
+              isBorrow={true}
+              position={positionManager}
+              chainId={chainId}
+            />
+          )}
 
           {/* Borrow Modal - EVM */}
           {isTokenBorrowModalOpen && (

@@ -1,17 +1,42 @@
 import { FC, useMemo, useState } from "react";
 import Image from "next/image";
-import { BorrowModalStark } from "~~/components/modals/stark/BorrowModalStark";
-import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
-import { MovePositionModal } from "~~/components/modals/stark/MovePositionModal";
-import { RepayModalStark } from "~~/components/modals/stark/RepayModalStark";
-import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
-import { WithdrawModalStark } from "~~/components/modals/stark/WithdrawModalStark";
+import dynamic from "next/dynamic";
 import { CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata, feltToString, formatTokenAmount } from "~~/utils/protocols";
 import { createVesuContextV1 } from "~~/utils/vesu";
+
+const BorrowModalStark = dynamic(() =>
+  import("~~/components/modals/stark/BorrowModalStark").then((mod) => ({ default: mod.BorrowModalStark })),
+  { ssr: false }
+);
+
+const DepositModalStark = dynamic(() =>
+  import("~~/components/modals/stark/DepositModalStark").then((mod) => ({ default: mod.DepositModalStark })),
+  { ssr: false }
+);
+
+const MovePositionModal = dynamic(() =>
+  import("~~/components/modals/stark/MovePositionModal").then((mod) => ({ default: mod.MovePositionModal })),
+  { ssr: false }
+);
+
+const RepayModalStark = dynamic(() =>
+  import("~~/components/modals/stark/RepayModalStark").then((mod) => ({ default: mod.RepayModalStark })),
+  { ssr: false }
+);
+
+const TokenSelectModalStark = dynamic(() =>
+  import("~~/components/modals/stark/TokenSelectModalStark").then((mod) => ({ default: mod.TokenSelectModalStark })),
+  { ssr: false }
+);
+
+const WithdrawModalStark = dynamic(() =>
+  import("~~/components/modals/stark/WithdrawModalStark").then((mod) => ({ default: mod.WithdrawModalStark })),
+  { ssr: false }
+);
 
 // Constants
 const YEAR_IN_SECONDS = 31536000; // 365 days
@@ -321,101 +346,109 @@ export const VesuPosition: FC<VesuPositionProps> = ({
       </div>
       {!isVtoken && (
         <>
-          <DepositModalStark
-            isOpen={isDepositModalOpen}
-            onClose={() => setIsDepositModalOpen(false)}
-            token={{
-              name: collateralSymbol,
-              icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
-              address: collateralAsset,
-              currentRate: collateralRates.supplyAPY * 100,
-              usdPrice: collateralUsdPrice,
-              decimals: Number(collateralMetadata.decimals),
-            }}
-            protocolName="Vesu"
-            vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
-            position={position}
-          />
+          {isDepositModalOpen && (
+            <DepositModalStark
+              isOpen={isDepositModalOpen}
+              onClose={() => setIsDepositModalOpen(false)}
+              token={{
+                name: collateralSymbol,
+                icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+                address: collateralAsset,
+                currentRate: collateralRates.supplyAPY * 100,
+                usdPrice: collateralUsdPrice,
+                decimals: Number(collateralMetadata.decimals),
+              }}
+              protocolName="Vesu"
+              vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
+              position={position}
+            />
+          )}
 
-          <WithdrawModalStark
-            isOpen={isWithdrawModalOpen}
-            onClose={() => setIsWithdrawModalOpen(false)}
-            token={{
-              name: collateralSymbol,
-              icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
-              address: collateralAsset,
-              currentRate: collateralRates.supplyAPY * 100,
-              usdPrice: collateralUsdPrice,
-              decimals: Number(collateralMetadata.decimals),
-            }}
-            protocolName="Vesu"
-            supplyBalance={BigInt(collateralAmount)}
-            vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
-            position={position}
-          />
+          {isWithdrawModalOpen && (
+            <WithdrawModalStark
+              isOpen={isWithdrawModalOpen}
+              onClose={() => setIsWithdrawModalOpen(false)}
+              token={{
+                name: collateralSymbol,
+                icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+                address: collateralAsset,
+                currentRate: collateralRates.supplyAPY * 100,
+                usdPrice: collateralUsdPrice,
+                decimals: Number(collateralMetadata.decimals),
+              }}
+              protocolName="Vesu"
+              supplyBalance={BigInt(collateralAmount)}
+              vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
+              position={position}
+            />
+          )}
 
-          <TokenSelectModalStark
-            isOpen={isTokenSelectModalOpen}
-            onClose={() => setIsTokenSelectModalOpen(false)}
-            tokens={tokensWithRates}
-            protocolName="Vesu"
-            collateralAsset={collateralAsset}
-            vesuContext={createVesuContextV1(poolId, collateralAsset)}
-            position={position}
-          />
+          {isTokenSelectModalOpen && (
+            <TokenSelectModalStark
+              isOpen={isTokenSelectModalOpen}
+              onClose={() => setIsTokenSelectModalOpen(false)}
+              tokens={tokensWithRates}
+              protocolName="Vesu"
+              collateralAsset={collateralAsset}
+              vesuContext={createVesuContextV1(poolId, collateralAsset)}
+              position={position}
+            />
+          )}
 
-          {debtMetadata && (
-            <>
-              <BorrowModalStark
-                isOpen={isBorrowModalOpen}
-                onClose={() => setIsBorrowModalOpen(false)}
-                token={{
-                  name: debtSymbol,
-                  icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-                  address: debtAsset,
-                  currentRate: debtRates.borrowAPR * 100,
-                  usdPrice: debtUsdPrice,
-                  decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-                }}
-                protocolName="Vesu"
-                currentDebt={debtNum}
-                vesuContext={createVesuContextV1(poolId, collateralAsset)}
-                position={position}
-              />
+          {debtMetadata && isBorrowModalOpen && (
+            <BorrowModalStark
+              isOpen={isBorrowModalOpen}
+              onClose={() => setIsBorrowModalOpen(false)}
+              token={{
+                name: debtSymbol,
+                icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+                address: debtAsset,
+                currentRate: debtRates.borrowAPR * 100,
+                usdPrice: debtUsdPrice,
+                decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+              }}
+              protocolName="Vesu"
+              currentDebt={debtNum}
+              vesuContext={createVesuContextV1(poolId, collateralAsset)}
+              position={position}
+            />
+          )}
 
-              <RepayModalStark
-                isOpen={isRepayModalOpen}
-                onClose={() => setIsRepayModalOpen(false)}
-                token={{
-                  name: debtSymbol,
-                  icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-                  address: debtAsset,
-                  currentRate: debtRates.borrowAPR * 100,
-                  usdPrice: debtUsdPrice,
-                  decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-                }}
-                protocolName="Vesu"
-                debtBalance={BigInt(nominalDebt)}
-                vesuContext={createVesuContextV1(poolId, collateralAsset)}
-                position={position}
-              />
+          {debtMetadata && isRepayModalOpen && (
+            <RepayModalStark
+              isOpen={isRepayModalOpen}
+              onClose={() => setIsRepayModalOpen(false)}
+              token={{
+                name: debtSymbol,
+                icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+                address: debtAsset,
+                currentRate: debtRates.borrowAPR * 100,
+                usdPrice: debtUsdPrice,
+                decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
+              }}
+              protocolName="Vesu"
+              debtBalance={BigInt(nominalDebt)}
+              vesuContext={createVesuContextV1(poolId, collateralAsset)}
+              position={position}
+            />
+          )}
 
-              <MovePositionModal
-                isOpen={isMoveModalOpen}
-                onClose={() => setIsMoveModalOpen(false)}
-                fromProtocol="Vesu"
-                position={{
-                  name: debtSymbol,
-                  balance: BigInt(nominalDebt),
-                  type: "borrow",
-                  tokenAddress: debtAsset,
-                  decimals: debtMetadata ? Number(debtMetadata.decimals) : Number(18),
-                  poolId: poolId,
-                }}
-                preSelectedCollaterals={preSelectedCollateral}
-                disableCollateralSelection={true}
-              />
-            </>
+          {debtMetadata && isMoveModalOpen && (
+            <MovePositionModal
+              isOpen={isMoveModalOpen}
+              onClose={() => setIsMoveModalOpen(false)}
+              fromProtocol="Vesu"
+              position={{
+                name: debtSymbol,
+                balance: BigInt(nominalDebt),
+                type: "borrow",
+                tokenAddress: debtAsset,
+                decimals: debtMetadata ? Number(debtMetadata.decimals) : Number(18),
+                poolId: poolId,
+              }}
+              preSelectedCollaterals={preSelectedCollateral}
+              disableCollateralSelection={true}
+            />
           )}
         </>
       )}

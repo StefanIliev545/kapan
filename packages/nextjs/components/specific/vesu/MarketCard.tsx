@@ -1,7 +1,12 @@
 import { FC, useState } from "react";
 import Image from "next/image";
-import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
+import dynamic from "next/dynamic";
 import { InterestPillRow } from "./InterestPillRow";
+
+const DepositModalStark = dynamic(() =>
+  import("~~/components/modals/stark/DepositModalStark").then((mod) => ({ default: mod.DepositModalStark })),
+  { ssr: false }
+);
 
 export type MarketCardProps = {
   icon: string;
@@ -67,17 +72,19 @@ export const MarketCard: FC<MarketCardProps> = ({
         </div>
       </div>
 
-      <DepositModalStark
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        token={{
-          name,
-          icon,
-          address,
-          currentRate: parseFloat(supplyRate.replace("%", "")),
-        }}
-        protocolName="Vesu"
-      />
+      {isDepositModalOpen && (
+        <DepositModalStark
+          isOpen={isDepositModalOpen}
+          onClose={() => setIsDepositModalOpen(false)}
+          token={{
+            name,
+            icon,
+            address,
+            currentRate: parseFloat(supplyRate.replace("%", "")),
+          }}
+          protocolName="Vesu"
+        />
+      )}
     </>
   );
 };

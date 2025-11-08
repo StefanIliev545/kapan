@@ -1,12 +1,21 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { DepositModal } from "~~/components/modals/DepositModal";
-import { WithdrawModal } from "~~/components/modals/WithdrawModal";
+import dynamic from "next/dynamic";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+
+const DepositModal = dynamic(() =>
+  import("~~/components/modals/DepositModal").then((mod) => ({ default: mod.DepositModal })),
+  { ssr: false }
+);
+
+const WithdrawModal = dynamic(() =>
+  import("~~/components/modals/WithdrawModal").then((mod) => ({ default: mod.WithdrawModal })),
+  { ssr: false }
+);
 
 interface CollateralPosition {
   icon: string;

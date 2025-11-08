@@ -1,10 +1,19 @@
 import { FC, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { ProtocolPosition } from "../ProtocolView";
-import { BorrowModal } from "./BorrowModal";
-import { DepositModal } from "./DepositModal";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+
+const BorrowModal = dynamic(() =>
+  import("./BorrowModal").then((mod) => ({ default: mod.BorrowModal })),
+  { ssr: false }
+);
+
+const DepositModal = dynamic(() =>
+  import("./DepositModal").then((mod) => ({ default: mod.DepositModal })),
+  { ssr: false }
+);
 
 interface TokenSelectModalProps {
   isOpen: boolean;
