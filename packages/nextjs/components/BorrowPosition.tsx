@@ -1,5 +1,6 @@
 import React, { FC, useCallback, useMemo } from "react";
 import Image from "next/image";
+import { useAccount } from "wagmi";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
@@ -94,6 +95,11 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const borrowModal = useModal();
   const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
+
+  // Access chain for reactivity - component re-renders when network changes
+  // Even if chain is unused, accessing it causes re-render on wallet network switch
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { chain } = useAccount();
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
