@@ -50,35 +50,31 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   }, [isOpen, chainId, chain?.id, switchChain]);
 
   const handleBorrow = useCallback(async (amount: string) => {
-    try {
-      // If a target chain is provided and wallet is on a different chain, switch first
-      if (chainId && chain?.id !== chainId) {
-        try {
-          await switchChain?.({ chainId });
-        } catch (e) {
-          notification.error("Please switch to the selected network to proceed");
-          return;
-        }
+    // If a target chain is provided and wallet is on a different chain, switch first
+    if (chainId && chain?.id !== chainId) {
+      try {
+        await switchChain?.({ chainId });
+      } catch (e) {
+        notification.error("Please switch to the selected network to proceed");
+        throw e;
       }
-      const instructions = buildBorrowFlow(
-        protocolName.toLowerCase(),
-        token.address,
-        amount,
-        token.decimals || decimals || 18
-      );
-      
-      if (instructions.length === 0) {
-        notification.error("Failed to build borrow instructions");
-        return;
-      }
-
-      // Use executeFlowBatchedIfPossible to handle gateway authorizations (batched when supported)
-      await executeFlowBatchedIfPossible(instructions, preferBatching);
-      notification.success("Borrow transaction sent");
-    } catch (error: any) {
-      console.error("Borrow error:", error);
-      notification.error(error.message || "Failed to borrow");
     }
+    const instructions = buildBorrowFlow(
+      protocolName.toLowerCase(),
+      token.address,
+      amount,
+      token.decimals || decimals || 18
+    );
+    
+    if (instructions.length === 0) {
+      const error = new Error("Failed to build borrow instructions");
+      notification.error(error.message);
+      throw error;
+    }
+
+    // Use executeFlowBatchedIfPossible to handle gateway authorizations (batched when supported)
+    await executeFlowBatchedIfPossible(instructions, preferBatching);
+    notification.success("Borrow transaction sent");
   }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
 
   useEffect(() => {

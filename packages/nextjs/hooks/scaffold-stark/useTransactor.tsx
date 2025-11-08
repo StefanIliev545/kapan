@@ -100,9 +100,27 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
         notification.remove(notificationId);
       }
 
-      const errorPattern = /Contract (.*?)"}/;
-      const match = errorPattern.exec(error.message);
-      const message = match ? match[1] : error.message;
+      // Check for user rejection
+      const errorMessage = error?.message || "";
+      const lowerMessage = errorMessage.toLowerCase();
+      const isRejection = 
+        lowerMessage.includes("user rejected") ||
+        lowerMessage.includes("user denied") ||
+        lowerMessage.includes("user cancelled") ||
+        lowerMessage.includes("rejected") ||
+        lowerMessage.includes("denied") ||
+        lowerMessage.includes("cancelled") ||
+        error?.code === 4001 ||
+        error?.code === "ACTION_REJECTED" ||
+        error?.code === "USER_REJECTED";
+
+      const message = isRejection 
+        ? "User rejected the request"
+        : (() => {
+            const errorPattern = /Contract (.*?)"}/;
+            const match = errorPattern.exec(errorMessage);
+            return match ? match[1] : errorMessage;
+          })();
 
       console.error("⚡️ ~ file: useTransactor.ts ~ error", message);
 

@@ -55,36 +55,32 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   }, [isOpen, chainId, chain?.id, switchChain]);
 
   const handleWithdraw = useCallback(async (amount: string, isMax?: boolean) => {
-    try {
-      if (chainId && chain?.id !== chainId) {
-        try {
-          await switchChain?.({ chainId });
-        } catch (e) {
-          notification.error("Please switch to the selected network to proceed");
-          return;
-        }
+    if (chainId && chain?.id !== chainId) {
+      try {
+        await switchChain?.({ chainId });
+      } catch (e) {
+        notification.error("Please switch to the selected network to proceed");
+        throw e;
       }
-      const instructions = buildWithdrawFlow(
-        protocolName.toLowerCase(),
-        token.address,
-        amount,
-        token.decimals || decimals || 18,
-        isMax || false,
-        market
-      );
-      
-      if (instructions.length === 0) {
-        notification.error("Failed to build withdraw instructions");
-        return;
-      }
-
-      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-      await executeFlowBatchedIfPossible(instructions, preferBatching);
-      notification.success("Withdraw transaction sent");
-    } catch (error: any) {
-      console.error("Withdraw error:", error);
-      notification.error(error.message || "Failed to withdraw");
     }
+    const instructions = buildWithdrawFlow(
+      protocolName.toLowerCase(),
+      token.address,
+      amount,
+      token.decimals || decimals || 18,
+      isMax || false,
+      market
+    );
+    
+    if (instructions.length === 0) {
+      const error = new Error("Failed to build withdraw instructions");
+      notification.error(error.message);
+      throw error;
+    }
+
+    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+    await executeFlowBatchedIfPossible(instructions, preferBatching);
+    notification.success("Withdraw transaction sent");
   }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, market, preferBatching]);
 
   useEffect(() => {

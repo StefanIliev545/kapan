@@ -54,36 +54,32 @@ export const RepayModal: FC<RepayModalProps> = ({
   }, [isOpen, chainId, chain?.id, switchChain]);
 
   const handleRepay = useCallback(async (amount: string, isMax?: boolean) => {
-    try {
-      if (chainId && chain?.id !== chainId) {
-        try {
-          await switchChain?.({ chainId });
-        } catch (e) {
-          notification.error("Please switch to the selected network to proceed");
-          return;
-        }
+    if (chainId && chain?.id !== chainId) {
+      try {
+        await switchChain?.({ chainId });
+      } catch (e) {
+        notification.error("Please switch to the selected network to proceed");
+        throw e;
       }
-      // Use async version for max repayments to safely read wallet balance
-      const instructions = await buildRepayFlowAsync(
-        protocolName.toLowerCase(),
-        token.address,
-        amount,
-        token.decimals || decimals || 18,
-        isMax || false
-      );
-      
-      if (instructions.length === 0) {
-        notification.error("Failed to build repay instructions or no balance to repay");
-        return;
-      }
-
-      // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-      await executeFlowBatchedIfPossible(instructions, preferBatching);
-      notification.success("Repay transaction sent");
-    } catch (error: any) {
-      console.error("Repay error:", error);
-      notification.error(error.message || "Failed to repay");
     }
+    // Use async version for max repayments to safely read wallet balance
+    const instructions = await buildRepayFlowAsync(
+      protocolName.toLowerCase(),
+      token.address,
+      amount,
+      token.decimals || decimals || 18,
+      isMax || false
+    );
+    
+    if (instructions.length === 0) {
+      const error = new Error("Failed to build repay instructions or no balance to repay");
+      notification.error(error.message);
+      throw error;
+    }
+
+    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
+    await executeFlowBatchedIfPossible(instructions, preferBatching);
+    notification.success("Repay transaction sent");
   }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
 
   useEffect(() => {
