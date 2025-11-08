@@ -43,7 +43,6 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 }) => {
   const [selectedToken, setSelectedToken] = useState<TokenWithRates | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
-  const [hoveredToken, setHoveredToken] = useState<string | null>(null);
 
   // Filter out the collateral asset from available tokens if provided
   const availableTokens = useMemo(
@@ -67,11 +66,6 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
     }
     setSelectedToken(token);
     setIsTokenModalOpen(true);
-  };
-
-  // Handle token hover
-  const handleTokenHover = (tokenAddress: string | null) => {
-    setHoveredToken(tokenAddress);
   };
 
   // Handle modal close
@@ -116,8 +110,6 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                     key={address}
                     className="w-full flex items-center justify-between p-3 hover:bg-base-200/60"
                     onClick={() => handleSelectToken(token)}
-                    onMouseEnter={() => handleTokenHover(address)}
-                    onMouseLeave={() => handleTokenHover(null)}
                   >
                     <div className="flex items-center gap-2">
                       <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={16} height={16} className="w-4 h-4" />

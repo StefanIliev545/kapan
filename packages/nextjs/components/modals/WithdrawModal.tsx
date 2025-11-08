@@ -1,11 +1,17 @@
+/**
+ * @deprecated This component is being phased out in favor of the unified modal system.
+ * For new code, use `useOpenTransactionModal().openWithdrawModal()` instead.
+ * This component is still used in some legacy components (SupplyPosition)
+ * but should be migrated to use the unified modal context.
+ * 
+ * TODO: Migrate SupplyPosition to use UnifiedTransactionModal
+ */
 import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
+import { useEVMTransactionModal } from "~~/hooks/useEVMTransactionModal";
 import { PositionManager } from "~~/utils/position";
-import { notification } from "~~/utils/scaffold-stark/notification";
-import { useAccount, useSwitchChain } from "wagmi";
 import type { Address } from "viem";
 
 interface WithdrawModalProps {
@@ -29,65 +35,45 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   chainId,
   market,
 }) => {
-  const { chain } = useAccount();
-  const { switchChain } = useSwitchChain();
-  const decimals = token.decimals;
-  const { buildWithdrawFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
-  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
-  
+  const { buildWithdrawFlow } = useKapanRouterV2();
+  const { decimals, preferBatching, setPreferBatching, isPreferenceLoaded, isAnyConfirmed, executeTransaction } = useEVMTransactionModal({
+    isOpen,
+    chainId,
+    tokenAddress: token.address,
+    protocolName,
+    market,
+  });
+
   if (token.decimals == null) {
     token.decimals = decimals;
   }
-  
+
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
-
-  // Ensure wallet is on the correct EVM network when modal opens
-  useEffect(() => {
-    if (!isOpen || !chainId) return;
-    if (chain?.id !== chainId) {
-      try {
-        switchChain?.({ chainId });
-      } catch (e) {
-        console.warn("Auto network switch failed", e);
-      }
-    }
-  }, [isOpen, chainId, chain?.id, switchChain]);
-
-  const handleWithdraw = useCallback(async (amount: string, isMax?: boolean) => {
-    if (chainId && chain?.id !== chainId) {
-      try {
-        await switchChain?.({ chainId });
-      } catch (e) {
-        notification.error("Please switch to the selected network to proceed");
-        throw e;
-      }
-    }
-    const instructions = buildWithdrawFlow(
-      protocolName.toLowerCase(),
-      token.address,
-      amount,
-      token.decimals || decimals || 18,
-      isMax || false,
-      market
-    );
-    
-    if (instructions.length === 0) {
-      const error = new Error("Failed to build withdraw instructions");
-      notification.error(error.message);
-      throw error;
-    }
-
-    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-    await executeFlowBatchedIfPossible(instructions, preferBatching);
-    notification.success("Withdraw transaction sent");
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, market, preferBatching]);
 
   useEffect(() => {
     if (isAnyConfirmed && isOpen) {
       onClose();
     }
   }, [isAnyConfirmed, isOpen, onClose]);
+
+  const handleWithdraw = useCallback(
+    async (amount: string, isMax?: boolean) => {
+      await executeTransaction(
+        () =>
+          buildWithdrawFlow(
+            protocolName.toLowerCase(),
+            token.address,
+            amount,
+            token.decimals || decimals || 18,
+            isMax || false,
+            market
+          ),
+        "Withdraw transaction sent"
+      );
+    },
+    [protocolName, token.address, token.decimals, decimals, market, buildWithdrawFlow, executeTransaction]
+  );
 
   return (
     <TokenActionModal

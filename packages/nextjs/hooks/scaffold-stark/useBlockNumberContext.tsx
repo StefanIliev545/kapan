@@ -5,8 +5,13 @@ import { useInterval } from "usehooks-ts";
 import scaffoldConfig from "~~/scaffold.config";
 import { useTargetNetwork } from "./useTargetNetwork";
 import { useGlobalState } from "~~/services/store/store";
+import { useNetworkContext } from "~~/contexts/NetworkContext";
 
 const BlockNumberUpdater = () => {
+  const { networkType } = useNetworkContext();
+  if (networkType !== "stark") {
+    return null;
+  }
   const { provider } = useProvider();
   const { targetNetwork } = useTargetNetwork();
   const setSnBlockNumber = useGlobalState(state => state.setSnBlockNumber);

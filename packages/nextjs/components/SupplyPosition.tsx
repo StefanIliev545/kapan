@@ -1,5 +1,6 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useCallback, useMemo } from "react";
 import Image from "next/image";
+import { useAccount } from "wagmi";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
@@ -98,6 +99,11 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
 
+  // Access chain for reactivity - component re-renders when network changes
+  // Even if chain is unused, accessing it causes re-render on wallet network switch
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { chain } = useAccount();
+
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   // const supplyAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
@@ -152,26 +158,29 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   // const actionGridClass =
   //   visibleActionCount === 1 ? "grid-cols-1" : visibleActionCount === 2 ? "grid-cols-2" : "grid-cols-3";
 
-  const handleDepositClick = onDeposit ?? depositModal.open;
-  const handleWithdrawClick = onWithdraw ?? withdrawModal.open;
-  const handleMoveClick = onMove ?? moveModal.open;
-  const handleSwapClick = onSwap;
+  const handleDepositClick = useMemo(() => onDeposit ?? depositModal.open, [onDeposit, depositModal.open]);
+  const handleWithdrawClick = useMemo(() => onWithdraw ?? withdrawModal.open, [onWithdraw, withdrawModal.open]);
+  const handleMoveClick = useMemo(() => onMove ?? moveModal.open, [onMove, moveModal.open]);
+  const handleSwapClick = useMemo(() => onSwap, [onSwap]);
 
-  // Toggle expanded state
-  const toggleExpanded = (e: React.MouseEvent) => {
-    // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest(".dropdown")) {
-      return;
-    }
-    if (!hasAnyActions) {
-      return;
-    }
-    if (onToggleExpanded) {
-      onToggleExpanded();
-    } else {
-      expanded.toggle();
-    }
-  };
+  // Toggle expanded state - memoized to prevent re-renders
+  const toggleExpanded = useCallback(
+    (e: React.MouseEvent) => {
+      // Don't expand if clicking on the info button or its dropdown
+      if ((e.target as HTMLElement).closest(".dropdown")) {
+        return;
+      }
+      if (!hasAnyActions) {
+        return;
+      }
+      if (onToggleExpanded) {
+        onToggleExpanded();
+      } else {
+        expanded.toggle();
+      }
+    },
+    [hasAnyActions, onToggleExpanded, expanded]
+  );
 
   const defaultInfoButton = (
     <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0">
@@ -205,17 +214,23 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
 
-  const baseStatColumns = hideBalanceColumn ? 2 : 3;
-  const totalStatColumns = baseStatColumns + extraStats.length;
-  const statColumnClassMap: Record<number, string> = {
-    1: "grid-cols-1",
-    2: "grid-cols-2",
-    3: "grid-cols-3",
-    4: "grid-cols-4",
-    5: "grid-cols-5",
-    6: "grid-cols-6",
-  };
-  const statGridClass = statColumnClassMap[totalStatColumns] ?? "grid-cols-3";
+  const baseStatColumns = useMemo(() => (hideBalanceColumn ? 2 : 3), [hideBalanceColumn]);
+  const totalStatColumns = useMemo(() => baseStatColumns + extraStats.length, [baseStatColumns, extraStats.length]);
+  const statColumnClassMap: Record<number, string> = useMemo(
+    () => ({
+      1: "grid-cols-1",
+      2: "grid-cols-2",
+      3: "grid-cols-3",
+      4: "grid-cols-4",
+      5: "grid-cols-5",
+      6: "grid-cols-6",
+    }),
+    []
+  );
+  const statGridClass = useMemo(
+    () => statColumnClassMap[totalStatColumns] ?? "grid-cols-3",
+    [statColumnClassMap, totalStatColumns]
+  );
 
   const statColumns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
 
@@ -424,75 +439,83 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       {/* Modals */}
       {networkType === "starknet" ? (
         <>
-          <DepositModalStark
-            isOpen={depositModal.isOpen}
-            onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            position={position}
-            vesuContext={vesuContext?.deposit}
-          />
-          <WithdrawModalStark
-            isOpen={withdrawModal.isOpen}
-            onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            vesuContext={vesuContext?.withdraw}
-          />
+          {depositModal.isOpen && (
+            <DepositModalStark
+              isOpen={depositModal.isOpen}
+              onClose={depositModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              position={position}
+              vesuContext={vesuContext?.deposit}
+            />
+          )}
+          {withdrawModal.isOpen && (
+            <WithdrawModalStark
+              isOpen={withdrawModal.isOpen}
+              onClose={withdrawModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              position={position}
+              vesuContext={vesuContext?.withdraw}
+            />
+          )}
         </>
       ) : (
         <>
-          <DepositModal
-            isOpen={depositModal.isOpen}
-            onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            position={position}
-            chainId={chainId}
-          />
-          <WithdrawModal
-            isOpen={withdrawModal.isOpen}
-            onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
-            protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-            position={position}
-            chainId={chainId}
-          />
+          {depositModal.isOpen && (
+            <DepositModal
+              isOpen={depositModal.isOpen}
+              onClose={depositModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              position={position}
+              chainId={chainId}
+            />
+          )}
+          {withdrawModal.isOpen && (
+            <WithdrawModal
+              isOpen={withdrawModal.isOpen}
+              onClose={withdrawModal.close}
+              token={{
+                name,
+                icon,
+                address: tokenAddress,
+                currentRate,
+                usdPrice,
+                decimals: tokenDecimals || 18,
+              }}
+              protocolName={protocolName}
+              supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+              position={position}
+              chainId={chainId}
+            />
+          )}
         </>
       )}
 
-      {!disableMove && (
+      {!disableMove && moveModal.isOpen && (
         <MoveSupplyModal
           isOpen={moveModal.isOpen}
           onClose={moveModal.close}

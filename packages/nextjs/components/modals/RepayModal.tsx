@@ -1,12 +1,17 @@
+/**
+ * @deprecated This component is being phased out in favor of the unified modal system.
+ * For new code, use `useOpenTransactionModal().openRepayModal()` instead.
+ * This component is still used in some legacy components (BorrowPosition)
+ * but should be migrated to use the unified modal context.
+ * 
+ * TODO: Migrate BorrowPosition to use UnifiedTransactionModal
+ */
 import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
-import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useEVMTransactionModal } from "~~/hooks/useEVMTransactionModal";
 import { PositionManager } from "~~/utils/position";
-import { notification } from "~~/utils/scaffold-stark/notification";
-import { useAccount, useSwitchChain } from "wagmi";
 
 interface RepayModalProps {
   isOpen: boolean;
@@ -27,66 +32,44 @@ export const RepayModal: FC<RepayModalProps> = ({
   position,
   chainId,
 }) => {
-  const { chain } = useAccount();
-  const { switchChain } = useSwitchChain();
-  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildRepayFlowAsync, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
-  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
-  
+  const { buildRepayFlowAsync } = useKapanRouterV2();
+  const { balance: walletBalance, decimals, preferBatching, setPreferBatching, isPreferenceLoaded, isAnyConfirmed, executeTransaction } = useEVMTransactionModal({
+    isOpen,
+    chainId,
+    tokenAddress: token.address,
+    protocolName,
+  });
+
   if (token.decimals == null) {
     token.decimals = decimals;
   }
-  
+
   const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = walletBalance < bump ? walletBalance : bump;
-
-  // Ensure wallet is on the correct EVM network when modal opens
-  useEffect(() => {
-    if (!isOpen || !chainId) return;
-    if (chain?.id !== chainId) {
-      try {
-        switchChain?.({ chainId });
-      } catch (e) {
-        console.warn("Auto network switch failed", e);
-      }
-    }
-  }, [isOpen, chainId, chain?.id, switchChain]);
-
-  const handleRepay = useCallback(async (amount: string, isMax?: boolean) => {
-    if (chainId && chain?.id !== chainId) {
-      try {
-        await switchChain?.({ chainId });
-      } catch (e) {
-        notification.error("Please switch to the selected network to proceed");
-        throw e;
-      }
-    }
-    // Use async version for max repayments to safely read wallet balance
-    const instructions = await buildRepayFlowAsync(
-      protocolName.toLowerCase(),
-      token.address,
-      amount,
-      token.decimals || decimals || 18,
-      isMax || false
-    );
-    
-    if (instructions.length === 0) {
-      const error = new Error("Failed to build repay instructions or no balance to repay");
-      notification.error(error.message);
-      throw error;
-    }
-
-    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-    await executeFlowBatchedIfPossible(instructions, preferBatching);
-    notification.success("Repay transaction sent");
-  }, [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
 
   useEffect(() => {
     if (isAnyConfirmed && isOpen) {
       onClose();
     }
   }, [isAnyConfirmed, isOpen, onClose]);
+
+  const handleRepay = useCallback(
+    async (amount: string, isMax?: boolean) => {
+      await executeTransaction(
+        async () =>
+          await buildRepayFlowAsync(
+            protocolName.toLowerCase(),
+            token.address,
+            amount,
+            token.decimals || decimals || 18,
+            isMax || false
+          ),
+        "Repay transaction sent"
+      );
+    },
+    [protocolName, token.address, token.decimals, decimals, buildRepayFlowAsync, executeTransaction]
+  );
 
   return (
     <TokenActionModal

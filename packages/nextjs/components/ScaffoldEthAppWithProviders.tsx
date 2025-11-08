@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
@@ -34,8 +34,20 @@ import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
+import { ModalProvider } from "~~/contexts/ModalContext";
+import { NetworkProvider, useNetworkContext } from "~~/contexts/NetworkContext";
+import dynamic from "next/dynamic";
 import { ControllerConnector } from "@cartridge/connector";
 import { constants } from "starknet";
+
+// Lazy-load the unified modal component - code-split into separate chunk
+const UnifiedTransactionModal = dynamic(
+  () => import("~~/components/modals/UnifiedTransactionModal").then(m => ({ default: m.UnifiedTransactionModal })),
+  {
+    ssr: false,
+    loading: () => null, // No loading UI needed - modal only shows when open
+  }
+);
 
 const cartridgeConnector = new ControllerConnector({
   chains: [
@@ -91,7 +103,8 @@ const ScaffoldEthApp = ({
   );
 };
 
-export const ScaffoldEthAppWithProviders = ({
+// Inner component that uses NetworkContext to key providers
+const ScaffoldEthAppWithProvidersInner = ({
   children,
   initialHost,
 }: {
@@ -101,6 +114,7 @@ export const ScaffoldEthAppWithProviders = ({
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === "dark";
   const [mounted, setMounted] = useState(false);
+  const { selectedChainId, networkType } = useNetworkContext();
 
   useEffect(() => {
     setMounted(true);
@@ -124,34 +138,73 @@ export const ScaffoldEthAppWithProviders = ({
     connectorsRef.current = connectorsWithCartridge;
   }, [liveConnectors]);
 
+  // Key providers based on network to force remount on network change
+  // Use stable keys that change when network type or chain ID changes
+  const evmProviderKey = useMemo(() => {
+    const key = networkType === "evm" && selectedChainId !== null 
+      ? `evm-${selectedChainId}` 
+      : "evm-off";
+    console.log("[ScaffoldEthApp] EVM provider key:", key, "networkType:", networkType, "selectedChainId:", selectedChainId);
+    return key;
+  }, [networkType, selectedChainId]);
+  
+  // Note: The StarknetConfig key changes based on network type to pause/resume Starknet queries.
+  // When switching to EVM, the key becomes "stark-off" which causes a remount.
+  // However, with autoConnect={true}, the Starknet wallet will automatically reconnect when
+  // switching back to Starknet. The AccountContext is independent of NetworkContext, so
+  // the connection state is preserved in localStorage and will be restored via autoConnect.
+  const starkProviderKey = useMemo(() => {
+    const key = networkType === "stark" 
+      ? `stark-${selectedChainId ?? "main"}` 
+      : "stark-off";
+    console.log("[ScaffoldEthApp] Stark provider key:", key, "networkType:", networkType, "selectedChainId:", selectedChainId);
+    return key;
+  }, [networkType, selectedChainId]);
+
   return (
-    <StarknetConfig
-      chains={appChains}
-      provider={provider}
-      paymasterProvider={paymasterProvider}
-      connectors={connectorsRef.current}
-      explorer={starkscan}
-      autoConnect={true}
-    >
-      <Suspense fallback={null}>
+    <WagmiProvider key={evmProviderKey} config={wagmiConfig}>
+      <StarknetConfig
+        key={starkProviderKey}
+        chains={appChains}
+        provider={provider}
+        paymasterProvider={paymasterProvider}
+        connectors={connectorsRef.current}
+        explorer={starkscan}
+        autoConnect={true}
+      >
         <AccountProvider>
-          <WagmiProvider config={wagmiConfig}>
-            <BlockNumberProvider>
-              <StarkBlockNumberProvider>
-                <ProgressBar height="3px" color="#2299dd" />
-                <RainbowKitProvider
-                  avatar={BlockieAvatar}
-                  theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
-                >
+          <BlockNumberProvider>
+            <StarkBlockNumberProvider>
+              <ProgressBar height="3px" color="#2299dd" />
+              <RainbowKitProvider
+                avatar={BlockieAvatar}
+                theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+              >
+                <ModalProvider>
                   <StarknetWalletAnalytics />
                   <WalletAnalytics />
                   <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
-                </RainbowKitProvider>
-              </StarkBlockNumberProvider>
-            </BlockNumberProvider>
-          </WagmiProvider>
+                  <UnifiedTransactionModal />
+                </ModalProvider>
+              </RainbowKitProvider>
+            </StarkBlockNumberProvider>
+          </BlockNumberProvider>
         </AccountProvider>
-      </Suspense>
-    </StarknetConfig>
+      </StarknetConfig>
+    </WagmiProvider>
+  );
+};
+
+export const ScaffoldEthAppWithProviders = ({
+  children,
+  initialHost,
+}: {
+  children: React.ReactNode;
+  initialHost?: string | null;
+}) => {
+  return (
+    <NetworkProvider>
+      <ScaffoldEthAppWithProvidersInner initialHost={initialHost}>{children}</ScaffoldEthAppWithProvidersInner>
+    </NetworkProvider>
   );
 };
