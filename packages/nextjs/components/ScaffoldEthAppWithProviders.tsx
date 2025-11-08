@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
@@ -35,7 +35,7 @@ import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
 import { ModalProvider } from "~~/contexts/ModalContext";
-import { NetworkProvider } from "~~/contexts/NetworkContext";
+import { NetworkProvider, useNetworkContext } from "~~/contexts/NetworkContext";
 import dynamic from "next/dynamic";
 import { ControllerConnector } from "@cartridge/connector";
 import { constants } from "starknet";
@@ -103,7 +103,8 @@ const ScaffoldEthApp = ({
   );
 };
 
-export const ScaffoldEthAppWithProviders = ({
+// Inner component that uses NetworkContext to key providers
+const ScaffoldEthAppWithProvidersInner = ({
   children,
   initialHost,
 }: {
@@ -113,6 +114,7 @@ export const ScaffoldEthAppWithProviders = ({
   const { resolvedTheme } = useTheme();
   const isDarkMode = resolvedTheme === "dark";
   const [mounted, setMounted] = useState(false);
+  const { selectedChainId, networkType } = useNetworkContext();
 
   useEffect(() => {
     setMounted(true);
@@ -136,17 +138,22 @@ export const ScaffoldEthAppWithProviders = ({
     connectorsRef.current = connectorsWithCartridge;
   }, [liveConnectors]);
 
+  // Key providers based on network to force remount on network change
+  const evmProviderKey = networkType === "evm" ? `evm-${selectedChainId}` : "evm-off";
+  const starkProviderKey = networkType === "stark" ? `stark-${selectedChainId ?? "main"}` : "stark-off";
+
   return (
-    <StarknetConfig
-      chains={appChains}
-      provider={provider}
-      paymasterProvider={paymasterProvider}
-      connectors={connectorsRef.current}
-      explorer={starkscan}
-      autoConnect={true}
-    >
-      <AccountProvider>
-        <WagmiProvider config={wagmiConfig}>
+    <WagmiProvider key={evmProviderKey} config={wagmiConfig}>
+      <StarknetConfig
+        key={starkProviderKey}
+        chains={appChains}
+        provider={provider}
+        paymasterProvider={paymasterProvider}
+        connectors={connectorsRef.current}
+        explorer={starkscan}
+        autoConnect={true}
+      >
+        <AccountProvider>
           <BlockNumberProvider>
             <StarkBlockNumberProvider>
               <ProgressBar height="3px" color="#2299dd" />
@@ -154,19 +161,31 @@ export const ScaffoldEthAppWithProviders = ({
                 avatar={BlockieAvatar}
                 theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
               >
-                <NetworkProvider>
-                  <ModalProvider>
-                    <StarknetWalletAnalytics />
-                    <WalletAnalytics />
-                    <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
-                    <UnifiedTransactionModal />
-                  </ModalProvider>
-                </NetworkProvider>
+                <ModalProvider>
+                  <StarknetWalletAnalytics />
+                  <WalletAnalytics />
+                  <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
+                  <UnifiedTransactionModal />
+                </ModalProvider>
               </RainbowKitProvider>
             </StarkBlockNumberProvider>
           </BlockNumberProvider>
-        </WagmiProvider>
-      </AccountProvider>
-    </StarknetConfig>
+        </AccountProvider>
+      </StarknetConfig>
+    </WagmiProvider>
+  );
+};
+
+export const ScaffoldEthAppWithProviders = ({
+  children,
+  initialHost,
+}: {
+  children: React.ReactNode;
+  initialHost?: string | null;
+}) => {
+  return (
+    <NetworkProvider>
+      <ScaffoldEthAppWithProvidersInner initialHost={initialHost}>{children}</ScaffoldEthAppWithProvidersInner>
+    </NetworkProvider>
   );
 };

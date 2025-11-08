@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useMemo } from "react";
+import { createContext, useContext, useState, useMemo, useCallback } from "react";
 import { useAccount } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Map network IDs to EVM chain IDs (matching NetworkFilter)
 const NETWORK_TO_CHAIN_ID: Record<string, number> = {
@@ -17,6 +18,7 @@ const DEFAULT_CHAIN_ID = 42161;
 type NetworkContextType = {
   selectedChainId: number | null; // null for Starknet
   selectedNetworkId: string | null; // "starknet" or EVM network ID
+  networkType: "evm" | "stark"; // Derived from selectedNetworkId
   setSelectedChainId: (chainId: number | null) => void;
   setSelectedNetworkId: (networkId: string | null) => void;
 };
@@ -25,6 +27,7 @@ const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
 export function NetworkProvider({ children }: { children: React.ReactNode }) {
   const { chain } = useAccount();
+  const queryClient = useQueryClient();
 
   // Initialize from URL or localStorage, fallback to wallet chain, then default
   const [selectedChainId, setSelectedChainIdState] = useState<number | null>(() => {
@@ -79,7 +82,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     return "starknet";
   });
 
-  const setSelectedChainId = (chainId: number | null) => {
+  const setSelectedChainId = useCallback((chainId: number | null) => {
     setSelectedChainIdState(chainId);
     if (chainId === null) {
       setSelectedNetworkIdState("starknet");
@@ -91,25 +94,47 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
         setSelectedNetworkIdState(networkId);
       }
     }
-  };
+    // Invalidate position queries when network changes
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        Array.isArray(query.queryKey) &&
+        (String(query.queryKey[0]).includes("positions") ||
+          String(query.queryKey[0]).includes("stark-read") ||
+          String(query.queryKey[0]).includes("starknet")),
+    });
+  }, [queryClient]);
 
-  const setSelectedNetworkId = (networkId: string | null) => {
+  const setSelectedNetworkId = useCallback((networkId: string | null) => {
     setSelectedNetworkIdState(networkId);
     if (networkId === "starknet" || networkId === null) {
       setSelectedChainIdState(null);
     } else if (NETWORK_TO_CHAIN_ID[networkId]) {
       setSelectedChainIdState(NETWORK_TO_CHAIN_ID[networkId]);
     }
-  };
+    // Invalidate position queries when network changes
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        Array.isArray(query.queryKey) &&
+        (String(query.queryKey[0]).includes("positions") ||
+          String(query.queryKey[0]).includes("stark-read") ||
+          String(query.queryKey[0]).includes("starknet")),
+    });
+  }, [queryClient]);
+
+  // Compute networkType from selectedNetworkId
+  const networkType = useMemo(() => {
+    return selectedNetworkId === "starknet" || selectedNetworkId === null ? "stark" : "evm";
+  }, [selectedNetworkId]);
 
   const value = useMemo(
     () => ({
       selectedChainId,
       selectedNetworkId,
+      networkType,
       setSelectedChainId,
       setSelectedNetworkId,
     }),
-    [selectedChainId, selectedNetworkId]
+    [selectedChainId, selectedNetworkId, networkType, setSelectedChainId, setSelectedNetworkId]
   );
 
   return <NetworkContext.Provider value={value}>{children}</NetworkContext.Provider>;
