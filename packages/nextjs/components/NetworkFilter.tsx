@@ -184,11 +184,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     if (!isValid(networkId) || networkId === selectedRef.current) return;
 
     // Update context (this will trigger re-renders across the app)
+    // Note: We update context directly here, and the parent's onNetworkChange
+    // callback is only used for side effects (like analytics), not for state updates
     setSelectedNetworkId(networkId);
 
     // Update local state for backward compatibility
     setLocalSelectedNetwork(networkId);
-    onNetworkChange(networkId);
 
     // Persist to cache
     try {
@@ -221,6 +222,10 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         router.replace(`${pathname}?${next.toString()}`, { scroll: false });
       }
     }
+
+    // Call parent callback for side effects (analytics, etc.) but NOT for state updates
+    // The context is already updated above, so this should not call setSelectedNetworkId again
+    onNetworkChange(networkId);
   };
 
   return (

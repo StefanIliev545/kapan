@@ -139,8 +139,27 @@ const ScaffoldEthAppWithProvidersInner = ({
   }, [liveConnectors]);
 
   // Key providers based on network to force remount on network change
-  const evmProviderKey = networkType === "evm" ? `evm-${selectedChainId}` : "evm-off";
-  const starkProviderKey = networkType === "stark" ? `stark-${selectedChainId ?? "main"}` : "stark-off";
+  // Use stable keys that change when network type or chain ID changes
+  const evmProviderKey = useMemo(() => {
+    const key = networkType === "evm" && selectedChainId !== null 
+      ? `evm-${selectedChainId}` 
+      : "evm-off";
+    console.log("[ScaffoldEthApp] EVM provider key:", key, "networkType:", networkType, "selectedChainId:", selectedChainId);
+    return key;
+  }, [networkType, selectedChainId]);
+  
+  // Note: The StarknetConfig key changes based on network type to pause/resume Starknet queries.
+  // When switching to EVM, the key becomes "stark-off" which causes a remount.
+  // However, with autoConnect={true}, the Starknet wallet will automatically reconnect when
+  // switching back to Starknet. The AccountContext is independent of NetworkContext, so
+  // the connection state is preserved in localStorage and will be restored via autoConnect.
+  const starkProviderKey = useMemo(() => {
+    const key = networkType === "stark" 
+      ? `stark-${selectedChainId ?? "main"}` 
+      : "stark-off";
+    console.log("[ScaffoldEthApp] Stark provider key:", key, "networkType:", networkType, "selectedChainId:", selectedChainId);
+    return key;
+  }, [networkType, selectedChainId]);
 
   return (
     <WagmiProvider key={evmProviderKey} config={wagmiConfig}>

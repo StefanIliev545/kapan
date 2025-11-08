@@ -1,3 +1,11 @@
+/**
+ * @deprecated This component is being phased out in favor of the unified modal system.
+ * For new code, use `useOpenTransactionModal().openBorrowModal()` instead.
+ * This component is still used in some legacy components (BorrowPosition, TokenSelectModal)
+ * but should be migrated to use the unified modal context.
+ * 
+ * TODO: Migrate BorrowPosition and TokenSelectModal to use UnifiedTransactionModal
+ */
 import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";

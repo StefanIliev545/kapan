@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, startTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import type { NextPage } from "next";
 import dynamic from "next/dynamic";
@@ -47,7 +47,7 @@ const networkOptions: NetworkOption[] = [
 ];
 
 const App: NextPage = () => {
-  const { selectedNetworkId, selectedChainId, setSelectedNetworkId } = useNetworkContext();
+  const { selectedNetworkId, selectedChainId } = useNetworkContext();
   const selectedNetwork = selectedNetworkId ?? "starknet";
 
   // Keep a cache of networks the user has visited so we keep their trees mounted
@@ -62,10 +62,11 @@ const App: NextPage = () => {
   }, [selectedNetwork]);
 
   // Tiny helper so the button click never feels blocked
-  const handleNetworkChange = (id: string) => {
-    startTransition(() => {
-      setSelectedNetworkId(id);
-    });
+  // Note: NetworkFilter already updates the context, so this is only for side effects
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleNetworkChange = (_id: string) => {
+    // No state update needed here - NetworkFilter handles it via context
+    // This callback is kept for potential future side effects (analytics, etc.)
   };
 
   // Optional: prefetch likely-next bundles when idle (micro-UX win)
@@ -140,13 +141,13 @@ const App: NextPage = () => {
         {mounted.has("arbitrum") && (
           <div className={selectedNetwork === "arbitrum" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "arbitrum"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={selectedChainId ?? arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={selectedNetwork === "arbitrum" ? (selectedChainId ?? arbitrum.id) : arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={selectedChainId ?? arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={selectedNetwork === "arbitrum" ? (selectedChainId ?? arbitrum.id) : arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={selectedChainId ?? arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
+              <VenusProtocolView chainId={selectedNetwork === "arbitrum" ? (selectedChainId ?? arbitrum.id) : arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
           </div>
         )}
@@ -155,13 +156,13 @@ const App: NextPage = () => {
         {mounted.has("base") && (
           <div className={selectedNetwork === "base" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "base"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={selectedChainId ?? base.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={selectedNetwork === "base" ? (selectedChainId ?? base.id) : base.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={selectedChainId ?? base.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={selectedNetwork === "base" ? (selectedChainId ?? base.id) : base.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={selectedChainId ?? base.id} enabledFeatures={{ swap: false, move: true }} />
+              <VenusProtocolView chainId={selectedNetwork === "base" ? (selectedChainId ?? base.id) : base.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
           </div>
         )}
@@ -182,10 +183,10 @@ const App: NextPage = () => {
         {mounted.has("optimism") && (
           <div className={selectedNetwork === "optimism" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "optimism"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={selectedChainId ?? optimism.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={selectedNetwork === "optimism" ? (selectedChainId ?? optimism.id) : optimism.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={selectedChainId ?? optimism.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={selectedNetwork === "optimism" ? (selectedChainId ?? optimism.id) : optimism.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
           </div>
         )}
@@ -194,10 +195,10 @@ const App: NextPage = () => {
         {mounted.has("linea") && (
           <div className={selectedNetwork === "linea" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "linea"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={selectedChainId ?? linea.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={selectedNetwork === "linea" ? (selectedChainId ?? linea.id) : linea.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={selectedChainId ?? linea.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={selectedNetwork === "linea" ? (selectedChainId ?? linea.id) : linea.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
           </div>
         )}

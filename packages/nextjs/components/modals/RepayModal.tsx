@@ -1,3 +1,11 @@
+/**
+ * @deprecated This component is being phased out in favor of the unified modal system.
+ * For new code, use `useOpenTransactionModal().openRepayModal()` instead.
+ * This component is still used in some legacy components (BorrowPosition)
+ * but should be migrated to use the unified modal context.
+ * 
+ * TODO: Migrate BorrowPosition to use UnifiedTransactionModal
+ */
 import { FC, useCallback, useEffect } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
