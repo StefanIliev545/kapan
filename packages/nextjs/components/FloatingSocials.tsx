@@ -25,6 +25,21 @@ export const FloatingSocials = () => {
           <span className="text-base-content">Join our Discord</span>
         </Link>
         <Link
+          href="https://t.me/+vYCKr2TrOXRiODg0"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 shadow-md hover:shadow-lg transition-all"
+        >
+          <Image
+            src="/logos/telegram.svg"
+            alt="Telegram Logo"
+            width={20}
+            height={20}
+            className="w-5 h-5"
+          />
+          <span className="text-base-content">Join our Telegram</span>
+        </Link>
+        <Link
           href="https://x.com/KapanFinance"
           target="_blank"
           rel="noopener noreferrer"
