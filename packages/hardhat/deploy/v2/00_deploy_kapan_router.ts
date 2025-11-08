@@ -7,12 +7,13 @@ import { deterministicSalt } from "../../utils/deploySalt";
 
 /**
  * Router is chain-agnostic; we deploy it always.
- * Balancer vaults are set only if the chain is recognized in the map.
+ * Balancer vaults and Aave pools are set only if the chain is recognized in the map.
  */
 const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute } = hre.deployments;
+  const { ethers } = hre;
   const WAIT = 3;
 
   const BALANCER: Record<number, { VAULT_V2?: string; VAULT_V3?: string }> = {
@@ -27,6 +28,22 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     10: {
       VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
+    },
+  };
+
+  // Aave V3 PoolAddressesProvider map (same as in AaveGatewayWrite deployment)
+  const AAVE: Record<number, { PROVIDER: string }> = {
+    42161: {
+      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
+    },
+    8453: {
+      PROVIDER: "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d", // Base v3 PoolAddressesProvider
+    },
+    10: {
+      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Optimism v3 PoolAddressesProvider
+    },
+    59144: {
+      PROVIDER: "0x89502c3731F69DDC95B65753708A07F8Cd0373F4", // Linea v3 PoolAddressesProvider
     },
   };
 
@@ -56,6 +73,31 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     console.log(`Balancer V3 vault set: ${v3}`);
   } else {
     console.warn(`No Balancer V3 for chainId=${chainId}. Skipping setBalancerV3.`);
+  }
+
+  // Set Aave V3 pool for flash loans if available
+  const aaveEntry = AAVE[chainId];
+  if (aaveEntry) {
+    const providerAddress = process.env.AAVE_POOL_ADDRESSES_PROVIDER || aaveEntry.PROVIDER;
+    try {
+      // Get the pool address from the PoolAddressesProvider
+      const provider = await ethers.getContractAt(
+        "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
+        providerAddress
+      );
+      const poolAddress = await provider.getPool();
+      
+      if (poolAddress && poolAddress !== ethers.ZeroAddress) {
+        await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setAaveV3", poolAddress);
+        console.log(`Aave V3 pool set: ${poolAddress}`);
+      } else {
+        console.warn(`Aave V3 pool address is zero for chainId=${chainId}. Skipping setAaveV3.`);
+      }
+    } catch (error) {
+      console.warn(`Failed to set Aave V3 pool for chainId=${chainId}:`, error);
+    }
+  } else {
+    console.warn(`No Aave V3 for chainId=${chainId}. Skipping setAaveV3.`);
   }
 
   // Temporarily disable Etherscan verification for v2 deploys

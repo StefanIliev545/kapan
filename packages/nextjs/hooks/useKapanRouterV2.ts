@@ -674,7 +674,9 @@ export const useKapanRouterV2 = () => {
 
   // --- Types for modular move position builder ---
   type FlashConfig = {
-    version: "v3" | "v2";
+    version: "v3" | "v2" | "aave";
+    premiumBps?: number;
+    bufferBps?: number;
   };
 
   type BuildUnlockDebtParams = {
@@ -818,13 +820,20 @@ export const useKapanRouterV2 = () => {
 
         // [1] FlashLoan: use GetBorrowBalance UTXO to flash loan exactly what we need
         // The flash loan will use the GetBorrowBalance output (exact debt amount)
-        const provider = version === "v3" ? FlashLoanProvider.BalancerV3 : FlashLoanProvider.BalancerV2;
+        let provider: FlashLoanProvider;
+        if (version === "aave") {
+          provider = FlashLoanProvider.AaveV3;
+        } else if (version === "v3") {
+          provider = FlashLoanProvider.BalancerV3;
+        } else {
+          provider = FlashLoanProvider.BalancerV2;
+        }
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount; // Track UTXO index before adding flash loan
         addRouter(flashData as `0x${string}`, true); // FlashLoan creates 1 UTXO (with repayment amount)
         
-        // Store the flash loan output UTXO index for this token
-        flashLoanOutputs.set(debtToken as Address, flashLoanUtxoIndex);
+        // Store the flash loan output UTXO index for this token (normalize to lowercase for consistent lookup)
+        flashLoanOutputs.set((debtToken as Address).toLowerCase() as Address, flashLoanUtxoIndex);
 
         // [2] Approve flash tokens to the *source* gateway so it can pull for Repay
         addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true); // Approve creates 1 dummy UTXO
@@ -916,11 +925,12 @@ export const useKapanRouterV2 = () => {
         } else {
           // coverFlash mode: use the flash loan output UTXO for this token
           // The flash loan output contains the repayment amount (principal + fee)
-          const flashLoanUtxoIndex = flashLoanOutputs.get(token);
+          // Normalize token address to lowercase for consistent lookup
+          const flashLoanUtxoIndex = flashLoanOutputs.get((token as Address).toLowerCase() as Address);
           
           if (flashLoanUtxoIndex === undefined) {
-            // No flash loan found for this token; no-op
-            return;
+            // No flash loan found for this token - this should not happen if buildUnlockDebt was called first
+            throw new Error(`Flash loan output not found for token ${token}. Make sure buildUnlockDebt was called before buildBorrow.`);
           }
 
           // Use the flash loan output UTXO to borrow exactly what's needed to repay
@@ -938,8 +948,9 @@ export const useKapanRouterV2 = () => {
 
         // Borrow on target
         // In coverFlash mode, use the flash loan output UTXO to borrow exactly what's needed
+        // Normalize token address to lowercase for consistent lookup
         const borrowInputIndex = p.mode === "coverFlash" 
-          ? (flashLoanOutputs.get(token) ?? 999)
+          ? (flashLoanOutputs.get((token as Address).toLowerCase() as Address) ?? 999)
           : 999;
         
         addProto(

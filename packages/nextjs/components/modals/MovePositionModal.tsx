@@ -10,6 +10,7 @@ import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
@@ -33,14 +34,16 @@ interface MovePositionModalProps {
 }
 
 type FlashLoanProvider = {
-  name: "Balancer V2" | "Balancer V3";
+  name: "Balancer V2" | "Balancer V3" | "Aave V3";
   icon: string;
-  version: "v2" | "v3";
+  version: "v2" | "v3" | "aave";
+  providerEnum: 0 | 1 | 2; // FlashLoanProvider enum: BalancerV2=0, BalancerV3=1, AaveV3=2
 };
 
-const FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
-  { name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2" },
-  { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3" },
+const ALL_FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
+  { name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 },
+  { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 },
+  { name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 },
 ] as const;
 
 // Extend the collateral type with rawBalance
@@ -53,12 +56,76 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const [amount, setAmount] = useState("");
   const [selectedCollateralsWithAmounts, setSelectedCollateralsWithAmounts] = useState<CollateralWithAmount[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider>(
-    FLASH_LOAN_PROVIDERS[0],
-  );
   const [isRepayingAll, setIsRepayingAll] = useState(false);
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  // Check which flash loan providers are available on the router using enabled functions
+  // These are view functions in FlashLoanConsumerBase that check if addresses are non-zero
+  const { data: routerContract } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as any });
+  
+  const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useReadContract({
+    address: routerContract?.address as `0x${string}` | undefined,
+    abi: routerContract?.abi,
+    functionName: "balancerV2Enabled",
+    query: { enabled: isOpen && !!chainId && !!routerContract?.address },
+  });
+
+  const { data: balancerV3Enabled, isLoading: isLoadingBalancerV3 } = useReadContract({
+    address: routerContract?.address as `0x${string}` | undefined,
+    abi: routerContract?.abi,
+    functionName: "balancerV3Enabled",
+    query: { enabled: isOpen && !!chainId && !!routerContract?.address },
+  });
+
+  const { data: aaveEnabled, isLoading: isLoadingAave } = useReadContract({
+    address: routerContract?.address as `0x${string}` | undefined,
+    abi: routerContract?.abi,
+    functionName: "aaveEnabled",
+    query: { enabled: isOpen && !!chainId && !!routerContract?.address },
+  });
+
+  // Chain-based provider availability (from deployment script)
+  // Balancer is only available on Arbitrum, Base, and Optimism
+  // Aave V3 is available on Arbitrum, Base, Optimism, and Linea
+  const BALANCER_CHAINS = [42161, 8453, 10]; // Arbitrum, Base, Optimism
+  const AAVE_CHAINS = [42161, 8453, 10, 59144]; // Arbitrum, Base, Optimism, Linea
+
+  // Filter available flash loan providers based on what's enabled AND chain support
+  // Only include providers once we've finished loading their status
+  const availableFlashLoanProviders = useMemo(() => {
+    const providers: FlashLoanProvider[] = [];
+    
+    // Only check if we're not loading (to avoid showing providers that will be filtered out)
+    // Also check chain support - Balancer is not available on Linea
+    if (!isLoadingBalancerV2 && balancerV2Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[0]);
+    }
+    
+    if (!isLoadingBalancerV3 && balancerV3Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[1]);
+    }
+    
+    if (!isLoadingAave && aaveEnabled === true && chainId && AAVE_CHAINS.includes(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[2]);
+    }
+    
+    return providers;
+  }, [balancerV2Enabled, balancerV3Enabled, aaveEnabled, isLoadingBalancerV2, isLoadingBalancerV3, isLoadingAave, chainId]);
+
+  // Set default selected provider (first available)
+  const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider | null>(null);
+
+  useEffect(() => {
+    if (availableFlashLoanProviders.length > 0) {
+      // Update selected provider if current one is not available, or set first available if none selected
+      if (!selectedFlashLoanProvider || !availableFlashLoanProviders.includes(selectedFlashLoanProvider)) {
+        setSelectedFlashLoanProvider(availableFlashLoanProviders[0]);
+      }
+    } else {
+      setSelectedFlashLoanProvider(null);
+    }
+  }, [availableFlashLoanProviders, selectedFlashLoanProvider]);
 
   // Fetch collaterals from the contract.
   const { collaterals: fetchedCollaterals, isLoading: isLoadingCollaterals } = useCollaterals(
@@ -277,13 +344,16 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         }
 
         // 1) Unlock debt using flash loan
+        if (!selectedFlashLoanProvider) {
+          throw new Error("No flash loan provider available");
+        }
         builder.buildUnlockDebt({
           fromProtocol,
           debtToken: position.tokenAddress as `0x${string}`,
           expectedDebt: debtAmountStr,
           debtDecimals: decimals as number,
           flash: {
-            version: selectedFlashLoanProvider.version === "v2" ? "v2" : "v3",
+            version: selectedFlashLoanProvider.version,
             premiumBps: 9, // TODO: Fetch from on-chain for Aave v3
             bufferBps: 10, // Small buffer for interest accrual
           },
@@ -521,53 +591,76 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
-              <div className="dropdown w-full">
-                <div
-                  tabIndex={0}
-                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
-                >
-                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                    <Image
-                      src={selectedFlashLoanProvider.icon}
-                      alt={selectedFlashLoanProvider.name}
-                      width={32}
-                      height={32}
-                      className="rounded-full min-w-[32px]"
-                    />
-                    <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
-                  </div>
-                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                >
-                  {FLASH_LOAN_PROVIDERS.map(provider => (
-                    <li key={provider.name}>
-                      <button
-                        className="flex items-center gap-3 py-2"
-                        onClick={() => setSelectedFlashLoanProvider(provider)}
-                      >
+            {availableFlashLoanProviders.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
+                {availableFlashLoanProviders.length === 1 ? (
+                  // Show as static display if only one provider available
+                  <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
+                    {selectedFlashLoanProvider && (
+                      <>
                         <Image
-                          src={provider.icon}
-                          alt={provider.name}
+                          src={selectedFlashLoanProvider.icon}
+                          alt={selectedFlashLoanProvider.name}
                           width={32}
                           height={32}
                           className="rounded-full min-w-[32px]"
                         />
-                        <span className="truncate text-lg">{provider.name}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                        <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  // Show dropdown if multiple providers available
+                  <div className="dropdown w-full">
+                    <div
+                      tabIndex={0}
+                      className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
+                    >
+                      <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                        {selectedFlashLoanProvider && (
+                          <>
+                            <Image
+                              src={selectedFlashLoanProvider.icon}
+                              alt={selectedFlashLoanProvider.name}
+                              width={32}
+                              height={32}
+                              className="rounded-full min-w-[32px]"
+                            />
+                            <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
+                          </>
+                        )}
+                      </div>
+                      <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    <ul
+                      tabIndex={0}
+                      className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                    >
+                      {availableFlashLoanProviders.map(provider => (
+                        <li key={provider.name}>
+                          <button
+                            className="flex items-center gap-3 py-2"
+                            onClick={() => setSelectedFlashLoanProvider(provider)}
+                          >
+                            <Image
+                              src={provider.icon}
+                              alt={provider.name}
+                              width={32}
+                              height={32}
+                              className="rounded-full min-w-[32px]"
+                            />
+                            <span className="truncate text-lg">{provider.name}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            </div>
-
-            {/* Note: Flash loan provider balance check UI removed - handled by router */}
+            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-3 pt-6 mt-auto">

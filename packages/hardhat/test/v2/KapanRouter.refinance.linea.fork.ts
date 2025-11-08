@@ -14,12 +14,12 @@ import {
 } from "./helpers/instructionHelpers";
 
 /**
- * Refinance Tests
+ * Refinance Tests - Linea
  * 
  * Pattern: Move a position from Protocol A to Protocol B using flash loans
  * Flow:
  *   1. Setup position in Protocol A (deposit collateral, borrow debt)
- *   2. Flash loan debt amount
+ *   2. Flash loan debt amount (using Aave V3 on Linea)
  *   3. Repay Protocol A debt (using flash loan)
  *   4. Withdraw Protocol A collateral
  *   5. Deposit collateral to Protocol B
@@ -29,17 +29,16 @@ import {
  * Everything uses UTXOs - no external funds needed during refinance
  */
 
-// Arbitrum One addresses (from deploy files)
+// Linea addresses (from deploy files)
 const FORK = process.env.MAINNET_FORKING_ENABLED === "true";
-const BALANCER_VAULT3 = "0xbA1333333333a1BA1108E8412f11850A5C319bA9"; // Same across all chains
-const USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"; // Native USDC on Arbitrum
-const WETH = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"; // WETH on Arbitrum
-const USDC_WHALE = "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D"; // Known USDC whale on Arbitrum
-const WETH_WHALE = BALANCER_VAULT3; // Use Balancer vault as WETH source
-const AAVE_POOL_PROVIDER = "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"; // Arbitrum Aave v3 PoolAddressesProvider
-const COMPOUND_USDC_COMET = "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf"; // cUSDCv3 for native USDC on Arbitrum
+const USDC = "0x176211869ca2b568f2a7d4ee941e073a821ee1ff"; // Native USDC on Linea
+const WETH = "0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f"; // WETH on Linea
+const USDC_WHALE = "0x795fACaa76Aed7C5F44a053155407199F4075139"; // USDC contract itself (will need to find actual whale)
+const WETH_WHALE = "0x47A0D24B34889277010026892B7612143d16bF13"; // WETH contract itself (will need to find actual whale)
+const AAVE_POOL_PROVIDER = "0x89502c3731F69DDC95B65753708A07F8Cd0373F4"; // Linea Aave v3 PoolAddressesProvider
+const COMPOUND_USDC_COMET = "0x8D38A3d6B3c3B7d96D6536DA7Eef94A9d7dbC991"; // cUSDCv3 on Linea
 
-describe("v2 Refinance Positions (fork)", function () {
+describe("v2 Refinance Positions - Linea (fork)", function () {
   this.timeout(120000); // 2 minutes
 
   before(function () {
@@ -49,7 +48,7 @@ describe("v2 Refinance Positions (fork)", function () {
   });
 
   describe("Refinance: Aave -> Compound (WETH collateral, USDC debt)", function () {
-    it("should move position from Aave to Compound using flash loan", async function () {
+    it("should move position from Aave to Compound using Aave V3 flash loan", async function () {
       const [deployer] = await ethers.getSigners();
       const user = ethers.Wallet.createRandom().connect(ethers.provider);
 
@@ -68,6 +67,18 @@ describe("v2 Refinance Positions (fork)", function () {
       const weth = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", WETH);
       const usdc = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", USDC);
 
+      // Wrap ETH to WETH for the whale if needed
+      const wethBalance = await weth.balanceOf(WETH_WHALE);
+      if (wethBalance < ethers.parseEther("2")) {
+        // WETH contract has a deposit() function - call it directly
+        const amountToWrap = ethers.parseEther("3"); // Wrap 3 ETH to have enough
+        await wethWhale.sendTransaction({
+          to: WETH,
+          value: amountToWrap,
+          data: "0xd0e30db0", // deposit() function selector
+        });
+      }
+
       // Fund user with WETH
       await (weth.connect(wethWhale) as any).transfer(await user.getAddress(), ethers.parseEther("2"));
 
@@ -75,7 +86,14 @@ describe("v2 Refinance Positions (fork)", function () {
       const Router = await ethers.getContractFactory("KapanRouter");
       const router = await Router.deploy(await deployer.getAddress());
       await router.waitForDeployment();
-      await (await router.setBalancerV3(BALANCER_VAULT3)).wait();
+      
+      // Set Aave V3 pool for flash loans
+      const poolProvider = await ethers.getContractAt(
+        "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
+        AAVE_POOL_PROVIDER
+      );
+      const aavePool = await poolProvider.getPool();
+      await (await router.setAaveV3(aavePool)).wait();
 
       // Deploy Aave gateway
       const AaveGateway = await ethers.getContractFactory("AaveGatewayWrite");
@@ -144,8 +162,8 @@ describe("v2 Refinance Positions (fork)", function () {
         "contracts/gateways/AaveGateway.sol:AaveGateway",
         await aaveGateway.getAddress()
       );
-      let aaveSupplySetup = 0n;
-      let aaveDebtSetup = 0n;
+      let aaveSupplySetup: bigint = 0n;
+      let aaveDebtSetup: bigint = 0n;
       try {
         aaveSupplySetup = await aaveGatewayViewSetup.getBalance(WETH, userAddress);
         aaveDebtSetup = await aaveGatewayViewSetup.getBorrowBalance(USDC, userAddress);
@@ -171,7 +189,7 @@ describe("v2 Refinance Positions (fork)", function () {
         expect(aaveDebtSetup).to.be.gte(borrowAmt); // Aave debt should be >= borrowed amount
       }
 
-      console.log("\n=== STEP 2: Refinance to Compound (via Flash Loan) ===");
+      console.log("\n=== STEP 2: Refinance to Compound (via Aave V3 Flash Loan) ===");
 
       // Authorize Aave repay/withdraw
       const aaveRepObj = {
@@ -230,11 +248,7 @@ describe("v2 Refinance Positions (fork)", function () {
       }
 
       // Query actual Aave debt balance off-chain (for flash loan sizing with buffer)
-      const poolProvider = await ethers.getContractAt(
-        "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
-        AAVE_POOL_PROVIDER
-      );
-      const pool = await ethers.getContractAt("@aave/core-v3/contracts/interfaces/IPool.sol:IPool", await poolProvider.getPool());
+      const pool = await ethers.getContractAt("@aave/core-v3/contracts/interfaces/IPool.sol:IPool", aavePool);
       const dataProvider = await ethers.getContractAt(
         "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
         await poolProvider.getPoolDataProvider()
@@ -269,12 +283,12 @@ describe("v2 Refinance Positions (fork)", function () {
       console.log(`Flash loan size: ${actualDebtAmount / 10n ** 6n} USDC (includes buffer for interest)`);
 
       // Refinance instructions (all in one atomic transaction via flash loan)
-      // New flow: Get exact debt first, then flash loan that exact amount
+      // New flow: Get exact debt first, then flash loan that exact amount using Aave V3
       const refinanceInstructions = [
         // 0. Query actual Aave debt balance -> UTXO[0] (exact current debt amount)
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
-        // 1. Flash loan USDC using exact debt amount from UTXO[0] -> UTXO[1] (flash loan output with repayment amount)
-        createRouterInstruction(encodeFlashLoan(FlashLoanProvider.BalancerV3, 0)), // Use UTXO[0] as input
+        // 1. Flash loan USDC using exact debt amount from UTXO[0] via Aave V3 -> UTXO[1] (flash loan output with repayment amount)
+        createRouterInstruction(encodeFlashLoan(FlashLoanProvider.AaveV3, 0)), // Use UTXO[0] as input
         // 2. Approve Aave gateway for flash loan UTXO[1] (for repay) -> UTXO[2] (empty)
         createRouterInstruction(encodeApprove(1, "aave")),
         // 3. Repay Aave debt using exact queried balance from UTXO[0] -> UTXO[3] (repay refund, if any)
@@ -290,13 +304,13 @@ describe("v2 Refinance Positions (fork)", function () {
         // The flash loan output (UTXO[1]) contains the repayment amount (principal + fee)
         // Use inputIndex 1 to borrow exactly what's needed to repay the flash loan
         createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddress, 0n, "0x", 1)),
-        // Flash loan repayment: Balancer v3 will use UTXO[1] (flash loan output) to repay
+        // Flash loan repayment: Aave V3 will use UTXO[1] (flash loan output) to repay
         // The borrowed amount (UTXO[6]) should match the repayment amount, ensuring atomic refinance
       ];
 
       console.log("Instructions:");
       console.log("  0. GetBorrowBalance(Aave) -> UTXO[0] (exact debt)");
-      console.log("  1. FlashLoan(USDC, using UTXO[0]) -> UTXO[1] (repayment amount)");
+      console.log("  1. FlashLoan(USDC, using UTXO[0] via Aave V3) -> UTXO[1] (repayment amount)");
       console.log("  2. Approve Aave (for UTXO[1]) -> UTXO[2] (empty)");
       console.log("  3. Repay Aave (using UTXO[0] exact debt) -> UTXO[3] (refund if any)");
       console.log("  4. Withdraw from Aave -> UTXO[4] (WETH collateral)");
