@@ -1,11 +1,9 @@
-import { FC, useCallback, useEffect } from "react";
+import { FC, useCallback } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
+import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
-import { notification } from "~~/utils/scaffold-stark/notification";
-import { useAccount, useSwitchChain } from "wagmi";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -26,62 +24,30 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   position,
   chainId,
 }) => {
-  const { chain } = useAccount();
-  const { switchChain } = useSwitchChain();
+  const { buildBorrowFlow } = useKapanRouterV2();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildBorrowFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
-  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
-  
+  const normalizedProtocolName = protocolName.toLowerCase();
+
   if (token.decimals == null) {
     token.decimals = decimals;
   }
 
-  // Ensure wallet is on the correct EVM network when modal opens
-  useEffect(() => {
-    if (!isOpen || !chainId) return;
-    if (chain?.id !== chainId) {
-      try {
-        switchChain?.({ chainId });
-      } catch (e) {
-        // Non-blocking; user can still switch manually
-        console.warn("Auto network switch failed", e);
-      }
-    }
-  }, [isOpen, chainId, chain?.id, switchChain]);
+  const buildFlow = useCallback(
+    (amount: string) =>
+      buildBorrowFlow(normalizedProtocolName, token.address, amount, token.decimals || decimals || 18),
+    [buildBorrowFlow, decimals, normalizedProtocolName, token.address, token.decimals],
+  );
 
-  const handleBorrow = useCallback(async (amount: string) => {
-    // If a target chain is provided and wallet is on a different chain, switch first
-    if (chainId && chain?.id !== chainId) {
-      try {
-        await switchChain?.({ chainId });
-      } catch (e) {
-        notification.error("Please switch to the selected network to proceed");
-        throw e;
-      }
-    }
-    const instructions = buildBorrowFlow(
-      protocolName.toLowerCase(),
-      token.address,
-      amount,
-      token.decimals || decimals || 18
-    );
-    
-    if (instructions.length === 0) {
-      const error = new Error("Failed to build borrow instructions");
-      notification.error(error.message);
-      throw error;
-    }
+  const { handleConfirm: handleBorrow, batchingPreference } = useEvmTransactionFlow({
+    isOpen,
+    chainId,
+    onClose,
+    buildFlow,
+    successMessage: "Borrow transaction sent",
+    emptyFlowErrorMessage: "Failed to build borrow instructions",
+  });
 
-    // Use executeFlowBatchedIfPossible to handle gateway authorizations (batched when supported)
-    await executeFlowBatchedIfPossible(instructions, preferBatching);
-    notification.success("Borrow transaction sent");
-  }, [protocolName, token.address, token.decimals, decimals, buildBorrowFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, preferBatching]);
-
-  useEffect(() => {
-    if (isAnyConfirmed && isOpen) {
-      onClose();
-    }
-  }, [isAnyConfirmed, isOpen, onClose]);
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = batchingPreference;
 
   return (
     <TokenActionModal
