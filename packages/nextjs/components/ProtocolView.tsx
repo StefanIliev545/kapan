@@ -12,6 +12,7 @@ import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
+import { useNetworkContext } from "~~/contexts/NetworkContext";
 
 export interface ProtocolPosition {
   icon: string;
@@ -89,9 +90,13 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   disableMoveSupply = false,
   readOnly = false,
   expandFirstPositions = true,
-  chainId,
+  chainId: chainIdProp,
   enabledFeatures = { swap: false, move: true },
 }) => {
+  const { selectedChainId } = useNetworkContext();
+  // Use prop if provided, otherwise fall back to context (for EVM networks)
+  const chainId = chainIdProp ?? (networkType === "evm" ? selectedChainId : undefined);
+
   const [showAll, setShowAll] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
   const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);

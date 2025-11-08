@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
 import Image from "next/image";
+import { useNetworkContext } from "~~/contexts/NetworkContext";
 
 export interface NetworkOption {
   id: string;
@@ -41,8 +42,11 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const pathname = usePathname();
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
+  const { selectedNetworkId, setSelectedNetworkId } = useNetworkContext();
 
-  const [selectedNetwork, setSelectedNetwork] = useState<string>(defaultNetwork);
+  // Use context value if available, otherwise fall back to local state
+  const [localSelectedNetwork, setLocalSelectedNetwork] = useState<string>(defaultNetwork);
+  const selectedNetwork = selectedNetworkId ?? localSelectedNetwork;
   const selectedRef = useRef(selectedNetwork);
   const didInitRef = useRef(false);
   const suppressNextUrlSyncRef = useRef(false); // guards URL->state loop
@@ -77,6 +81,9 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       const url = new URL(window.location.href);
       const urlNetwork = url.searchParams.get("network");
       if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
+        // Update context
+        setSelectedNetworkId(urlNetwork!);
+        setLocalSelectedNetwork(urlNetwork!);
         setSelectedNetwork(urlNetwork!);
         onNetworkChange(urlNetwork!);
 
@@ -98,7 +105,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [SHALLOW_URL_SYNC, isValid, onNetworkChange, chain?.id, switchChain]);
+  }, [SHALLOW_URL_SYNC, isValid, onNetworkChange, chain?.id, switchChain, setSelectedNetworkId]);
 
   // 1) Initialize once after mount (URL > cache > default)
   useEffect(() => {
@@ -118,6 +125,9 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     }
 
     if (initial && initial !== selectedRef.current) {
+      // Update context
+      setSelectedNetworkId(initial);
+      setLocalSelectedNetwork(initial);
       setSelectedNetwork(initial);
       onNetworkChange(initial);
 
@@ -131,7 +141,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         }
       }
     }
-  }, [defaultNetwork, isValid, onNetworkChange, searchParams, chain?.id, switchChain]);
+  }, [defaultNetwork, isValid, onNetworkChange, searchParams, chain?.id, switchChain, setSelectedNetworkId]);
 
   // 2) React to *external* URL param changes driven by Next navigation only.
   //    (If SHALLOW_URL_SYNC is true, our own URL changes won't trigger this effect.)
@@ -174,7 +184,11 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const handleNetworkChange = (networkId: string) => {
     if (!isValid(networkId) || networkId === selectedRef.current) return;
 
-    // Update UI immediately
+    // Update context (this will trigger re-renders across the app)
+    setSelectedNetworkId(networkId);
+
+    // Update local state for backward compatibility
+    setLocalSelectedNetwork(networkId);
     setSelectedNetwork(networkId);
     onNetworkChange(networkId);
 
