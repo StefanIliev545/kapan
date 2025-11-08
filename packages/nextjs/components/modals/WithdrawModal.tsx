@@ -1,11 +1,9 @@
-import { FC, useCallback, useEffect } from "react";
+import { FC, useCallback } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
+import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
-import { notification } from "~~/utils/scaffold-stark/notification";
-import { useAccount, useSwitchChain } from "wagmi";
 import type { Address } from "viem";
 
 interface WithdrawModalProps {
@@ -29,65 +27,46 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   chainId,
   market,
 }) => {
-  const { chain } = useAccount();
-  const { switchChain } = useSwitchChain();
+  const { buildWithdrawFlow } = useKapanRouterV2();
   const decimals = token.decimals;
-  const { buildWithdrawFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
-  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
-  
+  const normalizedProtocolName = protocolName.toLowerCase();
+
+  const buildFlow = useCallback(
+    (amount: string, isMax?: boolean) =>
+      buildWithdrawFlow(
+        normalizedProtocolName,
+        token.address,
+        amount,
+        token.decimals || decimals || 18,
+        isMax || false,
+        market,
+      ),
+    [
+      buildWithdrawFlow,
+      decimals,
+      market,
+      normalizedProtocolName,
+      token.address,
+      token.decimals,
+    ],
+  );
+
+  const { handleConfirm, batchingPreference } = useEvmTransactionFlow({
+    isOpen,
+    chainId,
+    onClose,
+    buildFlow,
+    successMessage: "Withdraw transaction sent",
+    emptyFlowErrorMessage: "Failed to build withdraw instructions",
+  });
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = batchingPreference;
+
   if (token.decimals == null) {
     token.decimals = decimals;
   }
   
   const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
   const maxInput = (supplyBalance * 101n) / 100n;
-
-  // Ensure wallet is on the correct EVM network when modal opens
-  useEffect(() => {
-    if (!isOpen || !chainId) return;
-    if (chain?.id !== chainId) {
-      try {
-        switchChain?.({ chainId });
-      } catch (e) {
-        console.warn("Auto network switch failed", e);
-      }
-    }
-  }, [isOpen, chainId, chain?.id, switchChain]);
-
-  const handleWithdraw = useCallback(async (amount: string, isMax?: boolean) => {
-    if (chainId && chain?.id !== chainId) {
-      try {
-        await switchChain?.({ chainId });
-      } catch (e) {
-        notification.error("Please switch to the selected network to proceed");
-        throw e;
-      }
-    }
-    const instructions = buildWithdrawFlow(
-      protocolName.toLowerCase(),
-      token.address,
-      amount,
-      token.decimals || decimals || 18,
-      isMax || false,
-      market
-    );
-    
-    if (instructions.length === 0) {
-      const error = new Error("Failed to build withdraw instructions");
-      notification.error(error.message);
-      throw error;
-    }
-
-    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-    await executeFlowBatchedIfPossible(instructions, preferBatching);
-    notification.success("Withdraw transaction sent");
-  }, [protocolName, token.address, token.decimals, decimals, buildWithdrawFlow, executeFlowBatchedIfPossible, chain?.id, chainId, switchChain, market, preferBatching]);
-
-  useEffect(() => {
-    if (isAnyConfirmed && isOpen) {
-      onClose();
-    }
-  }, [isAnyConfirmed, isOpen, onClose]);
 
   return (
     <TokenActionModal
@@ -105,7 +84,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       max={maxInput}
       network="evm"
       position={position}
-      onConfirm={handleWithdraw}
+      onConfirm={handleConfirm}
       renderExtraContent={() => isPreferenceLoaded ? (
         <div className="pt-2 pb-1">
           <label className="label cursor-pointer gap-2 justify-start">

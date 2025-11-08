@@ -1,11 +1,9 @@
-import { FC, useCallback, useEffect } from "react";
+import { FC, useCallback } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
-import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
+import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
-import { notification } from "~~/utils/scaffold-stark/notification";
-import { useAccount, useSwitchChain } from "wagmi";
 import type { Address } from "viem";
 
 interface DepositModalProps {
@@ -19,59 +17,37 @@ interface DepositModalProps {
 }
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId, market }) => {
-  const { chain } = useAccount();
-  const { switchChain } = useSwitchChain();
+  const { buildDepositFlow } = useKapanRouterV2();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
-  const { buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
-  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
-  
+  const normalizedProtocolName = protocolName.toLowerCase();
+
   if (token.decimals == null) {
     token.decimals = decimals;
   }
 
-  // Ensure wallet is on the correct EVM network when modal opens
-  useEffect(() => {
-    if (!isOpen || !chainId) return;
-    if (chain?.id !== chainId) {
-      try {
-        switchChain?.({ chainId });
-      } catch (e) {
-        console.warn("Auto network switch failed", e);
-      }
-    }
-  }, [isOpen, chainId, chain?.id, switchChain]);
-
-  const handleDeposit = useCallback(async (amount: string) => {
-    if (chainId && chain?.id !== chainId) {
-      try {
-        await switchChain?.({ chainId });
-      } catch (e) {
-        notification.error("Please switch to the selected network to proceed");
-        throw e;
-      }
-    }
-    const instructions = buildDepositFlow(
-      protocolName.toLowerCase(),
+  const buildFlow = useCallback(
+    (amount: string) =>
+      buildDepositFlow(normalizedProtocolName, token.address, amount, token.decimals || decimals || 18, market),
+    [
+      buildDepositFlow,
+      decimals,
+      market,
+      normalizedProtocolName,
       token.address,
-      amount,
-      token.decimals || decimals || 18,
-      market
-    );
-    
-    if (instructions.length === 0) {
-      const error = new Error("Failed to build deposit instructions");
-      notification.error(error.message);
-      throw error;
-    }
+      token.decimals,
+    ],
+  );
 
-    // Use executeFlowBatchedIfPossible to handle approvals automatically (batched when supported)
-    await executeFlowBatchedIfPossible(instructions, preferBatching);
-    notification.success("Deposit transaction sent");
-    
-    if (isAnyConfirmed) {
-      onClose();
-    }
-  }, [protocolName, token.address, token.decimals, decimals, buildDepositFlow, executeFlowBatchedIfPossible, isAnyConfirmed, onClose, chain?.id, chainId, switchChain, market, preferBatching]);
+  const { handleConfirm: handleDeposit, batchingPreference } = useEvmTransactionFlow({
+    isOpen,
+    chainId,
+    onClose,
+    buildFlow,
+    successMessage: "Deposit transaction sent",
+    emptyFlowErrorMessage: "Failed to build deposit instructions",
+  });
+
+  const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = batchingPreference;
 
   return (
     <TokenActionModal
