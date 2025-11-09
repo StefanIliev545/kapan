@@ -3,7 +3,7 @@ import { Chain, createClient, fallback, http } from "viem";
 import { hardhat, mainnet } from "viem/chains";
 import { createConfig } from "wagmi";
 import scaffoldConfig, { DEFAULT_ALCHEMY_API_KEY } from "~~/scaffold.config";
-import { getAlchemyHttpUrl } from "~~/utils/scaffold-eth";
+import { getRpcFallbackUrls } from "~~/utils/scaffold-eth";
 
 const { targetEVMNetworks: targetNetworks } = scaffoldConfig;
 
@@ -23,12 +23,9 @@ export const wagmiConfig = createConfig({
     const cached = clientCache.get(chain.id);
     if (cached) return cached;
 
-    let rpcFallbacks = [http()];
-
-    const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
-    if (alchemyHttpUrl) {
-      // Prefer Alchemy first to avoid public RPC rate limits
-      rpcFallbacks = [http(alchemyHttpUrl), http()];
+    let rpcFallbacks = getRpcFallbackUrls(chain).map(url => http(url));
+    if (rpcFallbacks.length === 0) {
+      rpcFallbacks = [http()];
     }
 
     const client = createClient({

@@ -1,3 +1,4 @@
+import type { Chain } from "viem";
 import * as chains from "viem/chains";
 import scaffoldConfig from "~~/scaffold.config";
 
@@ -40,6 +41,27 @@ export const getAlchemyHttpUrl = (chainId: number) => {
   return scaffoldConfig.alchemyApiKey && RPC_CHAIN_NAMES[chainId]
     ? `https://${RPC_CHAIN_NAMES[chainId]}.g.alchemy.com/v2/${scaffoldConfig.alchemyApiKey}`
     : undefined;
+};
+
+export const getRpcFallbackUrls = (chain: Chain) => {
+  const rpcUrls: string[] = [];
+
+  const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
+  if (alchemyHttpUrl) {
+    rpcUrls.push(alchemyHttpUrl);
+  }
+
+  const defaultRpcUrl = chain.rpcUrls?.default?.http?.[0];
+  if (defaultRpcUrl) {
+    rpcUrls.push(defaultRpcUrl);
+  }
+
+  const publicRpcUrl = chain.rpcUrls?.public?.http?.[0];
+  if (publicRpcUrl && publicRpcUrl !== defaultRpcUrl) {
+    rpcUrls.push(publicRpcUrl);
+  }
+
+  return rpcUrls;
 };
 
 export const NETWORKS_EXTRA_DATA: Record<string, ChainAttributes> = {
