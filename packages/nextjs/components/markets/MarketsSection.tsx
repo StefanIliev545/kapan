@@ -13,6 +13,9 @@ export interface MarketData {
   networkType: "evm" | "starknet";
   protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
   allowDeposit?: boolean;
+  totalSupply?: string;
+  totalBorrow?: string;
+  availableLiquidity?: string;
 }
 
 interface MarketsSectionProps {

@@ -17,9 +17,10 @@ interface AaveMarketsProps {
 }
 
 export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId }) => {
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const { address: connectedAddress } = useAccount();
   const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView", chainId: chainId as any });
-  const queryAddress = connectedAddress || contractInfo?.address;
+  const queryAddress = connectedAddress || contractInfo?.address || ZERO_ADDRESS;
 
   const { data: allTokensInfo } = useNetworkAwareReadContract({
     networkType: "evm",
@@ -27,17 +28,37 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
     functionName: "getAllTokensInfo",
     args: [queryAddress],
     chainId,
+    query: {
+      enabled: !!queryAddress,
+      staleTime: 5 * 60 * 1000,
+      refetchInterval: 5 * 60 * 1000,
+    },
   });
 
+  const formatAmount = (value?: bigint, decimals?: number) => {
+    if (!value || value === 0n) return undefined;
+    try {
+      const normalized = Number(formatUnits(value, decimals ?? 18));
+      if (!Number.isFinite(normalized)) return undefined;
+      return normalized.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    } catch {
+      return undefined;
+    }
+  };
+
   const markets: MarketData[] = useMemo(() => {
-    if (!allTokensInfo) return [];
+    if (!Array.isArray(allTokensInfo) || allTokensInfo.length === 0) return [];
     return (allTokensInfo as any[]).map(token => {
-      const supplyAPY = convertRateToAPY(token.supplyRate);
-      const borrowAPY = convertRateToAPY(token.borrowRate);
-      const price = Number(formatUnits(token.price, 8));
+      const decimals = Number(token.decimals ?? 18);
+      const supplyAPY = convertRateToAPY(token.supplyRate ?? 0n);
+      const borrowAPY = convertRateToAPY(token.borrowRate ?? 0n);
+      const price = Number(formatUnits(token.price ?? 0n, 8));
       const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
+      const totalSupply = formatAmount(token.totalSupply, decimals);
+      const totalBorrow = formatAmount(token.totalBorrow, decimals);
+      const availableLiquidity = formatAmount(token.availableLiquidity, decimals);
       return {
-        icon: tokenNameToLogo(token.symbol),
+        icon: tokenNameToLogo(token.symbol) || "/logos/token.svg",
         name: token.symbol,
         supplyRate: `${formatPercentage(supplyAPY)}%`,
         borrowRate: `${formatPercentage(borrowAPY)}%`,
@@ -46,6 +67,9 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
         address: token.token,
         networkType: "evm",
         protocol: "aave",
+        totalSupply,
+        totalBorrow,
+        availableLiquidity,
       } as MarketData;
     });
   }, [allTokensInfo]);
