@@ -64,7 +64,7 @@ export const useEvmTransactionFlow = ({
       }
 
       await executeFlowBatchedIfPossible(instructions, batchingPreference.enabled);
-      notification.success(successMessage);
+      // Transaction toast notifications are handled by executeFlowBatchedIfPossible
     },
     [
       ensureCorrectChain,

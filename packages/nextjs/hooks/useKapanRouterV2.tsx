@@ -3,6 +3,8 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicCl
 import { useQueryClient } from "@tanstack/react-query";
 import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, encodeFunctionData, type Address, type Hex } from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
+import { TransactionToast } from "~~/components/TransactionToast";
+import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
 import {
   ProtocolInstruction,
   createRouterInstruction,
@@ -115,10 +117,40 @@ export const useKapanRouterV2 = () => {
 
   // Batch execution hooks
   const { sendCallsAsync } = useSendCalls();
-  const { data: batchStatus, isSuccess: isBatchConfirmed } = useWaitForCallsStatus({
+  const { data: batchStatus, isSuccess: isBatchConfirmed, isError: isBatchError } = useWaitForCallsStatus({
     id: batchId,
     query: { enabled: !!batchId },
   });
+
+  // Track batch notification ID to remove "sent" toast when batch completes
+  const [batchNotificationId, setBatchNotificationId] = useState<string | number | null>(null);
+
+  // Show TransactionToast when batch completes
+  useEffect(() => {
+    if (!batchId || !batchStatus) return;
+
+    // Remove "sent" notification if it exists
+    if (batchNotificationId) {
+      notification.remove(batchNotificationId);
+      setBatchNotificationId(null);
+    }
+
+    if (isBatchConfirmed) {
+      notification.success(
+        <TransactionToast
+          step="confirmed"
+          message="Batch transaction completed successfully!"
+        />
+      );
+    } else if (isBatchError) {
+      notification.error(
+        <TransactionToast
+          step="failed"
+          message="Batch transaction failed"
+        />
+      );
+    }
+  }, [batchId, batchStatus, isBatchConfirmed, isBatchError, batchNotificationId]);
 
   // Refresh Wagmi queries when transaction completes (both single tx and batch)
   useEffect(() => {
@@ -445,22 +477,91 @@ export const useKapanRouterV2 = () => {
       throw new Error("Router contract or user address not available");
     }
 
+    let notificationId: string | number | null = null;
+    let transactionHash: string | undefined = undefined;
+    let blockExplorerTxURL = "";
+
     try {
-      // Convert instructions to the format expected by the contract
-      const protocolInstructions = instructions.map(inst => ({
-        protocolName: inst.protocolName,
-        data: inst.data as `0x${string}`,
-      }));
+      // Show pending notification
+      notificationId = notification.loading(
+        <TransactionToast step="pending" message="Waiting for approval..." />
+      );
 
-      const hash = await writeContractAsync({
-        address: routerContract.address as `0x${string}`,
-        abi: routerContract.abi,
-        functionName: "processProtocolInstructions",
-        args: [protocolInstructions],
-      });
+      // Set up 10 second timeout for pending state
+      const pendingTimeout = setTimeout(() => {
+        if (notificationId) {
+          notification.remove(notificationId);
+        }
+      }, 10000);
 
-      return hash;
+      try {
+        // Convert instructions to the format expected by the contract
+        const protocolInstructions = instructions.map(inst => ({
+          protocolName: inst.protocolName,
+          data: inst.data as `0x${string}`,
+        }));
+
+        // This will wait for MetaMask confirmation before returning hash
+        transactionHash = await writeContractAsync({
+          address: routerContract.address as `0x${string}`,
+          abi: routerContract.abi,
+          functionName: "processProtocolInstructions",
+          args: [protocolInstructions],
+        });
+
+        // Clear timeout since we got the hash
+        clearTimeout(pendingTimeout);
+      } catch (error) {
+        // Clear timeout on error
+        clearTimeout(pendingTimeout);
+        throw error;
+      }
+
+      // Now that we have the hash, transaction is sent - switch to "sent" state
+      const chainId = await publicClient?.getChainId();
+      blockExplorerTxURL = chainId ? getBlockExplorerTxLink(chainId, transactionHash as `0x${string}`) : "";
+
+      // Update notification to "sent" state
+      if (notificationId) {
+        notification.remove(notificationId);
+      }
+      notificationId = notification.loading(
+        <TransactionToast
+          step="sent"
+          txHash={transactionHash}
+          message="Waiting for transaction to complete."
+          blockExplorerLink={blockExplorerTxURL}
+        />
+      );
+
+      // Wait for transaction receipt
+      if (publicClient && transactionHash) {
+        await publicClient.waitForTransactionReceipt({
+          hash: transactionHash as `0x${string}`,
+          confirmations: effectiveConfirmations,
+        });
+      }
+
+      // Remove sent notification and show confirmed
+      if (notificationId) {
+        notification.remove(notificationId);
+      }
+      notification.success(
+        <TransactionToast
+          step="confirmed"
+          txHash={transactionHash}
+          message="Transaction completed successfully!"
+          blockExplorerLink={blockExplorerTxURL}
+        />
+      );
+
+      return transactionHash;
     } catch (error: any) {
+      // Remove pending/sent notification on error
+      if (notificationId) {
+        notification.remove(notificationId);
+      }
+
       console.error("Error executing instructions:", error);
       // Check for user rejection
       const errorMessage = error?.message || "";
@@ -477,10 +578,17 @@ export const useKapanRouterV2 = () => {
         error?.code === "USER_REJECTED";
       
       const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute instructions");
-      notification.error(message);
+      notification.error(
+        <TransactionToast
+          step="failed"
+          txHash={transactionHash}
+          message={message}
+          blockExplorerLink={blockExplorerTxURL}
+        />
+      );
       throw error;
     }
-  }, [routerContract, userAddress, writeContractAsync]);
+  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
   /**
    * Execute instructions with automatic approval handling
@@ -509,7 +617,6 @@ export const useKapanRouterV2 = () => {
       if (authCalls.length === 0) {
         // No approvals needed, proceed directly to execution
         console.log("executeFlowWithApprovals: No approvals needed, executing directly");
-        notification.info("Executing transaction...");
         return await executeInstructions(instructions);
       }
 
@@ -551,35 +658,119 @@ export const useKapanRouterV2 = () => {
           // If symbol read fails, use truncated address
         }
 
-        notification.info(`Approving ${tokenSymbol}...`);
+        let approvalNotificationId: string | number | null = null;
+        let approvalHash: string | undefined = undefined;
+        let approvalBlockExplorerURL = "";
 
-        // Execute the approval call directly using the encoded data from authorizeInstructions
-        // The router has already encoded the approve(address spender, uint256 amount) call
-        // Fetch the current nonce explicitly to avoid MetaMask nonce issues with Hardhat
-        const currentNonce = await publicClient.getTransactionCount({
-          address: userAddress as Address,
-        });
-        
-        const approveHash = await walletClient.sendTransaction({
-          account: userAddress as Address,
-          to: authCall.target,
-          data: authCall.data,
-          nonce: currentNonce, // Explicitly set nonce to prevent MetaMask caching issues
-        });
+        try {
+          // Show pending notification for approval
+          approvalNotificationId = notification.loading(
+            <TransactionToast step="pending" message={`Approving ${tokenSymbol}...`} />
+          );
 
-        // Wait for approval confirmation (crucial for mobile wallets)
-        // Add a small delay after receipt to ensure Hardhat processes the nonce update
-        await publicClient.waitForTransactionReceipt({ hash: approveHash, confirmations: effectiveConfirmations });
-        
-        // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        notification.success(`${tokenSymbol} approved ✅`);
+          // Set up 10 second timeout for pending state
+          const pendingTimeout = setTimeout(() => {
+            if (approvalNotificationId) {
+              notification.remove(approvalNotificationId);
+            }
+          }, 10000);
+
+          try {
+            // Execute the approval call directly using the encoded data from authorizeInstructions
+            // The router has already encoded the approve(address spender, uint256 amount) call
+            // Fetch the current nonce explicitly to avoid MetaMask nonce issues with Hardhat
+            const currentNonce = await publicClient.getTransactionCount({
+              address: userAddress as Address,
+            });
+            
+            // This will wait for MetaMask confirmation before returning hash
+            approvalHash = await walletClient.sendTransaction({
+              account: userAddress as Address,
+              to: authCall.target,
+              data: authCall.data,
+              nonce: currentNonce, // Explicitly set nonce to prevent MetaMask caching issues
+            });
+
+            // Clear timeout since we got the hash
+            clearTimeout(pendingTimeout);
+          } catch (error) {
+            // Clear timeout on error
+            clearTimeout(pendingTimeout);
+            throw error;
+          }
+
+          // Now that we have the hash, approval is sent - switch to "sent" state
+          const chainId = await publicClient.getChainId();
+          approvalBlockExplorerURL = chainId ? getBlockExplorerTxLink(chainId, approvalHash as `0x${string}`) : "";
+
+          // Update notification to "sent" state
+          if (approvalNotificationId) {
+            notification.remove(approvalNotificationId);
+          }
+          approvalNotificationId = notification.loading(
+            <TransactionToast
+              step="sent"
+              txHash={approvalHash}
+              message={`Approving ${tokenSymbol}...`}
+              blockExplorerLink={approvalBlockExplorerURL}
+            />
+          );
+
+          // Wait for approval confirmation (crucial for mobile wallets)
+          // Add a small delay after receipt to ensure Hardhat processes the nonce update
+          await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations });
+          
+          // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          // Remove sent notification and show confirmed
+          if (approvalNotificationId) {
+            notification.remove(approvalNotificationId);
+          }
+          notification.success(
+            <TransactionToast
+              step="confirmed"
+              txHash={approvalHash}
+              message={`${tokenSymbol} approved`}
+              blockExplorerLink={approvalBlockExplorerURL}
+            />
+          );
+        } catch (error: any) {
+          // Remove pending/sent notification on error
+          if (approvalNotificationId) {
+            notification.remove(approvalNotificationId);
+          }
+
+          // Check for user rejection
+          const errorMessage = error?.message || "";
+          const lowerMessage = errorMessage.toLowerCase();
+          const isRejection = 
+            lowerMessage.includes("user rejected") ||
+            lowerMessage.includes("user denied") ||
+            lowerMessage.includes("user cancelled") ||
+            lowerMessage.includes("rejected") ||
+            lowerMessage.includes("denied") ||
+            lowerMessage.includes("cancelled") ||
+            error?.code === 4001 ||
+            error?.code === "ACTION_REJECTED" ||
+            error?.code === "USER_REJECTED";
+          
+          const message = isRejection ? "User rejected the approval" : (error.message || `Failed to approve ${tokenSymbol}`);
+          notification.error(
+            <TransactionToast
+              step="failed"
+              txHash={approvalHash}
+              message={message}
+              blockExplorerLink={approvalBlockExplorerURL}
+            />
+          );
+          throw error;
+        }
+
         setIsApproving(false);
       }
 
       // 3. Execute the router instructions (now that approvals are in place)
-      notification.info("Executing transaction...");
       const resultHash = await executeInstructions(instructions);
       return resultHash;
     } catch (error: any) {
@@ -600,7 +791,9 @@ export const useKapanRouterV2 = () => {
         error?.code === "USER_REJECTED";
       
       const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute flow with approvals");
-      notification.error(message);
+      notification.error(
+        <TransactionToast step="failed" message={message} />
+      );
       throw error;
     }
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations]);
@@ -657,16 +850,58 @@ export const useKapanRouterV2 = () => {
 
     // 5) Try atomic batch if preference is enabled and wallet supports it
     if (preferBatching) {
+      let pendingNotificationId: string | number | null = null;
       try {
-        const { id } = await sendCallsAsync({
-          calls,
-          experimental_fallback: true, // runs sequentially if wallet can't batch
-        });
+        // Show pending notification for batch
+        pendingNotificationId = notification.loading(
+          <TransactionToast step="pending" message="Waiting for approval..." />
+        );
 
-        setBatchId(id);
-        notification.info("Batch sent — waiting for confirmation...", { duration: 2000});
-        return { kind: "batch", id };
+        // Set up 10 second timeout for pending state
+        const pendingTimeout = setTimeout(() => {
+          if (pendingNotificationId) {
+            notification.remove(pendingNotificationId);
+          }
+        }, 10000);
+
+        try {
+          const { id } = await sendCallsAsync({
+            calls,
+            experimental_fallback: true, // runs sequentially if wallet can't batch
+          });
+
+          // Clear timeout since we got the batch id
+          clearTimeout(pendingTimeout);
+
+          setBatchId(id);
+
+          // Now that we have the batch id, batch is sent - switch to "sent" state
+          // Remove pending notification
+          if (pendingNotificationId) {
+            notification.remove(pendingNotificationId);
+          }
+          // Update notification to "sent" state
+          const sentNotificationId = notification.loading(
+            <TransactionToast
+              step="sent"
+              message="Batch transaction sent — waiting for confirmation..."
+            />
+          );
+          setBatchNotificationId(sentNotificationId);
+
+          // The batch status will be tracked by useWaitForCallsStatus hook
+          // We'll show confirmed/failed when the batch completes
+          return { kind: "batch", id };
+        } catch (error) {
+          // Clear timeout on error
+          clearTimeout(pendingTimeout);
+          throw error;
+        }
       } catch (err) {
+        // Remove pending/sent notification on error
+        if (pendingNotificationId) {
+          notification.remove(pendingNotificationId);
+        }
         console.warn("Batch send failed, falling back:", err);
       }
     }

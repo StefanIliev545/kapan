@@ -381,8 +381,8 @@ export const useLendingAction = (
     if (!calls) {
       throw new Error("Failed to build transaction calls");
     }
+    // Transaction toast notifications are handled by useSmartTransactor (which uses useTransactor/usePaymasterTransactor)
     await sendTxn(calls);
-    notification.success("Instruction sent");
   };
 
   // Always return Starknet functions (network parameter kept for API compatibility)
