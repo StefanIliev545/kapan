@@ -27,6 +27,39 @@ interface AuthorizationCall {
   data: `0x${string}`;
 }
 
+const APPROVE_SELECTOR = "0x095ea7b3";
+
+const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
+  if (!data || data === "0x" || data.length < 10) {
+    return false;
+  }
+
+  try {
+    const decoded = decodeFunctionData({ abi: ERC20ABI, data: data as Hex });
+    if (decoded.functionName === "approve") {
+      const amount = decoded.args?.[1] as bigint | undefined;
+      return amount === 0n;
+    }
+    return false;
+  } catch {
+    try {
+      const selector = data.slice(0, 10).toLowerCase();
+      if (selector !== APPROVE_SELECTOR) {
+        return false;
+      }
+
+      const [, amount] = decodeAbiParameters(
+        [{ type: "address" }, { type: "uint256" }],
+        data.slice(10) as `0x${string}`
+      );
+
+      return (amount as bigint) === 0n;
+    } catch {
+      return false;
+    }
+  }
+};
+
 /**
  * Hook for building and executing instructions on KapanRouter v2
  * 
@@ -491,34 +524,9 @@ export const useKapanRouterV2 = () => {
         }
 
         // Decode and check if approval amount is zero (ERC20 approve(address,uint256))
-        try {
-          const decoded = decodeFunctionData({ abi: ERC20ABI, data: authCall.data });
-          if (decoded.functionName === "approve") {
-            const amount = decoded.args?.[1] as bigint;
-            if (amount === 0n) {
-              console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
-              continue; // Skip zero-amount approvals
-            }
-          }
-        } catch (e) {
-          // If ABI-aware decoding fails, fall back to selector-based check
-          try {
-            const selector = authCall.data.slice(0, 10).toLowerCase(); // 4-byte selector
-            const APPROVE_SELECTOR = "0x095ea7b3"; // approve(address,uint256)
-            if (selector === APPROVE_SELECTOR) {
-              const decodedParams = decodeAbiParameters(
-                [{ type: "address" }, { type: "uint256" }],
-                authCall.data.slice(10) as `0x${string}`
-              );
-              const amount = decodedParams[1] as bigint;
-              if (amount === 0n) {
-                console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
-                continue;
-              }
-            }
-          } catch (e2) {
-            console.log(`executeFlowWithApprovals: Could not decode approval amount, proceeding anyway`, e2);
-          }
+        if (isZeroAmountApproval(authCall.data)) {
+          console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
+          continue; // Skip zero-amount approvals
         }
 
         console.log(`executeFlowWithApprovals: Processing approval ${i + 1}/${authCalls.length}`, {
@@ -628,20 +636,17 @@ export const useKapanRouterV2 = () => {
     const authCalls = await getAuthorizations(instructions);
 
     // 3) Filter zero-amount approvals (same logic as sequential path)
-    const APPROVE_SELECTOR = "0x095ea7b3";
-    const filteredAuthCalls = authCalls.filter(({ data }) => {
-      if (!data) return false;
-      // Only filter approve calls
-      if (data.slice(0, 10).toLowerCase() !== APPROVE_SELECTOR) return true;
-      try {
-        const [, amount] = decodeAbiParameters(
-          [{ type: "address" }, { type: "uint256" }],
-          data.slice(10) as `0x${string}`
-        );
-        return (amount as bigint) !== 0n;
-      } catch {
-        return true; // If decode fails, include it (safer)
+    const filteredAuthCalls = authCalls.filter(({ target, data }) => {
+      if (!target || !data || data.length === 0) {
+        return false;
       }
+
+      if (isZeroAmountApproval(data)) {
+        console.warn("executeFlowBatchedIfPossible: Skipping zero-amount approval", { target });
+        return false;
+      }
+
+      return true;
     });
 
     // 4) Compose calls: filtered approvals… then router call
@@ -960,7 +965,9 @@ export const useKapanRouterV2 = () => {
         );
 
         // Approve borrowed tokens to the router so it can settle flash principal+premium (use UTXO index, not instruction index)
-        if (approveToRouter) {
+        const shouldApproveToRouter = approveToRouter && p.mode !== "coverFlash";
+
+        if (shouldApproveToRouter) {
           addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true); // Approve creates 1 dummy UTXO
         }
       },
