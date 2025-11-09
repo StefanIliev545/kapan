@@ -95,6 +95,12 @@ export const useKapanRouterV2 = () => {
   };
   
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
+  // Approvals are executed sequentially via the user's wallet. Waiting for
+  // the full safety margin of confirmations between each approval made the
+  // UX feel sluggish on chains where we target two confirmations (Base/Optimism).
+  // Only wait for a single confirmation before prompting the next approval
+  // while still respecting chains that can settle instantly (Arbitrum/Linea).
+  const sequentialConfirmations = effectiveConfirmations > 1 ? 1 : effectiveConfirmations;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
   
@@ -569,7 +575,7 @@ export const useKapanRouterV2 = () => {
 
         // Wait for approval confirmation (crucial for mobile wallets)
         // Add a small delay after receipt to ensure Hardhat processes the nonce update
-        await publicClient.waitForTransactionReceipt({ hash: approveHash, confirmations: effectiveConfirmations });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash, confirmations: sequentialConfirmations });
         
         // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
         await new Promise(resolve => setTimeout(resolve, 100));
