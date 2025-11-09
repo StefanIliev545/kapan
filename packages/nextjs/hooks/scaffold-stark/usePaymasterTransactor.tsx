@@ -54,7 +54,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
       return;
     }
 
-    let notificationId = null;
+    let notificationId: string | number | null = null;
     let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
 
     try {

@@ -32,7 +32,7 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
       return;
     }
 
-    let notificationId = null;
+    let notificationId: string | number | null = null;
     let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
     try {
       const networkId = await walletClient.getChainId();

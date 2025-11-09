@@ -31,7 +31,7 @@ export const useTransactor = (_walletClient?: WalletClient): TransactionFunc => 
       return;
     }
 
-    let notificationId = null;
+    let notificationId: string | number | null = null;
     let transactionHash: Hash | undefined = undefined;
     let transactionReceipt: TransactionReceipt | undefined;
     let blockExplorerTxURL = "";

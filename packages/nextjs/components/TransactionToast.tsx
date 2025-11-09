@@ -47,21 +47,21 @@ export function TransactionToast({ step, txHash, message, blockExplorerLink }: T
   const showSpinner = step === "pending" || step === "sent";
 
   return (
-    <div className="w-[360px] rounded border border-gray-800 bg-gray-950 p-4 shadow-lg pointer-events-auto">
+    <div className="w-[360px] rounded border border-base-300 dark:border-base-700 bg-base-100 dark:bg-base-200 p-4 shadow-lg pointer-events-auto">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex-shrink-0">{config.icon}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {showSpinner && <span>{config.spinner}</span>}
-            <h4 className="text-white">{config.title}</h4>
+            <h4 className="text-base-content">{config.title}</h4>
           </div>
-          <p className="text-gray-400 mt-1">{config.description}</p>
+          <p className="text-base-content/70 mt-1">{config.description}</p>
           {blockExplorerLink && blockExplorerLink.length > 0 && (
             <a
               href={blockExplorerLink}
               target="_blank"
               rel="noreferrer"
-              className="block link text-md text-blue-400 hover:text-blue-300 mt-1"
+              className="block link text-md text-primary hover:text-primary-focus mt-1"
             >
               View on explorer
             </a>
