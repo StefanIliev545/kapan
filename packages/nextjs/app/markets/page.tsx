@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import type { NextPage } from "next";
 import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import dynamic from "next/dynamic";
@@ -12,7 +12,7 @@ import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
 import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import StableArea from "~~/components/common/StableArea";
-import { arbitrum } from "wagmi/chains";
+import { arbitrum, base, linea, optimism } from "wagmi/chains";
 
 const MarketLoader = () => (
   <div className="flex justify-center py-10">
@@ -45,13 +45,62 @@ const NostraMarkets = dynamic(() => import("~~/components/specific/nostra/Nostra
 const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
+  { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
+  { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
 ];
+
+type ProtocolKey = "aave" | "compound" | "venus" | "vesu" | "nostra";
+
+type ProtocolConfig =
+  | { key: "aave" | "compound" | "venus"; chainId: number }
+  | { key: "vesu" | "nostra" };
+
+const networkProtocolMap: Record<string, ProtocolConfig[]> = {
+  starknet: [
+    { key: "vesu" },
+    { key: "nostra" },
+  ],
+  arbitrum: [
+    { key: "aave", chainId: arbitrum.id },
+    { key: "compound", chainId: arbitrum.id },
+    { key: "venus", chainId: arbitrum.id },
+  ],
+  base: [
+    { key: "aave", chainId: base.id },
+    { key: "compound", chainId: base.id },
+    { key: "venus", chainId: base.id },
+  ],
+  optimism: [
+    { key: "aave", chainId: optimism.id },
+    { key: "compound", chainId: optimism.id },
+  ],
+  linea: [
+    { key: "aave", chainId: linea.id },
+    { key: "compound", chainId: linea.id },
+  ],
+};
 
 const MarketsPage: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [search, setSearch] = useState("");
   const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
+
+  const [mountedNetworks, setMountedNetworks] = useState<Set<string>>(() => new Set(["starknet"]));
+
+  const handleNetworkChange = useCallback((networkId: string) => {
+    startTransition(() => setSelectedNetwork(networkId));
+  }, []);
+
+  useEffect(() => {
+    setMountedNetworks(prev => {
+      if (prev.has(selectedNetwork)) return prev;
+      const next = new Set(prev);
+      next.add(selectedNetwork);
+      return next;
+    });
+  }, [selectedNetwork]);
 
   const poolId = VESU_V1_POOLS["Genesis"];
 
@@ -72,7 +121,11 @@ const MarketsPage: NextPage = () => {
       <div className="flex-1 space-y-6">
         <div className="flex items-center mb-4">
           {groupMode === "protocol" && (
-            <NetworkFilter networks={networkOptions} defaultNetwork="starknet" onNetworkChange={setSelectedNetwork} />
+            <NetworkFilter
+              networks={networkOptions}
+              defaultNetwork={selectedNetwork}
+              onNetworkChange={handleNetworkChange}
+            />
           )}
           <div className="flex-1 flex justify-center">
             <div className="relative w-full max-w-md">
@@ -127,33 +180,102 @@ const MarketsPage: NextPage = () => {
           </StableArea>
         ) : (
           <div className="space-y-6">
-            {selectedNetwork === "arbitrum" && (
-              <>
-                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <AaveMarkets viewMode={viewMode} search={search} chainId={arbitrum.id} />
-                </StableArea>
-                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <CompoundMarkets viewMode={viewMode} search={search} chainId={arbitrum.id} />
-                </StableArea>
-                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <VenusMarkets viewMode={viewMode} search={search} chainId={arbitrum.id} />
-                </StableArea>
-              </>
-            )}
-            {selectedNetwork === "starknet" && (
-              <>
-                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <VesuMarkets
-                    supportedAssets={supportedAssets as ContractResponse | undefined}
-                    viewMode={viewMode}
-                    search={search}
-                  />
-                </StableArea>
-                <StableArea as="section" minHeight="30rem" className="block" innerClassName="h-full">
-                  <NostraMarkets viewMode={viewMode} search={search} />
-                </StableArea>
-              </>
-            )}
+            {networkOptions.map(option => {
+              if (!mountedNetworks.has(option.id)) return null;
+
+              const isActive = selectedNetwork === option.id;
+              const protocols = networkProtocolMap[option.id] ?? [];
+
+              if (protocols.length === 0) return null;
+
+              return (
+                <div
+                  key={option.id}
+                  className={isActive ? "space-y-6" : "space-y-6 hidden"}
+                  aria-hidden={isActive ? undefined : true}
+                >
+                  {protocols.map(protocol => {
+                    const key: ProtocolKey = protocol.key;
+
+                    if (key === "aave" && "chainId" in protocol) {
+                      return (
+                        <StableArea
+                          key={`${option.id}-aave`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <AaveMarkets viewMode={viewMode} search={search} chainId={protocol.chainId} />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "compound" && "chainId" in protocol) {
+                      return (
+                        <StableArea
+                          key={`${option.id}-compound`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <CompoundMarkets viewMode={viewMode} search={search} chainId={protocol.chainId} />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "venus" && "chainId" in protocol) {
+                      return (
+                        <StableArea
+                          key={`${option.id}-venus`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <VenusMarkets viewMode={viewMode} search={search} chainId={protocol.chainId} />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "vesu") {
+                      return (
+                        <StableArea
+                          key={`${option.id}-vesu`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <VesuMarkets
+                            supportedAssets={supportedAssets as ContractResponse | undefined}
+                            viewMode={viewMode}
+                            search={search}
+                          />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "nostra") {
+                      return (
+                        <StableArea
+                          key={`${option.id}-nostra`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <NostraMarkets viewMode={viewMode} search={search} />
+                        </StableArea>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
