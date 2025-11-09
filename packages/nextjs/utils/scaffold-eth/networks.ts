@@ -43,25 +43,53 @@ export const getAlchemyHttpUrl = (chainId: number) => {
     : undefined;
 };
 
+const pushUnique = (collection: string[], value?: string) => {
+  if (value && !collection.includes(value)) {
+    collection.push(value);
+  }
+};
+
 export const getRpcFallbackUrls = (chain: Chain) => {
   const rpcUrls: string[] = [];
 
   const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
-  if (alchemyHttpUrl) {
-    rpcUrls.push(alchemyHttpUrl);
-  }
+  pushUnique(rpcUrls, alchemyHttpUrl);
 
-  const defaultRpcUrl = chain.rpcUrls?.default?.http?.[0];
-  if (defaultRpcUrl) {
-    rpcUrls.push(defaultRpcUrl);
-  }
+  const defaultRpcUrls = chain.rpcUrls?.default?.http ?? [];
+  defaultRpcUrls.forEach(url => pushUnique(rpcUrls, url));
 
-  const publicRpcUrl = chain.rpcUrls?.public?.http?.[0];
-  if (publicRpcUrl && publicRpcUrl !== defaultRpcUrl) {
-    rpcUrls.push(publicRpcUrl);
-  }
+  const publicRpcUrls = chain.rpcUrls?.public?.http ?? [];
+  publicRpcUrls.forEach(url => pushUnique(rpcUrls, url));
 
   return rpcUrls;
+};
+
+export const withAlchemyRpcPreference = <T extends Chain>(chain: T): T => {
+  const prioritizedUrls = getRpcFallbackUrls(chain);
+  if (prioritizedUrls.length === 0) {
+    return chain;
+  }
+
+  const rpcUrls: Chain["rpcUrls"] = {
+    ...chain.rpcUrls,
+    default: {
+      ...chain.rpcUrls?.default,
+      http: prioritizedUrls,
+    },
+    ...(chain.rpcUrls?.public
+      ? {
+          public: {
+            ...chain.rpcUrls.public,
+            http: prioritizedUrls,
+          },
+        }
+      : {}),
+  };
+
+  return {
+    ...chain,
+    rpcUrls,
+  } as T;
 };
 
 export const NETWORKS_EXTRA_DATA: Record<string, ChainAttributes> = {
@@ -161,7 +189,7 @@ export function getBlockExplorerAddressLink(network: chains.Chain, address: stri
  */
 export function getTargetNetworks(): ChainWithAttributes[] {
   return scaffoldConfig.targetEVMNetworks.map(targetNetwork => ({
-    ...targetNetwork,
+    ...withAlchemyRpcPreference(targetNetwork),
     ...NETWORKS_EXTRA_DATA[targetNetwork.id],
   }));
 }
