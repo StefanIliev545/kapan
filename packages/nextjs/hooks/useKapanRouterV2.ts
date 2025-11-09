@@ -559,7 +559,7 @@ export const useKapanRouterV2 = () => {
           address: userAddress as Address,
           blockTag: "pending",
         });
-        let nextNonce = BigInt(baseNonce);
+        let nextNonce = baseNonce;
         const pendingApprovalWaits: Promise<void>[] = [];
 
         for (let i = 0; i < approvalPlans.length; i++) {
@@ -579,7 +579,7 @@ export const useKapanRouterV2 = () => {
             nonce: nextNonce,
           });
 
-          nextNonce += 1n;
+          nextNonce += 1;
 
           const waitForApproval = publicClient
             .waitForTransactionReceipt({ hash: approveHash, confirmations: sequentialConfirmations })
