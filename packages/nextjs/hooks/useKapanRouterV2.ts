@@ -95,12 +95,25 @@ export const useKapanRouterV2 = () => {
   };
   
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
+  // Approvals are executed sequentially via the user's wallet. Waiting for
+  // the full safety margin of confirmations between each approval made the
+  // UX feel sluggish on chains where we target two confirmations (Base/Optimism).
+  // Only wait for a single confirmation before prompting the next approval
+  // while still respecting chains that can settle instantly (Arbitrum/Linea).
+  const sequentialConfirmations = effectiveConfirmations > 1 ? 1 : effectiveConfirmations;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
     confirmations: effectiveConfirmations,
+  });
+
+  const refreshConfirmations = effectiveConfirmations > 1 ? 1 : effectiveConfirmations;
+  const { isSuccess: isRefreshConfirmed } = useWaitForTransactionReceipt({
+    hash,
+    confirmations: refreshConfirmations,
+    query: { enabled: !!hash },
   });
 
   const [isApproving, setIsApproving] = useState(false);
@@ -122,7 +135,7 @@ export const useKapanRouterV2 = () => {
 
   // Refresh Wagmi queries when transaction completes (both single tx and batch)
   useEffect(() => {
-    const complete = isConfirmed || isBatchConfirmed;
+    const complete = isRefreshConfirmed || isBatchConfirmed;
     if (!complete) return;
 
     Promise.all([
@@ -135,7 +148,7 @@ export const useKapanRouterV2 = () => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("txCompleted"));
     }
-  }, [isConfirmed, isBatchConfirmed, queryClient]);
+  }, [isRefreshConfirmed, isBatchConfirmed, queryClient]);
 
   /**
    * Helper to encode Compound market context
@@ -516,6 +529,9 @@ export const useKapanRouterV2 = () => {
       // 2. Execute approval calls sequentially (important for mobile wallets)
       // The router provides already encoded calldata - we just send it directly
       console.log(`executeFlowWithApprovals: Executing ${authCalls.length} approval(s) sequentially...`);
+
+      const approvalPlans: Array<{ target: Address; data: Hex; tokenSymbol: string }> = [];
+
       for (let i = 0; i < authCalls.length; i++) {
         const authCall = authCalls[i];
         if (!authCall.target || !authCall.data || authCall.data.length === 0) {
@@ -523,22 +539,12 @@ export const useKapanRouterV2 = () => {
           continue; // Skip invalid auth calls
         }
 
-        // Decode and check if approval amount is zero (ERC20 approve(address,uint256))
         if (isZeroAmountApproval(authCall.data)) {
           console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
           continue; // Skip zero-amount approvals
         }
 
-        console.log(`executeFlowWithApprovals: Processing approval ${i + 1}/${authCalls.length}`, {
-          target: authCall.target,
-          dataLength: authCall.data.length,
-        });
-        setIsApproving(true);
-
-        // Get token address from the target (it's the token contract address)
         const tokenAddress = authCall.target;
-
-        // Get token symbol for user notification (try to read, fallback to address)
         let tokenSymbol = tokenAddress.substring(0, 6) + "...";
         try {
           tokenSymbol = await publicClient.readContract({
@@ -551,30 +557,59 @@ export const useKapanRouterV2 = () => {
           // If symbol read fails, use truncated address
         }
 
-        notification.info(`Approving ${tokenSymbol}...`);
+        approvalPlans.push({ target: tokenAddress, data: authCall.data as Hex, tokenSymbol });
+      }
 
-        // Execute the approval call directly using the encoded data from authorizeInstructions
-        // The router has already encoded the approve(address spender, uint256 amount) call
-        // Fetch the current nonce explicitly to avoid MetaMask nonce issues with Hardhat
-        const currentNonce = await publicClient.getTransactionCount({
+      if (approvalPlans.length > 0) {
+        setIsApproving(true);
+        const baseNonce = await publicClient.getTransactionCount({
           address: userAddress as Address,
+          blockTag: "pending",
         });
-        
-        const approveHash = await walletClient.sendTransaction({
-          account: userAddress as Address,
-          to: authCall.target,
-          data: authCall.data,
-          nonce: currentNonce, // Explicitly set nonce to prevent MetaMask caching issues
-        });
+        let nextNonce = baseNonce;
+        const pendingApprovalWaits: Promise<void>[] = [];
 
-        // Wait for approval confirmation (crucial for mobile wallets)
-        // Add a small delay after receipt to ensure Hardhat processes the nonce update
-        await publicClient.waitForTransactionReceipt({ hash: approveHash, confirmations: effectiveConfirmations });
-        
-        // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        notification.success(`${tokenSymbol} approved ✅`);
+        for (let i = 0; i < approvalPlans.length; i++) {
+          const { target, data, tokenSymbol } = approvalPlans[i];
+
+          console.log(`executeFlowWithApprovals: Processing approval ${i + 1}/${approvalPlans.length}`, {
+            target,
+            dataLength: data.length,
+          });
+
+          notification.info(`Approving ${tokenSymbol}...`);
+
+          const approveHash = await walletClient.sendTransaction({
+            account: userAddress as Address,
+            to: target,
+            data,
+            nonce: nextNonce,
+          });
+
+          nextNonce += 1;
+
+          const waitForApproval = publicClient
+            .waitForTransactionReceipt({ hash: approveHash, confirmations: sequentialConfirmations })
+            .then(receipt => {
+              if (receipt.status === "reverted") {
+                throw new Error(`Approval for ${tokenSymbol} reverted`);
+              }
+              notification.success(`${tokenSymbol} approved ✅`);
+            });
+
+          pendingApprovalWaits.push(waitForApproval);
+
+          if (sequentialConfirmations > 0) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+
+        if (pendingApprovalWaits.length > 0) {
+          notification.info("Waiting for approvals to finalize...");
+          await Promise.all(pendingApprovalWaits);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
         setIsApproving(false);
       }
 
