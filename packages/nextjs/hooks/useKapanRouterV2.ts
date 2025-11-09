@@ -960,7 +960,9 @@ export const useKapanRouterV2 = () => {
         );
 
         // Approve borrowed tokens to the router so it can settle flash principal+premium (use UTXO index, not instruction index)
-        if (approveToRouter) {
+        const shouldApproveToRouter = approveToRouter && p.mode !== "coverFlash";
+
+        if (shouldApproveToRouter) {
           addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true); // Approve creates 1 dummy UTXO
         }
       },
