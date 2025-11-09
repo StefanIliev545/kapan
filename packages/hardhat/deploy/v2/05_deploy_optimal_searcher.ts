@@ -34,8 +34,7 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
     { name: "aave", viewGateway: "AaveGatewayView" },
     { name: "compound", viewGateway: "CompoundGatewayView" },
     { name: "venus", viewGateway: "VenusGatewayView" },
-    { name: "spark", viewGateway: "SparkGatewayView" }, // Spark is Aave fork, uses AaveGatewayView contract but deployed separately
-    { name: "morpho", viewGateway: "MorphoBlueView" },
+    { name: "spark", viewGateway: "AaveGatewayView" }, // Spark is Aave fork, uses same gateway
     { name: "aave v3", viewGateway: "AaveGatewayView" },
     { name: "compound v3", viewGateway: "CompoundGatewayView" },
   ];
@@ -67,5 +66,5 @@ export default deployOptimalInterestRateFinder;
 
 deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder", "v2"];
 // Dependencies: wait for gateway deployments (which deploy both Write and View contracts)
-deployOptimalInterestRateFinder.dependencies = ["AaveGatewayWrite", "CompoundGatewayWrite", "VenusGatewayWrite", "SparkGatewayWrite", "MorphoBlueWrite"];
+deployOptimalInterestRateFinder.dependencies = ["AaveGatewayWrite", "CompoundGatewayWrite", "VenusGatewayWrite"];
 

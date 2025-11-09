@@ -6273,6 +6273,7 @@ __metadata:
     gray-matter: ^4.0.3
     heatmap.js: ^2.0.5
     lodash.merge: ^4.6.2
+    lucide-react: ^0.553.0
     moment: ^2.30.1
     next: ^15.2.4
     next-mdx-remote: ^5.0.0
@@ -6293,6 +6294,7 @@ __metadata:
     rehype-highlight: ^7.0.2
     rehype-slug: ^6.0.0
     remark-gfm: ^4.0.1
+    sonner: ^2.0.7
     starknet: ^8.5.4
     starknetkit: 3.0.3
     tailwindcss: ~3.4.11
@@ -17367,6 +17369,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lucide-react@npm:^0.553.0":
+  version: 0.553.0
+  resolution: "lucide-react@npm:0.553.0"
+  peerDependencies:
+    react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 63308665fc0656642ec1508b834be6f3abd1aca479d59ec3323384cea19d86bcd340d115de981b1a544787bbbf1e1c31e8f35b3a94286a65b1ed060513de835b
+  languageName: node
+  linkType: hard
+
 "lz-string@npm:^1.5.0":
   version: 1.5.0
   resolution: "lz-string@npm:1.5.0"
@@ -22314,6 +22325,16 @@ __metadata:
   dependencies:
     atomic-sleep: ^1.0.0
   checksum: c7f9c89f931d7f60f8e0741551a729f0d81e6dc407a99420fc847a9a4c25af048a615b1188ab3c4f1fb3708fe4904973ddab6ebcc8ed5b78b50ab81a99045910
+  languageName: node
+  linkType: hard
+
+"sonner@npm:^2.0.7":
+  version: 2.0.7
+  resolution: "sonner@npm:2.0.7"
+  peerDependencies:
+    react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+    react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+  checksum: 17b521c2603662478cf86d21436dcfee7316785b4654456c5f37c1a15af35001953354653c5ff1239d91f04969835728daddbc61fa9a81a76ee075eb18073bae
   languageName: node
   linkType: hard
 

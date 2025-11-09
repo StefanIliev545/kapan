@@ -12,7 +12,7 @@ import {
 } from "@starknet-react/core";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "sonner";
 import { Fordefi } from "starknetkit/fordefi";
 import { Keplr } from "starknetkit/keplr";
 import { MetaMask } from "starknetkit/metamask";
@@ -86,7 +86,7 @@ const ScaffoldEthApp = ({
         <Footer />
       </div>
       <FloatingSocials />
-      <Toaster />
+      <Toaster position="bottom-right" />
     </SelectedGasTokenProvider>
   );
 };

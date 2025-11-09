@@ -14,7 +14,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  // ---- Address map (Arbitrum + Base). No chain in map => skip.
+  // ---- Address map (Arbitrum + Base + Optimism + Linea). No chain in map => skip.
   const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
     42161: {
       PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
@@ -27,8 +27,8 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
       REFERRAL: 0,
     },
     10: {
-      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // v3 PoolAddressesProvider
-      UI:       "0xE92cd6164CE7DC68e740765BC1f2a091B6CBc3e4", // UiPoolDataProviderV3
+      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Optimism v3 PoolAddressesProvider
+      UI:       "0xE92cd6164CE7DC68e740765BC1f2a091B6CBc3e4", // Optimism UiPoolDataProviderV3
       REFERRAL: 0,
     },
     59144: {

@@ -3,27 +3,12 @@ import { AccountInterface, InvokeFunctionResponse } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import providerFactory from "~~/services/web3/provider";
+import { TransactionToast } from "~~/components/TransactionToast";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string>,
   // | SendTransactionParameters,
 ) => Promise<string | undefined>;
-
-/**
- * Custom notification content for TXs.
- */
-const TxnNotification = ({ message, blockExplorerLink }: { message: string; blockExplorerLink?: string }) => {
-  return (
-    <div className={`flex flex-col ml-1 cursor-default`}>
-      <p className="my-0">{message}</p>
-      {blockExplorerLink && blockExplorerLink.length > 0 ? (
-        <a href={blockExplorerLink} target="_blank" rel="noreferrer" className="block link text-md">
-          check out transaction
-        </a>
-      ) : null}
-    </div>
-  );
-};
 
 /**
  * Runs Transaction passed in to returned function showing UI feedback.
@@ -51,29 +36,57 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
     let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
     try {
       const networkId = await walletClient.getChainId();
-      notificationId = notification.loading(<TxnNotification message="Awaiting for user confirmation" />);
-      if (typeof tx === "function") {
-        // Tx is already prepared by the caller
-        console.log("tx is a function");
-        const result = await tx();
-        if (typeof result === "string") {
-          transactionHash = result;
-        } else {
-          transactionHash = result.transaction_hash;
+      // Show pending notification - this will stay until we get the transaction hash or timeout
+      notificationId = notification.loading(
+        <TransactionToast step="pending" message="Waiting for approval..." />
+      );
+      
+      // Set up 10 second timeout for pending state
+      const pendingTimeout = setTimeout(() => {
+        if (notificationId) {
+          notification.remove(notificationId);
         }
-      } else if (tx != null) {
-        console.log("tx", tx);
-        transactionHash = (await walletClient.execute(tx)).transaction_hash;
-      } else {
-        throw new Error("Incorrect transaction passed to transactor");
+      }, 10000);
+      
+      try {
+        // Wait for user to confirm in wallet and get transaction hash
+        if (typeof tx === "function") {
+          // Tx is already prepared by the caller
+          console.log("tx is a function");
+          const result = await tx();
+          if (typeof result === "string") {
+            transactionHash = result;
+          } else {
+            transactionHash = result.transaction_hash;
+          }
+        } else if (tx != null) {
+          console.log("tx", tx);
+          // This will wait for wallet confirmation before returning hash
+          transactionHash = (await walletClient.execute(tx)).transaction_hash;
+        } else {
+          throw new Error("Incorrect transaction passed to transactor");
+        }
+        
+        // Clear timeout since we got the hash
+        clearTimeout(pendingTimeout);
+      } catch (error) {
+        // Clear timeout on error
+        clearTimeout(pendingTimeout);
+        throw error;
       }
 
-      notification.remove(notificationId);
-
+      // Now that we have the hash, transaction is sent - switch to "sent" state
       const blockExplorerTxURL = networkId ? getBlockExplorerTxLink(targetNetwork.network, transactionHash) : "";
 
+      // Update notification to "sent" state
+      notification.remove(notificationId);
       notificationId = notification.loading(
-        <TxnNotification message="Waiting for transaction to complete." blockExplorerLink={blockExplorerTxURL} />,
+        <TransactionToast
+          step="sent"
+          txHash={transactionHash}
+          message="Waiting for transaction to complete."
+          blockExplorerLink={blockExplorerTxURL}
+        />
       );
 
       try {
@@ -86,10 +99,12 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
       notification.remove(notificationId);
 
       notification.success(
-        <TxnNotification message="Transaction completed successfully!" blockExplorerLink={blockExplorerTxURL} />,
-        {
-          icon: "🎉",
-        },
+        <TransactionToast
+          step="confirmed"
+          txHash={transactionHash}
+          message="Transaction completed successfully!"
+          blockExplorerLink={blockExplorerTxURL}
+        />
       );
 
       if (typeof window !== "undefined") {
@@ -124,7 +139,12 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
 
       console.error("⚡️ ~ file: useTransactor.ts ~ error", message);
 
-      notification.error(message);
+      const blockExplorerTxURL = transactionHash
+        ? getBlockExplorerTxLink(targetNetwork.network, transactionHash)
+        : "";
+      notification.error(
+        <TransactionToast step="failed" txHash={transactionHash} message={message} blockExplorerLink={blockExplorerTxURL} />
+      );
       throw error;
     }
 
