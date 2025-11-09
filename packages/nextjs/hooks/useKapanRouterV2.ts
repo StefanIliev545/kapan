@@ -103,10 +103,17 @@ export const useKapanRouterV2 = () => {
   const sequentialConfirmations = effectiveConfirmations > 1 ? 1 : effectiveConfirmations;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
     confirmations: effectiveConfirmations,
+  });
+
+  const refreshConfirmations = Math.max(1, effectiveConfirmations);
+  const { isSuccess: isRefreshConfirmed } = useWaitForTransactionReceipt({
+    hash,
+    confirmations: refreshConfirmations,
+    query: { enabled: !!hash },
   });
 
   const [isApproving, setIsApproving] = useState(false);
@@ -128,7 +135,7 @@ export const useKapanRouterV2 = () => {
 
   // Refresh Wagmi queries when transaction completes (both single tx and batch)
   useEffect(() => {
-    const complete = isConfirmed || isBatchConfirmed;
+    const complete = isRefreshConfirmed || isBatchConfirmed;
     if (!complete) return;
 
     Promise.all([
@@ -141,7 +148,7 @@ export const useKapanRouterV2 = () => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("txCompleted"));
     }
-  }, [isConfirmed, isBatchConfirmed, queryClient]);
+  }, [isRefreshConfirmed, isBatchConfirmed, queryClient]);
 
   /**
    * Helper to encode Compound market context
