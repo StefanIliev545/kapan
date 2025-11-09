@@ -138,6 +138,8 @@ export const useKapanRouterV2 = () => {
     const complete = isRefreshConfirmed || isBatchConfirmed;
     if (!complete) return;
 
+    notification.success("Transaction confirmed — refreshing data...");
+
     Promise.all([
       queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
