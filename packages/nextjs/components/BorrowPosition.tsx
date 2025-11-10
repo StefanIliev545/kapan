@@ -541,20 +541,22 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             position={position}
             chainId={chainId}
           />
-          <RefinanceModal
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={protocolName}
-            position={{
-              name,
-              balance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals || 18,
-            }}
-            chainId={chainId}
-            networkType="evm"
-          />
+          {moveModal.isOpen && (
+            <RefinanceModal
+              isOpen={moveModal.isOpen}
+              onClose={moveModal.close}
+              fromProtocol={protocolName}
+              position={{
+                name,
+                balance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
+                type: "borrow",
+                tokenAddress,
+                decimals: tokenDecimals || 18,
+              }}
+              chainId={chainId}
+              networkType="evm"
+            />
+          )}
         </>
       )}
     </>
