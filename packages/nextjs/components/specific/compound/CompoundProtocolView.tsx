@@ -27,7 +27,15 @@ const decimalsFromScale = (scale: bigint) => {
 
 // (collateral value is computed via batch reads in the component below)
 
-export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
+export const CompoundProtocolView: FC<{
+  chainId?: number;
+  enabledFeatures?: { swap?: boolean; move?: boolean };
+  onPositions?: (payload: {
+    protocol: string;
+    suppliedPositions: ProtocolPosition[];
+    borrowedPositions: ProtocolPosition[];
+  }) => void;
+}> = ({ chainId, enabledFeatures, onPositions }) => {
   const { address: connectedAddress } = useAccount();
   const isWalletConnected = !!connectedAddress;
   const forceShowAll = !isWalletConnected;
@@ -247,6 +255,14 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
   // Hardcode current LTV (or fetch from contract if needed).
   const currentLtv = 75;
+
+  useEffect(() => {
+    onPositions?.({
+      protocol: "compound",
+      suppliedPositions,
+      borrowedPositions,
+    });
+  }, [onPositions, suppliedPositions, borrowedPositions]);
 
   return (
     <div>
