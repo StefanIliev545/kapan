@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, useEffect, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
@@ -6,7 +6,15 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 
-export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
+export const AaveProtocolView: FC<{
+  chainId?: number;
+  enabledFeatures?: { swap?: boolean; move?: boolean };
+  onPositions?: (payload: {
+    protocol: string;
+    suppliedPositions: ProtocolPosition[];
+    borrowedPositions: ProtocolPosition[];
+  }) => void;
+}> = ({ chainId, enabledFeatures, onPositions }) => {
   const { address: connectedAddress } = useAccount();
 
   // Get the AaveGatewayView contract info to use its address as a fallback
@@ -93,6 +101,14 @@ export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?:
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
     : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+
+  useEffect(() => {
+    onPositions?.({
+      protocol: "aave",
+      suppliedPositions,
+      borrowedPositions,
+    });
+  }, [onPositions, suppliedPositions, borrowedPositions]);
 
   return (
     <ProtocolView

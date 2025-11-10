@@ -9,6 +9,14 @@ import CallToAction, { CallToActionSectionProps } from "~~/components/common/Cal
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { arbitrum, base, optimism, linea } from "wagmi/chains";
+import { PortfolioHeader } from "~~/components/modals/PortfolioHeader";
+import type { ProtocolPosition } from "~~/components/ProtocolView";
+
+type PositionsBundle = {
+  key: string; // protocol key, e.g. "aave" | "compound" | ...
+  suppliedPositions: ProtocolPosition[];
+  borrowedPositions: ProtocolPosition[];
+};
 
 // ---- Lazy-load heavy protocol views (client-only) ----
 const AaveProtocolView = dynamic(
@@ -47,6 +55,26 @@ const networkOptions: NetworkOption[] = [
 
 const App: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
+  const [portfolioByNet, setPortfolioByNet] = useState<Record<string, PositionsBundle[]>>({});
+  const upsert = (net: string, key: string) =>
+    (payload: { suppliedPositions: ProtocolPosition[]; borrowedPositions: ProtocolPosition[] }) => {
+      setPortfolioByNet(prev => {
+        const arr = prev[net] ?? [];
+        const idx = arr.findIndex(b => b.key === key);
+        const bundle: PositionsBundle = { key, ...payload };
+        const next = idx === -1 ? [...arr, bundle] : arr.map((b, i) => (i === idx ? bundle : b));
+        return { ...prev, [net]: next };
+      });
+    };
+  
+  // + compute the portfolio for the currently selected network (what the header needs)
+  const portfolioForSelected = useMemo(() => {
+    const list = portfolioByNet[selectedNetwork] ?? [];
+    return list.map(b => ({
+      suppliedPositions: b.suppliedPositions,
+      borrowedPositions: b.borrowedPositions,
+    }));
+  }, [portfolioByNet, selectedNetwork]);
 
   // Keep a cache of networks the user has visited so we keep their trees mounted
   const [mounted, setMounted] = useState<Set<string>>(new Set(["starknet"]));
@@ -131,18 +159,20 @@ const App: NextPage = () => {
           </div>
         )}
 
+        <PortfolioHeader protocols={portfolioForSelected} />
+
         {/* ---- Cached panes: once mounted, never unmount; just hide/show ---- */}
         {/* ARBITRUM */}
         {mounted.has("arbitrum") && (
           <div className={selectedNetwork === "arbitrum" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "arbitrum"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("arbitrum", "aave")} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("arbitrum", "compound")}/>
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: false, move: true }} />
+              <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("arbitrum", "venus")}/>
             </StableArea>
           </div>
         )}
@@ -151,13 +181,13 @@ const App: NextPage = () => {
         {mounted.has("base") && (
           <div className={selectedNetwork === "base" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "base"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("base", "aave")}/>
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("base", "compound")}/>
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} />
+              <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("base", "venus")}/>
             </StableArea>
           </div>
         )}
@@ -178,10 +208,10 @@ const App: NextPage = () => {
         {mounted.has("optimism") && (
           <div className={selectedNetwork === "optimism" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "optimism"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("optimism", "aave")}/>
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("optimism", "compound")}/>
             </StableArea>
           </div>
         )}
@@ -190,10 +220,10 @@ const App: NextPage = () => {
         {mounted.has("linea") && (
           <div className={selectedNetwork === "linea" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "linea"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
+              <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("linea", "aave")}/>
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
+              <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} onPositions={upsert("linea", "compound")}/>
             </StableArea>
           </div>
         )}

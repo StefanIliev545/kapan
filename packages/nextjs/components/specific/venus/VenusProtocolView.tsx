@@ -24,7 +24,7 @@
  * 4. Allow users to supply, borrow, repay, and migrate debt between protocols
  */
 
-import { FC, useMemo } from "react";
+import { FC, useEffect, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
@@ -36,7 +36,15 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
 
-export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
+export const VenusProtocolView: FC<{
+  chainId?: number;
+  enabledFeatures?: { swap?: boolean; move?: boolean };
+  onPositions?: (p: {
+    protocol: string;
+    suppliedPositions: ProtocolPosition[];
+    borrowedPositions: ProtocolPosition[];
+  }) => void;
+}> = ({ chainId, enabledFeatures, onPositions }) => {
   const { address: connectedAddress } = useAccount();
  
   // Get Comptroller address from VenusGatewayView
@@ -248,6 +256,14 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
   // We'll use a fixed value here for simplicity
   const ltv = 75; // 75% LTV
   const maxLtv = 85; // 85% max LTV (liquidation threshold)
+
+  useEffect(() => {
+    onPositions?.({
+      protocol: "venus",
+      suppliedPositions: suppliedPositions as ProtocolPosition[],
+      borrowedPositions,
+    });
+  }, [onPositions, suppliedPositions, borrowedPositions]);
 
   return (
     <ProtocolView
