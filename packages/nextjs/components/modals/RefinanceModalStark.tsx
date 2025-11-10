@@ -229,10 +229,19 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         if (firstPreselected.amount) {
           const amount = formatUnits(firstPreselected.amount, firstPreselected.decimals);
           setTempAmount(amount);
+          try {
+            // If the provided amount equals full raw balance, mark as MAX by default
+            const providedRaw = firstPreselected.amount;
+            if (providedRaw === meta.rawBalance) {
+              setTempIsMax(true);
+            }
+          } catch {}
         } else if (firstPreselected.inputValue) {
           setTempAmount(firstPreselected.inputValue);
         } else {
+          // Default to full balance and mark as MAX until edited
           setTempAmount(formatUnits(meta.rawBalance, meta.decimals));
+          setTempIsMax(true);
         }
       }
     }
@@ -258,14 +267,25 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     if (!isVesu || !starkVesuPools) return;
 
     if (selectedVersion === "v1") {
-      const currentValid = starkVesuPools.v1Pools.some(p => p.id === selectedPoolId);
-      if (!currentValid && starkVesuPools.v1Pools[0]?.id) {
-        setSelectedPoolId(starkVesuPools.v1Pools[0].id);
+      const sourceV1Id = fromProtocol === "Vesu" && position.poolId
+        ? (typeof position.poolId === "string" ? BigInt(position.poolId) : position.poolId)
+        : undefined;
+      const filtered = starkVesuPools.v1Pools.filter(p => sourceV1Id === undefined || p.id !== sourceV1Id);
+      const currentValid = starkVesuPools.v1Pools.some(p => p.id === selectedPoolId) && (!sourceV1Id || selectedPoolId !== sourceV1Id);
+      if (!currentValid) {
+        const next = (filtered[0]?.id) ?? starkVesuPools.v1Pools[0]?.id;
+        if (next) setSelectedPoolId(next);
       }
     } else {
-      const currentValid = !!selectedV2PoolAddress && starkVesuPools.v2Pools.some(p => p.address.toLowerCase() === selectedV2PoolAddress.toLowerCase());
-      if (!currentValid && starkVesuPools.v2Pools[0]?.address) {
-        setSelectedV2PoolAddress(starkVesuPools.v2Pools[0].address);
+      const sourceV2Addr = fromProtocol === "VesuV2" && position.poolId ? String(position.poolId) : undefined;
+      const sourceV2Normalized = sourceV2Addr ? sourceV2Addr.toLowerCase() : undefined;
+      const currentValid = !!selectedV2PoolAddress
+        && starkVesuPools.v2Pools.some(p => p.address.toLowerCase() === selectedV2PoolAddress.toLowerCase())
+        && (!sourceV2Normalized || selectedV2PoolAddress.toLowerCase() !== sourceV2Normalized);
+      if (!currentValid) {
+        const filtered = starkVesuPools.v2Pools.filter(p => !sourceV2Normalized || p.address.toLowerCase() !== sourceV2Normalized);
+        const next = (filtered[0]?.address) ?? starkVesuPools.v2Pools[0]?.address;
+        if (next) setSelectedV2PoolAddress(next);
       }
     }
   }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress]);

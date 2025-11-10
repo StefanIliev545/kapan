@@ -145,9 +145,13 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         Withdraw: undefined, Redeposit: undefined, Reborrow: undefined,
       });
 
-      const isMax = collateralIsMaxMap[e.lower] === true;
-      const req = isMax ? col.rawBalance : parseUnits(e.amt || "0", col.decimals);
-      const withAmt = isMax ? req : req; // only buffer if you really want non-max; legacy path kept raw here
+      const mapMax = collateralIsMaxMap[e.lower] === true;
+      const typedRaw = parseUnits(e.amt || "0", col.decimals);
+      const typedIsExactlyMax = typedRaw === col.rawBalance;
+      const isMax = mapMax || typedIsExactlyMax;
+      // If Vesu source and treated as MAX, slightly bump to cover rounding (0.01% + 1)
+      const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
+      const withAmt = isMax && (fromProtocol === "Vesu" || fromProtocol === "VesuV2") ? bump(col.rawBalance) : (isMax ? col.rawBalance : typedRaw);
       const withdraw = new CairoCustomEnum({
         Deposit: undefined, Borrow: undefined, Repay: undefined,
         Withdraw: { basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress }, withdraw_all: isMax, context: withdrawCtx },
