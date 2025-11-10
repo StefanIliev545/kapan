@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useMemo } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -97,6 +97,22 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
+
+  // Stable position object for RefinanceModal (avoid hook re-ordering; defined at top-level)
+  const tokenBalanceBn = useMemo(
+    () => (typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)),
+    [tokenBalance],
+  );
+  const refiPosition = useMemo(
+    () => ({
+      name,
+      tokenAddress,
+      decimals: tokenDecimals || 18,
+      balance: tokenBalanceBn,
+      type: "borrow" as const,
+    }),
+    [name, tokenAddress, tokenDecimals, tokenBalanceBn],
+  );
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -546,13 +562,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               isOpen={moveModal.isOpen}
               onClose={moveModal.close}
               fromProtocol={protocolName}
-              position={{
-                name,
-                balance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
-                type: "borrow",
-                tokenAddress,
-                decimals: tokenDecimals || 18,
-              }}
+              position={refiPosition}
               chainId={chainId}
               networkType="evm"
             />
