@@ -625,7 +625,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
                     <div
                       key={c.address}
                       className={`p-2 border rounded ${isExpanded ? "col-span-2" : ""} ${
-                        isAdded ? "border-success bg-success/10" : supported ? "border-base-300" : "border-error/50 opacity-60"
+                        isAdded ? "border-success bg-success/10" : supported ? "border-base-300" : "border-error/50 opacity-60 pointer-events-none cursor-not-allowed"
                       } ${c.balance <= 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                       onClick={() => {
                         if (c.balance <= 0) return;
