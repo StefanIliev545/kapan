@@ -29,13 +29,12 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
   console.log(`OptimalInterestRateFinder deployed to: ${optimalFinder.address}`);
 
   // Register v2 view gateways if they exist
-  // Note: Spark uses AaveGatewayView since Spark is an Aave fork
   const protocols = [
     { name: "aave", viewGateway: "AaveGatewayView" },
     { name: "compound", viewGateway: "CompoundGatewayView" },
     { name: "venus", viewGateway: "VenusGatewayView" },
-    { name: "spark", viewGateway: "SparkGatewayView" }, // Spark is Aave fork, uses AaveGatewayView contract but deployed separately
-    { name: "morpho", viewGateway: "MorphoBlueView" },
+    { name: "spark", viewGateway: "SparkGatewayView" }, // Spark uses AaveGatewayView contract but deployed separately
+    { name: "zerolend", viewGateway: "ZeroLendGatewayView" }, // ZeroLend uses AaveGatewayView contract but deployed separately
     { name: "aave v3", viewGateway: "AaveGatewayView" },
     { name: "compound v3", viewGateway: "CompoundGatewayView" },
   ];
@@ -66,6 +65,6 @@ const deployOptimalInterestRateFinder: DeployFunction = async function (hre: Har
 export default deployOptimalInterestRateFinder;
 
 deployOptimalInterestRateFinder.tags = ["OptimalInterestRateFinder", "v2"];
-// Dependencies: wait for gateway deployments (which deploy both Write and View contracts)
-deployOptimalInterestRateFinder.dependencies = ["AaveGatewayWrite", "CompoundGatewayWrite", "VenusGatewayWrite", "SparkGatewayWrite", "MorphoBlueWrite"];
+// No dependencies - will try to register gateways if they exist
+deployOptimalInterestRateFinder.dependencies = [];
 

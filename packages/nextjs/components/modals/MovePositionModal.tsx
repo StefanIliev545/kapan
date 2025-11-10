@@ -50,7 +50,13 @@ const ALL_FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position, chainId }) => {
   const { address: userAddress, chain } = useAccount();
   const { switchChain } = useSwitchChain();
-  const protocols = [{ name: "Aave V3" }, { name: "Compound V3" }, { name: "Venus" }];
+  // Linea (59144) has ZeroLend instead of Venus
+  const isLinea = chainId === 59144;
+  const protocols = [
+    { name: "Aave V3" },
+    { name: "Compound V3" },
+    ...(isLinea ? [{ name: "ZeroLend" }] : [{ name: "Venus" }]),
+  ];
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");

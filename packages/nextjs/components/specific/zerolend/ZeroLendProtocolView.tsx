@@ -1,14 +1,14 @@
 import { FC } from "react";
 import { ProtocolView } from "../../ProtocolView";
-import { AaveLike } from "./AaveLike";
+import { AaveLike } from "../aave/AaveLike";
 
-export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
+export const ZeroLendProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
   return (
-    <AaveLike chainId={chainId} contractName="AaveGatewayView">
+    <AaveLike chainId={chainId} contractName="ZeroLendGatewayView">
       {({ suppliedPositions, borrowedPositions, forceShowAll }) => (
         <ProtocolView
-          protocolName="Aave V3"
-          protocolIcon="/logos/aave.svg"
+          protocolName="ZeroLend"
+          protocolIcon="/logos/zerolend.svg"
           enabledFeatures={enabledFeatures}
           ltv={75}
           maxLtv={90}
@@ -23,4 +23,5 @@ export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?:
   );
 };
 
-export default AaveProtocolView;
+export default ZeroLendProtocolView;
+

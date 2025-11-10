@@ -34,6 +34,7 @@ const pngLogoMap: Record<string, string> = {
   cash: "/logos/cash.png",
   brother: "/logos/brother.avif",
   sway: "/logos/sway.avif",
+  lyu: "/logos/lyu.png",
 };
 
 // Get token icon with PNG overrides and fallback to question mark

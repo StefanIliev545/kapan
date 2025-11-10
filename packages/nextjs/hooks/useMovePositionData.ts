@@ -124,7 +124,17 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   // Destination protocol options (simple baseline; caller can refine)
   const destinationProtocols: DestinationProtocolOption[] = useMemo(() => {
     if (networkType === "evm") {
-      return [{ name: "Aave V3", logo: getProtocolLogo("Aave V3") }, { name: "Compound V3", logo: getProtocolLogo("Compound V3") }, { name: "Venus", logo: getProtocolLogo("Venus") }].filter(
+      // Linea (59144) has ZeroLend instead of Venus
+      const isLinea = chainId === 59144;
+      const protocols = [
+        { name: "Aave V3", logo: getProtocolLogo("Aave V3") },
+        { name: "Compound V3", logo: getProtocolLogo("Compound V3") },
+        ...(isLinea 
+          ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }]
+          : [{ name: "Venus", logo: getProtocolLogo("Venus") }]
+        ),
+      ];
+      return protocols.filter(
         p => p.name.toLowerCase() !== fromProtocol.toLowerCase(),
       );
     }
@@ -140,7 +150,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
         return true;
       },
     );
-  }, [fromProtocol, networkType]);
+  }, [fromProtocol, networkType, chainId]);
 
   // Collaterals and support
   const [collaterals, setCollaterals] = useState<BasicCollateral[]>([]);

@@ -36,6 +36,11 @@ const NostraProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Nostra" /> }
 );
 
+const ZeroLendProtocolView = dynamic(
+  () => import("~~/components/specific/zerolend/ZeroLendProtocolView").then(m => m.ZeroLendProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading ZeroLend" /> }
+);
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
@@ -191,6 +196,9 @@ const App: NextPage = () => {
           <div className={selectedNetwork === "linea" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "linea"}>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <ZeroLendProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: false, move: true }} />
