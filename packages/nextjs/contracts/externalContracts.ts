@@ -250,6 +250,7 @@ export const tokenNameToLogo = (tokenName: string) => {
     tbtc: "/logos/threshold-btc.png", // threshold’s tBTC
     unibtc: "/logos/unibtc.png",
     xsbtc: "/logos/xsolvbtc.png",
+    lyu: "/logos/lyu.png",
   };
 
   const png = pngLogoMap[lower];
