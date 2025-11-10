@@ -247,7 +247,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    const next = Boolean(canDoAtomicBatch);
+    const next = Boolean(true);
     setPreferBatching(p => (p === next ? p : next));
   }, [isOpen, canDoAtomicBatch]);
 
