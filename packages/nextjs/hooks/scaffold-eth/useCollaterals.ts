@@ -1,5 +1,6 @@
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
 import { formatUnits } from "viem";
+import { ContractName } from "~~/utils/scaffold-eth/contract";
 
 interface CollateralToken {
   symbol: string;
@@ -10,10 +11,11 @@ interface CollateralToken {
 }
 
 // Map protocol names to gateway view contract names
-const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
+const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView"> = {
   aave: "AaveGatewayView",
   compound: "CompoundGatewayView",
   venus: "VenusGatewayView",
+  zerolend: "ZeroLendGatewayView",
 };
 
 export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean) => {
@@ -22,7 +24,7 @@ export const useCollaterals = (tokenAddress: string, protocolName: string, userA
   const gatewayContractName = PROTOCOL_TO_GATEWAY_MAP[normalizedProtocol] || "AaveGatewayView";
 
   const { data, isLoading } = useScaffoldReadContract({
-    contractName: gatewayContractName,
+    contractName: gatewayContractName as ContractName,
     functionName: "getPossibleCollaterals",
     args: [tokenAddress, userAddress],
     query: {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
+import { ContractName } from "~~/utils/scaffold-eth/contract";
 
 interface CollateralSupportResult {
   isLoading: boolean;
@@ -7,10 +8,11 @@ interface CollateralSupportResult {
 }
 
 // Map protocol names to gateway view contract names
-const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
+const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView"> = {
   aave: "AaveGatewayView",
   compound: "CompoundGatewayView",
   venus: "VenusGatewayView",
+  zerolend: "ZeroLendGatewayView",
 };
 
 /**
@@ -34,7 +36,7 @@ export const useCollateralSupport = (
 
   // Get all supported collaterals for the target protocol
   const { data: supportedCollateralsList, isLoading } = useScaffoldReadContract({
-    contractName: gatewayContractName,
+    contractName: gatewayContractName as ContractName,
     functionName: "getSupportedCollaterals",
     args: [marketAddress],
     query: {

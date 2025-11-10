@@ -159,6 +159,9 @@ const App: NextPage = () => {
               <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: false, move: true }} />
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">

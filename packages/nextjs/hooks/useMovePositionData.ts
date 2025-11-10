@@ -124,13 +124,18 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   // Destination protocol options (simple baseline; caller can refine)
   const destinationProtocols: DestinationProtocolOption[] = useMemo(() => {
     if (networkType === "evm") {
-      // Linea (59144) has ZeroLend instead of Venus
+      // Linea (59144): ZeroLend replaces Venus
+      // Base (8453): Show both ZeroLend and Venus
+      // Other chains: Show Venus only
       const isLinea = chainId === 59144;
+      const isBase = chainId === 8453;
       const protocols = [
         { name: "Aave V3", logo: getProtocolLogo("Aave V3") },
         { name: "Compound V3", logo: getProtocolLogo("Compound V3") },
         ...(isLinea 
           ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }]
+          : isBase
+          ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }, { name: "Venus", logo: getProtocolLogo("Venus") }]
           : [{ name: "Venus", logo: getProtocolLogo("Venus") }]
         ),
       ];
