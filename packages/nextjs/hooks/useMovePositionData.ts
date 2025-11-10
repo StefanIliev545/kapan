@@ -129,8 +129,16 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       );
     }
     // Starknet: Vesu, VesuV2, Nostra
+    // Note: Vesu/VesuV2 are always included as destinations (even when source is Vesu)
+    // because moving from Vesu V1 to Vesu V1 (different pool) is a valid move
     return [{ name: "Vesu", logo: getProtocolLogo("Vesu") }, { name: "VesuV2", logo: getProtocolLogo("VesuV2") }, { name: "Nostra", logo: getProtocolLogo("Nostra") }].filter(
-      p => p.name.toLowerCase() !== fromProtocol.toLowerCase(),
+      p => {
+        // Only filter out Nostra if source is Nostra (Vesu/VesuV2 can always be destinations)
+        if (p.name.toLowerCase() === "nostra" && fromProtocol.toLowerCase() === "nostra") {
+          return false;
+        }
+        return true;
+      },
     );
   }, [fromProtocol, networkType]);
 

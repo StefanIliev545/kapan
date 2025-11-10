@@ -507,21 +507,24 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             position={position}
             vesuContext={vesuContext?.repay}
           />
-          <MovePositionModalStark
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={moveFromProtocol}
-            position={{
-              name,
-              balance: tokenBalance ?? 0n,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals ?? 18,
-              poolId: movePoolId,
-            }}
-            preSelectedCollaterals={moveSupport?.preselectedCollaterals}
-            disableCollateralSelection={moveSupport?.disableCollateralSelection}
-          />
+          {moveModal.isOpen && (
+            <RefinanceModal
+              isOpen={moveModal.isOpen}
+              onClose={moveModal.close}
+              fromProtocol={moveFromProtocol}
+              position={{
+                name,
+                tokenAddress,
+                decimals: tokenDecimals ?? 18,
+                balance: tokenBalance ?? 0n,
+                poolId: movePoolId,
+                type: "borrow",
+              }}
+              networkType="starknet"
+              preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+              disableCollateralSelection={moveSupport?.disableCollateralSelection}
+            />
+          )}
         </>
       ) : (
         <>
