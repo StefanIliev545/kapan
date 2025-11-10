@@ -1,9 +1,9 @@
-import React, { FC } from "react";
+import React, { FC, useMemo } from "react";
 import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
-import { MovePositionModal } from "./modals/MovePositionModal";
+import { RefinanceModal } from "./modals/RefinanceModal";
 import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
@@ -97,6 +97,22 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
+
+  // Stable position object for RefinanceModal (avoid hook re-ordering; defined at top-level)
+  const tokenBalanceBn = useMemo(
+    () => (typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)),
+    [tokenBalance],
+  );
+  const refiPosition = useMemo(
+    () => ({
+      name,
+      tokenAddress,
+      decimals: tokenDecimals || 18,
+      balance: tokenBalanceBn,
+      type: "borrow" as const,
+    }),
+    [name, tokenAddress, tokenDecimals, tokenBalanceBn],
+  );
 
   // Get wallet connection status for both networks
   const { evm, starknet } = useWalletConnection();
@@ -491,21 +507,24 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             position={position}
             vesuContext={vesuContext?.repay}
           />
-          <MovePositionModalStark
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={moveFromProtocol}
-            position={{
-              name,
-              balance: tokenBalance ?? 0n,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals ?? 18,
-              poolId: movePoolId,
-            }}
-            preSelectedCollaterals={moveSupport?.preselectedCollaterals}
-            disableCollateralSelection={moveSupport?.disableCollateralSelection}
-          />
+          {moveModal.isOpen && (
+            <RefinanceModal
+              isOpen={moveModal.isOpen}
+              onClose={moveModal.close}
+              fromProtocol={moveFromProtocol}
+              position={{
+                name,
+                tokenAddress,
+                decimals: tokenDecimals ?? 18,
+                balance: tokenBalance ?? 0n,
+                poolId: movePoolId,
+                type: "borrow",
+              }}
+              networkType="starknet"
+              preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+              disableCollateralSelection={moveSupport?.disableCollateralSelection}
+            />
+          )}
         </>
       ) : (
         <>
@@ -541,19 +560,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             position={position}
             chainId={chainId}
           />
-          <MovePositionModal
-            isOpen={moveModal.isOpen}
-            onClose={moveModal.close}
-            fromProtocol={protocolName}
-            position={{
-              name,
-              balance: balance ? balance : 0,
-              type: "borrow",
-              tokenAddress,
-              decimals: tokenDecimals || 18,
-            }}
-            chainId={chainId}
-          />
+          {moveModal.isOpen && (
+            <RefinanceModal
+              isOpen={moveModal.isOpen}
+              onClose={moveModal.close}
+              fromProtocol={protocolName}
+              position={refiPosition}
+              chainId={chainId}
+              networkType="evm"
+            />
+          )}
         </>
       )}
     </>

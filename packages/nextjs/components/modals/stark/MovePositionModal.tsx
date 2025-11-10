@@ -456,7 +456,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
             Reborrow: {
               token: position.tokenAddress,
               target_output_pointer: toOutputPointer(0), // Point to repay instruction
-              approval_amount: uint256.bnToUint256((allocation.debtAmount * BigInt(101)) / BigInt(100)), // Add 1% buffer
+              approval_amount: uint256.bnToUint256(allocation.debtAmount),
               user: userAddress,
               context: contextReborrow,
             },
@@ -638,7 +638,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
       Reborrow: {
         token: position.tokenAddress,
         target_output_pointer: toOutputPointer(0),
-        approval_amount: uint256.bnToUint256((parsedAmount * BigInt(101)) / BigInt(100)),
+        approval_amount: uint256.bnToUint256(parsedAmount),
         user: userAddress,
         context: borrowInstructionContext,
       },
