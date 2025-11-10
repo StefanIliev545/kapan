@@ -15,14 +15,18 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  // ---- Address map (Linea only). No chain in map => skip.
-  // Reusing Aave addresses for now
+  // ---- Address map (Linea + Base). No chain in map => skip.
   const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
     59144: {
-        PROVIDER: "0xC44827C51d00381ed4C52646aeAB45b455d200eB", // ZeroLend PoolAddressesProvider (Linea)
-        UI:       "0x81b3184A3B5d4612F2c26A53Da8D99474B91B2D2", // ZeroLend UiPoolDataProviderV3 (Linea)
-        REFERRAL: 0,
-    },      
+      PROVIDER: "0xC44827C51d00381ed4C52646aeAB45b455d200eB", // ZeroLend PoolAddressesProvider (Linea)
+      UI:       "0x81b3184A3B5d4612F2c26A53Da8D99474B91B2D2", // ZeroLend UiPoolDataProviderV3 (Linea)
+      REFERRAL: 0,
+    },
+    8453: {
+      PROVIDER: "0x5213ab3997a596c75Ac6ebF81f8aEb9cf9A31007", // ZeroLend PoolAddressesProvider (Base)
+      UI:       "0x0A1198DDb5247a283F76077Bb1E45e5858ee100b", // ZeroLend UiPoolDataProviderV3 (Base)
+      REFERRAL: 0,
+    },
   };
 
   const entry = MAP[chainId];
