@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useMemo, useRef, useState } from "react";
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMovePositionData, type NetworkType } from "~~/hooks/useMovePositionData";
@@ -6,7 +6,7 @@ import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import type { Address } from "viem";
 import { FiCheck } from "react-icons/fi";
-import { formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 
 /** ---------- Helpers copied/adapted from MovePositionModal ---------- */
@@ -19,11 +19,12 @@ const toUsd = (humanAmount: number, p8: bigint): number => {
 };
 
 // Invisible probe that fetches a price for a symbol and reports it back (8d bigint).
+type PriceHandler = (addressLower: string, p8: bigint) => void;
 const CollatPriceProbe: FC<{
   symbol?: string;
   address: string;
   enabled: boolean;
-  onPrice: (addressLower: string, p8: bigint) => void;
+  onPrice: PriceHandler;
 }> = ({ symbol, address, enabled, onPrice }) => {
   const sym = (symbol || "").trim();
   type PriceHookShape = { isSuccess?: boolean; price?: number };
@@ -32,7 +33,7 @@ const CollatPriceProbe: FC<{
   useEffect(() => {
     if (!enabled || !sym) return;
     const ok = isSuccess && typeof price === "number" && isFinite(price) && price > 0;
-    if (ok) onPrice(address.toLowerCase(), BigInt(Math.round(price! * 1e8)));
+    if (ok) onPrice(address.toLowerCase(), BigInt(Math.round((price as number) * 1e8)));
   }, [enabled, sym, address, isSuccess, price, onPrice]);
 
   return null;
@@ -88,16 +89,22 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
   /** ---------- Local price map merged with API probes ---------- */
   const [mergedPrices, setMergedPrices] = useState<Record<string, bigint>>({});
 
-  // seed with hook-provided prices on open/changes
+  // seed with hook-provided prices on open/changes (return prev if unchanged)
   useEffect(() => {
     if (!isOpen) return;
     setMergedPrices(prev => {
+      let changed = false;
       const next = { ...prev };
       for (const [k, v] of Object.entries(tokenToPrices || {})) {
-        if (v && v > 0n) next[k.toLowerCase()] = v;
+        if (v && v > 0n) {
+          const key = k.toLowerCase();
+          if (next[key] !== v) {
+            next[key] = v;
+            changed = true;
+          }
+        }
       }
-      // ensure we keep any already-probed prices
-      return next;
+      return changed ? next : prev;
     });
   }, [isOpen, tokenToPrices]);
 
@@ -110,43 +117,53 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
     !mergedPrices[position.tokenAddress.toLowerCase()];
 
   // collect collateral probes
+  const reportPrice = useCallback((addr: string, p8: bigint) => {
+    if (!p8 || p8 <= 0n) return;
+    setMergedPrices(prev => (prev[addr] === p8 ? prev : { ...prev, [addr]: p8 }));
+  }, []);
+
   const apiProbes = useMemo(() => {
     if (!isOpen || networkType !== "evm") return null;
-    const items = [
-      // debt token probe (by symbol)
-      needDebtProbe ? (
+    const probes: React.ReactNode[] = [];
+    if (needDebtProbe) {
+      probes.push(
         <CollatPriceProbe
-          key={`_debt_${position.tokenAddress}`}
+          key={`probe-debt-${position.tokenAddress.toLowerCase()}`}
           address={position.tokenAddress}
           symbol={position.name}
-          enabled={true}
-          onPrice={(addr, p8) => {
-            if (!p8 || p8 <= 0n) return;
-            setMergedPrices(prev => (prev[addr] === p8 ? prev : { ...prev, [addr]: p8 }));
-          }}
-        />
-      ) : null,
-      // collateral probes (by symbol)
-      ...collaterals.map(c => {
-        const addr = c.address?.toLowerCase();
-        const sym = c.symbol;
-        const enabled = !!addr && !!sym && !mergedPrices[addr];
-        return (
-          <CollatPriceProbe
-            key={addr || sym}
-            address={addr!}
+          enabled
+          onPrice={reportPrice}
+        />,
+      );
+    }
+    for (const c of collaterals) {
+      const addr = c.address?.toLowerCase();
+      const sym = c.symbol;
+      const hasPrice = addr ? mergedPrices[addr] : undefined;
+      const enabled = !!addr && !!sym && !hasPrice;
+      if (enabled) {
+        probes.push(
+        <CollatPriceProbe
+          key={`probe-${addr}`}
+          address={addr as string}
             symbol={sym}
-            enabled={!!enabled}
-            onPrice={(a, p8) => {
-              if (!p8 || p8 <= 0n) return;
-              setMergedPrices(prev => (prev[a] === p8 ? prev : { ...prev, [a]: p8 }));
-            }}
-          />
+            enabled
+            onPrice={reportPrice}
+          />,
         );
-      }),
-    ];
-    return <>{items.filter(Boolean)}</>;
-  }, [isOpen, networkType, collaterals, mergedPrices, needDebtProbe, position.tokenAddress, position.name]);
+      }
+    }
+    return <>{probes}</>;
+  }, [
+    isOpen,
+    networkType,
+    needDebtProbe,
+    collaterals,
+    mergedPrices,
+    position.tokenAddress,
+    position.name,
+    reportPrice,
+  ]);
 
   /** ---------------- UI State (your original) ------------------ */
   const [debtAmount, setDebtAmount] = useState<string>("");
@@ -262,18 +279,18 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
   }, [debtAmount, debtConfirmed, debtPrice8]);
 
   // USD value of “added collaterals” (the ones user selects in this modal)
-  const getUsdValue = (address: string, humanAmount: string): number => {
+  const getUsdValue = useCallback((address: string, humanAmount: string): number => {
     if (networkType !== "evm") return 0;
     const p8 = price8(address, mergedPrices);
     if (!p8 || p8 === 0n) return 0;
     const amt = parseFloat(humanAmount || "0");
     if (Number.isNaN(amt) || amt <= 0) return 0;
     return toUsd(amt, p8);
-  };
+  }, [networkType, mergedPrices]);
 
   const totalCollateralUsd = useMemo(() => {
     return Object.entries(addedCollaterals).reduce((acc, [addr, amt]) => acc + getUsdValue(addr, amt), 0);
-  }, [addedCollaterals, mergedPrices]); // mergedPrices dependency ensures refresh when prices land
+  }, [addedCollaterals, getUsdValue]); // mergedPrices is used inside getUsdValue
 
   // LTV like in MovePositionModal’s analytics: debt / collateral
   const ltv = useMemo(() => {
@@ -301,7 +318,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
     return Number(formatUnits(amount, decimals)) * Number(formatUnits(p8, 8));
   };
 
-  const computeHF = (
+  const computeHF = useCallback((
     all: any[],
     moved: { token?: string; address?: string; amount: bigint; decimals: number }[],
     tokenToPrices: Record<string, bigint>,
@@ -339,7 +356,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
 
     if (!isFinite(totalDebtUsd) || totalDebtUsd <= 0) return 999;
     return weightedCollUsd / totalDebtUsd;
-  };
+  }, []);
 
   const hfTone = (hf: number) => {
     if (hf >= HF_SAFE) return { tone: "text-success", badge: "badge-success" };
@@ -349,15 +366,17 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
   };
 
   const movedList = useMemo(() => {
-    return Object.entries(addedCollaterals).map(([addr, amt]) => {
-      const col = collaterals.find(c => c.address.toLowerCase() === addr.toLowerCase());
-      if (!col) return null;
-      return {
-        address: addr.toLowerCase(),
-        amount: BigInt(Math.round(parseFloat(amt) * 10 ** col.decimals)),
-        decimals: col.decimals
-      };
-    }).filter(Boolean) as any[];
+    return Object.entries(addedCollaterals)
+      .map(([addr, amt]) => {
+        const col = collaterals.find(c => c.address.toLowerCase() === addr.toLowerCase());
+        if (!col) return null;
+        return {
+          address: addr.toLowerCase(),
+          amount: parseUnits(amt || "0", col.decimals),
+          decimals: col.decimals,
+        };
+      })
+      .filter(Boolean) as any[];
   }, [addedCollaterals, collaterals]);
   
   // Convert current debt to USD using price map (same as MovePositionModal)
@@ -371,7 +390,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
       mergedPrices,
       currentDebtUsd
     );
-  }, [collaterals, movedList, mergedPrices, currentDebtUsd]);
+  }, [collaterals, movedList, mergedPrices, currentDebtUsd, computeHF]);
   
   const hfColor = hfTone(refiHF);
 
