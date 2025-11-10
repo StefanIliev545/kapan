@@ -258,11 +258,13 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     if (!isVesu || !starkVesuPools) return;
 
     if (selectedVersion === "v1") {
-      if (starkVesuPools.v1Pools[0]?.id) {
+      const currentValid = starkVesuPools.v1Pools.some(p => p.id === selectedPoolId);
+      if (!currentValid && starkVesuPools.v1Pools[0]?.id) {
         setSelectedPoolId(starkVesuPools.v1Pools[0].id);
       }
     } else {
-      if (starkVesuPools.v2Pools[0]?.address) {
+      const currentValid = !!selectedV2PoolAddress && starkVesuPools.v2Pools.some(p => p.address.toLowerCase() === selectedV2PoolAddress.toLowerCase());
+      if (!currentValid && starkVesuPools.v2Pools[0]?.address) {
         setSelectedV2PoolAddress(starkVesuPools.v2Pools[0].address);
       }
     }
