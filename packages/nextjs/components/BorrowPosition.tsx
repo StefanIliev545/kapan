@@ -3,7 +3,7 @@ import Image from "next/image";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
-import { MovePositionModal } from "./modals/MovePositionModal";
+import { RefinanceModal } from "./modals/RefinanceModal";
 import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
@@ -541,18 +541,19 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             position={position}
             chainId={chainId}
           />
-          <MovePositionModal
+          <RefinanceModal
             isOpen={moveModal.isOpen}
             onClose={moveModal.close}
             fromProtocol={protocolName}
             position={{
               name,
-              balance: balance ? balance : 0,
+              balance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
               type: "borrow",
               tokenAddress,
               decimals: tokenDecimals || 18,
             }}
             chainId={chainId}
+            networkType="evm"
           />
         </>
       )}

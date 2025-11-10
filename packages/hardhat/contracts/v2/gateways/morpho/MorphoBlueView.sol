@@ -155,34 +155,6 @@ contract MorphoBlueView {
         return 0;
     }
 
-    function getEncodedCollateralApprovals(address /* token */, IGateway.Collateral[] calldata /* collaterals */) 
-        external 
-        pure 
-        returns (address[] memory target, bytes[] memory data) 
-    {
-        // Morpho Blue doesn't require special collateral approvals - standard ERC20 approvals are handled by router
-        target = new address[](0);
-        data = new bytes[](0);
-    }
-
-    function getEncodedDebtApproval(address /* token */, uint256 /* amount */, address /* user */) 
-        external 
-        pure 
-        returns (address[] memory target, bytes[] memory data) 
-    {
-        // Morpho Blue doesn't require special debt approvals - standard ERC20 approvals are handled by router
-        target = new address[](0);
-        data = new bytes[](0);
-    }
-
-    function getInboundCollateralActions(address /* token */, IGateway.Collateral[] calldata /* collaterals */) 
-        external 
-        pure 
-        returns (address[] memory target, bytes[] memory data) 
-    {
-        // Morpho Blue doesn't require special inbound collateral actions
-        target = new address[](0);
-        data = new bytes[](0);
-    }
+    // Morpho Blue does not require additional approval/action encoders in the v2 view interface.
 }
 
