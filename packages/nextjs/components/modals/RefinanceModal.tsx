@@ -738,6 +738,13 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
                 try {
                   setIsSubmitting(true);
                   const builder = createMoveBuilder();
+                  const normalizedSelectedProtocol = selectedProtocol.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+                  const normalizedFromProtocol = fromProtocol.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+                  
+                  if (normalizedSelectedProtocol === "compound" || normalizedFromProtocol === "compound") {
+                    builder.setCompoundMarket(position.tokenAddress as `0x${string}`);
+                  }
+
                   const providerVersion =
                     selectedProvider?.toLowerCase().includes("aave") ? "aave" :
                     selectedProvider?.toLowerCase().includes("v3") ? "v3" : "v2";
@@ -746,7 +753,11 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
                     debtToken: position.tokenAddress as Address,
                     expectedDebt: debtAmount,
                     debtDecimals: position.decimals,
-                    flash: { version: providerVersion as any },
+                    flash: {
+                      version: providerVersion,
+                      premiumBps: 9, // TODO: Fetch from on-chain for Aave v3
+                      bufferBps: 10, // Small buffer for interest accrual
+                    }
                   });
                   Object.entries(addedCollaterals).forEach(([addr, amt]) => {
                     const meta = collaterals.find(c => c.address.toLowerCase() === addr.toLowerCase());
@@ -765,6 +776,8 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
                     toProtocol: selectedProtocol,
                     token: position.tokenAddress as Address,
                     decimals: position.decimals,
+                    extraBps: 5,
+                    approveToRouter: true,
                   });
                   const flow = builder.build();
                   const res = await executeFlowBatchedIfPossible(flow, preferBatching);
