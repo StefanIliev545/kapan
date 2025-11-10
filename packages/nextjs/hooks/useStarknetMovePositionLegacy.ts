@@ -151,7 +151,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       const isMax = mapMax || typedIsExactlyMax;
       // If Vesu source and treated as MAX, slightly bump to cover rounding (0.01% + 1)
       const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
-      const withAmt = isMax && (fromProtocol === "Vesu" || fromProtocol === "VesuV2") ? bump(col.rawBalance) : (isMax ? col.rawBalance : typedRaw);
+      const withAmt = isMax ? bump(col.rawBalance) : typedRaw;
       const withdraw = new CairoCustomEnum({
         Deposit: undefined, Borrow: undefined, Repay: undefined,
         Withdraw: { basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress }, withdraw_all: isMax, context: withdrawCtx },
