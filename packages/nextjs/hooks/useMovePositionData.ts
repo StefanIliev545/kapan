@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCollaterals as useEvmCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
@@ -8,6 +8,11 @@ import { getProtocolLogo } from "~~/utils/protocol";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { VESU_V1_POOLS, VESU_V2_POOLS } from "~~/components/specific/vesu/pools";
 import { formatUnits } from "viem";
+
+// Helper function to safely stringify objects containing BigInt values
+const stringifyWithBigInt = (value: any): string => {
+  return JSON.stringify(value, (key, val) => (typeof val === "bigint" ? val.toString() : val));
+};
 
 export type NetworkType = "evm" | "starknet";
 
@@ -134,9 +139,6 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   const [isLoadingCollaterals, setIsLoadingCollaterals] = useState(false);
   const [supportedCollateralMap, setSupportedCollateralMap] = useState<Record<string, boolean> | undefined>(undefined);
 
-  // Prices map (EVM UiHelper 1e8 decimals)
-  const [tokenToPrices, setTokenToPrices] = useState<Record<string, bigint> | undefined>(undefined);
-
   // EVM branch: collaterals, support, prices, flash loan provider detection
   const { collaterals: evmCollaterals, isLoading: evmIsLoadingCollats } = useEvmCollaterals(
     position.tokenAddress,
@@ -144,37 +146,65 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     (evmUserAddress as string) || zeroAddress,
     isOpen && networkType === "evm",
   );
-  const collateralAddresses = useMemo(() => evmCollaterals.map(c => c.address), [evmCollaterals]);
+
+  // Use stringified version for stable comparison
+  const collateralAddressesString = useMemo(() => 
+    evmCollaterals.map(c => c.address).join(','), 
+    [evmCollaterals]
+  );
+
   const { isLoading: isLoadingSupport, supportedCollaterals } = useEvmCollateralSupport(
     destinationProtocols[0]?.name || "",
     position.tokenAddress,
-    collateralAddresses,
-    isOpen && networkType === "evm" && collateralAddresses.length > 0,
+    useMemo(() => evmCollaterals.map(c => c.address), [evmCollaterals]),
+    isOpen && networkType === "evm" && evmCollaterals.length > 0,
   );
+
   const { data: tokenPrices } = useNetworkAwareReadContract({
     networkType: "evm",
     contractName: "UiHelper",
     functionName: "get_asset_prices",
-    args: [[...collateralAddresses, position.tokenAddress]],
-    query: { enabled: isOpen && networkType === "evm" && collateralAddresses.length > 0 },
+    args: [useMemo(() => [...evmCollaterals.map(c => c.address), position.tokenAddress], [evmCollaterals, position.tokenAddress])],
+    query: { enabled: isOpen && networkType === "evm" && evmCollaterals.length > 0 },
   });
 
-  // Build prices map when available
-  useEffect(() => {
-    if (!tokenPrices || networkType !== "evm") return;
+  // Prices map (EVM UiHelper 1e8 decimals) - computed with useMemo
+  const tokenToPrices = useMemo(() => {
+    if (!tokenPrices || networkType !== "evm") return undefined;
     const prices = tokenPrices as unknown as bigint[];
-    const addresses = [...collateralAddresses, position.tokenAddress];
-    const map = prices.reduce((acc, price, idx) => {
+    const addresses = [...evmCollaterals.map(c => c.address), position.tokenAddress];
+    return prices.reduce((acc, price, idx) => {
       acc[addresses[idx]?.toLowerCase()] = price;
       return acc;
     }, {} as Record<string, bigint>);
-    setTokenToPrices(map);
-  }, [tokenPrices, collateralAddresses, position.tokenAddress, networkType]);
+  }, [tokenPrices, evmCollaterals, position.tokenAddress, networkType]);
 
-  // Normalize EVM collaterals into BasicCollateral
+  // Use ref to track previous values and avoid infinite loops
+  const prevEvmDataRef = useRef<{
+    evmCollaterals: string;
+    supportedCollaterals: string;
+    tokenToPrices: string;
+  }>({ evmCollaterals: '', supportedCollaterals: '', tokenToPrices: '' });
+
+  // Normalize EVM collaterals into BasicCollateral - FIXED VERSION
   useEffect(() => {
     if (networkType !== "evm") return;
+    
+    const currentEvmCollaterals = stringifyWithBigInt(evmCollaterals);
+    const currentSupportedCollaterals = stringifyWithBigInt(supportedCollaterals);
+    const currentTokenToPrices = stringifyWithBigInt(tokenToPrices);
+
+    // Only update if something actually changed
+    if (
+      prevEvmDataRef.current.evmCollaterals === currentEvmCollaterals &&
+      prevEvmDataRef.current.supportedCollaterals === currentSupportedCollaterals &&
+      prevEvmDataRef.current.tokenToPrices === currentTokenToPrices
+    ) {
+      return;
+    }
+
     setIsLoadingCollaterals(evmIsLoadingCollats || isLoadingSupport);
+    
     const normalized = evmCollaterals.map(c => ({
       address: c.address,
       symbol: c.symbol,
@@ -184,18 +214,47 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       balance: c.balance,
       usdPrice: tokenToPrices?.[c.address.toLowerCase()],
     }));
+
     setCollaterals(normalized);
     setSupportedCollateralMap(supportedCollaterals);
-  }, [evmCollaterals, evmIsLoadingCollats, isLoadingSupport, supportedCollaterals, tokenToPrices, networkType]);
 
-  // Stark branch: collaterals (already include balance/decimals), no UiHelper prices
-  const { collaterals: starkCollaterals, isLoading: starkIsLoading } = useStarkCollaterals({
-    protocolName: (fromProtocol as any) as "Vesu" | "VesuV2" | "Nostra",
-    userAddress: "", // stark user address handled inside hook's get_supported_assets_info call context if needed
-    isOpen: isOpen && networkType === "starknet",
-  });
+    // Update ref with current values
+    prevEvmDataRef.current = {
+      evmCollaterals: currentEvmCollaterals,
+      supportedCollaterals: currentSupportedCollaterals,
+      tokenToPrices: currentTokenToPrices,
+    };
+  }, [
+    networkType,
+    evmCollaterals,
+    evmIsLoadingCollats,
+    isLoadingSupport,
+    supportedCollaterals,
+    tokenToPrices,
+  ]);
+
+  // Stark branch: collaterals
+  const starkCollateralsData = networkType === "starknet" ? useStarkCollaterals({
+    protocolName: fromProtocol as "Vesu" | "VesuV2" | "Nostra",
+    userAddress: "",
+    isOpen: isOpen,
+  }) : { collaterals: [], isLoading: false };
+
+  const { collaterals: starkCollaterals, isLoading: starkIsLoading } = starkCollateralsData;
+
+  // Use ref for Stark data too
+  const prevStarkDataRef = useRef<{
+    starkCollaterals: string;
+  }>({ starkCollaterals: '' });
+
   useEffect(() => {
     if (networkType !== "starknet") return;
+
+    const currentStarkCollaterals = stringifyWithBigInt(starkCollaterals);
+    if (prevStarkDataRef.current.starkCollaterals === currentStarkCollaterals) {
+      return;
+    }
+
     setIsLoadingCollaterals(starkIsLoading);
     const normalized = starkCollaterals.map(c => ({
       address: c.address,
@@ -205,14 +264,17 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       rawBalance: c.rawBalance,
       balance: c.balance,
     }));
+
     setCollaterals(normalized);
     setSupportedCollateralMap(undefined);
-    setTokenToPrices(undefined);
+
+    prevStarkDataRef.current.starkCollaterals = currentStarkCollaterals;
   }, [starkCollaterals, starkIsLoading, networkType]);
 
   // Flash loan providers
   const [flashLoanProviders, setFlashLoanProviders] = useState<FlashLoanProviderOption[]>([]);
   const [defaultFlashLoanProvider, setDefaultFlashLoanProvider] = useState<FlashLoanProviderOption | undefined>(undefined);
+  
   // EVM router flags
   const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useNetworkAwareReadContract({
     networkType: "evm",
@@ -232,15 +294,21 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     functionName: "aaveEnabled",
     query: { enabled: isOpen && networkType === "evm" },
   });
+
+  // Use ref for flash loan providers too
+  const prevFlashLoanRef = useRef<string>('');
+
   useEffect(() => {
     if (networkType !== "evm") {
-      // Stark: show placeholder Vesu flash loan provider (matches current stark modal)
+      // Stark: show placeholder Vesu flash loan provider
       const starkProvider: FlashLoanProviderOption = { name: "Vesu", version: "v1", icon: "/logos/vesu.svg" };
       setFlashLoanProviders([starkProvider]);
       setDefaultFlashLoanProvider(starkProvider);
       return;
     }
+
     if (isLoadingBalancerV2 || isLoadingBalancerV3 || isLoadingAave) return;
+
     const providers: FlashLoanProviderOption[] = [];
     if (balancerV2Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
       providers.push({ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 });
@@ -251,8 +319,13 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     if (aaveEnabled === true && chainId && AAVE_CHAINS.includes(chainId)) {
       providers.push({ name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 });
     }
+
+    const currentProviders = stringifyWithBigInt(providers);
+    if (prevFlashLoanRef.current === currentProviders) return;
+
     setFlashLoanProviders(providers);
     setDefaultFlashLoanProvider(providers[0]);
+    prevFlashLoanRef.current = currentProviders;
   }, [
     networkType,
     isLoadingBalancerV2,
@@ -291,5 +364,3 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     vesuPools,
   };
 }
-
-
