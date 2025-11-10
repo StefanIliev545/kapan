@@ -195,8 +195,145 @@ export const useStarknetMovePosition = (params: StarknetMoveParams): StarknetMov
 
     const applyMaxBuffer = (amount: bigint, isMax: boolean) =>
       isMax ? (amount * BigInt(101)) / BigInt(100) : amount;
+    const MAX_UINT256 = (1n << 256n) - 1n;
+    // Match legacy behavior: +1.0% borrow allowance buffer (plus +1 to counter truncation)
+    const addBorrowBuffer = (amount: bigint) => ((amount * 101n) / 100n) + 1n; // ~+1.0% buffer
 
-    // Build repay instruction
+    // MULTI-COLLATERAL: build per-pair instructions with correct contexts and pointers
+    const entryList = Object.entries(addedCollaterals)
+      .map(([addr, amt]) => ({ addrLower: addrKey(addr), amt }))
+      .sort((a, b) => a.addrLower.localeCompare(b.addrLower));
+    if (entryList.length > 1) {
+      const n = BigInt(entryList.length);
+      const share = parsedAmount / n;
+      const remainder = parsedAmount - share * n;
+
+      const pairs = entryList.map((e, idx) => {
+        const meta = collaterals.find(c => addrKey(c.address) === e.addrLower);
+        if (!meta) return null;
+        const isLast = idx === entryList.length - 1;
+        const repayAll = isDebtMaxClicked && isLast;
+        const thisRepay = isLast ? (repayAll ? parsedAmount - share * BigInt(entryList.length - 1) : share + remainder) : share;
+
+        // Source contexts per collateral on Vesu/V2
+        let srcPool: bigint | null = null;
+        if (fromProtocol === "Vesu") {
+          const currentPoolId = typeof position.poolId === "string" ? BigInt(position.poolId) : (position.poolId ?? 0n);
+          srcPool = currentPoolId;
+        } else if (fromProtocol === "VesuV2") {
+          const sourcePoolAddress = BigInt(normalizeStarknetAddress(position.poolId ?? selectedV2PoolAddress));
+          srcPool = sourcePoolAddress;
+        }
+        const repayCtx =
+          srcPool !== null
+            ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(meta.address)])
+            : new CairoOption<bigint[]>(CairoOptionVariant.None);
+        const withdrawCtx =
+          srcPool !== null
+            ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
+            : new CairoOption<bigint[]>(CairoOptionVariant.None);
+
+        const repayInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: {
+            basic: {
+              token: position.tokenAddress,
+              amount: uint256.bnToUint256(thisRepay),
+              user: starkUserAddress,
+            },
+            repay_all: repayAll,
+            context: repayCtx,
+          },
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
+        });
+
+        const isMax = collateralIsMaxMap[e.addrLower] === true;
+        const requested = isMax ? meta.rawBalance : parseUnits(e.amt || "0", meta.decimals);
+        const upped = applyMaxBuffer(requested, isMax);
+        const withdrawInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: {
+            basic: {
+              token: meta.address,
+              amount: uint256.bnToUint256(upped),
+              user: starkUserAddress,
+            },
+            withdraw_all: isMax,
+            context: withdrawCtx,
+          },
+          Redeposit: undefined,
+          Reborrow: undefined,
+        });
+
+        // Target (Nostra) contexts none
+        const depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.None);
+        const borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.None);
+
+        const repayPtr = toOutputPointer(0);   // within this pair
+        const withdrawPtr = toOutputPointer(1);
+
+        const redepositInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: undefined,
+          Redeposit: {
+            token: meta.address,
+            target_output_pointer: withdrawPtr,
+            user: starkUserAddress,
+            context: depositCtx,
+          },
+          Reborrow: undefined,
+        });
+
+        // Reborrow approval must allow slight interest/rounding; use MAX on repay_all, else apply small buffer
+        const approval = repayAll ? MAX_UINT256 : addBorrowBuffer(thisRepay);
+        const reborrowInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: {
+            token: position.tokenAddress,
+            target_output_pointer: repayPtr,
+            approval_amount: uint256.bnToUint256(approval),
+            user: starkUserAddress,
+            context: borrowCtx,
+          },
+        });
+
+        return [
+          { protocol_name: sourceProtocolName, instructions: [repayInstruction, withdrawInstruction] },
+          { protocol_name: targetProtocolName, instructions: [redepositInstruction, reborrowInstruction] },
+        ];
+      }).filter(Boolean) as Array<{ protocol_name: string; instructions: CairoCustomEnum[] }[]>;
+
+      // Build auths from the same constructed instructions to preserve approval_amounts
+      const auths = pairs.flatMap(pair => {
+        const src = pair[0].instructions;
+        const dst = pair[1].instructions;
+        const withdrawInstr = src[1]; // [Repay, Withdraw]
+        const reborrowInstr = dst[1]; // [Redeposit, Reborrow]
+        return [
+          { protocol_name: sourceProtocolName, instructions: [withdrawInstr] },
+          { protocol_name: targetProtocolName, instructions: [reborrowInstr] },
+        ];
+      });
+
+      return {
+        pairInstructions: pairs,
+        authInstructions: auths,
+        authCalldataKey: JSON.stringify(CallData.compile({ instructions: auths, rawSelectors: false })),
+      };
+    }
+
+    // Build repay instruction (single-collateral)
     const repayInstruction = new CairoCustomEnum({
       Deposit: undefined,
       Borrow: undefined,
@@ -270,7 +407,7 @@ export const useStarknetMovePosition = (params: StarknetMoveParams): StarknetMov
       Reborrow: {
         token: position.tokenAddress,
         target_output_pointer: toOutputPointer(0),
-        approval_amount: uint256.bnToUint256(parsedAmount),
+        approval_amount: uint256.bnToUint256(isDebtMaxClicked ? MAX_UINT256 : addBorrowBuffer(parsedAmount)),
         user: starkUserAddress,
         context: borrowContext,
       },

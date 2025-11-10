@@ -9,7 +9,8 @@ import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { formatUnits } from "viem";
 import { useAccount } from "~~/hooks/useAccount";
 import { useCollateral as useStarkCollateral } from "~~/hooks/scaffold-stark/useCollateral";
-import { useStarknetMovePosition, useVesuPools } from "~~/hooks/useStarknetMovePosition";
+import { useVesuPools } from "~~/hooks/useStarknetMovePosition";
+import { useStarknetMovePositionLegacy } from "~~/hooks/useStarknetMovePositionLegacy";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { getV1PoolNameFromId, getV2PoolNameFromAddress } from "~~/components/specific/vesu/pools";
 import { normalizeStarknetAddress } from "~~/utils/vesu";
@@ -292,13 +293,10 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   const hfColor = { tone: "text-success", badge: "badge-success" };
 
   /* --------------------------- Starknet execution --------------------------- */
-  const {
-    sendAsync: sendStarkAsync,
-    error: starknetError,
-  } = useStarknetMovePosition({
+  const legacy = useStarknetMovePositionLegacy({
     isOpen: isOpen,
     fromProtocol,
-    toProtocol: selectedProtocol,
+    toProtocol: selectedProtocol || "Nostra",
     selectedVersion,
     debtAmount,
     isDebtMaxClicked,
@@ -309,6 +307,9 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     selectedPoolId,
     selectedV2PoolAddress,
   });
+
+  const sendStarkAsync = legacy.sendAsync;
+  const starknetError = legacy.error;
 
   /* --------------------------- Action Handlers --------------------------- */
   const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
