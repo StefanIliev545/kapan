@@ -163,7 +163,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
   const [collateralIsMaxMap, setCollateralIsMaxMap] = useState<Record<string, boolean>>({});
   const debtInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [preferBatching, setPreferBatching] = useState<boolean>(false);
+  const [preferBatching, setPreferBatching] = useState<boolean>(true);
   const [autoSelectedDest, setAutoSelectedDest] = useState<boolean>(false);
 
   // Compute support map reactively for selected destination protocol on EVM
@@ -230,7 +230,7 @@ export const RefinanceModal: FC<RefinanceModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setPreferBatching(Boolean(canDoAtomicBatch));
+    setPreferBatching(Boolean(true));
   }, [isOpen, canDoAtomicBatch]);
 
   useEffect(() => {
