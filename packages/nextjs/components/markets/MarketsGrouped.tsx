@@ -14,6 +14,7 @@ import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { useCompoundMarketData } from "~~/hooks/useCompoundMarketData";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
 
@@ -29,12 +30,14 @@ const convertVenusRate = (ratePerBlock: bigint): number => {
   return (Math.pow(ratePerBlockNum * blocksPerDay + 1, daysPerYear - 1) - 1) * 100;
 };
 
-// Helper: Compound rate conversion
-const convertCompoundRate = (ratePerSecond: bigint): number => {
-  const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
-  const SCALE = 1e18;
-  return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / SCALE;
+const TOKEN_ALIASES: Record<string, string> = {
+  usdt: "USDT",
+  "usd₮0": "USDT",
+  weth: "ETH",
+  eth: "ETH",
 };
+
+const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
 
 const useAaveData = (): MarketData[] => {
   const { address: connectedAddress } = useAccount();
@@ -66,68 +69,6 @@ const useAaveData = (): MarketData[] => {
       } as MarketData;
     });
   }, [allTokensInfo]);
-};
-
-const useCompoundData = (): MarketData[] => {
-  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const { data: weth } = useDeployedContractInfo({ contractName: "eth" });
-  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC" });
-  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT" });
-  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe" });
-
-  const { data: wethData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [weth?.address, ZERO_ADDRESS],
-  });
-  const { data: usdcData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdc?.address, ZERO_ADDRESS],
-  });
-  const { data: usdtData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdt?.address, ZERO_ADDRESS],
-  });
-  const { data: usdcEData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdcE?.address, ZERO_ADDRESS],
-  });
-
-  return useMemo(() => {
-    const tokens = [
-      { symbol: "WETH", address: weth?.address, data: wethData },
-      { symbol: "USDC", address: usdc?.address, data: usdcData },
-      { symbol: "USDT", address: usdt?.address, data: usdtData },
-      { symbol: "USDC.e", address: usdcE?.address, data: usdcEData },
-    ];
-    return tokens
-      .filter(t => t.address && t.data)
-      .map(t => {
-        const [supplyRate, borrowRate, , , price] = t.data as any;
-        const supplyAPR = supplyRate ? convertCompoundRate(BigInt(supplyRate)) : 0;
-        const borrowAPR = borrowRate ? convertCompoundRate(BigInt(borrowRate)) : 0;
-        const priceNum = price ? Number(formatUnits(price, 8)) : 0;
-        const utilization = borrowAPR > 0 ? (supplyAPR / borrowAPR) * 100 : 0;
-        return {
-          icon: tokenNameToLogo(t.symbol),
-          name: t.symbol,
-          supplyRate: `${formatPercentage(supplyAPR, 2, false)}%`,
-          borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
-          price: priceNum.toFixed(2),
-          utilization: utilization.toFixed(2),
-          address: t.address as string,
-          networkType: "evm",
-          protocol: "compound",
-        } as MarketData;
-      });
-  }, [weth?.address, usdc?.address, usdt?.address, usdcE?.address, wethData, usdcData, usdtData, usdcEData]);
 };
 
 const useNostraData = (): MarketData[] => {
@@ -266,20 +207,11 @@ const useVesuData = (): MarketData[] => {
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const aave = useAaveData();
-  const compound = useCompoundData();
+  const compound = useCompoundMarketData();
   const nostra = useNostraData();
   const venus = useVenusData();
   const vesu = useVesuData();
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
-
-  const aliases: Record<string, string> = {
-    usdt: "USDT",
-    "usd₮0": "USDT",
-    weth: "ETH",
-    eth: "ETH",
-  };
-
-  const canonicalName = (name: string) => aliases[name.toLowerCase()] || name;
 
   const all = useMemo(
     () => [...aave, ...compound, ...nostra, ...venus, ...vesu],
@@ -297,7 +229,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       }
     >();
     all.forEach(m => {
-      const key = canonicalName(m.name);
+      const key = canonicalizeTokenName(m.name);
       const entry = map.get(key);
       if (entry) {
         entry.markets.push(m);
@@ -325,7 +257,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
 
   const filtered = useMemo(() => {
     const lower = search.toLowerCase();
-    const canon = canonicalName(search).toLowerCase();
+    const canon = canonicalizeTokenName(search).toLowerCase();
     return sorted.filter(g => g.name.toLowerCase().includes(lower) || g.name.toLowerCase().includes(canon));
   }, [sorted, search]);
 

@@ -1,7 +1,6 @@
 import { FC, useMemo } from "react";
 import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { feltToString, formatPrice } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";

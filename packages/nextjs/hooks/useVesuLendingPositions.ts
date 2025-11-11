@@ -150,9 +150,6 @@ export const useVesuLendingPositions = (
   userAddress: string | undefined,
   poolId: bigint,
 ): UseVesuLendingPositionsResult => {
-  const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
-  const refetchCounter = useRef(0);
-
   const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuAssets(poolId);
 
   const {
@@ -166,7 +163,6 @@ export const useVesuLendingPositions = (
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 0n, 3n],
     watch: true,
-    refetchInterval: positionsRefetchInterval,
   });
 
   const {
@@ -180,7 +176,6 @@ export const useVesuLendingPositions = (
     functionName: "get_all_positions_range",
     args: [userAddress, poolId, 3n, 10n],
     watch: true,
-    refetchInterval: positionsRefetchInterval,
   });
 
   useEffect(() => {
@@ -201,14 +196,6 @@ export const useVesuLendingPositions = (
     return [...firstBatch, ...secondBatch];
   }, [userPositionsPart1, userPositionsPart2]);
 
-  useEffect(() => {
-    if (!userAddress) return;
-    refetchCounter.current += 1;
-    if (refetchCounter.current >= 3) {
-      setPositionsRefetchInterval(5000);
-    }
-  }, [mergedUserPositions, userAddress]);
-
   const isUpdating = (isFetching1 && !isLoading1) || (isFetching2 && !isLoading2);
   const isLoadingPositions = isLoading1 || isLoading2;
 
@@ -228,8 +215,6 @@ export const useVesuLendingPositions = (
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
-    refetchCounter.current = 0;
-    setPositionsRefetchInterval(2000);
     setCachedPositions([]);
     setHasLoadedOnce(false);
     if (userAddress) {

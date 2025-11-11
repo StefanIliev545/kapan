@@ -36,9 +36,11 @@ export const InterestPillRow: FC<{
   className?: string;
   labels?: "between" | "center";
 }> = ({ supplyRate, borrowRate, address, networkType, protocol, className = "", labels = "between" }) => {
+  const isEvmNetwork = networkType === "evm";
+
   // For EVM, use local rate provider instead of OptimalInterestRateFinder
-  const localSupplyRates = useLocalRateProvider(address as Address, "supply");
-  const localBorrowRates = useLocalRateProvider(address as Address, "borrow");
+  const localSupplyRates = useLocalRateProvider(address as Address, "supply", { enabled: isEvmNetwork });
+  const localBorrowRates = useLocalRateProvider(address as Address, "borrow", { enabled: isEvmNetwork });
 
   // For Starknet, still use the contract
   const { data: optimalSupplyRateData } = useNetworkAwareReadContract({
@@ -59,7 +61,7 @@ export const InterestPillRow: FC<{
 
   let optimalSupplyProtocol = "";
   let optimalSupplyRate = 0;
-  if (networkType === "evm") {
+  if (isEvmNetwork) {
     // Use local rate provider for EVM
     optimalSupplyProtocol = localSupplyRates.optimal.protocol;
     optimalSupplyRate = localSupplyRates.optimal.rate;
@@ -73,7 +75,7 @@ export const InterestPillRow: FC<{
 
   let optimalBorrowProtocol = "";
   let optimalBorrowRate = 0;
-  if (networkType === "evm") {
+  if (isEvmNetwork) {
     // Use local rate provider for EVM
     optimalBorrowProtocol = localBorrowRates.optimal.protocol;
     optimalBorrowRate = localBorrowRates.optimal.rate;

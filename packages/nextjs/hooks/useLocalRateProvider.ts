@@ -12,13 +12,25 @@ interface OptimalRateResult {
  * Replaces OptimalInterestRateFinder contract calls
  * Uses batched reads from useAllProtocolRates for efficiency
  */
-export const useLocalRateProvider = (tokenAddress: Address, type: "supply" | "borrow") => {
-  const { ratesMap, isLoading, getOptimalRate } = useAllProtocolRates();
+type UseLocalRateProviderOptions = {
+  enabled?: boolean;
+};
+
+export const useLocalRateProvider = (
+  tokenAddress: Address,
+  type: "supply" | "borrow",
+  options: UseLocalRateProviderOptions = {},
+) => {
+  const enabled = options.enabled ?? true;
+  const { ratesMap, isLoading, getOptimalRate } = useAllProtocolRates({ enabled });
 
   const optimal: OptimalRateResult = useMemo(() => {
+    if (!enabled) {
+      return { protocol: "", rate: 0 };
+    }
     const result = getOptimalRate(tokenAddress, type);
     return result || { protocol: "", rate: 0 };
-  }, [getOptimalRate, tokenAddress, type]);
+  }, [enabled, getOptimalRate, tokenAddress, type]);
 
   // Return format compatible with OptimalInterestRateFinder
   // For EVM: returns [protocols: string[], rates: uint256[], success: bool[]]
@@ -28,6 +40,10 @@ export const useLocalRateProvider = (tokenAddress: Address, type: "supply" | "bo
     const successFlags: boolean[] = [];
 
     // Get rates for this token from all protocols
+    if (!enabled) {
+      return [[], [], []] as const;
+    }
+
     const protocolRates = ratesMap.get(tokenAddress);
     if (!protocolRates) {
       return [[], [], []] as const;
@@ -46,10 +62,11 @@ export const useLocalRateProvider = (tokenAddress: Address, type: "supply" | "bo
     }
 
     return [protocols, rateValues, successFlags] as const;
-  }, [ratesMap, tokenAddress, type]);
+  }, [enabled, ratesMap, tokenAddress, type]);
 
   // Raw rates array for convenience
   const rates = useMemo(() => {
+    if (!enabled) return [];
     const result: Array<{ protocol: string; rate: number; success: boolean }> = [];
     const protocolRates = ratesMap.get(tokenAddress);
     if (!protocolRates) return result;
@@ -62,12 +79,12 @@ export const useLocalRateProvider = (tokenAddress: Address, type: "supply" | "bo
       });
     });
     return result;
-  }, [ratesMap, tokenAddress, type]);
+  }, [enabled, ratesMap, tokenAddress, type]);
 
   return {
     optimal,
     allRates,
-    isLoading,
+    isLoading: enabled ? isLoading : false,
     rates,
   };
 };

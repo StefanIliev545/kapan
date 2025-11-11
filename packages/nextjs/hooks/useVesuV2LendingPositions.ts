@@ -129,9 +129,6 @@ export const useVesuV2LendingPositions = (
   userAddress: string | undefined,
   poolAddress: string,
 ): UseVesuV2LendingPositionsResult => {
-  const [positionsRefetchInterval, setPositionsRefetchInterval] = useState(2000);
-  const refetchCounter = useRef(0);
-
   const normalizedPoolAddress = normalizeStarknetAddress(poolAddress);
   const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuV2Assets(normalizedPoolAddress);
 
@@ -146,7 +143,6 @@ export const useVesuV2LendingPositions = (
     functionName: "get_all_positions_range",
     args: [userAddress, poolAddress, 0n, 3n],
     watch: true,
-    refetchInterval: positionsRefetchInterval,
   });
 
   const {
@@ -160,7 +156,6 @@ export const useVesuV2LendingPositions = (
     functionName: "get_all_positions_range",
     args: [userAddress, poolAddress, 3n, 10n],
     watch: true,
-    refetchInterval: positionsRefetchInterval,
   });
 
   useEffect(() => {
@@ -181,14 +176,6 @@ export const useVesuV2LendingPositions = (
     return [...firstBatch, ...secondBatch];
   }, [userPositionsPart1, userPositionsPart2]);
 
-  useEffect(() => {
-    if (!userAddress) return;
-    refetchCounter.current += 1;
-    if (refetchCounter.current >= 3) {
-      setPositionsRefetchInterval(5000);
-    }
-  }, [mergedUserPositions, userAddress]);
-
   const isUpdating = (isFetching1 && !isLoading1) || (isFetching2 && !isLoading2);
   const isLoadingPositions = isLoading1 || isLoading2;
 
@@ -208,8 +195,6 @@ export const useVesuV2LendingPositions = (
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
-    refetchCounter.current = 0;
-    setPositionsRefetchInterval(2000);
     setCachedPositions([]);
     setHasLoadedOnce(false);
     if (userAddress) {

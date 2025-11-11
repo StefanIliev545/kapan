@@ -31,7 +31,8 @@ const convertVenusRate = (ratePerBlock: bigint): number => {
  * Fetches rates for ALL tokens from all protocols in batched calls
  * This is more efficient than calling per-token
  */
-export const useAllProtocolRates = () => {
+export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?: boolean } = {}) => {
+  const enabled = enabledProp;
   const { address: userAddress } = useAccount();
   const queryAddress = (userAddress || "0x0000000000000000000000000000000000000000") as Address;
 
@@ -40,12 +41,14 @@ export const useAllProtocolRates = () => {
     contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
+    query: { enabled },
   });
 
   // Venus: getAllVenusMarkets + getMarketRates (batched)
   const { data: venusMarkets, isLoading: venusMarketsLoading } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
     functionName: "getAllVenusMarkets",
+    query: { enabled },
   });
 
   const vTokens: Address[] | undefined = useMemo(() => {
@@ -60,7 +63,7 @@ export const useAllProtocolRates = () => {
     functionName: "getMarketRates",
     args: vTokens ? ([vTokens] as [Address[]]) : undefined,
     query: {
-      enabled: !!vTokens && vTokens.length > 0,
+      enabled: enabled && !!vTokens && vTokens.length > 0,
     },
   } as any);
 
@@ -68,12 +71,13 @@ export const useAllProtocolRates = () => {
   const { data: compoundBaseTokens, isLoading: compoundBaseLoading } = useScaffoldReadContract({
     contractName: "CompoundGatewayView",
     functionName: "allActiveBaseTokens",
+    query: { enabled },
   });
 
   const { data: compoundGateway } = useDeployedContractInfo({ contractName: "CompoundGatewayView" });
 
   const compoundCalls = useMemo(() => {
-    if (!compoundBaseTokens || !compoundGateway?.address || !compoundGateway?.abi) return [];
+    if (!enabled || !compoundBaseTokens || !compoundGateway?.address || !compoundGateway?.abi) return [];
     const baseTokens = compoundBaseTokens as Address[];
     return baseTokens.map(token => ({
       address: compoundGateway.address as Address,
@@ -81,19 +85,22 @@ export const useAllProtocolRates = () => {
       functionName: "getCompoundData" as const,
       args: [token, queryAddress] as [Address, Address],
     }));
-  }, [compoundBaseTokens, compoundGateway, queryAddress]);
+  }, [enabled, compoundBaseTokens, compoundGateway, queryAddress]);
 
   const { data: compoundResults, isLoading: compoundDataLoading } = useReadContracts({
     contracts: compoundCalls,
     allowFailure: true,
     query: {
-      enabled: compoundCalls.length > 0,
+      enabled: enabled && compoundCalls.length > 0,
     },
   });
 
   // Parse all rates into a unified map
   // Map structure: tokenAddress -> { protocol -> rate }
   const ratesMap = useMemo(() => {
+    if (!enabled) {
+      return new Map<Address, Map<"aave" | "compound" | "venus", TokenRate>>();
+    }
     const map = new Map<Address, Map<"aave" | "compound" | "venus", TokenRate>>();
 
     // Aave rates
@@ -156,14 +163,11 @@ export const useAllProtocolRates = () => {
     }
 
     return map;
-  }, [aaveTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
+  }, [enabled, aaveTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
 
-  const isLoading =
-    aaveLoading ||
-    venusMarketsLoading ||
-    venusRatesLoading ||
-    compoundBaseLoading ||
-    compoundDataLoading;
+  const isLoading = enabled
+    ? aaveLoading || venusMarketsLoading || venusRatesLoading || compoundBaseLoading || compoundDataLoading
+    : false;
 
   return {
     ratesMap,
