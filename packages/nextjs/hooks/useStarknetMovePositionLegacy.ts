@@ -261,18 +261,20 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
 
     type InstructionBlock = { protocol_name: string; instructions: CairoCustomEnum[] };
-    const instructionPairs: InstructionBlock[][] = [];
+    const aggregatedBlocks: InstructionBlock[] = [];
+    let globalInstructionIndex = 0;
 
     activeEntries.forEach((item, idx) => {
       const { col, typedRaw, isMax, repayAmt } = item;
       const { repayCtx, withdrawCtx } = buildSourceContexts(col.address);
 
       const sourceInstructions: CairoCustomEnum[] = [];
-      let repayPtrIndex: number | null = null;
+      let repayGlobalIndex: number | null = null;
       const includesRepay = repayAmt > 0n;
       const isLastRepay = includesRepay && idx === lastRepayIndex;
 
       if (includesRepay) {
+        const repayIndex = globalInstructionIndex + sourceInstructions.length;
         const repayInstruction = new CairoCustomEnum({
           Deposit: undefined,
           Borrow: undefined,
@@ -285,11 +287,12 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
           Redeposit: undefined,
           Reborrow: undefined,
         });
-        repayPtrIndex = sourceInstructions.length;
+        repayGlobalIndex = repayIndex;
         sourceInstructions.push(repayInstruction);
       }
 
       const withdrawAmount = isMax ? bump(col.rawBalance) : typedRaw;
+      const withdrawIndex = globalInstructionIndex + sourceInstructions.length;
       const withdrawInstruction = new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
@@ -303,8 +306,10 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         Reborrow: undefined,
       });
 
-      const withdrawPtrIndex = sourceInstructions.length;
       sourceInstructions.push(withdrawInstruction);
+
+      aggregatedBlocks.push({ protocol_name: sourceName, instructions: sourceInstructions });
+      globalInstructionIndex += sourceInstructions.length;
 
       const { depositCtx, borrowCtx } = buildTargetContexts(col.address);
       const targetInstructions: CairoCustomEnum[] = [];
@@ -316,7 +321,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         Withdraw: undefined,
         Redeposit: {
           token: col.address,
-          target_output_pointer: toOutputPointer(withdrawPtrIndex),
+          target_output_pointer: toOutputPointer(withdrawIndex),
           user: starkUserAddress,
           context: depositCtx,
         },
@@ -324,7 +329,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       });
       targetInstructions.push(redepositInstruction);
 
-      if (includesRepay && repayPtrIndex !== null) {
+      if (includesRepay && repayGlobalIndex !== null) {
         const approval = isDebtMaxClicked && isLastRepay ? MAX_UINT : buf(repayAmt);
         const reborrowInstruction = new CairoCustomEnum({
           Deposit: undefined,
@@ -334,7 +339,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
           Redeposit: undefined,
           Reborrow: {
             token: position.tokenAddress,
-            target_output_pointer: toOutputPointer(repayPtrIndex),
+            target_output_pointer: toOutputPointer(repayGlobalIndex),
             approval_amount: uint256.bnToUint256(approval),
             user: starkUserAddress,
             context: borrowCtx,
@@ -343,14 +348,11 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         targetInstructions.push(reborrowInstruction);
       }
 
-      instructionPairs.push([
-        { protocol_name: sourceName, instructions: sourceInstructions },
-        { protocol_name: targetName, instructions: targetInstructions },
-      ]);
+      aggregatedBlocks.push({ protocol_name: targetName, instructions: targetInstructions });
+      globalInstructionIndex += targetInstructions.length;
     });
 
-    const flattenedBlocks = instructionPairs.flat();
-    const authInstructions = flattenedBlocks
+    const authInstructions = aggregatedBlocks
       .map(block => ({
         protocol_name: block.protocol_name,
         instructions: block.instructions.filter(inst => {
@@ -360,7 +362,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       }))
       .filter(block => block.instructions.length > 0);
 
-    const pairInstructions = flattenedBlocks.length ? [flattenedBlocks] : [];
+    const pairInstructions = aggregatedBlocks.length ? [aggregatedBlocks] : [];
 
     return {
       pairInstructions,
