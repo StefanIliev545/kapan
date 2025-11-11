@@ -211,11 +211,6 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
     }
 
-    const aggregatedSource: CairoCustomEnum[] = [];
-    const aggregatedTarget: CairoCustomEnum[] = [];
-    const withdrawAuths: CairoCustomEnum[] = [];
-    const reborrowAuths: CairoCustomEnum[] = [];
-
     const entriesWithRepay = weightedData.map((item, idx) => ({ ...item, repayAmt: allocations[idx] ?? 0n }));
     const activeEntries = entriesWithRepay.filter(mapped => mapped.isMax || mapped.typedRaw > 0n);
     const repayEligibleEntries = activeEntries.filter(mapped => mapped.repayAmt > 0n);
@@ -223,8 +218,6 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     if (activeEntries.length === 0) {
       return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
     }
-
-    let processedRepayCount = 0;
 
     const buildSourceContexts = (colAddress: string) => {
       let srcPool: bigint | null = null;
@@ -264,71 +257,67 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       return { depositCtx, borrowCtx };
     };
 
-    const totalRepayEntries = repayEligibleEntries.length;
+    const withdrawAuths: CairoCustomEnum[] = [];
+    const reborrowAuths: CairoCustomEnum[] = [];
+    const sourceInstructions: CairoCustomEnum[] = [];
+    const withdrawPtrByToken = new Map<string, number>();
 
-    activeEntries.forEach(item => {
-      const { col, typedRaw, repayAmt, isMax } = item;
-      const { repayCtx, withdrawCtx } = buildSourceContexts(col.address);
-      const { depositCtx, borrowCtx } = buildTargetContexts(col.address);
-
-      const shouldRepay = repayAmt > 0n;
-      let pendingReborrow: CairoCustomEnum | null = null;
-      if (shouldRepay) {
-        const isLastRepay = processedRepayCount === totalRepayEntries - 1;
-        const repayAll = isDebtMaxClicked && isLastRepay;
-
-        const repayPtrIndex = aggregatedSource.length;
-        aggregatedSource.push(
-          new CairoCustomEnum({
-            Deposit: undefined,
-            Borrow: undefined,
-            Repay: {
-              basic: { token: position.tokenAddress, amount: uint256.bnToUint256(repayAmt), user: starkUserAddress },
-              repay_all: repayAll,
-              context: repayCtx,
-            },
-            Withdraw: undefined,
-            Redeposit: undefined,
-            Reborrow: undefined,
-          }),
-        );
-
-        const approval = repayAll ? MAX_UINT : buf(repayAmt);
-        pendingReborrow = new CairoCustomEnum({
+    let repayPtrIndex: number | null = null;
+    if (parsed > 0n) {
+      const { repayCtx } = buildSourceContexts(activeEntries[0].col.address);
+      repayPtrIndex = sourceInstructions.length;
+      sourceInstructions.push(
+        new CairoCustomEnum({
           Deposit: undefined,
           Borrow: undefined,
-          Repay: undefined,
+          Repay: {
+            basic: { token: position.tokenAddress, amount: uint256.bnToUint256(parsed), user: starkUserAddress },
+            repay_all: isDebtMaxClicked,
+            context: repayCtx,
+          },
           Withdraw: undefined,
           Redeposit: undefined,
-          Reborrow: {
-            token: position.tokenAddress,
-            target_output_pointer: toOutputPointer(repayPtrIndex),
-            approval_amount: uint256.bnToUint256(approval),
-            user: starkUserAddress,
-            context: borrowCtx,
-          },
-        });
+          Reborrow: undefined,
+        }),
+      );
+    }
 
-        processedRepayCount += 1;
-      }
+    const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
 
-      const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
-      const withAmt = isMax ? bump(col.rawBalance) : typedRaw;
+    activeEntries.forEach(item => {
+      const { col, typedRaw, isMax } = item;
+      const { withdrawCtx } = buildSourceContexts(col.address);
+      const withdrawAmount = isMax ? bump(col.rawBalance) : typedRaw;
       const withdrawInstruction = new CairoCustomEnum({
         Deposit: undefined,
         Borrow: undefined,
         Repay: undefined,
         Withdraw: {
-          basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress },
+          basic: { token: col.address, amount: uint256.bnToUint256(withdrawAmount), user: starkUserAddress },
           withdraw_all: isMax,
           context: withdrawCtx,
         },
         Redeposit: undefined,
         Reborrow: undefined,
       });
-      const withdrawPtrIndex = aggregatedSource.length;
-      aggregatedSource.push(withdrawInstruction);
+      const ptrIndex = sourceInstructions.length;
+      sourceInstructions.push(withdrawInstruction);
       withdrawAuths.push(withdrawInstruction);
+      withdrawPtrByToken.set(addrKey(col.address), ptrIndex);
+    });
+
+    let processedRepayCount = 0;
+    const totalRepayEntries = repayEligibleEntries.length;
+
+    const targetBlocks: Array<{ protocol_name: string; instructions: CairoCustomEnum[] }> = [];
+
+    activeEntries.forEach(item => {
+      const { col, repayAmt } = item;
+      const withdrawPtrIndex = withdrawPtrByToken.get(addrKey(col.address));
+      if (withdrawPtrIndex == null) {
+        return;
+      }
+      const { depositCtx, borrowCtx } = buildTargetContexts(col.address);
 
       const redepositInstruction = new CairoCustomEnum({
         Deposit: undefined,
@@ -343,32 +332,49 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         },
         Reborrow: undefined,
       });
-      aggregatedTarget.push(redepositInstruction);
-      if (pendingReborrow) {
-        aggregatedTarget.push(pendingReborrow);
-        reborrowAuths.push(pendingReborrow);
+
+      const instructions: CairoCustomEnum[] = [redepositInstruction];
+
+      if (repayAmt > 0n && repayPtrIndex !== null) {
+        const isLastRepay = processedRepayCount === totalRepayEntries - 1;
+        const approval = isDebtMaxClicked && isLastRepay ? MAX_UINT : buf(repayAmt);
+        const reborrowInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: {
+            token: position.tokenAddress,
+            target_output_pointer: toOutputPointer(repayPtrIndex),
+            approval_amount: uint256.bnToUint256(approval),
+            user: starkUserAddress,
+            context: borrowCtx,
+          },
+        });
+        instructions.push(reborrowInstruction);
+        reborrowAuths.push(reborrowInstruction);
+        processedRepayCount += 1;
       }
+
+      targetBlocks.push({ protocol_name: targetName, instructions });
     });
 
-    const pairInstructions = [
-      [
-        { protocol_name: sourceName, instructions: aggregatedSource },
-        { protocol_name: targetName, instructions: aggregatedTarget },
-      ],
+    const instructionsForOneCall = [
+      { protocol_name: sourceName, instructions: sourceInstructions },
+      ...targetBlocks,
     ];
 
     const authInstructions = [
       { protocol_name: sourceName, instructions: withdrawAuths },
       { protocol_name: targetName, instructions: reborrowAuths },
-    ];
-
-    const sanitizedAuths = authInstructions.filter(entry => entry.instructions.length > 0);
+    ].filter(entry => entry.instructions.length > 0);
 
     return {
-      pairInstructions,
-      authInstructions: sanitizedAuths,
-      authCalldataKey: sanitizedAuths.length
-        ? JSON.stringify(CallData.compile({ instructions: sanitizedAuths, rawSelectors: false }))
+      pairInstructions: [instructionsForOneCall],
+      authInstructions,
+      authCalldataKey: authInstructions.length
+        ? JSON.stringify(CallData.compile({ instructions: authInstructions, rawSelectors: false }))
         : "",
     };
   }, [paramsKey]);
