@@ -7,8 +7,8 @@ import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { VESU_V1_POOLS } from "../specific/vesu/pools";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
-import { formatUnits } from "viem";
-import { useAccount } from "wagmi";
+import { formatUnits, type Address, type Abi } from "viem";
+import { useAccount, useReadContracts } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold-eth";
@@ -69,65 +69,75 @@ const useAaveData = (): MarketData[] => {
 };
 
 const useCompoundData = (): MarketData[] => {
-  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
   const { data: weth } = useDeployedContractInfo({ contractName: "eth" });
   const { data: usdc } = useDeployedContractInfo({ contractName: "USDC" });
   const { data: usdt } = useDeployedContractInfo({ contractName: "USDT" });
   const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe" });
+  const { data: compoundGateway } = useDeployedContractInfo({ contractName: "CompoundGatewayView" });
 
-  const { data: wethData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [weth?.address, ZERO_ADDRESS],
-  });
-  const { data: usdcData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdc?.address, ZERO_ADDRESS],
-  });
-  const { data: usdtData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdt?.address, ZERO_ADDRESS],
-  });
-  const { data: usdcEData } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "CompoundGatewayView",
-    functionName: "getCompoundData",
-    args: [usdcE?.address, ZERO_ADDRESS],
+  const baseTokens = useMemo(
+    () => [
+      { symbol: "WETH", address: weth?.address },
+      { symbol: "USDC", address: usdc?.address },
+      { symbol: "USDT", address: usdt?.address },
+      { symbol: "USDC.e", address: usdcE?.address },
+    ],
+    [weth?.address, usdc?.address, usdt?.address, usdcE?.address],
+  );
+
+  const preparedTokens = useMemo(
+    () => baseTokens.filter((token): token is { symbol: string; address: Address } => Boolean(token.address)),
+    [baseTokens],
+  );
+
+  const compoundCalls = useMemo(() => {
+    if (!compoundGateway?.address || !compoundGateway?.abi) return [];
+    return preparedTokens.map(token => ({
+      address: compoundGateway.address as Address,
+      abi: compoundGateway.abi as Abi,
+      functionName: "getCompoundData" as const,
+      args: [token.address, ZERO_ADDRESS] as const,
+    }));
+  }, [compoundGateway?.address, compoundGateway?.abi, preparedTokens]);
+
+  const { data: compoundResults } = useReadContracts({
+    contracts: compoundCalls,
+    allowFailure: true,
+    query: {
+      enabled: compoundCalls.length > 0,
+    },
   });
 
   return useMemo(() => {
-    const tokens = [
-      { symbol: "WETH", address: weth?.address, data: wethData },
-      { symbol: "USDC", address: usdc?.address, data: usdcData },
-      { symbol: "USDT", address: usdt?.address, data: usdtData },
-      { symbol: "USDC.e", address: usdcE?.address, data: usdcEData },
-    ];
-    return tokens
-      .filter(t => t.address && t.data)
-      .map(t => {
-        const [supplyRate, borrowRate, , , price] = t.data as any;
-        const supplyAPR = supplyRate ? convertCompoundRate(BigInt(supplyRate)) : 0;
-        const borrowAPR = borrowRate ? convertCompoundRate(BigInt(borrowRate)) : 0;
-        const priceNum = price ? Number(formatUnits(price, 8)) : 0;
-        const utilization = borrowAPR > 0 ? (supplyAPR / borrowAPR) * 100 : 0;
-        return {
-          icon: tokenNameToLogo(t.symbol),
-          name: t.symbol,
+    if (!compoundResults) return [];
+
+    return preparedTokens.flatMap((token, index) => {
+      const callResult = compoundResults[index];
+      if (!callResult || callResult.status !== "success" || !callResult.result) {
+        return [];
+      }
+
+      const [supplyRate, borrowRate, , , price] = callResult.result as any;
+      const supplyAPR = supplyRate ? convertCompoundRate(BigInt(supplyRate)) : 0;
+      const borrowAPR = borrowRate ? convertCompoundRate(BigInt(borrowRate)) : 0;
+      const priceNum = price ? Number(formatUnits(price, 8)) : 0;
+      const utilization = borrowAPR > 0 ? (supplyAPR / borrowAPR) * 100 : 0;
+      return [
+        {
+          icon: tokenNameToLogo(token.symbol),
+          name: token.symbol,
           supplyRate: `${formatPercentage(supplyAPR, 2, false)}%`,
           borrowRate: `${formatPercentage(borrowAPR, 2, false)}%`,
           price: priceNum.toFixed(2),
           utilization: utilization.toFixed(2),
-          address: t.address as string,
+          address: token.address,
           networkType: "evm",
           protocol: "compound",
-        } as MarketData;
-      });
-  }, [weth?.address, usdc?.address, usdt?.address, usdcE?.address, wethData, usdcData, usdtData, usdcEData]);
+        } as MarketData,
+      ];
+    });
+  }, [compoundResults, preparedTokens]);
 };
 
 const useNostraData = (): MarketData[] => {
