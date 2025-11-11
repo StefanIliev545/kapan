@@ -257,36 +257,54 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       return { depositCtx, borrowCtx };
     };
 
-    const withdrawAuths: CairoCustomEnum[] = [];
-    const reborrowAuths: CairoCustomEnum[] = [];
-    const sourceInstructions: CairoCustomEnum[] = [];
-    const withdrawPtrByToken = new Map<string, number>();
+    const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
 
-    let repayPtrIndex: number | null = null;
-    if (parsed > 0n) {
-      const { repayCtx } = buildSourceContexts(activeEntries[0].col.address);
-      repayPtrIndex = sourceInstructions.length;
-      sourceInstructions.push(
-        new CairoCustomEnum({
+    const pairInstructions: Array<
+      [
+        { protocol_name: string; instructions: CairoCustomEnum[] },
+        { protocol_name: string; instructions: CairoCustomEnum[] },
+      ]
+    > = [];
+
+    const authMap = new Map<string, CairoCustomEnum[]>();
+    const pushAuth = (protocol: string, instruction: CairoCustomEnum) => {
+      const arr = authMap.get(protocol);
+      if (arr) {
+        arr.push(instruction);
+      } else {
+        authMap.set(protocol, [instruction]);
+      }
+    };
+
+    let processedRepayCount = 0;
+    const totalRepayEntries = repayEligibleEntries.length;
+
+    activeEntries.forEach(item => {
+      const { col, typedRaw, isMax, repayAmt } = item;
+      const { repayCtx, withdrawCtx } = buildSourceContexts(col.address);
+      const sourceInstructions: CairoCustomEnum[] = [];
+
+      let repayPtrIndex: number | null = null;
+      const includesRepay = repayAmt > 0n;
+      const isLastRepay = includesRepay && processedRepayCount === totalRepayEntries - 1;
+
+      if (includesRepay) {
+        const repayInstruction = new CairoCustomEnum({
           Deposit: undefined,
           Borrow: undefined,
           Repay: {
-            basic: { token: position.tokenAddress, amount: uint256.bnToUint256(parsed), user: starkUserAddress },
-            repay_all: isDebtMaxClicked,
+            basic: { token: position.tokenAddress, amount: uint256.bnToUint256(repayAmt), user: starkUserAddress },
+            repay_all: isDebtMaxClicked && isLastRepay,
             context: repayCtx,
           },
           Withdraw: undefined,
           Redeposit: undefined,
           Reborrow: undefined,
-        }),
-      );
-    }
+        });
+        repayPtrIndex = sourceInstructions.length;
+        sourceInstructions.push(repayInstruction);
+      }
 
-    const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
-
-    activeEntries.forEach(item => {
-      const { col, typedRaw, isMax } = item;
-      const { withdrawCtx } = buildSourceContexts(col.address);
       const withdrawAmount = isMax ? bump(col.rawBalance) : typedRaw;
       const withdrawInstruction = new CairoCustomEnum({
         Deposit: undefined,
@@ -300,24 +318,13 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         Redeposit: undefined,
         Reborrow: undefined,
       });
-      const ptrIndex = sourceInstructions.length;
+
+      const withdrawPtrIndex = sourceInstructions.length;
       sourceInstructions.push(withdrawInstruction);
-      withdrawAuths.push(withdrawInstruction);
-      withdrawPtrByToken.set(addrKey(col.address), ptrIndex);
-    });
+      pushAuth(sourceName, withdrawInstruction);
 
-    let processedRepayCount = 0;
-    const totalRepayEntries = repayEligibleEntries.length;
-
-    const targetBlocks: Array<{ protocol_name: string; instructions: CairoCustomEnum[] }> = [];
-
-    activeEntries.forEach(item => {
-      const { col, repayAmt } = item;
-      const withdrawPtrIndex = withdrawPtrByToken.get(addrKey(col.address));
-      if (withdrawPtrIndex == null) {
-        return;
-      }
       const { depositCtx, borrowCtx } = buildTargetContexts(col.address);
+      const targetInstructions: CairoCustomEnum[] = [];
 
       const redepositInstruction = new CairoCustomEnum({
         Deposit: undefined,
@@ -332,11 +339,9 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         },
         Reborrow: undefined,
       });
+      targetInstructions.push(redepositInstruction);
 
-      const instructions: CairoCustomEnum[] = [redepositInstruction];
-
-      if (repayAmt > 0n && repayPtrIndex !== null) {
-        const isLastRepay = processedRepayCount === totalRepayEntries - 1;
+      if (includesRepay && repayPtrIndex !== null) {
         const approval = isDebtMaxClicked && isLastRepay ? MAX_UINT : buf(repayAmt);
         const reborrowInstruction = new CairoCustomEnum({
           Deposit: undefined,
@@ -352,26 +357,23 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
             context: borrowCtx,
           },
         });
-        instructions.push(reborrowInstruction);
-        reborrowAuths.push(reborrowInstruction);
+        targetInstructions.push(reborrowInstruction);
+        pushAuth(targetName, reborrowInstruction);
         processedRepayCount += 1;
       }
 
-      targetBlocks.push({ protocol_name: targetName, instructions });
+      pairInstructions.push([
+        { protocol_name: sourceName, instructions: sourceInstructions },
+        { protocol_name: targetName, instructions: targetInstructions },
+      ]);
     });
 
-    const instructionsForOneCall = [
-      { protocol_name: sourceName, instructions: sourceInstructions },
-      ...targetBlocks,
-    ];
-
-    const authInstructions = [
-      { protocol_name: sourceName, instructions: withdrawAuths },
-      { protocol_name: targetName, instructions: reborrowAuths },
-    ].filter(entry => entry.instructions.length > 0);
+    const authInstructions = Array.from(authMap.entries())
+      .map(([protocol_name, instructions]) => ({ protocol_name, instructions }))
+      .filter(entry => entry.instructions.length > 0);
 
     return {
-      pairInstructions: [instructionsForOneCall],
+      pairInstructions,
       authInstructions,
       authCalldataKey: authInstructions.length
         ? JSON.stringify(CallData.compile({ instructions: authInstructions, rawSelectors: false }))
