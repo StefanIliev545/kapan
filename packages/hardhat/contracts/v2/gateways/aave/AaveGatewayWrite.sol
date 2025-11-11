@@ -136,38 +136,46 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
 
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                // User must approve aToken → gateway for withdraw
                 address aToken = _getAToken(ins.token);
-                uint256 cur = IERC20(aToken).allowance(caller, address(this));
-                if (cur >= ins.amount && ins.amount != 0) {
-                    // Already sufficient allowance for this withdrawal
+                uint256 needed = ins.amount;
+                if (needed == 0) {
                     targets[i] = address(0);
                     data[i] = bytes("");
                 } else {
-                    targets[i] = aToken;
-                    // Ask for max so withdraw-all / accrued interest cases don't need another approval
-                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
+                    uint256 cur = IERC20(aToken).allowance(caller, address(this));
+                    if (cur >= needed) {
+                        targets[i] = address(0);
+                        data[i] = bytes("");
+                    } else {
+                        targets[i] = aToken;
+                        data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), needed);
+                    }
                 }
 
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
                 // User must approveDelegation(vDebt → gateway) for borrow
                 (address aToken, address sToken, address vDebt) = _getReserveTokens(ins.token);
-                
+
                 if (vDebt == address(0)) {
                     revert("vDebt is zero address");
                 } else {
-                    uint256 cur = IVariableDebtToken(vDebt).borrowAllowance(caller, address(this));
-                    if (cur >= ins.amount && ins.amount != 0) {
-                        // Already sufficient delegation
+                    uint256 needed = ins.amount;
+                    if (needed == 0) {
                         targets[i] = address(0);
                         data[i] = bytes("");
                     } else {
-                        targets[i] = vDebt;
-                        data[i] = abi.encodeWithSignature(
-                            "approveDelegation(address,uint256)",
-                            address(this),
-                            type(uint256).max
-                        );
+                        uint256 cur = IVariableDebtToken(vDebt).borrowAllowance(caller, address(this));
+                        if (cur >= needed) {
+                            targets[i] = address(0);
+                            data[i] = bytes("");
+                        } else {
+                            targets[i] = vDebt;
+                            data[i] = abi.encodeWithSignature(
+                                "approveDelegation(address,uint256)",
+                                address(this),
+                                needed
+                            );
+                        }
                     }
                 }
 

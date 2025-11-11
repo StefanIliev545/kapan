@@ -167,14 +167,17 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
                 k++;
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address col = ins.token; address vToken = _getVTokenForUnderlying(col);
-                // Compute required vTokens from underlying using exchangeRateStored; if amount==0, require max
                 uint rate = VTokenInterface(vToken).exchangeRateStored();
-                uint requiredV = ins.amount == 0 ? type(uint256).max : (ins.amount * 1e18 + rate - 1) / rate;
-                uint256 curV = IERC20(vToken).allowance(caller, address(this));
-                if ((ins.amount != 0 && curV >= requiredV) || (ins.amount == 0 && curV == type(uint256).max)) {
+                uint requiredV = ins.amount == 0 ? 0 : (ins.amount * 1e18 + rate - 1) / rate;
+                if (requiredV == 0) {
                     targets[k] = address(0); data[k] = bytes("");
                 } else {
-                    targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
+                    uint256 curV = IERC20(vToken).allowance(caller, address(this));
+                    if (curV >= requiredV) {
+                        targets[k] = address(0); data[k] = bytes("");
+                    } else {
+                        targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), requiredV);
+                    }
                 }
                 k++;
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {

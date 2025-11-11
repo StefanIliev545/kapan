@@ -44,6 +44,90 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         RouterInstructionType instructionType;
     }
 
+    uint256 private constant INTEREST_BUFFER_BPS = 100; // 1%
+    uint256 private constant BPS_DENOMINATOR = 10_000;
+
+    struct SimulatedOutput {
+        address token;
+        uint256 amount;
+        bool isFullBalance;
+    }
+
+    struct AuthorizationContext {
+        address resolvedToken;
+        uint256 resolvedAmount;
+        bool fromFullBalance;
+    }
+
+    function _applyInterestBuffer(uint256 amount) internal pure returns (uint256) {
+        if (amount == 0) {
+            return 0;
+        }
+        uint256 buffered = (amount * (BPS_DENOMINATOR + INTEREST_BUFFER_BPS)) / BPS_DENOMINATOR;
+        return buffered + 1;
+    }
+
+    function _packOutputs(SimulatedOutput[] memory outputs, uint256 count)
+        internal
+        pure
+        returns (ProtocolTypes.Output[] memory packed)
+    {
+        packed = new ProtocolTypes.Output[](count);
+        for (uint256 i = 0; i < count; i++) {
+            packed[i] = ProtocolTypes.Output({ token: outputs[i].token, amount: outputs[i].amount });
+        }
+    }
+
+    function _appendOutput(
+        SimulatedOutput[] memory outputs,
+        uint256 outputCount,
+        address token,
+        uint256 amount,
+        bool isFullBalance
+    ) internal pure returns (uint256) {
+        if (outputCount < outputs.length) {
+            outputs[outputCount] = SimulatedOutput({ token: token, amount: amount, isFullBalance: isFullBalance });
+            return outputCount + 1;
+        }
+        return outputCount;
+    }
+
+    function _simulateBalanceOutputs(
+        IGateway gw,
+        SimulatedOutput[] memory outputs,
+        uint256 outputCount,
+        bytes memory instructionData,
+        address fallbackToken
+    ) internal view returns (uint256) {
+        ProtocolTypes.Output[] memory packedInputs = _packOutputs(outputs, outputCount);
+        (bool ok, bytes memory resp) = address(gw).staticcall(
+            abi.encodeWithSelector(gw.processLendingInstruction.selector, packedInputs, instructionData)
+        );
+        if (ok) {
+            ProtocolTypes.Output[] memory produced = abi.decode(resp, (ProtocolTypes.Output[]));
+            for (uint256 j = 0; j < produced.length; j++) {
+                outputCount = _appendOutput(outputs, outputCount, produced[j].token, produced[j].amount, true);
+            }
+            return outputCount;
+        }
+
+        return _appendOutput(outputs, outputCount, fallbackToken, 0, true);
+    }
+
+    function _collectAuthorization(
+        IGateway gw,
+        ProtocolTypes.LendingInstruction memory instr,
+        address caller
+    ) internal view returns (address target, bytes memory data) {
+        ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
+        one[0] = instr;
+        (address[] memory t, bytes[] memory d) = gw.authorize(one, caller);
+        if (t.length > 0 && t[0] != address(0) && d[0].length > 0) {
+            return (t[0], d[0]);
+        }
+        return (address(0), bytes(""));
+    }
+
     function convertToStack(ProtocolTypes.ProtocolInstruction[] calldata instructions) internal {
         ProtocolTypes.ProtocolInstruction[] memory reversed = new ProtocolTypes.ProtocolInstruction[](instructions.length);
 
@@ -273,9 +357,12 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         bytes[] memory tmpData = new bytes[](instructions.length);
         uint256 k;
 
+        SimulatedOutput[] memory outputs = new SimulatedOutput[](instructions.length * 3 + 5);
+        uint256 outputCount;
+
         for (uint256 i = 0; i < instructions.length; i++) {
             ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
-            
+
             // Router step
             if (keccak256(abi.encode(pi.protocolName)) == keccak256(abi.encode("router"))) {
                 // data is RouterInstruction
@@ -290,9 +377,29 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                         tmpTargets[k] = address(0);
                         tmpData[k] = bytes("");
                     }
+                    outputCount = _appendOutput(outputs, outputCount, r.token, r.amount, false);
                 } else {
                     tmpTargets[k] = address(0);
                     tmpData[k] = bytes("");
+                }
+                if (r.instructionType == RouterInstructionType.ToOutput) {
+                    outputCount = _appendOutput(outputs, outputCount, r.token, r.amount, false);
+                } else if (r.instructionType == RouterInstructionType.FlashLoan) {
+                    (, FlashLoanProvider _provider, ProtocolTypes.InputPtr memory inputPtr, ) =
+                        abi.decode(pi.data, (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address));
+                    if (inputPtr.index < outputCount) {
+                        SimulatedOutput memory base = outputs[inputPtr.index];
+                        outputCount = _appendOutput(outputs, outputCount, base.token, base.amount, true);
+                    }
+                } else if (r.instructionType == RouterInstructionType.Approve) {
+                    outputCount = _appendOutput(outputs, outputCount, address(0), 0, false);
+                } else if (r.instructionType == RouterInstructionType.PushToken) {
+                    (, ProtocolTypes.InputPtr memory inputPtr) =
+                        abi.decode(pi.data, (RouterInstruction, ProtocolTypes.InputPtr));
+                    if (inputPtr.index < outputCount) {
+                        outputs[inputPtr.index] =
+                            SimulatedOutput({ token: address(0), amount: 0, isFullBalance: false });
+                    }
                 }
                 k++;
                 continue;
@@ -300,7 +407,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
             // Protocol step => delegate to gateway.authorize one-by-one
             IGateway gw = gateways[pi.protocolName];
-            
+
             if (address(gw) == address(0)) {
                 // Unknown gateway; leave empty slot, but keep order
                 tmpTargets[k] = address(0);
@@ -312,19 +419,45 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             // Kapan encodes a single LendingInstruction in ProtocolInstruction.data
             ProtocolTypes.LendingInstruction memory li =
                 abi.decode(pi.data, (ProtocolTypes.LendingInstruction));
-            
-            ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
-            one[0] = li;
+            AuthorizationContext memory ctx;
+            ctx.resolvedToken = li.token;
+            ctx.resolvedAmount = li.amount;
+            ctx.fromFullBalance = false;
 
-            (address[] memory t, bytes[] memory d) = gw.authorize(one, caller);
+            if (li.input.index < outputCount) {
+                SimulatedOutput memory inputOut = outputs[li.input.index];
+                ctx.resolvedToken = inputOut.token != address(0) ? inputOut.token : ctx.resolvedToken;
+                ctx.resolvedAmount = inputOut.amount;
+                ctx.fromFullBalance = inputOut.isFullBalance;
+            }
 
-            // Gateway.authorize returns one element for 'one'
-            if (t.length > 0 && t[0] != address(0) && d[0].length > 0) {
-                tmpTargets[k] = t[0];
-                tmpData[k] = d[0];
-            } else {
+            if (
+                li.op == ProtocolTypes.LendingOp.GetBorrowBalance
+                    || li.op == ProtocolTypes.LendingOp.GetSupplyBalance
+            ) {
+                outputCount = _simulateBalanceOutputs(gw, outputs, outputCount, pi.data, ctx.resolvedToken);
                 tmpTargets[k] = address(0);
                 tmpData[k] = bytes("");
+                k++;
+                continue;
+            }
+
+            if (li.input.index < outputCount) {
+                li.amount = ctx.resolvedAmount;
+            }
+
+            if ((ctx.fromFullBalance || li.amount == type(uint256).max) && li.amount > 0) {
+                li.amount = _applyInterestBuffer(li.amount);
+            }
+
+            (tmpTargets[k], tmpData[k]) = _collectAuthorization(gw, li, caller);
+
+            if (li.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                outputCount = _appendOutput(outputs, outputCount, ctx.resolvedToken, ctx.resolvedAmount, ctx.fromFullBalance);
+            } else if (li.op == ProtocolTypes.LendingOp.Borrow) {
+                outputCount = _appendOutput(outputs, outputCount, ctx.resolvedToken, ctx.resolvedAmount, ctx.fromFullBalance);
+            } else if (li.op == ProtocolTypes.LendingOp.Repay) {
+                outputCount = _appendOutput(outputs, outputCount, ctx.resolvedToken, 0, false);
             }
             k++;
         }
