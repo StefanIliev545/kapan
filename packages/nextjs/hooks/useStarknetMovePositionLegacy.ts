@@ -213,11 +213,12 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
 
     const entriesWithRepay = weightedData.map((item, idx) => ({ ...item, repayAmt: allocations[idx] ?? 0n }));
     const activeEntries = entriesWithRepay.filter(mapped => mapped.isMax || mapped.typedRaw > 0n);
-    const repayEligibleEntries = activeEntries.filter(mapped => mapped.repayAmt > 0n);
 
     if (activeEntries.length === 0) {
       return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
     }
+
+    const lastRepayIndex = activeEntries.reduce((lastIdx, entry, idx) => (entry.repayAmt > 0n ? idx : lastIdx), -1);
 
     const buildSourceContexts = (colAddress: string) => {
       let srcPool: bigint | null = null;
@@ -260,29 +261,16 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
 
     type InstructionBlock = { protocol_name: string; instructions: CairoCustomEnum[] };
-    const aggregatedInstructions: InstructionBlock[] = [];
+    const instructionPairs: InstructionBlock[][] = [];
 
-    const authMap = new Map<string, CairoCustomEnum[]>();
-    const pushAuth = (protocol: string, instruction: CairoCustomEnum) => {
-      const arr = authMap.get(protocol);
-      if (arr) {
-        arr.push(instruction);
-      } else {
-        authMap.set(protocol, [instruction]);
-      }
-    };
-
-    let processedRepayCount = 0;
-    const totalRepayEntries = repayEligibleEntries.length;
-
-    activeEntries.forEach(item => {
+    activeEntries.forEach((item, idx) => {
       const { col, typedRaw, isMax, repayAmt } = item;
       const { repayCtx, withdrawCtx } = buildSourceContexts(col.address);
-      const sourceInstructions: CairoCustomEnum[] = [];
 
+      const sourceInstructions: CairoCustomEnum[] = [];
       let repayPtrIndex: number | null = null;
       const includesRepay = repayAmt > 0n;
-      const isLastRepay = includesRepay && processedRepayCount === totalRepayEntries - 1;
+      const isLastRepay = includesRepay && idx === lastRepayIndex;
 
       if (includesRepay) {
         const repayInstruction = new CairoCustomEnum({
@@ -317,7 +305,6 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
 
       const withdrawPtrIndex = sourceInstructions.length;
       sourceInstructions.push(withdrawInstruction);
-      pushAuth(sourceName, withdrawInstruction);
 
       const { depositCtx, borrowCtx } = buildTargetContexts(col.address);
       const targetInstructions: CairoCustomEnum[] = [];
@@ -354,20 +341,29 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
           },
         });
         targetInstructions.push(reborrowInstruction);
-        pushAuth(targetName, reborrowInstruction);
-        processedRepayCount += 1;
       }
 
-      aggregatedInstructions.push({ protocol_name: sourceName, instructions: sourceInstructions });
-      aggregatedInstructions.push({ protocol_name: targetName, instructions: targetInstructions });
+      instructionPairs.push([
+        { protocol_name: sourceName, instructions: sourceInstructions },
+        { protocol_name: targetName, instructions: targetInstructions },
+      ]);
     });
 
-    const authInstructions = Array.from(authMap.entries())
-      .map(([protocol_name, instructions]) => ({ protocol_name, instructions }))
-      .filter(entry => entry.instructions.length > 0);
+    const flattenedBlocks = instructionPairs.flat();
+    const authInstructions = flattenedBlocks
+      .map(block => ({
+        protocol_name: block.protocol_name,
+        instructions: block.instructions.filter(inst => {
+          const variant = inst.activeVariant();
+          return variant === "Withdraw" || variant === "Reborrow";
+        }),
+      }))
+      .filter(block => block.instructions.length > 0);
+
+    const pairInstructions = flattenedBlocks.length ? [flattenedBlocks] : [];
 
     return {
-      pairInstructions: aggregatedInstructions.length ? [aggregatedInstructions] : [],
+      pairInstructions,
       authInstructions,
       authCalldataKey: authInstructions.length
         ? JSON.stringify(CallData.compile({ instructions: authInstructions, rawSelectors: false }))
