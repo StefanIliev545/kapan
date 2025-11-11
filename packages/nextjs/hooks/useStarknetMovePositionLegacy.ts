@@ -132,6 +132,8 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         : targetIsExplicitVesuV1
         ? "vesu"
         : canonicalProtocolName(toProtocol);
+    const destinationIsAnyVesu =
+      targetName === "vesu" || targetName === "vesu_v2" || toLower === "vesuv2";
 
     const entries = Object.entries(addedCollaterals).map(([a, v]) => ({ lower: addrKey(a), amt: v })).sort((a, b) => a.lower.localeCompare(b.lower));
     if (entries.length === 0) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
@@ -143,6 +145,9 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       .map(entry => {
         const col = collaterals.find(c => addrKey(c.address) === entry.lower);
         if (!col) return null;
+        if (destinationIsAnyVesu && addrKey(col.address) === addrKey(position.tokenAddress)) {
+          return null;
+        }
         const amtString = (entry.amt || "").trim();
         let typedRaw: bigint;
         try {
