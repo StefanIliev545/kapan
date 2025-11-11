@@ -214,11 +214,16 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     return [...starkCollateralAddresses, position.tokenAddress];
   }, [starkCollateralAddresses, position.tokenAddress]);
 
+  const starkPriceArgsTuple = useMemo<readonly [string[] | undefined]>(
+    () => [starkPriceArgs] as const,
+    [starkPriceArgs],
+  );
+
   const { data: starkTokenPrices } = useScaffoldReadContract({
     contractName: "UiHelper",
     functionName: "get_asset_prices",
-    args: starkPriceArgs ? [starkPriceArgs] : undefined,
-    query: { enabled: isOpen && Boolean(starkPriceArgs?.length) },
+    args: starkPriceArgsTuple,
+    enabled: isOpen && Boolean(starkPriceArgs?.length),
   });
 
   const starkTokenToPrices = useMemo(() => {
@@ -273,7 +278,15 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         }
       }
     }
-  }, [isOpen, preSelectedCollaterals, collaterals, expandedCollateral, setExpandedCollateral, setTempAmount]);
+  }, [
+    isOpen,
+    preSelectedCollaterals,
+    collaterals,
+    expandedCollateral,
+    setExpandedCollateral,
+    setTempAmount,
+    setTempIsMax,
+  ]);
 
   /* -------------------------- Stable selections ------------------------- */
   useEffect(() => {
@@ -316,7 +329,18 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         if (next) setSelectedV2PoolAddress(next);
       }
     }
-  }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress]);
+  }, [
+    isOpen,
+    selectedProtocol,
+    selectedVersion,
+    starkVesuPools,
+    fromProtocol,
+    position.poolId,
+    selectedPoolId,
+    selectedV2PoolAddress,
+    setSelectedPoolId,
+    setSelectedV2PoolAddress,
+  ]);
 
   useEffect(() => {
     if (!(isOpen && !debtConfirmed)) return;
