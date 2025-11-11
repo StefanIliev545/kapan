@@ -210,12 +210,15 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   );
 
   const starkPriceArgs = useMemo(() => {
-    if (!starkCollateralAddresses.length) return undefined;
-    return [...starkCollateralAddresses, position.tokenAddress];
+    const addresses = [...starkCollateralAddresses];
+    if (position.tokenAddress) {
+      addresses.push(position.tokenAddress);
+    }
+    return addresses;
   }, [starkCollateralAddresses, position.tokenAddress]);
 
   const starkPriceArgsTuple = useMemo<readonly [string[] | undefined]>(
-    () => [starkPriceArgs] as const,
+    () => [starkPriceArgs.length ? starkPriceArgs : undefined] as const,
     [starkPriceArgs],
   );
 
@@ -223,11 +226,12 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     contractName: "UiHelper",
     functionName: "get_asset_prices",
     args: starkPriceArgsTuple,
-    enabled: isOpen && Boolean(starkPriceArgs?.length),
+    refetchInterval: 30000,
+    enabled: isOpen && Boolean(starkPriceArgs.length),
   });
 
   const starkTokenToPrices = useMemo(() => {
-    if (!starkTokenPrices || !starkPriceArgs?.length) return {} as Record<string, bigint>;
+    if (!starkTokenPrices || !starkPriceArgs.length) return {} as Record<string, bigint>;
     const prices = starkTokenPrices as unknown as bigint[];
     return starkPriceArgs.reduce((acc, address, index) => {
       const price = prices[index] ?? 0n;
