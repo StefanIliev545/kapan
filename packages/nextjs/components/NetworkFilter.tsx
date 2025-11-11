@@ -1,5 +1,6 @@
 "use client";
 
+import { track } from "@vercel/analytics";
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -165,14 +166,21 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     if (!isValid(selectedRef.current)) {
       const fallback = (isValid(defaultNetwork) && defaultNetwork) || networks[0]?.id;
       if (fallback && fallback !== selectedRef.current) {
-        handleNetworkChange(fallback);
+        handleNetworkChange(fallback, { trackEvent: false });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networks, defaultNetwork]);
 
-  const handleNetworkChange = (networkId: string) => {
+  const handleNetworkChange = (networkId: string, { trackEvent = true }: { trackEvent?: boolean } = {}) => {
     if (!isValid(networkId) || networkId === selectedRef.current) return;
+
+    if (trackEvent) {
+      track("network_filter_select", {
+        networkId,
+        pathname,
+      });
+    }
 
     // Update UI immediately
     setSelectedNetwork(networkId);

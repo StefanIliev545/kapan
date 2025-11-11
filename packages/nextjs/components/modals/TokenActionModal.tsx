@@ -1,4 +1,5 @@
-import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { track } from "@vercel/analytics";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { FaGasPump } from "react-icons/fa";
@@ -220,6 +221,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const wasOpenRef = useRef(false);
   const parsed = parseFloat(amount || "0");
 
   const price = token.usdPrice || 0;
@@ -293,10 +295,18 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
 
   // Reset transaction state when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setTxState("idle");
+      track("token_action_modal_open", {
+        action,
+        tokenName: token.name,
+        tokenAddress: token.address,
+        network,
+        protocol: protocolName ?? "unknown",
+      });
     }
-  }, [isOpen]);
+    wasOpenRef.current = isOpen;
+  }, [action, isOpen, network, protocolName, token.address, token.name]);
 
   const handleClose = () => {
     setAmount("");
