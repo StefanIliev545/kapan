@@ -21,6 +21,7 @@ type LegacyParams = {
   collaterals: Array<{ address: string; symbol: string; decimals: number; rawBalance: bigint; balance: number }>;
   selectedPoolId: bigint;
   selectedV2PoolAddress: string;
+  tokenToPrices?: Record<string, bigint>;
 };
 
 type LegacyResult = {
@@ -47,6 +48,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     collaterals,
     selectedPoolId,
     selectedV2PoolAddress,
+    tokenToPrices,
   } = params;
 
   const { address: starkUserAddress } = useAccount();
@@ -78,6 +80,11 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       isDebtMaxClicked,
       starkUserAddress,
       router: routerGateway?.address,
+      prices: tokenToPrices
+        ? Object.entries(tokenToPrices)
+            .map(([k, v]) => [addrKey(k), v.toString()] as const)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+        : [],
     });
   }, [
     isOpen,
@@ -96,6 +103,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     isDebtMaxClicked,
     starkUserAddress,
     routerGateway?.address,
+    tokenToPrices,
   ]);
 
   const { pairInstructions, authInstructions, authCalldataKey } = useMemo(() => {
@@ -109,19 +117,65 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     const entries = Object.entries(addedCollaterals).map(([a, v]) => ({ lower: addrKey(a), amt: v })).sort((a, b) => a.lower.localeCompare(b.lower));
     if (entries.length === 0) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
 
-    const n = BigInt(entries.length);
-    const share = parsed / n;
-    const remainder = parsed - share * n;
-
     const MAX_UINT = (1n << 256n) - 1n;
     const buf = (x: bigint) => ((x * 101n) / 100n) + 1n;
 
-    const pairs = entries.map((e, i) => {
-      const col = collaterals.find(c => addrKey(c.address) === e.lower);
-      if (!col) return null;
-      const isLast = i === entries.length - 1;
+    const valuationData = entries
+      .map(entry => {
+        const col = collaterals.find(c => addrKey(c.address) === entry.lower);
+        if (!col) return null;
+        const amtString = (entry.amt || "").trim();
+        let typedRaw: bigint;
+        try {
+          typedRaw = parseUnits(amtString === "" ? "0" : amtString, col.decimals);
+        } catch {
+          typedRaw = 0n;
+        }
+        const price = tokenToPrices?.[entry.lower] ?? 0n;
+        const weight = price > 0n ? typedRaw * price : typedRaw;
+        return { entry, col, typedRaw, price, weight };
+      })
+      .filter(Boolean) as Array<{
+        entry: { lower: string; amt: string };
+        col: { address: string; symbol: string; decimals: number; rawBalance: bigint; balance: number };
+        typedRaw: bigint;
+        price: bigint;
+        weight: bigint;
+      }>;
+
+    if (!valuationData.length) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
+
+    const totalWeight = valuationData.reduce((acc, item) => acc + item.weight, 0n);
+    let allocations: bigint[];
+    if (totalWeight === 0n) {
+      const n = BigInt(valuationData.length);
+      const base = n === 0n ? 0n : parsed / n;
+      const remainder = parsed - base * n;
+      allocations = valuationData.map((_, idx) => (idx === valuationData.length - 1 ? base + remainder : base));
+    } else {
+      let allocatedSoFar = 0n;
+      allocations = valuationData.map((item, idx) => {
+        if (idx === valuationData.length - 1) {
+          return parsed - allocatedSoFar;
+        }
+        const share = (parsed * item.weight) / totalWeight;
+        allocatedSoFar += share;
+        return share;
+      });
+    }
+
+    const totalAllocated = allocations.reduce((acc, amt) => acc + amt, 0n);
+    if (totalAllocated !== parsed && allocations.length) {
+      const diff = parsed - totalAllocated;
+      allocations[allocations.length - 1] += diff;
+    }
+
+    const pairs = valuationData.map((item, i) => {
+      const col = item.col;
+      const repayAmt = allocations[i] ?? 0n;
+      const entry = item.entry;
+      const isLast = i === valuationData.length - 1;
       const repayAll = isDebtMaxClicked && isLast;
-      const repayAmt = isLast ? (repayAll ? parsed - share * BigInt(entries.length - 1) : share + remainder) : share;
 
       let srcPool: bigint | null = null;
       if (fromProtocol === "Vesu") {
@@ -145,8 +199,8 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         Withdraw: undefined, Redeposit: undefined, Reborrow: undefined,
       });
 
-      const mapMax = collateralIsMaxMap[e.lower] === true;
-      const typedRaw = parseUnits(e.amt || "0", col.decimals);
+      const mapMax = collateralIsMaxMap[entry.lower] === true;
+      const typedRaw = item.typedRaw;
       const typedIsExactlyMax = typedRaw === col.rawBalance;
       const isMax = mapMax || typedIsExactlyMax;
       // If Vesu source and treated as MAX, slightly bump to cover rounding (0.01% + 1)
