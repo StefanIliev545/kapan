@@ -131,9 +131,15 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         } catch {
           typedRaw = 0n;
         }
+        const mapMax = collateralIsMaxMap[entry.lower] === true;
+        const typedIsExactlyMax = typedRaw === col.rawBalance;
+        const isMax = mapMax || typedIsExactlyMax;
+        if (typedRaw === 0n && !isMax) {
+          return null;
+        }
         const price = tokenToPrices?.[entry.lower] ?? 0n;
         const weight = price > 0n ? typedRaw * price : typedRaw;
-        return { entry, col, typedRaw, price, weight };
+        return { entry, col, typedRaw, price, weight, isMax };
       })
       .filter(Boolean) as Array<{
         entry: { lower: string; amt: string };
@@ -141,40 +147,71 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         typedRaw: bigint;
         price: bigint;
         weight: bigint;
+        isMax: boolean;
       }>;
 
     if (!valuationData.length) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
 
     const totalWeight = valuationData.reduce((acc, item) => acc + item.weight, 0n);
-    let allocations: bigint[];
+    let allocations: bigint[] = [];
+
     if (totalWeight === 0n) {
       const n = BigInt(valuationData.length);
-      const base = n === 0n ? 0n : parsed / n;
-      const remainder = parsed - base * n;
-      allocations = valuationData.map((_, idx) => (idx === valuationData.length - 1 ? base + remainder : base));
+      if (n > 0n) {
+        const base = parsed / n;
+        let remainder = parsed - base * n;
+        allocations = valuationData.map(() => {
+          if (remainder > 0n) {
+            remainder -= 1n;
+            return base + 1n;
+          }
+          return base;
+        });
+      }
     } else {
-      let allocatedSoFar = 0n;
-      allocations = valuationData.map((item, idx) => {
-        if (idx === valuationData.length - 1) {
-          return parsed - allocatedSoFar;
-        }
-        const share = (parsed * item.weight) / totalWeight;
-        allocatedSoFar += share;
-        return share;
+      const weightedShares = valuationData.map(item => {
+        const product = parsed * item.weight;
+        const share = product / totalWeight;
+        const remainder = product % totalWeight;
+        return { share, remainder };
       });
+      allocations = weightedShares.map(s => s.share);
+      let diff = parsed - allocations.reduce((acc, amt) => acc + amt, 0n);
+      if (diff > 0n) {
+        const order = weightedShares
+          .map((s, idx) => ({ idx, remainder: s.remainder }))
+          .sort((a, b) => {
+            if (a.remainder === b.remainder) return a.idx - b.idx;
+            return a.remainder > b.remainder ? -1 : 1;
+          });
+        for (const entry of order) {
+          if (diff === 0n) break;
+          allocations[entry.idx] += 1n;
+          diff -= 1n;
+        }
+      }
     }
 
-    const totalAllocated = allocations.reduce((acc, amt) => acc + amt, 0n);
-    if (totalAllocated !== parsed && allocations.length) {
-      const diff = parsed - totalAllocated;
-      allocations[allocations.length - 1] += diff;
+    if (!allocations.length) {
+      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
     }
 
-    const pairs = valuationData.map((item, i) => {
-      const col = item.col;
-      const repayAmt = allocations[i] ?? 0n;
-      const entry = item.entry;
-      const isLast = i === valuationData.length - 1;
+    const aggregatedSource: CairoCustomEnum[] = [];
+    const aggregatedTarget: CairoCustomEnum[] = [];
+    const withdrawAuths: CairoCustomEnum[] = [];
+    const reborrowAuths: CairoCustomEnum[] = [];
+
+    const activeEntries = valuationData
+      .map((item, idx) => ({ ...item, repayAmt: allocations[idx] ?? 0n }))
+      .filter(mapped => mapped.repayAmt > 0n);
+
+    if (activeEntries.length === 0) {
+      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
+    }
+
+    activeEntries.forEach((item, index) => {
+      const { col, typedRaw, repayAmt, isMax } = item;
+      const isLast = index === activeEntries.length - 1;
       const repayAll = isDebtMaxClicked && isLast;
 
       let srcPool: bigint | null = null;
@@ -192,30 +229,40 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
           ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
           : new CairoOption<bigint[]>(CairoOptionVariant.None);
 
-      const repay = new CairoCustomEnum({
-        Deposit: undefined,
-        Borrow: undefined,
-        Repay: { basic: { token: position.tokenAddress, amount: uint256.bnToUint256(repayAmt), user: starkUserAddress }, repay_all: repayAll, context: repayCtx },
-        Withdraw: undefined, Redeposit: undefined, Reborrow: undefined,
-      });
+      const repayPtrIndex = aggregatedSource.length;
+      aggregatedSource.push(
+        new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: {
+            basic: { token: position.tokenAddress, amount: uint256.bnToUint256(repayAmt), user: starkUserAddress },
+            repay_all: repayAll,
+            context: repayCtx,
+          },
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
+        }),
+      );
 
-      const mapMax = collateralIsMaxMap[entry.lower] === true;
-      const typedRaw = item.typedRaw;
-      const typedIsExactlyMax = typedRaw === col.rawBalance;
-      const isMax = mapMax || typedIsExactlyMax;
-      // If Vesu source and treated as MAX, slightly bump to cover rounding (0.01% + 1)
       const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
       const withAmt = isMax ? bump(col.rawBalance) : typedRaw;
-      const withdraw = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined,
-        Withdraw: { basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress }, withdraw_all: isMax, context: withdrawCtx },
-        Redeposit: undefined, Reborrow: undefined,
+      const withdrawInstruction = new CairoCustomEnum({
+        Deposit: undefined,
+        Borrow: undefined,
+        Repay: undefined,
+        Withdraw: {
+          basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress },
+          withdraw_all: isMax,
+          context: withdrawCtx,
+        },
+        Redeposit: undefined,
+        Reborrow: undefined,
       });
+      const withdrawPtrIndex = aggregatedSource.length;
+      aggregatedSource.push(withdrawInstruction);
+      withdrawAuths.push(withdrawInstruction);
 
-      const repayPtr = toOutputPointer(0);
-      const withdrawPtr = toOutputPointer(1);
-
-      // Target contexts: if Vesu target, encode pool and pair tokens; otherwise None (e.g., Nostra)
       let depositCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
       let borrowCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
       if (toProtocol === "Vesu") {
@@ -233,37 +280,60 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
       }
 
-      const redeposit = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined,
-        Redeposit: { token: col.address, target_output_pointer: withdrawPtr, user: starkUserAddress, context: depositCtx },
+      const redepositInstruction = new CairoCustomEnum({
+        Deposit: undefined,
+        Borrow: undefined,
+        Repay: undefined,
+        Withdraw: undefined,
+        Redeposit: {
+          token: col.address,
+          target_output_pointer: toOutputPointer(withdrawPtrIndex),
+          user: starkUserAddress,
+          context: depositCtx,
+        },
         Reborrow: undefined,
       });
+      aggregatedTarget.push(redepositInstruction);
 
       const approval = repayAll ? MAX_UINT : buf(repayAmt);
-      const reborrow = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined, Redeposit: undefined,
-        Reborrow: { token: position.tokenAddress, target_output_pointer: repayPtr, approval_amount: uint256.bnToUint256(approval), user: starkUserAddress, context: borrowCtx },
+      const reborrowInstruction = new CairoCustomEnum({
+        Deposit: undefined,
+        Borrow: undefined,
+        Repay: undefined,
+        Withdraw: undefined,
+        Redeposit: undefined,
+        Reborrow: {
+          token: position.tokenAddress,
+          target_output_pointer: toOutputPointer(repayPtrIndex),
+          approval_amount: uint256.bnToUint256(approval),
+          user: starkUserAddress,
+          context: borrowCtx,
+        },
       });
-
-      return [
-        { protocol_name: sourceName, instructions: [repay, withdraw] },
-        { protocol_name: targetName, instructions: [redeposit, reborrow] },
-      ];
-    }).filter(Boolean) as Array<{ protocol_name: string; instructions: CairoCustomEnum[] }[]>;
-
-    const auths = pairs.flatMap(pair => {
-      const src = pair[0].instructions;
-      const dst = pair[1].instructions;
-      return [
-        { protocol_name: sourceName, instructions: [src[1]] }, // Withdraw
-        { protocol_name: targetName, instructions: [dst[1]] }, // Reborrow
-      ];
+      aggregatedTarget.push(reborrowInstruction);
+      reborrowAuths.push(reborrowInstruction);
     });
 
+    const pairInstructions = [
+      [
+        { protocol_name: sourceName, instructions: aggregatedSource },
+        { protocol_name: targetName, instructions: aggregatedTarget },
+      ],
+    ];
+
+    const authInstructions = [
+      { protocol_name: sourceName, instructions: withdrawAuths },
+      { protocol_name: targetName, instructions: reborrowAuths },
+    ];
+
+    const sanitizedAuths = authInstructions.filter(entry => entry.instructions.length > 0);
+
     return {
-      pairInstructions: pairs,
-      authInstructions: auths,
-      authCalldataKey: JSON.stringify(CallData.compile({ instructions: auths, rawSelectors: false })),
+      pairInstructions,
+      authInstructions: sanitizedAuths,
+      authCalldataKey: sanitizedAuths.length
+        ? JSON.stringify(CallData.compile({ instructions: sanitizedAuths, rawSelectors: false }))
+        : "",
     };
   }, [paramsKey]);
 
