@@ -250,11 +250,11 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       }
       const repayCtx =
         srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
+          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(colAddress)])
           : new CairoOption<bigint[]>(CairoOptionVariant.None);
       const withdrawCtx =
         srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(colAddress)])
+          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
           : new CairoOption<bigint[]>(CairoOptionVariant.None);
       return { repayCtx, withdrawCtx };
     };
