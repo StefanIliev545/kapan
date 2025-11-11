@@ -134,33 +134,43 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         const mapMax = collateralIsMaxMap[entry.lower] === true;
         const typedIsExactlyMax = typedRaw === col.rawBalance;
         const isMax = mapMax || typedIsExactlyMax;
-        if (typedRaw === 0n && !isMax) {
+        const effectiveRaw = isMax ? col.rawBalance : typedRaw;
+        if (effectiveRaw === 0n) {
           return null;
         }
         const price = tokenToPrices?.[entry.lower] ?? 0n;
-        const weight = price > 0n ? typedRaw * price : typedRaw;
-        return { entry, col, typedRaw, price, weight, isMax };
+        return { entry, col, typedRaw, effectiveRaw, price, isMax };
       })
       .filter(Boolean) as Array<{
         entry: { lower: string; amt: string };
         col: { address: string; symbol: string; decimals: number; rawBalance: bigint; balance: number };
         typedRaw: bigint;
+        effectiveRaw: bigint;
         price: bigint;
-        weight: bigint;
         isMax: boolean;
       }>;
 
     if (!valuationData.length) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
 
-    const totalWeight = valuationData.reduce((acc, item) => acc + item.weight, 0n);
+    const nonZeroPriceEntries = valuationData.filter(item => item.price > 0n);
+    const averagePrice = nonZeroPriceEntries.length
+      ? nonZeroPriceEntries.reduce((acc, item) => acc + item.price, 0n) / BigInt(nonZeroPriceEntries.length)
+      : 10n ** 8n; // fall back to ~1.0 USD so zero-price tokens stay proportional
+    const weightedData = valuationData.map(item => {
+      const priceForWeight = item.price > 0n ? item.price : averagePrice;
+      const weight = item.effectiveRaw * priceForWeight;
+      return { ...item, weight };
+    });
+
+    const totalWeight = weightedData.reduce((acc, item) => acc + item.weight, 0n);
     let allocations: bigint[] = [];
 
     if (totalWeight === 0n) {
-      const n = BigInt(valuationData.length);
+      const n = BigInt(weightedData.length);
       if (n > 0n) {
         const base = parsed / n;
         let remainder = parsed - base * n;
-        allocations = valuationData.map(() => {
+        allocations = weightedData.map(() => {
           if (remainder > 0n) {
             remainder -= 1n;
             return base + 1n;
@@ -169,7 +179,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
         });
       }
     } else {
-      const weightedShares = valuationData.map(item => {
+      const weightedShares = weightedData.map(item => {
         const product = parsed * item.weight;
         const share = product / totalWeight;
         const remainder = product % totalWeight;
@@ -201,7 +211,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     const withdrawAuths: CairoCustomEnum[] = [];
     const reborrowAuths: CairoCustomEnum[] = [];
 
-    const activeEntries = valuationData
+    const activeEntries = weightedData
       .map((item, idx) => ({ ...item, repayAmt: allocations[idx] ?? 0n }))
       .filter(mapped => mapped.repayAmt > 0n);
 
