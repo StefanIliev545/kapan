@@ -1,10 +1,8 @@
 import type { NextPage } from "next";
-import HeroSection from "../components/home/HeroSection";
-import HowItWorks from "../components/home/HowItWorks";
 import LandingSection from "../components/home/LandingSection";
+import EnterAppCTA from "../components/home/EnterAppCTA";
 import ExplainerSection from "../components/home/ExplainerSection";
 import BuiltForConvenience from "../components/home/BuiltForConvenience";
-import BenefitsSection from "../components/info/BenefitsSection";
 import RoadmapSection from "../components/info/RoadmapSection";
 
 /**
@@ -16,6 +14,7 @@ const Home: NextPage = () => {
       {/* Main content */}
       <main className="relative z-10">
         <LandingSection />
+        <EnterAppCTA />
         <ExplainerSection />
         <BuiltForConvenience />
         <RoadmapSection />
