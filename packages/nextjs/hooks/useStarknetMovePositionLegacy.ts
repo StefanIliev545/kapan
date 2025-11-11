@@ -21,6 +21,7 @@ type LegacyParams = {
   collaterals: Array<{ address: string; symbol: string; decimals: number; rawBalance: bigint; balance: number }>;
   selectedPoolId: bigint;
   selectedV2PoolAddress: string;
+  tokenToPrices?: Record<string, bigint>;
 };
 
 type LegacyResult = {
@@ -47,6 +48,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     collaterals,
     selectedPoolId,
     selectedV2PoolAddress,
+    tokenToPrices,
   } = params;
 
   const { address: starkUserAddress } = useAccount();
@@ -78,6 +80,11 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       isDebtMaxClicked,
       starkUserAddress,
       router: routerGateway?.address,
+      prices: tokenToPrices
+        ? Object.entries(tokenToPrices)
+            .map(([k, v]) => [addrKey(k), v.toString()] as const)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+        : [],
     });
   }, [
     isOpen,
@@ -96,6 +103,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     isDebtMaxClicked,
     starkUserAddress,
     routerGateway?.address,
+    tokenToPrices,
   ]);
 
   const { pairInstructions, authInstructions, authCalldataKey } = useMemo(() => {
@@ -109,20 +117,107 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     const entries = Object.entries(addedCollaterals).map(([a, v]) => ({ lower: addrKey(a), amt: v })).sort((a, b) => a.lower.localeCompare(b.lower));
     if (entries.length === 0) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
 
-    const n = BigInt(entries.length);
-    const share = parsed / n;
-    const remainder = parsed - share * n;
-
     const MAX_UINT = (1n << 256n) - 1n;
     const buf = (x: bigint) => ((x * 101n) / 100n) + 1n;
 
-    const pairs = entries.map((e, i) => {
-      const col = collaterals.find(c => addrKey(c.address) === e.lower);
-      if (!col) return null;
-      const isLast = i === entries.length - 1;
-      const repayAll = isDebtMaxClicked && isLast;
-      const repayAmt = isLast ? (repayAll ? parsed - share * BigInt(entries.length - 1) : share + remainder) : share;
+    const valuationData = entries
+      .map(entry => {
+        const col = collaterals.find(c => addrKey(c.address) === entry.lower);
+        if (!col) return null;
+        const amtString = (entry.amt || "").trim();
+        let typedRaw: bigint;
+        try {
+          typedRaw = parseUnits(amtString === "" ? "0" : amtString, col.decimals);
+        } catch {
+          typedRaw = 0n;
+        }
+        const mapMax = collateralIsMaxMap[entry.lower] === true;
+        const typedIsExactlyMax = typedRaw === col.rawBalance;
+        const isMax = mapMax || typedIsExactlyMax;
+        const effectiveRaw = isMax ? col.rawBalance : typedRaw;
+        if (effectiveRaw === 0n) {
+          return null;
+        }
+        const price = tokenToPrices?.[entry.lower] ?? 0n;
+        return { entry, col, typedRaw, effectiveRaw, price, isMax };
+      })
+      .filter(Boolean) as Array<{
+        entry: { lower: string; amt: string };
+        col: { address: string; symbol: string; decimals: number; rawBalance: bigint; balance: number };
+        typedRaw: bigint;
+        effectiveRaw: bigint;
+        price: bigint;
+        isMax: boolean;
+      }>;
 
+    if (!valuationData.length) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
+
+    const weightedData = valuationData.map(item => {
+      const priceForWeight = item.price > 0n ? item.price : 0n;
+      const decimalsFactor = 10n ** BigInt(item.col.decimals);
+      const product = item.effectiveRaw * priceForWeight;
+      let weight = decimalsFactor > 0n ? product / decimalsFactor : product;
+      if (weight === 0n && product > 0n) {
+        weight = 1n;
+      }
+      return { ...item, weight };
+    });
+
+    const totalWeight = weightedData.reduce((acc, item) => acc + item.weight, 0n);
+    let allocations: bigint[] = [];
+
+    if (totalWeight === 0n) {
+      const n = BigInt(weightedData.length);
+      if (n > 0n) {
+        const base = parsed / n;
+        let remainder = parsed - base * n;
+        allocations = weightedData.map(() => {
+          if (remainder > 0n) {
+            remainder -= 1n;
+            return base + 1n;
+          }
+          return base;
+        });
+      }
+    } else {
+      const weightedShares = weightedData.map(item => {
+        const product = parsed * item.weight;
+        const share = product / totalWeight;
+        const remainder = product % totalWeight;
+        return { share, remainder };
+      });
+      allocations = weightedShares.map(s => s.share);
+      let diff = parsed - allocations.reduce((acc, amt) => acc + amt, 0n);
+      if (diff > 0n) {
+        const order = weightedShares
+          .map((s, idx) => ({ idx, remainder: s.remainder }))
+          .sort((a, b) => {
+            if (a.remainder === b.remainder) return a.idx - b.idx;
+            return a.remainder > b.remainder ? -1 : 1;
+          });
+        for (const entry of order) {
+          if (diff === 0n) break;
+          allocations[entry.idx] += 1n;
+          diff -= 1n;
+        }
+      }
+    }
+
+    if (!allocations.length) {
+      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
+    }
+
+    const entriesWithRepay = weightedData.map((item, idx) => ({ ...item, repayAmt: allocations[idx] ?? 0n }));
+    const moveEntries = entriesWithRepay.filter(mapped => mapped.isMax || mapped.typedRaw > 0n);
+
+    if (moveEntries.length === 0) {
+      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
+    }
+
+    const lastPositiveRepayIndex = moveEntries.reduce((lastIdx, entry, idx) => (entry.repayAmt > 0n ? idx : lastIdx), -1);
+    const totalRepayPlanned = moveEntries.reduce((acc, entry) => acc + entry.repayAmt, 0n);
+
+    const buildSourceContexts = (colAddress: string) => {
       let srcPool: bigint | null = null;
       if (fromProtocol === "Vesu") {
         srcPool = typeof position.poolId === "string" ? BigInt(position.poolId) : (position.poolId ?? 0n);
@@ -131,85 +226,156 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       }
       const repayCtx =
         srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(col.address)])
+          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
           : new CairoOption<bigint[]>(CairoOptionVariant.None);
       const withdrawCtx =
         srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
+          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(colAddress)])
           : new CairoOption<bigint[]>(CairoOptionVariant.None);
+      return { repayCtx, withdrawCtx };
+    };
 
-      const repay = new CairoCustomEnum({
-        Deposit: undefined,
-        Borrow: undefined,
-        Repay: { basic: { token: position.tokenAddress, amount: uint256.bnToUint256(repayAmt), user: starkUserAddress }, repay_all: repayAll, context: repayCtx },
-        Withdraw: undefined, Redeposit: undefined, Reborrow: undefined,
-      });
-
-      const mapMax = collateralIsMaxMap[e.lower] === true;
-      const typedRaw = parseUnits(e.amt || "0", col.decimals);
-      const typedIsExactlyMax = typedRaw === col.rawBalance;
-      const isMax = mapMax || typedIsExactlyMax;
-      // If Vesu source and treated as MAX, slightly bump to cover rounding (0.01% + 1)
-      const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
-      const withAmt = isMax ? bump(col.rawBalance) : typedRaw;
-      const withdraw = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined,
-        Withdraw: { basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress }, withdraw_all: isMax, context: withdrawCtx },
-        Redeposit: undefined, Reborrow: undefined,
-      });
-
-      const repayPtr = toOutputPointer(0);
-      const withdrawPtr = toOutputPointer(1);
-
-      // Target contexts: if Vesu target, encode pool and pair tokens; otherwise None (e.g., Nostra)
+    const buildTargetContexts = (colAddress: string) => {
       let depositCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
       let borrowCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
       if (toProtocol === "Vesu") {
         if (selectedVersion === "v1") {
           depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(position.tokenAddress)]);
-          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(col.address)]);
+          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(colAddress)]);
         } else {
           const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
           depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(position.tokenAddress)]);
-          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
+          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(colAddress)]);
         }
       } else if (toProtocol === "VesuV2") {
         const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
         depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(position.tokenAddress)]);
-        borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
+        borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(colAddress)]);
+      }
+      return { depositCtx, borrowCtx };
+    };
+
+    const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
+    const sourceInstructions: CairoCustomEnum[] = [];
+    const withdrawAuths: CairoCustomEnum[] = [];
+    const withdrawPtrByToken = new Map<string, number>();
+
+    let repayPtrIndex: number | null = null;
+    if (totalRepayPlanned > 0n) {
+      const { repayCtx } = buildSourceContexts(moveEntries[0].col.address);
+      repayPtrIndex = sourceInstructions.length;
+      sourceInstructions.push(
+        new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: {
+            basic: {
+              token: position.tokenAddress,
+              amount: uint256.bnToUint256(totalRepayPlanned),
+              user: starkUserAddress,
+            },
+            repay_all: isDebtMaxClicked,
+            context: repayCtx,
+          },
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: undefined,
+        }),
+      );
+    }
+
+    moveEntries.forEach(item => {
+      const { col, typedRaw, isMax } = item;
+      const { withdrawCtx } = buildSourceContexts(col.address);
+      const withdrawAmount = isMax ? bump(col.rawBalance) : typedRaw;
+      const withdrawInstruction = new CairoCustomEnum({
+        Deposit: undefined,
+        Borrow: undefined,
+        Repay: undefined,
+        Withdraw: {
+          basic: { token: col.address, amount: uint256.bnToUint256(withdrawAmount), user: starkUserAddress },
+          withdraw_all: isMax,
+          context: withdrawCtx,
+        },
+        Redeposit: undefined,
+        Reborrow: undefined,
+      });
+      const pointerIndex = sourceInstructions.length;
+      sourceInstructions.push(withdrawInstruction);
+      withdrawPtrByToken.set(addrKey(col.address), pointerIndex);
+      withdrawAuths.push(withdrawInstruction);
+    });
+
+    const targetBlocks = moveEntries.map((item, idx) => {
+      const { col, repayAmt } = item;
+      const { depositCtx, borrowCtx } = buildTargetContexts(col.address);
+      const withdrawPointer = withdrawPtrByToken.get(addrKey(col.address));
+      if (withdrawPointer === undefined) {
+        return { protocol_name: targetName, instructions: [] as CairoCustomEnum[] };
       }
 
-      const redeposit = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined,
-        Redeposit: { token: col.address, target_output_pointer: withdrawPtr, user: starkUserAddress, context: depositCtx },
+      const redepositInstruction = new CairoCustomEnum({
+        Deposit: undefined,
+        Borrow: undefined,
+        Repay: undefined,
+        Withdraw: undefined,
+        Redeposit: {
+          token: col.address,
+          target_output_pointer: toOutputPointer(withdrawPointer),
+          user: starkUserAddress,
+          context: depositCtx,
+        },
         Reborrow: undefined,
       });
 
-      const approval = repayAll ? MAX_UINT : buf(repayAmt);
-      const reborrow = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined, Redeposit: undefined,
-        Reborrow: { token: position.tokenAddress, target_output_pointer: repayPtr, approval_amount: uint256.bnToUint256(approval), user: starkUserAddress, context: borrowCtx },
-      });
+      const instructions: CairoCustomEnum[] = [redepositInstruction];
 
-      return [
-        { protocol_name: sourceName, instructions: [repay, withdraw] },
-        { protocol_name: targetName, instructions: [redeposit, reborrow] },
-      ];
-    }).filter(Boolean) as Array<{ protocol_name: string; instructions: CairoCustomEnum[] }[]>;
+      if (repayPtrIndex !== null && repayAmt > 0n) {
+        const isLastPositive = idx === lastPositiveRepayIndex;
+        const approval = isDebtMaxClicked && isLastPositive ? MAX_UINT : repayAmt;
+        const reborrowInstruction = new CairoCustomEnum({
+          Deposit: undefined,
+          Borrow: undefined,
+          Repay: undefined,
+          Withdraw: undefined,
+          Redeposit: undefined,
+          Reborrow: {
+            token: position.tokenAddress,
+            target_output_pointer: toOutputPointer(repayPtrIndex),
+            approval_amount: uint256.bnToUint256(approval),
+            user: starkUserAddress,
+            context: borrowCtx,
+          },
+        });
+        instructions.push(reborrowInstruction);
+      }
 
-    const auths = pairs.flatMap(pair => {
-      const src = pair[0].instructions;
-      const dst = pair[1].instructions;
-      return [
-        { protocol_name: sourceName, instructions: [src[1]] }, // Withdraw
-        { protocol_name: targetName, instructions: [dst[1]] }, // Reborrow
-      ];
+      return { protocol_name: targetName, instructions };
     });
 
+    const instructionBlocks = [
+      { protocol_name: sourceName, instructions: sourceInstructions },
+      ...targetBlocks.filter(block => block.instructions.length > 0),
+    ];
+
+    const authInstructions = [
+      ...(withdrawAuths.length ? [{ protocol_name: sourceName, instructions: withdrawAuths }] : []),
+      ...targetBlocks
+        .map(block => ({
+          protocol_name: block.protocol_name,
+          instructions: block.instructions.filter(inst => inst.activeVariant() === "Reborrow"),
+        }))
+        .filter(block => block.instructions.length > 0),
+    ];
+
+    const pairInstructions = instructionBlocks.length ? [instructionBlocks] : [];
+
     return {
-      pairInstructions: pairs,
-      authInstructions: auths,
-      authCalldataKey: JSON.stringify(CallData.compile({ instructions: auths, rawSelectors: false })),
+      pairInstructions,
+      authInstructions,
+      authCalldataKey: authInstructions.length
+        ? JSON.stringify(CallData.compile({ instructions: authInstructions, rawSelectors: false }))
+        : "",
     };
   }, [paramsKey]);
 
