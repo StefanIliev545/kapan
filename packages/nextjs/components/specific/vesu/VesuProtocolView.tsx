@@ -3,7 +3,6 @@ import { FC, useEffect, useMemo, useState } from "react";
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
 import {
-  createVesuContextV1,
   createVesuContextV2,
   normalizeStarknetAddress,
   type VesuContext,
@@ -196,7 +195,7 @@ export const VesuProtocolView: FC = () => {
     const inferredContext =
       options?.vesuContext ??
       (version === "v1"
-        ? createVesuContextV1(selectedV1PoolId, zeroCounterpart)
+        ? undefined
         : createVesuContextV2(normalizedPoolAddress, zeroCounterpart));
     setDepositSelection({ version, tokens, vesuContext: inferredContext, position: options?.position });
   };
