@@ -1,25 +1,73 @@
 import { useMemo, useState, useEffect } from "react";
+import { CallData } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
-import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, uint256 } from "starknet";
 import { useDeployedContractInfo, useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
-import { normalizeStarknetAddress } from "~~/utils/vesu";
 import { parseUnits } from "viem";
-// No NetworkType import needed here
+import { useSelectedCollaterals } from "~~/hooks/kapan/useSelectedCollaterals";
+import { usePriceMap } from "~~/hooks/kapan/usePrices";
+import { useDebtAllocations } from "~~/hooks/kapan/useDebtAllocations";
+import { buildMoveInstructions } from "~~/hooks/kapan/buildMoveInstructions";
 
 type LegacyParams = {
+  /** Whether the modal/dialog is currently open - used to enable/disable contract reads */
   isOpen: boolean;
+  /** Source protocol name (e.g., "Vesu", "VesuV2", "Nostra") - where the debt position currently exists */
   fromProtocol: string;
+  /** Target protocol name (e.g., "Vesu", "VesuV2", "Nostra") - where the debt will be moved to */
   toProtocol: string;
+  /** Selected version for Vesu protocol ("v1" or "v2") - determines which pool structure to use */
   selectedVersion: "v1" | "v2";
+  /** Debt amount as a string (e.g., "1000.5") - the amount of debt to move, in human-readable format */
   debtAmount: string;
+  /** Whether the user clicked "MAX" for debt amount - if true, moves all available debt */
   isDebtMaxClicked: boolean;
-  position: { tokenAddress: string; decimals: number; poolId?: bigint | string };
+  /** Current debt position information */
+  position: {
+    /** Address of the debt token (e.g., USDC, DAI) */
+    tokenAddress: string;
+    /** Number of decimals for the debt token (e.g., 18 for ETH, 6 for USDC) */
+    decimals: number;
+    /** Pool ID for Vesu protocols (v1 uses bigint, v2 uses address string) */
+    poolId?: bigint | string;
+  };
+  /**
+   * Map of collateral addresses to their amounts (as strings).
+   * Key: collateral token address (case-insensitive, normalized to lowercase)
+   * Value: amount string in human-readable format (e.g., "100.5")
+   * 
+   * Example: { "0x123...": "100.5", "0x456...": "50.0" }
+   * Represents the collaterals the user wants to move along with the debt.
+   */
   addedCollaterals: Record<string, string>;
+  /**
+   * Map indicating which collaterals have "MAX" clicked.
+   * Key: collateral token address (case-insensitive, normalized to lowercase)
+   * Value: true if user clicked MAX for this collateral, false otherwise
+   * 
+   * When true, the hook will:
+   * - Use the full rawBalance for that collateral
+   * - Apply a 1% buffer to counter truncation errors
+   * - Set withdraw_all flag to true in the contract call
+   * 
+   * Example: { "0x123...": true, "0x456...": false }
+   */
   collateralIsMaxMap: Record<string, boolean>;
+  /**
+   * Array of all available collateral tokens with their metadata.
+   * Used to look up token details (decimals, balances) when processing addedCollaterals.
+   * Each collateral includes:
+   * - address: token contract address
+   * - symbol: token symbol (e.g., "ETH", "USDC")
+   * - decimals: number of decimals for the token
+   * - rawBalance: full precision balance as bigint (e.g., 1000000000000000000n for 1 ETH)
+   * - balance: human-readable balance as number (e.g., 1.0)
+   */
   collaterals: Array<{ address: string; symbol: string; decimals: number; rawBalance: bigint; balance: number }>;
+  /** Selected pool ID for Vesu v1 - the pool where debt will be moved to */
   selectedPoolId: bigint;
+  /** Selected pool address for Vesu v2 - the pool contract address where debt will be moved to */
   selectedV2PoolAddress: string;
 };
 
@@ -29,9 +77,6 @@ type LegacyResult = {
   sendAsync: (() => Promise<any>) | null;
   error: string | null;
 };
-
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
-const toOutputPointer = (i: number) => ({ instruction_index: BigInt(i), output_index: 0n });
 
 export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResult => {
   const {
@@ -48,7 +93,7 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     selectedPoolId,
     selectedV2PoolAddress,
   } = params;
-
+  
   const { address: starkUserAddress } = useAccount();
   const { data: routerGateway } = useDeployedContractInfo("RouterGateway");
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
@@ -56,162 +101,69 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
   const [isLoadingAuths, setIsLoadingAuths] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const paramsKey = useMemo(() => {
-    const entries = Object.entries(addedCollaterals).map(([a, v]) => [addrKey(a), v] as const).sort((a, b) => a[0].localeCompare(b[0]));
-    return JSON.stringify({
-      isOpen,
-      debtAmount,
+  // 1) Filter and normalize selected collaterals
+  const selected = useSelectedCollaterals(
+    addedCollaterals,
+    collateralIsMaxMap,
+    collaterals,
+    toProtocol,
+    position.tokenAddress,
+  );
+
+  // 2) Fetch prices for selected collaterals + debt token
+  const priceAddrs = useMemo(
+    () => [...selected.map(s => s.address), position.tokenAddress],
+    [selected, position.tokenAddress],
+  );
+
+  const { priceByAddress } = usePriceMap(
+    priceAddrs,
+    isOpen,
+    30000,
+  );
+
+  // 3) Calculate debt allocations
+  const parsedDebt = parseUnits(debtAmount || "0", position.decimals);
+  const { rows, lastNonZeroIndex } = useDebtAllocations(
+    selected,
+    priceByAddress,
+    parsedDebt,
+    isDebtMaxClicked,
+  );
+
+  // 4) Pure function: Cairo-specific instruction building
+  const { pairInstructions, authInstructions, authCalldataKey } = useMemo(() => {
+    if (!isOpen || !debtAmount || !starkUserAddress || !routerGateway?.address || rows.length === 0) {
+      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
+    }
+
+    return buildMoveInstructions({
+      rows,
+      lastNonZeroIndex,
       fromProtocol,
       toProtocol,
       selectedVersion,
-      positionToken: position.tokenAddress,
-      positionDecimals: position.decimals,
-      positionPoolId:
-        position.poolId == null ? null : typeof position.poolId === "string" ? position.poolId.toLowerCase() : position.poolId.toString(),
-      entries,
-      maxMap: Object.entries(collateralIsMaxMap)
-        .map(([k, v]) => [addrKey(k), Boolean(v)] as const)
-        .sort((a, b) => a[0].localeCompare(b[0])),
-      colls: collaterals.map(c => ({ a: addrKey(c.address), d: c.decimals, r: c.rawBalance.toString() })).sort((a, b) => a.a.localeCompare(b.a)),
-      selectedPoolId: selectedPoolId?.toString(),
+      position,
+      selectedPoolId,
       selectedV2PoolAddress,
-      isDebtMaxClicked,
       starkUserAddress,
-      router: routerGateway?.address,
+      isDebtMaxClicked,
     });
   }, [
     isOpen,
     debtAmount,
+    starkUserAddress,
+    routerGateway?.address,
+    rows,
+    lastNonZeroIndex,
     fromProtocol,
     toProtocol,
     selectedVersion,
-    position.tokenAddress,
-    position.decimals,
-    position.poolId,
-    addedCollaterals,
-    collateralIsMaxMap,
-    collaterals,
+    position,
     selectedPoolId,
     selectedV2PoolAddress,
     isDebtMaxClicked,
-    starkUserAddress,
-    routerGateway?.address,
   ]);
-
-  const { pairInstructions, authInstructions, authCalldataKey } = useMemo(() => {
-    if (!isOpen || !debtAmount || !starkUserAddress || !routerGateway?.address) {
-      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
-    }
-    const parsed = parseUnits(debtAmount, position.decimals);
-    const sourceName = fromProtocol === "VesuV2" ? "vesu_v2" : fromProtocol.toLowerCase();
-    const targetName = toProtocol === "Vesu" ? (selectedVersion === "v2" ? "vesu_v2" : "vesu") : toProtocol.toLowerCase();
-
-    const entries = Object.entries(addedCollaterals).map(([a, v]) => ({ lower: addrKey(a), amt: v })).sort((a, b) => a.lower.localeCompare(b.lower));
-    if (entries.length === 0) return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
-
-    const n = BigInt(entries.length);
-    const share = parsed / n;
-    const remainder = parsed - share * n;
-
-    const MAX_UINT = (1n << 256n) - 1n;
-    const buf = (x: bigint) => ((x * 101n) / 100n) + 1n;
-
-    const pairs = entries.map((e, i) => {
-      const col = collaterals.find(c => addrKey(c.address) === e.lower);
-      if (!col) return null;
-      const isLast = i === entries.length - 1;
-      const repayAll = isDebtMaxClicked && isLast;
-      const repayAmt = isLast ? (repayAll ? parsed - share * BigInt(entries.length - 1) : share + remainder) : share;
-
-      let srcPool: bigint | null = null;
-      if (fromProtocol === "Vesu") {
-        srcPool = typeof position.poolId === "string" ? BigInt(position.poolId) : (position.poolId ?? 0n);
-      } else if (fromProtocol === "VesuV2") {
-        srcPool = BigInt(normalizeStarknetAddress(position.poolId ?? selectedV2PoolAddress));
-      }
-      const repayCtx =
-        srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(col.address)])
-          : new CairoOption<bigint[]>(CairoOptionVariant.None);
-      const withdrawCtx =
-        srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
-          : new CairoOption<bigint[]>(CairoOptionVariant.None);
-
-      const repay = new CairoCustomEnum({
-        Deposit: undefined,
-        Borrow: undefined,
-        Repay: { basic: { token: position.tokenAddress, amount: uint256.bnToUint256(repayAmt), user: starkUserAddress }, repay_all: repayAll, context: repayCtx },
-        Withdraw: undefined, Redeposit: undefined, Reborrow: undefined,
-      });
-
-      const mapMax = collateralIsMaxMap[e.lower] === true;
-      const typedRaw = parseUnits(e.amt || "0", col.decimals);
-      const typedIsExactlyMax = typedRaw === col.rawBalance;
-      const isMax = mapMax || typedIsExactlyMax;
-      // If Vesu source and treated as MAX, slightly bump to cover rounding (0.01% + 1)
-      const bump = (x: bigint) => ((x * 10001n) / 10000n) + 1n;
-      const withAmt = isMax ? bump(col.rawBalance) : typedRaw;
-      const withdraw = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined,
-        Withdraw: { basic: { token: col.address, amount: uint256.bnToUint256(withAmt), user: starkUserAddress }, withdraw_all: isMax, context: withdrawCtx },
-        Redeposit: undefined, Reborrow: undefined,
-      });
-
-      const repayPtr = toOutputPointer(0);
-      const withdrawPtr = toOutputPointer(1);
-
-      // Target contexts: if Vesu target, encode pool and pair tokens; otherwise None (e.g., Nostra)
-      let depositCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
-      let borrowCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
-      if (toProtocol === "Vesu") {
-        if (selectedVersion === "v1") {
-          depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(position.tokenAddress)]);
-          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(col.address)]);
-        } else {
-          const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
-          depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(position.tokenAddress)]);
-          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
-        }
-      } else if (toProtocol === "VesuV2") {
-        const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
-        depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(position.tokenAddress)]);
-        borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
-      }
-
-      const redeposit = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined,
-        Redeposit: { token: col.address, target_output_pointer: withdrawPtr, user: starkUserAddress, context: depositCtx },
-        Reborrow: undefined,
-      });
-
-      const approval = repayAll ? MAX_UINT : buf(repayAmt);
-      const reborrow = new CairoCustomEnum({
-        Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined, Redeposit: undefined,
-        Reborrow: { token: position.tokenAddress, target_output_pointer: repayPtr, approval_amount: uint256.bnToUint256(approval), user: starkUserAddress, context: borrowCtx },
-      });
-
-      return [
-        { protocol_name: sourceName, instructions: [repay, withdraw] },
-        { protocol_name: targetName, instructions: [redeposit, reborrow] },
-      ];
-    }).filter(Boolean) as Array<{ protocol_name: string; instructions: CairoCustomEnum[] }[]>;
-
-    const auths = pairs.flatMap(pair => {
-      const src = pair[0].instructions;
-      const dst = pair[1].instructions;
-      return [
-        { protocol_name: sourceName, instructions: [src[1]] }, // Withdraw
-        { protocol_name: targetName, instructions: [dst[1]] }, // Reborrow
-      ];
-    });
-
-    return {
-      pairInstructions: pairs,
-      authInstructions: auths,
-      authCalldataKey: JSON.stringify(CallData.compile({ instructions: auths, rawSelectors: false })),
-    };
-  }, [paramsKey]);
 
   // Fetch authorizations (legacy)
   useEffect(() => {
@@ -245,11 +197,14 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
     if (!pairInstructions || pairInstructions.length === 0) return [];
     const authorizations = fetchedAuthorizations ?? [];
     const revokeAuthorizations = buildModifyDelegationRevokeCalls(authorizations);
-    const moveCalls = pairInstructions.map(instructions => ({
-      contractName: "RouterGateway" as const,
-      functionName: "move_debt" as const,
-      args: CallData.compile({ instructions }),
-    }));
+    const combinedInstructions = pairInstructions.flat();
+    const moveCalls = [
+      {
+        contractName: "RouterGateway" as const,
+        functionName: "move_debt" as const,
+        args: CallData.compile({ instructions: combinedInstructions }),
+      }
+    ];
     return [
       ...(authorizations as any),
       ...moveCalls,

@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
-import { formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount } from "~~/hooks/useAccount";
 import { useCollateral as useStarkCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { useVesuPools } from "~~/hooks/useStarknetMovePosition";
@@ -18,6 +18,7 @@ import { useStarknetCollateralSupport } from "~~/hooks/useStarknetCollateralSupp
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { RefinanceModalContent } from "./RefinanceModalContent";
+import { usePriceMap } from "~~/hooks/kapan/usePrices";
 
 /* ------------------------------ Helpers ------------------------------ */
 const addrKey = (a?: string) => (a ?? "").toLowerCase();
@@ -296,23 +297,86 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     return () => clearTimeout(t);
   }, [isOpen, debtConfirmed]);
 
+  // Run reset only on closed -> open transition to avoid identity churn loops
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    resetState();
-  }, [isOpen, resetState]);
+    if (isOpen && !wasOpenRef.current) {
+      resetState();
+    }
+    wasOpenRef.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   /* ------------------------ Price‑based calculations -------------------- */
-  // For Starknet, we don't calculate USD values (return 0)
-  const getUsdValue = useCallback((address: string, humanAmount: string): number => {
-    void address;
-    void humanAmount;
-    return 0;
-  }, []);
+  // Collect addresses for price fetching: collaterals + debt token
+  const priceAddresses = useMemo(() => {
+    const collateralAddrs = collaterals.map(c => c.address);
+    return [...collateralAddrs, position.tokenAddress];
+  }, [collaterals, position.tokenAddress]);
 
-  const totalCollateralUsd = 0;
-  const debtUsd = 0;
-  const ltv = "0.0";
-  const refiHF = 999; // Safe default for Starknet
-  const hfColor = { tone: "text-success", badge: "badge-success" };
+  const { priceByAddress } = usePriceMap(priceAddresses, isOpen, 30000);
+
+  // Calculate USD value for a given address and amount
+  const getUsdValue = useCallback((address: string, humanAmount: string): number => {
+    if (!humanAmount || humanAmount === "0") return 0;
+    
+    const collateral = collaterals.find(c => addrKey(c.address) === addrKey(address));
+    if (!collateral) return 0;
+
+    try {
+      const amount = Number(formatUnits(parseUnits(humanAmount, collateral.decimals), collateral.decimals));
+      const priceRaw = priceByAddress[addrKey(address)];
+      if (!priceRaw) return 0;
+      
+      // Price is in 1e18 format, format with 18 decimals
+      const price = Number(formatUnits(priceRaw, 18));
+      return amount * price;
+    } catch {
+      return 0;
+    }
+  }, [collaterals, priceByAddress]);
+
+  // Calculate total collateral USD
+  const totalCollateralUsd = useMemo(() => {
+    return Object.entries(addedCollaterals).reduce((sum, [addr, amt]) => {
+      return sum + getUsdValue(addr, amt || "0");
+    }, 0);
+  }, [addedCollaterals, getUsdValue]);
+
+  // Calculate debt USD
+  const debtUsd = useMemo(() => {
+    if (!debtAmount || debtAmount === "0") return 0;
+    try {
+      const amount = Number(formatUnits(parseUnits(debtAmount, position.decimals), position.decimals));
+      const priceRaw = priceByAddress[addrKey(position.tokenAddress)];
+      if (!priceRaw) return 0;
+      
+      const price = Number(formatUnits(priceRaw, 18));
+      return amount * price;
+    } catch {
+      return 0;
+    }
+  }, [debtAmount, position.decimals, position.tokenAddress, priceByAddress]);
+
+  // Calculate LTV
+  const ltv = useMemo(() => {
+    if (totalCollateralUsd === 0) return "0.0";
+    return ((debtUsd / totalCollateralUsd) * 100).toFixed(1);
+  }, [debtUsd, totalCollateralUsd]);
+
+  // Health factor calculation (simplified - adjust based on your protocol requirements)
+  const refiHF = useMemo(() => {
+    if (totalCollateralUsd === 0) return 999;
+    // Simple calculation: HF = collateral / debt (higher is better)
+    const ratio = totalCollateralUsd / debtUsd;
+    return ratio > 0 ? ratio : 0;
+  }, [totalCollateralUsd, debtUsd]);
+
+  const hfColor = useMemo(() => {
+    if (refiHF >= 2.0) return { tone: "text-success", badge: "badge-success" };
+    if (refiHF >= 1.5) return { tone: "text-warning", badge: "badge-warning" };
+    return { tone: "text-error", badge: "badge-error" };
+  }, [refiHF]);
 
   /* --------------------------- Starknet execution --------------------------- */
   const legacy = useStarknetMovePositionLegacy({
