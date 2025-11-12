@@ -43,18 +43,18 @@ const ZeroLendProtocolView = dynamic(
 
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
-  { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
-  { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
   { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
+  { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
 const App: NextPage = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("base");
 
   // Keep a cache of networks the user has visited so we keep their trees mounted
-  const [mounted, setMounted] = useState<Set<string>>(new Set(["starknet"]));
+  const [mounted, setMounted] = useState<Set<string>>(new Set(["base"]));
   useEffect(() => {
     setMounted(prev => {
       if (prev.has(selectedNetwork)) return prev;
@@ -125,7 +125,7 @@ const App: NextPage = () => {
       <div className="flex-1 space-y-6">
         <NetworkFilter
           networks={networkOptions}
-          defaultNetwork="starknet"
+          defaultNetwork="base"
           onNetworkChange={handleNetworkChange}
         />
 
