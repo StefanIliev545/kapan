@@ -13,8 +13,12 @@ import {
 
 // Env vars and config
 const FORK = process.env.MAINNET_FORKING_ENABLED === "true";
-// Compound v3 USDC Comet on Arbitrum
-const COMPOUND_USDC_COMET = process.env.COMPOUND_USDC_COMET || "0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA";
+// Compound v3 USDC Comet (default Arbitrum One)
+// Mainnet: 0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA
+// Arbitrum: 0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf
+const COMPOUND_USDC_COMET =
+  process.env.COMPOUND_USDC_COMET ||
+  "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf";
 const USDC = (process.env.USDC || process.env.USDC_ARB || "0xaf88d065e77c8cC2239327C5EDb3A432268e5831").toLowerCase();
 const WETH = (process.env.WETH || process.env.WETH_ARB || "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1").toLowerCase();
 const USDC_WHALE = process.env.USDC_WHALE || "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D";
@@ -69,13 +73,8 @@ describe("v2 Compound end-to-end (fork)", function () {
       );
       await gateway.waitForDeployment();
 
-      // Register the USDC Comet
-      const comet = await ethers.getContractAt(
-        "contracts/v2/interfaces/compound/ICompoundComet.sol:ICompoundComet",
-        COMPOUND_USDC_COMET
-      );
-      await gateway.addComet(COMPOUND_USDC_COMET);
-      console.log(`Comet base token: ${await comet.baseToken()}`);
+      // Register the USDC Comet mapping explicitly (avoid on-chain baseToken() dependency)
+      await gateway.setCometForBase(USDC, COMPOUND_USDC_COMET);
 
       // Register gateway with router
       await (await router.addGateway("compound", await gateway.getAddress())).wait();

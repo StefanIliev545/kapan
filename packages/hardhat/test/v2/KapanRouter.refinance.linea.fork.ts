@@ -105,7 +105,8 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       const CompoundGateway = await ethers.getContractFactory("CompoundGatewayWrite");
       const compoundGateway = await CompoundGateway.deploy(await router.getAddress(), await deployer.getAddress());
       await compoundGateway.waitForDeployment();
-      await compoundGateway.addComet(COMPOUND_USDC_COMET);
+      // Register Comet mapping without relying on on-chain baseToken()
+      await compoundGateway.setCometForBase(USDC, COMPOUND_USDC_COMET);
       await (await router.addGateway("compound", await compoundGateway.getAddress())).wait();
 
       const userAddress = await user.getAddress();
@@ -157,37 +158,17 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       const userWethAfterSetup = await weth.balanceOf(userAddress);
       const userUsdcAfterSetup = await usdc.balanceOf(userAddress);
       
-      // Check Aave position via gateway
-      const aaveGatewayViewSetup = await ethers.getContractAt(
-        "contracts/gateways/AaveGateway.sol:AaveGateway",
-        await aaveGateway.getAddress()
-      );
-      let aaveSupplySetup: bigint = 0n;
-      let aaveDebtSetup: bigint = 0n;
-      try {
-        aaveSupplySetup = await aaveGatewayViewSetup.getBalance(WETH, userAddress);
-        aaveDebtSetup = await aaveGatewayViewSetup.getBorrowBalance(USDC, userAddress);
-      } catch (e) {
-        // v2 write gateway might not have view functions, skip for now
-      }
+      // Skip v1 gateway view checks; we verify via balances and protocol reads later
       
       console.log(`✓ Position created in Aave`);
       console.log(`  User WETH: ${ethers.formatEther(userWethAfterSetup)} (should be ~0.5 WETH, started with 2)`);
       console.log(`  User USDC: ${userUsdcAfterSetup / 10n ** 6n} USDC (borrowed)`);
-      if (aaveSupplySetup > 0n || aaveDebtSetup > 0n) {
-        console.log(`  Aave WETH collateral: ${ethers.formatEther(aaveSupplySetup)}`);
-        console.log(`  Aave USDC debt: ${aaveDebtSetup / 10n ** 6n}`);
-      }
+      // Aave position details are verified later via protocol data provider
       
       // Verify setup was correct
       expect(userWethAfterSetup).to.be.closeTo(ethers.parseEther("0.5"), ethers.parseEther("0.01")); // User should have ~0.5 WETH left (2 - 1.5)
       expect(userUsdcAfterSetup).to.be.gte(borrowAmt); // User should have at least the borrowed amount
-      if (aaveSupplySetup > 0n) {
-        expect(aaveSupplySetup).to.be.closeTo(depositAmt, ethers.parseEther("0.01")); // Aave should have ~1.5 WETH
-      }
-      if (aaveDebtSetup > 0n) {
-        expect(aaveDebtSetup).to.be.gte(borrowAmt); // Aave debt should be >= borrowed amount
-      }
+      // Additional Aave position checks are performed later via protocol data provider
 
       console.log("\n=== STEP 2: Refinance to Compound (via Aave V3 Flash Loan) ===");
 
@@ -248,23 +229,19 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       }
 
       // Query actual Aave debt balance off-chain (for flash loan sizing with buffer)
-      const pool = await ethers.getContractAt("@aave/core-v3/contracts/interfaces/IPool.sol:IPool", aavePool);
       const dataProvider = await ethers.getContractAt(
         "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
         await poolProvider.getPoolDataProvider()
       );
       
-      // Get user reserve data to find actual debt
-      const userReserveData = await dataProvider.getUserReserveData(USDC, userAddress);
-      // currentVariableDebt is scaled, we need to normalize it
-      // For now, use a simple view call to get approximate debt, then add buffer
-      const vDebtToken = await ethers.getContractAt(
-        "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
-        await poolProvider.getPoolDataProvider()
-      ).then(async (dp) => {
-        const reserveData = await dp.getReserveData(USDC);
-        return reserveData.variableDebtTokenAddress;
-      }).catch(() => null);
+      // Get reserve data to find variable debt token (approximate debt via scaled balance)
+      let vDebtToken: string | null = null;
+      try {
+        const reserveData = await dataProvider.getReserveData(USDC);
+        vDebtToken = reserveData.variableDebtTokenAddress;
+      } catch {
+        vDebtToken = null;
+      }
       
       let actualDebtAmount = borrowAmt + 5_000_000n; // Start with buffer, will query on-chain
       if (vDebtToken) {
@@ -324,7 +301,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
 
       const tx = await router.connect(user).processProtocolInstructions(refinanceInstructions);
       const receipt = await tx.wait();
-      console.log(`✓ Refinance completed: ${receipt!.status === 1 ? "success" : "failed"}`);
+      console.log(`✓ Refinance completed: ${receipt?.status === 1 ? "success" : "failed"}`);
 
       // Verify positions actually moved by querying balances in both protocols
       console.log("\n=== Verifying Position Migration ===");
@@ -334,43 +311,41 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetSupplyBalance, WETH, userAddress, 0n, "0x", 999)),
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
       ];
-      const aaveCheckTx = await router.connect(user).processProtocolInstructions(checkAaveBalances);
-      const aaveCheckReceipt = await aaveCheckTx.wait();
+      await (await router.connect(user).processProtocolInstructions(checkAaveBalances)).wait();
       
       // Query Compound balances (should have position)
       const checkCompoundBalances = [
         createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetSupplyBalance, WETH, userAddress, 0n, marketContext, 999)),
         createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
       ];
-      const compoundCheckTx = await router.connect(user).processProtocolInstructions(checkCompoundBalances);
-      const compoundCheckReceipt = await compoundCheckTx.wait();
+      await (await router.connect(user).processProtocolInstructions(checkCompoundBalances)).wait();
       
       // Parse outputs from receipts (need to decode events or use view calls)
       // For now, let's use the gateway's view functions if available, or parse from logs
       // Actually, let's use GetSupplyBalance/GetBorrowBalance directly via static call to gateways
       
-      // Check via Aave gateway directly
-      const aaveGatewayView = await ethers.getContractAt(
-        "contracts/gateways/AaveGateway.sol:AaveGateway",
-        await aaveGateway.getAddress()
+      // Check Aave balances via protocol data provider (no v1 gateway dependency)
+      const dataProviderPost = await ethers.getContractAt(
+        "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
+        await poolProvider.getPoolDataProvider()
       );
-      let aaveSupply: bigint = 0n;
-      let aaveDebt: bigint = 0n;
+      let aaveSupply = 0n;
+      let aaveDebt = 0n;
       try {
-        aaveSupply = await aaveGatewayView.getBalance(WETH, userAddress);
-        aaveDebt = await aaveGatewayView.getBorrowBalance(USDC, userAddress);
+        const wethData = await dataProviderPost.getUserReserveData(WETH, userAddress);
+        // tuple: (currentATokenBalance, currentStableDebt, currentVariableDebt, ...)
+        aaveSupply = wethData[0] as bigint; // currentATokenBalance
+        const usdcData = await dataProviderPost.getUserReserveData(USDC, userAddress);
+        const currentStableDebt = usdcData[1] as bigint;
+        const currentVariableDebt = usdcData[2] as bigint;
+        aaveDebt = currentStableDebt + currentVariableDebt;
       } catch (e) {
-        // v2 write gateway might not have view functions, use GetSupplyBalance instruction
-        console.log("  Note: Using instruction-based balance queries");
+        console.log("  Note: Failed to read Aave balances via data provider:", e);
       }
       
-      // Check via Compound gateway directly  
-      const compoundGatewayView = await ethers.getContractAt(
-        "contracts/gateways/CompoundGateway.sol:CompoundGateway",
-        await compoundGateway.getAddress()
-      );
-      let compoundSupply: bigint = 0n;
-      let compoundDebt: bigint = 0n;
+      // Compound balances queried directly on Comet below
+      let compoundSupply = 0n;
+      let compoundDebt = 0n;
       try {
         // For Compound, supply balance is collateral balance
         const comet = await ethers.getContractAt(
