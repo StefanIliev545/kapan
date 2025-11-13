@@ -8,7 +8,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const contracts = {
   10: {
     AaveGatewayView: {
-      address: "0x5299934b12a0cbDAed6038A57d54088574a5e444",
+      address: "0x9162c976DaE8B70505EA8060941113f181E449D8",
       abi: [
         {
           inputs: [
@@ -386,7 +386,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x059E341e66593eC62D9Ae7EB732EDb31035e60C9",
+      address: "0xb1A2B93bCe0aa8B29d2835Ea98Bb2C9959879470",
       abi: [
         {
           inputs: [
@@ -724,7 +724,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x0403008E441FD369aDaa9475b350ae7a2C9f49F5",
+      address: "0x8CA472aE9A5686cE709C6Dd3D7bD2d5418C4D149",
       abi: [
         {
           inputs: [
@@ -1500,7 +1500,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x4dcD4963dEe4562ae515bB3B0Da2A4Dd75a3B0DA",
+      address: "0x6c25206b853E7D6eFd330c2EC967d6D2922EfD7c",
       abi: [
         {
           inputs: [
@@ -2018,7 +2018,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x5B18152cac8779935Cc2A8525D49ffda7c94ffA3",
+      address: "0xcD2905D79d9cA063eda9E79774e489557A8841f6",
       abi: [
         {
           inputs: [
@@ -3048,7 +3048,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x3afB39c0aeEdfB524dC61f039B636C32E56b6b9C",
+      address: "0x23a0ebBf8Cd9911a3d71c799Dc9b514aC132C91D",
       abi: [
         {
           inputs: [
@@ -3075,7 +3075,7 @@ const contracts = {
   },
   8453: {
     AaveGatewayView: {
-      address: "0x4A18398E7410BF84BD61b6261409Bf17A94CBc6d",
+      address: "0x2706b25b9130261bC8e601f19207fE0d4bCa5BDd",
       abi: [
         {
           inputs: [
@@ -3440,7 +3440,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x943F487DaAD34cA25eeCe608E4CD03847930448c",
+      address: "0x6040cd66D10165FAC001b3cB643A2775581dF521",
       abi: [
         {
           inputs: [
@@ -3778,7 +3778,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0xDf4A8dDcC1cCFC742497f04599d4A6fD4e9Eea22",
+      address: "0xAe1AfC4f36DFA8B6b6D1AdDd272Cd943eD1bF79a",
       abi: [
         {
           inputs: [
@@ -4554,7 +4554,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xf1fD6a7832c5daA332741bF1576a1163Ea8240fB",
+      address: "0xdC2b5e46001EA7aEb930E5f533c65159eDb7b539",
       abi: [
         {
           inputs: [
@@ -5072,7 +5072,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x8Ae8bff63F92E9eC228579D1ecECF1f277C5bfc0",
+      address: "0xDb9c345b561e0C45c9611C00C7719E8815749Fd1",
       abi: [
         {
           inputs: [
@@ -5682,7 +5682,7 @@ const contracts = {
       },
     },
     OptimalInterestRateFinder: {
-      address: "0xDa5230AAf5eCe34eD9a0BEcb5e5DD47ed61d1416",
+      address: "0x75795Cd43dF9Ce2d6f4816CB2d40c33a754A5C0C",
       abi: [
         {
           inputs: [
@@ -6102,7 +6102,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xBd4D85e456126EF286e76f2A0F10dD395C10300A",
+      address: "0x9E1CA8a7c87A245d81857A45b6C7857f28002eAb",
       abi: [
         {
           inputs: [
@@ -6127,7 +6127,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x0BdBeE9d5EB3C6f9f10533104021d8ee8F47B226",
+      address: "0xCAF6c6C82d2f91a4B2d3C8a5EDa651E32F30D991",
       abi: [
         {
           inputs: [
@@ -6734,15 +6734,10 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0xd0F8EE01c3655C560A4fc4bFa51ebF3270531204",
+      address: "0x339D9525E5F84a5C4f86809c386961BEe5B5D6f5",
       abi: [
         {
           inputs: [
-            {
-              internalType: "address",
-              name: "_comptroller",
-              type: "address",
-            },
             {
               internalType: "address",
               name: "router",
@@ -6750,7 +6745,7 @@ const contracts = {
             },
             {
               internalType: "address",
-              name: "owner_",
+              name: "_comptroller",
               type: "address",
             },
           ],
@@ -6785,28 +6780,6 @@ const contracts = {
           type: "error",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "owner",
-              type: "address",
-            },
-          ],
-          name: "OwnableInvalidOwner",
-          type: "error",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "account",
-              type: "address",
-            },
-          ],
-          name: "OwnableUnauthorizedAccount",
-          type: "error",
-        },
-        {
           inputs: [],
           name: "ReentrancyGuardReentrantCall",
           type: "error",
@@ -6821,25 +6794,6 @@ const contracts = {
           ],
           name: "SafeERC20FailedOperation",
           type: "error",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "previousOwner",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newOwner",
-              type: "address",
-            },
-          ],
-          name: "OwnershipTransferred",
-          type: "event",
         },
         {
           inputs: [],
@@ -6982,19 +6936,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "owner",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [
             {
               components: [
@@ -7043,13 +6984,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "renounceOwnership",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
           inputs: [
             {
               internalType: "address",
@@ -7075,32 +7009,6 @@ const contracts = {
               type: "uint256",
             },
           ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_comptroller",
-              type: "address",
-            },
-          ],
-          name: "setComptroller",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "newOwner",
-              type: "address",
-            },
-          ],
-          name: "transferOwnership",
-          outputs: [],
           stateMutability: "nonpayable",
           type: "function",
         },
@@ -7143,13 +7051,10 @@ const contracts = {
         authorize: "contracts/v2/interfaces/IGateway.sol",
         processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
-        owner: "@openzeppelin/contracts/access/Ownable.sol",
-        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
-        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
     ZeroLendGatewayView: {
-      address: "0xd02D6237aaFF2D852f4DC964f20c28C06ED603ba",
+      address: "0xF7B151e3378ED81dA41D60e28f84c580a1b7bE42",
       abi: [
         {
           inputs: [
@@ -7514,7 +7419,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x6971c26ee2b02E2E94118618a2AdBd2243C49134",
+      address: "0x06E4Bfa2cB54EdeE0792F7f560bf068a2F42fFfA",
       abi: [
         {
           inputs: [
@@ -8266,7 +8171,7 @@ const contracts = {
   },
   42161: {
     AaveGatewayView: {
-      address: "0xEc026B6148F0dA6e4Ab1CA0d15c800A8c3f86A32",
+      address: "0xcD8d03b7ee5b53406cfc96215aE82A05f57703A8",
       abi: [
         {
           inputs: [
@@ -8644,7 +8549,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x5055ea09c90Ec905D2E0eBc8C0375849469E50aC",
+      address: "0xbC0b1B0AD983123fea1651b664E12F99059ebA48",
       abi: [
         {
           inputs: [
@@ -8982,7 +8887,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x005Abc0bAA66D629cCeef9b5083218C9475A6a57",
+      address: "0x654Ca74115a729a145040f4d80AbE03C7793992c",
       abi: [
         {
           inputs: [
@@ -9758,7 +9663,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x6A9a8FC1167F566F6F85Dd3B265cBC28c2c234B6",
+      address: "0xb361224576739e6861955721dd7d4587EF855178",
       abi: [
         {
           inputs: [
@@ -10276,7 +10181,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x117E73E7AE75Edb4A39c7caBDD683c23f5E5E689",
+      address: "0x0853C12377f9A83978376D2473aEcD032FCc7714",
       abi: [
         {
           inputs: [
@@ -11306,7 +11211,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xF858BD8775ef9855723704D91b7De6Ca86478fAA",
+      address: "0xb3Ea0C36095BF539FEC33b6Bb8a15C9CC7E6fD7D",
       abi: [
         {
           inputs: [
@@ -11331,7 +11236,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x7ec5AA0787B2Da99212371f1Eb7CffE2d926326A",
+      address: "0x8a093A21bD3dDa7Ef74c6EAf8909D59721C23994",
       abi: [
         {
           inputs: [
@@ -11938,15 +11843,10 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0xaa9E591BD9A2D98fab3d44d0f9637A29f688382A",
+      address: "0xeBE14dd4Caf25ddAbDB7fF363bC005b6D0a19E69",
       abi: [
         {
           inputs: [
-            {
-              internalType: "address",
-              name: "_comptroller",
-              type: "address",
-            },
             {
               internalType: "address",
               name: "router",
@@ -11954,7 +11854,7 @@ const contracts = {
             },
             {
               internalType: "address",
-              name: "owner_",
+              name: "_comptroller",
               type: "address",
             },
           ],
@@ -11989,28 +11889,6 @@ const contracts = {
           type: "error",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "owner",
-              type: "address",
-            },
-          ],
-          name: "OwnableInvalidOwner",
-          type: "error",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "account",
-              type: "address",
-            },
-          ],
-          name: "OwnableUnauthorizedAccount",
-          type: "error",
-        },
-        {
           inputs: [],
           name: "ReentrancyGuardReentrantCall",
           type: "error",
@@ -12025,25 +11903,6 @@ const contracts = {
           ],
           name: "SafeERC20FailedOperation",
           type: "error",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "previousOwner",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newOwner",
-              type: "address",
-            },
-          ],
-          name: "OwnershipTransferred",
-          type: "event",
         },
         {
           inputs: [],
@@ -12186,19 +12045,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "owner",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [
             {
               components: [
@@ -12247,13 +12093,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "renounceOwnership",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
           inputs: [
             {
               internalType: "address",
@@ -12279,32 +12118,6 @@ const contracts = {
               type: "uint256",
             },
           ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_comptroller",
-              type: "address",
-            },
-          ],
-          name: "setComptroller",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "newOwner",
-              type: "address",
-            },
-          ],
-          name: "transferOwnership",
-          outputs: [],
           stateMutability: "nonpayable",
           type: "function",
         },
@@ -12347,15 +12160,12 @@ const contracts = {
         authorize: "contracts/v2/interfaces/IGateway.sol",
         processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
-        owner: "@openzeppelin/contracts/access/Ownable.sol",
-        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
-        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
   },
   59144: {
     AaveGatewayView: {
-      address: "0x6aBd4e8395B10107122174f5ef18de76e0161e55",
+      address: "0xB69860E2AA499F795C0B3266233eB990d8F198f3",
       abi: [
         {
           inputs: [
@@ -12733,7 +12543,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xd2E8A530e5cbcA3ef25E45cbFd932Be56406e934",
+      address: "0x093b81E3a06A79C53172Ca75A0cE0A458B2303Ca",
       abi: [
         {
           inputs: [
@@ -13071,7 +12881,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x2C378C42Bb5dd96E132BEFE7E797f0CfE3ec79c4",
+      address: "0x0dd7D6DcedEe8c6e442457F6055033250C3078c2",
       abi: [
         {
           inputs: [
@@ -13847,7 +13657,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x90704e3A4eE27019e2Eb55957c76829027b050CA",
+      address: "0x28f1Ce953351d0355ED1A76ceA7827A0aC5AAa8D",
       abi: [
         {
           inputs: [
@@ -14365,7 +14175,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x0B2c84867aC6Dd369368cdd959C420A85485974E",
+      address: "0x52a843D3C92c823E4a3c96241a8233E3d0B51eef",
       abi: [
         {
           inputs: [
@@ -15395,7 +15205,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xC0FE0763317a8039a999f84F7791a83B94921Fde",
+      address: "0x24D5a12635FDa65e6a5e616Fa301510644D58D2C",
       abi: [
         {
           inputs: [
@@ -15420,7 +15230,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayView: {
-      address: "0xadDC5Ed0a8dd01C836152A2d0d86aaf2740cED67",
+      address: "0x5cfCfE952d5Ee94245Cf12B9488f6a6CeC8B6867",
       abi: [
         {
           inputs: [
@@ -15785,7 +15595,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x974A40B405e14bc922C087f8d66695d7C1a2BDdc",
+      address: "0xdaDFA8addA4Bf64f4713b2Ab8486DEF2E10146a7",
       abi: [
         {
           inputs: [

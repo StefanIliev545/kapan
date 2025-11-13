@@ -29,21 +29,21 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
     function addComet(ICompoundComet comet) external onlyOwner {
         address base = comet.baseToken();
         require(base != address(0), "Compound: base=0");
-        address prev = address(tokenToComet[base]);
-
+        require(!_isRegistered[address(comet)], "Compound: already registered");
+        
         tokenToComet[base] = comet;
-        if (!_isRegistered[address(comet)]) { _isRegistered[address(comet)] = true; _comets.push(address(comet)); }
+        _isRegistered[address(comet)] = true; 
+        _comets.push(address(comet));
         emit CometRegistered(base, address(comet));
-        if (prev != address(0) && prev != address(comet)) emit CometReplaced(base, prev, address(comet));
     }
 
     function setCometForBase(address baseToken, address comet_) external onlyOwner {
         require(baseToken != address(0) && comet_ != address(0), "Compound: zero");
-        address prev = address(tokenToComet[baseToken]);
+        require(address(tokenToComet[baseToken]) == address(0), "Compound: comet already set");
+        require(!_isRegistered[comet_], "Compound: comet already registered");
+
         tokenToComet[baseToken] = ICompoundComet(comet_);
-        if (!_isRegistered[comet_]) { _isRegistered[comet_] = true; _comets.push(comet_); }
         emit CometRegistered(baseToken, comet_);
-        if (prev != address(0) && prev != comet_) emit CometReplaced(baseToken, prev, comet_);
     }
 
     function allComets() external view returns (address[] memory) { return _comets; }

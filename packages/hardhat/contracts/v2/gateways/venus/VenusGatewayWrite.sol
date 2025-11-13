@@ -11,20 +11,15 @@ import {VTokenInterface} from "../../../interfaces/venus/VTokenInterface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract VenusGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
+contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    ComptrollerInterface public comptroller;
+    ComptrollerInterface immutable public comptroller;
 
-    constructor(address _comptroller, address router, address owner_) ProtocolGateway(router) Ownable(owner_) {
+    constructor(address router, address _comptroller) ProtocolGateway(router) {
         comptroller = ComptrollerInterface(_comptroller);
     }
-
-    function setComptroller(address _comptroller) external onlyOwner { comptroller = ComptrollerInterface(_comptroller); }
-
-    
 
     function processLendingInstruction(ProtocolTypes.Output[] calldata inputs, bytes calldata data)
         external
