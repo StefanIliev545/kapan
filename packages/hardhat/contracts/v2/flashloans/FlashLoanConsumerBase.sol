@@ -52,6 +52,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
 
     // ----------------- Internal state guard -----------------
     bool private flashLoanEnabled;
+    address private authorizedFlashSender;
 
     // ----------------- Events (optional, helpful for tracing) -----------------
     event FlashRequested(bytes32 provider, address indexed token, uint256 amount);
@@ -101,7 +102,16 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
 
     modifier flashLoanOnly() {
         require(flashLoanEnabled, "Flash loan not enabled");
+        require(msg.sender == authorizedFlashSender, "Unauthorized flash caller");
         _;
+    }
+
+    modifier authorizeFlashLoan(address expectedSender) {
+        flashLoanEnabled = true;
+        authorizedFlashSender = expectedSender;
+        _;
+        authorizedFlashSender = address(0);
+        flashLoanEnabled = false;
     }
 
     // ============================================================
@@ -109,7 +119,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     // ============================================================
 
     /// @notice Request a Balancer v2 flash loan (single-asset for simplicity).
-    function _requestBalancerV2(address token, uint256 amount, bytes memory userData) internal enableFlashLoan {
+    function _requestBalancerV2(address token, uint256 amount, bytes memory userData) internal authorizeFlashLoan(address(balancerV2Vault)) {
         require(balancerV2Enabled(), "Balancer v2 disabled");
 
         IERC20[] memory tokens = new IERC20[](1);
@@ -145,7 +155,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     // ============================================================
 
     /// @notice Request a Balancer v3 "unlocked" context; vault will callback with our calldata.
-    function _requestBalancerV3(address token, uint256 amount) internal enableFlashLoan {
+    function _requestBalancerV3(address token, uint256 amount) internal authorizeFlashLoan(address(balancerV3Vault)) {
         require(balancerV3Enabled(), "Balancer v3 disabled");
 
         bytes memory userData = abi.encode(token, amount);
@@ -181,7 +191,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     /// @param token Asset to borrow
     /// @param amount Amount to borrow
     /// @param userData Arbitrary data forwarded to executeOperation and to _afterFlashLoan
-    function _requestAaveV3(address token, uint256 amount, bytes memory userData) internal enableFlashLoan {
+    function _requestAaveV3(address token, uint256 amount, bytes memory userData) internal authorizeFlashLoan(address(aaveV3Pool)) {
         require(aaveEnabled(), "Aave v3 disabled");
         emit FlashRequested("AAVE_V3", token, amount);
         // referralCode = 0
@@ -226,7 +236,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
         address token,
         uint256 amount,
         bytes memory userData
-    ) internal enableFlashLoan {
+    ) internal authorizeFlashLoan(pool) {
         require(uniswapEnabled(), "Uniswap v3 disabled");
         require(pool != address(0), "Pool required");
         require(amount > 0, "Amount=0");

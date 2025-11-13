@@ -45,7 +45,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   const venusGatewayWrite = await deploy("VenusGatewayWrite", {
     from: deployer,
-    args: [VENUS_COMPTROLLER, kapanRouter.address, deployer], // comptroller, router, owner
+    args: [kapanRouter.address, VENUS_COMPTROLLER], // router, comptroller
     log: true,
     autoMine: true,
     deterministicDeployment: deterministicSalt(hre, "VenusGatewayWrite"),
