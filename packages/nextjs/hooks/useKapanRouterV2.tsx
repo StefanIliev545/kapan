@@ -302,13 +302,15 @@ export const useKapanRouterV2 = () => {
    * @param amount - Amount to repay (as string) or "max" for full wallet balance
    * @param decimals - Token decimals (default: 18)
    * @param isMax - Whether to repay maximum (uses wallet balance, not MaxUint256)
+   * @param maxPullAmount - Optional cap for the amount pulled from the wallet when repaying max
    */
   const buildRepayFlowAsync = useCallback(async (
     protocolName: string,
     tokenAddress: string,
     amount: string,
     decimals = 18,
-    isMax = false
+    isMax = false,
+    maxPullAmount?: bigint
   ): Promise<ProtocolInstruction[]> => {
     if (!userAddress || !publicClient) return [];
 
@@ -319,7 +321,8 @@ export const useKapanRouterV2 = () => {
     let pullAmount: bigint;
     if (isMax || amount.toLowerCase() === "max") {
       // For max repayments, pull 1% more to account for interest accrual/variation
-      pullAmount = (parseUnits(amount, decimals) * 101n) / 100n;
+      const requested = (parseUnits(amount, decimals) * 101n) / 100n;
+      pullAmount = maxPullAmount != null && maxPullAmount < requested ? maxPullAmount : requested;
     } else {
       pullAmount = parseUnits(amount, decimals);
     }
