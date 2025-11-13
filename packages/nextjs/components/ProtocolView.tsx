@@ -182,7 +182,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // - If showing all, show everything in the borrowedPositions array
   const filteredBorrowedPositions = (effectiveShowAll
     ? borrowedPositions
-    : borrowedPositions.filter(p => p.balance < 0)).map(p =>
+    : borrowedPositions.filter(p => p.balance < 0 || (p.collateralValue ?? 0) > 0)).map(p =>
     readOnly
       ? {
           ...p,
