@@ -3,14 +3,25 @@ import { Chain, createClient, fallback, http } from "viem";
 import { hardhat, mainnet } from "viem/chains";
 import { createConfig } from "wagmi";
 import scaffoldConfig, { DEFAULT_ALCHEMY_API_KEY } from "~~/scaffold.config";
-import { getAlchemyHttpUrl } from "~~/utils/scaffold-eth";
+import { getRpcFallbackUrls, withAlchemyRpcPreference } from "~~/utils/scaffold-eth";
 
 const { targetEVMNetworks: targetNetworks } = scaffoldConfig;
 
 // We always want to have mainnet enabled (ENS resolution, ETH price, etc). But only once.
-export const enabledChains = targetNetworks.find((network: Chain) => network.id === 1)
+const baseEnabledChains = targetNetworks.find((network: Chain) => network.id === 1)
   ? targetNetworks
-  : ([...targetNetworks, mainnet] as const);
+  : [...targetNetworks, mainnet];
+
+if (baseEnabledChains.length === 0) {
+  throw new Error("At least one chain must be enabled");
+}
+
+const [firstEnabledChain, ...restEnabledChains] = baseEnabledChains;
+
+export const enabledChains = [
+  withAlchemyRpcPreference(firstEnabledChain),
+  ...restEnabledChains.map(chain => withAlchemyRpcPreference(chain)),
+] as [Chain, ...Chain[]];
 
 const clientCache = new Map<number, any>();
 
@@ -23,12 +34,9 @@ export const wagmiConfig = createConfig({
     const cached = clientCache.get(chain.id);
     if (cached) return cached;
 
-    let rpcFallbacks = [http()];
-
-    const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
-    if (alchemyHttpUrl) {
-      // Prefer Alchemy first to avoid public RPC rate limits
-      rpcFallbacks = [http(alchemyHttpUrl), http()];
+    let rpcFallbacks = getRpcFallbackUrls(chain).map(url => http(url));
+    if (rpcFallbacks.length === 0) {
+      rpcFallbacks = [http()];
     }
 
     const client = createClient({

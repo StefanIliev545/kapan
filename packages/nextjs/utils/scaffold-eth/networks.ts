@@ -1,3 +1,4 @@
+import type { Chain } from "viem";
 import * as chains from "viem/chains";
 import scaffoldConfig from "~~/scaffold.config";
 
@@ -40,6 +41,55 @@ export const getAlchemyHttpUrl = (chainId: number) => {
   return scaffoldConfig.alchemyApiKey && RPC_CHAIN_NAMES[chainId]
     ? `https://${RPC_CHAIN_NAMES[chainId]}.g.alchemy.com/v2/${scaffoldConfig.alchemyApiKey}`
     : undefined;
+};
+
+const pushUnique = (collection: string[], value?: string) => {
+  if (value && !collection.includes(value)) {
+    collection.push(value);
+  }
+};
+
+export const getRpcFallbackUrls = (chain: Chain) => {
+  const rpcUrls: string[] = [];
+
+  const alchemyHttpUrl = getAlchemyHttpUrl(chain.id);
+  pushUnique(rpcUrls, alchemyHttpUrl);
+
+  const defaultRpcUrls = chain.rpcUrls?.default?.http ?? [];
+  defaultRpcUrls.forEach(url => pushUnique(rpcUrls, url));
+
+  const publicRpcUrls = chain.rpcUrls?.public?.http ?? [];
+  publicRpcUrls.forEach(url => pushUnique(rpcUrls, url));
+
+  return rpcUrls;
+};
+
+export const withAlchemyRpcPreference = <T extends Chain>(chain: T): T => {
+  const prioritizedUrls = getRpcFallbackUrls(chain);
+  if (prioritizedUrls.length === 0) {
+    return chain;
+  }
+
+  const rpcUrls: Chain["rpcUrls"] = {
+    ...chain.rpcUrls,
+    default: {
+      ...chain.rpcUrls?.default,
+      http: prioritizedUrls,
+    },
+    ...(chain.rpcUrls?.public
+      ? {
+          public: {
+            ...chain.rpcUrls.public,
+            http: prioritizedUrls,
+          },
+        }
+      : {}),
+  };
+
+  return {
+    ...chain,
+    rpcUrls,
+  } as T;
 };
 
 export const NETWORKS_EXTRA_DATA: Record<string, ChainAttributes> = {
@@ -139,7 +189,7 @@ export function getBlockExplorerAddressLink(network: chains.Chain, address: stri
  */
 export function getTargetNetworks(): ChainWithAttributes[] {
   return scaffoldConfig.targetEVMNetworks.map(targetNetwork => ({
-    ...targetNetwork,
+    ...withAlchemyRpcPreference(targetNetwork),
     ...NETWORKS_EXTRA_DATA[targetNetwork.id],
   }));
 }
