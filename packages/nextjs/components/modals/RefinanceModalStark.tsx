@@ -17,6 +17,7 @@ import { normalizeStarknetAddress } from "~~/utils/vesu";
 import { useStarknetCollateralSupport } from "~~/hooks/useStarknetCollateralSupport";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark/useScaffoldReadContract";
 import { RefinanceModalContent } from "./RefinanceModalContent";
 
 /* ------------------------------ Helpers ------------------------------ */
@@ -203,6 +204,38 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     onAddCollateral,
   } = state;
 
+  const starkCollateralAddresses = useMemo(
+    () => collaterals.map(c => c.address),
+    [collaterals],
+  );
+
+  const starkPriceArgs = useMemo(() => {
+    if (!starkCollateralAddresses.length) return undefined;
+    return [...starkCollateralAddresses, position.tokenAddress];
+  }, [starkCollateralAddresses, position.tokenAddress]);
+
+  const starkPriceArgsTuple = useMemo<readonly [string[] | undefined]>(
+    () => [starkPriceArgs] as const,
+    [starkPriceArgs],
+  );
+
+  const { data: starkTokenPrices } = useScaffoldReadContract({
+    contractName: "UiHelper",
+    functionName: "get_asset_prices",
+    args: starkPriceArgsTuple,
+    enabled: isOpen && Boolean(starkPriceArgs?.length),
+  });
+
+  const starkTokenToPrices = useMemo(() => {
+    if (!starkTokenPrices || !starkPriceArgs?.length) return {} as Record<string, bigint>;
+    const prices = starkTokenPrices as unknown as bigint[];
+    return starkPriceArgs.reduce((acc, address, index) => {
+      const price = prices[index] ?? 0n;
+      acc[addrKey(address)] = price / 10n ** 10n;
+      return acc;
+    }, {} as Record<string, bigint>);
+  }, [starkTokenPrices, starkPriceArgs]);
+
   /* ---------------------- Support map for selection --------------------- */
   const { supportedCollateralMap: starknetSupportedMap } = useStarknetCollateralSupport(
     fromProtocol,
@@ -245,7 +278,15 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         }
       }
     }
-  }, [isOpen, preSelectedCollaterals, collaterals, expandedCollateral, setExpandedCollateral, setTempAmount]);
+  }, [
+    isOpen,
+    preSelectedCollaterals,
+    collaterals,
+    expandedCollateral,
+    setExpandedCollateral,
+    setTempAmount,
+    setTempIsMax,
+  ]);
 
   /* -------------------------- Stable selections ------------------------- */
   useEffect(() => {
@@ -288,7 +329,18 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         if (next) setSelectedV2PoolAddress(next);
       }
     }
-  }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress]);
+  }, [
+    isOpen,
+    selectedProtocol,
+    selectedVersion,
+    starkVesuPools,
+    fromProtocol,
+    position.poolId,
+    selectedPoolId,
+    selectedV2PoolAddress,
+    setSelectedPoolId,
+    setSelectedV2PoolAddress,
+  ]);
 
   useEffect(() => {
     if (!(isOpen && !debtConfirmed)) return;
@@ -301,18 +353,52 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   }, [isOpen, resetState]);
 
   /* ------------------------ Price‑based calculations -------------------- */
-  // For Starknet, we don't calculate USD values (return 0)
-  const getUsdValue = useCallback((address: string, humanAmount: string): number => {
-    void address;
-    void humanAmount;
-    return 0;
-  }, []);
+  const debtPrice8 = starkTokenToPrices[addrKey(position.tokenAddress)] ?? 0n;
 
-  const totalCollateralUsd = 0;
-  const debtUsd = 0;
-  const ltv = "0.0";
-  const refiHF = 999; // Safe default for Starknet
-  const hfColor = { tone: "text-success", badge: "badge-success" };
+  const debtUsd = useMemo(() => {
+    if (!debtConfirmed) return 0;
+    const parsed = parseFloat((debtAmount || "").trim() || "0");
+    if (Number.isNaN(parsed) || parsed <= 0) return 0;
+    if (!debtPrice8) return 0;
+    return parsed * Number(formatUnits(debtPrice8, 8));
+  }, [debtAmount, debtConfirmed, debtPrice8]);
+
+  const getUsdValue = useCallback(
+    (address: string, humanAmount: string): number => {
+      const amt = parseFloat((humanAmount || "").trim() || "0");
+      if (Number.isNaN(amt) || amt <= 0) return 0;
+      const price8 = starkTokenToPrices[addrKey(address)] ?? 0n;
+      if (!price8) return 0;
+      return amt * Number(formatUnits(price8, 8));
+    },
+    [starkTokenToPrices],
+  );
+
+  const totalCollateralUsd = useMemo(() => {
+    let acc = 0;
+    for (const [addr, amt] of Object.entries(addedCollaterals)) {
+      acc += getUsdValue(addr, amt);
+    }
+    return acc;
+  }, [addedCollaterals, getUsdValue]);
+
+  const ltv = useMemo(() => {
+    if (!totalCollateralUsd) return "0.0";
+    if (!debtUsd) return "0.0";
+    return ((debtUsd / totalCollateralUsd) * 100).toFixed(1);
+  }, [debtUsd, totalCollateralUsd]);
+
+  const refiHF = useMemo(() => {
+    if (!debtUsd) return 999;
+    if (!totalCollateralUsd) return 0;
+    return totalCollateralUsd / debtUsd;
+  }, [debtUsd, totalCollateralUsd]);
+
+  const hfColor = useMemo(() => {
+    if (refiHF >= 2 || refiHF === 999) return { tone: "text-success", badge: "badge-success" };
+    if (refiHF >= 1.5) return { tone: "text-warning", badge: "badge-warning" };
+    return { tone: "text-error", badge: "badge-error" };
+  }, [refiHF]);
 
   /* --------------------------- Starknet execution --------------------------- */
   const legacy = useStarknetMovePositionLegacy({
@@ -328,6 +414,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     collaterals,
     selectedPoolId,
     selectedV2PoolAddress,
+    tokenToPrices: starkTokenToPrices,
   });
 
   const sendStarkAsync = legacy.sendAsync;
