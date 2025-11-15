@@ -9,8 +9,7 @@ import { formatUnits, type Address } from "viem";
 import type { Abi } from "abitype";
 
 import { NetworkFilter, type NetworkOption } from "~~/components/NetworkFilter";
-import CallToAction, { type CallToActionSectionProps } from "~~/components/common/CallToAction";
-import { RefinanceModalEvm } from "~~/components/modals/RefinanceModalEvm";
+import { RefinanceModalEvm } from "~~/components/modals/RefinanceModalEvmDemo";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { useDeployedContractInfo, useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
@@ -77,24 +76,6 @@ const ImportToAavePage: NextPage = () => {
     }),
     [],
   );
-
-  const ctaSections: CallToActionSectionProps[] = [
-    {
-      title: "⭐ Support on X",
-      description:
-        "We’re building real infra for DeFi users — your follow helps us reach more builders.",
-      buttonText: "Follow @KapanFinance",
-      buttonLink: "https://x.com/KapanFinance",
-    },
-    {
-      title: "🌱 Fund via Giveth",
-      description:
-        "Everything we ship here is free to use. If it already saves you gas and time, you can support us on Giveth.",
-      buttonText: "Support on Giveth",
-      buttonLink:
-        "https://giveth.io/project/kapan-finance-defi-lending-management-protocol",
-    },
-  ];
 
   /* ---------------------- collect borrows from all protocols --------------------- */
 
@@ -266,11 +247,6 @@ const ImportToAavePage: NextPage = () => {
             </div>
           </section>
         </main>
-
-        {/* CTA */}
-        <section className="mt-4">
-          <CallToAction sections={ctaSections} />
-        </section>
       </div>
 
       {/* Refinance modal → Aave */}
