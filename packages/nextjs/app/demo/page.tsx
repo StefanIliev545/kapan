@@ -193,7 +193,7 @@ const ImportToAavePage: NextPage = () => {
                     Open a position in ZeroLend, Compound or Venus and it will appear here automatically.
                   </div>
                 ) : (
-                  <BorrowList items={allBorrows} onSelect={openRefiModal} />
+                  <BorrowList items={allBorrows} onSelect={openRefiModal} aaveBorrowPositions={aavePositions.borrowedPositions} />
                 )}
               </div>
             </div>
@@ -261,14 +261,24 @@ export default ImportToAavePage;
 /* -------------------------------------------------------------------------- */
 
 const BorrowList: FC<{
-  items: AggregatedBorrow[];
-  onSelect: (fromProtocol: string, position: ProtocolPosition) => void;
-}> = ({ items, onSelect }) => {
-  return (
+    items: AggregatedBorrow[];
+    onSelect: (fromProtocol: string, position: ProtocolPosition) => void;
+    aaveBorrowPositions: ProtocolPosition[];
+  }> = ({ items, onSelect, aaveBorrowPositions }) => {
+    const findAaveBorrowRate = (symbol: string | undefined) => {
+      if (!symbol) return null;
+      const match = aaveBorrowPositions.find(
+        p => p.tokenSymbol === symbol || p.name === symbol,
+      );
+      return match?.currentRate ?? null;
+    };
+  
+    return (
     <div className="divide-y divide-slate-800/70 rounded-xl border border-slate-800/80 bg-slate-950/80">
       {items.map((p, idx) => {
         const usdDebt = -(p.balance as number);
         const apr = p.currentRate ?? 0;
+        const aaveBorrowApy = findAaveBorrowRate(p.tokenSymbol);
 
         return (
           <button
@@ -306,9 +316,16 @@ const BorrowList: FC<{
               <span className="font-semibold text-slate-50">
                 {formatUsd(usdDebt)}
               </span>
+
               <span className="text-[11px] text-slate-400">
                 Borrow APY · {formatPercent(apr || 0)}
               </span>
+
+              {aaveBorrowApy != null && (
+                <span className="text-[11px] text-slate-400">
+                  Aave borrow APY · {formatPercent(aaveBorrowApy)}
+                </span>
+              )}
             </div>
 
             <div className="ml-2 rounded-full bg-sky-500/15 px-3 py-1 text-[11px] font-semibold text-sky-300">
