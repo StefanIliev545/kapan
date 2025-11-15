@@ -129,17 +129,13 @@ const ImportToAavePage: NextPage = () => {
         {/* Header */}
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
-              <span className="inline-flex h-2 w-2 rounded-full bg-sky-400" />
-              Refinance to Aave
-            </div>
             <div className="flex items-center gap-3">
-              <div className="relative h-10 w-10 rounded-2xl bg-slate-900/70 p-2 ring-1 ring-sky-500/40">
+              <div className="relative h-10 w-10 rounded-2xl bg-slate-900/70 p-2 ring-sky-500/40">
                 <Image src="/logos/aave.svg" alt="Aave" fill className="object-contain" />
               </div>
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-                  Import your lending positions into Aave V3
+                  Refinance your position from any protocol to Aave.
                 </h1>
                 <p className="mt-1 max-w-xl text-sm text-slate-400">
                   Pick the network, we’ll scan supported protocols on that chain and list all
@@ -170,14 +166,14 @@ const ImportToAavePage: NextPage = () => {
           {/* Left: unified list of all source borrows */}
           <section className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-              1 · Select position to refinance
+              Source
             </h2>
 
             <div className="rounded-2xl border border-white/5 bg-slate-950/60 p-4 shadow-[0_0_0_1px_rgba(15,23,42,0.7)] backdrop-blur">
               <div className="flex items-baseline justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-100">
-                    Your open borrows
+                    Your open positions
                   </h3>
                   <p className="text-xs text-slate-500">
                     Aggregated across ZeroLend, Compound, Venus on the selected network.
@@ -206,13 +202,13 @@ const ImportToAavePage: NextPage = () => {
           {/* Right: Aave destination summary */}
           <section className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-              2 · Destination — Aave V3
+              Destination
             </h2>
 
             <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-br from-slate-950/80 via-slate-950/60 to-sky-950/40 p-4 shadow-[0_18px_60px_rgba(8,47,73,0.55)] backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="relative h-9 w-9 rounded-2xl bg-slate-950/80 p-1.5 ring-1 ring-sky-400/60">
+                  <div className="relative h-9 w-9 rounded-2xl bg-slate-950/80 p-1.5 ring-sky-400/60">
                     <Image src="/logos/aave.svg" alt="Aave" fill className="object-contain" />
                   </div>
                   <div>
@@ -238,12 +234,6 @@ const ImportToAavePage: NextPage = () => {
                   borrowedPositions={aavePositions.borrowedPositions}
                 />
               </div>
-
-              <ul className="mt-4 space-y-1 text-[11px] text-slate-400">
-                <li>• Flash-loan powered, collateral-aware routes.</li>
-                <li>• Single transaction where possible.</li>
-                <li>• Designed to embed into wallets and dashboards.</li>
-              </ul>
             </div>
           </section>
         </main>
@@ -394,12 +384,6 @@ const AaveSummaryCard: FC<{
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="max-w-xs text-[11px] text-slate-400">
-        Any borrow you move from the left side will land here as Aave V3 debt,
-        keeping your collateral and health factor safe thanks to the router’s
-        collateral-aware routes.
       </div>
     </div>
   );
