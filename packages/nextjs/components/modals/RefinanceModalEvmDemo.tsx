@@ -45,6 +45,12 @@ const getLtBps = (c: any): number => {
   return Math.max(0, Math.min(10000, v));
 };
 
+const normalizeProtocolName = (protocol?: string) =>
+  (protocol || "")
+    .toLowerCase()
+    .replace(/\s+v\d+$/i, "") // strip trailing " v3", " v2"
+    .replace(/\s+/g, "");     // remove spaces
+
 /* --------------------------- Price Probe ----------------------------- */
 const CollatPriceProbe: FC<{
   symbol?: string;
@@ -100,6 +106,7 @@ type RefinanceModalEvmProps = {
     inputValue?: string;
   }>;
   disableCollateralSelection?: boolean;
+  forcedDestinationProtocol?: string;
 };
 
 export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
@@ -110,6 +117,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   chainId,
   preSelectedCollaterals,
   disableCollateralSelection,
+  forcedDestinationProtocol
 }) => {
   /* ------------------------- External data hooks ------------------------- */
   const {
@@ -133,7 +141,21 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     position,
   });
 
-  const filteredDestinationProtocols = destinationProtocols;
+  const filteredDestinationProtocols = useMemo(() => {
+    if (!destinationProtocols) return [];
+  
+    if (!forcedDestinationProtocol) {
+      return destinationProtocols;
+    }
+  
+    const targetNorm = normalizeProtocolName(forcedDestinationProtocol);
+    const matched = destinationProtocols.filter(
+      p => normalizeProtocolName(p.name) === targetNorm,
+    );
+  
+    // If for some reason we didn’t find a match, fallback to full list
+    return matched.length ? matched : destinationProtocols;
+  }, [destinationProtocols, forcedDestinationProtocol]);  
 
   // Merge preselected collaterals with collaterals from hook
   const collaterals = useMemo(() => {
@@ -256,28 +278,36 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
     if (!isOpen || autoSelectedDest) return;
-    if (!destinationProtocols.length) return;
-
+    if (!filteredDestinationProtocols.length) return;
+  
+    // When destination is force-locked, we don’t try to “smart-switch”
+    if (forcedDestinationProtocol) {
+      setAutoSelectedDest(true);
+      return;
+    }
+  
     const supportedMap = effectiveSupportedMap;
     const hasSupportedNonZero = collaterals.some(c => {
       const supported = supportedMap?.[addrKey(c.address)];
       return supported && c.balance > 0;
     });
-
+  
     if (hasSupportedNonZero) {
       setAutoSelectedDest(true);
       return;
     }
-    const alt = destinationProtocols.find(p => p.name !== selectedProtocol);
+  
+    const alt = filteredDestinationProtocols.find(p => p.name !== selectedProtocol);
     if (alt && alt.name !== selectedProtocol) setSelectedProtocol(alt.name);
     setAutoSelectedDest(true);
   }, [
     isOpen,
     autoSelectedDest,
-    destinationProtocols,
+    filteredDestinationProtocols,
     selectedProtocol,
     collaterals,
     effectiveSupportedMap,
+    forcedDestinationProtocol,
     setSelectedProtocol,
     setAutoSelectedDest,
   ]);
@@ -646,6 +676,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       preferBatching={preferBatching}
       setPreferBatching={setPreferBatching}
       apiProbes={apiProbes}
+      lockDestinationSelection={Boolean(forcedDestinationProtocol)}
     />
   );
 };

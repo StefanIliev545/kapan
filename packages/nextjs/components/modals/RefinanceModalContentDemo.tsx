@@ -137,6 +137,9 @@ export type RefinanceModalContentProps = {
 
   // Price probes (invisible)
   apiProbes?: ReactNode;
+
+  // UX Options
+  lockDestinationSelection?: boolean;
 };
 
 export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
@@ -198,9 +201,16 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   setPreferBatching,
   errorMessage,
   apiProbes,
+  lockDestinationSelection
 }) => {
   const addrKey = (a?: string) => (a ?? "").toLowerCase();
 
+  const lockedDestination =
+  lockDestinationSelection && filteredDestinationProtocols.length
+    ? filteredDestinationProtocols.find(p => p.name === selectedProtocol) ??
+      filteredDestinationProtocols[0]
+    : null;
+    
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div
@@ -357,9 +367,32 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 12 }}
                     transition={{ duration: 0.15 }}
-                    className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4"
+                    className={
+                      lockDestinationSelection
+                        ? "mt-3"
+                        : "mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4"
+                    } 
                   >
-                    {filteredDestinationProtocols.map(p => {
+                  {lockDestinationSelection && lockedDestination ? (
+                    // READ-ONLY destination – no selection step
+                    <div className="rounded-lg border border-sky-500/70 bg-sky-500/10 px-3 py-2 text-xs">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Image
+                          src={lockedDestination.logo}
+                          alt={lockedDestination.name}
+                          width={24}
+                          height={24}
+                          className="flex-shrink-0 rounded"
+                        />
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-xs font-medium">
+                            {lockedDestination.name}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    filteredDestinationProtocols.map(p => {
                       const isSelected = selectedProtocol === p.name;
                       const isVesu = p.name === "Vesu";
                       const shouldExpand = isSelected && isVesu && vesuPools;
@@ -508,7 +541,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                           </div>
                         </div>
                       );
-                    })}
+                    }))}
                   </motion.div>
                 ) : (
                   <motion.div

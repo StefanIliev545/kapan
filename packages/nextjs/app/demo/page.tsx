@@ -257,6 +257,7 @@ const ImportToAavePage: NextPage = () => {
           fromProtocol={activeRefi.fromProtocol}
           position={activeRefi.position}
           chainId={activeRefi.chainId}
+          forcedDestinationProtocol="Aave V3"
         />
       )}
     </div>
