@@ -14,6 +14,7 @@ import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { useDeployedContractInfo, useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -57,6 +58,12 @@ const formatUsd = (v: number) =>
 
 const formatPercent = (v: number) => `${v.toFixed(2).replace(/\.00$/, "")}%`;
 
+const normalizeProtocolName = (protocol?: string) =>
+  (protocol || "")
+    .toLowerCase()
+    .replace(/\s+v\d+$/i, "")
+    .replace(/\s+/g, "");
+
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -64,7 +71,8 @@ const formatPercent = (v: number) => `${v.toFixed(2).replace(/\.00$/, "")}%`;
 const ImportToAavePage: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("base");
   const [activeRefi, setActiveRefi] = useState<ActiveRefi | null>(null);
-  const [showPerProtocolView, setShowPerProtocolView] = useState(false);
+  const [showPerProtocolView, setShowPerProtocolView] = useState(false); // from previous step
+  const [isOneShotRunning, setIsOneShotRunning] = useState(false); // NEW
 
   const chainId = NETWORK_TO_CHAIN_ID[selectedNetwork];
 
@@ -97,14 +105,18 @@ const ImportToAavePage: NextPage = () => {
       ...mapWithProtocol(venusBorrows.borrowedPositions, "Venus"),
       // add more protocols here later if needed
     ];
-  }, [zerolendPositions.borrowedPositions, compoundBorrows.borrowedPositions, venusBorrows.borrowedPositions]);
+  }, [
+    zerolendPositions.borrowedPositions,
+    compoundBorrows.borrowedPositions,
+    venusBorrows.borrowedPositions,
+  ]);
 
   const isAnyLoading =
     zerolendPositions.isLoading ||
     compoundBorrows.isLoading ||
     venusBorrows.isLoading;
 
-  /* -------------------------------- refinance modal -------------------------------- */
+  /* -------------------------------- refinance modal (per-position) ---------------- */
 
   const openRefiModal = (fromProtocol: string, p: ProtocolPosition) => {
     if (!p.tokenAddress || p.tokenDecimals == null) return;
@@ -123,6 +135,105 @@ const ImportToAavePage: NextPage = () => {
   };
 
   const closeRefiModal = () => setActiveRefi(null);
+
+  /* ----------------------------- One-shot ALL to Aave ---------------------------- */
+
+  const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2(); // NEW
+
+  const handleRefiAllToAave = async () => {
+    if (allBorrows.length === 0 || isAnyLoading) return;
+
+    try {
+      setIsOneShotRunning(true);
+
+      // map protocol -> its collateral set (supplied positions)
+      const protocolCollat: Record<string, ProtocolPosition[]> = {
+        ZeroLend: zerolendPositions.suppliedPositions || [],
+        Venus: venusBorrows.suppliedPositions || [],
+        "Compound V3": [], // we don't have collateral data here yet
+      };
+
+      // SINGLE builder for all protocols / all borrows
+      const builder = createMoveBuilder();
+
+      // keep track of which (protocol, collateralToken) we already moved
+      const movedCollatKeys = new Set<string>();
+
+      for (const borrow of allBorrows) {
+        const fromProtocol = borrow.protocol;
+        const decimals = borrow.tokenDecimals ?? 18;
+        const debtToken = borrow.tokenAddress as Address;
+        const rawDebt = (borrow.tokenBalance as bigint) || 0n;
+        if (rawDebt <= 0n) continue;
+
+        const expectedDebt = formatUnits(rawDebt, decimals);
+
+        const normalizedFrom = normalizeProtocolName(fromProtocol);
+        if (normalizedFrom === "compound") {
+          // NOTE: assumes setCompoundMarket config is applied
+          // per-market before its related steps
+          builder.setCompoundMarket(debtToken);
+        }
+
+        // 1) unlock full debt with Aave flash
+        builder.buildUnlockDebt({
+          fromProtocol,
+          debtToken,
+          expectedDebt,
+          debtDecimals: decimals,
+          flash: {
+            version: "aave" as any,
+            premiumBps: 9,
+            bufferBps: 10,
+          },
+        });
+
+        // 2) move ALL collateral we know for that protocol (max = true), de-duplicated
+        const collats = protocolCollat[fromProtocol] || [];
+        collats.forEach(c => {
+          const bal = (c.tokenBalance as bigint) || 0n;
+          if (!c.tokenAddress || bal <= 0n) return;
+
+          const key = `${fromProtocol.toLowerCase()}-${(c.tokenAddress as string).toLowerCase()}`;
+          if (movedCollatKeys.has(key)) return;
+
+          movedCollatKeys.add(key);
+
+          const cDecimals = c.tokenDecimals ?? 18;
+          builder.buildMoveCollateral({
+            fromProtocol,
+            toProtocol: "Aave V3",
+            collateralToken: c.tokenAddress as Address,
+            withdraw: { max: true },
+            collateralDecimals: cDecimals,
+          });
+        });
+
+        // 3) borrow on Aave to cover flash for this debt token
+        builder.buildBorrow({
+          mode: "coverFlash",
+          toProtocol: "Aave V3",
+          token: debtToken,
+          decimals,
+          extraBps: 5,
+          approveToRouter: true,
+        });
+      }
+
+      // If nothing meaningful was added, exit quietly
+      const flow = builder.build();
+      const res = await executeFlowBatchedIfPossible(flow, true);
+      if (!res) {
+        await executeFlowBatchedIfPossible(flow, false);
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("One-shot refi ALL → Aave error:", e);
+    } finally {
+      setIsOneShotRunning(false);
+    }
+  };
+
 
   return (
     <div className="min-h-[calc(100vh-6rem)] w-full bg-[#050816] text-slate-100">
@@ -180,86 +291,105 @@ const ImportToAavePage: NextPage = () => {
                     Aggregated across ZeroLend, Compound, Venus on the selected network.
                   </p>
                 </div>
+
+                {/* NEW: One-shot refi button */}
+                <button
+                  type="button"
+                  onClick={handleRefiAllToAave}
+                  disabled={
+                    isAnyLoading || isOneShotRunning || allBorrows.length === 0
+                  }
+                  className={`
+                    inline-flex items-center gap-1 rounded-md
+                    border border-sky-500/40 bg-sky-500/10
+                    px-3 py-1 text-[11px] font-semibold
+                    text-sky-200 transition
+                    hover:bg-sky-500/20 hover:border-sky-400
+                    disabled:cursor-not-allowed disabled:opacity-40
+                  `}
+                >
+                  {isOneShotRunning ? "Refinancing…" : "Refinance all to Aave"}
+                </button>
               </div>
 
               <div className="mt-4">
-              {isAnyLoading && allBorrows.length === 0 ? (
-                <div className="flex items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
-                  <span className="loading loading-spinner loading-xs" />
-                  <span>Scanning protocols for open borrow positions…</span>
-                </div>
-              ) : allBorrows.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/60 px-4 py-4 text-xs text-slate-400">
-                  No borrow positions found across supported protocols on this network.  
-                  Open a position in ZeroLend, Compound or Venus and it will appear here automatically.
-                </div>
-              ) : (
-                <>
-                <BorrowList
-                  items={allBorrows}
-                  onSelect={openRefiModal}
-                  aaveBorrowPositions={aavePositions.borrowedPositions}
-                />
-
-                {/* Collapsible per-protocol collateral/borrow breakdown */}
-                <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                        Per-protocol view
-                      </h3>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
-                        See how your collateral and borrows are distributed across each protocol.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPerProtocolView(prev => !prev)}
-                      className="
-                        inline-flex items-center gap-1
-                        rounded-md border border-slate-700/60
-                        bg-slate-900/70 px-2 py-0.5
-                        text-[10px] font-medium text-slate-200
-                        hover:bg-slate-800 hover:border-slate-500
-                        transition
-                      "
-                    >
-                      {showPerProtocolView ? "Hide" : "Show"}
-                      <span
-                        className={`transition-transform ${
-                          showPerProtocolView ? "rotate-180" : "rotate-0"
-                        }`}
-                      >
-                        ▾
-                      </span>
-                    </button>
+                {isAnyLoading && allBorrows.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Scanning protocols for open borrow positions…</span>
                   </div>
+                ) : allBorrows.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/60 px-4 py-4 text-xs text-slate-400">
+                    No borrow positions found across supported protocols on this network.
+                    Open a position in ZeroLend, Compound or Venus and it will appear here automatically.
+                  </div>
+                ) : (
+                  <>
+                    <BorrowList
+                      items={allBorrows}
+                      onSelect={openRefiModal}
+                      aaveBorrowPositions={aavePositions.borrowedPositions}
+                    />
 
-                  {showPerProtocolView && (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <SourceProtocolCard
-                        protocolName="ZeroLend"
-                        suppliedPositions={zerolendPositions.suppliedPositions}
-                        borrowedPositions={zerolendPositions.borrowedPositions}
-                        hasCollateralData
-                      />
-                      <SourceProtocolCard
-                        protocolName="Compound V3"
-                        borrowedPositions={compoundBorrows.borrowedPositions}
-                        hasCollateralData={false}
-                      />
-                      <SourceProtocolCard
-                        protocolName="Venus"
-                        suppliedPositions={venusBorrows.suppliedPositions}
-                        borrowedPositions={venusBorrows.borrowedPositions}
-                        hasCollateralData
-                      />
+                    {/* Collapsible per-protocol collateral/borrow breakdown */}
+                    <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                            Per-protocol view
+                          </h3>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            See how your collateral and borrows are distributed across each protocol.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowPerProtocolView(prev => !prev)}
+                          className="
+                            inline-flex items-center gap-1
+                            rounded-md border border-slate-700/60
+                            bg-slate-900/70 px-2 py-0.5
+                            text-[10px] font-medium text-slate-200
+                            hover:bg-slate-800 hover:border-slate-500
+                            transition
+                          "
+                        >
+                          {showPerProtocolView ? "Hide" : "Show"}
+                          <span
+                            className={`transition-transform ${
+                              showPerProtocolView ? "rotate-180" : "rotate-0"
+                            }`}
+                          >
+                            ▾
+                          </span>
+                        </button>
+                      </div>
+
+                      {showPerProtocolView && (
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <SourceProtocolCard
+                            protocolName="ZeroLend"
+                            suppliedPositions={zerolendPositions.suppliedPositions}
+                            borrowedPositions={zerolendPositions.borrowedPositions}
+                            hasCollateralData
+                          />
+                          <SourceProtocolCard
+                            protocolName="Compound V3"
+                            borrowedPositions={compoundBorrows.borrowedPositions}
+                            hasCollateralData={false}
+                          />
+                          <SourceProtocolCard
+                            protocolName="Venus"
+                            suppliedPositions={venusBorrows.suppliedPositions}
+                            borrowedPositions={venusBorrows.borrowedPositions}
+                            hasCollateralData
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </>
-              )}
+                  </>
+                )}
               </div>
             </div>
           </section>
@@ -293,7 +423,7 @@ const ImportToAavePage: NextPage = () => {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl bg-slate-950/60 p-3 ring-1 ring-white/5">
+              <div className="mt-4 rounded-xl bg-slate-950/60 p-3 ring-1 ring-white/5 relative">
                 <AaveSummaryCard
                   suppliedPositions={aavePositions.suppliedPositions}
                   borrowedPositions={aavePositions.borrowedPositions}
@@ -304,7 +434,7 @@ const ImportToAavePage: NextPage = () => {
         </main>
       </div>
 
-      {/* Refinance modal → Aave */}
+      {/* Refinance modal → Aave (per-position) */}
       {activeRefi && (
         <RefinanceModalEvm
           isOpen={!!activeRefi}
@@ -513,20 +643,24 @@ const SourceProtocolCard: FC<SourceProtocolCardProps> = ({
 /*  Source Protocol List                                                      */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/*  Borrow list (aggregated)                                                  */
+/* -------------------------------------------------------------------------- */
+
 const BorrowList: FC<{
-    items: AggregatedBorrow[];
-    onSelect: (fromProtocol: string, position: ProtocolPosition) => void;
-    aaveBorrowPositions: ProtocolPosition[];
-  }> = ({ items, onSelect, aaveBorrowPositions }) => {
-    const findAaveBorrowRate = (symbol: string | undefined) => {
-      if (!symbol) return null;
-      const match = aaveBorrowPositions.find(
-        p => p.tokenSymbol === symbol || p.name === symbol,
-      );
-      return match?.currentRate ?? null;
-    };
-  
-    return (
+  items: AggregatedBorrow[];
+  onSelect: (fromProtocol: string, position: ProtocolPosition) => void;
+  aaveBorrowPositions: ProtocolPosition[];
+}> = ({ items, onSelect, aaveBorrowPositions }) => {
+  const findAaveBorrowRate = (symbol: string | undefined) => {
+    if (!symbol) return null;
+    const match = aaveBorrowPositions.find(
+      p => p.tokenSymbol === symbol || p.name === symbol,
+    );
+    return match?.currentRate ?? null;
+  };
+
+  return (
     <div className="divide-y divide-slate-800/70 rounded-xl border border-slate-800/80 bg-slate-950/80">
       {items.map((p, idx) => {
         const usdDebt = -(p.balance as number);
@@ -1044,6 +1178,7 @@ function useCompoundBorrowPositions(chainId?: number) {
 
 /* --------------------------- Venus borrow positions ------------------------ */
 
+
 function useVenusBorrowPositions(chainId?: number) {
   const { address: connectedAddress } = useAccount();
 
@@ -1089,7 +1224,6 @@ function useVenusBorrowPositions(chainId?: number) {
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
-
     if (!marketDetails || !ratesData || !userBalances) {
       return { suppliedPositions: supplied, borrowedPositions: borrowed };
     }
@@ -1157,4 +1291,3 @@ function useVenusBorrowPositions(chainId?: number) {
 
   return { suppliedPositions, borrowedPositions, isLoading };
 }
-
