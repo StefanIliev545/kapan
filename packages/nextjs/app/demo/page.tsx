@@ -64,6 +64,7 @@ const formatPercent = (v: number) => `${v.toFixed(2).replace(/\.00$/, "")}%`;
 const ImportToAavePage: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>("base");
   const [activeRefi, setActiveRefi] = useState<ActiveRefi | null>(null);
+  const [showPerProtocolView, setShowPerProtocolView] = useState(false);
 
   const chainId = NETWORK_TO_CHAIN_ID[selectedNetwork];
 
@@ -182,19 +183,83 @@ const ImportToAavePage: NextPage = () => {
               </div>
 
               <div className="mt-4">
-                {isAnyLoading && allBorrows.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
-                    <span className="loading loading-spinner loading-xs" />
-                    <span>Scanning protocols for open borrow positions…</span>
+              {isAnyLoading && allBorrows.length === 0 ? (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 text-xs text-slate-400">
+                  <span className="loading loading-spinner loading-xs" />
+                  <span>Scanning protocols for open borrow positions…</span>
+                </div>
+              ) : allBorrows.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/60 px-4 py-4 text-xs text-slate-400">
+                  No borrow positions found across supported protocols on this network.  
+                  Open a position in ZeroLend, Compound or Venus and it will appear here automatically.
+                </div>
+              ) : (
+                <>
+                <BorrowList
+                  items={allBorrows}
+                  onSelect={openRefiModal}
+                  aaveBorrowPositions={aavePositions.borrowedPositions}
+                />
+
+                {/* Collapsible per-protocol collateral/borrow breakdown */}
+                <div className="mt-4 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                        Per-protocol view
+                      </h3>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        See how your collateral and borrows are distributed across each protocol.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPerProtocolView(prev => !prev)}
+                      className="
+                        inline-flex items-center gap-1
+                        rounded-md border border-slate-700/60
+                        bg-slate-900/70 px-2 py-0.5
+                        text-[10px] font-medium text-slate-200
+                        hover:bg-slate-800 hover:border-slate-500
+                        transition
+                      "
+                    >
+                      {showPerProtocolView ? "Hide" : "Show"}
+                      <span
+                        className={`transition-transform ${
+                          showPerProtocolView ? "rotate-180" : "rotate-0"
+                        }`}
+                      >
+                        ▾
+                      </span>
+                    </button>
                   </div>
-                ) : allBorrows.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-950/60 px-4 py-4 text-xs text-slate-400">
-                    No borrow positions found across supported protocols on this network.  
-                    Open a position in ZeroLend, Compound or Venus and it will appear here automatically.
-                  </div>
-                ) : (
-                  <BorrowList items={allBorrows} onSelect={openRefiModal} aaveBorrowPositions={aavePositions.borrowedPositions} />
-                )}
+
+                  {showPerProtocolView && (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <SourceProtocolCard
+                        protocolName="ZeroLend"
+                        suppliedPositions={zerolendPositions.suppliedPositions}
+                        borrowedPositions={zerolendPositions.borrowedPositions}
+                        hasCollateralData
+                      />
+                      <SourceProtocolCard
+                        protocolName="Compound V3"
+                        borrowedPositions={compoundBorrows.borrowedPositions}
+                        hasCollateralData={false}
+                      />
+                      <SourceProtocolCard
+                        protocolName="Venus"
+                        suppliedPositions={venusBorrows.suppliedPositions}
+                        borrowedPositions={venusBorrows.borrowedPositions}
+                        hasCollateralData
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+              )}
               </div>
             </div>
           </section>
@@ -258,6 +323,194 @@ export default ImportToAavePage;
 
 /* -------------------------------------------------------------------------- */
 /*  Borrow list (aggregated)                                                  */
+/* -------------------------------------------------------------------------- */
+type SourceProtocolCardProps = {
+  protocolName: string;
+  suppliedPositions?: ProtocolPosition[];
+  borrowedPositions: ProtocolPosition[];
+  hasCollateralData?: boolean;
+};
+
+const SourceProtocolCard: FC<SourceProtocolCardProps> = ({
+  protocolName,
+  suppliedPositions,
+  borrowedPositions,
+  hasCollateralData = true,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const {
+    totalSuppliedUsd,
+    totalBorrowedUsd,
+    suppliedNonZero,
+    borrowedNonZero,
+  } = useMemo(() => {
+    const toNum = (v: unknown) =>
+      typeof v === "number" ? (v as number) : 0;
+
+    const suppliedList = (suppliedPositions || []).filter(p => toNum(p.balance) > 0.000001);
+    const borrowedList = (borrowedPositions || []).filter(p => toNum(p.balance) < -0.000001);
+
+    const totalSuppliedUsd = suppliedList.reduce(
+      (acc, p) => acc + toNum(p.balance),
+      0,
+    );
+    const totalBorrowedUsd = borrowedList.reduce(
+      (acc, p) => acc + Math.abs(toNum(p.balance)),
+      0,
+    );
+
+    return { totalSuppliedUsd, totalBorrowedUsd, suppliedNonZero: suppliedList, borrowedNonZero: borrowedList };
+  }, [suppliedPositions, borrowedPositions]);
+
+  const showToggle = suppliedNonZero.length > 0 || borrowedNonZero.length > 0;
+
+  return (
+    <div className="relative rounded-xl border border-slate-800/70 bg-slate-950/80 px-3 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {protocolName}
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs">
+            <div className="space-y-0.5">
+              <div className="text-[10px] text-slate-500">Supplied</div>
+              <div className="font-semibold text-slate-50">
+                {formatUsd(totalSuppliedUsd)}
+              </div>
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-[10px] text-slate-500">Borrowed</div>
+              <div className="font-semibold text-slate-50">
+                {formatUsd(totalBorrowedUsd)}
+              </div>
+            </div>
+          </div>
+          {!hasCollateralData && (
+            <div className="mt-1 text-[10px] text-slate-500">
+              Collateral breakdown is not available for this protocol yet.
+            </div>
+          )}
+        </div>
+
+        {showToggle && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(prev => !prev)}
+            className="
+              mt-0.5
+              inline-flex items-center gap-1
+              rounded-md border border-slate-700/60
+              bg-slate-900/70 px-2 py-0.5
+              text-[10px] font-medium text-slate-200
+              hover:bg-slate-800 hover:border-slate-500
+              transition
+            "
+          >
+            {isExpanded ? "Hide" : "Details"}
+            <span
+              className={`transition-transform ${isExpanded ? "rotate-180" : "rotate-0"}`}
+            >
+              ▾
+            </span>
+          </button>
+        )}
+      </div>
+
+      {isExpanded && (
+        <div className="mt-3 border-t border-slate-800/70 pt-2 text-[11px] text-slate-200">
+          <div className="space-y-1.5">
+            {hasCollateralData && (
+              <>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Collateral 
+                </div>
+                {suppliedNonZero.length === 0 ? (
+                  <div className="rounded-md bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500">
+                    No supplied positions.
+                  </div>
+                ) : (
+                  <ul className="space-y-1">
+                    {suppliedNonZero.map((p, idx) => {
+                      const usd = typeof p.balance === "number" ? (p.balance as number) : 0;
+                      const apy = p.currentRate ?? 0;
+                      return (
+                        <li
+                          key={`${protocolName}-sup-${p.tokenAddress || p.name}-${idx}`}
+                          className="flex items-center justify-between rounded-md bg-slate-950/80 px-2 py-1"
+                        >
+                          <div className="flex items-center gap-2">
+                            {p.icon && (
+                              <div className="relative h-3.5 w-3.5 overflow-hidden rounded-full bg-slate-900">
+                                <Image src={p.icon} alt={p.name} fill className="object-contain" />
+                              </div>
+                            )}
+                            <span>{p.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">
+                              {formatUsd(usd)}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              Supply APY · {formatPercent(apy || 0)}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
+
+            <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Borrowed
+            </div>
+            {borrowedNonZero.length === 0 ? (
+              <div className="rounded-md bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500">
+                No borrow positions.
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {borrowedNonZero.map((p, idx) => {
+                  const raw = typeof p.balance === "number" ? (p.balance as number) : 0;
+                  const usd = Math.abs(raw);
+                  const apy = p.currentRate ?? 0;
+                  return (
+                    <li
+                      key={`${protocolName}-bor-${p.tokenAddress || p.name}-${idx}`}
+                      className="flex items-center justify-between rounded-md bg-slate-950/80 px-2 py-1"
+                    >
+                      <div className="flex items-center gap-2">
+                        {p.icon && (
+                          <div className="relative h-3.5 w-3.5 overflow-hidden rounded-full bg-slate-900">
+                            <Image src={p.icon} alt={p.name} fill className="object-contain" />
+                          </div>
+                        )}
+                        <span>{p.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">
+                          {formatUsd(usd)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          Borrow APY · {formatPercent(apy || 0)}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Source Protocol List                                                      */
 /* -------------------------------------------------------------------------- */
 
 const BorrowList: FC<{
@@ -346,65 +599,222 @@ const AaveSummaryCard: FC<{
   suppliedPositions: ProtocolPosition[];
   borrowedPositions: ProtocolPosition[];
 }> = ({ suppliedPositions, borrowedPositions }) => {
-  const { totalSuppliedUsd, totalBorrowedUsd, utilization } = useMemo(() => {
-    const supplied = (suppliedPositions || []).reduce((acc, p) => {
-      const v = typeof p.balance === "number" ? (p.balance as number) : 0;
-      return v > 0 ? acc + v : acc;
-    }, 0);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-    const borrowed = (borrowedPositions || []).reduce((acc, p) => {
-      const v = typeof p.balance === "number" ? (p.balance as number) : 0;
-      return v < 0 ? acc - v : acc;
-    }, 0);
+  const {
+    totalSuppliedUsd,
+    totalBorrowedUsd,
+    utilization,
+    suppliedNonZero,
+    borrowedNonZero,
+  } = useMemo(() => {
+    const toNumber = (v: unknown) =>
+      typeof v === "number" ? (v as number) : 0;
 
-    const util =
-      supplied > 0 ? Math.min(100, Math.max(0, (borrowed / supplied) * 100)) : 0;
+    const suppliedNonZero = (suppliedPositions || []).filter(p => {
+      const v = toNumber(p.balance);
+      return v > 0.000001;
+    });
+
+    const borrowedNonZero = (borrowedPositions || []).filter(p => {
+      const v = toNumber(p.balance);
+      return v < -0.000001;
+    });
+
+    const totalSuppliedUsd = suppliedNonZero.reduce(
+      (acc, p) => acc + toNumber(p.balance),
+      0,
+    );
+
+    const totalBorrowedUsd = borrowedNonZero.reduce(
+      (acc, p) => acc + Math.abs(toNumber(p.balance)),
+      0,
+    );
+
+    const utilization =
+      totalSuppliedUsd > 0
+        ? Math.min(100, Math.max(0, (totalBorrowedUsd / totalSuppliedUsd) * 100))
+        : 0;
 
     return {
-      totalSuppliedUsd: supplied,
-      totalBorrowedUsd: borrowed,
-      utilization: util,
+      totalSuppliedUsd,
+      totalBorrowedUsd,
+      utilization,
+      suppliedNonZero,
+      borrowedNonZero,
     };
   }, [suppliedPositions, borrowedPositions]);
 
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div className="space-y-1">
-        <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
-          Current on Aave
-        </div>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="space-y-0.5">
-            <div className="text-[11px] text-slate-500">Supplied</div>
-            <div className="font-semibold text-slate-50">
-              {formatUsd(totalSuppliedUsd)}
-            </div>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+            Current on Aave
           </div>
-          <div className="space-y-0.5">
-            <div className="text-[11px] text-slate-500">Borrowed</div>
-            <div className="font-semibold text-slate-50">
-              {formatUsd(totalBorrowedUsd)}
-            </div>
-          </div>
-          <div className="space-y-0.5">
-            <div className="text-[11px] text-slate-500">Utilization</div>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-sky-400"
-                  style={{ width: `${Math.min(100, utilization)}%` }}
-                />
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div className="space-y-0.5">
+              <div className="text-[11px] text-slate-500">Supplied</div>
+              <div className="font-semibold text-slate-50">
+                {formatUsd(totalSuppliedUsd)}
               </div>
-              <span className="text-xs text-slate-200">
-                {utilization.toFixed(1)}%
-              </span>
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-[11px] text-slate-500">Borrowed</div>
+              <div className="font-semibold text-slate-50">
+                {formatUsd(totalBorrowedUsd)}
+              </div>
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-[11px] text-slate-500">Utilization</div>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-sky-400"
+                    style={{ width: `${Math.min(100, utilization)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-slate-200">
+                  {utilization.toFixed(1)}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsExpanded(prev => !prev)}
+          className="
+            absolute right-3 top-3 
+            flex items-center gap-1 
+            rounded-md border border-slate-700/50 
+            bg-slate-900/60 
+            px-2 py-0.5 
+            text-[10px] font-medium text-slate-200
+            hover:bg-slate-800 hover:border-slate-500
+            transition
+          "
+        >
+          {isExpanded ? "Hide" : "Show"}
+          <span
+            className={`transition-transform ${isExpanded ? "rotate-180" : "rotate-0"}`}
+          >
+            ▾
+          </span>
+        </button>
       </div>
+
+      {isExpanded && (
+        <div className="mt-1 border-t border-slate-800/70 pt-3 text-xs text-slate-200">
+          <div className="grid gap-3 md:grid-cols-2">
+            {/* Supplied list */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Supplied positions
+              </div>
+              {suppliedNonZero.length === 0 ? (
+                <div className="rounded-md bg-slate-900/60 px-3 py-2 text-[11px] text-slate-500">
+                  No supplied positions on Aave.
+                </div>
+              ) : (
+                <ul className="space-y-1.5">
+                  {suppliedNonZero.map((p, idx) => {
+                    const usd = typeof p.balance === "number" ? (p.balance as number) : 0;
+                    const apy = p.currentRate ?? 0;
+
+                    return (
+                      <li
+                        key={`${p.tokenAddress || p.name}-supplied-${idx}`}
+                        className="flex items-center justify-between rounded-md bg-slate-950/70 px-3 py-1.5"
+                      >
+                        <div className="flex items-center gap-2">
+                          {p.icon && (
+                            <div className="relative h-4 w-4 overflow-hidden rounded-full bg-slate-900">
+                              <Image
+                                src={p.icon}
+                                alt={p.name}
+                                fill
+                                className="object-contain"
+                              />
+                            </div>
+                          )}
+                          <span className="text-[11px] font-medium">
+                            {p.name}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[11px] font-semibold">
+                            {formatUsd(usd)}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Supply APY · {formatPercent(apy || 0)}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Borrowed list */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Borrowed positions
+              </div>
+              {borrowedNonZero.length === 0 ? (
+                <div className="rounded-md bg-slate-900/60 px-3 py-2 text-[11px] text-slate-500">
+                  No borrow positions on Aave yet.
+                </div>
+              ) : (
+                <ul className="space-y-1.5">
+                  {borrowedNonZero.map((p, idx) => {
+                    const raw = typeof p.balance === "number" ? (p.balance as number) : 0;
+                    const usd = Math.abs(raw);
+                    const apy = p.currentRate ?? 0;
+
+                    return (
+                      <li
+                        key={`${p.tokenAddress || p.name}-borrowed-${idx}`}
+                        className="flex items-center justify-between rounded-md bg-slate-950/70 px-3 py-1.5"
+                      >
+                        <div className="flex items-center gap-2">
+                          {p.icon && (
+                            <div className="relative h-4 w-4 overflow-hidden rounded-full bg-slate-900">
+                              <Image
+                                src={p.icon}
+                                alt={p.name}
+                                fill
+                                className="object-contain"
+                              />
+                            </div>
+                          )}
+                          <span className="text-[11px] font-medium">
+                            {p.name}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[11px] font-semibold">
+                            {formatUsd(usd)}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Borrow APY · {formatPercent(apy || 0)}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
 
 /* -------------------------------------------------------------------------- */
 /*  Hooks: Aave-like, Compound, Venus                                         */
@@ -676,9 +1086,13 @@ function useVenusBorrowPositions(chainId?: number) {
     "0x47c031236e19d024b42f8AE6780E44A573170703": { name: "gmWBTC/USDC", logo: "/logos/gmbtc.svg" },
   };
 
-  const borrowedPositions: ProtocolPosition[] = useMemo(() => {
+  const { suppliedPositions, borrowedPositions } = useMemo(() => {
+    const supplied: ProtocolPosition[] = [];
     const borrowed: ProtocolPosition[] = [];
-    if (!marketDetails || !ratesData || !userBalances) return borrowed;
+
+    if (!marketDetails || !ratesData || !userBalances) {
+      return { suppliedPositions: supplied, borrowedPositions: borrowed };
+    }
 
     const [, supplyRates, borrowRates] = ratesData as unknown as [bigint[], bigint[], bigint[]];
     const [balances, borrowBalances] = userBalances as unknown as [bigint[], bigint[]];
@@ -703,9 +1117,25 @@ function useVenusBorrowPositions(chainId?: number) {
       const tokenPrice = Number(formatUnits(price, 18 + (18 - dec)));
       const priceWith8Decimals = BigInt(Math.round(tokenPrice * 1e8));
 
+      const supplyBalance = balances[i];
+      const supplyFormatted = Number(formatUnits(supplyBalance, dec));
+      const supplyUsdBalance = supplyFormatted * tokenPrice;
+
       const borrowBalance = borrowBalances[i];
       const borrowFormatted = Number(formatUnits(borrowBalance, dec));
       const borrowUsdBalance = borrowFormatted * tokenPrice;
+
+      supplied.push({
+        icon: logo,
+        name: displayName,
+        balance: supplyUsdBalance,
+        tokenBalance: supplyBalance,
+        currentRate: supplyAPY,
+        tokenAddress: underlying,
+        tokenPrice: priceWith8Decimals,
+        tokenDecimals: Number(dec),
+        tokenSymbol: symbol,
+      });
 
       borrowed.push({
         icon: logo,
@@ -720,10 +1150,11 @@ function useVenusBorrowPositions(chainId?: number) {
       });
     }
 
-    return borrowed;
+    return { suppliedPositions: supplied, borrowedPositions: borrowed };
   }, [marketDetails, ratesData, userBalances, vTokens, tokens, symbols, decimals, prices]);
 
   const isLoading = loadingMarkets || loadingRates || loadingBalances;
 
-  return { borrowedPositions, isLoading };
+  return { suppliedPositions, borrowedPositions, isLoading };
 }
+
