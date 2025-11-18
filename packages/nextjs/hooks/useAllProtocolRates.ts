@@ -4,11 +4,13 @@ import { Address, Abi } from "viem";
 import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useAccount } from "wagmi";
 
+type ProtocolKey = "aave" | "zerolend" | "compound" | "venus";
+
 interface TokenRate {
   token: Address;
   supplyRate: number;
   borrowRate: number;
-  protocol: "aave" | "compound" | "venus";
+  protocol: ProtocolKey;
 }
 
 // Rate conversion helpers
@@ -39,6 +41,14 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
   // Aave: getAllTokensInfo already includes rates for all tokens
   const { data: aaveTokensInfo, isLoading: aaveLoading } = useScaffoldReadContract({
     contractName: "AaveGatewayView",
+    functionName: "getAllTokensInfo",
+    args: [queryAddress],
+    query: { enabled },
+  });
+
+  // ZeroLend shares the same interface as Aave (AaveGatewayViewBase)
+  const { data: zeroLendTokensInfo, isLoading: zeroLendLoading } = useScaffoldReadContract({
+    contractName: "ZeroLendGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
     query: { enabled },
@@ -99,9 +109,9 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
   // Map structure: tokenAddress -> { protocol -> rate }
   const ratesMap = useMemo(() => {
     if (!enabled) {
-      return new Map<Address, Map<"aave" | "compound" | "venus", TokenRate>>();
+      return new Map<Address, Map<ProtocolKey, TokenRate>>();
     }
-    const map = new Map<Address, Map<"aave" | "compound" | "venus", TokenRate>>();
+    const map = new Map<Address, Map<ProtocolKey, TokenRate>>();
 
     // Aave rates
     if (aaveTokensInfo && Array.isArray(aaveTokensInfo)) {
@@ -116,6 +126,24 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
             supplyRate: convertAaveRate(BigInt(tokenInfo.supplyRate || 0)),
             borrowRate: convertAaveRate(BigInt(tokenInfo.borrowRate || 0)),
             protocol: "aave",
+          });
+        }
+      });
+    }
+
+    // ZeroLend rates
+    if (zeroLendTokensInfo && Array.isArray(zeroLendTokensInfo)) {
+      (zeroLendTokensInfo as any[]).forEach((tokenInfo: any) => {
+        if (tokenInfo?.token) {
+          const token = tokenInfo.token as Address;
+          if (!map.has(token)) {
+            map.set(token, new Map());
+          }
+          map.get(token)?.set("zerolend", {
+            token,
+            supplyRate: convertAaveRate(BigInt(tokenInfo.supplyRate || 0)),
+            borrowRate: convertAaveRate(BigInt(tokenInfo.borrowRate || 0)),
+            protocol: "zerolend",
           });
         }
       });
@@ -163,10 +191,16 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     }
 
     return map;
-  }, [enabled, aaveTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
+  }, [enabled, aaveTokensInfo, zeroLendTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
 
   const isLoading = enabled
-    ? aaveLoading || venusMarketsLoading || venusRatesLoading || compoundBaseLoading || compoundDataLoading
+    ?
+        aaveLoading ||
+        zeroLendLoading ||
+        venusMarketsLoading ||
+        venusRatesLoading ||
+        compoundBaseLoading ||
+        compoundDataLoading
     : false;
 
   return {
@@ -190,29 +224,16 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
 
       const candidates: Array<{ protocol: string; rate: number }> = [];
       
-      const aaveRate = protocolRates.get("aave");
-      if (aaveRate) {
-        candidates.push({
-          protocol: "aave",
-          rate: type === "supply" ? aaveRate.supplyRate : aaveRate.borrowRate,
-        });
-      }
-      
-      const venusRate = protocolRates.get("venus");
-      if (venusRate) {
-        candidates.push({
-          protocol: "venus",
-          rate: type === "supply" ? venusRate.supplyRate : venusRate.borrowRate,
-        });
-      }
-      
-      const compoundRate = protocolRates.get("compound");
-      if (compoundRate) {
-        candidates.push({
-          protocol: "compound",
-          rate: type === "supply" ? compoundRate.supplyRate : compoundRate.borrowRate,
-        });
-      }
+      const protocolsToCheck: ProtocolKey[] = ["aave", "zerolend", "venus", "compound"];
+      protocolsToCheck.forEach(protocolKey => {
+        const protocolRate = protocolRates.get(protocolKey);
+        if (protocolRate) {
+          candidates.push({
+            protocol: protocolKey,
+            rate: type === "supply" ? protocolRate.supplyRate : protocolRate.borrowRate,
+          });
+        }
+      });
 
       if (candidates.length === 0) return null;
 

@@ -49,7 +49,7 @@ export const useLocalRateProvider = (
       return [[], [], []] as const;
     }
 
-    const orderedProtocols = ["aave", "compound", "venus"] as const;
+    const orderedProtocols = ["aave", "zerolend", "compound", "venus"] as const;
     for (const proto of orderedProtocols) {
       const tokenRate = protocolRates.get(proto);
       if (tokenRate) {
