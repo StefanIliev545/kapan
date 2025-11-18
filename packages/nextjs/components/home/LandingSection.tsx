@@ -1,17 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProtocolView } from "../ProtocolView";
 import { motion } from "framer-motion";
 import { Heading } from "@radix-ui/themes";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
+import { ArrowTopRightOnSquareIcon, PlayIcon } from "@heroicons/react/24/outline";
 
-
-
+const supportedNetworks = [
+  { name: "Arbitrum", logo: "/logos/arb.svg" },
+  { name: "Base", logo: "/logos/base.svg" },
+  { name: "Optimism", logo: "/logos/optimism.svg" },
+  { name: "Starknet", logo: "/logos/starknet.svg" },
+];
 
 const LandingSection = () => {
   const { starknet } = useWalletConnection();
   const [hasStarknetWallet, setHasStarknetWallet] = useState(false);
+  const appUrl = useMemo(() => {
+    if (typeof window === "undefined") return "/app";
+    const { protocol } = window.location;
+    const hostname = window.location.hostname;
+    const baseHost = hostname.replace(/^www\./, "");
+    if (window.location.host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
+    if (hostname.startsWith("app.")) return `${protocol}//${window.location.host}`;
+    return `${protocol}//app.${baseHost}`;
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -23,22 +37,62 @@ const LandingSection = () => {
     <section className="w-full pt-3 pb-3 lg:py-5 relative overflow-hidden bg-gradient-to-b from-base-100 to-base-200 dark:from-base-200 dark:to-base-300">
       <div className="container mx-auto max-w-screen-2xl px-5 relative">
         <motion.div
+          className="max-w-3xl mx-auto text-center"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
+          transition={{ duration: 0.5, ease: "easeOut", delay: 0.4 }}
         >
           <Heading
             as="h1"
             size="9"
             weight="bold"
             align="center"
-            className="font-extrabold font-display mb-4 tracking-tight text-gradient bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent drop-shadow-md"
+            className="font-extrabold font-display mb-6 tracking-tight text-gradient bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent drop-shadow-md"
           >
-            The Unified Lending Experience. <br className="hidden md:inline" />
-            <span className="text-primary">Borrow anytime.</span>
-            <br className="hidden md:inline" />
-            Lend everywhere.
+            Cross-chain lending without the tab hopping
           </Heading>
+          <p className="text-lg md:text-2xl text-base-content/80 leading-relaxed">
+            Kapan aggregates Starknet and EVM money markets into one dashboard, so you can supply, borrow, refinance and
+            automate strategies with the exact wallet you already use.
+          </p>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <motion.a
+              href="/app"
+              onClick={event => {
+                event.preventDefault();
+                window.location.assign(appUrl);
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn btn-primary btn-wide text-base shadow-lg"
+            >
+              Launch App
+              <ArrowTopRightOnSquareIcon className="h-5 w-5" />
+            </motion.a>
+            <motion.a
+              href="/info"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn btn-ghost btn-wide text-base border-base-content/20"
+            >
+              View Litepaper
+              <PlayIcon className="h-5 w-5" />
+            </motion.a>
+          </div>
+          <div className="mt-8 flex flex-col items-center gap-3 text-sm uppercase tracking-[0.3em] text-base-content/60">
+            <span>Live across ecosystems</span>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              {supportedNetworks.map(({ name, logo }) => (
+                <span key={name} className="inline-flex items-center gap-2 text-base-content/80">
+                  <img src={logo} alt={name} className="h-6 w-6" />
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-base-content/70">
+            Audited smart routing • Non-custodial transactions • Pay gas in the token you prefer
+          </p>
         </motion.div>
         <div className="relative fade-bottom-mask">
           {hasStarknetWallet ? (

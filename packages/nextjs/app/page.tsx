@@ -4,6 +4,8 @@ import EnterAppCTA from "../components/home/EnterAppCTA";
 import ExplainerSection from "../components/home/ExplainerSection";
 import BuiltForConvenience from "../components/home/BuiltForConvenience";
 import RoadmapSection from "../components/info/RoadmapSection";
+import HowItWorksSection from "../components/home/HowItWorksSection";
+import EcosystemHighlights from "../components/home/EcosystemHighlights";
 
 /**
  * Home Page Component
@@ -16,7 +18,9 @@ const Home: NextPage = () => {
         <LandingSection />
         <EnterAppCTA />
         <ExplainerSection />
+        <HowItWorksSection />
         <BuiltForConvenience />
+        <EcosystemHighlights />
         <RoadmapSection />
       </main>
     </div>
