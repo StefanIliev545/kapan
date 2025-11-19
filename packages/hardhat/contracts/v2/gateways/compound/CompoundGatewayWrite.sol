@@ -288,11 +288,47 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
 
     function deauthorize(
         ProtocolTypes.LendingInstruction[] calldata instrs,
-        address /*caller*/
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata inputs
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
-        // Deauthorization disabled for now
+
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            address market = _decodeMarket(ins.context);
+            address token = ins.token;
+            if (ins.input.index < inputs.length) {
+                token = inputs[ins.input.index].token;
+            }
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                address base = market != address(0) ? market : token;
+                ICompoundComet comet = tokenToComet[base];
+                if (address(comet) != address(0)) {
+                    targets[i] = address(comet);
+                    // allow(manager, isAllowed) -> false
+                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
+                }
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                ICompoundComet comet = tokenToComet[token];
+                if (address(comet) != address(0)) {
+                    targets[i] = address(comet);
+                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
+                }
+            } else if (
+                ins.op == ProtocolTypes.LendingOp.Deposit ||
+                ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
+                ins.op == ProtocolTypes.LendingOp.Repay
+            ) {
+                // Revoke underlying approval
+                targets[i] = token;
+                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+            } else {
+                targets[i] = address(0);
+                data[i] = bytes("");
+            }
+        }
     }
 
     function _decodeMarket(bytes memory ctx) internal pure returns (address market) {

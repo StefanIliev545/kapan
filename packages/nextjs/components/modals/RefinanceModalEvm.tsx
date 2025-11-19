@@ -37,10 +37,10 @@ const toUsdRaw = (amountRaw: bigint, decimals: number, p8: bigint): number => {
 const getLtBps = (c: any): number => {
   const v = Number(
     c?.liquidationThresholdBps ??
-      c?.collateralFactorBps ??
-      c?.ltBps ??
-      c?.ltvBps ??
-      8273
+    c?.collateralFactorBps ??
+    c?.ltBps ??
+    c?.ltvBps ??
+    8273
   );
   return Math.max(0, Math.min(10000, v));
 };
@@ -143,7 +143,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
     const existingMap = new Map(collateralsFromHook.map(c => [addrKey(c.address), c]));
     const merged = [...collateralsFromHook];
-    
+
     preSelectedCollaterals.forEach(pc => {
       const key = addrKey(pc.token);
       if (!existingMap.has(key)) {
@@ -290,6 +290,15 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     const next = Boolean(canDoAtomicBatch);
     setPreferBatching(prev => (prev === next ? prev : next));
   }, [isOpen, canDoAtomicBatch, setPreferBatching]);
+
+  const [revokePermissions, setRevokePermissions] = useState(false);
+
+  // Auto-enable revoke permissions when batching is enabled
+  useEffect(() => {
+    if (preferBatching) {
+      setRevokePermissions(true);
+    }
+  }, [preferBatching]);
 
   const debtInputRef = useRef<HTMLInputElement>(null);
 
@@ -571,9 +580,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       });
 
       const flow = builder.build();
-      const res = await executeFlowBatchedIfPossible(flow, preferBatching);
+      const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions });
       if (!res) {
-        await executeFlowBatchedIfPossible(flow, false);
+        await executeFlowBatchedIfPossible(flow, false, { revokePermissions });
       }
     } catch (e: any) {
       console.error("Refinance flow error:", e);
@@ -645,6 +654,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       showBatchingOption={true}
       preferBatching={preferBatching}
       setPreferBatching={setPreferBatching}
+      revokePermissions={revokePermissions}
+      setRevokePermissions={setRevokePermissions}
       apiProbes={apiProbes}
     />
   );

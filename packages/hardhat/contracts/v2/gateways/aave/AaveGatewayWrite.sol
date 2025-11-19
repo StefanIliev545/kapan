@@ -242,10 +242,40 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
 
     function deauthorize(
         ProtocolTypes.LendingInstruction[] calldata instrs,
-        address /*caller*/
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata inputs
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            address token = ins.token;
+            if (ins.input.index < inputs.length) {
+                token = inputs[ins.input.index].token;
+            }
+
+            if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
+                // Revoke underlying approval
+                targets[i] = token;
+                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+            } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                // Revoke aToken approval
+                address aToken = _getAToken(token);
+                targets[i] = aToken;
+                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                // Revoke Credit Delegation
+                (, , address vDebt) = _getReserveTokens(token);
+                if (vDebt != address(0)) {
+                    targets[i] = vDebt;
+                    data[i] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), 0);
+                }
+            } else {
+                targets[i] = address(0);
+                data[i] = bytes("");
+            }
+        }
     }
 
     function _getAToken(address underlying) internal view returns (address) {

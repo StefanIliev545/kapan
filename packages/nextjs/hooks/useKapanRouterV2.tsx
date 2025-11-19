@@ -551,7 +551,8 @@ export const useKapanRouterV2 = () => {
   }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
   const executeFlowWithApprovals = useCallback(async (
-    instructions: ProtocolInstruction[]
+    instructions: ProtocolInstruction[],
+    options?: { revokePermissions?: boolean }
   ): Promise<string | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
       throw new Error("Context not available");
@@ -621,7 +622,7 @@ export const useKapanRouterV2 = () => {
 
       // 3. Execute Logic (Atomic Batch if supported, else Tx)
       if (canDoAtomicBatch && sendCallsAsync) {
-        const deauthCalls = [] as { target: Address, data: any }[]; // Placeholder for future deauth logic
+        const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
 
         const calls = [
           {
@@ -648,7 +649,47 @@ export const useKapanRouterV2 = () => {
         return id;
       }
 
-      return await executeInstructions(instructions);
+      const txHash = await executeInstructions(instructions);
+
+      // 4. Post-Execution Deauthorization (Sequential)
+      try {
+        const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
+        if (deauthCalls.length > 0) {
+          for (let i = 0; i < deauthCalls.length; i++) {
+            const call = deauthCalls[i];
+            if (!call.target || !call.data) continue;
+
+            // Reuse approval notification logic for simplicity
+            let deauthNotifId: string | number | null = null;
+            try {
+              deauthNotifId = notification.loading(
+                <TransactionToast step="pending" message="Revoking permissions..." />
+              );
+              const currentNonce = await publicClient.getTransactionCount({ address: userAddress as Address });
+              const hash = await walletClient.sendTransaction({
+                account: userAddress as Address,
+                to: call.target,
+                data: call.data,
+                nonce: currentNonce,
+              });
+              if (deauthNotifId) notification.remove(deauthNotifId);
+              deauthNotifId = notification.loading(
+                <TransactionToast step="sent" txHash={hash} message="Revoking permissions..." />
+              );
+              await publicClient.waitForTransactionReceipt({ hash, confirmations: effectiveConfirmations });
+              if (deauthNotifId) notification.remove(deauthNotifId);
+              notification.success(<TransactionToast step="confirmed" txHash={hash} message="Permissions revoked" />);
+            } catch (e) {
+              if (deauthNotifId) notification.remove(deauthNotifId);
+              console.warn("Deauth step failed", e);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Deauthorization check failed", e);
+      }
+
+      return txHash;
     } catch (error: any) {
       setIsApproving(false);
       console.error("Error in executeFlowWithApprovals:", error);
@@ -658,7 +699,8 @@ export const useKapanRouterV2 = () => {
 
   const executeFlowBatchedIfPossible = useCallback(async (
     instructions: ProtocolInstruction[],
-    preferBatching = false
+    preferBatching = false,
+    options?: { revokePermissions?: boolean }
   ): Promise<{ kind: "batch", id: string } | { kind: "tx", hash: string } | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
       throw new Error("Missing context");
@@ -683,9 +725,16 @@ export const useKapanRouterV2 = () => {
       return true;
     });
 
+    // Prepare deauthorizations
+    const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
+    const filteredDeauthCalls = deauthCalls.filter(({ target, data }) => {
+      return target && data && data.length > 0;
+    });
+
     const calls = [
       ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
       { to: routerContract.address as Address, data: routerCalldata as Hex },
+      ...filteredDeauthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
     ];
 
     if (preferBatching) {
@@ -707,12 +756,12 @@ export const useKapanRouterV2 = () => {
       }
     }
 
-    const hash = await executeFlowWithApprovals(instructions);
+    const hash = await executeFlowWithApprovals(instructions, options);
     return hash ? { kind: "tx", hash } : undefined;
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals]);
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals, getDeauthorizations]);
 
   // --- Move Flow Builder ---
-  
+
   type FlashConfig = { version: "v3" | "v2" | "aave"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
@@ -765,7 +814,7 @@ export const useKapanRouterV2 = () => {
         if (expected === 0n) throw new Error(`Invalid debt amount`);
 
         const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(debtToken)) : getContext(from, fromContext as `0x${string}`);
-        
+
         // 1. Get Borrow Balance (creates UTXO)
         const utxoIndexForGetBorrow = utxoCount;
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
@@ -780,7 +829,7 @@ export const useKapanRouterV2 = () => {
         // 3. Approve Gateway (Router Instruction)
         // CRITICAL: createsUtxo=true because fixed Router logic appends an empty output for Approves to maintain index sync.
         addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true);
-        
+
         // 4. Repay Debt (using Flash Loan proceeds)
         // Repay creates a refund UTXO (usually 0)
         addProto(from, encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`, true);
@@ -820,7 +869,7 @@ export const useKapanRouterV2 = () => {
 
         // Borrow (creates UTXO)
         addProto(to, encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`, true);
-        
+
         if (approveToRouter && p.mode !== "coverFlash") {
           // Approve (creates UTXO)
           addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true);
@@ -850,6 +899,7 @@ export const useKapanRouterV2 = () => {
     executeFlowWithApprovals,
     executeFlowBatchedIfPossible,
     getAuthorizations,
+    getDeauthorizations,
     hash,
     isPending,
     isConfirming,
