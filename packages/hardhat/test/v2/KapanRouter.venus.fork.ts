@@ -52,6 +52,12 @@ describe("v2 Venus end-to-end (fork)", function () {
     if (!VENUS_COMPTROLLER) {
       throw new Error("VENUS_COMPTROLLER must be set in .env");
     }
+    // Check if we are on BNB Chain (56)
+    const chainId = network.config.chainId;
+    if (chainId !== 56) {
+      console.log(`Skipping Venus tests: Current chain ID is ${chainId}, expected 56 (BNB Chain)`);
+      this.skip();
+    }
   });
 
   describe("USDC collateral, USDC debt", function () {
@@ -175,7 +181,7 @@ describe("v2 Venus end-to-end (fork)", function () {
         context: "0x",
         input: { index: 0 },
       };
-      const [gatewayTargets, gatewayDatas] = await setup.gateway.authorize([depObj], userAddress);
+      const [gatewayTargets, gatewayDatas, produced] = await setup.gateway.authorize([depObj], userAddress, []);
       console.log("\nGateway deposit authorizations:");
       for (let i = 0; i < gatewayTargets.length; i++) {
         if (!gatewayTargets[i] || gatewayDatas[i].length === 0) continue;
@@ -213,7 +219,7 @@ describe("v2 Venus end-to-end (fork)", function () {
 
       const userBalanceAfter = await setup.collateralToken.balanceOf(userAddress);
       console.log(`User USDC after deposit: ${userBalanceAfter / 10n ** 6n}`);
-      
+
       // Verify deposit worked
       expect(userBalanceAfter).to.equal(userBalanceBefore - config.amounts.deposit);
     });

@@ -75,15 +75,22 @@ export async function setupLendingTest(config: LendingTestConfig): Promise<TestS
     method: "hardhat_impersonateAccount",
     params: [whaleAddress],
   });
-  
+
   // Fund whale with ETH for gas
   await network.provider.send("hardhat_setBalance", [
     whaleAddress,
     "0x56BC75E2D63100000", // 100 ETH
   ]);
-  
+
   const whale = await ethers.getSigner(whaleAddress);
   await whale.sendTransaction({ to: await user.getAddress(), value: ethers.parseEther("1") });
+
+  // Check whale balance
+  const whaleBal = await collateralToken.balanceOf(whaleAddress);
+  console.log(`Whale ${whaleAddress} balance: ${whaleBal}`);
+  if (whaleBal < config.userFunding.collateral) {
+    console.warn(`WARNING: Whale has insufficient balance! Needed: ${config.userFunding.collateral}`);
+  }
 
   // Fund user with collateral token
   await (collateralToken.connect(whale) as any).transfer(
@@ -93,8 +100,17 @@ export async function setupLendingTest(config: LendingTestConfig): Promise<TestS
 
   // Fund user with debt token if needed (for repay)
   if (config.userFunding.debt) {
-    const debtWhaleAddress = config.debtToken.whale || await deployer.getAddress();
-    if (config.debtToken.whale && config.debtToken.whale !== config.collateralToken.whale) {
+    // Use debt token whale if provided, otherwise default to deployer (which likely has nothing)
+    // If debt token is same as collateral, we can use collateral whale
+    let debtWhaleAddress = config.debtToken.whale;
+    if (!debtWhaleAddress && config.debtToken.address === config.collateralToken.address) {
+      debtWhaleAddress = config.collateralToken.whale;
+    }
+    if (!debtWhaleAddress) {
+      debtWhaleAddress = await deployer.getAddress();
+    }
+
+    if (debtWhaleAddress !== whaleAddress) {
       await network.provider.request({
         method: "hardhat_impersonateAccount",
         params: [debtWhaleAddress],
@@ -120,14 +136,13 @@ export async function setupLendingTest(config: LendingTestConfig): Promise<TestS
   // Deploy gateway
   const GatewayFactory = await ethers.getContractFactory(config.gateway.factoryName);
   let gateway;
-  
+
   // Different gateways have different constructor arg orders
   if (config.gateway.type === "venus") {
-    // Venus: (comptroller, router, owner)
+    // Venus: (router, comptroller)
     gateway = await GatewayFactory.deploy(
-      config.gateway.deployArgs[0], // comptroller
       await router.getAddress(),
-      await deployer.getAddress() // owner
+      config.gateway.deployArgs[0] // comptroller
     );
   } else {
     // Aave/Compound: (router, ...deployArgs)
@@ -177,7 +192,7 @@ export async function setupApprovals(
     input: { index: 0 },
   };
 
-  const [gatewayTargets, gatewayDatas] = await gateway.authorize([depObj, borObj, witObj], await user.getAddress());
+  const [gatewayTargets, gatewayDatas, produced] = await gateway.authorize([depObj, borObj, witObj], await user.getAddress(), []);
   console.log("Gateway authorizations:");
   for (let i = 0; i < gatewayTargets.length; i++) {
     if (!gatewayTargets[i] || gatewayDatas[i].length === 0) continue;
@@ -256,6 +271,7 @@ export async function createLendingFlowInstructions(
     // Borrow flow: ToOutput creates UTXO[2] with borrow amount, Borrow uses UTXO[2]
     createRouterInstruction(encodeToOutput(amounts.borrow, config.debtToken.address)), // Creates UTXO[2]
     createProtocolInstr(LendingOp.Borrow, config.debtToken.address, 0n, 2), // Uses UTXO[2], produces UTXO[3]
+    createRouterInstruction(encodePushToken(3, userAddr)), // Pushes borrowed tokens to user, consumes UTXO[3]
 
     // Repay flow: Pull/Approve/Repay
     createRouterInstruction(encodePullToken(repayAmt, config.debtToken.address, userAddr)), // Creates UTXO[4]
@@ -302,16 +318,18 @@ export async function verifyLendingFlowBalances(
 
   // User balance: before - deposit - repay (if same token) + withdraw
   let expectedUserBalance: bigint;
-  if (
-    config.collateralToken.address.toLowerCase() === config.debtToken.address.toLowerCase()
-  ) {
-    // Same token: userBalanceBefore - deposit - repay + withdraw
-    expectedUserBalance = userBalanceBefore - amounts.deposit - repayAmt + withdrawAmt;
+  const isSameToken =
+    config.collateralToken.address.toLowerCase() === config.debtToken.address.toLowerCase();
+  if (isSameToken) {
+    // If same token, user pays deposit, receives borrow, pays repay, receives withdraw
+    // expected = start - deposit + borrow - repay + withdraw
+    expectedUserBalance = userBalanceBefore - amounts.deposit + amounts.borrow - repayAmt + withdrawAmt;
   } else {
     // Different tokens: userBalanceBefore - deposit + withdraw
     expectedUserBalance = userBalanceBefore - amounts.deposit + withdrawAmt;
   }
 
-  expect(userBalanceAfter).to.equal(expectedUserBalance);
+  // Allow for small rounding errors (e.g. Aave ray math)
+  expect(userBalanceAfter).to.be.closeTo(expectedUserBalance, 1000n);
 }
 

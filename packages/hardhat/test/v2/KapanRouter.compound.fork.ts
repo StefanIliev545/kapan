@@ -118,7 +118,7 @@ describe("v2 Compound end-to-end (fork)", function () {
         input: { index: 0 },
       };
 
-      const [authTargets, authDatas] = await gateway.authorize([depObj, borObj, witObj], userAddress);
+      const [authTargets, authDatas, produced] = await gateway.authorize([depObj, borObj, witObj], userAddress, []);
       console.log("\n=== Gateway Authorizations ===");
       for (let i = 0; i < authTargets.length; i++) {
         if (!authTargets[i] || authDatas[i].length === 0) continue;

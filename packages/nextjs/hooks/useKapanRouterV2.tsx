@@ -78,7 +78,7 @@ export const useKapanRouterV2 = () => {
   const { data: walletClient } = useWalletClient();
   const queryClient = useQueryClient();
   const chainId = useChainId();
-  
+
   // Confirmation count per chain
   // Base and Optimism (OpStack chains) use 2 confirmations for safety
   // Arbitrum and Linea use 1 confirmation for faster UX
@@ -95,11 +95,11 @@ export const useKapanRouterV2 = () => {
     59144: 0,  // Linea mainnet
     59141: 1,  // Linea Sepolia
   };
-  
+
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
     confirmations: effectiveConfirmations,
@@ -196,7 +196,7 @@ export const useKapanRouterV2 = () => {
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = parseUnits(amount, decimals);
-    
+
     // For Compound, use DepositCollateral and encode market context
     const isCompound = normalizedProtocol === "compound";
     const lendingOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
@@ -377,7 +377,7 @@ export const useKapanRouterV2 = () => {
     const normalizedProtocol = normalizeProtocolName(protocolName);
     // For max withdrawals, use MaxUint256 as a sentinel value
     // The protocol will withdraw all available including accrued interest
-    const amountBigInt = isMax || amount.toLowerCase() === "max" 
+    const amountBigInt = isMax || amount.toLowerCase() === "max"
       ? (2n ** 256n - 1n) // MaxUint256
       : parseUnits(amount, decimals);
 
@@ -462,6 +462,46 @@ export const useKapanRouterV2 = () => {
       return authCalls;
     } catch (error) {
       console.error("Error calling authorizeInstructions:", error);
+      return [];
+    }
+  }, [routerContract, userAddress, publicClient]);
+
+  /**
+   * Get deauthorization calls for a set of instructions
+   * Uses the router's deauthorizeInstructions function
+   */
+  const getDeauthorizations = useCallback(async (
+    instructions: ProtocolInstruction[]
+  ): Promise<AuthorizationCall[]> => {
+    if (!routerContract || !userAddress || !publicClient) {
+      return [];
+    }
+
+    try {
+      const protocolInstructions = instructions.map(inst => ({
+        protocolName: normalizeProtocolName(inst.protocolName),
+        data: inst.data as `0x${string}`,
+      }));
+
+      const result = await publicClient.readContract({
+        address: routerContract.address as Address,
+        abi: routerContract.abi,
+        functionName: "deauthorizeInstructions",
+        args: [protocolInstructions, userAddress as Address],
+      });
+      const [targets, data] = result as unknown as [Address[], `0x${string}`[]];
+
+      const authCalls: AuthorizationCall[] = [];
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        const dataItem = data[i];
+        if (target && target !== "0x0000000000000000000000000000000000000000" && dataItem && dataItem.length > 0) {
+          authCalls.push({ target, data: dataItem });
+        }
+      }
+      return authCalls;
+    } catch (error) {
+      console.error("Error calling deauthorizeInstructions:", error);
       return [];
     }
   }, [routerContract, userAddress, publicClient]);
@@ -566,7 +606,7 @@ export const useKapanRouterV2 = () => {
       // Check for user rejection
       const errorMessage = error?.message || "";
       const lowerMessage = errorMessage.toLowerCase();
-      const isRejection = 
+      const isRejection =
         lowerMessage.includes("user rejected") ||
         lowerMessage.includes("user denied") ||
         lowerMessage.includes("user cancelled") ||
@@ -576,7 +616,7 @@ export const useKapanRouterV2 = () => {
         error?.code === 4001 ||
         error?.code === "ACTION_REJECTED" ||
         error?.code === "USER_REJECTED";
-      
+
       const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute instructions");
       notification.error(
         <TransactionToast
@@ -682,7 +722,7 @@ export const useKapanRouterV2 = () => {
             const currentNonce = await publicClient.getTransactionCount({
               address: userAddress as Address,
             });
-            
+
             // This will wait for MetaMask confirmation before returning hash
             approvalHash = await walletClient.sendTransaction({
               account: userAddress as Address,
@@ -719,7 +759,7 @@ export const useKapanRouterV2 = () => {
           // Wait for approval confirmation (crucial for mobile wallets)
           // Add a small delay after receipt to ensure Hardhat processes the nonce update
           await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations });
-          
+
           // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
           await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -744,7 +784,7 @@ export const useKapanRouterV2 = () => {
           // Check for user rejection
           const errorMessage = error?.message || "";
           const lowerMessage = errorMessage.toLowerCase();
-          const isRejection = 
+          const isRejection =
             lowerMessage.includes("user rejected") ||
             lowerMessage.includes("user denied") ||
             lowerMessage.includes("user cancelled") ||
@@ -754,7 +794,7 @@ export const useKapanRouterV2 = () => {
             error?.code === 4001 ||
             error?.code === "ACTION_REJECTED" ||
             error?.code === "USER_REJECTED";
-          
+
           const message = isRejection ? "User rejected the approval" : (error.message || `Failed to approve ${tokenSymbol}`);
           notification.error(
             <TransactionToast
@@ -771,7 +811,60 @@ export const useKapanRouterV2 = () => {
       }
 
       // 3. Execute the router instructions (now that approvals are in place)
+      // If atomic batching is supported, we can bundle execution and deauthorization
+      if (canDoAtomicBatch && sendCallsAsync) {
+        console.log("executeFlowWithApprovals: Using atomic batch for execution + deauth");
+
+        // Get deauthorizations
+        const deauthCalls = await getDeauthorizations(instructions);
+        console.log(`executeFlowWithApprovals: Found ${deauthCalls.length} deauthorization(s)`);
+
+        // Build batch: [Execution, ...Deauthorizations]
+        // Note: Approvals were already done sequentially above because we can't assume batch support for approvals 
+        // (unless we refactor to do EVERYTHING in one batch if supported, which is better but risky if approvals fail)
+        // For now, we stick to the requested flow: sandwich process lending instructions between approvals and revokations
+        // But since we already did approvals, we just do Execution + Revocation here.
+
+        // Actually, if we have atomic batch support, we should ideally do [Approvals, Execution, Revocations] all in one go!
+        // But the current logic does approvals sequentially first. 
+        // Let's keep approvals sequential for safety (as per existing code comments about mobile wallets)
+        // and just batch [Execution, Revocation].
+
+        const calls = [
+          {
+            to: routerContract.address as Address,
+            data: encodeFunctionData({
+              abi: routerContract.abi,
+              functionName: "processProtocolInstructions",
+              args: [instructions.map(inst => ({
+                protocolName: inst.protocolName,
+                data: inst.data as `0x${string}`,
+              }))],
+            }),
+            value: 0n,
+          },
+          ...deauthCalls.map(call => ({
+            to: call.target,
+            data: call.data,
+            value: 0n,
+          }))
+        ];
+
+        const id = await sendCallsAsync({ calls, capabilities });
+        setBatchId(id);
+        return id;
+      }
+
+      // Fallback to standard execution if no batch support
       const resultHash = await executeInstructions(instructions);
+
+      // Try to deauthorize separately if not batching (best effort)
+      // Note: This will prompt the user again, which might be annoying. 
+      // The requirement was "when using smart wallets... sandwich...". 
+      // So maybe only do this if batching is supported?
+      // "then i want to add a deauthorize flow, which when using smart wallets goes and removes permissions"
+      // So we only do this for smart wallets (atomic batch).
+
       return resultHash;
     } catch (error: any) {
       setIsApproving(false);
@@ -779,7 +872,7 @@ export const useKapanRouterV2 = () => {
       // Check for user rejection
       const errorMessage = error?.message || "";
       const lowerMessage = errorMessage.toLowerCase();
-      const isRejection = 
+      const isRejection =
         lowerMessage.includes("user rejected") ||
         lowerMessage.includes("user denied") ||
         lowerMessage.includes("user cancelled") ||
@@ -789,7 +882,7 @@ export const useKapanRouterV2 = () => {
         error?.code === 4001 ||
         error?.code === "ACTION_REJECTED" ||
         error?.code === "USER_REJECTED";
-      
+
       const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute flow with approvals");
       notification.error(
         <TransactionToast step="failed" message={message} />
@@ -940,25 +1033,25 @@ export const useKapanRouterV2 = () => {
 
   type BuildBorrowParams =
     | {
-        // Borrow an exact amount (generic)
-        mode: "exact";
-        toProtocol: string;
-        token: Address;
-        amount: string;
-        decimals?: number;
-        approveToRouter?: boolean; // default true
-        toContext?: `0x${string}`;
-      }
+      // Borrow an exact amount (generic)
+      mode: "exact";
+      toProtocol: string;
+      token: Address;
+      amount: string;
+      decimals?: number;
+      approveToRouter?: boolean; // default true
+      toContext?: `0x${string}`;
+    }
     | {
-        // Borrow just enough to repay all flash obligations for this token
-        mode: "coverFlash";
-        toProtocol: string;
-        token: Address;
-        decimals?: number;
-        extraBps?: number;        // extra headroom on top of premium-augmented need
-        approveToRouter?: boolean; // default true
-        toContext?: `0x${string}`;
-      };
+      // Borrow just enough to repay all flash obligations for this token
+      mode: "coverFlash";
+      toProtocol: string;
+      token: Address;
+      decimals?: number;
+      extraBps?: number;        // extra headroom on top of premium-augmented need
+      approveToRouter?: boolean; // default true
+      toContext?: `0x${string}`;
+    };
 
   type MoveFlowBuilder = {
     // chunk builders
@@ -1071,7 +1164,7 @@ export const useKapanRouterV2 = () => {
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount; // Track UTXO index before adding flash loan
         addRouter(flashData as `0x${string}`, true); // FlashLoan creates 1 UTXO (with repayment amount)
-        
+
         // Store the flash loan output UTXO index for this token (normalize to lowercase for consistent lookup)
         flashLoanOutputs.set((debtToken as Address).toLowerCase() as Address, flashLoanUtxoIndex);
 
@@ -1167,7 +1260,7 @@ export const useKapanRouterV2 = () => {
           // The flash loan output contains the repayment amount (principal + fee)
           // Normalize token address to lowercase for consistent lookup
           const flashLoanUtxoIndex = flashLoanOutputs.get((token as Address).toLowerCase() as Address);
-          
+
           if (flashLoanUtxoIndex === undefined) {
             // No flash loan found for this token - this should not happen if buildUnlockDebt was called first
             throw new Error(`Flash loan output not found for token ${token}. Make sure buildUnlockDebt was called before buildBorrow.`);
@@ -1189,10 +1282,10 @@ export const useKapanRouterV2 = () => {
         // Borrow on target
         // In coverFlash mode, use the flash loan output UTXO to borrow exactly what's needed
         // Normalize token address to lowercase for consistent lookup
-        const borrowInputIndex = p.mode === "coverFlash" 
+        const borrowInputIndex = p.mode === "coverFlash"
           ? (flashLoanOutputs.get((token as Address).toLowerCase() as Address) ?? 999)
           : 999;
-        
+
         addProto(
           to,
           encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`,
@@ -1213,7 +1306,7 @@ export const useKapanRouterV2 = () => {
         compoundMarket = debtToken;
       },
 
-        build: () => instructions,
+      build: () => instructions,
 
       getFlashObligations: () => {
         // Return flash loan output UTXO indices by token

@@ -39,10 +39,15 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             uint256 refund = repay(token, ins.user, amount); outputs = new ProtocolTypes.Output[](1); outputs[0] = ProtocolTypes.Output({token: token, amount: refund});
         } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
             address vToken = _getVTokenForUnderlying(token); uint256 bal = VTokenInterface(vToken).borrowBalanceCurrent(ins.user);
+            // Add 0.1% buffer
+            bal = (bal * 1001) / 1000;
             outputs = new ProtocolTypes.Output[](1); outputs[0] = ProtocolTypes.Output({token: token, amount: bal});
         } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
             address vToken = _getVTokenForUnderlying(token); uint256 vBal = VTokenInterface(vToken).balanceOf(ins.user); uint256 rate = VTokenInterface(vToken).exchangeRateStored();
-            uint256 bal = (vBal * rate) / 1e18; outputs = new ProtocolTypes.Output[](1); outputs[0] = ProtocolTypes.Output({token: token, amount: bal});
+            uint256 bal = (vBal * rate) / 1e18; 
+            // Add 0.1% buffer
+            bal = (bal * 1001) / 1000;
+            outputs = new ProtocolTypes.Output[](1); outputs[0] = ProtocolTypes.Output({token: token, amount: bal});
         } else { revert("Venus: unknown op"); }
     }
 
@@ -108,46 +113,59 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         }
     }
 
-    function authorize(ProtocolTypes.LendingInstruction[] calldata instrs, address caller)
-        external view returns (address[] memory targets, bytes[] memory data)
+    function authorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address caller,
+        ProtocolTypes.Output[] calldata inputs
+    )
+        external view returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced)
     {
-        uint256 count; for (uint256 i; i < instrs.length; i++) {
-            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            if (ins.op == ProtocolTypes.LendingOp.Deposit) count += 2; // approve + enterMarkets (enable collateral)
-            else if (ins.op == ProtocolTypes.LendingOp.Repay) count++;
-            else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) count += 2; // approve + enterMarkets
-            else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) count++;
-            else if (ins.op == ProtocolTypes.LendingOp.Borrow) count++;
-        }
-        targets = new address[](count); data = new bytes[](count); uint256 k;
+        targets = new address[](instrs.length);
+        data = new bytes[](instrs.length);
+        produced = new ProtocolTypes.Output[](instrs.length);
+        
+        uint256 k;
         for (uint256 i; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            if (ins.op == ProtocolTypes.LendingOp.Deposit) {
-                // 1) User token approval to gateway, only if insufficient
-                uint256 cur = IERC20(ins.token).allowance(caller, address(this));
-                if (ins.amount != 0 && cur >= ins.amount) { targets[k] = address(0); data[k] = bytes(""); }
-                else { targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); }
+            
+            // Simulation logic
+            address token = ins.token;
+            uint256 amount = ins.amount;
+            if (ins.input.index < inputs.length) {
+                token = inputs[ins.input.index].token;
+                amount = inputs[ins.input.index].amount;
+            }
+
+            if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
+                // Approve underlying to gateway only if insufficient allowance
+                // Add 0.1% buffer for interest/rounding
+                uint256 amountWithBuffer = amount == 0 ? 0 : (amount * 1001) / 1000;
+                uint256 cur = IERC20(token).allowance(caller, address(this));
+                if (amount != 0 && cur >= amountWithBuffer) { targets[k] = address(0); data[k] = bytes(""); }
+                else { targets[k] = token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), amountWithBuffer); }
                 k++;
-                // 2) Enter market to enable as collateral (idempotent)
-                address vToken = _getVTokenForUnderlying(ins.token);
-                bool member = false; try comptroller.checkMembership(caller, vToken) returns (bool m) { member = m; } catch {}
-                if (member) { targets[k] = address(0); data[k] = bytes(""); }
-                else { address[] memory markets = new address[](1); markets[0] = vToken; targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets); }
-                k++;
-            } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
-                // User token approval to gateway, only if insufficient
-                uint256 cur = IERC20(ins.token).allowance(caller, address(this));
-                if (ins.amount != 0 && cur >= ins.amount) { targets[k] = address(0); data[k] = bytes(""); }
-                else { targets[k] = ins.token; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount); }
-                k++;
+
+                if (ins.op == ProtocolTypes.LendingOp.Deposit) {
+                    // 2) Enter market to enable as collateral (idempotent)
+                    address vToken = _getVTokenForUnderlying(token);
+                    bool member = false; try comptroller.checkMembership(caller, vToken) returns (bool m) { member = m; } catch {}
+                    if (member) { targets[k] = address(0); data[k] = bytes(""); }
+                    else { address[] memory markets = new address[](1); markets[0] = vToken; targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets); }
+                    k++;
+                }
+                
+                // Repay produces refund output (unknown/zero for sim)
+                if (ins.op == ProtocolTypes.LendingOp.Repay) {
+                    produced[i] = ProtocolTypes.Output({ token: token, amount: 0 });
+                }
             } else if (ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
-                address col = ins.token; address vToken = _getVTokenForUnderlying(col);
+                address col = token; address vToken = _getVTokenForUnderlying(col);
                 // First: approve gateway to spend tokens (only if insufficient)
                 uint256 cur = IERC20(col).allowance(caller, address(this));
-                if (ins.amount != 0 && cur >= ins.amount) {
+                if (amount != 0 && cur >= amount) {
                     targets[k] = address(0); data[k] = bytes("");
                 } else {
-                    targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), ins.amount);
+                    targets[k] = col; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), amount);
                 }
                 k++;
                 // Second: enter market so vTokens can be used as collateral (only if not already a member)
@@ -161,16 +179,22 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 }
                 k++;
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                address col = ins.token; address vToken = _getVTokenForUnderlying(col);
+                address col = token; address vToken = _getVTokenForUnderlying(col);
                 // Compute required vTokens from underlying using exchangeRateStored; if amount==0, require max
                 uint rate = VTokenInterface(vToken).exchangeRateStored();
-                uint requiredV = ins.amount == 0 ? type(uint256).max : (ins.amount * 1e18 + rate - 1) / rate;
+                uint requiredV = amount == 0 ? type(uint256).max : (amount * 1e18 + rate - 1) / rate;
                 uint256 curV = IERC20(vToken).allowance(caller, address(this));
-                if ((ins.amount != 0 && curV >= requiredV) || (ins.amount == 0 && curV == type(uint256).max)) {
-                    targets[k] = address(0); data[k] = bytes("");
-                } else {
-                    targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
-                }
+               // Amount is already buffered if coming from GetSupplyBalance
+            uint256 required = amount;
+            produced[i] = ProtocolTypes.Output({ token: token, amount: required });
+
+            if (amount != 0 && curV >= requiredV) { // Changed cur to curV and required to requiredV
+                targets[k] = address(0); data[k] = bytes("");
+            } else {
+                targets[k] = vToken; data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), requiredV);
+            }    
+                // Simulate output
+                produced[i] = ProtocolTypes.Output({ token: token, amount: amount });
                 k++;
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
                 // Only updateDelegate if not already approved
@@ -181,9 +205,36 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 } else {
                     targets[k] = address(comptroller); data[k] = abi.encodeWithSelector(ComptrollerInterface.updateDelegate.selector, address(this), true);
                 }
+                
+                // Simulate output
+                produced[i] = ProtocolTypes.Output({ token: token, amount: amount });
+                k++;
+            } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
+                address vToken = _getVTokenForUnderlying(token); uint256 bal = VTokenInterface(vToken).borrowBalanceStored(ins.user);
+                // Add 0.1% buffer
+                bal = (bal * 1001) / 1000;
+                produced[i] = ProtocolTypes.Output({ token: token, amount: bal });
+                targets[k] = address(0); data[k] = bytes("");
+                k++;
+            } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
+                address vToken = _getVTokenForUnderlying(token); uint256 vBal = VTokenInterface(vToken).balanceOf(ins.user); uint256 rate = VTokenInterface(vToken).exchangeRateStored();
+                uint256 bal = (vBal * rate) / 1e18;
+                // Add 0.1% buffer
+                bal = (bal * 1001) / 1000;
+                produced[i] = ProtocolTypes.Output({ token: token, amount: bal });
+                targets[k] = address(0); data[k] = bytes("");
                 k++;
             }
         }
+    }
+
+    function deauthorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address /*caller*/
+    ) external view override returns (address[] memory targets, bytes[] memory data) {
+        targets = new address[](instrs.length);
+        data = new bytes[](instrs.length);
+        // Deauthorization disabled for now
     }
 
     function _getVTokenForUnderlying(address underlying) internal view returns (address) {

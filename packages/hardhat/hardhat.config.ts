@@ -37,6 +37,7 @@ const config: HardhatUserConfig = {
             // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
             runs: 200,
           },
+          viaIR: true,
         },
       },
       {
@@ -62,13 +63,14 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       hardfork: "cancun",
+      chainId: 42161,
       forking: {
         // Default to Base mainnet Alchemy; override via ALCHEMY_API_KEY
-       url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        // url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+        // url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+        url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
         //      url: `https://base-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-       // blockNumber: 396136412,
-//        blockNumber: 37791583,
+        // blockNumber: 396136412,
+        //        blockNumber: 37791583,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
     },
@@ -292,7 +294,7 @@ task("deploy").setAction(async (args, hre, runSuper) => {
   await runSuper(args);
   // Force run the generateTsAbis script
   await generateTsAbis(hre);
-  
+
   // Log verification instruction
   console.log("\n====================");
   console.log("Deployment completed! To verify contracts manually:");

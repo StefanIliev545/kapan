@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { encodeLendingInstruction, LendingOp } from "./helpers/instructionHelpers";
 
 describe("KapanRouter transient instruction stack", function () {
   it("processes all instructions via transient stack in order", async function () {
@@ -16,7 +17,10 @@ describe("KapanRouter transient instruction stack", function () {
     await (await router.addGateway("mock", await mock.getAddress())).wait();
 
     const coder = ethers.AbiCoder.defaultAbiCoder();
-    const payloads = [1n, 2n, 3n].map((n) => coder.encode(["uint256"], [n]));
+    // Use dummy values for token/user, but vary amount to track order
+    const payloads = [1n, 2n, 3n].map((n) =>
+      encodeLendingInstruction(LendingOp.Deposit, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", n, "0x", 999)
+    );
     const instructions = payloads.map((data) => ({ protocolName: "mock", data }));
 
     const tx = await router.processProtocolInstructions(instructions);
@@ -27,13 +31,20 @@ describe("KapanRouter transient instruction stack", function () {
 
     const decoded = logs.map((log: any) => {
       const parsed = mock.interface.parseLog(log);
-      return parsed?.args?.[0] as string;
+      // MockGateway emits Instruction(bytes data)
+      // We need to decode the data as LendingInstruction
+      const data = parsed?.args?.[0];
+      const lendingInstr = ethers.AbiCoder.defaultAbiCoder().decode(
+        ["tuple(uint8 op,address token,address user,uint256 amount,bytes context,tuple(uint256 index) input)"],
+        data
+      );
+      return lendingInstr[0].amount;
     });
 
     expect(decoded.length).to.equal(payloads.length);
     // Should process in original order: 1,2,3
     for (let i = 0; i < payloads.length; i++) {
-      expect(decoded[i]).to.equal(payloads[i]);
+      expect(decoded[i]).to.equal(BigInt(i + 1));
     }
   });
 });

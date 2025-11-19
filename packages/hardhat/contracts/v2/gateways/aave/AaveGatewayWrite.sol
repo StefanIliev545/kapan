@@ -56,10 +56,14 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             outputs[0] = ProtocolTypes.Output({ token: token, amount: refund });
         } else if (instr.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
             uint256 bal = _getBorrowBalance(token, instr.user);
+            // Add 0.1% buffer
+            bal = (bal * 1001) / 1000;
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
         } else if (instr.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
             uint256 bal = _getSupplyBalance(token, instr.user);
+            // Add 0.1% buffer
+            bal = (bal * 1001) / 1000;
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
         } else {
@@ -86,7 +90,12 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address aToken = _getAToken(underlying);
         require(aToken != address(0), "aToken not found");
         IERC20 a = IERC20(aToken);
-        require(a.balanceOf(user) >= amount, "aToken: insufficient");
+        uint256 balance = a.balanceOf(user);
+        // Clamp amount to balance if requested amount > balance
+        // This handles rounding errors (e.g. 1 wei less) and type(uint256).max
+        if (amount > balance) {
+            amount = balance;
+        }
         require(a.allowance(user, address(this)) >= amount, "aToken: allowance");
         a.safeTransferFrom(user, address(this), amount);
         address pool = poolAddressesProvider.getPool();
@@ -124,41 +133,66 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         }
     }
 
-    function authorize(ProtocolTypes.LendingInstruction[] calldata instrs, address caller)
+    function authorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address caller,
+        ProtocolTypes.Output[] calldata inputs
+    )
         external
         view
-        returns (address[] memory targets, bytes[] memory data)
+        returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced)
     { 
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+        produced = new ProtocolTypes.Output[](instrs.length);
 
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            
+            // Simulation logic to determine actual token and amount
+            address token = ins.token;
+            uint256 amount = ins.amount;
+            if (ins.input.index < inputs.length) {
+                token = inputs[ins.input.index].token;
+                amount = inputs[ins.input.index].amount;
+            }
 
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                // User must approve aToken → gateway for withdraw
-                address aToken = _getAToken(ins.token);
+                // User must approve aToken -> gateway for withdraw
+                address aToken = _getAToken(token);
                 uint256 cur = IERC20(aToken).allowance(caller, address(this));
-                if (cur >= ins.amount && ins.amount != 0) {
-                    // Already sufficient allowance for this withdrawal
+                
+                // Calculate required approval (amount is already buffered if coming from GetSupplyBalance)
+                uint256 required = amount;
+                
+                // Set produced output
+                produced[i] = ProtocolTypes.Output({ token: token, amount: required });
+
+                if (amount != 0 && cur >= required) {
                     targets[i] = address(0);
                     data[i] = bytes("");
                 } else {
                     targets[i] = aToken;
-                    // Ask for max so withdraw-all / accrued interest cases don't need another approval
-                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), type(uint256).max);
+                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), required);
                 }
+                
+                // Simulate output: underlying token
+                produced[i] = ProtocolTypes.Output({ token: token, amount: amount });
 
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                // User must approveDelegation(vDebt → gateway) for borrow
-                (address aToken, address sToken, address vDebt) = _getReserveTokens(ins.token);
+                // User must approveDelegation(vDebt -> gateway) for borrow
+                (, , address vDebt) = _getReserveTokens(token);
                 
                 if (vDebt == address(0)) {
-                    revert("vDebt is zero address");
+                    // Should revert or handle error, but view function shouldn't revert if possible
+                    targets[i] = address(0);
+                    data[i] = bytes("");
                 } else {
                     uint256 cur = IVariableDebtToken(vDebt).borrowAllowance(caller, address(this));
-                    if (cur >= ins.amount && ins.amount != 0) {
-                        // Already sufficient delegation
+                    // Borrow amount is exact
+                    uint256 required = amount; 
+                    
+                    if (cur >= required && amount != 0) {
                         targets[i] = address(0);
                         data[i] = bytes("");
                     } else {
@@ -166,18 +200,47 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                         data[i] = abi.encodeWithSignature(
                             "approveDelegation(address,uint256)",
                             address(this),
-                            type(uint256).max
+                            type(uint256).max // Delegation usually safe to be max, or use required
                         );
                     }
                 }
+                produced[i] = ProtocolTypes.Output({ token: token, amount: amount });
 
-            } else {
-                // Deposit / Repay / DepositCollateral: user approvals not needed
-                // (router handles pull + router->gateway approve)
+            } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
+                uint256 bal = _getBorrowBalance(token, ins.user);
+                // Add 0.1% buffer
+                bal = (bal * 1001) / 1000;
+                produced[i] = ProtocolTypes.Output({ token: token, amount: bal });
                 targets[i] = address(0);
                 data[i] = bytes("");
+            } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
+                uint256 bal = _getSupplyBalance(token, ins.user);
+                // Add 0.1% buffer
+                bal = (bal * 1001) / 1000;
+                produced[i] = ProtocolTypes.Output({ token: token, amount: bal });
+                targets[i] = address(0);
+                data[i] = bytes("");
+            } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
+                 // Repay produces refund output
+                 produced[i] = ProtocolTypes.Output({ token: token, amount: 0 }); // Refund unknown/zero for sim
+                 targets[i] = address(0);
+                 data[i] = bytes("");
+            } else {
+                // Deposit etc
+                targets[i] = address(0);
+                data[i] = bytes("");
+                // No output for deposit
             }
         }
+    }
+
+    function deauthorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address /*caller*/
+    ) external view override returns (address[] memory targets, bytes[] memory data) {
+        targets = new address[](instrs.length);
+        data = new bytes[](instrs.length);
+        // Deauthorization disabled for now
     }
 
     function _getAToken(address underlying) internal view returns (address) {

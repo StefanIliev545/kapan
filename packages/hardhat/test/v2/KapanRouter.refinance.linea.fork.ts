@@ -45,6 +45,12 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
     if (!FORK) {
       throw new Error("MAINNET_FORKING_ENABLED must be true to run fork tests");
     }
+    // Check if we are on Linea (59144)
+    const chainId = network.config.chainId;
+    if (chainId !== 59144) {
+      console.log(`Skipping Linea refinance tests: Current chain ID is ${chainId}, expected 59144`);
+      this.skip();
+    }
   });
 
   describe("Refinance: Aave -> Compound (WETH collateral, USDC debt)", function () {
@@ -86,7 +92,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       const Router = await ethers.getContractFactory("KapanRouter");
       const router = await Router.deploy(await deployer.getAddress());
       await router.waitForDeployment();
-      
+
       // Set Aave V3 pool for flash loans
       const poolProvider = await ethers.getContractAt(
         "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
@@ -132,7 +138,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         context: "0x",
         input: { index: 0 },
       };
-      const [aaveAuthTargets, aaveAuthDatas] = await aaveGateway.authorize([aaveDepObj, aaveBorObj], userAddress);
+      const [aaveAuthTargets, aaveAuthDatas, produced] = await aaveGateway.authorize([aaveDepObj, aaveBorObj], userAddress, []);
       console.log("Aave authorizations:");
       for (let i = 0; i < aaveAuthTargets.length; i++) {
         if (!aaveAuthTargets[i] || aaveAuthDatas[i].length === 0) continue;
@@ -157,14 +163,14 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       // Verify position was created correctly
       const userWethAfterSetup = await weth.balanceOf(userAddress);
       const userUsdcAfterSetup = await usdc.balanceOf(userAddress);
-      
+
       // Skip v1 gateway view checks; we verify via balances and protocol reads later
-      
+
       console.log(`✓ Position created in Aave`);
       console.log(`  User WETH: ${ethers.formatEther(userWethAfterSetup)} (should be ~0.5 WETH, started with 2)`);
       console.log(`  User USDC: ${userUsdcAfterSetup / 10n ** 6n} USDC (borrowed)`);
       // Aave position details are verified later via protocol data provider
-      
+
       // Verify setup was correct
       expect(userWethAfterSetup).to.be.closeTo(ethers.parseEther("0.5"), ethers.parseEther("0.01")); // User should have ~0.5 WETH left (2 - 1.5)
       expect(userUsdcAfterSetup).to.be.gte(borrowAmt); // User should have at least the borrowed amount
@@ -189,7 +195,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         context: "0x",
         input: { index: 0 },
       };
-      const [aaveRepTargets, aaveRepDatas] = await aaveGateway.authorize([aaveRepObj, aaveWitObj], userAddress);
+      const [aaveRepTargets, aaveRepDatas, produced1] = await aaveGateway.authorize([aaveRepObj, aaveWitObj], userAddress, []);
       console.log("Aave repay/withdraw authorizations:");
       for (let i = 0; i < aaveRepTargets.length; i++) {
         if (!aaveRepTargets[i] || aaveRepDatas[i].length === 0) continue;
@@ -217,9 +223,10 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         context: marketContext,
         input: { index: 0 },
       };
-      const [compoundAuthTargets, compoundAuthDatas] = await compoundGateway.authorize(
+      const [compoundAuthTargets, compoundAuthDatas, produced2] = await compoundGateway.authorize(
         [compoundDepObj, compoundBorObj],
-        userAddress
+        userAddress,
+        []
       );
       console.log("Compound authorizations:");
       for (let i = 0; i < compoundAuthTargets.length; i++) {
@@ -233,7 +240,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
         await poolProvider.getPoolDataProvider()
       );
-      
+
       // Get reserve data to find variable debt token (approximate debt via scaled balance)
       let vDebtToken: string | null = null;
       try {
@@ -242,7 +249,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       } catch {
         vDebtToken = null;
       }
-      
+
       let actualDebtAmount = borrowAmt + 5_000_000n; // Start with buffer, will query on-chain
       if (vDebtToken) {
         try {
@@ -256,7 +263,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
           actualDebtAmount = borrowAmt + 5_000_000n;
         }
       }
-      
+
       console.log(`Flash loan size: ${actualDebtAmount / 10n ** 6n} USDC (includes buffer for interest)`);
 
       // Refinance instructions (all in one atomic transaction via flash loan)
@@ -305,25 +312,25 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
 
       // Verify positions actually moved by querying balances in both protocols
       console.log("\n=== Verifying Position Migration ===");
-      
+
       // Query Aave balances (should be ~0)
       const checkAaveBalances = [
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetSupplyBalance, WETH, userAddress, 0n, "0x", 999)),
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
       ];
       await (await router.connect(user).processProtocolInstructions(checkAaveBalances)).wait();
-      
+
       // Query Compound balances (should have position)
       const checkCompoundBalances = [
         createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetSupplyBalance, WETH, userAddress, 0n, marketContext, 999)),
         createProtocolInstruction("compound", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
       ];
       await (await router.connect(user).processProtocolInstructions(checkCompoundBalances)).wait();
-      
+
       // Parse outputs from receipts (need to decode events or use view calls)
       // For now, let's use the gateway's view functions if available, or parse from logs
       // Actually, let's use GetSupplyBalance/GetBorrowBalance directly via static call to gateways
-      
+
       // Check Aave balances via protocol data provider (no v1 gateway dependency)
       const dataProviderPost = await ethers.getContractAt(
         "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
@@ -342,7 +349,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       } catch (e) {
         console.log("  Note: Failed to read Aave balances via data provider:", e);
       }
-      
+
       // Compound balances queried directly on Comet below
       let compoundSupply = 0n;
       let compoundDebt = 0n;
@@ -357,7 +364,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       } catch (e) {
         console.log(`  Error checking Compound balances: ${e}`);
       }
-      
+
       // Also check user/router balances
       const userWethAfter = await weth.balanceOf(userAddress);
       const userUsdcAfter = await usdc.balanceOf(userAddress);
@@ -378,15 +385,15 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
       // 1. Aave position should be cleared (or minimal due to interest accrual during test execution)
       expect(aaveSupply).to.be.lt(ethers.parseEther("0.01")); // Aave collateral should be ~0
       expect(aaveDebt).to.be.lt(1_000_000n); // Aave debt should be ~0 (< 1 USDC)
-      
+
       // 2. Compound position should exist (debt slightly higher than borrowed amount due to interest)
       expect(compoundSupply).to.be.gte(depositAmt - ethers.parseEther("0.01")); // Compound should have ~1.5 WETH
       expect(compoundDebt).to.be.gte(borrowAmt); // Compound debt should be >= original borrow (interest accrued)
-      
+
       // 3. User balances unchanged (no external funds used)
       expect(userWethAfter).to.equal(userWethBefore);
       expect(userUsdcAfter).to.equal(userUsdcBefore);
-      
+
       // 4. Router has minimal balances (flash loan repaid)
       expect(routerWeth).to.be.lt(ethers.parseEther("0.01"));
       expect(routerUsdc).to.be.lt(10_000_000n); // < 10 USDC
