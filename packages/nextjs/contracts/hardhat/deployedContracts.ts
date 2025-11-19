@@ -3442,7 +3442,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x4368c6c26B821933c796EDA29bd8097B0560D028",
+      address: "0x3eAAf048adbd1E425A43f866e947bF95F0D1e58f",
       abi: [
         {
           inputs: [
@@ -4659,7 +4659,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xCC3e4DbDebBE14dcC028b7B57999a21c02B0badB",
+      address: "0x6041B69BE09b0AB1D827d9CAeeB56F51e917Ff5f",
       abi: [
         {
           inputs: [
@@ -5280,7 +5280,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x27Dd6baEA6db73be2ABdf3Ddb631d5aEeb184870",
+      address: "0x50A72e9767bc929A111dcd74a41A0eB3D0EE747c",
       abi: [
         {
           inputs: [
@@ -6983,7 +6983,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x5993c8f2167c1F5C01137aC28D3CB152B439890f",
+      address: "0xa156a3E7C44eCc4a8DDE0096719422C9c6Dd5De5",
       abi: [
         {
           inputs: [
@@ -7771,7 +7771,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0xA692E79d995Fe351D3349d712D98ec1c3601Dd0B",
+      address: "0x209BCf09780b79E6e5FB64f22Dd3DF041e499774",
       abi: [
         {
           inputs: [
