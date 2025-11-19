@@ -1,7 +1,25 @@
 import { useCallback, useState, useEffect } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient, useChainId, useSendCalls, useWaitForCallsStatus, useCapabilities } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  usePublicClient,
+  useWalletClient,
+  useChainId,
+  useSendCalls,
+  useWaitForCallsStatus,
+  useCapabilities
+} from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, encodeFunctionData, type Address, type Hex } from "viem";
+import {
+  parseUnits,
+  decodeAbiParameters,
+  encodeAbiParameters,
+  decodeFunctionData,
+  encodeFunctionData,
+  type Address,
+  type Hex
+} from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
@@ -22,8 +40,8 @@ import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContra
 import { ERC20ABI } from "~~/contracts/externalContracts";
 
 // --- ABI FIXES ---
-// Local definition of deauthorizeInstructions to avoid stale ABI errors if the frontend 
-// hasn't updated with the latest contract deployment.
+// Local definition of deauthorizeInstructions/authorizeInstructions signatures 
+// to ensure stability even if artifacts are slightly stale.
 const DEAUTH_ABI = [
   {
     inputs: [
@@ -57,6 +75,7 @@ interface AuthorizationCall {
 
 const APPROVE_SELECTOR = "0x095ea7b3";
 
+// Helper to detect if an authorization call is just approving "0" (which we can skip for gas efficiency)
 const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
   if (!data || data === "0x" || data.length < 10) {
     return false;
@@ -71,16 +90,15 @@ const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
     return false;
   } catch {
     try {
+      // Fallback manual decode
       const selector = data.slice(0, 10).toLowerCase();
       if (selector !== APPROVE_SELECTOR) {
         return false;
       }
-
       const [, amount] = decodeAbiParameters(
         [{ type: "address" }, { type: "uint256" }],
         data.slice(10) as `0x${string}`
       );
-
       return (amount as bigint) === 0n;
     } catch {
       return false;
@@ -102,13 +120,13 @@ export const useKapanRouterV2 = () => {
   const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
     8453: 2,   // Base mainnet
     84531: 2,  // Base Sepolia
-    84532: 2,  // Base Sepolia (alternative)
-    10: 2,     // Optimism mainnet
+    84532: 2,  // Base Sepolia
+    10: 2,     // Optimism
     420: 2,    // Optimism Goerli
     11155420: 2, // Optimism Sepolia
-    42161: 0,  // Arbitrum One
+    42161: 0,  // Arbitrum One (Instant)
     421614: 1, // Arbitrum Sepolia
-    59144: 0,  // Linea mainnet
+    59144: 0,  // Linea
     59141: 1,  // Linea Sepolia
   };
 
@@ -124,7 +142,7 @@ export const useKapanRouterV2 = () => {
   const [isApproving, setIsApproving] = useState(false);
   const [batchId, setBatchId] = useState<string | undefined>(undefined);
 
-  // EIP-5792 capability detection
+  // EIP-5792 capability detection (Atomic Batching)
   const { data: capabilities } = useCapabilities({ account: userAddress });
   const chainIdHex = `0x${chainId.toString(16)}`;
   const atomicStatus = (capabilities as Record<string, { atomic?: { status?: string } }> | undefined)?.[chainIdHex]?.atomic?.status as
@@ -140,6 +158,7 @@ export const useKapanRouterV2 = () => {
 
   const [batchNotificationId, setBatchNotificationId] = useState<string | number | null>(null);
 
+  // Batch Status Effects
   useEffect(() => {
     if (!batchId || !batchStatus) return;
 
@@ -165,6 +184,7 @@ export const useKapanRouterV2 = () => {
     }
   }, [batchId, batchStatus, isBatchConfirmed, isBatchError, batchNotificationId]);
 
+  // Refetch Data on Success
   useEffect(() => {
     const complete = isConfirmed || isBatchConfirmed;
     if (!complete) return;
@@ -242,7 +262,7 @@ export const useKapanRouterV2 = () => {
     const normalizedProtocol = normalizeProtocolName(protocolName);
 
     if (isMax || amount.toLowerCase() === "max") {
-      console.warn("buildRepayFlow: isMax=true is deprecated. Use buildRepayFlowAsync instead.");
+      console.warn("buildRepayFlow: isMax=true is deprecated for sync calls. Use buildRepayFlowAsync instead.");
       return [];
     }
 
@@ -259,6 +279,7 @@ export const useKapanRouterV2 = () => {
     ];
   }, [userAddress]);
 
+  // FIXED: Handles "max" correctly by fetching balance on-chain
   const buildRepayFlowAsync = useCallback(async (
     protocolName: string,
     tokenAddress: string,
@@ -268,9 +289,18 @@ export const useKapanRouterV2 = () => {
   ): Promise<ProtocolInstruction[]> => {
     if (!userAddress || !publicClient) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
+
     let pullAmount: bigint;
+
     if (isMax || amount.toLowerCase() === "max") {
-      pullAmount = (parseUnits(amount, decimals) * 101n) / 100n;
+      // Fetch actual balance for "max" to prevent parsing error
+      const balance = await publicClient.readContract({
+        address: tokenAddress as Address,
+        abi: ERC20ABI,
+        functionName: "balanceOf",
+        args: [userAddress],
+      }) as bigint;
+      pullAmount = balance;
     } else {
       pullAmount = parseUnits(amount, decimals);
     }
@@ -286,6 +316,7 @@ export const useKapanRouterV2 = () => {
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, "0x", isMax ? 2 : 0)
       ),
+      // Note: Repay will produce a refund output (index 3)
       createRouterInstruction(encodePushToken(3, userAddress)),
     ];
   }, [userAddress, publicClient]);
@@ -334,6 +365,8 @@ export const useKapanRouterV2 = () => {
         data: inst.data as `0x${string}`,
       }));
 
+      // We send the FULL set of instructions to authorizeInstructions.
+      // The Router calculates the simulated state (UTXOs) internally.
       const result = await publicClient.readContract({
         address: routerContract.address as Address,
         abi: routerContract.abi,
@@ -374,7 +407,6 @@ export const useKapanRouterV2 = () => {
         data: inst.data as `0x${string}`,
       }));
 
-      // FIX: Use local ABI constant to bypass stale contract type definition
       const result = await publicClient.readContract({
         address: routerContract.address as Address,
         abi: DEAUTH_ABI,
@@ -510,13 +542,14 @@ export const useKapanRouterV2 = () => {
     }
 
     try {
+      // 1. Calculate Authorizations
       const authCalls = await getAuthorizations(instructions);
 
       if (authCalls.length === 0) {
         return await executeInstructions(instructions);
       }
 
-      // Execute approvals sequentially
+      // 2. Execute Approvals Sequentially
       for (let i = 0; i < authCalls.length; i++) {
         const authCall = authCalls[i];
         if (!authCall.target || !authCall.data || authCall.data.length === 0) continue;
@@ -570,9 +603,9 @@ export const useKapanRouterV2 = () => {
         setIsApproving(false);
       }
 
-      // Atomic batch for Execution + Deauth if supported
+      // 3. Execute Logic (Atomic Batch if supported, else Tx)
       if (canDoAtomicBatch && sendCallsAsync) {
-        const deauthCalls = [] as { target: Address, data: any }[]; //await getDeauthorizations(instructions);
+        const deauthCalls = [] as { target: Address, data: any }[]; // Placeholder for future deauth logic
 
         const calls = [
           {
@@ -594,7 +627,6 @@ export const useKapanRouterV2 = () => {
           }))
         ];
 
-        // FIX: Destructure return to get ID string
         const { id } = await sendCallsAsync({ calls, capabilities });
         setBatchId(id);
         return id;
@@ -616,6 +648,7 @@ export const useKapanRouterV2 = () => {
       throw new Error("Missing context");
     }
 
+    // Prepare main calldata
     const protocolInstructions = instructions.map(inst => ({
       protocolName: inst.protocolName,
       data: inst.data as `0x${string}`,
@@ -626,6 +659,7 @@ export const useKapanRouterV2 = () => {
       args: [protocolInstructions],
     });
 
+    // Prepare approvals
     const authCalls = await getAuthorizations(instructions);
     const filteredAuthCalls = authCalls.filter(({ target, data }) => {
       if (!target || !data || data.length === 0) return false;
@@ -640,15 +674,12 @@ export const useKapanRouterV2 = () => {
 
     if (preferBatching) {
       try {
-        // FIX: Destructure return to get ID string
         const { id } = await sendCallsAsync({
           calls,
           experimental_fallback: true,
         });
 
         setBatchId(id);
-
-        // Show tracking notification
         const sentNotificationId = notification.loading(
           <TransactionToast step="sent" message="Batch transaction sent — waiting for confirmation..." />
         );
@@ -665,7 +696,6 @@ export const useKapanRouterV2 = () => {
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals]);
 
   // --- Move Flow Builder ---
-  // (Implementation same as previous, just ensuring context is passed correctly)
 
   type FlashConfig = { version: "v3" | "v2" | "aave"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
@@ -698,6 +728,7 @@ export const useKapanRouterV2 = () => {
     let compoundMarket: Address | null = null;
     let utxoCount = 0;
 
+    // Helper to add instructions and track UTXO indices
     const add = (inst: ProtocolInstruction, createsUtxo = false) => {
       instructions.push(inst);
       if (createsUtxo) utxoCount++;
@@ -718,16 +749,24 @@ export const useKapanRouterV2 = () => {
         if (expected === 0n) throw new Error(`Invalid debt amount`);
 
         const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(debtToken)) : getContext(from, fromContext as `0x${string}`);
+
+        // 1. Get Borrow Balance (creates UTXO)
         const utxoIndexForGetBorrow = utxoCount;
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
 
+        // 2. Flash Loan (creates UTXO)
         let provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.AaveV3 : (version === "v3" ? FlashLoanProvider.BalancerV3 : FlashLoanProvider.BalancerV2);
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount;
         addRouter(flashData as `0x${string}`, true);
         flashLoanOutputs.set((debtToken as Address).toLowerCase() as Address, flashLoanUtxoIndex);
 
+        // 3. Approve Gateway (Router Instruction)
+        // CRITICAL: createsUtxo=true because fixed Router logic appends an empty output for Approves to maintain index sync.
         addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true);
+
+        // 4. Repay Debt (using Flash Loan proceeds)
+        // Repay creates a refund UTXO (usually 0)
         addProto(from, encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`, true);
       },
 
@@ -747,7 +786,9 @@ export const useKapanRouterV2 = () => {
         const utxoIndexForWithdraw = utxoCount;
         addProto(from, encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralToken, userAddress, withdrawAmt, fromCtx, "max" in withdraw && withdraw.max && utxoIndexForGetSupply !== undefined ? utxoIndexForGetSupply : 999) as `0x${string}`, true);
 
+        // Approve (creates UTXO for sync)
         addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true);
+        // Deposit (NO UTXO created)
         addProto(to, encodeLendingInstruction(LendingOp.Deposit, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
       },
 
@@ -761,8 +802,11 @@ export const useKapanRouterV2 = () => {
         const utxoIndexForBorrow = utxoCount;
         const borrowInputIndex = p.mode === "coverFlash" ? (flashLoanOutputs.get((token as Address).toLowerCase() as Address) ?? 999) : 999;
 
+        // Borrow (creates UTXO)
         addProto(to, encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`, true);
+
         if (approveToRouter && p.mode !== "coverFlash") {
+          // Approve (creates UTXO)
           addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true);
         }
       },
@@ -780,9 +824,26 @@ export const useKapanRouterV2 = () => {
   const isAnyConfirmed = isConfirmed || isBatchConfirmed;
 
   return {
-    buildDepositFlow, buildBorrowFlow, buildRepayFlow, buildRepayFlowAsync, buildWithdrawFlow, createMoveBuilder,
-    executeInstructions, executeFlowWithApprovals, executeFlowBatchedIfPossible, getAuthorizations,
-    hash, isPending, isConfirming, isConfirmed, isApproving, writeContract,
-    batchId, batchStatus, isBatchConfirmed, canDoAtomicBatch, isAnyConfirmed,
+    buildDepositFlow,
+    buildBorrowFlow,
+    buildRepayFlow,
+    buildRepayFlowAsync,
+    buildWithdrawFlow,
+    createMoveBuilder,
+    executeInstructions,
+    executeFlowWithApprovals,
+    executeFlowBatchedIfPossible,
+    getAuthorizations,
+    hash,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    isApproving,
+    writeContract,
+    batchId,
+    batchStatus,
+    isBatchConfirmed,
+    canDoAtomicBatch,
+    isAnyConfirmed,
   };
 };
