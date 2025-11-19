@@ -8,7 +8,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const contracts = {
   10: {
     AaveGatewayView: {
-      address: "0x9162c976DaE8B70505EA8060941113f181E449D8",
+      address: "0x063831f2E172a25A287F0838d1715c5CbE3E14c4",
       abi: [
         {
           inputs: [
@@ -386,7 +386,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xb1A2B93bCe0aa8B29d2835Ea98Bb2C9959879470",
+      address: "0xe91967428b54a3700436bE7FbC40b2f55CDfbe62",
       abi: [
         {
           inputs: [
@@ -529,6 +529,23 @@ const contracts = {
               name: "caller",
               type: "address",
             },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
           ],
           name: "authorize",
           outputs: [
@@ -541,6 +558,23 @@ const contracts = {
               internalType: "bytes[]",
               name: "data",
               type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
             },
           ],
           stateMutability: "view",
@@ -567,6 +601,74 @@ const contracts = {
           name: "borrow",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -725,7 +827,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x8CA472aE9A5686cE709C6Dd3D7bD2d5418C4D149",
+      address: "0x9587b8D16210EaA43e505e1882C20223e5d92b56",
       abi: [
         {
           inputs: [
@@ -1501,7 +1603,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x6c25206b853E7D6eFd330c2EC967d6D2922EfD7c",
+      address: "0xA6C6976b2A4CB6b0e3Ebba1F378d34C081ABf830",
       abi: [
         {
           inputs: [
@@ -1737,6 +1839,23 @@ const contracts = {
               name: "caller",
               type: "address",
             },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
           ],
           name: "authorize",
           outputs: [
@@ -1749,6 +1868,23 @@ const contracts = {
               internalType: "bytes[]",
               name: "data",
               type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
             },
           ],
           stateMutability: "view",
@@ -1775,6 +1911,74 @@ const contracts = {
           name: "borrow",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -2020,7 +2224,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xcD2905D79d9cA063eda9E79774e489557A8841f6",
+      address: "0xe3d67c67714Ed9c81Bd2468300B5101F6A5C72b1",
       abi: [
         {
           inputs: [
@@ -2345,6 +2549,47 @@ const contracts = {
               internalType: "contract IVaultV3",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "string",
+                  name: "protocolName",
+                  type: "string",
+                },
+                {
+                  internalType: "bytes",
+                  name: "data",
+                  type: "bytes",
+                },
+              ],
+              internalType: "struct ProtocolTypes.ProtocolInstruction[]",
+              name: "instructions",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "caller",
+              type: "address",
+            },
+          ],
+          name: "deauthorizeInstructions",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
             },
           ],
           stateMutability: "view",
@@ -3050,7 +3295,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x23a0ebBf8Cd9911a3d71c799Dc9b514aC132C91D",
+      address: "0x580E43a49841b97cdB0eeAbAfCf4002446598F43",
       abi: [
         {
           inputs: [
