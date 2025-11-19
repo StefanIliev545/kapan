@@ -283,6 +283,9 @@ export const useVesuV2LendingPositions = (
     return cachedPositions
       .map((position, index) => {
         const [collateralAddressRaw, debtAddressRaw, stats] = position;
+        if (stats.collateral_amount === 0n && stats.nominal_debt === 0n) {
+          return null;
+        }
         const collateralAddress = `0x${collateralAddressRaw.toString(16).padStart(64, "0")}`;
         const debtAddress = `0x${debtAddressRaw.toString(16).padStart(64, "0")}`;
 

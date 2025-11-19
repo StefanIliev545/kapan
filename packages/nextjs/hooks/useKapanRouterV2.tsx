@@ -279,13 +279,23 @@ export const useKapanRouterV2 = () => {
     ];
   }, [userAddress]);
 
-  // FIXED: Handles "max" correctly by fetching balance on-chain
+  /**
+   * Build a repay flow with async wallet balance check for max repayments
+   * This safely handles "max" repayments by reading the user's wallet balance instead of using MaxUint256
+   * @param protocolName - Protocol to repay to
+   * @param tokenAddress - Token address to repay
+   * @param amount - Amount to repay (as string) or "max" for full wallet balance
+   * @param decimals - Token decimals (default: 18)
+   * @param isMax - Whether to repay maximum (uses wallet balance, not MaxUint256)
+   * @param maxPullAmount - Optional cap for the amount pulled from the wallet when repaying max
+   */
   const buildRepayFlowAsync = useCallback(async (
     protocolName: string,
     tokenAddress: string,
     amount: string,
     decimals = 18,
-    isMax = false
+    isMax = false,
+    maxPullAmount?: bigint
   ): Promise<ProtocolInstruction[]> => {
     if (!userAddress || !publicClient) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -293,14 +303,20 @@ export const useKapanRouterV2 = () => {
     let pullAmount: bigint;
 
     if (isMax || amount.toLowerCase() === "max") {
-      // Fetch actual balance for "max" to prevent parsing error
+      // 1. Fetch actual balance for "max" to prevent parsing error (Safety Fix from Staging)
       const balance = await publicClient.readContract({
         address: tokenAddress as Address,
         abi: ERC20ABI,
         functionName: "balanceOf",
         args: [userAddress],
       }) as bigint;
-      pullAmount = balance;
+
+      // 2. Respect optional cap (Feature from Main)
+      if (maxPullAmount !== undefined && maxPullAmount < balance) {
+        pullAmount = maxPullAmount;
+      } else {
+        pullAmount = balance;
+      }
     } else {
       pullAmount = parseUnits(amount, decimals);
     }
@@ -696,7 +712,7 @@ export const useKapanRouterV2 = () => {
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals]);
 
   // --- Move Flow Builder ---
-
+  
   type FlashConfig = { version: "v3" | "v2" | "aave"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
@@ -749,7 +765,7 @@ export const useKapanRouterV2 = () => {
         if (expected === 0n) throw new Error(`Invalid debt amount`);
 
         const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(debtToken)) : getContext(from, fromContext as `0x${string}`);
-
+        
         // 1. Get Borrow Balance (creates UTXO)
         const utxoIndexForGetBorrow = utxoCount;
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
@@ -764,7 +780,7 @@ export const useKapanRouterV2 = () => {
         // 3. Approve Gateway (Router Instruction)
         // CRITICAL: createsUtxo=true because fixed Router logic appends an empty output for Approves to maintain index sync.
         addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true);
-
+        
         // 4. Repay Debt (using Flash Loan proceeds)
         // Repay creates a refund UTXO (usually 0)
         addProto(from, encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`, true);
@@ -804,7 +820,7 @@ export const useKapanRouterV2 = () => {
 
         // Borrow (creates UTXO)
         addProto(to, encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`, true);
-
+        
         if (approveToRouter && p.mode !== "coverFlash") {
           // Approve (creates UTXO)
           addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true);

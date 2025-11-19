@@ -43,11 +43,11 @@ const NostraMarkets = dynamic(() => import("~~/components/specific/nostra/Nostra
 });
 
 const networkOptions: NetworkOption[] = [
-  { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
-  { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
   { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
+  { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
 type ProtocolKey = "aave" | "compound" | "venus" | "vesu" | "nostra";
@@ -82,12 +82,12 @@ const networkProtocolMap: Record<string, ProtocolConfig[]> = {
 };
 
 const MarketsPage: NextPage = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("starknet");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("base");
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [search, setSearch] = useState("");
   const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
 
-  const [mountedNetworks, setMountedNetworks] = useState<Set<string>>(() => new Set(["starknet"]));
+  const [mountedNetworks, setMountedNetworks] = useState<Set<string>>(() => new Set(["base"]));
 
   const handleNetworkChange = useCallback((networkId: string) => {
     startTransition(() => setSelectedNetwork(networkId));

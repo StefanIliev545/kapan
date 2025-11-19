@@ -123,13 +123,10 @@ export const PercentInput: FC<{
     }
     const base = percentBase ?? balance;
     const limit = max ?? base;
-    let isMax = false;
+    const isMax = false;
     if (limit > 0n && parsed >= limit) {
       parsed = limit;
       val = formatUnits(limit, decimals);
-      isMax = true;
-    } else if (base > 0n && parsed >= base) {
-      isMax = true;
     }
     setAmount(val);
     setActive(null);
@@ -322,11 +319,41 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     }
     try {
       setTxState("pending");
+      track("token_action_tx_begin", {
+        action,
+        tokenName: token.name,
+        tokenAddress: token.address,
+        network,
+        protocol: protocolName ?? "unknown",
+        amount,
+        isMax,
+      });
       await onConfirm?.(amount, isMax);
       setTxState("success");
+      track("token_action_tx_complete", {
+        action,
+        tokenName: token.name,
+        tokenAddress: token.address,
+        network,
+        protocol: protocolName ?? "unknown",
+        amount,
+        isMax,
+        status: "success",
+      });
     } catch (e) {
       console.error(e);
       setTxState("error");
+      track("token_action_tx_complete", {
+        action,
+        tokenName: token.name,
+        tokenAddress: token.address,
+        network,
+        protocol: protocolName ?? "unknown",
+        amount,
+        isMax,
+        status: "error",
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   };
 

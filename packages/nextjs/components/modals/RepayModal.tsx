@@ -45,10 +45,12 @@ export const RepayModal: FC<RepayModalProps> = ({
         amount,
         token.decimals || decimals || 18,
         isMax,
+        maxInput,
       ),
     [
       buildRepayFlowAsync,
       decimals,
+      maxInput,
       normalizedProtocolName,
       token.address,
       token.decimals,
