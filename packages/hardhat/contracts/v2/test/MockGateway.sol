@@ -59,15 +59,44 @@ contract MockGateway is IGateway {
         }
     }
 
-    function authorize(ProtocolTypes.LendingInstruction[] calldata /* instrs */, address /* caller */)
+    function authorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata /*inputs*/
+    )
         external
         pure
-        returns (address[] memory targets, bytes[] memory data)
+        returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced)
     {
-        // Mock gateway doesn't require any user-side approvals
-        targets = new address[](0);
-        data = new bytes[](0);
+        targets = new address[](instrs.length);
+        data = new bytes[](instrs.length);
+        produced = new ProtocolTypes.Output[](instrs.length);
+        
+        for (uint256 i = 0; i < instrs.length; i++) {
+            // Mock logic: if amount is 0, assume it's a check and return empty
+            // If amount > 0, return a mock approval
+            if (instrs[i].amount > 0) {
+                targets[i] = instrs[i].token;
+                data[i] = abi.encodeWithSignature("approve(address,uint256)", address(0), instrs[i].amount);
+            } else {
+                targets[i] = address(0);
+                data[i] = bytes("");
+            }
+            
+            // Mock output: just pass through token and amount
+            produced[i] = ProtocolTypes.Output({ token: instrs[i].token, amount: instrs[i].amount });
+        }
+    }
+
+    function deauthorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address /*caller*/
+    ) external pure returns (address[] memory targets, bytes[] memory data) {
+        targets = new address[](instrs.length);
+        data = new bytes[](instrs.length);
+        for (uint256 i = 0; i < instrs.length; i++) {
+            targets[i] = instrs[i].token;
+            data[i] = abi.encodeWithSignature("approve(address,uint256)", address(0), 0);
+        }
     }
 }
-
-

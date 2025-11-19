@@ -42,6 +42,12 @@ describe("v2 Venus Dynamic Balance Flow (fork)", function () {
     if (!FORK) {
       throw new Error("MAINNET_FORKING_ENABLED must be true to run fork tests");
     }
+    // Check if we are on BNB Chain (56)
+    const chainId = network.config.chainId;
+    if (chainId !== 56) {
+      console.log(`Skipping Venus Dynamic tests: Current chain ID is ${chainId}, expected 56 (BNB Chain)`);
+      this.skip();
+    }
     if (!VENUS_COMPTROLLER) {
       throw new Error("VENUS_COMPTROLLER must be set in .env");
     }
@@ -118,7 +124,7 @@ describe("v2 Venus Dynamic Balance Flow (fork)", function () {
         // Push withdrawn amount to user
         createRouterInstruction(encodePushToken(3, userAddress)),
       ];
-      
+
       // Authorize withdraw (using estimated balance)
       const estimatedBalance = 990_000_000n;
       const witObj = {
@@ -136,7 +142,7 @@ describe("v2 Venus Dynamic Balance Flow (fork)", function () {
         console.log(`  ${i}: target=${witTargets[i]}`);
         await setup.user.sendTransaction({ to: witTargets[i], data: witDatas[i] });
       }
-      
+
       await (await setup.router.connect(setup.user).processProtocolInstructions(allInstrs)).wait();
       console.log("✓ Complete flow: Deposit -> Query Balance -> Withdraw");
 

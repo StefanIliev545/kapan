@@ -1,7 +1,25 @@
 import { useCallback, useState, useEffect } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient, useChainId, useSendCalls, useWaitForCallsStatus, useCapabilities } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  usePublicClient,
+  useWalletClient,
+  useChainId,
+  useSendCalls,
+  useWaitForCallsStatus,
+  useCapabilities
+} from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseUnits, decodeAbiParameters, encodeAbiParameters, decodeFunctionData, encodeFunctionData, type Address, type Hex } from "viem";
+import {
+  parseUnits,
+  decodeAbiParameters,
+  encodeAbiParameters,
+  decodeFunctionData,
+  encodeFunctionData,
+  type Address,
+  type Hex
+} from "viem";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
@@ -21,6 +39,32 @@ import {
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 
+// --- ABI FIXES ---
+// Local definition of deauthorizeInstructions/authorizeInstructions signatures 
+// to ensure stability even if artifacts are slightly stale.
+const DEAUTH_ABI = [
+  {
+    inputs: [
+      {
+        components: [
+          { name: "protocolName", type: "string" },
+          { name: "data", type: "bytes" },
+        ],
+        name: "instructions",
+        type: "tuple[]",
+      },
+      { name: "caller", type: "address" },
+    ],
+    name: "deauthorizeInstructions",
+    outputs: [
+      { name: "targets", type: "address[]" },
+      { name: "data", type: "bytes[]" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 /**
  * Interface for authorization calls returned by authorizeInstructions
  */
@@ -31,6 +75,7 @@ interface AuthorizationCall {
 
 const APPROVE_SELECTOR = "0x095ea7b3";
 
+// Helper to detect if an authorization call is just approving "0" (which we can skip for gas efficiency)
 const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
   if (!data || data === "0x" || data.length < 10) {
     return false;
@@ -45,16 +90,15 @@ const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
     return false;
   } catch {
     try {
+      // Fallback manual decode
       const selector = data.slice(0, 10).toLowerCase();
       if (selector !== APPROVE_SELECTOR) {
         return false;
       }
-
       const [, amount] = decodeAbiParameters(
         [{ type: "address" }, { type: "uint256" }],
         data.slice(10) as `0x${string}`
       );
-
       return (amount as bigint) === 0n;
     } catch {
       return false;
@@ -64,12 +108,6 @@ const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
 
 /**
  * Hook for building and executing instructions on KapanRouter v2
- * 
- * This hook provides utilities to:
- * - Build instruction sequences (deposit, borrow, repay, withdraw)
- * - Get authorizations required for the instructions
- * - Execute the instructions on the router with automatic approval handling
- * - Handle max amount scenarios for withdrawals and repayments
  */
 export const useKapanRouterV2 = () => {
   const { address: userAddress } = useAccount();
@@ -78,28 +116,24 @@ export const useKapanRouterV2 = () => {
   const { data: walletClient } = useWalletClient();
   const queryClient = useQueryClient();
   const chainId = useChainId();
-  
-  // Confirmation count per chain
-  // Base and Optimism (OpStack chains) use 2 confirmations for safety
-  // Arbitrum and Linea use 1 confirmation for faster UX
-  // Default to 1 for other chains
+
   const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
     8453: 2,   // Base mainnet
     84531: 2,  // Base Sepolia
-    84532: 2,  // Base Sepolia (alternative)
-    10: 2,     // Optimism mainnet
+    84532: 2,  // Base Sepolia
+    10: 2,     // Optimism
     420: 2,    // Optimism Goerli
     11155420: 2, // Optimism Sepolia
-    42161: 0,  // Arbitrum One
+    42161: 0,  // Arbitrum One (Instant)
     421614: 1, // Arbitrum Sepolia
-    59144: 0,  // Linea mainnet
+    59144: 0,  // Linea
     59141: 1,  // Linea Sepolia
   };
-  
+
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
 
   const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
     confirmations: effectiveConfirmations,
@@ -108,7 +142,7 @@ export const useKapanRouterV2 = () => {
   const [isApproving, setIsApproving] = useState(false);
   const [batchId, setBatchId] = useState<string | undefined>(undefined);
 
-  // EIP-5792 capability detection for atomic batching
+  // EIP-5792 capability detection (Atomic Batching)
   const { data: capabilities } = useCapabilities({ account: userAddress });
   const chainIdHex = `0x${chainId.toString(16)}`;
   const atomicStatus = (capabilities as Record<string, { atomic?: { status?: string } }> | undefined)?.[chainIdHex]?.atomic?.status as
@@ -122,14 +156,12 @@ export const useKapanRouterV2 = () => {
     query: { enabled: !!batchId },
   });
 
-  // Track batch notification ID to remove "sent" toast when batch completes
   const [batchNotificationId, setBatchNotificationId] = useState<string | number | null>(null);
 
-  // Show TransactionToast when batch completes
+  // Batch Status Effects
   useEffect(() => {
     if (!batchId || !batchStatus) return;
 
-    // Remove "sent" notification if it exists
     if (batchNotificationId) {
       notification.remove(batchNotificationId);
       setBatchNotificationId(null);
@@ -152,7 +184,7 @@ export const useKapanRouterV2 = () => {
     }
   }, [batchId, batchStatus, isBatchConfirmed, isBatchError, batchNotificationId]);
 
-  // Refresh Wagmi queries when transaction completes (both single tx and batch)
+  // Refetch Data on Success
   useEffect(() => {
     const complete = isConfirmed || isBatchConfirmed;
     if (!complete) return;
@@ -169,22 +201,12 @@ export const useKapanRouterV2 = () => {
     }
   }, [isConfirmed, isBatchConfirmed, queryClient]);
 
-  /**
-   * Helper to encode Compound market context
-   * Context format: abi.encode(address marketBaseToken)
-   */
   const encodeCompoundMarket = useCallback((marketAddress: Address): `0x${string}` => {
     return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;
   }, []);
 
-  /**
-   * Build a basic deposit flow: PullToken -> Approve -> Deposit
-   * @param protocolName - Protocol to deposit to (e.g., "aave", "compound", "venus")
-   * @param tokenAddress - Token address to deposit
-   * @param amount - Amount to deposit (as string, e.g., "100.5")
-   * @param decimals - Token decimals (default: 18)
-   * @param market - Market address for Compound (baseToken/comet address). Required for Compound collateral deposits.
-   */
+  // --- Flow Builders ---
+
   const buildDepositFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
@@ -196,18 +218,13 @@ export const useKapanRouterV2 = () => {
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = parseUnits(amount, decimals);
-    
-    // For Compound, use DepositCollateral and encode market context
     const isCompound = normalizedProtocol === "compound";
     const lendingOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
     const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     return [
-      // Pull tokens from user to router
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
-      // Approve gateway to pull tokens from router (UTXO[0] = pulled tokens)
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-      // Deposit tokens (uses UTXO[0] as input)
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(lendingOp, tokenAddress, userAddress, 0n, context, 0)
@@ -215,13 +232,6 @@ export const useKapanRouterV2 = () => {
     ];
   }, [userAddress, encodeCompoundMarket]);
 
-  /**
-   * Build a basic borrow flow: Borrow -> PushToken
-   * @param protocolName - Protocol to borrow from
-   * @param tokenAddress - Token address to borrow
-   * @param amount - Amount to borrow (as string)
-   * @param decimals - Token decimals (default: 18)
-   */
   const buildBorrowFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
@@ -229,29 +239,18 @@ export const useKapanRouterV2 = () => {
     decimals = 18
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
-
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = parseUnits(amount, decimals);
 
     return [
-      // Borrow tokens (creates UTXO[0] with borrowed tokens)
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.Borrow, tokenAddress, userAddress, amountBigInt, "0x", 999)
       ),
-      // Push borrowed tokens to user (UTXO[0])
       createRouterInstruction(encodePushToken(0, userAddress)),
     ];
   }, [userAddress]);
 
-  /**
-   * Build a basic repay flow: PullToken -> Approve -> Repay
-   * @param protocolName - Protocol to repay to
-   * @param tokenAddress - Token address to repay
-   * @param amount - Amount to repay (as string). Use "max" or MaxUint256 string for full repayment
-   * @param decimals - Token decimals (default: 18)
-   * @param isMax - Whether to repay the maximum debt (uses MaxUint256 sentinel for repay instruction)
-   */
   const buildRepayFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
@@ -260,36 +259,22 @@ export const useKapanRouterV2 = () => {
     isMax = false
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
-
     const normalizedProtocol = normalizeProtocolName(protocolName);
-    // NEVER use MaxUint256 for PullToken - it will always revert!
-    // Use buildRepayFlowAsync for max repayments to safely read wallet balance
+
     if (isMax || amount.toLowerCase() === "max") {
-      console.warn("buildRepayFlow: isMax=true is deprecated. Use buildRepayFlowAsync instead.");
-      return []; // Return empty to prevent invalid flow
+      console.warn("buildRepayFlow: isMax=true is deprecated for sync calls. Use buildRepayFlowAsync instead.");
+      return [];
     }
 
     const amountBigInt = parseUnits(amount, decimals);
 
-    // UTXO sequence:
-    // 0: PullToken creates UTXO[0] with pulled tokens
-    // 1: Approve creates UTXO[1] (dummy zero output to maintain index alignment)
-    // 2: Repay consumes UTXO[0], creates UTXO[2] with refund (if any)
-    // So refund is at index 2, not 1!
     return [
-      // Pull tokens from user to router (creates UTXO[0] with pulled tokens)
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
-      // Approve gateway to pull tokens from router (UTXO[0])
-      // This creates UTXO[1] (dummy zero output)
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-      // Repay debt (uses UTXO[0] as input, creates UTXO[2] with refund if any)
-      // Gateway will use UTXO[0].token and UTXO[0].amount when inputIndex < inputs.length
-      // The amount parameter (0n) is ignored when inputIndex is used
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, "0x", 0)
       ),
-      // Push refund to user if any (UTXO[2] contains refund from repay)
       createRouterInstruction(encodePushToken(2, userAddress)),
     ];
   }, [userAddress]);
@@ -313,60 +298,45 @@ export const useKapanRouterV2 = () => {
     maxPullAmount?: bigint
   ): Promise<ProtocolInstruction[]> => {
     if (!userAddress || !publicClient) return [];
-
     const normalizedProtocol = normalizeProtocolName(protocolName);
 
-    // For max repayments, pull 1% more than wallet balance to account for interest accrual
-    // during transaction travel. GetBorrowBalance will provide the exact debt amount.
     let pullAmount: bigint;
+
     if (isMax || amount.toLowerCase() === "max") {
-      // For max repayments, pull 1% more to account for interest accrual/variation
-      const requested = (parseUnits(amount, decimals) * 101n) / 100n;
-      pullAmount = maxPullAmount != null && maxPullAmount < requested ? maxPullAmount : requested;
+      // 1. Fetch actual balance for "max" to prevent parsing error (Safety Fix from Staging)
+      const balance = await publicClient.readContract({
+        address: tokenAddress as Address,
+        abi: ERC20ABI,
+        functionName: "balanceOf",
+        args: [userAddress],
+      }) as bigint;
+
+      // 2. Respect optional cap (Feature from Main)
+      if (maxPullAmount !== undefined && maxPullAmount < balance) {
+        pullAmount = maxPullAmount;
+      } else {
+        pullAmount = balance;
+      }
     } else {
       pullAmount = parseUnits(amount, decimals);
     }
 
-    // UTXO sequence:
-    // 0: PullToken creates UTXO[0] with pulled tokens (wallet balance * 1.01)
-    // 1: Approve creates UTXO[1] (dummy zero output to maintain index alignment)
-    // 2: GetBorrowBalance creates UTXO[2] with exact debt amount
-    // 3: Repay consumes UTXO[0] (or UTXO[2] for max), creates UTXO[3] with refund (if any)
-    // So refund is at index 3!
     return [
-      // Pull tokens from user to router (wallet balance * 1.01 for max repayments)
       createRouterInstruction(encodePullToken(pullAmount, tokenAddress, userAddress)),
-      // Approve gateway to pull tokens from router (UTXO[0])
-      // This creates UTXO[1] (dummy zero output)
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-      // Get exact borrow balance (creates UTXO[2] with current debt amount)
-      // This ensures we repay exactly what's owed, accounting for interest accrual
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.GetBorrowBalance, tokenAddress, userAddress, 0n, "0x", 999)
       ),
-      // Repay debt:
-      // - For max: uses UTXO[2] (GetBorrowBalance output) for exact debt amount
-      // - For regular: uses UTXO[0] (pulled amount) for specified amount
-      // Creates UTXO[3] with refund (if pulled amount > debt amount)
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, "0x", isMax ? 2 : 0)
       ),
-      // Push refund to user if any (UTXO[3] contains refund from repay)
+      // Note: Repay will produce a refund output (index 3)
       createRouterInstruction(encodePushToken(3, userAddress)),
     ];
   }, [userAddress, publicClient]);
 
-  /**
-   * Build a basic withdraw flow: Withdraw -> PushToken
-   * @param protocolName - Protocol to withdraw from
-   * @param tokenAddress - Token address to withdraw
-   * @param amount - Amount to withdraw (as string). Use "max" or MaxUint256 string for full withdrawal
-   * @param decimals - Token decimals (default: 18)
-   * @param isMax - Whether to withdraw the maximum available amount (uses MaxUint256 sentinel)
-   * @param market - Market address for Compound (baseToken/comet address). Required for Compound collateral withdrawals.
-   */
   const buildWithdrawFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
@@ -376,15 +346,10 @@ export const useKapanRouterV2 = () => {
     market?: Address
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
-
     const normalizedProtocol = normalizeProtocolName(protocolName);
-    // For max withdrawals, use MaxUint256 as a sentinel value
-    // The protocol will withdraw all available including accrued interest
-    const amountBigInt = isMax || amount.toLowerCase() === "max" 
-      ? (2n ** 256n - 1n) // MaxUint256
+    const amountBigInt = isMax || amount.toLowerCase() === "max"
+      ? (2n ** 256n - 1n)
       : parseUnits(amount, decimals);
-
-    // For Compound, encode market context
     const isCompound = normalizedProtocol === "compound";
     const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
@@ -393,50 +358,31 @@ export const useKapanRouterV2 = () => {
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenAddress, userAddress, 0n, context, 0)
       ),
-      // Withdraw collateral (creates UTXO[0] with withdrawn tokens)
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.WithdrawCollateral, tokenAddress, userAddress, amountBigInt, context, isMax ? 0 : 999)
       ),
-      // Push withdrawn tokens to user (UTXO[0])
       createRouterInstruction(encodePushToken(1, userAddress)),
     ];
   }, [userAddress, encodeCompoundMarket]);
 
-  /**
-   * Get authorization calls required for a set of instructions
-   * Uses the router's authorizeInstructions function which aggregates both router and gateway authorizations
-   */
+  // --- Authorization Helpers ---
+
   const getAuthorizations = useCallback(async (
     instructions: ProtocolInstruction[]
   ): Promise<AuthorizationCall[]> => {
     if (!routerContract || !userAddress || !publicClient) {
-      console.warn("getAuthorizations: Missing required dependencies", { routerContract: !!routerContract, userAddress: !!userAddress, publicClient: !!publicClient });
       return [];
     }
 
-    console.log("getAuthorizations: Starting", { instructionCount: instructions.length });
-    console.log("getAuthorizations: Instructions", instructions.map(inst => ({
-      protocolName: inst.protocolName,
-      dataLength: inst.data.length,
-    })));
-
     try {
-      // Convert instructions to the format expected by the contract
-      // Protocol names should already be normalized from build*Flow functions,
-      // but normalize again here as a safety measure
-      const protocolInstructions = instructions.map(inst => {
-        const normalizedName = normalizeProtocolName(inst.protocolName);
-        if (inst.protocolName !== normalizedName) {
-          console.log(`getAuthorizations: Normalizing "${inst.protocolName}" -> "${normalizedName}"`);
-        }
-        return {
-          protocolName: normalizedName,
-          data: inst.data as `0x${string}`,
-        };
-      });
+      const protocolInstructions = instructions.map(inst => ({
+        protocolName: normalizeProtocolName(inst.protocolName),
+        data: inst.data as `0x${string}`,
+      }));
 
-      // Call the router's authorizeInstructions function which aggregates all authorizations
+      // We send the FULL set of instructions to authorizeInstructions.
+      // The Router calculates the simulated state (UTXOs) internally.
       const result = await publicClient.readContract({
         address: routerContract.address as Address,
         abi: routerContract.abi,
@@ -445,14 +391,11 @@ export const useKapanRouterV2 = () => {
       });
       const [targets, data] = result as unknown as [Address[], `0x${string}`[]];
 
-      // Combine targets and data into AuthorizationCall array, filtering out empty ones
       const authCalls: AuthorizationCall[] = [];
-      console.log(`getAuthorizations: Received ${targets.length} authorization(s) from router`);
       for (let i = 0; i < targets.length; i++) {
         const target = targets[i];
         const dataItem = data[i];
         const isValid = target && target !== "0x0000000000000000000000000000000000000000" && dataItem && dataItem.length > 0;
-        console.log(`getAuthorizations: Auth ${i} - target: ${target}, dataLength: ${dataItem?.length || 0}, valid: ${isValid}`);
         if (isValid) {
           authCalls.push({
             target: target,
@@ -460,8 +403,6 @@ export const useKapanRouterV2 = () => {
           });
         }
       }
-
-      console.log(`getAuthorizations: Complete. Total valid authorizations: ${authCalls.length}`);
       return authCalls;
     } catch (error) {
       console.error("Error calling authorizeInstructions:", error);
@@ -469,10 +410,44 @@ export const useKapanRouterV2 = () => {
     }
   }, [routerContract, userAddress, publicClient]);
 
-  /**
-   * Execute a sequence of instructions on the router
-   * @param instructions - Array of ProtocolInstructions to execute
-   */
+  const getDeauthorizations = useCallback(async (
+    instructions: ProtocolInstruction[]
+  ): Promise<AuthorizationCall[]> => {
+    if (!routerContract || !userAddress || !publicClient) {
+      return [];
+    }
+
+    try {
+      const protocolInstructions = instructions.map(inst => ({
+        protocolName: normalizeProtocolName(inst.protocolName),
+        data: inst.data as `0x${string}`,
+      }));
+
+      const result = await publicClient.readContract({
+        address: routerContract.address as Address,
+        abi: DEAUTH_ABI,
+        functionName: "deauthorizeInstructions",
+        args: [protocolInstructions, userAddress as Address],
+      });
+      const [targets, data] = result as unknown as [Address[], `0x${string}`[]];
+
+      const authCalls: AuthorizationCall[] = [];
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        const dataItem = data[i];
+        if (target && target !== "0x0000000000000000000000000000000000000000" && dataItem && dataItem.length > 0) {
+          authCalls.push({ target, data: dataItem });
+        }
+      }
+      return authCalls;
+    } catch (error) {
+      console.error("Error calling deauthorizeInstructions:", error);
+      return [];
+    }
+  }, [routerContract, userAddress, publicClient]);
+
+  // --- Execution Helpers ---
+
   const executeInstructions = useCallback(async (
     instructions: ProtocolInstruction[]
   ): Promise<string | undefined> => {
@@ -485,12 +460,10 @@ export const useKapanRouterV2 = () => {
     let blockExplorerTxURL = "";
 
     try {
-      // Show pending notification
       notificationId = notification.loading(
         <TransactionToast step="pending" message="Waiting for approval..." />
       );
 
-      // Set up 10 second timeout for pending state
       const pendingTimeout = setTimeout(() => {
         if (notificationId) {
           notification.remove(notificationId);
@@ -498,13 +471,11 @@ export const useKapanRouterV2 = () => {
       }, 10000);
 
       try {
-        // Convert instructions to the format expected by the contract
         const protocolInstructions = instructions.map(inst => ({
           protocolName: inst.protocolName,
           data: inst.data as `0x${string}`,
         }));
 
-        // This will wait for MetaMask confirmation before returning hash
         transactionHash = await writeContractAsync({
           address: routerContract.address as `0x${string}`,
           abi: routerContract.abi,
@@ -512,22 +483,16 @@ export const useKapanRouterV2 = () => {
           args: [protocolInstructions],
         });
 
-        // Clear timeout since we got the hash
         clearTimeout(pendingTimeout);
       } catch (error) {
-        // Clear timeout on error
         clearTimeout(pendingTimeout);
         throw error;
       }
 
-      // Now that we have the hash, transaction is sent - switch to "sent" state
       const chainId = await publicClient?.getChainId();
       blockExplorerTxURL = chainId ? getBlockExplorerTxLink(chainId, transactionHash as `0x${string}`) : "";
 
-      // Update notification to "sent" state
-      if (notificationId) {
-        notification.remove(notificationId);
-      }
+      if (notificationId) notification.remove(notificationId);
       notificationId = notification.loading(
         <TransactionToast
           step="sent"
@@ -537,7 +502,6 @@ export const useKapanRouterV2 = () => {
         />
       );
 
-      // Wait for transaction receipt
       if (publicClient && transactionHash) {
         await publicClient.waitForTransactionReceipt({
           hash: transactionHash as `0x${string}`,
@@ -545,10 +509,7 @@ export const useKapanRouterV2 = () => {
         });
       }
 
-      // Remove sent notification and show confirmed
-      if (notificationId) {
-        notification.remove(notificationId);
-      }
+      if (notificationId) notification.remove(notificationId);
       notification.success(
         <TransactionToast
           step="confirmed"
@@ -560,16 +521,12 @@ export const useKapanRouterV2 = () => {
 
       return transactionHash;
     } catch (error: any) {
-      // Remove pending/sent notification on error
-      if (notificationId) {
-        notification.remove(notificationId);
-      }
+      if (notificationId) notification.remove(notificationId);
 
       console.error("Error executing instructions:", error);
-      // Check for user rejection
       const errorMessage = error?.message || "";
       const lowerMessage = errorMessage.toLowerCase();
-      const isRejection = 
+      const isRejection =
         lowerMessage.includes("user rejected") ||
         lowerMessage.includes("user denied") ||
         lowerMessage.includes("user cancelled") ||
@@ -579,7 +536,7 @@ export const useKapanRouterV2 = () => {
         error?.code === 4001 ||
         error?.code === "ACTION_REJECTED" ||
         error?.code === "USER_REJECTED";
-      
+
       const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute instructions");
       notification.error(
         <TransactionToast
@@ -593,62 +550,29 @@ export const useKapanRouterV2 = () => {
     }
   }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
-  /**
-   * Execute instructions with automatic approval handling
-   * This ensures all required token approvals are in place before executing the router call.
-   * For mobile wallets, approvals are executed sequentially and we wait for each confirmation.
-   * Uses the router's authorizeInstructions function which aggregates both router and gateway authorizations
-   * and returns already encoded approval calls.
-   * 
-   * @param instructions - Array of ProtocolInstructions to execute
-   */
   const executeFlowWithApprovals = useCallback(async (
     instructions: ProtocolInstruction[]
   ): Promise<string | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
-      throw new Error("Router contract, user address, public client, or wallet client not available");
+      throw new Error("Context not available");
     }
 
     try {
-      // 1. Get authorization calls from the router's authorizeInstructions function
-      // This aggregates both router and gateway authorizations and returns already encoded approval calls (targets and data)
-      console.log("executeFlowWithApprovals: Getting authorizations...");
+      // 1. Calculate Authorizations
       const authCalls = await getAuthorizations(instructions);
 
-      console.log(`executeFlowWithApprovals: Found ${authCalls.length} authorization(s) required`);
-
       if (authCalls.length === 0) {
-        // No approvals needed, proceed directly to execution
-        console.log("executeFlowWithApprovals: No approvals needed, executing directly");
         return await executeInstructions(instructions);
       }
 
-      // 2. Execute approval calls sequentially (important for mobile wallets)
-      // The router provides already encoded calldata - we just send it directly
-      console.log(`executeFlowWithApprovals: Executing ${authCalls.length} approval(s) sequentially...`);
+      // 2. Execute Approvals Sequentially
       for (let i = 0; i < authCalls.length; i++) {
         const authCall = authCalls[i];
-        if (!authCall.target || !authCall.data || authCall.data.length === 0) {
-          console.warn(`executeFlowWithApprovals: Skipping invalid auth call ${i}`, authCall);
-          continue; // Skip invalid auth calls
-        }
+        if (!authCall.target || !authCall.data || authCall.data.length === 0) continue;
+        if (isZeroAmountApproval(authCall.data)) continue;
 
-        // Decode and check if approval amount is zero (ERC20 approve(address,uint256))
-        if (isZeroAmountApproval(authCall.data)) {
-          console.warn(`executeFlowWithApprovals: Skipping zero-amount approval for token ${authCall.target}`);
-          continue; // Skip zero-amount approvals
-        }
-
-        console.log(`executeFlowWithApprovals: Processing approval ${i + 1}/${authCalls.length}`, {
-          target: authCall.target,
-          dataLength: authCall.data.length,
-        });
         setIsApproving(true);
-
-        // Get token address from the target (it's the token contract address)
         const tokenAddress = authCall.target;
-
-        // Get token symbol for user notification (try to read, fallback to address)
         let tokenSymbol = tokenAddress.substring(0, 6) + "...";
         try {
           tokenSymbol = await publicClient.readContract({
@@ -657,167 +581,90 @@ export const useKapanRouterV2 = () => {
             functionName: "symbol",
             args: [],
           }) as string;
-        } catch {
-          // If symbol read fails, use truncated address
-        }
+        } catch { }
 
         let approvalNotificationId: string | number | null = null;
         let approvalHash: string | undefined = undefined;
-        let approvalBlockExplorerURL = "";
 
         try {
-          // Show pending notification for approval
           approvalNotificationId = notification.loading(
             <TransactionToast step="pending" message={`Approving ${tokenSymbol}...`} />
           );
 
-          // Set up 10 second timeout for pending state
-          const pendingTimeout = setTimeout(() => {
-            if (approvalNotificationId) {
-              notification.remove(approvalNotificationId);
-            }
-          }, 10000);
+          const currentNonce = await publicClient.getTransactionCount({
+            address: userAddress as Address,
+          });
 
-          try {
-            // Execute the approval call directly using the encoded data from authorizeInstructions
-            // The router has already encoded the approve(address spender, uint256 amount) call
-            // Fetch the current nonce explicitly to avoid MetaMask nonce issues with Hardhat
-            const currentNonce = await publicClient.getTransactionCount({
-              address: userAddress as Address,
-            });
-            
-            // This will wait for MetaMask confirmation before returning hash
-            approvalHash = await walletClient.sendTransaction({
-              account: userAddress as Address,
-              to: authCall.target,
-              data: authCall.data,
-              nonce: currentNonce, // Explicitly set nonce to prevent MetaMask caching issues
-            });
+          approvalHash = await walletClient.sendTransaction({
+            account: userAddress as Address,
+            to: authCall.target,
+            data: authCall.data,
+            nonce: currentNonce,
+          });
 
-            // Clear timeout since we got the hash
-            clearTimeout(pendingTimeout);
-          } catch (error) {
-            // Clear timeout on error
-            clearTimeout(pendingTimeout);
-            throw error;
-          }
-
-          // Now that we have the hash, approval is sent - switch to "sent" state
-          const chainId = await publicClient.getChainId();
-          approvalBlockExplorerURL = chainId ? getBlockExplorerTxLink(chainId, approvalHash as `0x${string}`) : "";
-
-          // Update notification to "sent" state
-          if (approvalNotificationId) {
-            notification.remove(approvalNotificationId);
-          }
+          if (approvalNotificationId) notification.remove(approvalNotificationId);
           approvalNotificationId = notification.loading(
-            <TransactionToast
-              step="sent"
-              txHash={approvalHash}
-              message={`Approving ${tokenSymbol}...`}
-              blockExplorerLink={approvalBlockExplorerURL}
-            />
+            <TransactionToast step="sent" txHash={approvalHash} message={`Approving ${tokenSymbol}...`} />
           );
 
-          // Wait for approval confirmation (crucial for mobile wallets)
-          // Add a small delay after receipt to ensure Hardhat processes the nonce update
           await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations });
-          
-          // Small delay to ensure Hardhat updates nonce state (helps with interval mining)
           await new Promise(resolve => setTimeout(resolve, 100));
 
-          // Remove sent notification and show confirmed
-          if (approvalNotificationId) {
-            notification.remove(approvalNotificationId);
-          }
-          notification.success(
-            <TransactionToast
-              step="confirmed"
-              txHash={approvalHash}
-              message={`${tokenSymbol} approved`}
-              blockExplorerLink={approvalBlockExplorerURL}
-            />
-          );
+          if (approvalNotificationId) notification.remove(approvalNotificationId);
+          notification.success(<TransactionToast step="confirmed" txHash={approvalHash} message={`${tokenSymbol} approved`} />);
         } catch (error: any) {
-          // Remove pending/sent notification on error
-          if (approvalNotificationId) {
-            notification.remove(approvalNotificationId);
-          }
-
-          // Check for user rejection
-          const errorMessage = error?.message || "";
-          const lowerMessage = errorMessage.toLowerCase();
-          const isRejection = 
-            lowerMessage.includes("user rejected") ||
-            lowerMessage.includes("user denied") ||
-            lowerMessage.includes("user cancelled") ||
-            lowerMessage.includes("rejected") ||
-            lowerMessage.includes("denied") ||
-            lowerMessage.includes("cancelled") ||
-            error?.code === 4001 ||
-            error?.code === "ACTION_REJECTED" ||
-            error?.code === "USER_REJECTED";
-          
-          const message = isRejection ? "User rejected the approval" : (error.message || `Failed to approve ${tokenSymbol}`);
-          notification.error(
-            <TransactionToast
-              step="failed"
-              txHash={approvalHash}
-              message={message}
-              blockExplorerLink={approvalBlockExplorerURL}
-            />
-          );
+          if (approvalNotificationId) notification.remove(approvalNotificationId);
           throw error;
         }
-
         setIsApproving(false);
       }
 
-      // 3. Execute the router instructions (now that approvals are in place)
-      const resultHash = await executeInstructions(instructions);
-      return resultHash;
+      // 3. Execute Logic (Atomic Batch if supported, else Tx)
+      if (canDoAtomicBatch && sendCallsAsync) {
+        const deauthCalls = [] as { target: Address, data: any }[]; // Placeholder for future deauth logic
+
+        const calls = [
+          {
+            to: routerContract.address as Address,
+            data: encodeFunctionData({
+              abi: routerContract.abi,
+              functionName: "processProtocolInstructions",
+              args: [instructions.map(inst => ({
+                protocolName: inst.protocolName,
+                data: inst.data as `0x${string}`,
+              }))],
+            }),
+            value: 0n,
+          },
+          ...deauthCalls.map(call => ({
+            to: call.target,
+            data: call.data,
+            value: 0n,
+          }))
+        ];
+
+        const { id } = await sendCallsAsync({ calls, capabilities });
+        setBatchId(id);
+        return id;
+      }
+
+      return await executeInstructions(instructions);
     } catch (error: any) {
       setIsApproving(false);
       console.error("Error in executeFlowWithApprovals:", error);
-      // Check for user rejection
-      const errorMessage = error?.message || "";
-      const lowerMessage = errorMessage.toLowerCase();
-      const isRejection = 
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("user denied") ||
-        lowerMessage.includes("user cancelled") ||
-        lowerMessage.includes("rejected") ||
-        lowerMessage.includes("denied") ||
-        lowerMessage.includes("cancelled") ||
-        error?.code === 4001 ||
-        error?.code === "ACTION_REJECTED" ||
-        error?.code === "USER_REJECTED";
-      
-      const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute flow with approvals");
-      notification.error(
-        <TransactionToast step="failed" message={message} />
-      );
       throw error;
     }
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations]);
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations, canDoAtomicBatch, sendCallsAsync, capabilities, getDeauthorizations]);
 
-  /**
-   * Execute instructions with atomic batching support (EIP-5792)
-   * Attempts to batch all approvals + router call atomically if wallet supports it.
-   * Falls back to sequential execution if batching is unavailable.
-   * 
-   * @param instructions - Array of ProtocolInstructions to execute
-   * @returns Object indicating whether batch or sequential tx was used, with id/hash
-   */
   const executeFlowBatchedIfPossible = useCallback(async (
     instructions: ProtocolInstruction[],
     preferBatching = false
   ): Promise<{ kind: "batch", id: string } | { kind: "tx", hash: string } | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
-      throw new Error("Missing router/user/public/wallet context");
+      throw new Error("Missing context");
     }
 
-    // 1) Final router calldata
+    // Prepare main calldata
     const protocolInstructions = instructions.map(inst => ({
       protocolName: inst.protocolName,
       data: inst.data as `0x${string}`,
@@ -828,439 +675,191 @@ export const useKapanRouterV2 = () => {
       args: [protocolInstructions],
     });
 
-    // 2) Gather approvals (router aggregates them)
+    // Prepare approvals
     const authCalls = await getAuthorizations(instructions);
-
-    // 3) Filter zero-amount approvals (same logic as sequential path)
     const filteredAuthCalls = authCalls.filter(({ target, data }) => {
-      if (!target || !data || data.length === 0) {
-        return false;
-      }
-
-      if (isZeroAmountApproval(data)) {
-        console.warn("executeFlowBatchedIfPossible: Skipping zero-amount approval", { target });
-        return false;
-      }
-
+      if (!target || !data || data.length === 0) return false;
+      if (isZeroAmountApproval(data)) return false;
       return true;
     });
 
-    // 4) Compose calls: filtered approvals… then router call
     const calls = [
       ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
       { to: routerContract.address as Address, data: routerCalldata as Hex },
     ];
 
-    // 5) Try atomic batch if preference is enabled and wallet supports it
     if (preferBatching) {
-      let pendingNotificationId: string | number | null = null;
       try {
-        // Show pending notification for batch
-        pendingNotificationId = notification.loading(
-          <TransactionToast step="pending" message="Waiting for approval..." />
+        const { id } = await sendCallsAsync({
+          calls,
+          experimental_fallback: true,
+        });
+
+        setBatchId(id);
+        const sentNotificationId = notification.loading(
+          <TransactionToast step="sent" message="Batch transaction sent — waiting for confirmation..." />
         );
+        setBatchNotificationId(sentNotificationId);
 
-        // Set up 10 second timeout for pending state
-        const pendingTimeout = setTimeout(() => {
-          if (pendingNotificationId) {
-            notification.remove(pendingNotificationId);
-          }
-        }, 10000);
-
-        try {
-          const { id } = await sendCallsAsync({
-            calls,
-            experimental_fallback: true, // runs sequentially if wallet can't batch
-          });
-
-          // Clear timeout since we got the batch id
-          clearTimeout(pendingTimeout);
-
-          setBatchId(id);
-
-          // Now that we have the batch id, batch is sent - switch to "sent" state
-          // Remove pending notification
-          if (pendingNotificationId) {
-            notification.remove(pendingNotificationId);
-          }
-          // Update notification to "sent" state
-          const sentNotificationId = notification.loading(
-            <TransactionToast
-              step="sent"
-              message="Batch transaction sent — waiting for confirmation..."
-            />
-          );
-          setBatchNotificationId(sentNotificationId);
-
-          // The batch status will be tracked by useWaitForCallsStatus hook
-          // We'll show confirmed/failed when the batch completes
-          return { kind: "batch", id };
-        } catch (error) {
-          // Clear timeout on error
-          clearTimeout(pendingTimeout);
-          throw error;
-        }
+        return { kind: "batch", id };
       } catch (err) {
-        // Remove pending/sent notification on error
-        if (pendingNotificationId) {
-          notification.remove(pendingNotificationId);
-        }
         console.warn("Batch send failed, falling back:", err);
       }
     }
 
-
-    // 6) Fallback: your existing sequential helper
     const hash = await executeFlowWithApprovals(instructions);
     return hash ? { kind: "tx", hash } : undefined;
   }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals]);
 
-  // --- Types for modular move position builder ---
-  type FlashConfig = {
-    version: "v3" | "v2" | "aave";
-    premiumBps?: number;
-    bufferBps?: number;
-  };
-
+  // --- Move Flow Builder ---
+  
+  type FlashConfig = { version: "v3" | "v2" | "aave"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
-    fromProtocol: string;
-    debtToken: Address;
-    expectedDebt: string;       // user-selected amount; used to size flash & later borrow
-    debtDecimals?: number;
-    fromContext?: `0x${string}`;
-    flash: FlashConfig;
+    fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
   };
-
   type BuildMoveCollateralParams = {
-    fromProtocol: string;
-    toProtocol: string;
-    collateralToken: Address;
-    withdraw: { max: true } | { amount: string };
-    collateralDecimals?: number;
-    fromContext?: `0x${string}`;
-    toContext?: `0x${string}`;
+    fromProtocol: string; toProtocol: string; collateralToken: Address; withdraw: { max: true } | { amount: string }; collateralDecimals?: number; fromContext?: `0x${string}`; toContext?: `0x${string}`;
   };
-
   type BuildBorrowParams =
-    | {
-        // Borrow an exact amount (generic)
-        mode: "exact";
-        toProtocol: string;
-        token: Address;
-        amount: string;
-        decimals?: number;
-        approveToRouter?: boolean; // default true
-        toContext?: `0x${string}`;
-      }
-    | {
-        // Borrow just enough to repay all flash obligations for this token
-        mode: "coverFlash";
-        toProtocol: string;
-        token: Address;
-        decimals?: number;
-        extraBps?: number;        // extra headroom on top of premium-augmented need
-        approveToRouter?: boolean; // default true
-        toContext?: `0x${string}`;
-      };
+    | { mode: "exact"; toProtocol: string; token: Address; amount: string; decimals?: number; approveToRouter?: boolean; toContext?: `0x${string}`; }
+    | { mode: "coverFlash"; toProtocol: string; token: Address; decimals?: number; extraBps?: number; approveToRouter?: boolean; toContext?: `0x${string}`; };
 
   type MoveFlowBuilder = {
-    // chunk builders
     buildUnlockDebt: (p: BuildUnlockDebtParams) => void;
     buildMoveCollateral: (p: BuildMoveCollateralParams) => void;
     buildBorrow: (p: BuildBorrowParams) => void;
-    // Compound-specific helpers
     setCompoundMarket: (debtToken: Address) => void;
-    // raw accessors
     build: () => ProtocolInstruction[];
     getFlashObligations: () => Record<Address, { flashLoanUtxoIndex: number }>;
   };
 
-  /**
-   * Create a composable move-flow session builder.
-   * Allows building unlock debt, move collateral, and borrow steps incrementally.
-   * 
-   * Usage:
-   * ```typescript
-   * const b = createMoveBuilder();
-   * b.buildUnlockDebt({ fromProtocol: "Aave V3", debtToken: USDC, expectedDebt: "1000", ... });
-   * b.buildMoveCollateral({ fromProtocol: "Aave V3", toProtocol: "Compound V3", ... });
-   * b.buildBorrow({ mode: "coverFlash", toProtocol: "Compound V3", token: USDC, ... });
-   * await executeFlowWithApprovals(b.build());
-   * ```
-   */
   const createMoveBuilder = useCallback((): MoveFlowBuilder => {
     if (!userAddress) {
-      // Return a no-op builder; you can also throw if you prefer hard-fail
-      const noOp = () => {
-        // No-op: user address not available
-      };
-      return {
-        buildUnlockDebt: noOp,
-        buildMoveCollateral: noOp,
-        buildBorrow: noOp,
-        setCompoundMarket: noOp,
-        build: () => [],
-        getFlashObligations: () => ({}),
-      };
+      const noOp = () => { };
+      return { buildUnlockDebt: noOp, buildMoveCollateral: noOp, buildBorrow: noOp, setCompoundMarket: noOp, build: () => [], getFlashObligations: () => ({}), };
     }
 
     const instructions: ProtocolInstruction[] = [];
-    const flashLoanOutputs = new Map<Address, number>(); // Track flash loan output UTXO indices by token
-    let compoundMarket: Address | null = null; // Track Compound market (debt token/base token)
-    let utxoCount = 0; // Track UTXO count as we build instructions
+    const flashLoanOutputs = new Map<Address, number>();
+    let compoundMarket: Address | null = null;
+    let utxoCount = 0;
 
-    // Tiny helpers
+    // Helper to add instructions and track UTXO indices
     const add = (inst: ProtocolInstruction, createsUtxo = false) => {
       instructions.push(inst);
-      if (createsUtxo) {
-        utxoCount++;
-      }
+      if (createsUtxo) utxoCount++;
       return instructions.length - 1;
     };
-
     const addRouter = (data: `0x${string}`, createsUtxo = false) => add(createRouterInstruction(data), createsUtxo);
-    const addProto = (protocol: string, data: `0x${string}`, createsUtxo = false) =>
-      add(createProtocolInstruction(protocol, data), createsUtxo);
+    const addProto = (protocol: string, data: `0x${string}`, createsUtxo = false) => add(createProtocolInstruction(protocol, data), createsUtxo);
 
-    /**
-     * Get context for a protocol operation
-     * For Compound, returns encoded market address if set
-     */
     const getContext = (protocol: string, defaultContext: `0x${string}` = "0x"): `0x${string}` => {
-      if (protocol === "compound" && compoundMarket) {
-        return encodeCompoundMarket(compoundMarket);
-      }
+      if (protocol === "compound" && compoundMarket) return encodeCompoundMarket(compoundMarket);
       return defaultContext;
     };
 
-    const builder: MoveFlowBuilder = {
-      // 1) UNLOCK DEBT (one call per debt asset you want to migrate)
-      buildUnlockDebt: ({
-        fromProtocol,
-        debtToken,
-        expectedDebt,
-        debtDecimals = 18,
-        fromContext = "0x",
-        flash: { version },
-      }) => {
+    return {
+      buildUnlockDebt: ({ fromProtocol, debtToken, expectedDebt, debtDecimals = 18, fromContext = "0x", flash: { version } }) => {
         const from = normalizeProtocolName(fromProtocol);
         const expected = parseUnits(expectedDebt, debtDecimals);
+        if (expected === 0n) throw new Error(`Invalid debt amount`);
 
-        // Validate expected debt amount
-        if (expected === 0n) {
-          throw new Error(`Invalid debt amount: ${expectedDebt}. Cannot create flash loan with zero amount.`);
-        }
-
-        // [0] GetBorrowBalance(source) -> used as the *exact* repay amount
-        // For Compound, use market context if fromProtocol is Compound
         const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(debtToken)) : getContext(from, fromContext as `0x${string}`);
-        const utxoIndexForGetBorrow = utxoCount; // Track UTXO index before adding GetBorrowBalance
-        addProto(
-          from,
-          encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`,
-          true, // GetBorrowBalance creates 1 UTXO
-        );
-
-        // [1] FlashLoan: use GetBorrowBalance UTXO to flash loan exactly what we need
-        // The flash loan will use the GetBorrowBalance output (exact debt amount)
-        let provider: FlashLoanProvider;
-        if (version === "aave") {
-          provider = FlashLoanProvider.AaveV3;
-        } else if (version === "v3") {
-          provider = FlashLoanProvider.BalancerV3;
-        } else {
-          provider = FlashLoanProvider.BalancerV2;
-        }
-        const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
-        const flashLoanUtxoIndex = utxoCount; // Track UTXO index before adding flash loan
-        addRouter(flashData as `0x${string}`, true); // FlashLoan creates 1 UTXO (with repayment amount)
         
-        // Store the flash loan output UTXO index for this token (normalize to lowercase for consistent lookup)
+        // 1. Get Borrow Balance (creates UTXO)
+        const utxoIndexForGetBorrow = utxoCount;
+        addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
+
+        // 2. Flash Loan (creates UTXO)
+        let provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.AaveV3 : (version === "v3" ? FlashLoanProvider.BalancerV3 : FlashLoanProvider.BalancerV2);
+        const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
+        const flashLoanUtxoIndex = utxoCount;
+        addRouter(flashData as `0x${string}`, true);
         flashLoanOutputs.set((debtToken as Address).toLowerCase() as Address, flashLoanUtxoIndex);
 
-        // [2] Approve flash tokens to the *source* gateway so it can pull for Repay
-        addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true); // Approve creates 1 dummy UTXO
-
-        // [3] Repay(source): uses GetBorrowBalance UTXO so the amount is exact on-chain
-        addProto(
-          from,
-          encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`,
-          true, // Repay creates 1 UTXO (refund)
-        );
-
-        // Note: Flash loan output (flashLoanUtxoIndex UTXO) contains the repayment amount (principal + fee)
-        // This will be used by buildBorrow in coverFlash mode to borrow exactly what's needed
+        // 3. Approve Gateway (Router Instruction)
+        // CRITICAL: createsUtxo=true because fixed Router logic appends an empty output for Approves to maintain index sync.
+        addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true);
+        
+        // 4. Repay Debt (using Flash Loan proceeds)
+        // Repay creates a refund UTXO (usually 0)
+        addProto(from, encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`, true);
       },
 
-      // 2) MOVE COLLATERAL (withdraw from source -> deposit into dest)
-      buildMoveCollateral: ({
-        fromProtocol,
-        toProtocol,
-        collateralToken,
-        withdraw,
-        collateralDecimals = 18,
-        fromContext = "0x",
-        toContext = "0x",
-      }) => {
+      buildMoveCollateral: ({ fromProtocol, toProtocol, collateralToken, withdraw, collateralDecimals = 18, fromContext = "0x", toContext = "0x" }) => {
         const from = normalizeProtocolName(fromProtocol);
         const to = normalizeProtocolName(toProtocol);
-
-        // Get contexts for both protocols (Compound needs market context)
         const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(collateralToken)) : getContext(from, fromContext as `0x${string}`);
         const toCtx = to === "compound" && compoundMarket ? getContext(to, encodeCompoundMarket(compoundMarket)) : getContext(to, toContext as `0x${string}`);
 
-        // Optional GetSupplyBalance if max
         let utxoIndexForGetSupply: number | undefined;
         if ("max" in withdraw && withdraw.max) {
-          // Record the UTXO index where GetSupplyBalance will create its output
           utxoIndexForGetSupply = utxoCount;
-          addProto(
-            from,
-            encodeLendingInstruction(LendingOp.GetSupplyBalance, collateralToken, userAddress, 0n, fromCtx, 999) as `0x${string}`,
-            true, // GetSupplyBalance creates 1 UTXO
-          );
+          addProto(from, encodeLendingInstruction(LendingOp.GetSupplyBalance, collateralToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
         }
 
-        // Withdraw
-        const withdrawAmt =
-          "amount" in withdraw ? parseUnits(withdraw.amount, collateralDecimals) : 0n;
-        // Track UTXO index where WithdrawCollateral will create its output
+        const withdrawAmt = "amount" in withdraw ? parseUnits(withdraw.amount, collateralDecimals) : 0n;
         const utxoIndexForWithdraw = utxoCount;
-        addProto(
-          from,
-          encodeLendingInstruction(
-            LendingOp.WithdrawCollateral,
-            collateralToken,
-            userAddress,
-            withdrawAmt,
-            fromCtx,
-            "max" in withdraw && withdraw.max && utxoIndexForGetSupply !== undefined ? utxoIndexForGetSupply : 999,
-          ) as `0x${string}`,
-          true, // WithdrawCollateral creates 1 UTXO
-        );
+        addProto(from, encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralToken, userAddress, withdrawAmt, fromCtx, "max" in withdraw && withdraw.max && utxoIndexForGetSupply !== undefined ? utxoIndexForGetSupply : 999) as `0x${string}`, true);
 
-        // Approve withdrawn collateral to *target* gateway (use UTXO index, not instruction index)
-        addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true); // Approve creates 1 dummy UTXO
-
-        // Deposit on target using the withdraw UTXO (use UTXO index, not instruction index)
-        addProto(
-          to,
-          encodeLendingInstruction(LendingOp.Deposit, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`,
-          false, // Deposit doesn't create UTXO
-        );
+        // Approve (creates UTXO for sync)
+        addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true);
+        // Deposit (NO UTXO created)
+        addProto(to, encodeLendingInstruction(LendingOp.Deposit, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
       },
 
-      // 3) BORROW (either exact amount or "cover all flash obligations for this token")
-      buildBorrow: (p: BuildBorrowParams) => {
-        const {
-          toProtocol,
-          token,
-          toContext = "0x",
-          approveToRouter = true,
-        } = p as any;
-
+      buildBorrow: (p) => {
+        const { toProtocol, token, toContext = "0x", approveToRouter = true } = p as any;
         const to = normalizeProtocolName(toProtocol);
+        let borrowAmt = 0n;
+        if (p.mode === "exact") borrowAmt = parseUnits(p.amount, p.decimals ?? 18);
 
-        let borrowAmt: bigint;
-
-        if (p.mode === "exact") {
-          borrowAmt = parseUnits(p.amount, p.decimals ?? 18);
-        } else {
-          // coverFlash mode: use the flash loan output UTXO for this token
-          // The flash loan output contains the repayment amount (principal + fee)
-          // Normalize token address to lowercase for consistent lookup
-          const flashLoanUtxoIndex = flashLoanOutputs.get((token as Address).toLowerCase() as Address);
-          
-          if (flashLoanUtxoIndex === undefined) {
-            // No flash loan found for this token - this should not happen if buildUnlockDebt was called first
-            throw new Error(`Flash loan output not found for token ${token}. Make sure buildUnlockDebt was called before buildBorrow.`);
-          }
-
-          // Use the flash loan output UTXO to borrow exactly what's needed to repay
-          // The flash loan output already contains the repayment amount (principal + fee)
-          // When using InputPtr, the gateway will use the UTXO amount, so we set borrowAmt to 0
-          // Set to 0 - the gateway will use the UTXO amount via InputPtr
-          borrowAmt = 0n; // Gateway will use UTXO amount via InputPtr
-        }
-
-        // Get context for target protocol (Compound needs market context)
         const toCtx = to === "compound" && compoundMarket ? getContext(to, encodeCompoundMarket(compoundMarket)) : getContext(to, toContext as `0x${string}`);
-
-        // Track UTXO index where Borrow will create its output
         const utxoIndexForBorrow = utxoCount;
+        const borrowInputIndex = p.mode === "coverFlash" ? (flashLoanOutputs.get((token as Address).toLowerCase() as Address) ?? 999) : 999;
 
-        // Borrow on target
-        // In coverFlash mode, use the flash loan output UTXO to borrow exactly what's needed
-        // Normalize token address to lowercase for consistent lookup
-        const borrowInputIndex = p.mode === "coverFlash" 
-          ? (flashLoanOutputs.get((token as Address).toLowerCase() as Address) ?? 999)
-          : 999;
+        // Borrow (creates UTXO)
+        addProto(to, encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`, true);
         
-        addProto(
-          to,
-          encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`,
-          true, // Borrow creates 1 UTXO
-        );
-
-        // Approve borrowed tokens to the router so it can settle flash principal+premium (use UTXO index, not instruction index)
-        const shouldApproveToRouter = approveToRouter && p.mode !== "coverFlash";
-
-        if (shouldApproveToRouter) {
-          addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true); // Approve creates 1 dummy UTXO
+        if (approveToRouter && p.mode !== "coverFlash") {
+          // Approve (creates UTXO)
+          addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true);
         }
       },
 
-      // Set Compound market (debt token/base token address)
-      // This should be called before building operations involving Compound
-      setCompoundMarket: (debtToken: Address) => {
-        compoundMarket = debtToken;
-      },
-
-        build: () => instructions,
-
+      setCompoundMarket: (debtToken) => { compoundMarket = debtToken; },
+      build: () => instructions,
       getFlashObligations: () => {
-        // Return flash loan output UTXO indices by token
         const obj: Record<Address, { flashLoanUtxoIndex: number }> = {};
-        for (const [token, utxoIndex] of flashLoanOutputs.entries()) {
-          obj[token] = { flashLoanUtxoIndex: utxoIndex };
-        }
+        for (const [token, utxoIndex] of flashLoanOutputs.entries()) obj[token] = { flashLoanUtxoIndex: utxoIndex };
         return obj;
       },
     };
-
-    return builder;
   }, [userAddress, encodeCompoundMarket]);
 
-  // Combined confirmation state (either single tx or batch)
   const isAnyConfirmed = isConfirmed || isBatchConfirmed;
 
   return {
-    // Builder functions
     buildDepositFlow,
     buildBorrowFlow,
     buildRepayFlow,
-    buildRepayFlowAsync, // Use this for max repayments
+    buildRepayFlowAsync,
     buildWithdrawFlow,
-    createMoveBuilder, // Modular move position builder
-    // Execution functions
+    createMoveBuilder,
     executeInstructions,
-    executeFlowWithApprovals, // Sequential execution (fallback - use executeFlowBatchedIfPossible instead)
-    executeFlowBatchedIfPossible, // Batched execution (preferred - use this as default)
+    executeFlowWithApprovals,
+    executeFlowBatchedIfPossible,
     getAuthorizations,
-    // Transaction state
     hash,
     isPending,
     isConfirming,
     isConfirmed,
     isApproving,
     writeContract,
-    // Batch state (EIP-5792)
     batchId,
     batchStatus,
     isBatchConfirmed,
-    canDoAtomicBatch, // Export capability detection for UI
-    // Combined confirmation state (use this in modals)
+    canDoAtomicBatch,
     isAnyConfirmed,
   };
 };
-

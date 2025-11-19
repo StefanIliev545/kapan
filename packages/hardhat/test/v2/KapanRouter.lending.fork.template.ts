@@ -40,7 +40,8 @@ const AAVE_GATEWAY: GatewayConfig = {
   type: "aave",
   protocolName: "aave",
   factoryName: "AaveGatewayWrite",
-  deployArgs: [process.env.AAVE_POOL_ADDRESSES_PROVIDER || "", 0], // [poolAddressesProvider, referralCode]
+  // Arbitrum Aave V3 Pool Addresses Provider
+  deployArgs: [process.env.AAVE_POOL_ADDRESSES_PROVIDER || "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", 0], // [poolAddressesProvider, referralCode]
 };
 
 // Example gateway configurations (uncomment to use)
@@ -73,11 +74,13 @@ describe("v2 Lending end-to-end (fork)", function () {
       amounts: {
         deposit: 1_000_000_000n, // 1,000 USDC
         borrow: 100_000_000n, // 100 USDC
+        repay: 100_100_000n, // 100.1 USDC (to cover interest and ensure full debt repayment)
         // repay and withdraw default to borrow and deposit respectively
       },
       gateway: AAVE_GATEWAY, // Change to COMPOUND_GATEWAY or VENUS_GATEWAY
       userFunding: {
-        collateral: 2_000_000_000n, // 2,000 USDC (enough for deposit + repay)
+        collateral: 1000_000_000n, // 1000 USDC (Whale has ~2050)
+        debt: 100_000_000n, // 100 USDC
       },
     };
 
@@ -119,12 +122,12 @@ describe("v2 Lending end-to-end (fork)", function () {
       amounts: {
         deposit: ethers.parseEther("1"), // 1 WETH
         borrow: 100_000_000n, // 100 USDC
-        repay: 100_000_000n, // 100 USDC
+        repay: 100_100_000n, // 100.1 USDC (to cover interest)
         withdraw: ethers.parseEther("1"), // 1 WETH
       },
       gateway: AAVE_GATEWAY, // Change to COMPOUND_GATEWAY or VENUS_GATEWAY
       userFunding: {
-        collateral: ethers.parseEther("2"), // 2 WETH
+        collateral: ethers.parseEther("1.5"), // 1.5 WETH (enough for 1 WETH deposit + gas)
         debt: 200_000_000n, // 200 USDC (for repay)
       },
     };
