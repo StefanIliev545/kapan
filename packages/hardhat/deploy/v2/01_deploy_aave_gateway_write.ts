@@ -18,22 +18,27 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
     42161: {
       PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
-      UI:       "0x5c5228aC8BC1528482514aF3e27E692495148717", // Arbitrum UiPoolDataProviderV3
+      UI: "0x5c5228aC8BC1528482514aF3e27E692495148717", // Arbitrum UiPoolDataProviderV3
       REFERRAL: 0,
     },
     8453: {
       PROVIDER: "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d", // Base v3 PoolAddressesProvider
-      UI:       "0x174446a6741300cD2E7C1b1A636Fee99c8F83502", // Base UiPoolDataProviderV3
+      UI: "0x174446a6741300cD2E7C1b1A636Fee99c8F83502", // Base UiPoolDataProviderV3
       REFERRAL: 0,
     },
     10: {
       PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Optimism v3 PoolAddressesProvider
-      UI:       "0xE92cd6164CE7DC68e740765BC1f2a091B6CBc3e4", // Optimism UiPoolDataProviderV3
+      UI: "0xE92cd6164CE7DC68e740765BC1f2a091B6CBc3e4", // Optimism UiPoolDataProviderV3
       REFERRAL: 0,
     },
     59144: {
       PROVIDER: "0x89502c3731F69DDC95B65753708A07F8Cd0373F4", // Linea v3 PoolAddressesProvider
-      UI:       "0xf751969521E20A972A0776CDB0497Fad0F773F1F", // Linea UiPoolDataProviderV3
+      UI: "0xf751969521E20A972A0776CDB0497Fad0F773F1F", // Linea UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
+    31337: { // hardhat
+      PROVIDER: "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d", // hh v3 PoolAddressesProvider
+      UI: "0x174446a6741300cD2E7C1b1A636Fee99c8F83502", // hh UiPoolDataProviderV3
       REFERRAL: 0,
     },
   };
@@ -46,7 +51,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
 
   // Env can override addresses for recognized chains
   const POOL_ADDRESSES_PROVIDER = process.env.AAVE_POOL_ADDRESSES_PROVIDER || entry.PROVIDER;
-  const UI_POOL_DATA_PROVIDER  = process.env.AAVE_UI_POOL_DATA_PROVIDER || entry.UI;
+  const UI_POOL_DATA_PROVIDER = process.env.AAVE_UI_POOL_DATA_PROVIDER || entry.UI;
   const REFERRAL_CODE = Number(process.env.AAVE_REFERRAL_CODE ?? entry.REFERRAL);
 
   const kapanRouter = await get("KapanRouter");

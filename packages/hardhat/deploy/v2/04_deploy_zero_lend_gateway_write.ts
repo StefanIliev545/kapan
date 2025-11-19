@@ -19,12 +19,17 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
   const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
     59144: {
       PROVIDER: "0xC44827C51d00381ed4C52646aeAB45b455d200eB", // ZeroLend PoolAddressesProvider (Linea)
-      UI:       "0x81b3184A3B5d4612F2c26A53Da8D99474B91B2D2", // ZeroLend UiPoolDataProviderV3 (Linea)
+      UI: "0x81b3184A3B5d4612F2c26A53Da8D99474B91B2D2", // ZeroLend UiPoolDataProviderV3 (Linea)
       REFERRAL: 0,
     },
     8453: {
       PROVIDER: "0x5213ab3997a596c75Ac6ebF81f8aEb9cf9A31007", // ZeroLend PoolAddressesProvider (Base)
-      UI:       "0x0A1198DDb5247a283F76077Bb1E45e5858ee100b", // ZeroLend UiPoolDataProviderV3 (Base)
+      UI: "0x0A1198DDb5247a283F76077Bb1E45e5858ee100b", // ZeroLend UiPoolDataProviderV3 (Base)
+      REFERRAL: 0,
+    },
+    31337: {
+      PROVIDER: "0x5213ab3997a596c75Ac6ebF81f8aEb9cf9A31007", // hh PoolAddressesProvider (Base)
+      UI: "0x0A1198DDb5247a283F76077Bb1E45e5858ee100b", // hh UiPoolDataProviderV3 (Base)
       REFERRAL: 0,
     },
   };
@@ -37,7 +42,7 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
 
   // Env can override addresses for recognized chains
   const POOL_ADDRESSES_PROVIDER = process.env.ZEROLEND_POOL_ADDRESSES_PROVIDER || entry.PROVIDER;
-  const UI_POOL_DATA_PROVIDER  = process.env.ZEROLEND_UI_POOL_DATA_PROVIDER || entry.UI;
+  const UI_POOL_DATA_PROVIDER = process.env.ZEROLEND_UI_POOL_DATA_PROVIDER || entry.UI;
   const REFERRAL_CODE = Number(process.env.ZEROLEND_REFERRAL_CODE ?? entry.REFERRAL);
 
   const kapanRouter = await get("KapanRouter");

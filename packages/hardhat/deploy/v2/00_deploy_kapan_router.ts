@@ -86,7 +86,7 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
         providerAddress
       );
       const poolAddress = await provider.getPool();
-      
+
       if (poolAddress && poolAddress !== ethers.ZeroAddress) {
         await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setAaveV3", poolAddress);
         console.log(`Aave V3 pool set: ${poolAddress}`);

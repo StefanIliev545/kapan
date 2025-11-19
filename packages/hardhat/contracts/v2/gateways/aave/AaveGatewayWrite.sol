@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ProtocolGateway} from "../../../gateways/ProtocolGateway.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ProtocolGateway } from "../../../gateways/ProtocolGateway.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IGateway} from "../../interfaces/IGateway.sol";
-import {ProtocolTypes} from "../../interfaces/ProtocolTypes.sol";
+import { IGateway } from "../../interfaces/IGateway.sol";
+import { ProtocolTypes } from "../../interfaces/ProtocolTypes.sol";
 
-import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
-import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
-import {IPoolDataProvider} from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
+import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
+import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import { IPoolDataProvider } from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 
-interface IVariableDebtToken { function borrowAllowance(address fromUser, address spender) external view returns (uint256); }
+interface IVariableDebtToken {
+    function borrowAllowance(address fromUser, address spender) external view returns (uint256);
+}
 
 contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -26,12 +28,10 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         REFERRAL_CODE = _referralCode;
     }
 
-    
-
-    function processLendingInstruction(ProtocolTypes.Output[] calldata inputs, bytes calldata data)
-        external
-        returns (ProtocolTypes.Output[] memory outputs)
-    {
+    function processLendingInstruction(
+        ProtocolTypes.Output[] calldata inputs,
+        bytes calldata data
+    ) external returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory instr = abi.decode(data, (ProtocolTypes.LendingInstruction));
         address token = instr.token;
         uint256 amount = instr.amount;
@@ -56,14 +56,12 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             outputs[0] = ProtocolTypes.Output({ token: token, amount: refund });
         } else if (instr.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
             uint256 bal = _getBorrowBalance(token, instr.user);
-            // Add 0.1% buffer
-            bal = (bal * 1001) / 1000;
+            // NO BUFFER in execution
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
         } else if (instr.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
             uint256 bal = _getSupplyBalance(token, instr.user);
-            // Add 0.1% buffer
-            bal = (bal * 1001) / 1000;
+            // NO BUFFER in execution
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
         } else {
@@ -81,12 +79,11 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         IPool(pool).supply(token, amount, onBehalfOf, REFERRAL_CODE);
     }
 
-    function withdraw(address underlying, address user, uint256 amount)
-        public
-        onlyRouter
-        nonReentrant
-        returns (address, uint256)
-    {
+    function withdraw(
+        address underlying,
+        address user,
+        uint256 amount
+    ) public onlyRouter nonReentrant returns (address, uint256) {
         address aToken = _getAToken(underlying);
         require(aToken != address(0), "aToken not found");
         IERC20 a = IERC20(aToken);
@@ -116,7 +113,11 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function repay(address token, address user, uint256 amount) public onlyRouter nonReentrant returns (uint256 refund) {
+    function repay(
+        address token,
+        address user,
+        uint256 amount
+    ) public onlyRouter nonReentrant returns (uint256 refund) {
         address pool = poolAddressesProvider.getPool();
         require(pool != address(0), "Pool not set");
         uint256 pre = IERC20(token).balanceOf(address(this));
@@ -137,18 +138,30 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         ProtocolTypes.LendingInstruction[] calldata instrs,
         address caller,
         ProtocolTypes.Output[] calldata inputs
-    )
-        external
-        view
-        returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced)
-    { 
+    ) external view returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
-        produced = new ProtocolTypes.Output[](instrs.length);
+
+        // 1. Calculate exact output count to match execution logic
+        uint256 outCount = 0;
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingOp op = instrs[i].op;
+            if (
+                op == ProtocolTypes.LendingOp.WithdrawCollateral ||
+                op == ProtocolTypes.LendingOp.Borrow ||
+                op == ProtocolTypes.LendingOp.GetBorrowBalance ||
+                op == ProtocolTypes.LendingOp.GetSupplyBalance ||
+                op == ProtocolTypes.LendingOp.Repay
+            ) {
+                outCount++;
+            }
+        }
+        produced = new ProtocolTypes.Output[](outCount);
+        uint256 pIdx = 0;
 
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            
+
             // Simulation logic to determine actual token and amount
             address token = ins.token;
             uint256 amount = ins.amount;
@@ -158,15 +171,13 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             }
 
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                // User must approve aToken -> gateway for withdraw
                 address aToken = _getAToken(token);
                 uint256 cur = IERC20(aToken).allowance(caller, address(this));
-                
-                // Calculate required approval (amount is already buffered if coming from GetSupplyBalance)
                 uint256 required = amount;
-                
-                // Set produced output
-                produced[i] = ProtocolTypes.Output({ token: token, amount: required });
+
+                // Add to produced
+                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: amount });
+                pIdx++;
 
                 if (amount != 0 && cur >= required) {
                     targets[i] = address(0);
@@ -175,23 +186,20 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                     targets[i] = aToken;
                     data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), required);
                 }
-                
-                // Simulate output: underlying token
-                produced[i] = ProtocolTypes.Output({ token: token, amount: amount });
-
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                // User must approveDelegation(vDebt -> gateway) for borrow
                 (, , address vDebt) = _getReserveTokens(token);
-                
+
+                // Add to produced
+                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: amount });
+                pIdx++;
+
                 if (vDebt == address(0)) {
-                    // Should revert or handle error, but view function shouldn't revert if possible
                     targets[i] = address(0);
                     data[i] = bytes("");
                 } else {
                     uint256 cur = IVariableDebtToken(vDebt).borrowAllowance(caller, address(this));
-                    // Borrow amount is exact
-                    uint256 required = amount; 
-                    
+                    uint256 required = amount; // Exact amount
+
                     if (cur >= required && amount != 0) {
                         targets[i] = address(0);
                         data[i] = bytes("");
@@ -200,36 +208,34 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                         data[i] = abi.encodeWithSignature(
                             "approveDelegation(address,uint256)",
                             address(this),
-                            type(uint256).max // Delegation usually safe to be max, or use required
+                            type(uint256).max
                         );
                     }
                 }
-                produced[i] = ProtocolTypes.Output({ token: token, amount: amount });
-
             } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
                 uint256 bal = _getBorrowBalance(token, ins.user);
-                // Add 0.1% buffer
-                bal = (bal * 1001) / 1000;
-                produced[i] = ProtocolTypes.Output({ token: token, amount: bal });
+                bal = (bal * 1001) / 1000; // Buffer
+                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: bal });
+                pIdx++;
                 targets[i] = address(0);
                 data[i] = bytes("");
             } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
                 uint256 bal = _getSupplyBalance(token, ins.user);
-                // Add 0.1% buffer
-                bal = (bal * 1001) / 1000;
-                produced[i] = ProtocolTypes.Output({ token: token, amount: bal });
+                bal = (bal * 1001) / 1000; // Buffer
+                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: bal });
+                pIdx++;
                 targets[i] = address(0);
                 data[i] = bytes("");
             } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
-                 // Repay produces refund output
-                 produced[i] = ProtocolTypes.Output({ token: token, amount: 0 }); // Refund unknown/zero for sim
-                 targets[i] = address(0);
-                 data[i] = bytes("");
-            } else {
-                // Deposit etc
+                // Repay produces a refund output (usually 0)
+                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: 0 });
+                pIdx++;
                 targets[i] = address(0);
                 data[i] = bytes("");
-                // No output for deposit
+            } else {
+                // Deposit / DepositCollateral produce NO output
+                targets[i] = address(0);
+                data[i] = bytes("");
             }
         }
     }
@@ -240,15 +246,17 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
-        // Deauthorization disabled for now
     }
 
     function _getAToken(address underlying) internal view returns (address) {
         IPoolDataProvider data = IPoolDataProvider(poolAddressesProvider.getPoolDataProvider());
-        (address aToken,,) = data.getReserveTokensAddresses(underlying);
+        (address aToken, , ) = data.getReserveTokensAddresses(underlying);
         return aToken;
     }
-    function _getReserveTokens(address underlying) internal view returns (address aToken, address sDebt, address vDebt) {
+
+    function _getReserveTokens(
+        address underlying
+    ) internal view returns (address aToken, address sDebt, address vDebt) {
         IPoolDataProvider data = IPoolDataProvider(poolAddressesProvider.getPoolDataProvider());
         (aToken, sDebt, vDebt) = data.getReserveTokensAddresses(underlying);
     }
@@ -259,9 +267,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     }
 
     function _getSupplyBalance(address token, address user) internal view returns (uint256) {
-        (address aToken,,) = _getReserveTokens(token);
+        (address aToken, , ) = _getReserveTokens(token);
         return aToken == address(0) ? 0 : IERC20(aToken).balanceOf(user);
     }
 }
-
-
