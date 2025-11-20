@@ -1,3 +1,4 @@
+import { track } from "@vercel/analytics";
 import React, {
   FC,
   useCallback,
@@ -203,6 +204,21 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     onAddCollateral,
   } = state;
 
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      track("refinance_modal_open", {
+        network: "starknet",
+        fromProtocol,
+        debtTokenName: position.name,
+        debtTokenAddress: position.tokenAddress,
+        positionType: position.type,
+      });
+    }
+    wasOpenRef.current = isOpen;
+  }, [fromProtocol, isOpen, position.name, position.tokenAddress, position.type]);
+
   /* ---------------------- Support map for selection --------------------- */
   const { supportedCollateralMap: starknetSupportedMap } = useStarknetCollateralSupport(
     fromProtocol,
@@ -342,14 +358,48 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     try {
       setIsSubmitting(true);
 
+      track("refinance_tx_begin", {
+        network: "starknet",
+        fromProtocol,
+        toProtocol: selectedProtocol,
+        debtTokenName: position.name,
+        debtTokenAddress: position.tokenAddress,
+        positionType: position.type,
+        preferBatching: false,
+        batchingUsed: false,
+      });
+
       if (!sendStarkAsync) {
         throw new Error("Starknet transaction not ready");
       }
 
       await sendStarkAsync();
+      track("refinance_tx_complete", {
+        network: "starknet",
+        fromProtocol,
+        toProtocol: selectedProtocol,
+        debtTokenName: position.name,
+        debtTokenAddress: position.tokenAddress,
+        positionType: position.type,
+        preferBatching: false,
+        batchingUsed: false,
+        status: "success",
+      });
       setTimeout(() => onClose(), 2000);
     } catch (e: any) {
       console.error("Refinance flow error:", e);
+      track("refinance_tx_complete", {
+        network: "starknet",
+        fromProtocol,
+        toProtocol: selectedProtocol,
+        debtTokenName: position.name,
+        debtTokenAddress: position.tokenAddress,
+        positionType: position.type,
+        preferBatching: false,
+        batchingUsed: false,
+        status: "error",
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setIsSubmitting(false);
     }
