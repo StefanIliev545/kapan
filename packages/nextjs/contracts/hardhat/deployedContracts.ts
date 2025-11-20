@@ -386,7 +386,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xe91967428b54a3700436bE7FbC40b2f55CDfbe62",
+      address: "0xCb8D77d39F403641f668ad78e338Af3dbCfe1439",
       abi: [
         {
           inputs: [
@@ -653,6 +653,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -1603,7 +1620,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xA6C6976b2A4CB6b0e3Ebba1F378d34C081ABf830",
+      address: "0xE177e20098680E7a5f7acf8c56e8CE18067B09a8",
       abi: [
         {
           inputs: [
@@ -1964,6 +1981,23 @@ const contracts = {
               name: "",
               type: "address",
             },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
           ],
           name: "deauthorize",
           outputs: [
@@ -2224,7 +2258,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xe3d67c67714Ed9c81Bd2468300B5101F6A5C72b1",
+      address: "0x0602d08FF9937EdB2506e7C166363Ee55b934c4a",
       abi: [
         {
           inputs: [
@@ -3687,7 +3721,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x3eAAf048adbd1E425A43f866e947bF95F0D1e58f",
+      address: "0x101f9fb6498297Ba44e70E79550E5268B068E470",
       abi: [
         {
           inputs: [
@@ -3954,6 +3988,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -4904,7 +4955,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x6041B69BE09b0AB1D827d9CAeeB56F51e917Ff5f",
+      address: "0x3bF546e2D54abE7C02E8eF02993E2A537861310F",
       abi: [
         {
           inputs: [
@@ -5265,6 +5316,23 @@ const contracts = {
               name: "",
               type: "address",
             },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
           ],
           name: "deauthorize",
           outputs: [
@@ -5525,7 +5593,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x50A72e9767bc929A111dcd74a41A0eB3D0EE747c",
+      address: "0x48379B11f724ED84Dbdbe1569f033f52b35f7404",
       abi: [
         {
           inputs: [
@@ -7228,7 +7296,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0xa156a3E7C44eCc4a8DDE0096719422C9c6Dd5De5",
+      address: "0x74dCC211e523A7895Aa41973cBAa7580495A0bbB",
       abi: [
         {
           inputs: [
@@ -7490,6 +7558,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -8016,7 +8101,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x209BCf09780b79E6e5FB64f22Dd3DF041e499774",
+      address: "0x64436D76A0756218A1Cf68440E82db2d4Ecd5cB6",
       abi: [
         {
           inputs: [
@@ -8283,6 +8368,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -11130,7 +11232,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x74094a869a356D7D37db8bB52B1903A6475B706A",
+      address: "0xF7A1EDB6E212E9F34c0C188C82dacbf2760b48C1",
       abi: [
         {
           inputs: [
@@ -11397,6 +11499,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -12347,7 +12466,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x57F504f9c51883fD8cc14F3590c66C8ECB4C8F4b",
+      address: "0xa11d56322366Ea6D386c2087664880219cdF6EC0",
       abi: [
         {
           inputs: [
@@ -12708,6 +12827,23 @@ const contracts = {
               name: "",
               type: "address",
             },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
           ],
           name: "deauthorize",
           outputs: [
@@ -12968,7 +13104,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x104F51Ebf7a0D5c4a7536e6017E5B97E661F574e",
+      address: "0x8243cA3e983B74D20a105b501698492A095Fafb6",
       abi: [
         {
           inputs: [
@@ -14671,7 +14807,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x76dE326Cf970F3978336BAadBA1D5ba726284f53",
+      address: "0x6F26C68ce6CD28aFFc61eb0854C3AD4686e041C7",
       abi: [
         {
           inputs: [
@@ -14933,6 +15069,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -15474,7 +15627,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xf943d3fD76130059d58F0c7449E70387D4543ffC",
+      address: "0x288EECF5721640C28AABC32C9b863e0B230542D4",
       abi: [
         {
           inputs: [
@@ -15741,6 +15894,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",
@@ -16691,7 +16861,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x740dB33FcF84A6A656f4696fdBfBa251E995C54d",
+      address: "0x95f202828Cde09c9b90b2Cd33A36C954d2fB134f",
       abi: [
         {
           inputs: [
@@ -17052,6 +17222,23 @@ const contracts = {
               name: "",
               type: "address",
             },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
           ],
           name: "deauthorize",
           outputs: [
@@ -17312,7 +17499,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xF0Bd9C355B15b5091F38C783626Fe7367241A82E",
+      address: "0xf7ec4d5FC2c6C6ae4364E92D36334A3f887Dda9e",
       abi: [
         {
           inputs: [
@@ -18773,7 +18960,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x9D7336794871708618709Da49d81fFAD863C5663",
+      address: "0x3Af5DCD186a2Be60Cc234045822cC7B263549973",
       abi: [
         {
           inputs: [
@@ -19040,6 +19227,23 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
             },
           ],
           name: "deauthorize",

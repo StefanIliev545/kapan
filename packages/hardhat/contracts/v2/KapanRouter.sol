@@ -414,19 +414,60 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         ProtocolTypes.ProtocolInstruction[] calldata instructions,
         address caller
     ) external view returns (address[] memory targets, bytes[] memory data) {
-        address[] memory tmpTargets = new address[](instructions.length);
-        bytes[] memory tmpData = new bytes[](instructions.length);
+        // We must track outputs even in deauth to resolve token addresses from indices
+        ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
+
+        // Estimate max size (Gateways might return multiple revokes per instruction)
+        address[] memory tmpTargets = new address[](instructions.length * 3);
+        bytes[] memory tmpData = new bytes[](instructions.length * 3);
         uint256 k;
 
         for (uint256 i = 0; i < instructions.length; i++) {
             ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
 
+            // --- ROUTER INSTRUCTIONS ---
             if (keccak256(abi.encode(pi.protocolName)) == keccak256(abi.encode("router"))) {
                 RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
-                if (r.instructionType == RouterInstructionType.PullToken && r.user == caller) {
-                    tmpTargets[k] = r.token;
-                    tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
-                } else {
+
+                if (r.instructionType == RouterInstructionType.PullToken) {
+                    if (r.user == caller) {
+                        // Revoke: Approve 0 to Router
+                        tmpTargets[k] = r.token;
+                        tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+                    } else {
+                        tmpTargets[k] = address(0);
+                        tmpData[k] = bytes("");
+                    }
+                    // Update state for downstream instructions
+                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: r.token, amount: r.amount }));
+                } else if (r.instructionType == RouterInstructionType.PushToken) {
+                    (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr)
+                    );
+                    if (inputPtr.index < outputs.length)
+                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                } else if (r.instructionType == RouterInstructionType.ToOutput) {
+                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: r.token, amount: r.amount }));
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                } else if (r.instructionType == RouterInstructionType.Approve) {
+                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                } else if (r.instructionType == RouterInstructionType.FlashLoan) {
+                    // Simulate flashloan output for indexing consistency
+                    (, , ProtocolTypes.InputPtr memory inputPtr, ) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address)
+                    );
+                    if (inputPtr.index < outputs.length) {
+                        outputs = _appendOutputMemory(outputs, outputs[inputPtr.index]);
+                    } else {
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
                     tmpTargets[k] = address(0);
                     tmpData[k] = bytes("");
                 }
@@ -434,32 +475,52 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                 continue;
             }
 
+            // --- GATEWAY INSTRUCTIONS ---
             IGateway gw = gateways[pi.protocolName];
-            if (address(gw) != address(0)) {
-                ProtocolTypes.LendingInstruction memory li = abi.decode(pi.data, (ProtocolTypes.LendingInstruction));
-                ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
-                one[0] = li;
+            if (address(gw) == address(0)) {
+                tmpTargets[k] = address(0);
+                tmpData[k] = bytes("");
+                k++;
+                continue;
+            }
 
-                (address[] memory t, bytes[] memory d) = gw.deauthorize(one, caller);
-                if (t.length > 0 && t[0] != address(0)) {
-                    tmpTargets[k] = t[0];
-                    tmpData[k] = d[0];
+            ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
+            one[0] = abi.decode(pi.data, (ProtocolTypes.LendingInstruction));
+
+            // 1. Get Revocation Call(s)
+            (address[] memory t, bytes[] memory d) = gw.deauthorize(one, caller, outputs);
+
+            for (uint j = 0; j < t.length; j++) {
+                if (t[j] != address(0)) {
+                    tmpTargets[k] = t[j];
+                    tmpData[k] = d[j];
                 } else {
                     tmpTargets[k] = address(0);
                     tmpData[k] = bytes("");
                 }
-            } else {
-                tmpTargets[k] = address(0);
-                tmpData[k] = bytes("");
+                k++;
             }
-            k++;
+
+            // 2. Update Simulation State (using authorize view)
+            // We ignore the targets returned here, we only want 'produced' outputs
+            (, , ProtocolTypes.Output[] memory produced) = gw.authorize(one, caller, outputs);
+            if (produced.length > 0) outputs = _concatOutputsMemory(outputs, produced);
         }
 
-        targets = new address[](k);
-        data = new bytes[](k);
-        for (uint256 i = 0; i < k; i++) {
-            targets[i] = tmpTargets[i];
-            data[i] = tmpData[i];
+        // Compact results to remove empty slots
+        uint256 actualCount = 0;
+        for (uint i = 0; i < k; i++) {
+            if (tmpTargets[i] != address(0)) actualCount++;
+        }
+        targets = new address[](actualCount);
+        data = new bytes[](actualCount);
+        uint256 idx = 0;
+        for (uint i = 0; i < k; i++) {
+            if (tmpTargets[i] != address(0)) {
+                targets[idx] = tmpTargets[i];
+                data[idx] = tmpData[i];
+                idx++;
+            }
         }
     }
 
