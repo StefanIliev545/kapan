@@ -255,11 +255,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 token = inputs[ins.input.index].token;
             }
 
-            if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                // Revoke underlying approval
-                targets[i] = token;
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
-            } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 // Revoke aToken approval
                 address aToken = _getAToken(token);
                 targets[i] = aToken;

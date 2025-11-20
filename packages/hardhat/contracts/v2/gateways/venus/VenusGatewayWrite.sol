@@ -328,14 +328,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 token = inputs[ins.input.index].token;
             }
 
-            if (
-                ins.op == ProtocolTypes.LendingOp.Deposit ||
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
-                ins.op == ProtocolTypes.LendingOp.Repay
-            ) {
-                targets[i] = token;
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
-            } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address vToken = _getVTokenForUnderlying(token);
                 targets[i] = vToken;
                 data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);

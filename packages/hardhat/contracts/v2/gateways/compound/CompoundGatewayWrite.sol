@@ -316,14 +316,6 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
                     targets[i] = address(comet);
                     data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
                 }
-            } else if (
-                ins.op == ProtocolTypes.LendingOp.Deposit ||
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
-                ins.op == ProtocolTypes.LendingOp.Repay
-            ) {
-                // Revoke underlying approval
-                targets[i] = token;
-                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
             } else {
                 targets[i] = address(0);
                 data[i] = bytes("");
