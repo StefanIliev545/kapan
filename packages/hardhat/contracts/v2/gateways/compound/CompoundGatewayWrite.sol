@@ -292,7 +292,26 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
-        // Deauthorization disabled for now
+
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            address market = _decodeMarket(ins.context);
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                address base = market != address(0) ? market : ins.token;
+                ICompoundComet comet = tokenToComet[base];
+                if (address(comet) != address(0)) {
+                    targets[i] = address(comet);
+                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
+                }
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                ICompoundComet comet = tokenToComet[ins.token];
+                if (address(comet) != address(0)) {
+                    targets[i] = address(comet);
+                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
+                }
+            }
+        }
     }
 
     function _decodeMarket(bytes memory ctx) internal pure returns (address market) {

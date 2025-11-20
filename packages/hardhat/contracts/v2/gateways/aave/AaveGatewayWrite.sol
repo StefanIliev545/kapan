@@ -246,6 +246,24 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                address aToken = _getAToken(ins.token);
+                if (aToken != address(0)) {
+                    targets[i] = aToken;
+                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+                }
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                (, , address vDebt) = _getReserveTokens(ins.token);
+                if (vDebt != address(0)) {
+                    targets[i] = vDebt;
+                    data[i] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), 0);
+                }
+            }
+        }
     }
 
     function _getAToken(address underlying) internal view returns (address) {

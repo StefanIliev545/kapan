@@ -317,6 +317,21 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+
+        for (uint256 i; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                address vToken = _getVTokenForUnderlying(ins.token);
+                if (vToken != address(0)) {
+                    targets[i] = vToken;
+                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+                }
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                targets[i] = address(comptroller);
+                data[i] = abi.encodeWithSelector(ComptrollerInterface.updateDelegate.selector, address(this), false);
+            }
+        }
     }
 
     function _getVTokenForUnderlying(address underlying) internal view returns (address) {
