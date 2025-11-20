@@ -244,14 +244,19 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
-      track("refinance_modal_open", {
+      const modalOpenProps: Record<string, string | number | boolean> = {
         network: "evm",
         fromProtocol,
         debtTokenName: position.name,
         debtTokenAddress: position.tokenAddress,
         positionType: position.type,
-        chainId,
-      });
+      };
+
+      if (chainId !== undefined) {
+        modalOpenProps.chainId = chainId;
+      }
+
+      track("refinance_modal_open", modalOpenProps);
     }
     wasOpenRef.current = isOpen;
   }, [chainId, fromProtocol, isOpen, position.name, position.tokenAddress, position.type]);
@@ -537,16 +542,21 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     try {
       setIsSubmitting(true);
 
-      track("refinance_tx_begin", {
+      const txBeginProps: Record<string, string | number | boolean> = {
         network: "evm",
         fromProtocol,
         toProtocol: selectedProtocol,
         debtTokenName: position.name,
         debtTokenAddress: position.tokenAddress,
         positionType: position.type,
-        chainId,
-        preferBatching,
-      });
+        preferBatching: Boolean(preferBatching),
+      };
+
+      if (chainId !== undefined) {
+        txBeginProps.chainId = chainId;
+      }
+
+      track("refinance_tx_begin", txBeginProps);
 
       const builder = createMoveBuilder();
       const pv = (selectedProvider || "").toLowerCase();
@@ -608,37 +618,43 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         batchingUsed = batchingUsed || fallbackResult?.kind === "batch";
       }
 
-      track("refinance_tx_complete", {
+      const txCompleteProps: Record<string, string | number | boolean> = {
         network: "evm",
         fromProtocol,
         toProtocol: selectedProtocol,
         debtTokenName: position.name,
         debtTokenAddress: position.tokenAddress,
         positionType: position.type,
-        chainId,
-        preferBatching,
+        preferBatching: Boolean(preferBatching),
         batchingUsed,
         status: "success",
-        selectedProvider,
-        selectedPool,
-      });
+      };
+
+      if (chainId !== undefined) txCompleteProps.chainId = chainId;
+      if (selectedProvider) txCompleteProps.selectedProvider = selectedProvider;
+      if (selectedPool) txCompleteProps.selectedPool = selectedPool;
+
+      track("refinance_tx_complete", txCompleteProps);
     } catch (e: any) {
       console.error("Refinance flow error:", e);
-      track("refinance_tx_complete", {
+      const txCompleteProps: Record<string, string | number | boolean> = {
         network: "evm",
         fromProtocol,
         toProtocol: selectedProtocol,
         debtTokenName: position.name,
         debtTokenAddress: position.tokenAddress,
         positionType: position.type,
-        chainId,
-        preferBatching,
+        preferBatching: Boolean(preferBatching),
         batchingUsed,
         status: "error",
-        selectedProvider,
-        selectedPool,
         error: e instanceof Error ? e.message : String(e),
-      });
+      };
+
+      if (chainId !== undefined) txCompleteProps.chainId = chainId;
+      if (selectedProvider) txCompleteProps.selectedProvider = selectedProvider;
+      if (selectedPool) txCompleteProps.selectedPool = selectedPool;
+
+      track("refinance_tx_complete", txCompleteProps);
     } finally {
       setIsSubmitting(false);
     }
