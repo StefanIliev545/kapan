@@ -226,9 +226,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
     ? React.cloneElement(collateralView as React.ReactElement, {
-        isVisible: isExpanded,
-        initialShowAll: false,
-      })
+      isVisible: isExpanded,
+      initialShowAll: false,
+    })
     : null;
 
   const defaultInfoButton = (
@@ -285,16 +285,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${
-          hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
-        } transition-all duration-200 ${containerClassName ?? ""}`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
+          } transition-all duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
           {/* Header: Icon and Title */}
           <div className="order-1 lg:order-none lg:col-span-3 flex items-center">
             <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
+              <Image src={icon} alt={`${name} icon`} fill className="rounded-full" />
             </div>
             <div className="ml-2 flex items-center gap-1">
               {renderName ? (
@@ -314,9 +313,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${
-              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
-            }`}
+            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+              }`}
           >
             {!hideBalanceColumn && (
               <div className="px-2 border-r border-base-300">
@@ -387,9 +385,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             )}
             {hasAnyActions && (
               <div
-                className={`flex items-center justify-center w-7 h-7 rounded-full ${
-                  isExpanded ? "bg-primary/20" : "bg-base-300/50"
-                } transition-colors duration-200`}
+                className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"
+                  } transition-colors duration-200`}
               >
                 {isExpanded ? (
                   <FiChevronUp className="w-4 h-4 text-primary" />
@@ -410,21 +407,21 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 className="w-full"
                 autoCompact
                 actions={[
-                ...(showRepayButton
-                  ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
-                  : []),
-                ...(showBorrowButton
-                  ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
-                  : []),
-                ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showMoveButton
-                  ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
+                  ...(showRepayButton
+                    ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
+                    : []),
+                  ...(showBorrowButton
+                    ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
+                    : []),
+                  ...(showSwapButton
+                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showMoveButton
+                    ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showCloseButton
+                    ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
                 ]}
               />
             </div>
@@ -435,30 +432,30 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 className="w-full"
                 autoCompact
                 actions={[
-                ...(showRepayButton
-                  ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
-                  : []),
-                ...(showBorrowButton
-                  ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
-                  : []),
-                ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showMoveButton
-                  ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
+                  ...(showRepayButton
+                    ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
+                    : []),
+                  ...(showBorrowButton
+                    ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
+                    : []),
+                  ...(showSwapButton
+                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showMoveButton
+                    ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showCloseButton
+                    ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
                 ]}
               />
             </div>
 
-        {actionsDisabled && !suppressDisabledMessage && (
-          <div className="mt-3 text-sm text-base-content/50">
-            {disabledMessage}
-          </div>
-        )}
+            {actionsDisabled && !suppressDisabledMessage && (
+              <div className="mt-3 text-sm text-base-content/50">
+                {disabledMessage}
+              </div>
+            )}
 
             {extraActions && <div className="mt-3">{extraActions}</div>}
           </div>

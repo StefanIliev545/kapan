@@ -293,16 +293,15 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${
-          hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
-        } transition-all duration-200 ${containerClassName ?? ""}`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
+          } transition-all duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 relative">
           {/* Header: Icon and Title */}
           <div className="order-1 lg:order-none lg:col-span-3 flex items-center min-w-0">
             <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
+              <Image src={icon} alt={`${name} icon`} fill className="rounded-full" />
             </div>
             <div className="ml-2 flex items-center gap-1 min-w-0">
               <div className="flex flex-col min-w-0">
@@ -346,9 +345,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end">
             {hasAnyActions && showExpandIndicator && (
               <div
-                className={`flex items-center justify-center w-7 h-7 rounded-full ${
-                  isExpanded ? "bg-primary/20" : "bg-base-300/50"
-                } transition-colors duration-200`}
+                className={`flex items-center justify-center w-7 h-7 rounded-full ${isExpanded ? "bg-primary/20" : "bg-base-300/50"
+                  } transition-colors duration-200`}
               >
                 {isExpanded ? (
                   <FiChevronUp className="w-4 h-4 text-primary" />

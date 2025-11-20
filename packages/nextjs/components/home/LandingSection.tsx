@@ -23,9 +23,9 @@ const LandingSection = () => {
     <section className="w-full pt-3 pb-3 lg:py-5 relative overflow-hidden bg-gradient-to-b from-base-100 to-base-200 dark:from-base-200 dark:to-base-300">
       <div className="container mx-auto max-w-screen-2xl px-5 relative">
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut", delay: 0.6 }}
+          initial={{ y: 8 }}
+          animate={{ y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <Heading
             as="h1"
@@ -43,7 +43,7 @@ const LandingSection = () => {
         <div className="relative fade-bottom-mask">
           {hasStarknetWallet ? (
             <>
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut", delay: 1.2 }}>
+              <motion.div initial={{ y: 10 }} animate={{ y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
                 <ProtocolView
                   protocolName="Vesu"
                   protocolIcon="/logos/vesu.svg"
@@ -62,7 +62,7 @@ const LandingSection = () => {
                 />
               </motion.div>
               <div className="mt-1" />
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut", delay: 1.8 }}>
+              <motion.div initial={{ y: 12 }} animate={{ y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
                 <ProtocolView
                   protocolName="Nostra"
                   protocolIcon="/logos/nostra.svg"
@@ -83,7 +83,7 @@ const LandingSection = () => {
             </>
           ) : (
             <>
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut", delay: 1.2 }}>
+              <motion.div initial={{ y: 10 }} animate={{ y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
                 <ProtocolView
                   protocolName="Aave"
                   protocolIcon="/logos/aave.svg"
@@ -102,7 +102,7 @@ const LandingSection = () => {
                 />
               </motion.div>
               <div className="mt-1" />
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut", delay: 1.8 }}>
+              <motion.div initial={{ y: 12 }} animate={{ y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
                 <ProtocolView
                   protocolName="Compound"
                   protocolIcon="/logos/compound.svg"
