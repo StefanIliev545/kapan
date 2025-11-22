@@ -8,10 +8,12 @@ import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
+import { useAccount as useEvmAccount } from "wagmi";
 import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
+import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
 
 export interface ProtocolPosition {
   icon: string;
@@ -97,6 +99,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
   const [isTokenBorrowSelectModalOpen, setIsTokenBorrowSelectModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
+  const { address: evmAddress } = useEvmAccount();
+  const { isConnected: isStarknetConnected } = useStarknetAccount();
+
+  const isWalletConnected = networkType === "evm" ? Boolean(evmAddress) : isStarknetConnected;
 
   // Sync showAll with forceShowAll prop; reset when wallet connects
   useEffect(() => {
@@ -360,22 +366,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   ))}
 
                   {/* "Add Supply" button */}
-                  {!readOnly && (
-                  <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Add Supply
-                  </button>
+                  {!readOnly && isWalletConnected && (
+                    <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Add Supply
+                    </button>
                   )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
                   <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
-                  {!readOnly && (
-                  <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Supply Assets
-                  </button>
+                  {!readOnly && isWalletConnected && (
+                    <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Supply Assets
+                    </button>
                   )}
                 </div>
               )}
@@ -409,22 +415,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   ))}
 
                   {/* "Add Borrow" button */}
-                  {!readOnly && (
-                  <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Borrow
-                  </button>
+                  {!readOnly && isWalletConnected && (
+                    <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Borrow
+                    </button>
                   )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
                   <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
-                  {!readOnly && (
-                  <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Borrow Assets
-                  </button>
+                  {!readOnly && isWalletConnected && (
+                    <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Borrow Assets
+                    </button>
                   )}
                 </div>
               )}
