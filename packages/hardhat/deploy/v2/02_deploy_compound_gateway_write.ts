@@ -30,7 +30,13 @@ const DEFAULT_COMETS: Record<number, string[]> = {
   ],
   59144: [
     "0x8D38A3d6B3c3B7d96D6536DA7Eef94A9d7dbC991", // cUSDCv3 (Comet proxy)
-    "0x60F2058379716A64a7A5d29219397e79bC552194", // cWETHv3 (Comet proxy)
+  ],
+  // Hardhat (31337) - mapped to Arbitrum
+  31337: [
+    "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // cUSDCv3
+    "0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07", // cUSDTv3
+    "0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA", // cUSDC.e (USDbC)
+    "0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486", // cWETHv3
   ],
 };
 
@@ -49,15 +55,15 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   // Enhanced list resolution with logging and validation
   function parseAddressList(raw?: string): string[] {
     if (!raw) return [];
-    
+
     // Try JSON array first
     try {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
         return arr.map((s) => String(s).trim()).filter(Boolean);
       }
-    } catch {/* not JSON, continue */}
-    
+    } catch {/* not JSON, continue */ }
+
     // Fallback: CSV / whitespace
     return raw
       .replace(/[\[\]\n\r'"]/g, " ")

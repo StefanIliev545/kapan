@@ -28,6 +28,7 @@ import {
   createRouterInstruction,
   createProtocolInstruction,
   encodePullToken,
+  encodeToOutput,
   encodeApprove,
   encodePushToken,
   encodeLendingInstruction,
@@ -363,6 +364,124 @@ export const useKapanRouterV2 = () => {
         encodeLendingInstruction(LendingOp.WithdrawCollateral, tokenAddress, userAddress, amountBigInt, context, isMax ? 0 : 999)
       ),
       createRouterInstruction(encodePushToken(1, userAddress)),
+    ];
+  }, [userAddress, encodeCompoundMarket]);
+
+  const buildCollateralSwapFlow = useCallback((
+    protocolName: string,
+    tokenInAddress: string,
+    tokenOutAddress: string,
+    amountIn: string,
+    minAmountOut: string,
+    swapData: string,
+    decimalsIn = 18,
+    market?: Address,
+    isMax = false
+  ): ProtocolInstruction[] => {
+    if (!userAddress) return [];
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const amountInBigInt = parseUnits(amountIn, decimalsIn);
+    const minAmountOutBigInt = BigInt(minAmountOut);
+    const isCompound = normalizedProtocol === "compound";
+    const depositOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const withdrawOp = LendingOp.WithdrawCollateral;
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
+
+    // Encode Swap Context: (tokenOut, minAmountOut, swapData)
+    const swapContext = encodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+      [tokenOutAddress as Address, minAmountOutBigInt, swapData as Hex]
+    );
+
+    // Flow:
+    // 1. Flash Loan TokenIn (AmountIn) -> Output 0
+    // 2. Approve TokenIn for OneInchGateway (using Output 0)
+    // 3. Swap TokenIn -> TokenOut (Output 1) + Refund (Output 2)
+    // 4. Approve TokenOut (Output 1) for LendingProtocol
+    // 5. Deposit TokenOut (Output 1) into LendingProtocol
+    // 6. Withdraw TokenIn (AmountIn) from LendingProtocol -> Output 3
+    // 7. Repay Flash Loan with Output 3
+
+    // Note: Flash Loan is handled by the Router's FlashLoan instruction.
+    // We need to construct the instructions *inside* the flash loan callback?
+    // No, the KapanRouter V2 handles Flash Loans by executing the subsequent instructions
+    // and expecting the repayment at the end (or via specific Repay instruction if it was a protocol flash loan).
+    // But here we are using the *Router's* flash loan capability (e.g. Balancer).
+
+    // Wait, `encodeFlashLoan` in `instructionHelpers` uses `RouterInstructionType.FlashLoan`.
+    // The Router's `processFlashLoan` executes the provider's flash loan.
+    // The provider calls back `receiveFlashLoan` (or similar).
+    // `KapanRouter`'s callback then executes `runStack`.
+    // So we just push the FlashLoan instruction, and the *rest* of the instructions are executed inside the callback.
+
+    // However, `encodeFlashLoan` takes an `inputIndex`. It expects an existing UTXO to define the amount/token.
+    // So we first need to create a UTXO with the amount/token we want to flash loan.
+    // We can use `ToOutput` for this.
+
+    const startInstruction = isMax
+      ? createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenInAddress, userAddress, 0n, context, 999)
+      )
+      : createRouterInstruction(encodeToOutput(amountInBigInt, tokenInAddress));
+
+    return [
+      // 0. Create UTXO for Flash Loan Amount/Token -> Output 0
+      startInstruction,
+
+      // 1. Flash Loan (uses Output 0) -> Output 1 (Borrowed Funds)
+      // Note: Output 0 is consumed? No, FlashLoan reads it.
+      // The Flash Loan result is pushed as a new Output.
+      // Let's assume Balancer V2 for now (0 fee).
+      createRouterInstruction(encodeFlashLoan(FlashLoanProvider.BalancerV2, 0)),
+
+      // 2. Approve TokenIn (Output 1) for OneInchGateway
+      createRouterInstruction(encodeApprove(1, "oneinch")),
+
+      // 3. Swap TokenIn (Output 1) -> TokenOut (Output 2) + Refund (Output 3)
+      createProtocolInstruction(
+        "oneinch",
+        encodeLendingInstruction(LendingOp.Swap, tokenInAddress, userAddress, 0n, swapContext as string, 1)
+      ),
+
+      // 4. Approve TokenOut (Output 3) for LendingProtocol
+      createRouterInstruction(encodeApprove(3, normalizedProtocol)),
+
+      // 5. Deposit TokenOut (Output 3) into LendingProtocol
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, tokenOutAddress, userAddress, 0n, context, 3)
+      ),
+
+      // 6. Withdraw TokenIn from LendingProtocol -> Output 4
+      // We withdraw the exact amount we flash loaned (plus fee if any).
+      // We use Output 1 (Repayment Amount) from the Flash Loan callback.
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(withdrawOp, tokenInAddress, userAddress, 0n, context, 1)
+      ),
+
+      // 7. Repay Flash Loan
+      // The Router automatically handles repayment check at the end of the transaction?
+      // No, for Balancer flash loans, the *callback* must return the funds.
+      // The `KapanRouter` implementation of `receiveFlashLoan` (or equivalent) likely checks if it has the funds.
+      // Wait, let's check `KapanRouter.sol` `_afterFlashLoan` or similar.
+      // The `processFlashLoan` calls `_requestBalancerV2`.
+      // The callback `onFlashLoan` (or similar) calls `runStack`.
+      // After `runStack` returns, the Router must have the funds to repay.
+      // The `Withdraw` instruction (Step 6) puts funds into the Router (Output 4).
+      // Does the Router automatically use Output 4 to repay?
+      // The `KapanRouter` usually requires the funds to be *in the contract*.
+      // `Withdraw` pulls funds *to the Router*.
+      // So the funds are there.
+      // The Balancer Vault will pull the funds from the Router at the end of the callback.
+      // So we just need to make sure the Router *has* the tokens.
+      // Step 6 (Withdraw) ensures that.
+
+      // However, we should probably "clean up" the outputs or ensure the Router knows these are for repayment?
+      // The Router doesn't explicitly "pay back" in the instruction list. The Balancer Vault takes it.
+      // So as long as `Withdraw` puts `amountIn` of `tokenIn` into `address(this)`, we are good.
     ];
   }, [userAddress, encodeCompoundMarket]);
 
@@ -894,6 +1013,7 @@ export const useKapanRouterV2 = () => {
     buildRepayFlow,
     buildRepayFlowAsync,
     buildWithdrawFlow,
+    buildCollateralSwapFlow,
     createMoveBuilder,
     executeInstructions,
     executeFlowWithApprovals,

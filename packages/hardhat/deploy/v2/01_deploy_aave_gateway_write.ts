@@ -37,8 +37,8 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
       REFERRAL: 0,
     },
     31337: { // hardhat
-      PROVIDER: "0xe20fcbdbffc4dd138ce8b2e6fbb6cb49777ad64d", // hh v3 PoolAddressesProvider
-      UI: "0x174446a6741300cD2E7C1b1A636Fee99c8F83502", // hh UiPoolDataProviderV3
+      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // hh v3 PoolAddressesProvider (Arbitrum)
+      UI: "0x5c5228aC8BC1528482514aF3e27E692495148717", // hh UiPoolDataProviderV3 (Arbitrum)
       REFERRAL: 0,
     },
   };

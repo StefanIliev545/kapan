@@ -26,6 +26,7 @@ export enum LendingOp {
   Repay = 4,
   GetBorrowBalance = 5,
   GetSupplyBalance = 6,
+  Swap = 7,
 }
 
 // Router instruction struct
@@ -226,3 +227,9 @@ export function encodeMockInstruction(produceOutput: boolean): string {
   return coder.encode(["tuple(bool produceOutput)"], [{ produceOutput }]);
 }
 
+/**
+ * Encode a Deposit lending instruction
+ */
+export function encodeDeposit(token: string, amount: bigint, user: string): string {
+  return encodeLendingInstruction(LendingOp.Deposit, token, user, amount, "0x", 999);
+}

@@ -63,7 +63,6 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       hardfork: "cancun",
-      chainId: 42161,
       forking: {
         // Default to Base mainnet Alchemy; override via ALCHEMY_API_KEY
         // url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
@@ -76,7 +75,11 @@ const config: HardhatUserConfig = {
       mining: {
         auto: true,
         interval: 1000
-      },
+      }
+    },
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      saveDeployments: true,
     },
     mainnet: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
@@ -288,6 +291,9 @@ const config: HardhatUserConfig = {
     },
   },
   sourcify: {
+    enabled: false,
+  },
+  gasReporter: {
     enabled: false,
   },
 };

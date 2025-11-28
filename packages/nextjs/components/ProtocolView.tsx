@@ -12,6 +12,9 @@ import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
+import { CollateralSwapModal } from "./modals/CollateralSwapModal";
+import { BasicCollateral } from "~~/hooks/useMovePositionData";
+
 
 export interface ProtocolPosition {
   icon: string;
@@ -97,6 +100,28 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
   const [isTokenBorrowSelectModalOpen, setIsTokenBorrowSelectModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [swapSourceToken, setSwapSourceToken] = useState<string | undefined>(undefined);
+
+  const handleSwap = (position: ProtocolPosition) => {
+    if (readOnly) return;
+    setSwapSourceToken(position.tokenAddress);
+    setIsSwapModalOpen(true);
+  };
+
+  // Convert suppliedPositions to BasicCollateral for the modal
+  const availableCollaterals: BasicCollateral[] = useMemo(() => {
+    return suppliedPositions.map(p => ({
+      symbol: p.name,
+      address: p.tokenAddress,
+      decimals: p.tokenDecimals || 18,
+      rawBalance: p.tokenBalance,
+      balance: p.balance,
+      icon: p.icon,
+    }));
+  }, [suppliedPositions]);
+
+
 
   // Sync showAll with forceShowAll prop; reset when wallet connects
   useEffect(() => {
@@ -170,10 +195,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const filteredSuppliedPositions = (effectiveShowAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
     readOnly
       ? {
-          ...p,
-          actionsDisabled: true,
-          moveSupport: p.moveSupport ? { ...p.moveSupport, disableCollateralSelection: true } : undefined,
-        }
+        ...p,
+        actionsDisabled: true,
+        moveSupport: p.moveSupport ? { ...p.moveSupport, disableCollateralSelection: true } : undefined,
+      }
       : p,
   );
 
@@ -183,14 +208,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const filteredBorrowedPositions = (effectiveShowAll
     ? borrowedPositions
     : borrowedPositions.filter(p => p.balance < 0 || (p.collateralValue ?? 0) > 0)).map(p =>
-    readOnly
-      ? {
+      readOnly
+        ? {
           ...p,
           actionsDisabled: true,
           moveSupport: p.moveSupport ? { ...p.moveSupport, disableCollateralSelection: true } : undefined,
         }
-      : p,
-  );
+        : p,
+    );
 
   // Assuming tokenNameToLogo is defined elsewhere, we use a fallback here.
   // const getProtocolLogo = (protocol: string) => `/logos/${protocol.toLowerCase()}-logo.svg`;
@@ -285,13 +310,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <span className="flex items-center gap-1">
                     <span>Net APY:</span>
                     <span
-                      className={`font-semibold ${
-                        netApyPercent == null
-                          ? "text-base-content"
-                          : netApyPercent >= 0
-                            ? "text-success"
-                            : "text-error"
-                      }`}
+                      className={`font-semibold ${netApyPercent == null
+                        ? "text-base-content"
+                        : netApyPercent >= 0
+                          ? "text-success"
+                          : "text-error"
+                        }`}
                     >
                       {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
                     </span>
@@ -349,10 +373,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         {...position}
                         protocolName={protocolName}
                         networkType={networkType}
-                    chainId={chainId}
+                        chainId={chainId}
                         position={positionManager}
                         disableMove={disableMoveSupply || readOnly}
-                        availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: false } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
+                        availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: true } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
+                        onSwap={() => handleSwap(position)}
                         suppressDisabledMessage
                         defaultExpanded={expandFirstPositions && index === 0}
                       />
@@ -361,10 +386,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
                   {/* "Add Supply" button */}
                   {!readOnly && (
-                  <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Add Supply
-                  </button>
+                    <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Add Supply
+                    </button>
                   )}
                 </div>
               ) : (
@@ -372,10 +397,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                   {!readOnly && (
-                  <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Supply Assets
-                  </button>
+                    <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Supply Assets
+                    </button>
                   )}
                 </div>
               )}
@@ -399,7 +424,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         {...position}
                         protocolName={protocolName}
                         networkType={networkType}
-                    chainId={chainId}
+                        chainId={chainId}
                         position={positionManager}
                         availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: false, swap: enabledFeatures.swap ?? false }}
                         suppressDisabledMessage
@@ -410,10 +435,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
                   {/* "Add Borrow" button */}
                   {!readOnly && (
-                  <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Borrow
-                  </button>
+                    <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Borrow
+                    </button>
                   )}
                 </div>
               ) : (
@@ -421,10 +446,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
                   <p>{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                   {!readOnly && (
-                  <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
-                    <FiPlus className="w-4 h-4 mr-1" />
-                    Borrow Assets
-                  </button>
+                    <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
+                      <FiPlus className="w-4 h-4 mr-1" />
+                      Borrow Assets
+                    </button>
                   )}
                 </div>
               )}
@@ -496,19 +521,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               token={
                 selectedToken
                   ? {
-                      name: selectedToken.name,
-                      icon: selectedToken.icon,
-                      currentRate: selectedToken.currentRate,
-                      address: selectedToken.tokenAddress,
-                      usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
-                    }
+                    name: selectedToken.name,
+                    icon: selectedToken.icon,
+                    currentRate: selectedToken.currentRate,
+                    address: selectedToken.tokenAddress,
+                    usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
+                  }
                   : {
-                      name: borrowedPositions[0]?.name || "",
-                      icon: borrowedPositions[0]?.icon || "",
-                      currentRate: borrowedPositions[0]?.currentRate || 0,
-                      address: borrowedPositions[0]?.tokenAddress || "",
-                      usdPrice: borrowedPositions[0]?.tokenPrice ? Number(borrowedPositions[0]?.tokenPrice) / 1e8 : 0,
-                    }
+                    name: borrowedPositions[0]?.name || "",
+                    icon: borrowedPositions[0]?.icon || "",
+                    currentRate: borrowedPositions[0]?.currentRate || 0,
+                    address: borrowedPositions[0]?.tokenAddress || "",
+                    usdPrice: borrowedPositions[0]?.tokenPrice ? Number(borrowedPositions[0]?.tokenPrice) / 1e8 : 0,
+                  }
               }
               protocolName={protocolName}
               currentDebt={
@@ -549,6 +574,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             chainId={chainId}
           />
 
+          {/* Collateral Swap Modal */}
+          {isSwapModalOpen && (
+            <CollateralSwapModal
+              isOpen={isSwapModalOpen}
+              onClose={() => setIsSwapModalOpen(false)}
+              protocolName={protocolName}
+              availableAssets={availableCollaterals}
+              initialFromTokenAddress={swapSourceToken}
+              chainId={chainId || 1}
+            />
+          )}
+
           {/* Borrow Modal - EVM */}
           {isTokenBorrowModalOpen && (
             <BorrowModal
@@ -557,19 +594,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               token={
                 selectedToken
                   ? {
-                      name: selectedToken.name,
-                      icon: selectedToken.icon,
-                      address: selectedToken.tokenAddress,
-                      currentRate: selectedToken.currentRate,
-                      usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
-                    }
+                    name: selectedToken.name,
+                    icon: selectedToken.icon,
+                    address: selectedToken.tokenAddress,
+                    currentRate: selectedToken.currentRate,
+                    usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
+                  }
                   : {
-                      name: borrowedPositions[0]?.name || "",
-                      icon: borrowedPositions[0]?.icon || "",
-                      address: borrowedPositions[0]?.tokenAddress || "",
-                      currentRate: borrowedPositions[0]?.currentRate || 0,
-                      usdPrice: borrowedPositions[0]?.tokenPrice ? Number(borrowedPositions[0]?.tokenPrice) / 1e8 : 0,
-                    }
+                    name: borrowedPositions[0]?.name || "",
+                    icon: borrowedPositions[0]?.icon || "",
+                    address: borrowedPositions[0]?.tokenAddress || "",
+                    currentRate: borrowedPositions[0]?.currentRate || 0,
+                    usdPrice: borrowedPositions[0]?.tokenPrice ? Number(borrowedPositions[0]?.tokenPrice) / 1e8 : 0,
+                  }
               }
               protocolName={protocolName}
               currentDebt={
