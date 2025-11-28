@@ -119,16 +119,17 @@ export const useKapanRouterV2 = () => {
   const chainId = useChainId();
 
   const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
-    8453: 2,   // Base mainnet
-    84531: 2,  // Base Sepolia
-    84532: 2,  // Base Sepolia
-    10: 2,     // Optimism
-    420: 2,    // Optimism Goerli
-    11155420: 2, // Optimism Sepolia
-    42161: 0,  // Arbitrum One (Instant)
+    8453: 1,   // Base mainnet
+    84531: 1,  // Base Sepolia
+    84532: 1,  // Base Sepolia
+    10: 1,     // Optimism
+    420: 1,    // Optimism Goerli
+    11155420: 1, // Optimism Sepolia
+    42161: 1,  // Arbitrum One
     421614: 1, // Arbitrum Sepolia
-    59144: 0,  // Linea
+    59144: 1,  // Linea
     59141: 1,  // Linea Sepolia
+    31337: 1,  // Hardhat
   };
 
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
@@ -138,6 +139,7 @@ export const useKapanRouterV2 = () => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
     confirmations: effectiveConfirmations,
+    pollingInterval: 1000,
   });
 
   const [isApproving, setIsApproving] = useState(false);
@@ -625,6 +627,7 @@ export const useKapanRouterV2 = () => {
         await publicClient.waitForTransactionReceipt({
           hash: transactionHash as `0x${string}`,
           confirmations: effectiveConfirmations,
+          pollingInterval: 1000,
         });
       }
 
@@ -727,7 +730,7 @@ export const useKapanRouterV2 = () => {
             <TransactionToast step="sent" txHash={approvalHash} message={`Approving ${tokenSymbol}...`} />
           );
 
-          await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations });
+          await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations, pollingInterval: 1000 });
           await new Promise(resolve => setTimeout(resolve, 100));
 
           if (approvalNotificationId) notification.remove(approvalNotificationId);
@@ -795,7 +798,7 @@ export const useKapanRouterV2 = () => {
               deauthNotifId = notification.loading(
                 <TransactionToast step="sent" txHash={hash} message="Revoking permissions..." />
               );
-              await publicClient.waitForTransactionReceipt({ hash, confirmations: effectiveConfirmations });
+              await publicClient.waitForTransactionReceipt({ hash, confirmations: effectiveConfirmations, pollingInterval: 1000 });
               if (deauthNotifId) notification.remove(deauthNotifId);
               notification.success(<TransactionToast step="confirmed" txHash={hash} message="Permissions revoked" />);
             } catch (e) {

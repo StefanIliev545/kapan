@@ -10,7 +10,6 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 
 contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -27,11 +26,9 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
     ) external override returns (ProtocolTypes.Output[] memory outputs) {
-        console.log("OneInchGateway: processLendingInstruction");
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
 
         if (ins.op == ProtocolTypes.LendingOp.Swap) {
-            console.log("OneInchGateway: Swap Op");
             address tokenIn = ins.token;
             uint256 amountIn = ins.amount;
 
@@ -40,7 +37,6 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
                 tokenIn = inputs[ins.input.index].token;
                 amountIn = inputs[ins.input.index].amount;
             }
-            console.log("OneInchGateway: TokenIn %s AmountIn %s", tokenIn, amountIn);
 
             require(address(adapter) != address(0), "OneInch: Adapter not set");
             require(tokenIn != address(0), "OneInch: Zero token");
@@ -52,13 +48,11 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
                 ins.context,
                 (address, uint256, bytes)
             );
-            console.log("OneInchGateway: TokenOut %s MinAmountOut %s", tokenOut, minAmountOut);
 
             // Transfer tokens to adapter
             IERC20(tokenIn).safeTransferFrom(msg.sender, address(adapter), amountIn);
 
             // Execute swap
-            console.log("OneInchGateway: Executing swap via adapter");
             (uint256 amountOut, uint256 amountRefund) = adapter.executeSwap(
                 tokenIn,
                 tokenOut,
@@ -66,7 +60,6 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
                 minAmountOut,
                 swapData
             );
-            console.log("OneInchGateway: Swap done. Out: %s Refund: %s", amountOut, amountRefund);
 
             // Return outputs: [TokenOut, TokenInRefund]
             outputs = new ProtocolTypes.Output[](2);
@@ -81,7 +74,6 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
                 IERC20(tokenIn).safeTransfer(msg.sender, amountRefund);
             }
         } else {
-            console.log("OneInchGateway: Unsupported Op");
             revert("OneInch: Unsupported Op");
         }
     }

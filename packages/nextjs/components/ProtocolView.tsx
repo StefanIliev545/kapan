@@ -110,7 +110,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   };
 
   // Convert suppliedPositions to BasicCollateral for the modal
-  const availableCollaterals: BasicCollateral[] = useMemo(() => {
+  const availableCollaterals = useMemo(() => {
     return suppliedPositions.map(p => ({
       symbol: p.name,
       address: p.tokenAddress,
@@ -118,6 +118,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       rawBalance: p.tokenBalance,
       balance: p.balance,
       icon: p.icon,
+      usdValue: p.balance,
+      price: p.tokenPrice,
     }));
   }, [suppliedPositions]);
 

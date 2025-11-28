@@ -10,8 +10,6 @@ import { IGateway } from "./interfaces/IGateway.sol";
 import { ProtocolTypes } from "./interfaces/ProtocolTypes.sol";
 import { FlashLoanConsumerBase } from "./flashloans/FlashLoanConsumerBase.sol";
 
-import "hardhat/console.sol";
-
 contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     using SafeERC20 for IERC20;
 
@@ -133,7 +131,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             return;
         }
         while (true) {
-            console.log("KapanRouter: Processing %s", instruction.protocolName);
             if (keccak256(abi.encode(instruction.protocolName)) == keccak256(abi.encode("router"))) {
                 bool halt = processRouterInstruction(instruction);
                 if (halt) {
@@ -145,16 +142,13 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     revert("Gateway not found");
                 }
                 ProtocolTypes.Output[] memory inputs = _getOutputs();
-                console.log("KapanRouter: Calling gateway %s", instruction.protocolName);
                 ProtocolTypes.Output[] memory produced = gw.processLendingInstruction(inputs, instruction.data);
-                console.log("KapanRouter: Gateway returned. Produced: %s", produced.length);
                 if (produced.length > 0) {
                     _appendOutputs(produced);
                 }
             }
 
             if (isEmpty) {
-                console.log("KapanRouter: Stack empty, breaking");
                 break;
             }
             (instruction, isEmpty) = popStack();
@@ -535,7 +529,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function _appendOutputs(ProtocolTypes.Output[] memory produced) internal {
-        console.log("KapanRouter: Appending outputs");
         ProtocolTypes.Output[] memory cur = _getOutputs();
         ProtocolTypes.Output[] memory merged = new ProtocolTypes.Output[](cur.length + produced.length);
         for (uint256 i = 0; i < cur.length; i++) {
@@ -545,7 +538,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             merged[cur.length + j] = produced[j];
         }
         TBytes.set(OUTPUTS_SLOT, abi.encode(merged));
-        console.log("KapanRouter: Outputs appended. New size: %s", merged.length);
     }
 
     function _appendOutputMemory(
