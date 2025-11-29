@@ -83,8 +83,8 @@ export type UseMovePositionDataResult = {
 };
 
 // EVM-only provider chains
-const BALANCER_CHAINS = [42161, 8453, 10]; // Arbitrum, Base, Optimism
-const AAVE_CHAINS = [42161, 8453, 10, 59144]; // Arbitrum, Base, Optimism, Linea
+const BALANCER_CHAINS = [42161, 8453, 10, 31337]; // Arbitrum, Base, Optimism, Hardhat
+const AAVE_CHAINS = [42161, 8453, 10, 59144, 31337]; // Arbitrum, Base, Optimism, Linea, Hardhat
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
   const { isOpen, networkType, fromProtocol, chainId, position } = params;
@@ -117,7 +117,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
         const short = dec ? `${int}.${dec.slice(0, 6).replace(/0+$/, "")}` : int;
         return { debtMaxRaw: full, debtMaxLabel: short };
       }
-    } catch {}
+    } catch { }
     return { debtMaxRaw: undefined, debtMaxLabel: undefined };
   }, [position.balance, position.decimals]);
 
@@ -132,11 +132,11 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       const protocols = [
         { name: "Aave V3", logo: getProtocolLogo("Aave V3") },
         { name: "Compound V3", logo: getProtocolLogo("Compound V3") },
-        ...(isLinea 
+        ...(isLinea
           ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }]
           : isBase
-          ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }, { name: "Venus", logo: getProtocolLogo("Venus") }]
-          : [{ name: "Venus", logo: getProtocolLogo("Venus") }]
+            ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }, { name: "Venus", logo: getProtocolLogo("Venus") }]
+            : [{ name: "Venus", logo: getProtocolLogo("Venus") }]
         ),
       ];
       return protocols.filter(
@@ -171,8 +171,8 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   );
 
   // Use stringified version for stable comparison
-  const collateralAddressesString = useMemo(() => 
-    evmCollaterals.map(c => c.address).join(','), 
+  const collateralAddressesString = useMemo(() =>
+    evmCollaterals.map(c => c.address).join(','),
     [evmCollaterals]
   );
 
@@ -212,7 +212,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   // Normalize EVM collaterals into BasicCollateral - FIXED VERSION
   useEffect(() => {
     if (networkType !== "evm") return;
-    
+
     const currentEvmCollaterals = stringifyWithBigInt(evmCollaterals);
     const currentSupportedCollaterals = stringifyWithBigInt(supportedCollaterals);
     const currentTokenToPrices = stringifyWithBigInt(tokenToPrices);
@@ -227,7 +227,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     }
 
     setIsLoadingCollaterals(evmIsLoadingCollats || isLoadingSupport);
-    
+
     const normalized = evmCollaterals.map(c => ({
       address: c.address,
       symbol: c.symbol,
@@ -297,7 +297,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   // Flash loan providers
   const [flashLoanProviders, setFlashLoanProviders] = useState<FlashLoanProviderOption[]>([]);
   const [defaultFlashLoanProvider, setDefaultFlashLoanProvider] = useState<FlashLoanProviderOption | undefined>(undefined);
-  
+
   // EVM router flags
   const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useNetworkAwareReadContract({
     networkType: "evm",

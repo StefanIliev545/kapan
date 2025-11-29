@@ -16,6 +16,7 @@ import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { RefinanceModalContent } from "./RefinanceModalContent";
+import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 
 /* ------------------------------ Helpers ------------------------------ */
 type PriceMap = Record<string, bigint>;
@@ -216,8 +217,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     setActiveTab,
     selectedProtocol,
     setSelectedProtocol,
-    selectedProvider,
-    setSelectedProvider,
+    selectedProvider: _stateSelectedProvider,
+    setSelectedProvider: _stateSetSelectedProvider,
     selectedVersion,
     setSelectedVersion,
     expandedCollateral,
@@ -240,6 +241,29 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   } = state;
 
   const [selectedPool, setSelectedPool] = useState<string>("");
+
+  // Flash Loan Selection Hook
+  const debtAmountBigInt = useMemo(() => {
+    try {
+      return debtAmount ? parseUnits(debtAmount, position.decimals) : 0n;
+    } catch {
+      return 0n;
+    }
+  }, [debtAmount, position.decimals]);
+
+  const { selectedProvider: hookSelectedProvider, setSelectedProvider: setHookSelectedProvider } = useFlashLoanSelection({
+    flashLoanProviders,
+    defaultProvider: defaultFlashLoanProvider,
+    tokenAddress: position.tokenAddress,
+    amount: debtAmountBigInt,
+    chainId: chainId || 1,
+  });
+
+  const selectedProvider = hookSelectedProvider?.name;
+  const setSelectedProvider = (name: string) => {
+    const p = flashLoanProviders.find(p => p.name === name);
+    setHookSelectedProvider(p);
+  };
 
   /* ---------------------- Support map for selection --------------------- */
   const collateralAddresses = useMemo(() => collaterals.map(c => c.address), [collaterals]);
@@ -336,12 +360,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     }
   }, [isOpen, filteredDestinationProtocols, selectedProtocol, setSelectedProtocol]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!selectedProvider && defaultFlashLoanProvider?.name) {
-      setSelectedProvider(defaultFlashLoanProvider.name);
-    }
-  }, [isOpen, selectedProvider, defaultFlashLoanProvider?.name, setSelectedProvider]);
+
 
   useEffect(() => {
     if (!isOpen) return;

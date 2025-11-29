@@ -593,6 +593,13 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           initialFromTokenAddress={selectedCollateral.address}
           chainId={chainId || 1}
           market={baseToken as `0x${string}`}
+          position={{
+            name: selectedCollateral.name,
+            tokenAddress: selectedCollateral.address,
+            decimals: selectedCollateral.decimals,
+            balance: selectedCollateral.balance,
+            type: "supply"
+          }}
         />
       )}
     </>

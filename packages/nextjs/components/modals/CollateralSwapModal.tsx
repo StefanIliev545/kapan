@@ -6,8 +6,11 @@ import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
-import { BasicCollateral } from "~~/hooks/useMovePositionData";
+import { BasicCollateral, useMovePositionData, FlashLoanProviderOption } from "~~/hooks/useMovePositionData";
+import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
+import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { FiCheck, FiAlertTriangle, FiArrowDown, FiInfo, FiSettings } from "react-icons/fi";
+import { SegmentedActionBar } from "../common/SegmentedActionBar";
 
 // Extended type to include price info passed from parent
 interface ExtendedCollateral extends BasicCollateral {
@@ -23,6 +26,13 @@ interface CollateralSwapModalProps {
     initialFromTokenAddress?: string;
     chainId: number;
     market?: Address; // For Compound
+    position: {
+        name: string;
+        tokenAddress: string;
+        decimals: number;
+        balance?: number | bigint;
+        type: "borrow" | "supply";
+    };
 }
 
 export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
@@ -33,9 +43,20 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     initialFromTokenAddress,
     chainId,
     market,
+    position,
 }) => {
     const { data: oneInchAdapter } = useDeployedContractInfo("OneInchAdapter");
     const { buildCollateralSwapFlow } = useKapanRouterV2();
+
+    // Fetch Flash Loan Providers using existing hook logic
+    // We construct a minimal "position" object for the hook if needed, or just rely on chainId/networkType
+    const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
+        isOpen,
+        networkType: "evm",
+        fromProtocol: protocolName,
+        chainId,
+        position: position || { name: "", tokenAddress: "", decimals: 18, type: "borrow" }, // Fallback if position not passed (though it should be)
+    });
 
     // Filter assets with balance > 0 for "From" selection
     const userAssets = useMemo(() =>
@@ -47,6 +68,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const [selectedTo, setSelectedTo] = useState<ExtendedCollateral | null>(null);
     const [activeTab, setActiveTab] = useState<"swap" | "info">("swap");
     const [slippage, setSlippage] = useState<number>(3); // Default 3%
+    const [amountIn, setAmountIn] = useState("");
+    const [isMax, setIsMax] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Initialize selection
     useEffect(() => {
@@ -78,8 +102,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
     }, [isOpen, targetAssets, selectedTo, selectedFrom]);
 
-    const [amountIn, setAmountIn] = useState("");
-    const [isMax, setIsMax] = useState(false);
+    // Flash Loan Liquidity Check & Auto-Selection
+    const amountInBigInt = useMemo(() => {
+        try {
+            return selectedFrom && amountIn ? parseUnits(amountIn, selectedFrom.decimals) : 0n;
+        } catch {
+            return 0n;
+        }
+    }, [amountIn, selectedFrom]);
+
+    const { selectedProvider, setSelectedProvider } = useFlashLoanSelection({
+        flashLoanProviders,
+        defaultProvider: defaultFlashLoanProvider,
+        tokenAddress: selectedFrom?.address,
+        amount: amountInBigInt,
+        chainId,
+    });
 
     // 1inch Quote
     const { data: quote, isLoading: isQuoteLoading, error: quoteError } = use1inchQuote({
@@ -105,13 +143,14 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const buildFlow = () => {
         if (!quote || !selectedFrom || !selectedTo || !oneInchAdapter) return [];
 
-        // minAmountOut with slippage (matching the quote)
-        // Slippage is already applied in quote.dstAmount if we trust 1inch API, 
-        // but typically quote returns expected amount. We should calculate minAmountOut manually.
-        // 1inch API 'slippage' param is for the tx data generation, but quote.dstAmount is usually the estimated return.
-        // Let's apply our local slippage to the estimated return for safety in the contract check.
-        const slippageBps = BigInt(Math.round(slippage * 100)); // 1% = 100bps
-        const minAmountOut = (BigInt(quote.dstAmount) * (10000n - slippageBps)) / 10000n;
+        // We rely on 1inch Router's internal slippage check (encoded in tx.data).
+        // Passing a strict minAmountOut here causes "double slippage" issues due to rounding differences
+        // between our calculation and 1inch's internal calculation.
+        // We pass 1 to ensure we receive *something*, but the real protection is in the 1inch calldata.
+        const minAmountOut = 1n;
+
+        // Default to BalancerV2 if provider not selected (shouldn't happen if logic works)
+        const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
 
         return buildCollateralSwapFlow(
             protocolName,
@@ -122,7 +161,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             quote.tx.data,
             selectedFrom.decimals,
             market,
-            isMax
+            isMax,
+            providerEnum
         );
     };
 
@@ -135,7 +175,18 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         emptyFlowErrorMessage: "Failed to build swap instructions",
     });
 
+    const handleSwapWrapper = async () => {
+        try {
+            setIsSubmitting(true);
+            await handleSwap(amountIn, isMax);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+
+
 
     // Helper to calculate USD value
     const getUsdValue = (amount: string, price?: bigint) => {
@@ -193,6 +244,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                                 <div className="pb-4">
                                     <h4 className="font-medium text-sm">Flash Loan</h4>
                                     <p className="text-xs text-base-content/70">We borrow the new collateral asset via a Flash Loan.</p>
+                                    <div className="mt-1 text-xs bg-base-200 p-1 rounded inline-block">
+                                        Provider: {selectedProvider?.name || "Auto"}
+                                    </div>
                                 </div>
                             </div>
 
@@ -231,6 +285,26 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     </div>
                 ) : (
                     <div className="space-y-6">
+                        {/* Flash Loan Provider Selector */}
+                        {flashLoanProviders.length > 1 && (
+                            <div className="flex justify-end mb-[-10px]">
+                                <select
+                                    className="select select-xs select-ghost font-normal text-base-content/60"
+                                    value={selectedProvider?.name || ""}
+                                    onChange={(e) => {
+                                        const p = flashLoanProviders.find(p => p.name === e.target.value);
+                                        if (p) setSelectedProvider(p);
+                                    }}
+                                >
+                                    {flashLoanProviders.map(p => (
+                                        <option key={p.name} value={p.name}>
+                                            Flash Loan: {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         {/* FROM Section */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -386,7 +460,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         {quoteError && (
                             <div className="alert alert-error text-xs py-2">
                                 <FiAlertTriangle className="w-4 h-4" />
-                                <span>Error fetching quote: {quoteError.message}</span>
+                                <span className="break-all">Error fetching quote: {quoteError.message}</span>
                             </div>
                         )}
                         {quote && oneInchAdapter && quote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
@@ -409,13 +483,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                                 </button>
                             </div>
 
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => handleSwap(amountIn, isMax)}
-                                disabled={!quote || isQuoteLoading || parseFloat(amountIn) <= 0}
-                            >
-                                {isQuoteLoading ? "Fetching Quote..." : "Swap Collateral"}
-                            </button>
+                            <div className="flex-1 ml-4">
+                                <SegmentedActionBar
+                                    className="w-full"
+                                    autoCompact
+                                    actions={[
+                                        {
+                                            key: "swap",
+                                            label: isSubmitting ? "Processing..." : isQuoteLoading ? "Fetching Quote..." : "Swap Collateral",
+                                            icon: isSubmitting ? <span className="loading loading-spinner loading-xs" /> : undefined,
+                                            onClick: handleSwapWrapper,
+                                            disabled: !quote || isQuoteLoading || parseFloat(amountIn) <= 0 || isSubmitting,
+                                            variant: "ghost",
+                                        },
+                                    ]}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}

@@ -101,11 +101,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [isTokenBorrowSelectModalOpen, setIsTokenBorrowSelectModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
-  const [swapSourceToken, setSwapSourceToken] = useState<string | undefined>(undefined);
+  const [selectedSwapPosition, setSelectedSwapPosition] = useState<ProtocolPosition | null>(null);
 
   const handleSwap = (position: ProtocolPosition) => {
     if (readOnly) return;
-    setSwapSourceToken(position.tokenAddress);
+    setSelectedSwapPosition(position);
     setIsSwapModalOpen(true);
   };
 
@@ -577,14 +577,21 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           />
 
           {/* Collateral Swap Modal */}
-          {isSwapModalOpen && (
+          {isSwapModalOpen && selectedSwapPosition && (
             <CollateralSwapModal
               isOpen={isSwapModalOpen}
               onClose={() => setIsSwapModalOpen(false)}
               protocolName={protocolName}
               availableAssets={availableCollaterals}
-              initialFromTokenAddress={swapSourceToken}
+              initialFromTokenAddress={selectedSwapPosition.tokenAddress}
               chainId={chainId || 1}
+              position={{
+                name: selectedSwapPosition.name,
+                tokenAddress: selectedSwapPosition.tokenAddress,
+                decimals: selectedSwapPosition.tokenDecimals || 18,
+                balance: selectedSwapPosition.balance,
+                type: "supply"
+              }}
             />
           )}
 

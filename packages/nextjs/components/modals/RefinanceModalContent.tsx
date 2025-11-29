@@ -3,6 +3,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { FiCheck, FiAlertTriangle } from "react-icons/fi";
 import { formatUnits } from "viem";
+import { SegmentedActionBar } from "../common/SegmentedActionBar";
 
 /* ------------------------------ Helpers ------------------------------ */
 const clampAmount = (value: string, max?: string) => {
@@ -661,14 +662,22 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
             )}
             {!showBatchingOption && <div />}
 
-            <button
-              className={`btn btn-primary ${isSubmitting ? "loading" : ""} ${isActionDisabled ? "btn-disabled" : ""
-                }`}
-              onClick={handleExecuteMove}
-              disabled={isActionDisabled || isSubmitting}
-            >
-              {isSubmitting ? "Processing..." : "Refinance"}
-            </button>
+            <div className="flex-1 ml-4">
+              <SegmentedActionBar
+                className="w-full"
+                autoCompact
+                actions={[
+                  {
+                    key: "refinance",
+                    label: isSubmitting ? "Processing..." : "Refinance",
+                    icon: isSubmitting ? <span className="loading loading-spinner loading-xs" /> : undefined,
+                    onClick: handleExecuteMove,
+                    disabled: isActionDisabled || isSubmitting,
+                    variant: "ghost",
+                  },
+                ]}
+              />
+            </div>
           </div>
         </div>
       </div>

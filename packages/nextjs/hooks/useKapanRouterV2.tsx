@@ -376,9 +376,10 @@ export const useKapanRouterV2 = () => {
     amountIn: string,
     minAmountOut: string,
     swapData: string,
-    decimalsIn = 18,
+    decimalsIn: number,
     market?: Address,
-    isMax = false
+    isMax = false,
+    flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
@@ -435,8 +436,7 @@ export const useKapanRouterV2 = () => {
       // 1. Flash Loan (uses Output 0) -> Output 1 (Borrowed Funds)
       // Note: Output 0 is consumed? No, FlashLoan reads it.
       // The Flash Loan result is pushed as a new Output.
-      // Let's assume Balancer V2 for now (0 fee).
-      createRouterInstruction(encodeFlashLoan(FlashLoanProvider.BalancerV2, 0)),
+      createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
 
       // 2. Approve TokenIn (Output 1) for OneInchGateway
       createRouterInstruction(encodeApprove(1, "oneinch")),
@@ -468,22 +468,14 @@ export const useKapanRouterV2 = () => {
       // The Router automatically handles repayment check at the end of the transaction?
       // No, for Balancer flash loans, the *callback* must return the funds.
       // The `KapanRouter` implementation of `receiveFlashLoan` (or equivalent) likely checks if it has the funds.
-      // Wait, let's check `KapanRouter.sol` `_afterFlashLoan` or similar.
       // The `processFlashLoan` calls `_requestBalancerV2`.
       // The callback `onFlashLoan` (or similar) calls `runStack`.
       // After `runStack` returns, the Router must have the funds to repay.
       // The `Withdraw` instruction (Step 6) puts funds into the Router (Output 4).
-      // Does the Router automatically use Output 4 to repay?
-      // The `KapanRouter` usually requires the funds to be *in the contract*.
-      // `Withdraw` pulls funds *to the Router*.
       // So the funds are there.
       // The Balancer Vault will pull the funds from the Router at the end of the callback.
       // So we just need to make sure the Router *has* the tokens.
       // Step 6 (Withdraw) ensures that.
-
-      // However, we should probably "clean up" the outputs or ensure the Router knows these are for repayment?
-      // The Router doesn't explicitly "pay back" in the instruction list. The Balancer Vault takes it.
-      // So as long as `Withdraw` puts `amountIn` of `tokenIn` into `address(this)`, we are good.
     ];
   }, [userAddress, encodeCompoundMarket]);
 
