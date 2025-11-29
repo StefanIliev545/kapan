@@ -26,13 +26,16 @@ export const useBatchingPreference = () => {
   }, []);
 
   // Save to localStorage when preference changes
-  const setPreference = (value: boolean) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, String(value));
-      setEnabled(value);
-    } catch (error) {
-      console.warn("Failed to save batching preference to localStorage:", error);
-    }
+  const setPreference = (valueOrFn: boolean | ((prev: boolean) => boolean)) => {
+    setEnabled(prev => {
+      const newValue = typeof valueOrFn === "function" ? (valueOrFn as (prev: boolean) => boolean)(prev) : valueOrFn;
+      try {
+        localStorage.setItem(STORAGE_KEY, String(newValue));
+      } catch (error) {
+        console.warn("Failed to save batching preference to localStorage:", error);
+      }
+      return newValue;
+    });
   };
 
   return {

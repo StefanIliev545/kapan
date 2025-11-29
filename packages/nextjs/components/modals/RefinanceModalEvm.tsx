@@ -244,14 +244,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   /* ---------------------- Support map for selection --------------------- */
   const collateralAddresses = useMemo(() => collaterals.map(c => c.address), [collaterals]);
 
-  const { supportedCollaterals: supportFromHook } = useCollateralSupport(
+  const { supportedCollaterals: effectiveSupportedMap, isLoading: isSupportLoading } = useCollateralSupport(
     selectedProtocol || filteredDestinationProtocols[0]?.name || "",
     position.tokenAddress,
-    collateralAddresses,
+    collateralAddresses.map(a => a.toLowerCase()),
     isOpen && collateralAddresses.length > 0 && Boolean(selectedProtocol || filteredDestinationProtocols[0]?.name),
   );
-
-  const effectiveSupportedMap = supportFromHook;
 
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
@@ -519,7 +517,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [isOpen, needDebtProbe, position.tokenAddress, position.name, collaterals, mergedPrices, reportPrice]);
 
   /* --------------------------- Action Handlers --------------------------- */
-  const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
+  const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0 || Object.keys(addedCollaterals).some(addr => effectiveSupportedMap?.[addrKey(addr)] === false);
 
   const handleExecuteMove = async () => {
     if (!debtConfirmed || !selectedProtocol) return;
@@ -631,7 +629,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       selectedProvider={selectedProvider ?? ""}
       setSelectedProvider={setSelectedProvider}
       collaterals={collaterals}
-      isLoadingCollaterals={isLoadingCollaterals}
+      isLoadingCollaterals={isLoadingCollaterals || isSupportLoading}
       effectiveSupportedMap={effectiveSupportedMap}
       addedCollaterals={addedCollaterals}
       expandedCollateral={expandedCollateral}

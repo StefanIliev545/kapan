@@ -488,7 +488,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   : collaterals
                 ).map(c => {
                   const key = addrKey(c.address);
-                  const supported = effectiveSupportedMap?.[key] ?? true;
+                  const supported = effectiveSupportedMap?.[key] ?? false;
                   const isAdded = Boolean(addedCollaterals[key]);
                   const isExpanded = expandedCollateral === key;
 

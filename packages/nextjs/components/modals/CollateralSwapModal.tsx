@@ -1,7 +1,7 @@
 import { FC, useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { formatUnits, parseUnits, Address } from "viem";
-import { useAccount } from "wagmi";
+
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
@@ -87,7 +87,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         src: selectedFrom?.address as Address,
         dst: selectedTo?.address as Address,
         amount: parseUnits(amountIn || "0", selectedFrom?.decimals || 18).toString(),
-        from: oneInchAdapter?.address,
+        from: oneInchAdapter?.address || "",
         slippage: slippage,
         enabled: !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
         apiKey: process.env.NEXT_PUBLIC_ONE_INCH_API_KEY,
@@ -138,7 +138,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
 
     // Helper to calculate USD value
-    const getUsdValue = (amount: string, price?: bigint, decimals: number = 18) => {
+    const getUsdValue = (amount: string, price?: bigint) => {
         if (!amount || !price) return 0;
         const parsed = parseFloat(amount);
         if (isNaN(parsed)) return 0;
@@ -146,8 +146,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         return parsed * Number(formatUnits(price, 8));
     };
 
-    const usdValueIn = selectedFrom ? getUsdValue(amountIn, selectedFrom.price, selectedFrom.decimals) : 0;
-    const usdValueOut = selectedTo && quote ? getUsdValue(amountOut, selectedTo.price, selectedTo.decimals) : 0;
+    const usdValueIn = selectedFrom ? getUsdValue(amountIn, selectedFrom.price) : 0;
+    const usdValueOut = selectedTo && quote ? getUsdValue(amountOut, selectedTo.price) : 0;
 
     return (
         <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -374,7 +374,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                                         <>
                                             {formatUnits((BigInt(quote.dstAmount) * (10000n - BigInt(Math.round(slippage * 100)))) / 10000n, selectedTo?.decimals || 18).slice(0, 8)}
                                             <span className="text-xs text-base-content/60 ml-1">
-                                                (${getUsdValue(formatUnits((BigInt(quote.dstAmount) * (10000n - BigInt(Math.round(slippage * 100)))) / 10000n, selectedTo?.decimals || 18), selectedTo?.price, selectedTo?.decimals).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                                (${getUsdValue(formatUnits((BigInt(quote.dstAmount) * (10000n - BigInt(Math.round(slippage * 100)))) / 10000n, selectedTo?.decimals || 18), selectedTo?.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                                             </span>
                                         </>
                                     ) : "-"}
@@ -392,7 +392,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         {quote && oneInchAdapter && quote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                             <div className="alert alert-warning text-xs py-2">
                                 <FiAlertTriangle className="w-4 h-4" />
-                                <span>Warning: Quote 'from' address mismatch!</span>
+                                <span>Warning: Quote &apos;from&apos; address mismatch!</span>
                             </div>
                         )}
 
@@ -411,7 +411,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
                             <button
                                 className="btn btn-primary"
-                                onClick={handleSwap}
+                                onClick={() => handleSwap(amountIn, isMax)}
                                 disabled={!quote || isQuoteLoading || parseFloat(amountIn) <= 0}
                             >
                                 {isQuoteLoading ? "Fetching Quote..." : "Swap Collateral"}

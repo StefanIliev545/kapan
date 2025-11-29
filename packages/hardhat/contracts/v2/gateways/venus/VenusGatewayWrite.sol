@@ -242,8 +242,8 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
 
                 // 1. Approval
                 if (amount == 0 || cur < amountWithBuffer) {
-                    targets[k] = token;
-                    data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), amountWithBuffer);
+                    targets[k] = address(0);
+                    data[k] = bytes("");
                     k++;
                 }
 

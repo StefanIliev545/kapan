@@ -201,17 +201,8 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
             }
 
             if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                uint256 required = amount;
-                uint256 cur = IERC20(token).allowance(caller, address(this));
-
-                if (amount != 0 && cur >= required) {
-                    targets[i] = address(0);
-                    data[i] = bytes("");
-                } else {
-                    targets[i] = token;
-                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), required);
-                }
-
+                targets[i] = address(0);
+                data[i] = bytes("");
                 // Repay produces output
                 if (ins.op == ProtocolTypes.LendingOp.Repay) {
                     produced[pIdx] = ProtocolTypes.Output({ token: token, amount: 0 });
@@ -222,16 +213,8 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
                 ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
                 (ins.op == ProtocolTypes.LendingOp.Deposit && market != address(0) && market != token)
             ) {
-                address col = token;
-                uint256 required = amount;
-                uint256 cur = IERC20(col).allowance(caller, address(this));
-                if (amount != 0 && cur >= required) {
-                    targets[i] = address(0);
-                    data[i] = bytes("");
-                } else {
-                    targets[i] = col;
-                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), required);
-                }
+                targets[i] = address(0);
+                data[i] = bytes("");
                 // DepositCollateral produces NO output
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address base = market != address(0) ? market : token;
