@@ -128,7 +128,6 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         from: oneInchAdapter?.address || "",
         slippage: slippage,
         enabled: !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
-        apiKey: process.env.NEXT_PUBLIC_ONE_INCH_API_KEY,
     });
 
     const amountOut = quote ? formatUnits(BigInt(quote.dstAmount), selectedTo?.decimals || 18) : "0";
@@ -466,7 +465,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         {quote && oneInchAdapter && quote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                             <div className="alert alert-warning text-xs py-2">
                                 <FiAlertTriangle className="w-4 h-4" />
-                                <span>Warning: Quote &apos;from&apos; address mismatch!</span>
+                                <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
+                            </div>
+                        )}
+                        {!oneInchAdapter && isOpen && (
+                            <div className="alert alert-warning text-xs py-2">
+                                <FiAlertTriangle className="w-4 h-4" />
+                                <span>1inch Adapter not found on this network. Swaps unavailable.</span>
                             </div>
                         )}
 

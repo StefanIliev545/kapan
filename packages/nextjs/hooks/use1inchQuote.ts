@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Address } from "viem";
 import { fetch1inchSwap, OneInchSwapResponse } from "../utils/1inch";
 import { useDebounceValue } from "usehooks-ts";
@@ -11,7 +12,6 @@ type Use1inchQuoteProps = {
     from: Address; // Adapter address
     slippage?: number;
     enabled?: boolean;
-    apiKey?: string;
 };
 
 export const use1inchQuote = ({
@@ -22,14 +22,19 @@ export const use1inchQuote = ({
     from,
     slippage = 1,
     enabled = true,
-    apiKey,
 }: Use1inchQuoteProps) => {
     const [debouncedAmount] = useDebounceValue(amount, 500);
+    const isEnabled = enabled && BigInt(debouncedAmount || "0") > 0n && !!src && !!dst && !!from;
+
+    useEffect(() => {
+        if (!isEnabled && enabled) {
+            console.log("use1inchQuote disabled:", { enabled, amount: debouncedAmount, src, dst, from });
+        }
+    }, [isEnabled, enabled, debouncedAmount, src, dst, from]);
 
     return useQuery<OneInchSwapResponse, Error>({
         queryKey: ["1inch-quote", chainId, src, dst, debouncedAmount, from, slippage],
         queryFn: async () => {
-            if (!apiKey) throw new Error("API Key missing");
             try {
                 return await fetch1inchSwap(
                     chainId === 31337 ? 42161 : chainId,
@@ -40,15 +45,14 @@ export const use1inchQuote = ({
                         from,
                         slippage,
                         disableEstimate: true, // Always disable for adapter flow
-                    },
-                    apiKey
+                    }
                 );
             } catch (e) {
                 console.error("1inch API Error:", e);
                 throw e;
             }
         },
-        enabled: enabled && !!apiKey && BigInt(debouncedAmount || "0") > 0n && !!src && !!dst && !!from,
+        enabled: enabled && BigInt(debouncedAmount || "0") > 0n && !!src && !!dst && !!from,
         refetchInterval: 10000, // Poll every 10s
         retry: false,
     });

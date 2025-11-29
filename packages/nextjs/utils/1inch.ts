@@ -38,8 +38,7 @@ export type OneInchSwapResponse = {
 
 export const fetch1inchSwap = async (
     chainId: number,
-    params: OneInchQuoteParams,
-    apiKey: string
+    params: OneInchQuoteParams
 ): Promise<OneInchSwapResponse> => {
     const searchParams = new URLSearchParams();
     searchParams.append("src", params.src);

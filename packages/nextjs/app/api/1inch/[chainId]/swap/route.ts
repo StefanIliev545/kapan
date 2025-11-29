@@ -6,7 +6,8 @@ export async function GET(
 ) {
     const { chainId } = await params;
     const searchParams = request.nextUrl.searchParams;
-    const apiKey = process.env.NEXT_PUBLIC_ONE_INCH_API_KEY;
+    const apiKey = process.env.ONE_INCH_API_KEY || process.env.NEXT_PUBLIC_ONE_INCH_API_KEY;
+    console.log(`1inch API Proxy: Request for chain ${chainId}, hasKey: ${!!apiKey}`);
 
     if (!apiKey) {
         return NextResponse.json(
