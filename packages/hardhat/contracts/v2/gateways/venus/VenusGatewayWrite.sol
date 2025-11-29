@@ -242,8 +242,8 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
 
                 // 1. Approval
                 if (amount == 0 || cur < amountWithBuffer) {
-                    targets[k] = token;
-                    data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), amountWithBuffer);
+                    targets[k] = address(0);
+                    data[k] = bytes("");
                     k++;
                 }
 
@@ -313,10 +313,34 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
 
     function deauthorize(
         ProtocolTypes.LendingInstruction[] calldata instrs,
-        address /*caller*/
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata inputs
     ) external view override returns (address[] memory targets, bytes[] memory data) {
+        // Venus can generate multiple revokes per instruction, but standard revokes are 1-to-1
+        // We intentionally do NOT exit markets (too disruptive).
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            address token = ins.token;
+            if (ins.input.index < inputs.length) {
+                token = inputs[ins.input.index].token;
+            }
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                address vToken = _getVTokenForUnderlying(token);
+                targets[i] = vToken;
+                data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                // Revoke delegate
+                targets[i] = address(comptroller);
+                data[i] = abi.encodeWithSelector(ComptrollerInterface.updateDelegate.selector, address(this), false);
+            } else {
+                targets[i] = address(0);
+                data[i] = bytes("");
+            }
+        }
     }
 
     function _getVTokenForUnderlying(address underlying) internal view returns (address) {

@@ -2,11 +2,14 @@ import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { DepositModal } from "~~/components/modals/DepositModal";
 import { WithdrawModal } from "~~/components/modals/WithdrawModal";
+import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { BasicCollateral } from "~~/hooks/useMovePositionData";
+import { FiRepeat } from "react-icons/fi";
 
 interface CollateralPosition {
   icon: string;
@@ -57,7 +60,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 }) => {
   const [showAll, setShowAll] = useState(initialShowAll === undefined ? false : initialShowAll);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
-  const [selectedAction, setSelectedAction] = useState<"deposit" | "withdraw" | null>(null);
+  const [selectedAction, setSelectedAction] = useState<"deposit" | "withdraw" | "swap" | null>(null);
   const { address: connectedAddress } = useAccount();
 
   // Use ZERO_ADDRESS when wallet is not connected
@@ -184,7 +187,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
       // Store the raw balance
       const balanceRaw = balances[index];
-      
+
       // Format balance with correct decimals
       const balance = Number(formatUnits(balanceRaw, decimals));
 
@@ -196,13 +199,13 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
       // 2. Convert baseToken value to USD
       let usdValue = 0;
       let effectiveUsdPrice = 0n;
-      
+
       if (collateralToBasePrice > 0n && baseTokenUsdPrice > 0n) {
         // Calculate the effective USD price by combining both rates
         // Convert to BigInt calculation to avoid precision issues
         const scaleFactor = 10n ** 8n; // Both prices have 8 decimals, result will have 8 decimals
         effectiveUsdPrice = (collateralToBasePrice * baseTokenUsdPrice) / scaleFactor;
-        
+
         // Calculate USD value
         usdValue = balance * Number(formatUnits(effectiveUsdPrice, 8));
       }
@@ -226,7 +229,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   useEffect(() => {
     if (isVisible) {
       // You could trigger a manual refetch here if needed
-      console.log("Collateral view is now visible", { 
+      console.log("Collateral view is now visible", {
         baseToken,
         baseTokenUsdPrice: baseTokenUsdPrice ? baseTokenUsdPrice.toString() : "0",
       });
@@ -237,7 +240,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   useEffect(() => {
     // Skip this logic if initialShowAll was explicitly provided
     if (initialShowAll !== undefined) return;
-    
+
     if (isVisible && !showAll) {
       // Check if we have any tokens with balance
       const hasTokensWithBalance = allCollateralPositions.some((pos: CollateralPosition) => pos.balance > 0);
@@ -307,6 +310,11 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   const openWithdraw = (position: CollateralPosition) => {
     setSelectedCollateral(position);
     setSelectedAction("withdraw");
+  };
+
+  const openSwap = (position: CollateralPosition) => {
+    setSelectedCollateral(position);
+    setSelectedAction("swap");
   };
 
   // Handle closing the deposit modal
@@ -399,6 +407,31 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                     ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"} 
                     hover:bg-base-200/50 flex items-center overflow-hidden`}
                 >
+                  <div className="flex gap-1">
+                    <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openSwap(position); }}
+                        className="join-item group btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-start overflow-hidden rounded-none rounded-tl-lg hover:bg-primary/20 hover:text-primary transition-colors w-full"
+                        aria-label={`Swap ${position.name}`}
+                        title="Swap"
+                      >
+                        <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
+                          <FiRepeat className="w-3 h-3" />
+                        </div>
+                        <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
+                          Swap
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className="join-item btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-center overflow-hidden rounded-none rounded-bl-lg cursor-default opacity-0 w-full"
+                      >
+                        <span className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2 overflow-hidden flex-1 p-2">
                     <div className="avatar flex-shrink-0">
                       <div className="w-7 h-7 rounded-full bg-base-200 p-1.5 flex items-center justify-center overflow-hidden">
@@ -435,35 +468,44 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="join join-vertical">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); openDeposit(position); }}
-                      className="join-item group btn btn-xs btn-ghost px-2 h-7 min-h-0 flex items-center justify-center overflow-hidden rounded-none rounded-tr-lg hover:bg-primary/20 hover:text-primary transition-colors"
-                      aria-label={`Deposit ${position.name}`}
-                      title="Deposit"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 flex-shrink-0">
-                        <path d="M12 5c.414 0 .75.336.75.75V11.25H18.25a.75.75 0 010 1.5H12.75V18.25a.75.75 0 01-1.5 0V12.75H5.75a.75.75 0 010-1.5H11.25V5.75c0-.414.336-.75.75-.75z" />
-                      </svg>
-                      <span className="ml-1 max-w-0 group-hover:max-w-[90px] transition-all duration-200 overflow-hidden whitespace-nowrap">
-                        Deposit
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); openWithdraw(position); }}
-                      className="join-item group btn btn-xs btn-ghost px-2 h-7 min-h-0 flex items-center justify-center overflow-hidden rounded-none rounded-br-lg hover:bg-primary/20 hover:text-primary transition-colors"
-                      aria-label={`Withdraw ${position.name}`}
-                      title="Withdraw"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 flex-shrink-0">
-                        <path d="M5.75 12a.75.75 0 01.75-.75h11a.75.75 0 010 1.5h-11a.75.75 0 01-.75-.75z" />
-                      </svg>
-                      <span className="ml-1 max-w-0 group-hover:max-w-[90px] transition-all duration-200 overflow-hidden whitespace-nowrap">
-                        Withdraw
-                      </span>
-                    </button>
+                  <div className="flex gap-1">
+
+                    <div className="flex gap-1">
+                      <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openDeposit(position); }}
+                          className="join-item group btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-start overflow-hidden rounded-none rounded-tr-lg hover:bg-primary/20 hover:text-primary transition-colors w-full"
+                          aria-label={`Deposit ${position.name}`}
+                          title="Deposit"
+                        >
+                          <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                              <path d="M12 5c.414 0 .75.336.75.75V11.25H18.25a.75.75 0 010 1.5H12.75V18.25a.75.75 0 01-1.5 0V12.75H5.75a.75.75 0 010-1.5H11.25V5.75c0-.414.336-.75.75-.75z" />
+                            </svg>
+                          </div>
+                          <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
+                            Deposit
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openWithdraw(position); }}
+                          className="join-item group btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-start overflow-hidden rounded-none rounded-br-lg hover:bg-primary/20 hover:text-primary transition-colors w-full"
+                          aria-label={`Withdraw ${position.name}`}
+                          title="Withdraw"
+                        >
+                          <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                              <path d="M5.75 12a.75.75 0 01.75-.75h11a.75.75 0 010 1.5h-11a.75.75 0 01-.75-.75z" />
+                            </svg>
+                          </div>
+                          <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
+                            Withdraw
+                          </span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -531,6 +573,33 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           supplyBalance={selectedCollateral.balanceRaw}
           chainId={chainId}
           market={baseToken as `0x${string}`}
+        />
+      )}
+      {selectedCollateral && selectedAction === "swap" && (
+        <CollateralSwapModal
+          isOpen={!!selectedCollateral}
+          onClose={handleCloseModal}
+          protocolName="compound"
+          availableAssets={allCollateralPositions.map(p => ({
+            symbol: p.name,
+            address: p.address,
+            decimals: p.decimals,
+            rawBalance: p.balanceRaw,
+            balance: p.balance,
+            icon: p.icon,
+            usdValue: p.usdValue,
+            price: p.rawPrice,
+          }))}
+          initialFromTokenAddress={selectedCollateral.address}
+          chainId={chainId || 1}
+          market={baseToken as `0x${string}`}
+          position={{
+            name: selectedCollateral.name,
+            tokenAddress: selectedCollateral.address,
+            decimals: selectedCollateral.decimals,
+            balance: selectedCollateral.balance,
+            type: "supply"
+          }}
         />
       )}
     </>

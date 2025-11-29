@@ -13,8 +13,19 @@ library ProtocolTypes {
     }
 
     // Common lending instruction schema for gateways (deposit/withdraw/borrow/repay)
-    enum LendingOp { Deposit, DepositCollateral, WithdrawCollateral, Borrow, Repay, GetBorrowBalance, GetSupplyBalance }
-    struct InputPtr { uint256 index; }
+    enum LendingOp {
+        Deposit,
+        DepositCollateral,
+        WithdrawCollateral,
+        Borrow,
+        Repay,
+        GetBorrowBalance,
+        GetSupplyBalance,
+        Swap
+    }
+    struct InputPtr {
+        uint256 index;
+    }
     /**
      * Cross-protocol instruction.
      * - For Compound you can pass `context = abi.encode(address marketBaseToken)`
@@ -22,12 +33,10 @@ library ProtocolTypes {
      */
     struct LendingInstruction {
         LendingOp op;
-        address token;        // underlying being acted on (base or collateral)
-        address user;         // end user on whose account we operate
-        uint256 amount;       // amount in underlying units
-        bytes context;        // (optional) protocol-specific blob (e.g., Compound marketBaseToken)
-        InputPtr input;       // (optional) pointer to prior output (UTXO); use if index < inputs.length
+        address token; // underlying being acted on (base or collateral)
+        address user; // end user on whose account we operate
+        uint256 amount; // amount in underlying units
+        bytes context; // (optional) protocol-specific blob (e.g., Compound marketBaseToken)
+        InputPtr input; // (optional) pointer to prior output (UTXO); use if index < inputs.length
     }
 }
-
-

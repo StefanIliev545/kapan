@@ -17,6 +17,7 @@ import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { RefinanceModalContent } from "./RefinanceModalContent";
+import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 
 /* ------------------------------ Helpers ------------------------------ */
 type PriceMap = Record<string, bigint>;
@@ -38,10 +39,10 @@ const toUsdRaw = (amountRaw: bigint, decimals: number, p8: bigint): number => {
 const getLtBps = (c: any): number => {
   const v = Number(
     c?.liquidationThresholdBps ??
-      c?.collateralFactorBps ??
-      c?.ltBps ??
-      c?.ltvBps ??
-      8273
+    c?.collateralFactorBps ??
+    c?.ltBps ??
+    c?.ltvBps ??
+    8273
   );
   return Math.max(0, Math.min(10000, v));
 };
@@ -144,7 +145,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
     const existingMap = new Map(collateralsFromHook.map(c => [addrKey(c.address), c]));
     const merged = [...collateralsFromHook];
-    
+
     preSelectedCollaterals.forEach(pc => {
       const key = addrKey(pc.token);
       if (!existingMap.has(key)) {
@@ -217,8 +218,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     setActiveTab,
     selectedProtocol,
     setSelectedProtocol,
-    selectedProvider,
-    setSelectedProvider,
+    selectedProvider: _stateSelectedProvider,
+    setSelectedProvider: _stateSetSelectedProvider,
     selectedVersion,
     setSelectedVersion,
     expandedCollateral,
@@ -263,17 +264,38 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   const [selectedPool, setSelectedPool] = useState<string>("");
 
+  // Flash Loan Selection Hook
+  const debtAmountBigInt = useMemo(() => {
+    try {
+      return debtAmount ? parseUnits(debtAmount, position.decimals) : 0n;
+    } catch {
+      return 0n;
+    }
+  }, [debtAmount, position.decimals]);
+
+  const { selectedProvider: hookSelectedProvider, setSelectedProvider: setHookSelectedProvider } = useFlashLoanSelection({
+    flashLoanProviders,
+    defaultProvider: defaultFlashLoanProvider,
+    tokenAddress: position.tokenAddress,
+    amount: debtAmountBigInt,
+    chainId: chainId || 1,
+  });
+
+  const selectedProvider = hookSelectedProvider?.name;
+  const setSelectedProvider = (name: string) => {
+    const p = flashLoanProviders.find(p => p.name === name);
+    setHookSelectedProvider(p);
+  };
+
   /* ---------------------- Support map for selection --------------------- */
   const collateralAddresses = useMemo(() => collaterals.map(c => c.address), [collaterals]);
 
-  const { supportedCollaterals: supportFromHook } = useCollateralSupport(
+  const { supportedCollaterals: effectiveSupportedMap, isLoading: isSupportLoading } = useCollateralSupport(
     selectedProtocol || filteredDestinationProtocols[0]?.name || "",
     position.tokenAddress,
-    collateralAddresses,
+    collateralAddresses.map(a => a.toLowerCase()),
     isOpen && collateralAddresses.length > 0 && Boolean(selectedProtocol || filteredDestinationProtocols[0]?.name),
   );
-
-  const effectiveSupportedMap = supportFromHook;
 
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
@@ -313,6 +335,15 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     setPreferBatching(prev => (prev === next ? prev : next));
   }, [isOpen, canDoAtomicBatch, setPreferBatching]);
 
+  const [revokePermissions, setRevokePermissions] = useState(false);
+
+  // Auto-enable revoke permissions when batching is enabled
+  useEffect(() => {
+    if (preferBatching) {
+      setRevokePermissions(true);
+    }
+  }, [preferBatching]);
+
   const debtInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize preselected collaterals
@@ -351,12 +382,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     }
   }, [isOpen, filteredDestinationProtocols, selectedProtocol, setSelectedProtocol]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!selectedProvider && defaultFlashLoanProvider?.name) {
-      setSelectedProvider(defaultFlashLoanProvider.name);
-    }
-  }, [isOpen, selectedProvider, defaultFlashLoanProvider?.name, setSelectedProvider]);
+
 
   useEffect(() => {
     if (!isOpen) return;
@@ -532,7 +558,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [isOpen, needDebtProbe, position.tokenAddress, position.name, collaterals, mergedPrices, reportPrice]);
 
   /* --------------------------- Action Handlers --------------------------- */
-  const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
+  const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0 || Object.keys(addedCollaterals).some(addr => effectiveSupportedMap?.[addrKey(addr)] === false);
 
   const handleExecuteMove = async () => {
     if (!debtConfirmed || !selectedProtocol) return;
@@ -611,10 +637,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       });
 
       const flow = builder.build();
-      const res = await executeFlowBatchedIfPossible(flow, preferBatching);
+      const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions });
       batchingUsed = res?.kind === "batch";
       if (!res) {
-        const fallbackResult = await executeFlowBatchedIfPossible(flow, false);
+        const fallbackResult = await executeFlowBatchedIfPossible(flow, false, { revokePermissions });
         batchingUsed = batchingUsed || fallbackResult?.kind === "batch";
       }
 
@@ -700,7 +726,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       selectedProvider={selectedProvider ?? ""}
       setSelectedProvider={setSelectedProvider}
       collaterals={collaterals}
-      isLoadingCollaterals={isLoadingCollaterals}
+      isLoadingCollaterals={isLoadingCollaterals || isSupportLoading}
       effectiveSupportedMap={effectiveSupportedMap}
       addedCollaterals={addedCollaterals}
       expandedCollateral={expandedCollateral}
@@ -723,6 +749,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       showBatchingOption={true}
       preferBatching={preferBatching}
       setPreferBatching={setPreferBatching}
+      revokePermissions={revokePermissions}
+      setRevokePermissions={setRevokePermissions}
       apiProbes={apiProbes}
     />
   );

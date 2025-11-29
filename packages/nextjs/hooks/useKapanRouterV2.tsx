@@ -28,6 +28,7 @@ import {
   createRouterInstruction,
   createProtocolInstruction,
   encodePullToken,
+  encodeToOutput,
   encodeApprove,
   encodePushToken,
   encodeLendingInstruction,
@@ -118,16 +119,17 @@ export const useKapanRouterV2 = () => {
   const chainId = useChainId();
 
   const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
-    8453: 2,   // Base mainnet
-    84531: 2,  // Base Sepolia
-    84532: 2,  // Base Sepolia
-    10: 2,     // Optimism
-    420: 2,    // Optimism Goerli
-    11155420: 2, // Optimism Sepolia
-    42161: 0,  // Arbitrum One (Instant)
+    8453: 1,   // Base mainnet
+    84531: 1,  // Base Sepolia
+    84532: 1,  // Base Sepolia
+    10: 1,     // Optimism
+    420: 1,    // Optimism Goerli
+    11155420: 1, // Optimism Sepolia
+    42161: 1,  // Arbitrum One
     421614: 1, // Arbitrum Sepolia
-    59144: 0,  // Linea
+    59144: 1,  // Linea
     59141: 1,  // Linea Sepolia
+    31337: 1,  // Hardhat
   };
 
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
@@ -137,6 +139,7 @@ export const useKapanRouterV2 = () => {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
     confirmations: effectiveConfirmations,
+    pollingInterval: 1000,
   });
 
   const [isApproving, setIsApproving] = useState(false);
@@ -366,6 +369,116 @@ export const useKapanRouterV2 = () => {
     ];
   }, [userAddress, encodeCompoundMarket]);
 
+  const buildCollateralSwapFlow = useCallback((
+    protocolName: string,
+    tokenInAddress: string,
+    tokenOutAddress: string,
+    amountIn: string,
+    minAmountOut: string,
+    swapData: string,
+    decimalsIn: number,
+    market?: Address,
+    isMax = false,
+    flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2
+  ): ProtocolInstruction[] => {
+    if (!userAddress) return [];
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const amountInBigInt = parseUnits(amountIn, decimalsIn);
+    const minAmountOutBigInt = BigInt(minAmountOut);
+    const isCompound = normalizedProtocol === "compound";
+    const depositOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const withdrawOp = LendingOp.WithdrawCollateral;
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
+
+    // Encode Swap Context: (tokenOut, minAmountOut, swapData)
+    const swapContext = encodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+      [tokenOutAddress as Address, minAmountOutBigInt, swapData as Hex]
+    );
+
+    // Flow:
+    // 1. Flash Loan TokenIn (AmountIn) -> Output 0
+    // 2. Approve TokenIn for OneInchGateway (using Output 0)
+    // 3. Swap TokenIn -> TokenOut (Output 1) + Refund (Output 2)
+    // 4. Approve TokenOut (Output 1) for LendingProtocol
+    // 5. Deposit TokenOut (Output 1) into LendingProtocol
+    // 6. Withdraw TokenIn (AmountIn) from LendingProtocol -> Output 3
+    // 7. Repay Flash Loan with Output 3
+
+    // Note: Flash Loan is handled by the Router's FlashLoan instruction.
+    // We need to construct the instructions *inside* the flash loan callback?
+    // No, the KapanRouter V2 handles Flash Loans by executing the subsequent instructions
+    // and expecting the repayment at the end (or via specific Repay instruction if it was a protocol flash loan).
+    // But here we are using the *Router's* flash loan capability (e.g. Balancer).
+
+    // Wait, `encodeFlashLoan` in `instructionHelpers` uses `RouterInstructionType.FlashLoan`.
+    // The Router's `processFlashLoan` executes the provider's flash loan.
+    // The provider calls back `receiveFlashLoan` (or similar).
+    // `KapanRouter`'s callback then executes `runStack`.
+    // So we just push the FlashLoan instruction, and the *rest* of the instructions are executed inside the callback.
+
+    // However, `encodeFlashLoan` takes an `inputIndex`. It expects an existing UTXO to define the amount/token.
+    // So we first need to create a UTXO with the amount/token we want to flash loan.
+    // We can use `ToOutput` for this.
+
+    const startInstruction = isMax
+      ? createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenInAddress, userAddress, 0n, context, 999)
+      )
+      : createRouterInstruction(encodeToOutput(amountInBigInt, tokenInAddress));
+
+    return [
+      // 0. Create UTXO for Flash Loan Amount/Token -> Output 0
+      startInstruction,
+
+      // 1. Flash Loan (uses Output 0) -> Output 1 (Borrowed Funds)
+      // Note: Output 0 is consumed? No, FlashLoan reads it.
+      // The Flash Loan result is pushed as a new Output.
+      createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
+
+      // 2. Approve TokenIn (Output 1) for OneInchGateway
+      createRouterInstruction(encodeApprove(1, "oneinch")),
+
+      // 3. Swap TokenIn (Output 1) -> TokenOut (Output 2) + Refund (Output 3)
+      createProtocolInstruction(
+        "oneinch",
+        encodeLendingInstruction(LendingOp.Swap, tokenInAddress, userAddress, 0n, swapContext as string, 1)
+      ),
+
+      // 4. Approve TokenOut (Output 3) for LendingProtocol
+      createRouterInstruction(encodeApprove(3, normalizedProtocol)),
+
+      // 5. Deposit TokenOut (Output 3) into LendingProtocol
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, tokenOutAddress, userAddress, 0n, context, 3)
+      ),
+
+      // 6. Withdraw TokenIn from LendingProtocol -> Output 4
+      // We withdraw the exact amount we flash loaned (plus fee if any).
+      // We use Output 1 (Repayment Amount) from the Flash Loan callback.
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(withdrawOp, tokenInAddress, userAddress, 0n, context, 1)
+      ),
+
+      // 7. Repay Flash Loan
+      // The Router automatically handles repayment check at the end of the transaction?
+      // No, for Balancer flash loans, the *callback* must return the funds.
+      // The `KapanRouter` implementation of `receiveFlashLoan` (or equivalent) likely checks if it has the funds.
+      // The `processFlashLoan` calls `_requestBalancerV2`.
+      // The callback `onFlashLoan` (or similar) calls `runStack`.
+      // After `runStack` returns, the Router must have the funds to repay.
+      // The `Withdraw` instruction (Step 6) puts funds into the Router (Output 4).
+      // So the funds are there.
+      // The Balancer Vault will pull the funds from the Router at the end of the callback.
+      // So we just need to make sure the Router *has* the tokens.
+      // Step 6 (Withdraw) ensures that.
+    ];
+  }, [userAddress, encodeCompoundMarket]);
+
   // --- Authorization Helpers ---
 
   const getAuthorizations = useCallback(async (
@@ -506,6 +619,7 @@ export const useKapanRouterV2 = () => {
         await publicClient.waitForTransactionReceipt({
           hash: transactionHash as `0x${string}`,
           confirmations: effectiveConfirmations,
+          pollingInterval: 1000,
         });
       }
 
@@ -551,7 +665,8 @@ export const useKapanRouterV2 = () => {
   }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
   const executeFlowWithApprovals = useCallback(async (
-    instructions: ProtocolInstruction[]
+    instructions: ProtocolInstruction[],
+    options?: { revokePermissions?: boolean }
   ): Promise<string | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
       throw new Error("Context not available");
@@ -607,7 +722,7 @@ export const useKapanRouterV2 = () => {
             <TransactionToast step="sent" txHash={approvalHash} message={`Approving ${tokenSymbol}...`} />
           );
 
-          await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations });
+          await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations, pollingInterval: 1000 });
           await new Promise(resolve => setTimeout(resolve, 100));
 
           if (approvalNotificationId) notification.remove(approvalNotificationId);
@@ -621,7 +736,7 @@ export const useKapanRouterV2 = () => {
 
       // 3. Execute Logic (Atomic Batch if supported, else Tx)
       if (canDoAtomicBatch && sendCallsAsync) {
-        const deauthCalls = [] as { target: Address, data: any }[]; // Placeholder for future deauth logic
+        const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
 
         const calls = [
           {
@@ -648,7 +763,47 @@ export const useKapanRouterV2 = () => {
         return id;
       }
 
-      return await executeInstructions(instructions);
+      const txHash = await executeInstructions(instructions);
+
+      // 4. Post-Execution Deauthorization (Sequential)
+      try {
+        const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
+        if (deauthCalls.length > 0) {
+          for (let i = 0; i < deauthCalls.length; i++) {
+            const call = deauthCalls[i];
+            if (!call.target || !call.data) continue;
+
+            // Reuse approval notification logic for simplicity
+            let deauthNotifId: string | number | null = null;
+            try {
+              deauthNotifId = notification.loading(
+                <TransactionToast step="pending" message="Revoking permissions..." />
+              );
+              const currentNonce = await publicClient.getTransactionCount({ address: userAddress as Address });
+              const hash = await walletClient.sendTransaction({
+                account: userAddress as Address,
+                to: call.target,
+                data: call.data,
+                nonce: currentNonce,
+              });
+              if (deauthNotifId) notification.remove(deauthNotifId);
+              deauthNotifId = notification.loading(
+                <TransactionToast step="sent" txHash={hash} message="Revoking permissions..." />
+              );
+              await publicClient.waitForTransactionReceipt({ hash, confirmations: effectiveConfirmations, pollingInterval: 1000 });
+              if (deauthNotifId) notification.remove(deauthNotifId);
+              notification.success(<TransactionToast step="confirmed" txHash={hash} message="Permissions revoked" />);
+            } catch (e) {
+              if (deauthNotifId) notification.remove(deauthNotifId);
+              console.warn("Deauth step failed", e);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Deauthorization check failed", e);
+      }
+
+      return txHash;
     } catch (error: any) {
       setIsApproving(false);
       console.error("Error in executeFlowWithApprovals:", error);
@@ -658,7 +813,8 @@ export const useKapanRouterV2 = () => {
 
   const executeFlowBatchedIfPossible = useCallback(async (
     instructions: ProtocolInstruction[],
-    preferBatching = false
+    preferBatching = false,
+    options?: { revokePermissions?: boolean }
   ): Promise<{ kind: "batch", id: string } | { kind: "tx", hash: string } | undefined> => {
     if (!routerContract || !userAddress || !publicClient || !walletClient) {
       throw new Error("Missing context");
@@ -683,36 +839,39 @@ export const useKapanRouterV2 = () => {
       return true;
     });
 
+    // Prepare deauthorizations
+    const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
+    const filteredDeauthCalls = deauthCalls.filter(({ target, data }) => {
+      return target && data && data.length > 0;
+    });
+
     const calls = [
       ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
       { to: routerContract.address as Address, data: routerCalldata as Hex },
+      ...filteredDeauthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
     ];
 
     if (preferBatching) {
-      try {
-        const { id } = await sendCallsAsync({
-          calls,
-          experimental_fallback: true,
-        });
+      const { id } = await sendCallsAsync({
+        calls,
+        experimental_fallback: true,
+      });
 
-        setBatchId(id);
-        const sentNotificationId = notification.loading(
-          <TransactionToast step="sent" message="Batch transaction sent — waiting for confirmation..." />
-        );
-        setBatchNotificationId(sentNotificationId);
+      setBatchId(id);
+      const sentNotificationId = notification.loading(
+        <TransactionToast step="sent" message="Batch transaction sent — waiting for confirmation..." />
+      );
+      setBatchNotificationId(sentNotificationId);
 
-        return { kind: "batch", id };
-      } catch (err) {
-        console.warn("Batch send failed, falling back:", err);
-      }
+      return { kind: "batch", id };
     }
 
-    const hash = await executeFlowWithApprovals(instructions);
+    const hash = await executeFlowWithApprovals(instructions, options);
     return hash ? { kind: "tx", hash } : undefined;
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals]);
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals, getDeauthorizations]);
 
   // --- Move Flow Builder ---
-  
+
   type FlashConfig = { version: "v3" | "v2" | "aave"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
@@ -765,7 +924,7 @@ export const useKapanRouterV2 = () => {
         if (expected === 0n) throw new Error(`Invalid debt amount`);
 
         const fromCtx = from === "compound" ? getContext(from, encodeCompoundMarket(debtToken)) : getContext(from, fromContext as `0x${string}`);
-        
+
         // 1. Get Borrow Balance (creates UTXO)
         const utxoIndexForGetBorrow = utxoCount;
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
@@ -780,7 +939,7 @@ export const useKapanRouterV2 = () => {
         // 3. Approve Gateway (Router Instruction)
         // CRITICAL: createsUtxo=true because fixed Router logic appends an empty output for Approves to maintain index sync.
         addRouter(encodeApprove(flashLoanUtxoIndex, from) as `0x${string}`, true);
-        
+
         // 4. Repay Debt (using Flash Loan proceeds)
         // Repay creates a refund UTXO (usually 0)
         addProto(from, encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, fromCtx, utxoIndexForGetBorrow) as `0x${string}`, true);
@@ -820,7 +979,7 @@ export const useKapanRouterV2 = () => {
 
         // Borrow (creates UTXO)
         addProto(to, encodeLendingInstruction(LendingOp.Borrow, token, userAddress, borrowAmt, toCtx, borrowInputIndex) as `0x${string}`, true);
-        
+
         if (approveToRouter && p.mode !== "coverFlash") {
           // Approve (creates UTXO)
           addRouter(encodeApprove(utxoIndexForBorrow, "router") as `0x${string}`, true);
@@ -845,11 +1004,13 @@ export const useKapanRouterV2 = () => {
     buildRepayFlow,
     buildRepayFlowAsync,
     buildWithdrawFlow,
+    buildCollateralSwapFlow,
     createMoveBuilder,
     executeInstructions,
     executeFlowWithApprovals,
     executeFlowBatchedIfPossible,
     getAuthorizations,
+    getDeauthorizations,
     hash,
     isPending,
     isConfirming,

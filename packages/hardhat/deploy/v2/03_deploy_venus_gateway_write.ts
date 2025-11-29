@@ -18,16 +18,20 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
   const VENUS: Record<number, { COMPTROLLER: string; ORACLE: string }> = {
     42161: { // Arbitrum One
       COMPTROLLER: "0x317c1A5739F39046E20b08ac9BeEa3f10fD43326",
-      ORACLE:      "0xd55A98150e0F9f5e3F6280FC25617A5C93d96007",
+      ORACLE: "0xd55A98150e0F9f5e3F6280FC25617A5C93d96007",
     },
     8453: { // Base
       COMPTROLLER: "0x0C7973F9598AA62f9e03B94E92C967fD5437426C",
-      ORACLE:      "0xcBBf58bD5bAdE357b634419B70b215D5E9d6FbeD",
+      ORACLE: "0xcBBf58bD5bAdE357b634419B70b215D5E9d6FbeD",
     },
     130: {
       COMPTROLLER: "0xe22af1e6b78318e1Fe1053Edbd7209b8Fc62c4Fe",
-      ORACLE:      "0x86D04d6FE928D888076851122dc6739551818f7E",
-    },    
+      ORACLE: "0x86D04d6FE928D888076851122dc6739551818f7E",
+    },
+    31337: { // Hardhat (Forking Arbitrum)
+      COMPTROLLER: "0x317c1A5739F39046E20b08ac9BeEa3f10fD43326",
+      ORACLE: "0xd55A98150e0F9f5e3F6280FC25617A5C93d96007",
+    },
   };
 
   const entry = VENUS[chainId];
@@ -38,7 +42,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   // Env can override addresses for recognized chains
   const VENUS_COMPTROLLER = process.env.VENUS_COMPTROLLER || entry.COMPTROLLER;
-  const VENUS_ORACLE      = process.env.VENUS_ORACLE || entry.ORACLE;
+  const VENUS_ORACLE = process.env.VENUS_ORACLE || entry.ORACLE;
 
   const kapanRouter = await get("KapanRouter");
   const WAIT = 3;

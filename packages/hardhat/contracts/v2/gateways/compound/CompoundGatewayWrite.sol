@@ -201,17 +201,8 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
             }
 
             if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                uint256 required = amount;
-                uint256 cur = IERC20(token).allowance(caller, address(this));
-
-                if (amount != 0 && cur >= required) {
-                    targets[i] = address(0);
-                    data[i] = bytes("");
-                } else {
-                    targets[i] = token;
-                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), required);
-                }
-
+                targets[i] = address(0);
+                data[i] = bytes("");
                 // Repay produces output
                 if (ins.op == ProtocolTypes.LendingOp.Repay) {
                     produced[pIdx] = ProtocolTypes.Output({ token: token, amount: 0 });
@@ -222,16 +213,8 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
                 ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
                 (ins.op == ProtocolTypes.LendingOp.Deposit && market != address(0) && market != token)
             ) {
-                address col = token;
-                uint256 required = amount;
-                uint256 cur = IERC20(col).allowance(caller, address(this));
-                if (amount != 0 && cur >= required) {
-                    targets[i] = address(0);
-                    data[i] = bytes("");
-                } else {
-                    targets[i] = col;
-                    data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), required);
-                }
+                targets[i] = address(0);
+                data[i] = bytes("");
                 // DepositCollateral produces NO output
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address base = market != address(0) ? market : token;
@@ -288,11 +271,39 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
 
     function deauthorize(
         ProtocolTypes.LendingInstruction[] calldata instrs,
-        address /*caller*/
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata inputs
     ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
-        // Deauthorization disabled for now
+
+        for (uint256 i = 0; i < instrs.length; i++) {
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            address market = _decodeMarket(ins.context);
+            address token = ins.token;
+            if (ins.input.index < inputs.length) {
+                token = inputs[ins.input.index].token;
+            }
+
+            if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+                address base = market != address(0) ? market : token;
+                ICompoundComet comet = tokenToComet[base];
+                if (address(comet) != address(0)) {
+                    targets[i] = address(comet);
+                    // allow(manager, isAllowed) -> false
+                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
+                }
+            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+                ICompoundComet comet = tokenToComet[token];
+                if (address(comet) != address(0)) {
+                    targets[i] = address(comet);
+                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), false);
+                }
+            } else {
+                targets[i] = address(0);
+                data[i] = bytes("");
+            }
+        }
     }
 
     function _decodeMarket(bytes memory ctx) internal pure returns (address market) {

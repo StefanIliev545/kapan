@@ -26,6 +26,7 @@ const NETWORK_TO_CHAIN_ID: Record<string, number> = {
   base: 8453,
   optimism: 10,
   linea: 59144,
+  hardhat: 31337,
 };
 
 // --- tweakable behavior flags ---
@@ -84,7 +85,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         // cache
         try {
           localStorage.setItem(STORAGE_KEY, urlNetwork!);
-        } catch {}
+        } catch { }
         // non-blocking wallet network switch
         const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
         if (chainId && chainId !== chain?.id) {
@@ -115,7 +116,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
         if (isValid(cached)) initial = cached!;
-      } catch {}
+      } catch { }
     }
 
     if (initial && initial !== selectedRef.current) {
@@ -149,7 +150,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       onNetworkChange(urlNetwork!);
       try {
         localStorage.setItem(STORAGE_KEY, urlNetwork!);
-      } catch {}
+      } catch { }
       const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
       if (chainId && chainId !== chain?.id) {
         try {
@@ -189,7 +190,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     // Persist to cache
     try {
       localStorage.setItem(STORAGE_KEY, networkId);
-    } catch {}
+    } catch { }
 
     // Switch wallet network if it's an EVM network (non-blocking)
     const chainId = NETWORK_TO_CHAIN_ID[networkId];
@@ -230,11 +231,10 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
               type="button"
               aria-pressed={isActive}
               // Keep dimensions stable to avoid “jump” when styles change:
-              className={`btn btn-sm normal-case inline-flex items-center gap-2 ${
-                isActive ? "btn-primary" : "btn-outline" // outline keeps width/border consistent
-              }`}
+              className={`btn btn-sm normal-case inline-flex items-center gap-2 ${isActive ? "btn-primary" : "btn-outline" // outline keeps width/border consistent
+                }`}
               onClick={() => handleNetworkChange(network.id)}
-              // Don’t globally disable other buttons; let people click around quickly.
+            // Don’t globally disable other buttons; let people click around quickly.
             >
               <div className="w-5 h-5 relative">
                 <Image

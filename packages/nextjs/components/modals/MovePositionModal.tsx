@@ -58,11 +58,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const protocols = [
     { name: "Aave V3" },
     { name: "Compound V3" },
-    ...(isLinea 
+    ...(isLinea
       ? [{ name: "ZeroLend" }]
       : isBase
-      ? [{ name: "ZeroLend" }, { name: "Venus" }]
-      : [{ name: "Venus" }]
+        ? [{ name: "ZeroLend" }, { name: "Venus" }]
+        : [{ name: "Venus" }]
     ),
   ];
 
@@ -77,7 +77,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   // Check which flash loan providers are available on the router using enabled functions
   // These are view functions in FlashLoanConsumerBase that check if addresses are non-zero
   const { data: routerContract } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as any });
-  
+
   const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useReadContract({
     address: routerContract?.address as `0x${string}` | undefined,
     abi: routerContract?.abi,
@@ -109,21 +109,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   // Only include providers once we've finished loading their status
   const availableFlashLoanProviders = useMemo(() => {
     const providers: FlashLoanProvider[] = [];
-    
+
     // Only check if we're not loading (to avoid showing providers that will be filtered out)
     // Also check chain support - Balancer is not available on Linea
     if (!isLoadingBalancerV2 && balancerV2Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
       providers.push(ALL_FLASH_LOAN_PROVIDERS[0]);
     }
-    
+
     if (!isLoadingBalancerV3 && balancerV3Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
       providers.push(ALL_FLASH_LOAN_PROVIDERS[1]);
     }
-    
+
     if (!isLoadingAave && aaveEnabled === true && chainId && AAVE_CHAINS.includes(chainId)) {
       providers.push(ALL_FLASH_LOAN_PROVIDERS[2]);
     }
-    
+
     return providers;
   }, [balancerV2Enabled, balancerV3Enabled, aaveEnabled, isLoadingBalancerV2, isLoadingBalancerV3, isLoadingAave, chainId]);
 
@@ -203,6 +203,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   // Move position hook with modular builder
   const { createMoveBuilder, executeFlowBatchedIfPossible } = useKapanRouterV2();
   const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
+  const [revokePermissions, setRevokePermissions] = useState(false);
+
+  // Auto-enable revoke permissions when batching is enabled
+  useEffect(() => {
+    if (preferBatching) {
+      setRevokePermissions(true);
+    }
+  }, [preferBatching]);
 
   // Map protocol names to gateway view contract names
   const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView"> = {
@@ -343,7 +351,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
       if (position.type === "borrow") {
         // Calculate debt amount
-        const debtAmountStr = isRepayingAll 
+        const debtAmountStr = isRepayingAll
           ? formatUnits(tokenBalance as bigint, decimals as number)
           : amount;
 
@@ -397,7 +405,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         });
 
         // Execute the flow with automatic approvals (batched when supported)
-        await executeFlowBatchedIfPossible(builder.build(), preferBatching);
+        await executeFlowBatchedIfPossible(builder.build(), preferBatching, { revokePermissions });
 
         setStep("done");
         // Close modal after a short delay on success
@@ -679,8 +687,8 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
         </div>
         <div className="flex flex-col items-end gap-3 pt-6 mt-auto">
           {isPreferenceLoaded && (
-            <div className="pb-1">
-              <label className="label cursor-pointer gap-2 justify-end">
+            <div className="pb-1 flex flex-col items-end gap-1">
+              <label className="label cursor-pointer gap-2 justify-end p-0">
                 <input
                   type="checkbox"
                   checked={preferBatching}
@@ -689,12 +697,20 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 />
                 <span className="label-text text-xs">Batch Transactions with Smart Account</span>
               </label>
+              <label className="label cursor-pointer gap-2 justify-end p-0">
+                <input
+                  type="checkbox"
+                  checked={revokePermissions}
+                  onChange={(e) => setRevokePermissions(e.target.checked)}
+                  className="checkbox checkbox-sm"
+                />
+                <span className="label-text text-xs">Revoke permissions after execution</span>
+              </label>
             </div>
           )}
           <button
-            className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${
-              loading ? "animate-pulse" : ""
-            }`}
+            className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${loading ? "animate-pulse" : ""
+              }`}
             onClick={step === "done" ? onClose : handleMoveDebt}
             disabled={step === "done" ? false : isActionDisabled}
           >

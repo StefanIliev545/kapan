@@ -3,6 +3,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { FiCheck, FiAlertTriangle } from "react-icons/fi";
 import { formatUnits } from "viem";
+import { SegmentedActionBar } from "../common/SegmentedActionBar";
 
 /* ------------------------------ Helpers ------------------------------ */
 const clampAmount = (value: string, max?: string) => {
@@ -50,7 +51,7 @@ type VesuPools = {
 export type RefinanceModalContentProps = {
   isOpen: boolean;
   onClose: () => void;
-  
+
   // Debt section
   debtSymbol: string;
   debtIcon: string;
@@ -63,12 +64,12 @@ export type RefinanceModalContentProps = {
   debtInputRef: React.RefObject<HTMLInputElement>;
   sourceProtocol: Protocol;
   setIsDebtMaxClicked: (value: boolean) => void;
-  
+
   // Tabs
   activeTab: "protocol" | "flashloan";
   setActiveTab: (tab: "protocol" | "flashloan") => void;
   showFlashLoanTab: boolean;
-  
+
   // Protocol selection
   filteredDestinationProtocols: Protocol[];
   selectedProtocol: string;
@@ -77,22 +78,22 @@ export type RefinanceModalContentProps = {
   setSelectedVersion: (version: "v1" | "v2") => void;
   vesuPools?: VesuPools;
   sourcePoolName: string | null;
-  
+
   // EVM-specific pool selection
   selectedPool?: string;
   setSelectedPool?: (pool: string) => void;
-  
+
   // Starknet-specific pool selection
   selectedPoolId?: bigint;
   setSelectedPoolId?: (id: bigint) => void;
   selectedV2PoolAddress?: string;
   setSelectedV2PoolAddress?: (address: string) => void;
-  
+
   // Flash loan providers (EVM only)
   flashLoanProviders: FlashLoanProvider[];
   selectedProvider: string;
   setSelectedProvider: (provider: string) => void;
-  
+
   // Collaterals
   collaterals: Collateral[];
   isLoadingCollaterals: boolean;
@@ -114,27 +115,29 @@ export type RefinanceModalContentProps = {
     inputValue?: string;
   }>;
   getUsdValue: (address: string, amount: string) => number;
-  
+
   // Stats
   refiHF: number;
   hfColor: { tone: string; badge: string };
   totalCollateralUsd: number;
   ltv: string;
   debtUsd: number;
-  
+
   // Actions
   isActionDisabled: boolean;
   isSubmitting: boolean;
   handleExecuteMove: () => void;
-  
+
   // Network-specific options
   showBatchingOption: boolean;
   preferBatching: boolean;
   setPreferBatching?: React.Dispatch<React.SetStateAction<boolean>>;
-  
+  revokePermissions?: boolean;
+  setRevokePermissions?: React.Dispatch<React.SetStateAction<boolean>>;
+
   // Error display
   errorMessage?: string;
-  
+
   // Price probes (invisible)
   apiProbes?: ReactNode;
 };
@@ -196,6 +199,8 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   showBatchingOption,
   preferBatching,
   setPreferBatching,
+  revokePermissions,
+  setRevokePermissions,
   errorMessage,
   apiProbes,
 }) => {
@@ -326,7 +331,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                         <div className="flex items-center gap-2 flex-nowrap min-w-0">
                           <Image src={p.logo} alt={p.name} width={24} height={24} className="rounded flex-shrink-0" />
                           <span className="text-sm whitespace-nowrap flex-shrink-0">{p.name}</span>
-                          
+
                           {(isSelected && isVesu && vesuPools) && (
                             <div className="flex items-center gap-1 flex-nowrap ml-auto flex-shrink-0">
                               {/* Version toggle */}
@@ -373,24 +378,24 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                                 >
                                   {selectedVersion === "v1"
                                     ? vesuPools.v1Pools
-                                        .filter(pool => pool.name !== sourcePoolName)
-                                        .map(pool => (
-                                          <option key={pool.name} value={pool.name}>
-                                            {pool.name}
-                                          </option>
-                                        ))
+                                      .filter(pool => pool.name !== sourcePoolName)
+                                      .map(pool => (
+                                        <option key={pool.name} value={pool.name}>
+                                          {pool.name}
+                                        </option>
+                                      ))
                                     : vesuPools.v2Pools
-                                        .filter(pool => pool.name !== sourcePoolName)
-                                        .map(pool => (
-                                          <option key={pool.name} value={pool.name}>
-                                            {pool.name}
-                                          </option>
-                                        ))}
+                                      .filter(pool => pool.name !== sourcePoolName)
+                                      .map(pool => (
+                                        <option key={pool.name} value={pool.name}>
+                                          {pool.name}
+                                        </option>
+                                      ))}
                                 </select>
                               ) : (
                                 <select
                                   className="select select-bordered select-xs flex-shrink-0 w-auto max-w-[140px] min-w-[100px] text-xs"
-                                  value={selectedVersion === "v1" 
+                                  value={selectedVersion === "v1"
                                     ? vesuPools.v1Pools.find(p => p.id === selectedPoolId)?.name || ""
                                     : vesuPools.v2Pools.find(p => p.address === selectedV2PoolAddress)?.name || ""}
                                   onChange={e => {
@@ -406,19 +411,19 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                                 >
                                   {selectedVersion === "v1"
                                     ? vesuPools.v1Pools
-                                        .filter(pool => pool.name !== sourcePoolName)
-                                        .map(pool => (
-                                          <option key={pool.name} value={pool.name}>
-                                            {pool.name}
-                                          </option>
-                                        ))
+                                      .filter(pool => pool.name !== sourcePoolName)
+                                      .map(pool => (
+                                        <option key={pool.name} value={pool.name}>
+                                          {pool.name}
+                                        </option>
+                                      ))
                                     : vesuPools.v2Pools
-                                        .filter(pool => pool.name !== sourcePoolName)
-                                        .map(pool => (
-                                          <option key={pool.name} value={pool.name}>
-                                            {pool.name}
-                                          </option>
-                                        ))}
+                                      .filter(pool => pool.name !== sourcePoolName)
+                                      .map(pool => (
+                                        <option key={pool.name} value={pool.name}>
+                                          {pool.name}
+                                        </option>
+                                      ))}
                                 </select>
                               )}
                             </div>
@@ -479,20 +484,19 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
               ) : (
                 (disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0
                   ? collaterals.filter(c =>
-                      preSelectedCollaterals.some(pc => addrKey(pc.token) === addrKey(c.address)),
-                    )
+                    preSelectedCollaterals.some(pc => addrKey(pc.token) === addrKey(c.address)),
+                  )
                   : collaterals
                 ).map(c => {
                   const key = addrKey(c.address);
-                  const supported = effectiveSupportedMap?.[key] ?? true;
+                  const supported = effectiveSupportedMap?.[key] ?? false;
                   const isAdded = Boolean(addedCollaterals[key]);
                   const isExpanded = expandedCollateral === key;
 
                   return (
                     <div
                       key={c.address}
-                        className={`p-2 border rounded ${isExpanded ? "col-span-2" : ""} ${
-                        isAdded ? "border-success bg-success/10" : supported ? "border-base-300" : "border-error/50 opacity-60"
+                      className={`p-2 border rounded ${isExpanded ? "col-span-2" : ""} ${isAdded ? "border-success bg-success/10" : supported ? "border-base-300" : "border-error/50 opacity-60"
                         } ${c.balance <= 0 ? "opacity-50 cursor-not-allowed" : disableCollateralSelection ? "cursor-default" : "cursor-pointer"}`}
                       onClick={() => {
                         if (c.balance <= 0 || disableCollateralSelection) return;
@@ -507,13 +511,13 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                           {c.symbol}
                           {isAdded && <span className="text-success">✓</span>}
                         </span>
-                          {!supported && <span className="badge badge-error badge-outline badge-xs ml-1">Not supported</span>}
+                        {!supported && <span className="badge badge-error badge-outline badge-xs ml-1">Not supported</span>}
                         <span className="ml-auto text-sm text-base-content/70">
-                            {addedCollaterals[key]
-                              ? `$${getUsdValue(c.address, addedCollaterals[key]).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}`
+                          {addedCollaterals[key]
+                            ? `$${getUsdValue(c.address, addedCollaterals[key]).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`
                             : `${c.balance.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
                         </span>
                       </div>
@@ -526,7 +530,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                               value={tempAmount}
                               onChange={e => {
                                 setTempIsMax(false);
-                                  setTempAmount(clampAmount(e.target.value, String(c.balance)));
+                                setTempAmount(clampAmount(e.target.value, String(c.balance)));
                               }}
                               onKeyDown={e => e.key === "Enter" && onAddCollateral(c.address, c.balance)}
                               placeholder="0.00"
@@ -561,7 +565,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                               value={tempAmount || ""}
                               onChange={e => {
                                 setTempIsMax(false);
-                                  setTempAmount(clampAmount(e.target.value, String(c.balance)));
+                                setTempAmount(clampAmount(e.target.value, String(c.balance)));
                               }}
                               placeholder="0.00"
                               className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-20 outline-none text-base-content"
@@ -569,9 +573,9 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                             />
                             <button
                               className="absolute right-2 top-1/2 -translate-y-1/2 text-primary"
-                                onClick={() => {
+                              onClick={() => {
                                 setTempIsMax(true);
-                                  setTempAmount(formatUnits(c.rawBalance, c.decimals));
+                                setTempAmount(formatUnits(c.rawBalance, c.decimals));
                               }}
                             >
                               {c.balance.toLocaleString(undefined, { maximumFractionDigits: 6 })}
@@ -633,28 +637,47 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
           {/* Action */}
           <div className="pt-2 flex items-center justify-between">
             {showBatchingOption && setPreferBatching && (
-              <button
-                type="button"
-                onClick={() => setPreferBatching(prev => !prev)}
-                className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${
-                  preferBatching ? "text-success" : "text-base-content/60"
-                }`}
-              >
-                <FiCheck className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
-                Batch transactions
-              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPreferBatching(prev => !prev)}
+                  className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"
+                    }`}
+                >
+                  <FiCheck className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                  Batch transactions
+                </button>
+                {setRevokePermissions && (
+                  <button
+                    type="button"
+                    onClick={() => setRevokePermissions(prev => !prev)}
+                    className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${revokePermissions ? "text-success" : "text-base-content/60"
+                      }`}
+                  >
+                    <FiCheck className={`w-4 h-4 ${revokePermissions ? "" : "opacity-40"}`} />
+                    Revoke permissions
+                  </button>
+                )}
+              </div>
             )}
             {!showBatchingOption && <div />}
 
-            <button
-              className={`btn btn-primary ${isSubmitting ? "loading" : ""} ${
-                isActionDisabled ? "btn-disabled" : ""
-              }`}
-              onClick={handleExecuteMove}
-              disabled={isActionDisabled || isSubmitting}
-            >
-              {isSubmitting ? "Processing..." : "Refinance"}
-            </button>
+            <div className="flex-1 ml-4">
+              <SegmentedActionBar
+                className="w-full"
+                autoCompact
+                actions={[
+                  {
+                    key: "refinance",
+                    label: isSubmitting ? "Processing..." : "Refinance",
+                    icon: isSubmitting ? <span className="loading loading-spinner loading-xs" /> : undefined,
+                    onClick: handleExecuteMove,
+                    disabled: isActionDisabled || isSubmitting,
+                    variant: "ghost",
+                  },
+                ]}
+              />
+            </div>
           </div>
         </div>
       </div>
