@@ -852,22 +852,18 @@ export const useKapanRouterV2 = () => {
     ];
 
     if (preferBatching) {
-      try {
-        const { id } = await sendCallsAsync({
-          calls,
-          experimental_fallback: true,
-        });
+      const { id } = await sendCallsAsync({
+        calls,
+        experimental_fallback: true,
+      });
 
-        setBatchId(id);
-        const sentNotificationId = notification.loading(
-          <TransactionToast step="sent" message="Batch transaction sent — waiting for confirmation..." />
-        );
-        setBatchNotificationId(sentNotificationId);
+      setBatchId(id);
+      const sentNotificationId = notification.loading(
+        <TransactionToast step="sent" message="Batch transaction sent — waiting for confirmation..." />
+      );
+      setBatchNotificationId(sentNotificationId);
 
-        return { kind: "batch", id };
-      } catch (err) {
-        console.warn("Batch send failed, falling back:", err);
-      }
+      return { kind: "batch", id };
     }
 
     const hash = await executeFlowWithApprovals(instructions, options);

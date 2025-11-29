@@ -640,7 +640,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions });
       batchingUsed = res?.kind === "batch";
       if (!res) {
-        await executeFlowBatchedIfPossible(flow, false, { revokePermissions });
+        const fallbackResult = await executeFlowBatchedIfPossible(flow, false, { revokePermissions });
         batchingUsed = batchingUsed || fallbackResult?.kind === "batch";
       }
 
