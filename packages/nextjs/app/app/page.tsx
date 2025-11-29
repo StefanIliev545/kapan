@@ -8,7 +8,7 @@ import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
-import { arbitrum, base, optimism, linea, hardhat } from "wagmi/chains";
+import { arbitrum, base, optimism, linea } from "wagmi/chains";
 
 // ---- Lazy-load heavy protocol views (client-only) ----
 const AaveProtocolView = dynamic(
@@ -48,7 +48,6 @@ const networkOptions: NetworkOption[] = [
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
   { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
-  { id: "hardhat", name: "Hardhat", logo: "/logos/hardhat.svg" },
 ];
 
 const App: NextPage = () => {
@@ -210,20 +209,7 @@ const App: NextPage = () => {
           </div>
         )}
 
-        {/* HARDHAT */}
-        {mounted.has("hardhat") && (
-          <div className={selectedNetwork === "hardhat" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "hardhat"}>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-          </div>
-        )}
+
 
         <CallToAction sections={sections} />
       </div>
