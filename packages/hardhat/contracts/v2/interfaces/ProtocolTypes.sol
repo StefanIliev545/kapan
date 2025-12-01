@@ -21,7 +21,8 @@ library ProtocolTypes {
         Repay,
         GetBorrowBalance,
         GetSupplyBalance,
-        Swap
+        Swap,
+        SwapExactOut
     }
     struct InputPtr {
         uint256 index;

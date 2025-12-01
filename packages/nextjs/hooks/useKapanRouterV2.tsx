@@ -39,6 +39,7 @@ import {
 } from "~~/utils/v2/instructionHelpers";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { ERC20ABI } from "~~/contracts/externalContracts";
+import { simulateTransaction, formatErrorForDisplay, decodeRevertReason } from "~~/utils/errorDecoder";
 
 // --- ABI FIXES ---
 // Local definition of deauthorizeInstructions/authorizeInstructions signatures 
@@ -379,7 +380,8 @@ export const useKapanRouterV2 = () => {
     decimalsIn: number,
     market?: Address,
     isMax = false,
-    flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2
+    flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
+    isExactOut = false
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
@@ -392,6 +394,7 @@ export const useKapanRouterV2 = () => {
     const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     // Encode Swap Context: (tokenOut, minAmountOut, swapData)
+    // For SwapExactOut, minAmountOut is interpreted as exactAmountOut
     const swapContext = encodeAbiParameters(
       [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
       [tokenOutAddress as Address, minAmountOutBigInt, swapData as Hex]
@@ -429,53 +432,239 @@ export const useKapanRouterV2 = () => {
       )
       : createRouterInstruction(encodeToOutput(amountInBigInt, tokenInAddress));
 
+    const swapOp = isExactOut ? LendingOp.SwapExactOut : LendingOp.Swap;
+
+    // Output index tracking:
+    // 0. startInstruction -> Output[0] (amount/token for flash loan)
+    // 1. FlashLoan -> Output[1] (flash loan proceeds)
+    // 2. Approve -> Output[2] (DUMMY - approve always creates empty output)
+    // 3. Swap -> Output[3] (tokenOut), Output[4] (refund/tokenIn)
+    // 4. Approve -> Output[5] (DUMMY)
+    // 5. Deposit -> no output (or depends on protocol)
+    // 6. Withdraw -> Output[6] (withdrawn tokenIn for flash repayment)
+
     return [
-      // 0. Create UTXO for Flash Loan Amount/Token -> Output 0
+      // 0. Create UTXO for Flash Loan Amount/Token -> Output[0]
       startInstruction,
 
-      // 1. Flash Loan (uses Output 0) -> Output 1 (Borrowed Funds)
-      // Note: Output 0 is consumed? No, FlashLoan reads it.
-      // The Flash Loan result is pushed as a new Output.
+      // 1. Flash Loan (uses Output[0]) -> Output[1] (Borrowed Funds)
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
 
-      // 2. Approve TokenIn (Output 1) for OneInchGateway
+      // 2. Approve TokenIn (Output[1]) for OneInchGateway -> Output[2] (dummy)
       createRouterInstruction(encodeApprove(1, "oneinch")),
 
-      // 3. Swap TokenIn (Output 1) -> TokenOut (Output 2) + Refund (Output 3)
+      // 3. Swap TokenIn (Output[1]) -> Output[3] (TokenOut) + Output[4] (Refund)
       createProtocolInstruction(
         "oneinch",
-        encodeLendingInstruction(LendingOp.Swap, tokenInAddress, userAddress, 0n, swapContext as string, 1)
+        encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 1)
       ),
 
-      // 4. Approve TokenOut (Output 3) for LendingProtocol
+      // 4. Approve TokenOut (Output[3]) for LendingProtocol -> Output[5] (dummy)
       createRouterInstruction(encodeApprove(3, normalizedProtocol)),
 
-      // 5. Deposit TokenOut (Output 3) into LendingProtocol
+      // 5. Deposit TokenOut (Output[3]) into LendingProtocol
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(depositOp, tokenOutAddress, userAddress, 0n, context, 3)
       ),
 
-      // 6. Withdraw TokenIn from LendingProtocol -> Output 4
+      // 6. Withdraw TokenIn from LendingProtocol -> Output[6]
       // We withdraw the exact amount we flash loaned (plus fee if any).
-      // We use Output 1 (Repayment Amount) from the Flash Loan callback.
+      // We reference Output[1] (flash loan amount) for the withdrawal amount.
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(withdrawOp, tokenInAddress, userAddress, 0n, context, 1)
       ),
 
-      // 7. Repay Flash Loan
-      // The Router automatically handles repayment check at the end of the transaction?
-      // No, for Balancer flash loans, the *callback* must return the funds.
-      // The `KapanRouter` implementation of `receiveFlashLoan` (or equivalent) likely checks if it has the funds.
-      // The `processFlashLoan` calls `_requestBalancerV2`.
-      // The callback `onFlashLoan` (or similar) calls `runStack`.
-      // After `runStack` returns, the Router must have the funds to repay.
-      // The `Withdraw` instruction (Step 6) puts funds into the Router (Output 4).
-      // So the funds are there.
-      // The Balancer Vault will pull the funds from the Router at the end of the callback.
-      // So we just need to make sure the Router *has* the tokens.
-      // Step 6 (Withdraw) ensures that.
+      // Flash loan repayment happens automatically - Router must have funds from Withdraw
+    ];
+  }, [userAddress, encodeCompoundMarket]);
+
+  /**
+   * Build a "close with collateral" flow using flash loan:
+   * Flash loan debt -> repay debt -> withdraw collateral -> swap collateral to debt -> repay flash loan.
+   * This allows closing positions even when collateral is fully locked by debt.
+   * 
+   * @param exactDebtOut - The exact amount of debt to repay (flash loan amount), ignored if isMax=true
+   * @param maxCollateralIn - Max collateral to sell (with slippage buffer)
+   * @param swapData - 1inch swap data for collateral -> debt swap
+   * @param isMax - If true, uses GetBorrowBalance to get exact debt amount on-chain (prevents dust)
+   */
+  const buildCloseWithCollateralFlow = useCallback((
+    protocolName: string,
+    collateralToken: string,
+    debtToken: string,
+    maxCollateralIn: bigint,
+    exactDebtOut: bigint,
+    swapData: string,
+    flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
+    market?: Address,
+    isMax = false,
+  ): ProtocolInstruction[] => {
+    if (!userAddress) return [];
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const isCompound = normalizedProtocol === "compound";
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
+
+    // Swap context: (tokenOut, minAmountOut, swapData)
+    // We swap collateral -> debt, need at least exactDebtOut to repay flash loan
+    // Note: For isMax, exactDebtOut is still used for minAmountOut in swap context
+    // The actual flash loan amount comes from GetBorrowBalance
+    const swapContext = encodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+      [debtToken as Address, exactDebtOut, swapData as Hex]
+    );
+
+    // For isMax: use GetBorrowBalance to get exact debt amount on-chain
+    // This prevents dust from rounding/timing differences
+    const debtAmountInstruction = isMax
+      ? createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, context, 999)
+        )
+      : createRouterInstruction(encodeToOutput(exactDebtOut, debtToken));
+
+    return [
+      // 0. Get debt amount: either GetBorrowBalance (isMax) or ToOutput (fixed amount)
+      // -> output[0] is the debt amount
+      debtAmountInstruction,
+      // 1. Flash loan debt token using UTXO[0] -> output[1] is flash loan proceeds
+      createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
+      // 2. Approve protocol for debt token (output[1])
+      createRouterInstruction(encodeApprove(1, normalizedProtocol)),
+      // 3. Repay debt using flash loan proceeds (output[1])
+      // Repay produces output[3] (refund, usually 0)
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, context, 1)
+      ),
+      // 4. ToOutput: declare how much collateral to withdraw
+      createRouterInstruction(encodeToOutput(maxCollateralIn, collateralToken)),
+      // 5. Withdraw collateral (now unlocked) using UTXO[4] -> output[5]
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralToken, userAddress, 0n, context, 4)
+      ),
+      // 6. Approve OneInch on withdrawn collateral (output[5])
+      createRouterInstruction(encodeApprove(5, "oneinch")),
+      // 7. SwapExactOut collateral -> debt token (output[7]: debt, output[8]: collateral refund)
+      // We want at least exactDebtOut of debt token to repay flash loan
+      createProtocolInstruction(
+        "oneinch",
+        encodeLendingInstruction(LendingOp.SwapExactOut, collateralToken, userAddress, 0n, swapContext as string, 5)
+      ),
+      // 8. Push collateral refund (output[8]) to user
+      createRouterInstruction(encodePushToken(8, userAddress)),
+      // 9. Do NOT push output[7] (debt token) - it stays in router to repay flash loan
+      // Any excess debt token from swap (beyond flash loan repayment) is dust in router
+    ];
+  }, [userAddress, encodeCompoundMarket]);
+
+  /**
+   * Build a "swap debt A -> debt B" flow using a flash loan:
+   * Flash debtB -> swap exact-out to debtA for repayment -> repay debtA -> borrow debtB to repay flash.
+   * Caller provides maxAmountIn (debtB to swap) and swapData sized via one forward quote + small buffer.
+   * 
+   * @param currentDebtFrom - amount to repay in debtFrom, ignored if isMax=true
+   * @param isMax - If true, uses GetBorrowBalance to get exact debt amount on-chain (prevents dust)
+   */
+  const buildDebtSwapFlow = useCallback((
+    protocolName: string,
+    debtFromToken: string,            // e.g., USDC (current debt to repay)
+    debtToToken: string,              // e.g., USDT (new debt to take on)
+    currentDebtFrom: bigint,          // amount to repay in debtFrom (ignored if isMax)
+    maxDebtToInForSwap: bigint,       // max input for USDT->USDC swap (flash loan amount)
+    swapData: string,                 // 1inch calldata for USDT->USDC
+    flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
+    market?: Address,
+    isMax = false,
+  ): ProtocolInstruction[] => {
+    if (!userAddress) return [];
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const isCompound = normalizedProtocol === "compound";
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
+
+    // For isMax, we still need currentDebtFrom for the swap's minAmountOut
+    // The actual repay amount will come from GetBorrowBalance
+    const swapExactOutContext = encodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+      [debtFromToken as Address, currentDebtFrom, swapData as Hex]
+    );
+
+    if (isMax) {
+      // When isMax, we need to:
+      // 1. Get exact borrow balance first (output[0])
+      // 2. Flash loan the new debt token (output[1])
+      // 3. Swap new debt -> old debt (outputs[3,4])
+      // 4. Repay using GetBorrowBalance output for exact amount
+      // 5. Borrow new debt to repay flash loan
+      return [
+        // 0. GetBorrowBalance for debtFrom -> output[0] is exact debt amount
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.GetBorrowBalance, debtFromToken, userAddress, 0n, context, 999)
+        ),
+        // 1. ToOutput: declare how much debtTo we will flash (max input for swap)
+        createRouterInstruction(encodeToOutput(maxDebtToInForSwap, debtToToken)),
+        // 2. Flash loan debtTo using input[1] (appends output[2])
+        createRouterInstruction(encodeFlashLoan(flashLoanProvider, 1)),
+        // 3. Approve OneInch for debtTo (using input[1] for amount)
+        createRouterInstruction(encodeApprove(1, "oneinch")),
+        // 4. SwapExactOut debtTo->debtFrom (output[4]: debtFrom, output[5]: debtTo refund)
+        // Uses input[1] for swap input amount
+        createProtocolInstruction(
+          "oneinch",
+          encodeLendingInstruction(LendingOp.SwapExactOut, debtToToken, userAddress, 0n, swapExactOutContext as string, 1)
+        ),
+        // 5. Approve protocol on debtFrom (output[4])
+        createRouterInstruction(encodeApprove(4, normalizedProtocol)),
+        // 6. Repay debtFrom using output[4], but reference GetBorrowBalance output[0] for exact amount
+        // This ensures we repay EXACTLY what we owe, no dust
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, context, 0)
+        ),
+        // 7. Push debtFrom repay refund (output[7], usually swap output - exact debt)
+        createRouterInstruction(encodePushToken(7, userAddress)),
+        // 8. Push debtTo swap refund (output[5]) to user
+        createRouterInstruction(encodePushToken(5, userAddress)),
+        // 9. Borrow debtTo equal to flash repayment amount by referencing flash UTXO[2]
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.Borrow, debtToToken, userAddress, 0n, context, 2)
+        ),
+      ];
+    }
+
+    // Non-max flow: use fixed currentDebtFrom amount
+    return [
+      // 0. ToOutput: declare how much debtTo we will flash (max input for swap)
+      createRouterInstruction(encodeToOutput(maxDebtToInForSwap, debtToToken)),
+      // 1. Flash loan debtTo using input[0] (appends output[1])
+      createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
+      // 2. Approve OneInch for debtTo (approve read from input[0], consistent with tests/authorization)
+      createRouterInstruction(encodeApprove(0, "oneinch")),
+      // 3. SwapExactOut debtTo->debtFrom for exact currentDebtFrom (output[3]: debtFrom, output[4]: debtTo refund)
+      createProtocolInstruction(
+        "oneinch",
+        encodeLendingInstruction(LendingOp.SwapExactOut, debtToToken, userAddress, 0n, swapExactOutContext as string, 0)
+      ),
+      // 4. Approve Aave on debtFrom (USDC) at output[3]
+      createRouterInstruction(encodeApprove(3, normalizedProtocol)),
+      // 5. Repay debtFrom using output[3]
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, context, 3)
+      ),
+      // 6. Push USDC repay refund (output[6], usually 0)
+      createRouterInstruction(encodePushToken(6, userAddress)),
+      // 7. Push debtTo swap refund (output[4]) to user (optional, keeps router dust 0)
+      createRouterInstruction(encodePushToken(4, userAddress)),
+      // 8. Borrow debtTo equal to flash repayment amount by referencing flash UTXO[1]
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Borrow, debtToToken, userAddress, 0n, context, 1)
+      ),
     ];
   }, [userAddress, encodeCompoundMarket]);
 
@@ -589,6 +778,31 @@ export const useKapanRouterV2 = () => {
           data: inst.data as `0x${string}`,
         }));
 
+        // Simulate transaction first to get better error messages
+        if (publicClient) {
+          const calldata = encodeFunctionData({
+            abi: routerContract.abi,
+            functionName: "processProtocolInstructions",
+            args: [protocolInstructions],
+          });
+          
+          const simResult = await simulateTransaction(
+            publicClient,
+            routerContract.address as `0x${string}`,
+            calldata,
+            userAddress as `0x${string}`
+          );
+          
+          if (!simResult.success && simResult.error) {
+            clearTimeout(pendingTimeout);
+            const formatted = formatErrorForDisplay(simResult.error);
+            const errorMsg = formatted.suggestion 
+              ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+              : `${formatted.title}: ${formatted.description}`;
+            throw new Error(errorMsg);
+          }
+        }
+
         transactionHash = await writeContractAsync({
           address: routerContract.address as `0x${string}`,
           abi: routerContract.abi,
@@ -651,7 +865,56 @@ export const useKapanRouterV2 = () => {
         error?.code === "ACTION_REJECTED" ||
         error?.code === "USER_REJECTED";
 
-      const message = isRejection ? "User rejected the request" : (error.message || "Failed to execute instructions");
+      let message = "Failed to execute instructions";
+      if (isRejection) {
+        message = "User rejected the request";
+      } else {
+        // Try to extract and decode revert data from the error
+        let revertData = "";
+        
+        // Helper to extract hex string from various data formats
+        const extractHexData = (data: unknown): string => {
+          if (!data) return "";
+          if (typeof data === "string" && data.startsWith("0x")) return data;
+          if (typeof data === "object" && data !== null) {
+            // Check if it's an object with a data property
+            if ("data" in data && typeof (data as any).data === "string") {
+              return (data as any).data;
+            }
+            // Try to stringify and extract hex
+            const str = String(data);
+            const match = str.match(/(0x[a-fA-F0-9]{8,})/);
+            return match ? match[1] : "";
+          }
+          return "";
+        };
+        
+        // Check various places where revert data might be
+        revertData = extractHexData(error?.cause?.data) || 
+                     extractHexData(error?.data) ||
+                     "";
+        
+        // If still no revert data, try to extract from error message
+        if (!revertData && errorMessage) {
+          const match = errorMessage.match(/return data: (0x[a-fA-F0-9]+)/i) ||
+                        errorMessage.match(/data: (0x[a-fA-F0-9]+)/i) ||
+                        errorMessage.match(/(0x[a-fA-F0-9]{8,})/);
+          if (match) {
+            revertData = match[1];
+          }
+        }
+        
+        if (revertData && revertData.length >= 10) {
+          const decoded = decodeRevertReason(revertData);
+          const formatted = formatErrorForDisplay(decoded);
+          message = formatted.suggestion 
+            ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+            : `${formatted.title}: ${formatted.description}`;
+        } else {
+          message = error.shortMessage || error.message || message;
+        }
+      }
+      
       notification.error(
         <TransactionToast
           step="failed"
@@ -660,7 +923,7 @@ export const useKapanRouterV2 = () => {
           blockExplorerLink={blockExplorerTxURL}
         />
       );
-      throw error;
+      throw new Error(message);
     }
   }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
@@ -894,7 +1157,8 @@ export const useKapanRouterV2 = () => {
 
   const createMoveBuilder = useCallback((): MoveFlowBuilder => {
     if (!userAddress) {
-      const noOp = () => { };
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      const noOp = () => {};
       return { buildUnlockDebt: noOp, buildMoveCollateral: noOp, buildBorrow: noOp, setCompoundMarket: noOp, build: () => [], getFlashObligations: () => ({}), };
     }
 
@@ -930,7 +1194,7 @@ export const useKapanRouterV2 = () => {
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
 
         // 2. Flash Loan (creates UTXO)
-        let provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.AaveV3 : (version === "v3" ? FlashLoanProvider.BalancerV3 : FlashLoanProvider.BalancerV2);
+        const provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.AaveV3 : (version === "v3" ? FlashLoanProvider.BalancerV3 : FlashLoanProvider.BalancerV2);
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount;
         addRouter(flashData as `0x${string}`, true);
@@ -1005,6 +1269,8 @@ export const useKapanRouterV2 = () => {
     buildRepayFlowAsync,
     buildWithdrawFlow,
     buildCollateralSwapFlow,
+    buildCloseWithCollateralFlow,
+    buildDebtSwapFlow,
     createMoveBuilder,
     executeInstructions,
     executeFlowWithApprovals,

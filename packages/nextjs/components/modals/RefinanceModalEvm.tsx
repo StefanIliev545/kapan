@@ -284,7 +284,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const selectedProvider = hookSelectedProvider?.name;
   const setSelectedProvider = (name: string) => {
     const p = flashLoanProviders.find(p => p.name === name);
-    setHookSelectedProvider(p);
+    if (p) {
+      setHookSelectedProvider(p);
+    }
   };
 
   /* ---------------------- Support map for selection --------------------- */

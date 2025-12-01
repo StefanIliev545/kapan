@@ -8,6 +8,10 @@ import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
+import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
+import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
+import { SwapAsset } from "./modals/SwapModalShell";
+import { Address } from "viem";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX, FiArrowRight } from "react-icons/fi";
 import { SegmentedActionBar } from "./common/SegmentedActionBar";
 import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
@@ -25,6 +29,16 @@ export type BorrowPositionProps = ProtocolPosition & {
   networkType: "evm" | "starknet";
   chainId?: number;
   position?: PositionManager;
+  availableAssets?: Array<{
+    symbol: string;
+    address: string;
+    decimals: number;
+    rawBalance: bigint;
+    balance: number;
+    icon: string;
+    usdValue?: number;
+    price?: bigint;
+  }>;
   containerClassName?: string;
   hideBalanceColumn?: boolean;
   availableActions?: {
@@ -66,6 +80,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   networkType,
   chainId,
   position,
+  availableAssets: availableAssetsList,
   vesuContext,
   moveSupport,
   actionsDisabled = false,
@@ -92,6 +107,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const moveModal = useModal();
   const repayModal = useModal();
   const borrowModal = useModal();
+  const closeWithCollateralModal = useModal();
+  const debtSwapModal = useModal();
   const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
 
@@ -175,8 +192,11 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const showBorrowButton = actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow);
   const showRepayButton = actionConfig.repay;
   const showMoveButton = actionConfig.move && hasBalance;
-  const showCloseButton = Boolean(onClosePosition) && actionConfig.close && hasBalance;
-  const showSwapButton = Boolean(onSwap) && actionConfig.swap && hasBalance;
+  // Enable buttons if either external handler exists OR we can open local modal (EVM)
+  const showCloseButton =
+    (networkType === "evm" ? true : Boolean(onClosePosition)) && actionConfig.close && hasBalance;
+  const showSwapButton =
+    (networkType === "evm" ? true : Boolean(onSwap)) && actionConfig.swap && hasBalance;
 
   const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton, showCloseButton, showSwapButton].filter(Boolean).length;
   const hasAnyActions = visibleActionCount > 0;
@@ -184,6 +204,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   // Render actions in a single horizontal row for both mobile and desktop
 
   const handleBorrowClick = onBorrow ?? borrowModal.open;
+  // For EVM, always open local modals to avoid state lifting issues
+  const handleCloseClick = networkType === "evm" ? closeWithCollateralModal.open : (onClosePosition ?? (() => { return; }));
+  const handleSwapClick = networkType === "evm" ? debtSwapModal.open : (onSwap ?? (() => { return; }));
 
   const borrowPoolId = (() => {
     if (!vesuContext?.borrow) return undefined;
@@ -417,13 +440,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
                   : []),
                 ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showMoveButton
                   ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ]}
               />
@@ -442,13 +465,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                   ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
                   : []),
                 ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: onSwap ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showMoveButton
                   ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: onClosePosition ?? (() => { return; }), disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
                   : []),
                 ]}
               />
@@ -570,6 +593,34 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               networkType="evm"
             />
           )}
+          <CloseWithCollateralEvmModal
+            isOpen={closeWithCollateralModal.isOpen}
+            onClose={closeWithCollateralModal.close}
+            protocolName={protocolName}
+            chainId={chainId || 1}
+            debtToken={tokenAddress as Address}
+            debtName={name}
+            debtIcon={icon}
+            debtDecimals={tokenDecimals || 18}
+            debtPrice={tokenPrice}
+            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            availableCollaterals={availableAssetsList as SwapAsset[]}
+            market={protocolName.toLowerCase() === "compound" ? (tokenAddress as Address) : undefined}
+          />
+          <DebtSwapEvmModal
+            isOpen={debtSwapModal.isOpen}
+            onClose={debtSwapModal.close}
+            protocolName={protocolName}
+            chainId={chainId || 1}
+            debtFromToken={tokenAddress as Address}
+            currentDebtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            debtFromName={name}
+            debtFromIcon={icon}
+            debtFromDecimals={tokenDecimals || 18}
+            debtFromPrice={tokenPrice}
+            availableAssets={availableAssetsList as SwapAsset[]}
+            market={protocolName.toLowerCase() === "compound" ? (tokenAddress as Address) : undefined}
+          />
         </>
       )}
     </>

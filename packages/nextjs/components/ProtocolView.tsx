@@ -1,5 +1,6 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { Address } from "viem";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
 import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
@@ -14,6 +15,8 @@ import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
 import { CollateralSwapModal } from "./modals/CollateralSwapModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
+import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
+import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 
 
 export interface ProtocolPosition {
@@ -102,11 +105,25 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [selectedSwapPosition, setSelectedSwapPosition] = useState<ProtocolPosition | null>(null);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [selectedClosePosition, setSelectedClosePosition] = useState<ProtocolPosition | null>(null);
+  const [isDebtSwapModalOpen, setIsDebtSwapModalOpen] = useState(false);
+  const [selectedDebtSwapPosition, setSelectedDebtSwapPosition] = useState<ProtocolPosition | null>(null);
 
   const handleSwap = (position: ProtocolPosition) => {
     if (readOnly) return;
     setSelectedSwapPosition(position);
     setIsSwapModalOpen(true);
+  };
+  const handleCloseWithCollateral = (position: ProtocolPosition) => {
+    if (readOnly) return;
+    setSelectedClosePosition(position);
+    setIsCloseModalOpen(true);
+  };
+  const handleDebtSwap = (position: ProtocolPosition) => {
+    if (readOnly) return;
+    setSelectedDebtSwapPosition(position);
+    setIsDebtSwapModalOpen(true);
   };
 
   // Convert suppliedPositions to BasicCollateral for the modal
@@ -428,7 +445,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         networkType={networkType}
                         chainId={chainId}
                         position={positionManager}
-                        availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: false, swap: enabledFeatures.swap ?? false }}
+                        availableAssets={availableCollaterals}
+                        availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: true, swap: enabledFeatures.swap ?? true }}
+                        onClosePosition={() => handleCloseWithCollateral(position)}
+                        onSwap={() => handleDebtSwap(position)}
                         suppressDisabledMessage
                         defaultExpanded={expandFirstPositions && index === 0}
                       />
@@ -549,6 +569,42 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               vesuContext={
                 selectedToken?.vesuContext?.borrow ?? borrowedPositions[0]?.vesuContext?.borrow
               }
+            />
+          )}
+
+          {/* Close With Collateral (EVM) */}
+          {isCloseModalOpen && selectedClosePosition && (
+            <CloseWithCollateralEvmModal
+              isOpen={isCloseModalOpen}
+              onClose={() => { setIsCloseModalOpen(false); setSelectedClosePosition(null); }}
+              protocolName={protocolName}
+              chainId={chainId || 1}
+              debtToken={selectedClosePosition.tokenAddress as Address}
+              debtName={selectedClosePosition.name}
+              debtIcon={selectedClosePosition.icon}
+              debtDecimals={selectedClosePosition.tokenDecimals || 18}
+              debtPrice={selectedClosePosition.tokenPrice}
+              debtBalance={selectedClosePosition.tokenBalance}
+              availableCollaterals={availableCollaterals}
+              market={protocolName.toLowerCase() === "compound" ? (selectedClosePosition.tokenAddress as Address) : undefined}
+            />
+          )}
+
+          {/* Debt Swap (EVM) */}
+          {isDebtSwapModalOpen && selectedDebtSwapPosition && (
+            <DebtSwapEvmModal
+              isOpen={isDebtSwapModalOpen}
+              onClose={() => { setIsDebtSwapModalOpen(false); setSelectedDebtSwapPosition(null); }}
+              protocolName={protocolName}
+              chainId={chainId || 1}
+              debtFromToken={selectedDebtSwapPosition.tokenAddress as Address}
+              debtFromName={selectedDebtSwapPosition.name}
+              debtFromIcon={selectedDebtSwapPosition.icon}
+              debtFromDecimals={selectedDebtSwapPosition.tokenDecimals || 18}
+              debtFromPrice={selectedDebtSwapPosition.tokenPrice}
+              currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
+              availableAssets={availableCollaterals}
+              market={protocolName.toLowerCase() === "compound" ? (selectedDebtSwapPosition.tokenAddress as Address) : undefined}
             />
           )}
         </>

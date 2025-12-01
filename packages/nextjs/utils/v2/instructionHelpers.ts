@@ -27,6 +27,7 @@ export enum LendingOp {
   GetBorrowBalance = 5,
   GetSupplyBalance = 6,
   Swap = 7,
+  SwapExactOut = 8,
 }
 
 // Protocol instruction structure (matches Solidity ProtocolTypes.ProtocolInstruction)

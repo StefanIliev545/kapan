@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // --- Existing Balancer imports ---
-import {IFlashLoanProvider} from "../interfaces/balancer/IFlashLoanProvider.sol";
-import {IVaultV3} from "../interfaces/balancer/IVaultV3.sol";
+import { IFlashLoanProvider } from "../interfaces/balancer/IFlashLoanProvider.sol";
+import { IVaultV3 } from "../interfaces/balancer/IVaultV3.sol";
 
 // --- Minimal Aave v3 interfaces (flashLoanSimple) ---
 interface IAaveV3Pool {
@@ -32,7 +32,9 @@ interface IAaveFlashLoanSimpleReceiver {
 // --- Minimal Uniswap v3 pool interface ---
 interface IUniswapV3Pool {
     function token0() external view returns (address);
+
     function token1() external view returns (address);
+
     function flash(address recipient, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
 
@@ -43,8 +45,8 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
 
     // ----------------- Providers (config) -----------------
     IFlashLoanProvider public balancerV2Vault; // Balancer v2 Vault
-    IVaultV3 public balancerV3Vault;           // Balancer v3 Vault
-    IAaveV3Pool public aaveV3Pool;             // Aave v3 Pool (flashLoanSimple)
+    IVaultV3 public balancerV3Vault; // Balancer v3 Vault
+    IAaveV3Pool public aaveV3Pool; // Aave v3 Pool (flashLoanSimple)
 
     // We gate Uniswap v3 availability by storing a *factory or sentinel address*.
     // The actual pool is passed per-request.
@@ -119,7 +121,11 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     // ============================================================
 
     /// @notice Request a Balancer v2 flash loan (single-asset for simplicity).
-    function _requestBalancerV2(address token, uint256 amount, bytes memory userData) internal authorizeFlashLoan(address(balancerV2Vault)) {
+    function _requestBalancerV2(
+        address token,
+        uint256 amount,
+        bytes memory userData
+    ) internal authorizeFlashLoan(address(balancerV2Vault)) {
         require(balancerV2Enabled(), "Balancer v2 disabled");
 
         IERC20[] memory tokens = new IERC20[](1);
@@ -191,7 +197,11 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     /// @param token Asset to borrow
     /// @param amount Amount to borrow
     /// @param userData Arbitrary data forwarded to executeOperation and to _afterFlashLoan
-    function _requestAaveV3(address token, uint256 amount, bytes memory userData) internal authorizeFlashLoan(address(aaveV3Pool)) {
+    function _requestAaveV3(
+        address token,
+        uint256 amount,
+        bytes memory userData
+    ) internal authorizeFlashLoan(address(aaveV3Pool)) {
         require(aaveEnabled(), "Aave v3 disabled");
         emit FlashRequested("AAVE_V3", token, amount);
         // referralCode = 0
@@ -255,13 +265,11 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     }
 
     /// @notice Uniswap v3 flash callback. Must repay (amount + fee) to the *pool* (msg.sender).
-    function uniswapV3FlashCallback(
-        uint256 fee0,
-        uint256 fee1,
-        bytes calldata data
-    ) external flashLoanOnly {
-        (address pool, address token, uint256 amount, bytes memory userData, bool is0) =
-            abi.decode(data, (address, address, uint256, bytes, bool));
+    function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external flashLoanOnly {
+        (address pool, address token, uint256 amount, bytes memory userData, bool is0) = abi.decode(
+            data,
+            (address, address, uint256, bytes, bool)
+        );
 
         require(msg.sender == pool, "Unauthorized Uniswap pool");
 
@@ -284,5 +292,3 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     ///      Accepts bytes memory to support both calldata (from callbacks) and memory (from decoded data).
     function _afterFlashLoan(address token, uint256 repaymentAmount, bytes memory userData) internal virtual;
 }
-
-

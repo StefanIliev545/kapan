@@ -73,6 +73,52 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
             if (amountRefund > 0) {
                 IERC20(tokenIn).safeTransfer(msg.sender, amountRefund);
             }
+        } else if (ins.op == ProtocolTypes.LendingOp.SwapExactOut) {
+            address tokenIn = ins.token;
+            uint256 maxAmountIn = ins.amount;
+
+            // Resolve input pointer if present
+            if (ins.input.index < inputs.length) {
+                tokenIn = inputs[ins.input.index].token;
+                maxAmountIn = inputs[ins.input.index].amount;
+            }
+
+            require(address(adapter) != address(0), "OneInch: Adapter not set");
+            require(tokenIn != address(0), "OneInch: Zero token");
+            require(maxAmountIn > 0, "OneInch: Zero max amount");
+
+            // Decode swap context: (address tokenOut, uint256 exactAmountOut, bytes memory swapData)
+            (address tokenOut, uint256 amountOut, bytes memory swapData) = abi.decode(
+                ins.context,
+                (address, uint256, bytes)
+            );
+
+            // Transfer up to maxAmountIn of tokenIn from Router to the OneInchAdapter
+            IERC20(tokenIn).safeTransferFrom(msg.sender, address(adapter), maxAmountIn);
+
+            // Execute the swap via the adapter in exact-out mode
+            // The adapter will call the 1inch router with swapData.
+            // Adapter returns (amountReceived, amountRefunded)
+            (uint256 outputReceived, uint256 refundAmount) = adapter.executeSwap(
+                tokenIn,
+                tokenOut,
+                maxAmountIn,
+                amountOut, // minimum amountOut we expect (the exact target)
+                swapData
+            );
+
+            // Prepare outputs: [TokenOut, TokenInRefund]
+            outputs = new ProtocolTypes.Output[](2);
+            outputs[0] = ProtocolTypes.Output({ token: tokenOut, amount: outputReceived });
+            outputs[1] = ProtocolTypes.Output({ token: tokenIn, amount: refundAmount });
+
+            // Transfer results back to the Router
+            if (outputReceived > 0) {
+                IERC20(tokenOut).safeTransfer(msg.sender, outputReceived);
+            }
+            if (refundAmount > 0) {
+                IERC20(tokenIn).safeTransfer(msg.sender, refundAmount);
+            }
         } else {
             revert("OneInch: Unsupported Op");
         }
@@ -94,7 +140,7 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         // Count outputs (Swaps produce 2 outputs)
         uint256 outCount = 0;
         for (uint256 i = 0; i < instrs.length; i++) {
-            if (instrs[i].op == ProtocolTypes.LendingOp.Swap) {
+            if (instrs[i].op == ProtocolTypes.LendingOp.Swap || instrs[i].op == ProtocolTypes.LendingOp.SwapExactOut) {
                 outCount += 2;
             }
         }
@@ -117,6 +163,22 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
                 pIdx++;
 
                 // Output 2: Refund (Simulated as 0 for safety/conservatism in downstream checks)
+                address tokenIn = ins.token;
+                if (ins.input.index < inputs.length) {
+                    tokenIn = inputs[ins.input.index].token;
+                }
+                produced[pIdx] = ProtocolTypes.Output({ token: tokenIn, amount: 0 });
+                pIdx++;
+            } else if (ins.op == ProtocolTypes.LendingOp.SwapExactOut) {
+                targets[i] = address(0);
+                data[i] = bytes("");
+
+                (address tokenOut, uint256 exactOut, ) = abi.decode(ins.context, (address, uint256, bytes));
+                // Output 1: the desired tokenOut, simulate the full exactOut amount as output
+                produced[pIdx] = ProtocolTypes.Output({ token: tokenOut, amount: exactOut });
+                pIdx++;
+
+                // Output 2: refund of tokenIn (if any), conservatively assume 0
                 address tokenIn = ins.token;
                 if (ins.input.index < inputs.length) {
                     tokenIn = inputs[ins.input.index].token;
