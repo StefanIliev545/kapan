@@ -44,7 +44,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     availableAssets,
     market,
 }) => {
-    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId });
+    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 });
     const { buildDebtSwapFlow } = useKapanRouterV2();
 
     // Flash Loan Providers

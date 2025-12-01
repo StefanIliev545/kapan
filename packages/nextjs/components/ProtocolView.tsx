@@ -1,5 +1,6 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { Address } from "viem";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
 import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
@@ -578,9 +579,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               onClose={() => { setIsCloseModalOpen(false); setSelectedClosePosition(null); }}
               protocolName={protocolName}
               chainId={chainId || 1}
-              debtToken={selectedClosePosition.tokenAddress as any}
+              debtToken={selectedClosePosition.tokenAddress as Address}
+              debtName={selectedClosePosition.name}
+              debtIcon={selectedClosePosition.icon}
+              debtDecimals={selectedClosePosition.tokenDecimals || 18}
+              debtPrice={selectedClosePosition.tokenPrice}
               debtBalance={selectedClosePosition.tokenBalance}
-              market={protocolName.toLowerCase() === "compound" ? (selectedClosePosition.tokenAddress as any) : undefined}
+              availableCollaterals={availableCollaterals}
+              market={protocolName.toLowerCase() === "compound" ? (selectedClosePosition.tokenAddress as Address) : undefined}
             />
           )}
 
@@ -591,9 +597,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               onClose={() => { setIsDebtSwapModalOpen(false); setSelectedDebtSwapPosition(null); }}
               protocolName={protocolName}
               chainId={chainId || 1}
-              debtFromToken={selectedDebtSwapPosition.tokenAddress as any}
-              currentDebtFrom={selectedDebtSwapPosition.tokenBalance}
-              market={protocolName.toLowerCase() === "compound" ? (selectedDebtSwapPosition.tokenAddress as any) : undefined}
+              debtFromToken={selectedDebtSwapPosition.tokenAddress as Address}
+              debtFromName={selectedDebtSwapPosition.name}
+              debtFromIcon={selectedDebtSwapPosition.icon}
+              debtFromDecimals={selectedDebtSwapPosition.tokenDecimals || 18}
+              debtFromPrice={selectedDebtSwapPosition.tokenPrice}
+              currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
+              availableAssets={availableCollaterals}
+              market={protocolName.toLowerCase() === "compound" ? (selectedDebtSwapPosition.tokenAddress as Address) : undefined}
             />
           )}
         </>
