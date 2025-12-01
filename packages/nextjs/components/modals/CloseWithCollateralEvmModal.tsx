@@ -83,7 +83,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Filter "To" assets (collaterals with balance, exclude debt token)
     const toAssets = useMemo(() =>
-        availableCollaterals.filter(a => a.rawBalance > 0n && a.address.toLowerCase() !== debtToken.toLowerCase()),
+        (availableCollaterals || []).filter(a => a.rawBalance > 0n && a.address.toLowerCase() !== debtToken.toLowerCase()),
         [availableCollaterals, debtToken]
     );
 

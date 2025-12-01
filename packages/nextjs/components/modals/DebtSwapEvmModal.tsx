@@ -83,7 +83,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Filter "To" assets (exclude current debt)
     const toAssets = useMemo(() =>
-        availableAssets.filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase()),
+        (availableAssets || []).filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase()),
         [availableAssets, debtFromToken]
     );
 
