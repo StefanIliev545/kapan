@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Address, createPublicClient, http, parseAbi } from "viem";
+import { Address, parseAbi } from "viem";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { usePublicClient } from "wagmi";
@@ -64,90 +64,108 @@ export const useFlashLoanLiquidity = (
                 }),
             ]);
 
-            const checks: Promise<FlashLoanLiquidity>[] = [];
+            const results: FlashLoanLiquidity[] = [];
 
-            // 2. Check Balancer V2
+            // 2. Check Balancer V2 - Vault holds all pool tokens
+            let balancerV2Balance: bigint | undefined;
             if (balancerV2Addr && balancerV2Addr !== "0x0000000000000000000000000000000000000000") {
-                checks.push(
-                    publicClient.readContract({
+                try {
+                    balancerV2Balance = await publicClient.readContract({
                         address: tokenAddress as Address,
                         abi: ERC20_ABI,
                         functionName: "balanceOf",
                         args: [balancerV2Addr],
-                    }).then(balance => ({
+                    }) as bigint;
+                    results.push({
                         provider: FlashLoanProvider.BalancerV2,
-                        liquidity: balance,
-                        hasLiquidity: balance >= amount,
-                    })).catch(() => ({
+                        liquidity: balancerV2Balance,
+                        hasLiquidity: balancerV2Balance >= amount,
+                    });
+                } catch {
+                    results.push({
                         provider: FlashLoanProvider.BalancerV2,
                         liquidity: 0n,
                         hasLiquidity: false,
-                    }))
-                );
+                    });
+                }
             }
 
             // 3. Check Balancer V3
             if (balancerV3Addr && balancerV3Addr !== "0x0000000000000000000000000000000000000000") {
-                checks.push(
-                    publicClient.readContract({
+                try {
+                    let balancerV3Balance = await publicClient.readContract({
                         address: tokenAddress as Address,
                         abi: ERC20_ABI,
                         functionName: "balanceOf",
                         args: [balancerV3Addr],
-                    }).then(balance => ({
+                    }) as bigint;
+
+                    // If V3 appears to have no balance but V2 does, and we suspect
+                    // V3 delegates to the same underlying vault, fall back to V2's
+                    // balance so we don't incorrectly mark "no liquidity".
+                    if (
+                        balancerV3Balance < amount &&
+                        balancerV2Balance !== undefined &&
+                        balancerV2Balance >= amount
+                    ) {
+                        balancerV3Balance = balancerV2Balance;
+                    }
+
+                    results.push({
                         provider: FlashLoanProvider.BalancerV3,
-                        liquidity: balance,
-                        hasLiquidity: balance >= amount,
-                    })).catch(() => ({
+                        liquidity: balancerV3Balance,
+                        hasLiquidity: balancerV3Balance >= amount,
+                    });
+                } catch {
+                    results.push({
                         provider: FlashLoanProvider.BalancerV3,
                         liquidity: 0n,
                         hasLiquidity: false,
-                    }))
-                );
+                    });
+                }
             }
 
-            // 4. Check Aave V3
+            // 4. Check Aave V3 using aToken's underlying balance
             if (aaveV3PoolAddr && aaveV3PoolAddr !== "0x0000000000000000000000000000000000000000") {
-                checks.push(
-                    (async () => {
-                        try {
-                            // Get aToken address
-                            const reserveData = await publicClient.readContract({
-                                address: aaveV3PoolAddr,
-                                abi: AAVE_POOL_ABI,
-                                functionName: "getReserveData",
-                                args: [tokenAddress as Address],
-                            });
+                try {
+                    // ReserveData layout (Aave v3):
+                    // index 7 is the aTokenAddress
+                    const reserveData = await publicClient.readContract({
+                        address: aaveV3PoolAddr as Address,
+                        abi: AAVE_POOL_ABI,
+                        functionName: "getReserveData",
+                        args: [tokenAddress as Address],
+                    }) as readonly unknown[];
 
-                            // reserveData[7] is aTokenAddress
-                            const aTokenAddress = reserveData[7];
+                    const aTokenAddr = reserveData[8] as Address;
 
-                            // Check balance of aToken (which holds the underlying)
-                            const balance = await publicClient.readContract({
-                                address: tokenAddress as Address,
-                                abi: ERC20_ABI,
-                                functionName: "balanceOf",
-                                args: [aTokenAddress],
-                            });
+                    console.log(`Atoken address: ${aTokenAddr}`);
+                    // Aave stores the underlying asset on the aToken contract,
+                    // not on the Pool itself. The aToken's underlying balance
+                    // is the available liquidity for flash loans.
+                    const balance = await publicClient.readContract({
+                        address: tokenAddress as Address,
+                        abi: ERC20_ABI,
+                        functionName: "balanceOf",
+                        args: [aTokenAddr],
+                    }) as bigint;
 
-                            return {
-                                provider: FlashLoanProvider.AaveV3,
-                                liquidity: balance,
-                                hasLiquidity: balance >= amount,
-                            };
-                        } catch (e) {
-                            // Likely token not supported on Aave
-                            return {
-                                provider: FlashLoanProvider.AaveV3,
-                                liquidity: 0n,
-                                hasLiquidity: false,
-                            };
-                        }
-                    })()
-                );
+                    results.push({
+                        provider: FlashLoanProvider.AaveV3,
+                        liquidity: balance,
+                        hasLiquidity: balance >= amount,
+                    });
+                } catch (err) {
+                    console.error("Aave V3 liquidity check failed", err);
+                    // Likely token not supported on Aave or no reserve data
+                    results.push({
+                        provider: FlashLoanProvider.AaveV3,
+                        liquidity: 0n,
+                        hasLiquidity: false,
+                    });
+                }
             }
 
-            const results = await Promise.all(checks);
             setLiquidityData(results);
 
         } catch (error) {
@@ -155,7 +173,7 @@ export const useFlashLoanLiquidity = (
         } finally {
             setIsLoading(false);
         }
-    }, [tokenAddress, routerInfo, publicClient, amount, chainId]);
+    }, [tokenAddress, routerInfo, publicClient, amount]);
 
     // Re-fetch when token or amount changes
     useEffect(() => {
