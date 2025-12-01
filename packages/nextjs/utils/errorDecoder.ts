@@ -199,6 +199,15 @@ export function formatErrorForDisplay(error: string): { title: string; descripti
     };
   }
 
+  // Supply cap
+  if (error.includes("Supply cap exceeded")) {
+    return {
+      title: "Supply Cap Reached",
+      description: "This asset has reached its maximum supply limit on Aave.",
+      suggestion: "Try supplying a different asset or a smaller amount.",
+    };
+  }
+
   // Slippage
   if (error.includes("slippage")) {
     return {

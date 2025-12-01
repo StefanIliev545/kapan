@@ -84,7 +84,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
     }, [amountIn, selectedFrom]);
 
-    const { selectedProvider, setSelectedProvider } = useFlashLoanSelection({
+    const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
         flashLoanProviders,
         defaultProvider: defaultFlashLoanProvider,
         tokenAddress: selectedFrom?.address,
@@ -252,6 +252,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             flashLoanProviders={flashLoanProviders}
             selectedProvider={selectedProvider}
             setSelectedProvider={setSelectedProvider}
+            flashLoanLiquidityData={liquidityData}
             preferBatching={preferBatching}
             setPreferBatching={setPreferBatching}
             onSubmit={handleSwapWrapper}
