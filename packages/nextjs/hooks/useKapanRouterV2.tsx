@@ -434,61 +434,49 @@ export const useKapanRouterV2 = () => {
 
     const swapOp = isExactOut ? LendingOp.SwapExactOut : LendingOp.Swap;
 
+    // Output index tracking:
+    // 0. startInstruction -> Output[0] (amount/token for flash loan)
+    // 1. FlashLoan -> Output[1] (flash loan proceeds)
+    // 2. Approve -> Output[2] (DUMMY - approve always creates empty output)
+    // 3. Swap -> Output[3] (tokenOut), Output[4] (refund/tokenIn)
+    // 4. Approve -> Output[5] (DUMMY)
+    // 5. Deposit -> no output (or depends on protocol)
+    // 6. Withdraw -> Output[6] (withdrawn tokenIn for flash repayment)
+
     return [
-      // 0. Create UTXO for Flash Loan Amount/Token -> Output 0
+      // 0. Create UTXO for Flash Loan Amount/Token -> Output[0]
       startInstruction,
 
-      // 1. Flash Loan (uses Output 0) -> Output 1 (Borrowed Funds)
-      // Note: Output 0 is consumed? No, FlashLoan reads it.
-      // The Flash Loan result is pushed as a new Output.
+      // 1. Flash Loan (uses Output[0]) -> Output[1] (Borrowed Funds)
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
 
-      // 2. Approve TokenIn (Output 1) for OneInchGateway
+      // 2. Approve TokenIn (Output[1]) for OneInchGateway -> Output[2] (dummy)
       createRouterInstruction(encodeApprove(1, "oneinch")),
 
-      // 3. Swap TokenIn (Output 1) -> TokenOut (Output 2) + Refund (Output 3)
+      // 3. Swap TokenIn (Output[1]) -> Output[3] (TokenOut) + Output[4] (Refund)
       createProtocolInstruction(
         "oneinch",
         encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 1)
       ),
 
-      // 4. Approve TokenOut (Output 2) for LendingProtocol
-      // Note: Swap produces [TokenOut, Refund]. So Output 2 is TokenOut. Output 3 is Refund.
-      // Wait, in OneInchGateway.sol:
-      // outputs[0] = ProtocolTypes.Output({ token: tokenOut, amount: outputReceived });
-      // outputs[1] = ProtocolTypes.Output({ token: tokenIn, amount: refundAmount });
-      // If FlashLoan was Output 1.
-      // Swap uses Output 1 as input.
-      // Swap produces Output 2 (TokenOut) and Output 3 (Refund).
-      // So we approve Output 2.
-      createRouterInstruction(encodeApprove(2, normalizedProtocol)),
+      // 4. Approve TokenOut (Output[3]) for LendingProtocol -> Output[5] (dummy)
+      createRouterInstruction(encodeApprove(3, normalizedProtocol)),
 
-      // 5. Deposit TokenOut (Output 2) into LendingProtocol
+      // 5. Deposit TokenOut (Output[3]) into LendingProtocol
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(depositOp, tokenOutAddress, userAddress, 0n, context, 2)
+        encodeLendingInstruction(depositOp, tokenOutAddress, userAddress, 0n, context, 3)
       ),
 
-      // 6. Withdraw TokenIn from LendingProtocol -> Output 4
+      // 6. Withdraw TokenIn from LendingProtocol -> Output[6]
       // We withdraw the exact amount we flash loaned (plus fee if any).
-      // We use Output 1 (Repayment Amount) from the Flash Loan callback.
+      // We reference Output[1] (flash loan amount) for the withdrawal amount.
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(withdrawOp, tokenInAddress, userAddress, 0n, context, 1)
       ),
 
-      // 7. Repay Flash Loan
-      // The Router automatically handles repayment check at the end of the transaction?
-      // No, for Balancer flash loans, the *callback* must return the funds.
-      // The `KapanRouter` implementation of `receiveFlashLoan` (or equivalent) likely checks if it has the funds.
-      // The `processFlashLoan` calls `_requestBalancerV2`.
-      // The callback `onFlashLoan` (or similar) calls `runStack`.
-      // After `runStack` returns, the Router must have the funds to repay.
-      // The `Withdraw` instruction (Step 6) puts funds into the Router (Output 4).
-      // So the funds are there.
-      // The Balancer Vault will pull the funds from the Router at the end of the callback.
-      // So we just need to make sure the Router *has* the tokens.
-      // Step 6 (Withdraw) ensures that.
+      // Flash loan repayment happens automatically - Router must have funds from Withdraw
     ];
   }, [userAddress, encodeCompoundMarket]);
 
