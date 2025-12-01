@@ -298,23 +298,26 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   const [flashLoanProviders, setFlashLoanProviders] = useState<FlashLoanProviderOption[]>([]);
   const [defaultFlashLoanProvider, setDefaultFlashLoanProvider] = useState<FlashLoanProviderOption | undefined>(undefined);
 
-  // EVM router flags
+  // EVM router flags - pass chainId to ensure we read from the correct network
   const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useNetworkAwareReadContract({
     networkType: "evm",
     contractName: "KapanRouter",
     functionName: "balancerV2Enabled",
+    chainId,
     query: { enabled: isOpen && networkType === "evm" },
   });
   const { data: balancerV3Enabled, isLoading: isLoadingBalancerV3 } = useNetworkAwareReadContract({
     networkType: "evm",
     contractName: "KapanRouter",
     functionName: "balancerV3Enabled",
+    chainId,
     query: { enabled: isOpen && networkType === "evm" },
   });
   const { data: aaveEnabled, isLoading: isLoadingAave } = useNetworkAwareReadContract({
     networkType: "evm",
     contractName: "KapanRouter",
     functionName: "aaveEnabled",
+    chainId,
     query: { enabled: isOpen && networkType === "evm" },
   });
 

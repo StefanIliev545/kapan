@@ -40,7 +40,14 @@ const localhost = defineChain({
 const scaffoldConfig = {
   // The networks on which your DApp is live
   // Using custom localhost chain with chainId 31337 to match Hardhat network deployments
-  targetEVMNetworks: [chains.arbitrum, chains.base, chains.optimism, chains.linea],
+  targetEVMNetworks: [
+    chains.arbitrum,
+    chains.base,
+    chains.optimism,
+    chains.linea,
+    // Conditionally include Hardhat (localhost) for local development only
+    ...(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? [localhost] : []),
+  ],
   targetSNNetworks: [snchains.mainnet],
   // The interval at which your front-end polls the RPC servers for new data
   // it has no effect if you only target the local network (default is 4000)

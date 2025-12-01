@@ -9,6 +9,7 @@ import CallToAction, { CallToActionSectionProps } from "~~/components/common/Cal
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { arbitrum, base, optimism, linea } from "wagmi/chains";
+import { hardhat } from "viem/chains";
 
 // ---- Lazy-load heavy protocol views (client-only) ----
 const AaveProtocolView = dynamic(
@@ -47,14 +48,17 @@ const networkOptions: NetworkOption[] = [
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
   { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
+  ...(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true"
+    ? [{ id: "hardhat", name: "Hardhat", logo: "/logos/ethereum.svg" } as NetworkOption]
+    : []),
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
 const App: NextPage = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("base");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base");
 
   // Keep a cache of networks the user has visited so we keep their trees mounted
-  const [mounted, setMounted] = useState<Set<string>>(new Set(["base"]));
+  const [mounted, setMounted] = useState<Set<string>>(new Set([process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base"]));
   useEffect(() => {
     setMounted(prev => {
       if (prev.has(selectedNetwork)) return prev;
@@ -166,6 +170,24 @@ const App: NextPage = () => {
             </StableArea>
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+            </StableArea>
+          </div>
+        )}
+
+        {/* HARDHAT (conditionally enabled via NEXT_PUBLIC_ENABLE_HARDHAT_UI) */}
+        {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && mounted.has("hardhat") && (
+          <div className={selectedNetwork === "hardhat" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "hardhat"}>
+            <div className="my-2 text-warning text-sm text-center">
+              Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
+            </div>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+            </StableArea>
+            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
             </StableArea>
           </div>
         )}

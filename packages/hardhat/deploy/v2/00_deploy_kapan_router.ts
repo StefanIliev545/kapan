@@ -29,6 +29,11 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
       VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
     },
+    // Hardhat localhost forking Arbitrum - use Arbitrum addresses
+    31337: {
+      VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
+    },
   };
 
   // Aave V3 PoolAddressesProvider map (same as in AaveGatewayWrite deployment)
@@ -44,6 +49,10 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     },
     59144: {
       PROVIDER: "0x89502c3731F69DDC95B65753708A07F8Cd0373F4", // Linea v3 PoolAddressesProvider
+    },
+    // Hardhat localhost forking Arbitrum - use Arbitrum addresses
+    31337: {
+      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
     },
   };
 

@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
-import { parseUnits } from "viem";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { FlashLoanProviderOption } from "./useMovePositionData";
 import { useFlashLoanLiquidity } from "./useFlashLoanLiquidity";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
@@ -21,20 +20,38 @@ export const useFlashLoanSelection = ({
     chainId,
     initialProviderName
 }: UseFlashLoanSelectionProps) => {
-    const [selectedProvider, setSelectedProvider] = useState<FlashLoanProviderOption | undefined>(undefined);
+    const [selectedProvider, setSelectedProviderInternal] = useState<FlashLoanProviderOption | undefined>(undefined);
+    // Track if user has manually selected a provider (don't auto-override)
+    const userHasSelected = useRef(false);
+    // Track the token to reset manual selection when token changes
+    const prevTokenRef = useRef<string | undefined>(undefined);
+
+    // Reset manual selection flag when token changes
+    useEffect(() => {
+        if (tokenAddress !== prevTokenRef.current) {
+            userHasSelected.current = false;
+            prevTokenRef.current = tokenAddress;
+        }
+    }, [tokenAddress]);
+
+    // Wrap setSelectedProvider to track manual selection
+    const setSelectedProvider = useCallback((provider: FlashLoanProviderOption) => {
+        userHasSelected.current = true;
+        setSelectedProviderInternal(provider);
+    }, []);
 
     // Initialize with default or initial
     useEffect(() => {
-        if (!selectedProvider) {
+        if (!selectedProvider && !userHasSelected.current) {
             if (initialProviderName) {
                 const found = flashLoanProviders.find(p => p.name === initialProviderName);
                 if (found) {
-                    setSelectedProvider(found);
+                    setSelectedProviderInternal(found);
                     return;
                 }
             }
             if (defaultProvider) {
-                setSelectedProvider(defaultProvider);
+                setSelectedProviderInternal(defaultProvider);
             }
         }
     }, [flashLoanProviders, defaultProvider, initialProviderName, selectedProvider]);
@@ -42,15 +59,17 @@ export const useFlashLoanSelection = ({
     // Fetch liquidity
     const { liquidityData, isLoading } = useFlashLoanLiquidity(tokenAddress, amount, chainId);
 
-    // Auto-select based on liquidity
+    // Auto-select based on liquidity (only if user hasn't manually selected)
     useEffect(() => {
+        // Don't auto-select if user has manually chosen
+        if (userHasSelected.current) return;
         if (!liquidityData.length || amount === 0n) return;
 
-        // Priority: Balancer V3 > Balancer V2 > Aave V3
+        // Priority: Balancer V2 > Aave V3 > Balancer V3
         const priority = [
-            FlashLoanProvider.BalancerV3,
             FlashLoanProvider.BalancerV2,
-            FlashLoanProvider.AaveV3
+            FlashLoanProvider.AaveV3,
+            FlashLoanProvider.BalancerV3
         ];
 
         // Find the best provider with sufficient liquidity
@@ -61,14 +80,8 @@ export const useFlashLoanSelection = ({
 
         if (bestProviderEnum !== undefined) {
             const providerOption = flashLoanProviders.find(p => p.providerEnum === bestProviderEnum);
-            // Only switch if the current selection is different (and we want to enforce "best" available)
-            // Or maybe we only switch if the *current* one is NOT sufficient?
-            // The user requested "auto pick one that has [balance]".
-            // Let's stick to the logic: if we find a better one (higher priority with liquidity), pick it.
-            // But we should respect manual selection if it's valid?
-            // For now, let's keep the aggressive auto-select which ensures success.
             if (providerOption && providerOption.name !== selectedProvider?.name) {
-                setSelectedProvider(providerOption);
+                setSelectedProviderInternal(providerOption);
             }
         }
     }, [liquidityData, amount, flashLoanProviders, selectedProvider]);

@@ -9,6 +9,7 @@ import { TBytes } from "./libraries/TBytes.sol";
 import { IGateway } from "./interfaces/IGateway.sol";
 import { ProtocolTypes } from "./interfaces/ProtocolTypes.sol";
 import { FlashLoanConsumerBase } from "./flashloans/FlashLoanConsumerBase.sol";
+import "hardhat/console.sol";
 
 contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     using SafeERC20 for IERC20;
@@ -130,7 +131,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         if (bytes(instruction.protocolName).length == 0) {
             return;
         }
+        uint256 instrIndex = 0;
         while (true) {
+            console.log("KapanRouter: Processing instruction %s: %s", instrIndex, instruction.protocolName);
             if (keccak256(abi.encode(instruction.protocolName)) == keccak256(abi.encode("router"))) {
                 bool halt = processRouterInstruction(instruction);
                 if (halt) {
@@ -142,7 +145,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     revert("Gateway not found");
                 }
                 ProtocolTypes.Output[] memory inputs = _getOutputs();
+                console.log("KapanRouter: Calling gateway with %s inputs", inputs.length);
                 ProtocolTypes.Output[] memory produced = gw.processLendingInstruction(inputs, instruction.data);
+                console.log("KapanRouter: Gateway produced %s outputs", produced.length);
                 if (produced.length > 0) {
                     _appendOutputs(produced);
                 }
@@ -152,6 +157,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                 break;
             }
             (instruction, isEmpty) = popStack();
+            instrIndex++;
         }
     }
 
@@ -212,12 +218,15 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     ) internal {
         // Read the amount and token from the output stack using InputPtr
         ProtocolTypes.Output[] memory inputs = _getOutputs();
+        console.log("FlashLoan: inputPtr.index=%s, inputs.length=%s", inputPtr.index, inputs.length);
         require(inputPtr.index < inputs.length, "FlashLoan: bad index");
         ProtocolTypes.Output memory input = inputs[inputPtr.index];
+        console.log("FlashLoan: token=%s, amount=%s", input.token, input.amount);
         require(input.token != address(0), "FlashLoan: zero token");
         require(input.amount > 0, "FlashLoan: zero amount");
 
         // Route to the appropriate provider
+        console.log("FlashLoan: provider=%s", uint256(provider));
         if (provider == FlashLoanProvider.BalancerV2) {
             _requestBalancerV2(input.token, input.amount, bytes(""));
         } else if (provider == FlashLoanProvider.BalancerV3) {

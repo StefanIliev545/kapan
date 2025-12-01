@@ -29,11 +29,16 @@ export const useFlashLoanLiquidity = (
     amount: bigint,
     chainId: number
 ) => {
-    const { data: routerInfo } = useDeployedContractInfo("KapanRouter");
+    const { data: routerInfo } = useDeployedContractInfo({ contractName: "KapanRouter", chainId });
     const publicClient = usePublicClient({ chainId });
 
     const [liquidityData, setLiquidityData] = useState<FlashLoanLiquidity[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Reset liquidity data when token changes to avoid showing stale data
+    useEffect(() => {
+        setLiquidityData([]);
+    }, [tokenAddress, chainId]);
 
     const fetchLiquidity = useCallback(async () => {
         if (!tokenAddress || !routerInfo || !publicClient || amount === 0n) return;
@@ -150,11 +155,12 @@ export const useFlashLoanLiquidity = (
         } finally {
             setIsLoading(false);
         }
-    }, [tokenAddress, routerInfo, publicClient, amount]);
+    }, [tokenAddress, routerInfo, publicClient, amount, chainId]);
 
+    // Re-fetch when token or amount changes
     useEffect(() => {
         fetchLiquidity();
-    }, [fetchLiquidity]);
+    }, [fetchLiquidity, tokenAddress, amount]);
 
     return { liquidityData, isLoading, refetch: fetchLiquidity };
 };
