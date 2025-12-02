@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "hardhat/console.sol";
 
 // --- Existing Balancer imports ---
 import { IFlashLoanProvider } from "../interfaces/balancer/IFlashLoanProvider.sol";
@@ -228,6 +229,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
         IERC20(asset).approve(address(aaveV3Pool), repayment);
 
         emit FlashRepaid("AAVE_V3", asset, repayment);
+        console.log("FlashLoanConsumerBase: AaveV3 executeOperation after repayment");
         return true;
     }
 

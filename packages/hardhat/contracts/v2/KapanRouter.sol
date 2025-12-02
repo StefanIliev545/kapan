@@ -49,7 +49,10 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         PullToken,
         PushToken,
         ToOutput,
-        Approve
+        Approve,
+        Split,
+        Add,
+        Subtract
     }
     enum FlashLoanProvider {
         BalancerV2,
@@ -206,6 +209,70 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             // Always produce an output (even if empty) to ensure consistent indexing
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            _appendOutputs(out);
+        } else if (routerInstruction.instructionType == RouterInstructionType.Split) {
+            // Decode extra params: input pointer and basisPoints (e.g. 30 = 0.3%)
+            (, ProtocolTypes.InputPtr memory inputPtr, uint256 bp) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr, uint256)
+            );
+            ProtocolTypes.Output[] memory inputs = _getOutputs();
+            require(inputPtr.index < inputs.length, "Split: bad index");
+            ProtocolTypes.Output memory orig = inputs[inputPtr.index];
+            require(orig.token != address(0) && orig.amount > 0, "Split: no value");
+            require(bp <= 10000, "Split: fraction too large"); // 10000 = 100%
+            // Calculate fee = (orig.amount * bp) / 10000 (round up to ensure coverage)
+            uint256 feeAmount = (orig.amount * bp + 10000 - 1) / 10000;
+            if (feeAmount > orig.amount) feeAmount = orig.amount; // cap at 100%
+            uint256 remainder = orig.amount - feeAmount;
+            // Produce two outputs: fee portion and remainder portion
+            ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](2);
+            out[0] = ProtocolTypes.Output({ token: orig.token, amount: feeAmount });
+            out[1] = ProtocolTypes.Output({ token: orig.token, amount: remainder });
+            // Consume the original output by clearing it
+            inputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            TBytes.set(OUTPUTS_SLOT, abi.encode(inputs));
+            _appendOutputs(out);
+        } else if (routerInstruction.instructionType == RouterInstructionType.Add) {
+            // Decode extra params: two input pointers
+            (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+            );
+            ProtocolTypes.Output[] memory inputs = _getOutputs();
+            require(ptrA.index < inputs.length && ptrB.index < inputs.length, "Add: bad index");
+            ProtocolTypes.Output memory outA = inputs[ptrA.index];
+            ProtocolTypes.Output memory outB = inputs[ptrB.index];
+            require(outA.token != address(0) && outB.token != address(0), "Add: zero token");
+            require(outA.token == outB.token, "Add: token mismatch");
+            uint256 total = outA.amount + outB.amount;
+            ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
+            out[0] = ProtocolTypes.Output({ token: outA.token, amount: total });
+            // Clear the original outputs
+            inputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            inputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            TBytes.set(OUTPUTS_SLOT, abi.encode(inputs));
+            _appendOutputs(out);
+        } else if (routerInstruction.instructionType == RouterInstructionType.Subtract) {
+            // Decode extra params: two input pointers (minuend - subtrahend)
+            (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+            );
+            ProtocolTypes.Output[] memory inputs = _getOutputs();
+            require(ptrA.index < inputs.length && ptrB.index < inputs.length, "Subtract: bad index");
+            ProtocolTypes.Output memory outA = inputs[ptrA.index];
+            ProtocolTypes.Output memory outB = inputs[ptrB.index];
+            require(outA.token != address(0) && outB.token != address(0), "Subtract: zero token");
+            require(outA.token == outB.token, "Subtract: token mismatch");
+            require(outA.amount >= outB.amount, "Subtract: underflow");
+            uint256 diff = outA.amount - outB.amount;
+            ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
+            out[0] = ProtocolTypes.Output({ token: outA.token, amount: diff });
+            // Clear the original outputs
+            inputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            inputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            TBytes.set(OUTPUTS_SLOT, abi.encode(inputs));
             _appendOutputs(out);
         }
         return false;
@@ -364,6 +431,63 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     } else {
                         outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
                     }
+                } else if (r.instructionType == RouterInstructionType.Split) {
+                    // Simulate Split: takes one output and produces two (fee + remainder)
+                    (, ProtocolTypes.InputPtr memory inputPtr, uint256 bp) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr, uint256)
+                    );
+                    if (inputPtr.index < outputs.length) {
+                        ProtocolTypes.Output memory orig = outputs[inputPtr.index];
+                        uint256 feeAmount = (orig.amount * bp + 10000 - 1) / 10000;
+                        if (feeAmount > orig.amount) feeAmount = orig.amount;
+                        uint256 remainder = orig.amount - feeAmount;
+                        // Clear the original
+                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        // Append fee and remainder
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: feeAmount }));
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: remainder }));
+                    } else {
+                        // Bad index, append two empty outputs for consistent indexing
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
+                } else if (r.instructionType == RouterInstructionType.Add) {
+                    // Simulate Add: takes two outputs and produces one (sum)
+                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+                    );
+                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
+                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
+                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
+                        uint256 total = outA.amount + outB.amount;
+                        // Clear the originals
+                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        // Append sum
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: total }));
+                    } else {
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
+                } else if (r.instructionType == RouterInstructionType.Subtract) {
+                    // Simulate Subtract: takes two outputs and produces one (difference)
+                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+                    );
+                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
+                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
+                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
+                        uint256 diff = outA.amount >= outB.amount ? outA.amount - outB.amount : 0;
+                        // Clear the originals
+                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        // Append difference
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: diff }));
+                    } else {
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
                 }
 
                 k++;
@@ -472,6 +596,62 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     );
                     if (inputPtr.index < outputs.length) {
                         outputs = _appendOutputMemory(outputs, outputs[inputPtr.index]);
+                    } else {
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                } else if (r.instructionType == RouterInstructionType.Split) {
+                    // Simulate Split output for indexing consistency (no revocation needed)
+                    (, ProtocolTypes.InputPtr memory inputPtr, uint256 bp) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr, uint256)
+                    );
+                    if (inputPtr.index < outputs.length) {
+                        ProtocolTypes.Output memory orig = outputs[inputPtr.index];
+                        uint256 feeAmount = (orig.amount * bp + 10000 - 1) / 10000;
+                        if (feeAmount > orig.amount) feeAmount = orig.amount;
+                        uint256 remainder = orig.amount - feeAmount;
+                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: feeAmount }));
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: remainder }));
+                    } else {
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                } else if (r.instructionType == RouterInstructionType.Add) {
+                    // Simulate Add output for indexing consistency (no revocation needed)
+                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+                    );
+                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
+                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
+                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
+                        uint256 total = outA.amount + outB.amount;
+                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: total }));
+                    } else {
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+                    }
+                    tmpTargets[k] = address(0);
+                    tmpData[k] = bytes("");
+                } else if (r.instructionType == RouterInstructionType.Subtract) {
+                    // Simulate Subtract output for indexing consistency (no revocation needed)
+                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                        pi.data,
+                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+                    );
+                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
+                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
+                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
+                        uint256 diff = outA.amount >= outB.amount ? outA.amount - outB.amount : 0;
+                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: diff }));
                     } else {
                         outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
                     }

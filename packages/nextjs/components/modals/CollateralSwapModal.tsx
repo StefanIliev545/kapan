@@ -2,6 +2,11 @@ import { FC, useState, useMemo } from "react";
 import { formatUnits, parseUnits, Address } from "viem";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
+
+// Aave flash loan fee buffer: 9 bps (0.09%)
+// When using Aave with isMax, we need to quote for a reduced amount
+// because Split will carve out the fee buffer before the flash loan
+const AAVE_FEE_BUFFER_BPS = 9n;
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
@@ -92,12 +97,42 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         chainId,
     });
 
-    // 1inch Quote
+    const quoteAmount = useMemo(() => {
+        // When isMax=true, use the ACTUAL raw balance from the asset, not parsed amountIn
+        // This ensures we match what GetSupplyBalance will return on-chain
+        const baseAmount = isMax && selectedFrom?.rawBalance 
+            ? selectedFrom.rawBalance 
+            : parseUnits(amountIn || "0", selectedFrom?.decimals || 18);
+        
+        // If using Aave flash loan with isMax, reduce the quote amount by fee buffer
+        // This ensures the 1inch swap data matches the actual amount we'll swap
+        const isAaveWithMax = isMax && selectedProvider?.providerEnum === FlashLoanProvider.AaveV3;
+        if (isAaveWithMax && baseAmount > 0n) {
+            // IMPORTANT: Must match on-chain Split rounding exactly!
+            // On-chain: feeAmount = (amount * bp + 10000 - 1) / 10000  (rounds UP)
+            // On-chain: principal = amount - feeAmount
+            // We must use the same formula here to avoid rounding mismatches
+            const feeAmount = (baseAmount * AAVE_FEE_BUFFER_BPS + 10000n - 1n) / 10000n;
+            const principal = baseAmount - feeAmount;
+            
+            // Add a tiny safety buffer (0.01%) to ensure quote is always <= on-chain amount
+            // This handles any timing differences between UI load and tx execution
+            // 1inch will swap whatever we send, and any extra stays as refund
+            const safetyBuffer = principal / 10000n; // 0.01%
+            const safeQuoteAmount = principal - safetyBuffer;
+            
+            return safeQuoteAmount.toString();
+        }
+        
+        return baseAmount.toString();
+    }, [amountIn, selectedFrom?.decimals, selectedFrom?.rawBalance, isMax, selectedProvider?.providerEnum]);
+
+    // 1inch Quote - uses reduced amount when Aave + isMax
     const { data: quote, isLoading: isQuoteLoading, error: quoteError } = use1inchQuote({
         chainId,
         src: selectedFrom?.address as Address,
         dst: selectedTo?.address as Address,
-        amount: parseUnits(amountIn || "0", selectedFrom?.decimals || 18).toString(),
+        amount: quoteAmount,
         from: oneInchAdapter?.address || "",
         slippage: slippage,
         enabled: !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,

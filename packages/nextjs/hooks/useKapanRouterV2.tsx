@@ -33,6 +33,7 @@ import {
   encodePushToken,
   encodeLendingInstruction,
   encodeFlashLoan,
+  encodeSplit,
   FlashLoanProvider,
   LendingOp,
   normalizeProtocolName,
@@ -400,39 +401,96 @@ export const useKapanRouterV2 = () => {
       [tokenOutAddress as Address, minAmountOutBigInt, swapData as Hex]
     );
 
-    // Flow:
-    // 1. Flash Loan TokenIn (AmountIn) -> Output 0
-    // 2. Approve TokenIn for OneInchGateway (using Output 0)
-    // 3. Swap TokenIn -> TokenOut (Output 1) + Refund (Output 2)
-    // 4. Approve TokenOut (Output 1) for LendingProtocol
-    // 5. Deposit TokenOut (Output 1) into LendingProtocol
-    // 6. Withdraw TokenIn (AmountIn) from LendingProtocol -> Output 3
-    // 7. Repay Flash Loan with Output 3
+    const swapOp = isExactOut ? LendingOp.SwapExactOut : LendingOp.Swap;
 
-    // Note: Flash Loan is handled by the Router's FlashLoan instruction.
-    // We need to construct the instructions *inside* the flash loan callback?
-    // No, the KapanRouter V2 handles Flash Loans by executing the subsequent instructions
-    // and expecting the repayment at the end (or via specific Repay instruction if it was a protocol flash loan).
-    // But here we are using the *Router's* flash loan capability (e.g. Balancer).
+    // Aave V3 flash loans have a fee (~5-9 bps). When isMax=true, we need to use Split
+    // to reduce the flash loan principal so that (principal + fee) fits within our supply balance.
+    // Balancer V2/V3 have no fees, so we can flash the full amount.
+    const needsFeeSplit = isMax && flashLoanProvider === FlashLoanProvider.AaveV3;
+    
+    // Aave flash loan fee buffer: 9 bps (0.09%) - slightly higher than typical 5 bps for safety
+    const AAVE_FEE_BUFFER_BPS = 9;
 
-    // Wait, `encodeFlashLoan` in `instructionHelpers` uses `RouterInstructionType.FlashLoan`.
-    // The Router's `processFlashLoan` executes the provider's flash loan.
-    // The provider calls back `receiveFlashLoan` (or similar).
-    // `KapanRouter`'s callback then executes `runStack`.
-    // So we just push the FlashLoan instruction, and the *rest* of the instructions are executed inside the callback.
+    if (needsFeeSplit) {
+      // AAVE WITH FEE HANDLING using Split
+      // 
+      // The key insight: Split reduces the flash loan principal so that when Aave adds
+      // its fee, the repayment amount ≈ original supply balance (what we can withdraw).
+      //
+      // CRITICAL: The router RECEIVES Output[2] (principal) tokens from the flash loan,
+      // but Output[3] contains the REPAYMENT amount (principal + fee). We must use
+      // Output[2] for approve/swap since that's the actual tokens we have!
+      //
+      // NOTE: Output[1] (fee buffer) is a VIRTUAL UTXO - it represents the portion of
+      // collateral that stays in Aave. Do NOT try to PushToken it.
+      //
+      // Output tracking:
+      // 0. GetSupplyBalance -> Output[0] = full supply (e.g., 100)
+      // 1. Split(0, 9bps) -> Output[1] = fee buffer (~0.09), Output[2] = principal (~99.91)
+      // 2. FlashLoan(Aave, 2) -> Output[3] = repayment amount (~100), router has ~99.91 tokens
+      // 3. Approve(2) -> Output[4] (dummy) - approve PRINCIPAL, not repayment
+      // 4. Swap(2) -> Output[5] (tokenOut), Output[6] (refund) - swap PRINCIPAL
+      // 5. Approve(5) -> Output[7] (dummy)
+      // 6. Deposit(5) -> no output
+      // 7. Withdraw(3) -> Output[8] - withdraw REPAYMENT amount to cover flash loan
+      // 8. PushToken(6) -> return swap refund to user
 
-    // However, `encodeFlashLoan` takes an `inputIndex`. It expects an existing UTXO to define the amount/token.
-    // So we first need to create a UTXO with the amount/token we want to flash loan.
-    // We can use `ToOutput` for this.
+      return [
+        // 0. Get exact supply balance -> Output[0]
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenInAddress, userAddress, 0n, context, 999)
+        ),
 
+        // 1. Split to separate fee buffer from flash loan principal
+        // Split(0, 9 bps) -> Output[1] = fee (~0.09%), Output[2] = principal (~99.91%)
+        createRouterInstruction(encodeSplit(0, AAVE_FEE_BUFFER_BPS)),
+
+        // 2. Flash Loan using Aave with the REDUCED amount (Output[2])
+        // Creates Output[3] = repayment amount (principal + fee ≈ original supply)
+        createRouterInstruction(encodeFlashLoan(flashLoanProvider, 2)),
+
+        // 3. Approve OneInch for TokenIn using Output[2] (the actual principal we received)
+        createRouterInstruction(encodeApprove(2, "oneinch")),
+
+        // 4. Swap TokenIn using Output[2] (principal) -> Output[5] (TokenOut) + Output[6] (Refund)
+        createProtocolInstruction(
+          "oneinch",
+          encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 2)
+        ),
+
+        // 5. Approve TokenOut (Output[5]) for LendingProtocol -> Output[7] (dummy)
+        createRouterInstruction(encodeApprove(5, normalizedProtocol)),
+
+        // 6. Deposit TokenOut (Output[5]) into LendingProtocol
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(depositOp, tokenOutAddress, userAddress, 0n, context, 5)
+        ),
+
+        // 7. Withdraw TokenIn to repay flash loan
+        // Reference Output[3] (repayment amount) ≈ original supply
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(withdrawOp, tokenInAddress, userAddress, 0n, context, 3)
+        ),
+
+        // NOTE: Do NOT push Output[1] (fee buffer) - it's virtual, stays in Aave
+
+        // 8. Push swap refund (Output[6]) to user if any
+        createRouterInstruction(encodePushToken(6, userAddress)),
+      ];
+    }
+
+    // STANDARD FLOW (Balancer V2/V3 or non-max Aave)
+    // No fee handling needed for Balancer (0 fee) or non-max amounts
+    
     const startInstruction = isMax
       ? createProtocolInstruction(
-        normalizedProtocol,
-        encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenInAddress, userAddress, 0n, context, 999)
-      )
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.GetSupplyBalance, tokenInAddress, userAddress, 0n, context, 999)
+        )
       : createRouterInstruction(encodeToOutput(amountInBigInt, tokenInAddress));
-
-    const swapOp = isExactOut ? LendingOp.SwapExactOut : LendingOp.Swap;
 
     // Output index tracking:
     // 0. startInstruction -> Output[0] (amount/token for flash loan)
