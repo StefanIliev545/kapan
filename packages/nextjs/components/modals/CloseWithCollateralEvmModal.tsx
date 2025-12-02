@@ -12,6 +12,10 @@ import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { FiAlertTriangle, FiInfo, FiSettings } from "react-icons/fi";
 import { SwapModalShell, SwapAsset } from "./SwapModalShell";
 
+// Aave flash loan fee: 5 bps (0.05%)
+// We add a small buffer (10 bps total) to ensure swap covers repayment
+const AAVE_FLASH_LOAN_FEE_BPS = 10n;
+
 interface CloseWithCollateralEvmModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -178,18 +182,26 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
 
+        // For Aave flash loans, the swap needs to output enough to cover the flash loan repayment
+        // (principal + 0.05% fee). We add a buffer to be safe.
+        // For Balancer/others (no fee), we just use the exact debt amount.
+        const isAave = providerEnum === FlashLoanProvider.AaveV3;
+        const swapMinAmountOut = isAave
+            ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS / 10000n)
+            : repayAmountRaw;
+
         // For close with collateral (with flash loan):
         // 1. Flash loan debt token (use GetBorrowBalance if isMax for exact amount)
-        // 2. Repay debt (unlocks collateral)
+        // 2. Repay debt (unlocks collateral) - uses Output[0], the actual debt
         // 3. Withdraw collateral
-        // 4. Swap collateral to debt token
-        // 5. Repay flash loan
+        // 4. Swap collateral to debt token - must output >= flash loan repayment
+        // 5. Flash loan repays itself from swap output
         return buildCloseWithCollateralFlow(
             protocolName,
             selectedTo.address,      // collateral to sell
             debtToken,               // debt to repay
             requiredCollateral,      // max collateral to sell (with buffer)
-            repayAmountRaw,          // exact debt to repay (used for minAmountOut in swap)
+            swapMinAmountOut,        // minAmountOut for swap (includes Aave fee if applicable)
             swapQuote.tx.data,       // swap data
             providerEnum,            // flash loan provider
             market,

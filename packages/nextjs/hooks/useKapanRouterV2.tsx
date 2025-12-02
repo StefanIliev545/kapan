@@ -582,38 +582,63 @@ export const useKapanRouterV2 = () => {
         )
       : createRouterInstruction(encodeToOutput(exactDebtOut, debtToken));
 
+    // Output tracking:
+    // 0. GetBorrowBalance/ToOutput -> Output[0] = debtAmount (what we owe)
+    // 1. FlashLoan(0) -> Output[1] = repaymentAmount (debt + fee for Aave)
+    //    IMPORTANT: Router RECEIVES debtAmount tokens, but Output[1] tracks repaymentAmount!
+    // 2. Approve(1) -> Output[2] (dummy) - approve repaymentAmount (more than needed, OK)
+    // 3. Repay(0) -> Output[3] (refund) - repay using Output[0] (actual debt), NOT Output[1]!
+    // 4. ToOutput -> Output[4] = maxCollateralIn
+    // 5. Withdraw(4) -> Output[5] (withdrawn collateral)
+    // 6. Approve(5) -> Output[6] (dummy)
+    // 7. SwapExactOut(5) -> Output[7] (debt), Output[8] (collateral refund)
+    //    Swap must output >= repaymentAmount to cover flash loan!
+    // 8. PushToken(8) -> return excess collateral to user
+    
     return [
       // 0. Get debt amount: either GetBorrowBalance (isMax) or ToOutput (fixed amount)
-      // -> output[0] is the debt amount
+      // -> Output[0] is the debt amount we want to repay
       debtAmountInstruction,
-      // 1. Flash loan debt token using UTXO[0] -> output[1] is flash loan proceeds
+      
+      // 1. Flash loan debt token using Output[0]
+      // -> Output[1] = repaymentAmount (for Aave: debt + 0.05% fee)
+      // NOTE: Router receives Output[0] worth of tokens, but Output[1] tracks repayment!
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
-      // 2. Approve protocol for debt token (output[1])
+      
+      // 2. Approve protocol for debt token (Output[1] - approving more than needed is OK)
       createRouterInstruction(encodeApprove(1, normalizedProtocol)),
-      // 3. Repay debt using flash loan proceeds (output[1])
-      // Repay produces output[3] (refund, usually 0)
+      
+      // 3. Repay debt using Output[0] (the actual debt amount we owe)
+      // NOT Output[1] which is the repayment amount (more than we have for Aave!)
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, context, 1)
+        encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, context, 0)
       ),
+      
       // 4. ToOutput: declare how much collateral to withdraw
       createRouterInstruction(encodeToOutput(maxCollateralIn, collateralToken)),
-      // 5. Withdraw collateral (now unlocked) using UTXO[4] -> output[5]
+      
+      // 5. Withdraw collateral (now unlocked) using Output[4]
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralToken, userAddress, 0n, context, 4)
       ),
-      // 6. Approve OneInch on withdrawn collateral (output[5])
+      
+      // 6. Approve OneInch on withdrawn collateral (Output[5])
       createRouterInstruction(encodeApprove(5, "oneinch")),
-      // 7. SwapExactOut collateral -> debt token (output[7]: debt, output[8]: collateral refund)
-      // We want at least exactDebtOut of debt token to repay flash loan
+      
+      // 7. SwapExactOut collateral -> debt token
+      // Output[7] = debt token, Output[8] = collateral refund
+      // The swap minAmountOut (in swapContext) should cover flash loan repayment!
       createProtocolInstruction(
         "oneinch",
         encodeLendingInstruction(LendingOp.SwapExactOut, collateralToken, userAddress, 0n, swapContext as string, 5)
       ),
-      // 8. Push collateral refund (output[8]) to user
+      
+      // 8. Push collateral refund (Output[8]) to user
       createRouterInstruction(encodePushToken(8, userAddress)),
-      // 9. Do NOT push output[7] (debt token) - it stays in router to repay flash loan
+      
+      // NOTE: Output[7] (debt token) stays in router to repay flash loan
       // Any excess debt token from swap (beyond flash loan repayment) is dust in router
     ];
   }, [userAddress, encodeCompoundMarket]);
