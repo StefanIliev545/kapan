@@ -7,6 +7,9 @@ export enum RouterInstructionType {
   PushToken = 2,
   ToOutput = 3,
   Approve = 4,
+  Split = 5,
+  Add = 6,
+  Subtract = 7,
 }
 
 // Flash loan provider enum (matches Solidity)
@@ -233,4 +236,56 @@ export function encodeMockInstruction(produceOutput: boolean): string {
  */
 export function encodeDeposit(token: string, amount: bigint, user: string): string {
   return encodeLendingInstruction(LendingOp.Deposit, token, user, amount, "0x", 999);
+}
+
+/**
+ * Encode a Split router instruction
+ * Splits an output into two parts: fee (based on basis points) and remainder.
+ * @param inputIndex - Index of the UTXO to split
+ * @param basisPoints - Fee percentage in basis points (e.g., 30 = 0.3%, 100 = 1%)
+ */
+export function encodeSplit(inputIndex: number, basisPoints: number): string {
+  return coder.encode(
+    [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)", "uint256"],
+    [
+      [0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Split],
+      { index: inputIndex },
+      basisPoints,
+    ]
+  );
+}
+
+/**
+ * Encode an Add router instruction
+ * Combines two outputs of the same token into one by summing their amounts.
+ * @param indexA - Index of the first UTXO
+ * @param indexB - Index of the second UTXO
+ */
+export function encodeAdd(indexA: number, indexB: number): string {
+  return coder.encode(
+    [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)", "tuple(uint256 index)"],
+    [
+      [0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Add],
+      { index: indexA },
+      { index: indexB },
+    ]
+  );
+}
+
+/**
+ * Encode a Subtract router instruction
+ * Computes the difference between two outputs (minuend - subtrahend).
+ * Both outputs must be the same token and minuend.amount >= subtrahend.amount.
+ * @param minuendIndex - Index of the UTXO to subtract from
+ * @param subtrahendIndex - Index of the UTXO to subtract
+ */
+export function encodeSubtract(minuendIndex: number, subtrahendIndex: number): string {
+  return coder.encode(
+    [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)", "tuple(uint256 index)"],
+    [
+      [0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Subtract],
+      { index: minuendIndex },
+      { index: subtrahendIndex },
+    ]
+  );
 }
