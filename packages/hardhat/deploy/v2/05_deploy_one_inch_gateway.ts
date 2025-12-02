@@ -17,6 +17,7 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
         137: "0x111111125421ca6dc452d289314280a0f8842a65", // Polygon
         56: "0x111111125421ca6dc452d289314280a0f8842a65", // BSC
         8453: "0x111111125421ca6dc452d289314280a0f8842a65", // Base
+        59144: "0x111111125421ca6dc452d289314280a0f8842a65", // Linea
         31337: "0x111111125421ca6dc452d289314280a0f8842a65", // Hardhat (Arbitrum)
     };
 
