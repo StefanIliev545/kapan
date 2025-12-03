@@ -1,10 +1,12 @@
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import Image from "next/image";
 import { ProtocolPosition } from "../ProtocolView";
 import { BorrowModal } from "./BorrowModal";
 import { DepositModal } from "./DepositModal";
+import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
+import { formatUnits } from "viem";
 
 interface TokenSelectModalProps {
   isOpen: boolean;
@@ -27,6 +29,41 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
 }) => {
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
+  const { balances } = useWalletTokenBalances({
+    tokens: tokens.map(token => ({ address: token.tokenAddress, decimals: token.tokenDecimals })),
+    network: "evm",
+    chainId,
+  });
+
+  const tokensWithBalances = useMemo(
+    () =>
+      tokens.map(token => {
+        const key = token.tokenAddress.toLowerCase();
+        const balanceInfo = balances[key];
+        const decimals = balanceInfo?.decimals ?? token.tokenDecimals ?? 18;
+        const rawBalance = balanceInfo?.balance ?? 0n;
+        const balance = Number(formatUnits(rawBalance, decimals));
+
+        return {
+          ...token,
+          formattedBalance: balance,
+          hasBalance: rawBalance > 0n,
+          balanceLabel: balance.toLocaleString("en-US", {
+            maximumFractionDigits: 6,
+          }),
+        };
+      }),
+    [balances, tokens],
+  );
+
+  const sortedTokens = useMemo(
+    () =>
+      [...tokensWithBalances].sort((a, b) => {
+        if (a.hasBalance !== b.hasBalance) return Number(b.hasBalance) - Number(a.hasBalance);
+        return b.formattedBalance - a.formattedBalance;
+      }),
+    [tokensWithBalances],
+  );
   // Handle token selection
   const handleSelectToken = (token: ProtocolPosition) => {
     setSelectedToken(token);
@@ -58,8 +95,8 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
           </div>
 
           <div className="border border-base-300 divide-y divide-base-300 max-h-96 overflow-y-auto">
-            {tokens.length > 0 ? (
-              tokens.map(token => (
+            {sortedTokens.length > 0 ? (
+              sortedTokens.map(token => (
                 <button
                   key={token.tokenAddress}
                   className="w-full flex items-center justify-between p-3 hover:bg-base-200/60"
@@ -69,8 +106,13 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
                     <Image src={token.icon} alt={token.name} width={20} height={20} className="w-5 h-5" />
                     <span className="text-sm font-medium">{token.name}</span>
                   </div>
-                  <div className="text-[11px] text-base-content/60">
-                    {formatPercentage(token.currentRate, 2, false)}% {isBorrow ? "APR" : "APY"}
+                  <div className="flex flex-col text-right">
+                    <div className="text-[11px] text-base-content/60">
+                      {formatPercentage(token.currentRate, 2, false)}% {isBorrow ? "APR" : "APY"}
+                    </div>
+                    <div className="text-xs text-base-content/80">
+                      Balance: {token.balanceLabel}
+                    </div>
                   </div>
                 </button>
               ))
