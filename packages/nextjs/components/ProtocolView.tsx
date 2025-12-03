@@ -588,7 +588,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               debtPrice={selectedClosePosition.tokenPrice}
               debtBalance={selectedClosePosition.tokenBalance}
               availableCollaterals={selectedClosePosition.collaterals || availableCollaterals}
-              market={protocolName.toLowerCase() === "compound" ? (selectedClosePosition.tokenAddress as Address) : undefined}
+              market={
+                protocolName.toLowerCase().includes("compound")
+                  ? (selectedClosePosition.tokenAddress as Address)
+                  : undefined
+              }
             />
           )}
 
@@ -606,7 +610,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               debtFromPrice={selectedDebtSwapPosition.tokenPrice}
               currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
               availableAssets={selectedDebtSwapPosition.collaterals || availableCollaterals}
-              market={protocolName.toLowerCase() === "compound" ? (selectedDebtSwapPosition.tokenAddress as Address) : undefined}
+              market={
+                protocolName.toLowerCase().includes("compound")
+                  ? (selectedDebtSwapPosition.tokenAddress as Address)
+                  : undefined
+              }
             />
           )}
         </>
