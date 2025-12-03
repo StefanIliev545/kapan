@@ -833,6 +833,41 @@ export const useKapanRouterV2 = () => {
 
   // --- Execution Helpers ---
 
+  const simulateInstructions = useCallback(
+    async (instructions: ProtocolInstruction[]) => {
+      if (!routerContract || !userAddress || !publicClient) {
+        throw new Error("Router contract or user address not available");
+      }
+
+      const protocolInstructions = instructions.map(inst => ({
+        protocolName: inst.protocolName,
+        data: inst.data as `0x${string}`,
+      }));
+
+      const calldata = encodeFunctionData({
+        abi: routerContract.abi,
+        functionName: "processProtocolInstructions",
+        args: [protocolInstructions],
+      });
+
+      const simResult = await simulateTransaction(
+        publicClient,
+        routerContract.address as `0x${string}`,
+        calldata,
+        userAddress as `0x${string}`
+      );
+
+      if (!simResult.success && simResult.error) {
+        const formatted = formatErrorForDisplay(simResult.error);
+        const errorMsg = formatted.suggestion
+          ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+          : `${formatted.title}: ${formatted.description}`;
+        throw new Error(errorMsg);
+      }
+    },
+    [routerContract, userAddress, publicClient]
+  );
+
   const executeInstructions = useCallback(async (
     instructions: ProtocolInstruction[]
   ): Promise<string | undefined> => {
@@ -863,27 +898,7 @@ export const useKapanRouterV2 = () => {
 
         // Simulate transaction first to get better error messages
         if (publicClient) {
-          const calldata = encodeFunctionData({
-            abi: routerContract.abi,
-            functionName: "processProtocolInstructions",
-            args: [protocolInstructions],
-          });
-          
-          const simResult = await simulateTransaction(
-            publicClient,
-            routerContract.address as `0x${string}`,
-            calldata,
-            userAddress as `0x${string}`
-          );
-          
-          if (!simResult.success && simResult.error) {
-            clearTimeout(pendingTimeout);
-            const formatted = formatErrorForDisplay(simResult.error);
-            const errorMsg = formatted.suggestion 
-              ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
-              : `${formatted.title}: ${formatted.description}`;
-            throw new Error(errorMsg);
-          }
+          await simulateInstructions(instructions);
         }
 
         transactionHash = await writeContractAsync({
@@ -954,7 +969,7 @@ export const useKapanRouterV2 = () => {
       } else {
         // Try to extract and decode revert data from the error
         let revertData = "";
-        
+
         // Helper to extract hex string from various data formats
         const extractHexData = (data: unknown): string => {
           if (!data) return "";
@@ -971,12 +986,12 @@ export const useKapanRouterV2 = () => {
           }
           return "";
         };
-        
+
         // Check various places where revert data might be
-        revertData = extractHexData(error?.cause?.data) || 
+        revertData = extractHexData(error?.cause?.data) ||
                      extractHexData(error?.data) ||
                      "";
-        
+
         // If still no revert data, try to extract from error message
         if (!revertData && errorMessage) {
           const match = errorMessage.match(/return data: (0x[a-fA-F0-9]+)/i) ||
@@ -986,18 +1001,18 @@ export const useKapanRouterV2 = () => {
             revertData = match[1];
           }
         }
-        
+
         if (revertData && revertData.length >= 10) {
           const decoded = decodeRevertReason(revertData);
           const formatted = formatErrorForDisplay(decoded);
-          message = formatted.suggestion 
+          message = formatted.suggestion
             ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
             : `${formatted.title}: ${formatted.description}`;
         } else {
           message = error.shortMessage || error.message || message;
         }
       }
-      
+
       notification.error(
         <TransactionToast
           step="failed"
@@ -1008,7 +1023,7 @@ export const useKapanRouterV2 = () => {
       );
       throw new Error(message);
     }
-  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
+  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations, simulateInstructions]);
 
   const executeFlowWithApprovals = useCallback(async (
     instructions: ProtocolInstruction[],
@@ -1355,6 +1370,7 @@ export const useKapanRouterV2 = () => {
     buildCloseWithCollateralFlow,
     buildDebtSwapFlow,
     createMoveBuilder,
+    simulateInstructions,
     executeInstructions,
     executeFlowWithApprovals,
     executeFlowBatchedIfPossible,
