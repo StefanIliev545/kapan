@@ -23,6 +23,8 @@
     "@radix-ui/themes": "^3.2.1",
     "@rainbow-me/rainbowkit": "2.1.6",
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@safe-global/safe-apps-provider": "^0.18.3",
+    "@safe-global/safe-apps-sdk": "^9.1.0",
     "@scaffold-stark/stark-burner": "^0.1.13",
     "@starknet-io/get-starknet": "^4.0.7",
     "@starknet-io/get-starknet-core": "^4.0.7",
