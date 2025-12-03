@@ -32,7 +32,7 @@ export const useEvmTransactionFlow = ({
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
   const batchingPreference = useBatchingPreference();
-  const { executeFlowBatchedIfPossible, isAnyConfirmed } = useKapanRouterV2();
+  const { executeFlowBatchedIfPossible, isAnyConfirmed, simulateInstructions } = useKapanRouterV2();
 
   const ensureCorrectChain = useCallback(async () => {
     if (!chainId || !switchChain || chain?.id === chainId) return;
@@ -63,6 +63,16 @@ export const useEvmTransactionFlow = ({
         throw error;
       }
 
+      // For batched flows, run a client-side simulation to surface readable errors before bundling
+      if (batchingPreference.enabled) {
+        try {
+          await simulateInstructions(instructions);
+        } catch (error: any) {
+          notification.error(error?.message || "Transaction simulation failed");
+          throw error;
+        }
+      }
+
       await executeFlowBatchedIfPossible(instructions, batchingPreference.enabled);
       // Transaction toast notifications are handled by executeFlowBatchedIfPossible
     },
@@ -71,6 +81,7 @@ export const useEvmTransactionFlow = ({
       buildFlow,
       executeFlowBatchedIfPossible,
       batchingPreference.enabled,
+      simulateInstructions,
       successMessage,
       chainSwitchErrorMessage,
       emptyFlowErrorMessage,
