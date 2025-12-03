@@ -37,6 +37,18 @@ const nativeAssetFallback: Record<string, string> = {
   SOL: "solana:So11111111111111111111111111111111111111112",
 };
 
+const chainPrefixes: Record<string, string> = {
+  ethereum: "ethereum",
+  polygon: "polygon",
+  matic: "polygon",
+  bsc: "bsc",
+  binance: "bsc",
+  solana: "solana",
+  arbitrum: "arbitrum",
+  optimism: "optimism",
+  avalanche: "avax",
+};
+
 const fetchYieldPools = async (): Promise<YieldPoolEntry[]> => {
   const response = await fetch(DEFILLAMA_POOLS_ENDPOINT);
   if (!response.ok) {
@@ -56,6 +68,17 @@ const resolveNativeAssetId = ({ tokenSymbol, nativeAssetId }: NativeYieldRequest
   return fallback?.toLowerCase();
 };
 
+const normalizeAssetId = (tokenId: string, chain?: string) => {
+  const lowerToken = tokenId.toLowerCase();
+  if (lowerToken.includes(":")) return lowerToken;
+
+  const chainKey = chain?.toLowerCase() ?? "";
+  const chainPrefix = chainPrefixes[chainKey] ?? chainKey;
+  if (!chainPrefix) return undefined;
+
+  return `${chainPrefix}:${lowerToken}`;
+};
+
 export const useNativeStakingYields = (requests: NativeYieldRequest[] = []) => {
   const nativeAssetIds = useMemo(() => {
     const ids = new Set<string>();
@@ -65,6 +88,8 @@ export const useNativeStakingYields = (requests: NativeYieldRequest[] = []) => {
     });
     return Array.from(ids);
   }, [requests]);
+
+  const nativeAssetIdSet = useMemo(() => new Set(nativeAssetIds), [nativeAssetIds]);
 
   const { data: pools = [], isLoading } = useQuery({
     queryKey: qk.nativeStakingYields(),
@@ -77,15 +102,15 @@ export const useNativeStakingYields = (requests: NativeYieldRequest[] = []) => {
   const apyByAssetId = useMemo(() => {
     const map = new Map<string, NativeYieldResult>();
 
-    if (!pools.length || !nativeAssetIds.length) return map;
+    if (!pools.length || !nativeAssetIdSet.size) return map;
 
     pools.forEach(pool => {
-      if (pool.category !== "Liquid Staking" || !pool.underlyingTokens?.length) return;
+      if (!pool.underlyingTokens?.length) return;
       const poolApy = Number(pool.apy) || 0;
 
       pool.underlyingTokens.forEach(tokenId => {
-        const normalizedId = tokenId.toLowerCase();
-        if (!nativeAssetIds.includes(normalizedId)) return;
+        const normalizedId = normalizeAssetId(tokenId, pool.chain);
+        if (!normalizedId || !nativeAssetIdSet.has(normalizedId)) return;
 
         const existing = map.get(normalizedId);
         if (!existing || poolApy > existing.apy) {
@@ -95,7 +120,7 @@ export const useNativeStakingYields = (requests: NativeYieldRequest[] = []) => {
     });
 
     return map;
-  }, [nativeAssetIds, pools]);
+  }, [nativeAssetIdSet, pools]);
 
   const yieldsByToken = useMemo(() => {
     const map = new Map<string, NativeYieldResult>();
