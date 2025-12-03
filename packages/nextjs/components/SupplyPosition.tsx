@@ -64,6 +64,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   tokenAddress,
   tokenPrice,
   tokenDecimals,
+  nativeYieldApy,
+  nativeYieldSource,
   afterInfoContent,
   renderName,
   networkType,
@@ -107,6 +109,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   // Check if position has a balance
   const hasBalance = tokenBalance > 0;
+
+  const nativeYield = nativeYieldApy ?? 0;
+  const totalApy = currentRate + nativeYield;
+  const apyBreakdownTooltip = nativeYieldApy
+    ? `Total APY: ${formatPercentage(totalApy)}%\n- Lending yield: ${formatPercentage(currentRate)}%\n- Native staking: ${formatPercentage(nativeYield)}%${nativeYieldSource ? ` (${nativeYieldSource})` : ""}`
+    : undefined;
 
   const disabledMessage =
     actionsDisabledReason ||
@@ -247,9 +255,20 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     content: (
       <>
         <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
-        <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
-          {formatPercentage(currentRate)}%
+        <div
+          className={`font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1 ${
+            apyBreakdownTooltip ? "tooltip tooltip-bottom" : ""
+          }`}
+          data-tip={apyBreakdownTooltip}
+          title={apyBreakdownTooltip}
+        >
+          {formatPercentage(totalApy)}%
         </div>
+        {nativeYieldApy ? (
+          <div className="text-[11px] text-base-content/60 leading-tight">
+            Lending {formatPercentage(currentRate)}% + Native {formatPercentage(nativeYield)}%
+          </div>
+        ) : null}
       </>
     ),
   });

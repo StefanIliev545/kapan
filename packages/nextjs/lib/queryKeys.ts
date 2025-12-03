@@ -7,6 +7,7 @@ export const qk = {
     ["balanceOf", chainId, address.toLowerCase(), token.toLowerCase()] as const,
   positions: (chainId: number, address: string) => ["positions", chainId, address.toLowerCase()] as const,
   mockData: () => ["mockData"] as const,
+  nativeStakingYields: () => ["nativeStakingYields"] as const,
   eventHistory: (
     chainId: number,
     address: string,
