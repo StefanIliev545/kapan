@@ -9,6 +9,7 @@ import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
+import type { SwapAsset } from "./modals/SwapModalShell";
 import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
@@ -29,6 +30,7 @@ export interface ProtocolPosition {
   tokenPrice?: bigint; // Token price with 8 decimals of precision
   tokenDecimals?: number; // Token decimals
   tokenSymbol?: string; // Token symbol for price feed selection
+  collaterals?: SwapAsset[]; // Optional collateral assets tied to the position (e.g., Compound)
   collateralView?: React.ReactNode;
   collateralValue?: number; // Optional collateral value (used by borrowed positions)
   vesuContext?: {
@@ -445,7 +447,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         networkType={networkType}
                         chainId={chainId}
                         position={positionManager}
-                        availableAssets={availableCollaterals}
+                        availableAssets={position.collaterals || availableCollaterals}
                         availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: true, swap: enabledFeatures.swap ?? true }}
                         onClosePosition={() => handleCloseWithCollateral(position)}
                         onSwap={() => handleDebtSwap(position)}
@@ -585,7 +587,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               debtDecimals={selectedClosePosition.tokenDecimals || 18}
               debtPrice={selectedClosePosition.tokenPrice}
               debtBalance={selectedClosePosition.tokenBalance}
-              availableCollaterals={availableCollaterals}
+              availableCollaterals={selectedClosePosition.collaterals || availableCollaterals}
               market={protocolName.toLowerCase() === "compound" ? (selectedClosePosition.tokenAddress as Address) : undefined}
             />
           )}
@@ -603,7 +605,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               debtFromDecimals={selectedDebtSwapPosition.tokenDecimals || 18}
               debtFromPrice={selectedDebtSwapPosition.tokenPrice}
               currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
-              availableAssets={availableCollaterals}
+              availableAssets={selectedDebtSwapPosition.collaterals || availableCollaterals}
               market={protocolName.toLowerCase() === "compound" ? (selectedDebtSwapPosition.tokenAddress as Address) : undefined}
             />
           )}

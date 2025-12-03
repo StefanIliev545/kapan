@@ -7,6 +7,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { Abi } from "abitype";
 import { useQueryClient } from "@tanstack/react-query";
+import type { SwapAsset } from "../../modals/SwapModalShell";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -158,6 +159,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const depRes = depositedResults?.[idx]?.result as [Address[], bigint[], string[]] | undefined;
       const colls = depRes?.[0] ?? [];
       const balances = depRes?.[1] ?? [];
+      const collNames = depRes?.[2] ?? [];
 
       // locate prices/decimals array index among non-empty markets
       const locateRank = (): number => {
@@ -182,13 +184,34 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         collDecs = (collDecimalsResults?.[nonEmptyRank]?.result as bigint[] | undefined) ?? [];
       }
 
-      for (let i = 0; i < colls.length; i++) {
+      const swapCollaterals: SwapAsset[] = colls.map((collAddr, i) => {
         const balRaw = balances[i] ?? 0n;
         const dec = Number(collDecs[i] ?? 18n);
         const bal = Number(formatUnits(balRaw, dec));
         const collateralPriceInBase = Number(formatUnits(marketPrices[i] ?? 0n, priceDecimals));
-        collateralValue += bal * collateralPriceInBase * price;
-      }
+        const collateralUsdPrice = collateralPriceInBase * price;
+        const usdValue = Number.isFinite(collateralUsdPrice) ? bal * collateralUsdPrice : 0;
+        if (Number.isFinite(usdValue)) {
+          collateralValue += usdValue;
+        }
+
+        const collateralPrice = Number.isFinite(collateralUsdPrice)
+          ? BigInt(Math.round(collateralUsdPrice * 1e8))
+          : undefined;
+
+        const name = collNames[i] || "Collateral";
+
+        return {
+          symbol: name,
+          address: collAddr as Address,
+          decimals: dec,
+          rawBalance: balRaw,
+          balance: bal,
+          icon: tokenNameToLogo(name) || "/logos/token.svg",
+          usdValue,
+          price: collateralPrice,
+        };
+      });
 
       const safeName = (symbol || "").replace("₮", "T");
       const icon = tokenNameToLogo(safeName) || "/logos/token.svg";
@@ -216,6 +239,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         tokenPrice: priceRaw,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
+        collaterals: swapCollaterals,
         collateralView: (
           <CompoundCollateralView baseToken={base} baseTokenDecimals={decimals} compoundData={compound} chainId={chainId} />
         ),
