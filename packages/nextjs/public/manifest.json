@@ -1,5 +1,6 @@
 {
   "name": "Kapan",
   "description": "Lending Explorer",
-  "iconPath": "seal-logo.png"
+  "iconPath": "seal-logo.png",
+  "safe_apps_permissions": []
 }

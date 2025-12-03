@@ -10,6 +10,8 @@ import {
 import { rainbowkitBurnerWallet } from "burner-connector";
 import * as chains from "viem/chains";
 import scaffoldConfig from "~~/scaffold.config";
+import { type CreateConnectorFn } from "wagmi";
+import { safe } from "wagmi/connectors";
 
 const { onlyLocalBurnerWallet, targetEVMNetworks: targetNetworks } = scaffoldConfig;
 
@@ -50,5 +52,10 @@ export function getWagmiConnectors() {
     );
   }
 
-  return globalThis.wagmiConnectors;
+  const safeConnector: CreateConnectorFn = safe({
+    allowedDomains: [/\.safe\.global$/, /gnosis-safe\.io$/],
+    debug: false,
+  });
+
+  return [safeConnector, ...globalThis.wagmiConnectors];
 }
