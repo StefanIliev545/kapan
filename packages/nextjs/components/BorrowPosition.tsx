@@ -605,7 +605,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtPrice={tokenPrice}
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             availableCollaterals={availableAssetsList as SwapAsset[]}
-            market={protocolName.toLowerCase() === "compound" ? (tokenAddress as Address) : undefined}
+            market={
+              protocolName.toLowerCase().includes("compound") ? (tokenAddress as Address) : undefined
+            }
           />
           <DebtSwapEvmModal
             isOpen={debtSwapModal.isOpen}
@@ -619,7 +621,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtFromDecimals={tokenDecimals || 18}
             debtFromPrice={tokenPrice}
             availableAssets={availableAssetsList as SwapAsset[]}
-            market={protocolName.toLowerCase() === "compound" ? (tokenAddress as Address) : undefined}
+            market={
+              protocolName.toLowerCase().includes("compound") ? (tokenAddress as Address) : undefined
+            }
           />
         </>
       )}
