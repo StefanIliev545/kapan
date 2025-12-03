@@ -17,6 +17,7 @@ import { CollateralSwapModal } from "./modals/CollateralSwapModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
+import { useNativeStakingYields } from "~~/hooks/useNativeStakingYields";
 
 
 export interface ProtocolPosition {
@@ -29,6 +30,9 @@ export interface ProtocolPosition {
   tokenPrice?: bigint; // Token price with 8 decimals of precision
   tokenDecimals?: number; // Token decimals
   tokenSymbol?: string; // Token symbol for price feed selection
+  nativeYieldApy?: number; // Optional native staking APY to display alongside lending yield
+  nativeYieldSource?: string; // Source of the native yield (e.g., LST provider)
+  nativeAssetId?: string; // DefiLlama asset ID override for native staking lookup
   collateralView?: React.ReactNode;
   collateralValue?: number; // Optional collateral value (used by borrowed positions)
   vesuContext?: {
@@ -87,8 +91,8 @@ const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercen
 export const ProtocolView: FC<ProtocolViewProps> = ({
   protocolName,
   protocolIcon,
-  suppliedPositions,
-  borrowedPositions,
+  suppliedPositions: suppliedPositionsProp,
+  borrowedPositions: borrowedPositionsProp,
   hideUtilization = false,
   forceShowAll = false,
   networkType,
@@ -110,6 +114,35 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [isDebtSwapModalOpen, setIsDebtSwapModalOpen] = useState(false);
   const [selectedDebtSwapPosition, setSelectedDebtSwapPosition] = useState<ProtocolPosition | null>(null);
 
+  const nativeYieldRequests = useMemo(
+    () =>
+      suppliedPositionsProp.map(position => ({
+        tokenAddress: position.tokenAddress,
+        tokenSymbol: position.tokenSymbol ?? position.name,
+        nativeAssetId: position.nativeAssetId,
+      })),
+    [suppliedPositionsProp],
+  );
+
+  const { yieldsByToken } = useNativeStakingYields(nativeYieldRequests);
+
+  const suppliedPositions = useMemo(
+    () =>
+      suppliedPositionsProp.map(position => {
+        const key = position.tokenAddress?.toLowerCase() ?? position.tokenSymbol?.toLowerCase();
+        const yieldInfo = key ? yieldsByToken.get(key) : undefined;
+
+        return {
+          ...position,
+          nativeYieldApy: yieldInfo?.apy ?? position.nativeYieldApy,
+          nativeYieldSource: yieldInfo?.source ?? position.nativeYieldSource,
+        };
+      }),
+    [suppliedPositionsProp, yieldsByToken],
+  );
+
+  const borrowedPositions = useMemo(() => borrowedPositionsProp, [borrowedPositionsProp]);
+
   const handleSwap = (position: ProtocolPosition) => {
     if (readOnly) return;
     setSelectedSwapPosition(position);
@@ -127,7 +160,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   };
 
   // Convert suppliedPositions to BasicCollateral for the modal
-  const availableCollaterals = useMemo(() => {
+  const availableCollaterals = useMemo<BasicCollateral[]>(() => {
     return suppliedPositions.map(p => ({
       symbol: p.name,
       address: p.tokenAddress,
