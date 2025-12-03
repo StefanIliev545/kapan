@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useProvider as useStarkProvider } from "@starknet-react/core";
-import { Address } from "viem";
+import { Abi, Address } from "viem";
 import { useAccount as useEvmAccount, usePublicClient } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useAccount as useStarkAccount } from "./useAccount";
@@ -16,6 +16,8 @@ type TokenBalanceResult = Record<string, { balance: bigint; decimals?: number }>
 
 export const normalizeAddress = (address: string) => address.toLowerCase();
 
+const getCallResult = (response: unknown) => (response as { result?: string[] })?.result;
+
 const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
   const { address } = useEvmAccount();
   const publicClient = usePublicClient({ chainId });
@@ -30,7 +32,14 @@ const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
     queryFn: async (): Promise<TokenBalanceResult> => {
       if (!publicClient || !address) return {};
 
-      const contracts: Parameters<typeof publicClient.multicall>[0]["contracts"] = [];
+      type MulticallContract = {
+        address: Address;
+        abi: Abi;
+        functionName: "balanceOf" | "decimals";
+        args?: readonly [Address];
+      };
+
+      const contracts: MulticallContract[] = [];
       const balanceIndices: number[] = [];
       const decimalsIndices: Array<number | null> = [];
 
@@ -38,16 +47,16 @@ const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
         balanceIndices.push(contracts.length);
         contracts.push({
           address: token.address as Address,
-          abi: ERC20ABI,
+          abi: ERC20ABI as Abi,
           functionName: "balanceOf",
-          args: [address],
+          args: [address] as const,
         });
 
         if (token.decimals === undefined) {
           decimalsIndices.push(contracts.length);
           contracts.push({
             address: token.address as Address,
-            abi: ERC20ABI,
+            abi: ERC20ABI as Abi,
             functionName: "decimals",
           });
         } else {
@@ -110,14 +119,16 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
                 : Promise.resolve(null),
             ]);
 
-            const balanceRaw = balanceResponse.result?.[0];
+            const balanceRaw = getCallResult(balanceResponse)?.[0];
             const balance = balanceRaw ? BigInt(balanceRaw) : 0n;
+
+            const decimalsResult = decimalsResponse ? getCallResult(decimalsResponse)?.[0] : undefined;
 
             const decimals =
               token.decimals !== undefined
                 ? token.decimals
-                : decimalsResponse?.result?.[0] !== undefined
-                  ? Number(BigInt(decimalsResponse.result[0]))
+                : decimalsResult !== undefined
+                  ? Number(BigInt(decimalsResult))
                   : undefined;
 
             return { balance, decimals };
