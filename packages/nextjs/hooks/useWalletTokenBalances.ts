@@ -5,7 +5,7 @@ import { useAccount as useEvmAccount, usePublicClient } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useAccount as useStarkAccount } from "./useAccount";
 
-type NetworkType = "evm" | "starknet";
+type NetworkType = "evm" | "starknet" | "stark";
 
 type TokenBalanceInput = {
   address: string;
@@ -14,7 +14,7 @@ type TokenBalanceInput = {
 
 type TokenBalanceResult = Record<string, { balance: bigint; decimals?: number }>;
 
-const normalizeAddress = (address: string) => address.toLowerCase();
+export const normalizeAddress = (address: string) => address.toLowerCase();
 
 const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
   const { address } = useEvmAccount();
@@ -30,19 +30,48 @@ const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
     queryFn: async (): Promise<TokenBalanceResult> => {
       if (!publicClient || !address) return {};
 
-      const contracts = tokens.map(token => ({
-        address: token.address as Address,
-        abi: ERC20ABI,
-        functionName: "balanceOf",
-        args: [address],
-      }));
+      const contracts: Parameters<typeof publicClient.multicall>[0]["contracts"] = [];
+      const balanceIndices: number[] = [];
+      const decimalsIndices: Array<number | null> = [];
+
+      tokens.forEach(token => {
+        balanceIndices.push(contracts.length);
+        contracts.push({
+          address: token.address as Address,
+          abi: ERC20ABI,
+          functionName: "balanceOf",
+          args: [address],
+        });
+
+        if (token.decimals === undefined) {
+          decimalsIndices.push(contracts.length);
+          contracts.push({
+            address: token.address as Address,
+            abi: ERC20ABI,
+            functionName: "decimals",
+          });
+        } else {
+          decimalsIndices.push(null);
+        }
+      });
 
       const results = await publicClient.multicall({ contracts, allowFailure: true });
 
       return tokens.reduce((acc, token, index) => {
-        const result = results[index];
-        const balance = result.status === "success" && result.result != null ? BigInt(result.result as bigint) : 0n;
-        acc[normalizeAddress(token.address)] = { balance, decimals: token.decimals };
+        const balanceResult = results[balanceIndices[index]];
+        const balance =
+          balanceResult.status === "success" && balanceResult.result != null ? BigInt(balanceResult.result as bigint) : 0n;
+
+        const decimalsIndex = decimalsIndices[index];
+        const decimalsResult = decimalsIndex != null ? results[decimalsIndex] : null;
+        const decimalsValue =
+          token.decimals !== undefined
+            ? token.decimals
+            : decimalsResult?.status === "success" && decimalsResult.result != null
+              ? Number(decimalsResult.result as number)
+              : undefined;
+
+        acc[normalizeAddress(token.address)] = { balance, decimals: decimalsValue };
         return acc;
       }, {} as TokenBalanceResult);
     },
@@ -63,26 +92,45 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
     queryFn: async (): Promise<TokenBalanceResult> => {
       if (!provider || !address) return {};
 
-      const balances = await Promise.all(
+      const balancesAndDecimals = await Promise.all(
         tokens.map(async token => {
           try {
-            const response = await provider.callContract({
-              contractAddress: token.address as `0x${string}`,
-              entrypoint: "balance_of",
-              calldata: [address as `0x${string}`],
-            });
+            const [balanceResponse, decimalsResponse] = await Promise.all([
+              provider.callContract({
+                contractAddress: token.address as `0x${string}`,
+                entrypoint: "balance_of",
+                calldata: [address as `0x${string}`],
+              }),
+              token.decimals === undefined
+                ? provider.callContract({
+                    contractAddress: token.address as `0x${string}`,
+                    entrypoint: "decimals",
+                    calldata: [],
+                  })
+                : Promise.resolve(null),
+            ]);
 
-            const raw = response.result?.[0];
-            return raw ? BigInt(raw) : 0n;
+            const balanceRaw = balanceResponse.result?.[0];
+            const balance = balanceRaw ? BigInt(balanceRaw) : 0n;
+
+            const decimals =
+              token.decimals !== undefined
+                ? token.decimals
+                : decimalsResponse?.result?.[0] !== undefined
+                  ? Number(BigInt(decimalsResponse.result[0]))
+                  : undefined;
+
+            return { balance, decimals };
           } catch (error) {
             console.warn("Failed to fetch Starknet balance for", token.address, error);
-            return 0n;
+            return { balance: 0n, decimals: token.decimals };
           }
         }),
       );
 
       return tokens.reduce((acc, token, index) => {
-        acc[normalizeAddress(token.address)] = { balance: balances[index], decimals: token.decimals };
+        const { balance, decimals } = balancesAndDecimals[index];
+        acc[normalizeAddress(token.address)] = { balance, decimals };
         return acc;
       }, {} as TokenBalanceResult);
     },
@@ -98,7 +146,8 @@ export const useWalletTokenBalances = ({
   network: NetworkType;
   chainId?: number;
 }) => {
-  const queryResult = network === "evm" ? useEvmBalances(tokens, chainId) : useStarknetBalances(tokens);
+  const normalizedNetwork = network === "stark" ? "starknet" : network;
+  const queryResult = normalizedNetwork === "evm" ? useEvmBalances(tokens, chainId) : useStarknetBalances(tokens);
 
   return {
     balances: queryResult.data ?? {},
