@@ -25,6 +25,11 @@ interface NativeYieldResult {
   pool?: string;
 }
 
+const isNativeStakingPool = (pool: YieldPoolEntry) => {
+  const category = pool.category?.toLowerCase();
+  return category === "liquid staking";
+};
+
 const DEFILLAMA_POOLS_ENDPOINT = "https://yields.llama.fi/pools";
 
 const nativeAssetFallback: Record<string, string> = {
@@ -106,6 +111,7 @@ export const useNativeStakingYields = (requests: NativeYieldRequest[] = []) => {
 
     pools.forEach(pool => {
       if (!pool.underlyingTokens?.length) return;
+      if (!isNativeStakingPool(pool)) return;
       const poolApy = Number(pool.apy) || 0;
 
       pool.underlyingTokens.forEach(tokenId => {
