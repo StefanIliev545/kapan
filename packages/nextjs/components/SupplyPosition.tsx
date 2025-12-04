@@ -225,15 +225,15 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       hasBorder: true,
       content: (
         <>
-          <div className="text-sm text-base-content/70 overflow-hidden h-6">Balance</div>
-          <div className="text-sm font-medium h-6 line-clamp-1">
+          <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Balance</div>
+          <div className="text-sm font-mono font-semibold tabular-nums">
             <FiatBalance
               tokenAddress={tokenAddress}
               rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
               price={tokenPrice}
               decimals={tokenDecimals}
               tokenSymbol={name}
-              className="text-green-500"
+              className="text-success"
             />
           </div>
         </>
@@ -246,8 +246,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     hasBorder: true,
     content: (
       <>
-        <div className="text-sm text-base-content/70 overflow-hidden h-6 flex items-center">APY</div>
-        <div className="font-medium tabular-nums whitespace-nowrap text-ellipsis h-6 line-clamp-1">
+        <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">APY</div>
+        <div className="text-sm font-mono font-semibold tabular-nums text-base-content">
           {formatPercentage(currentRate)}%
         </div>
       </>
@@ -258,18 +258,19 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     key: "best-apy",
     content: (
       <>
-        <div className="text-sm text-base-content/70 overflow-hidden h-6">Best APY</div>
-        <div className="font-medium flex items-center h-6">
-          <span className="tabular-nums whitespace-nowrap text-ellipsis min-w-0 line-clamp-1">
+        <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Best APY</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-mono font-semibold tabular-nums text-success">
             {formatPercentage(displayedOptimalRate)}%
           </span>
-          <Image
-            src={getProtocolLogo(displayedOptimalProtocol)}
-            alt={displayedOptimalProtocol}
-            width={displayedOptimalProtocol == "vesu" ? 35 : 16}
-            height={displayedOptimalProtocol == "vesu" ? 35 : 16}
-            className={`flex-shrink-0 ${displayedOptimalProtocol == "vesu" ? "" : "rounded-md"} ml-1`}
-          />
+          <div className="w-4 h-4 relative flex-shrink-0">
+            <Image
+              src={getProtocolLogo(displayedOptimalProtocol)}
+              alt={displayedOptimalProtocol}
+              fill
+              className="object-contain rounded"
+            />
+          </div>
         </div>
       </>
     ),
@@ -282,8 +283,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       hasBorder: !isLast,
       content: (
         <>
-          <div className="text-sm text-base-content/70 overflow-hidden h-6">{stat.label}</div>
-          <div className="font-medium h-6 flex items-center">{stat.value}</div>
+          <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">{stat.label}</div>
+          <div className="text-sm font-mono font-semibold tabular-nums">{stat.value}</div>
         </>
       ),
     });
@@ -293,33 +294,33 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     <>
       {/* Outer container - clickable to expand/collapse */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-3 pt-3 pb-0" : "p-3"} rounded-md bg-base-200 ${
-          hasAnyActions ? "cursor-pointer hover:bg-base-300/80" : "cursor-default"
-        } transition-all duration-200 ${containerClassName ?? ""}`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-4 pt-3 pb-0" : "p-4"} rounded-xl bg-gradient-to-r from-base-200/80 to-base-200/60 border border-base-300/40 ${
+          hasAnyActions ? "cursor-pointer hover:border-base-300 hover:shadow-md" : "cursor-default"
+        } transition-all duration-300 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 relative gap-3 lg:gap-0">
           {/* Header: Icon and Title */}
           <div className="order-1 lg:order-none lg:col-span-3 flex items-center min-w-0">
-            <div className="w-7 h-7 relative min-w-[28px] min-h-[28px]">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full" />
+            <div className="w-9 h-9 relative min-w-[36px] min-h-[36px] rounded-xl bg-base-100 p-1 ring-1 ring-base-300/50 shadow-sm">
+              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-lg object-contain" />
             </div>
-            <div className="ml-2 flex items-center gap-1 min-w-0">
+            <div className="ml-3 flex items-center gap-1.5 min-w-0">
               <div className="flex flex-col min-w-0">
                 {renderName ? (
                   <>{renderName(name)}</>
                 ) : (
                   <>
-                    <span className="font-semibold text-lg truncate leading-tight">{name}</span>
+                    <span className="font-bold text-base tracking-tight truncate leading-tight">{name}</span>
                     {subtitle ? (
-                      <span className="text-xs text-base-content/60 truncate leading-tight">{subtitle}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-base-content/40 truncate leading-tight">{subtitle}</span>
                     ) : null}
                   </>
                 )}
               </div>
             </div>
             {infoButtonNode && (
-              <div className="flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
+              <div className="flex-shrink-0 ml-1.5" onClick={e => e.stopPropagation()}>
                 {infoButtonNode}
               </div>
             )}
@@ -333,9 +334,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           >
             {statColumns.map((column, index) => {
               const isLast = index === statColumns.length - 1;
-              const borderClass = !isLast && column.hasBorder !== false ? "border-r border-base-300" : "";
+              const borderClass = !isLast && column.hasBorder !== false ? "border-r border-base-300/50" : "";
               return (
-                <div key={column.key} className={`px-2 ${borderClass}`}>
+                <div key={column.key} className={`px-3 ${borderClass}`}>
                   {column.content}
                 </div>
               );
@@ -346,14 +347,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end">
             {hasAnyActions && showExpandIndicator && (
               <div
-                className={`flex items-center justify-center w-7 h-7 rounded-full ${
-                  isExpanded ? "bg-primary/20" : "bg-base-300/50"
-                } transition-colors duration-200`}
+                className={`flex items-center justify-center w-6 h-6 rounded-lg ${
+                  isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
+                } transition-all duration-200`}
               >
                 {isExpanded ? (
-                  <FiChevronUp className="w-4 h-4 text-primary" />
+                  <FiChevronUp className="w-3.5 h-3.5 text-primary" />
                 ) : (
-                  <FiChevronDown className="w-4 h-4 text-base-content/70" />
+                  <FiChevronDown className="w-3.5 h-3.5 text-base-content/50" />
                 )}
               </div>
             )}
@@ -362,7 +363,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
-          <div className="-mx-3 mt-0 pt-1 border-t border-base-300" onClick={e => e.stopPropagation()}>
+          <div className="-mx-4 mt-3 pt-2 border-t border-base-300/50" onClick={e => e.stopPropagation()}>
             {/* Unified segmented bar - centered */}
             <div className="flex justify-center w-full pb-0">
               <SegmentedActionBar

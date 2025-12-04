@@ -389,12 +389,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Supplied Assets */}
         <div className="h-full">
-          <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 h-full rounded-lg">
+          <div className="card bg-gradient-to-br from-base-100 to-base-100/80 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-200/50">
             <div className="card-body p-4 flex flex-col">
-              <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
-                <span>Supplied Assets</span>
-                <span className="badge badge-primary badge-outline">{filteredSuppliedPositions.length}</span>
-              </h2>
+              <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-5 rounded-full bg-success" />
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Supplied</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-success">
+                  <span className="text-xs font-mono font-bold">{filteredSuppliedPositions.length}</span>
+                  <span className="text-[10px] uppercase tracking-wider opacity-70">assets</span>
+                </div>
+              </div>
               {filteredSuppliedPositions.length > 0 ? (
                 <div className="flex flex-col flex-1 pt-2">
                   <div className="space-y-3">
@@ -450,12 +456,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
         {/* Borrowed Assets */}
         <div className="h-full">
-          <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 h-full rounded-lg">
+          <div className="card bg-gradient-to-br from-base-100 to-base-100/80 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-200/50">
             <div className="card-body p-4 flex flex-col">
-              <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
-                <span>Borrowed Assets</span>
-                <span className="badge badge-secondary badge-outline">{filteredBorrowedPositions.length}</span>
-              </h2>
+              <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-5 rounded-full bg-error" />
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Borrowed</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error/10 text-error">
+                  <span className="text-xs font-mono font-bold">{filteredBorrowedPositions.length}</span>
+                  <span className="text-[10px] uppercase tracking-wider opacity-70">assets</span>
+                </div>
+              </div>
               {filteredBorrowedPositions.length > 0 ? (
                 <div className="flex flex-col flex-1 pt-2">
                   <div className="space-y-3">
