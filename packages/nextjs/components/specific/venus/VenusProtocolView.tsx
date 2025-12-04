@@ -90,13 +90,15 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
   // Step 1: Get basic token info from getAllVenusMarkets
   const { data: vTokenAddresses, isLoading: isLoadingVTokens } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
-    functionName: "getAllMarkets"
+    functionName: "getAllMarkets",
+    chainId: chainId as any,
   });
 
   // Step 2: Get detailed market information including prices from oracles
   const { data: marketDetails, isLoading: isLoadingMarketDetails } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
-    functionName: "getAllVenusMarkets"
+    functionName: "getAllVenusMarkets",
+    chainId: chainId as any,
   });
   
   // Step 3: Get market rates after we have the vToken addresses

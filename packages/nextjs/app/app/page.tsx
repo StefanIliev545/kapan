@@ -57,17 +57,6 @@ const networkOptions: NetworkOption[] = [
 const App: NextPage = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<string>(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base");
 
-  // Keep a cache of networks the user has visited so we keep their trees mounted
-  const [mounted, setMounted] = useState<Set<string>>(new Set([process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base"]));
-  useEffect(() => {
-    setMounted(prev => {
-      if (prev.has(selectedNetwork)) return prev;
-      const next = new Set(prev);
-      next.add(selectedNetwork);
-      return next;
-    });
-  }, [selectedNetwork]);
-
   // Tiny helper so the button click never feels blocked
   const handleNetworkChange = (id: string) => {
     startTransition(() => setSelectedNetwork(id));
@@ -140,10 +129,10 @@ const App: NextPage = () => {
           </div>
         )}
 
-        {/* ---- Cached panes: once mounted, never unmount; just hide/show ---- */}
+        {/* ---- Network panes: only render the active selection ---- */}
         {/* ARBITRUM */}
-        {mounted.has("arbitrum") && (
-          <div className={selectedNetwork === "arbitrum" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "arbitrum"}>
+        {selectedNetwork === "arbitrum" && (
+          <div className="space-y-4">
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
             </StableArea>
@@ -157,8 +146,8 @@ const App: NextPage = () => {
         )}
 
         {/* BASE */}
-        {mounted.has("base") && (
-          <div className={selectedNetwork === "base" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "base"}>
+        {selectedNetwork === "base" && (
+          <div className="space-y-4">
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
             </StableArea>
@@ -175,8 +164,8 @@ const App: NextPage = () => {
         )}
 
         {/* HARDHAT (conditionally enabled via NEXT_PUBLIC_ENABLE_HARDHAT_UI) */}
-        {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && mounted.has("hardhat") && (
-          <div className={selectedNetwork === "hardhat" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "hardhat"}>
+        {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && selectedNetwork === "hardhat" && (
+          <div className="space-y-4">
             <div className="my-2 text-warning text-sm text-center">
               Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
             </div>
@@ -193,8 +182,8 @@ const App: NextPage = () => {
         )}
 
         {/* STARKNET */}
-        {mounted.has("starknet") && (
-          <div className={selectedNetwork === "starknet" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "starknet"}>
+        {selectedNetwork === "starknet" && (
+          <div className="space-y-4">
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <VesuProtocolView />
             </StableArea>
@@ -205,8 +194,8 @@ const App: NextPage = () => {
         )}
 
         {/* OPTIMISM */}
-        {mounted.has("optimism") && (
-          <div className={selectedNetwork === "optimism" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "optimism"}>
+        {selectedNetwork === "optimism" && (
+          <div className="space-y-4">
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
             </StableArea>
@@ -217,8 +206,8 @@ const App: NextPage = () => {
         )}
 
         {/* LINEA */}
-        {mounted.has("linea") && (
-          <div className={selectedNetwork === "linea" ? "space-y-4" : "space-y-4 hidden"} aria-hidden={selectedNetwork !== "linea"}>
+        {selectedNetwork === "linea" && (
+          <div className="space-y-4">
             <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
               <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
             </StableArea>
