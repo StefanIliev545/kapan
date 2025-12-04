@@ -68,7 +68,7 @@ interface ProtocolViewProps {
 }
 
 // Health status indicator component that shows utilization percentage
-const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
+const HealthStatus: FC<{ utilizationPercentage: number; mobileLabel?: string }> = ({ utilizationPercentage, mobileLabel = "LTV" }) => {
   // Determine color based on utilization percentage
   const getColorClasses = () => {
     if (utilizationPercentage < 50) return { bar: "bg-success", text: "text-success", glow: "shadow-success/30" };
@@ -78,17 +78,24 @@ const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercen
   const colors = getColorClasses();
 
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`}
-          style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
-        />
+    <>
+      {/* Desktop: bar + percentage */}
+      <div className="hidden sm:flex items-center gap-2.5">
+        <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
+          <div
+            className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`}
+            style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
+          />
+        </div>
+        <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
+          {utilizationPercentage.toFixed(0)}%
+        </span>
       </div>
-      <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
+      {/* Mobile: just percentage */}
+      <span className={`sm:hidden text-sm font-mono font-bold tabular-nums ${colors.text}`}>
         {utilizationPercentage.toFixed(0)}%
       </span>
-    </div>
+    </>
   );
 };
 
@@ -339,16 +346,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 </span>
               </div>
 
-              {/* 30D Yield */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              {/* 30D Yield - hidden on very narrow screens */}
+              <div className="hidden min-[480px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                 <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netYield30d)}
                 </span>
               </div>
 
-              {/* Net APY */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              {/* Net APY - hidden on very narrow screens */}
+              <div className="hidden min-[400px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                 <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
@@ -358,7 +365,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               {/* Utilization */}
               {!hideUtilization && (
                 <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">
+                    <span className="hidden sm:inline">Utilization</span>
+                    <span className="sm:hidden">LTV</span>
+                  </span>
                   <HealthStatus utilizationPercentage={utilizationPercentage} />
                 </div>
               )}
