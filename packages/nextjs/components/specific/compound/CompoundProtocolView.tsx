@@ -55,8 +55,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
   // Batch symbols + decimals
   const symbolCalls = useMemo(() => {
-    return baseTokens.map(t => ({ address: t, abi: ERC20_META_ABI, functionName: "symbol" as const, args: [] }));
-  }, [baseTokens]);
+    return baseTokens.map(t => ({ address: t, abi: ERC20_META_ABI, functionName: "symbol" as const, args: [], chainId }));
+  }, [baseTokens, chainId]);
   const { data: symbolResults } = useReadContracts({ allowFailure: true, contracts: symbolCalls, query: { enabled: symbolCalls.length > 0 } });
   const symbols: string[] = useMemo(() => (symbolResults || []).map(r => (r?.result as string) || ""), [symbolResults]);
 
@@ -72,8 +72,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   // Refetch contract reads when a transaction completes
   useEffect(() => {
     const handler = () => {
-      queryClient.refetchQueries({ queryKey: ["readContract"], type: "active" });
-      queryClient.refetchQueries({ queryKey: ["readContracts"], type: "active" });
+      queryClient.refetchQueries({ queryKey: [chainId, "readContract"], type: "active" });
+      queryClient.refetchQueries({ queryKey: [chainId, "readContracts"], type: "active" });
     };
     if (typeof window !== "undefined") {
       window.addEventListener("txCompleted", handler);
@@ -83,20 +83,20 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         window.removeEventListener("txCompleted", handler);
       }
     };
-  }, [queryClient]);
+  }, [chainId, queryClient]);
 
   // Batch market data getCompoundData(baseToken, user)
   const compoundCalls = useMemo(() => {
     if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
-    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getCompoundData" as const, args: [t, queryAddress] }));
-  }, [gatewayAddress, gateway, baseTokens, queryAddress]);
+    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getCompoundData" as const, args: [t, queryAddress], chainId }));
+  }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
   const { data: compoundResults } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
 
 // Batch collateral data per market
   const depositedCalls = useMemo(() => {
     if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
-    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getDepositedCollaterals" as const, args: [t, queryAddress] }));
-  }, [gatewayAddress, gateway, baseTokens, queryAddress]);
+    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getDepositedCollaterals" as const, args: [t, queryAddress], chainId }));
+  }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
   const { data: depositedResults } = useReadContracts({ allowFailure: true, contracts: depositedCalls, query: { enabled: depositedCalls.length > 0 } });
 
   const pricesCalls = useMemo(() => {
@@ -105,11 +105,11 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     (depositedResults as any[]).forEach((res, i) => {
       const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
       if (colls.length > 0) {
-        calls.push({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getPrices" as const, args: [baseTokens[i], colls] });
+        calls.push({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getPrices" as const, args: [baseTokens[i], colls], chainId });
       }
     });
     return calls;
-  }, [gatewayAddress, gateway, depositedResults, baseTokens]);
+  }, [gatewayAddress, gateway, depositedResults, baseTokens, chainId]);
   const { data: pricesResults } = useReadContracts({ allowFailure: true, contracts: pricesCalls, query: { enabled: pricesCalls.length > 0 } });
 
   const collDecimalsCalls = useMemo(() => {
@@ -118,11 +118,11 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     (depositedResults as any[]).forEach(res => {
       const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
       if (colls.length > 0) {
-        calls.push({ address: uiHelperAddress, abi: uiHelper.abi as Abi, functionName: "getDecimals" as const, args: [colls] });
+        calls.push({ address: uiHelperAddress, abi: uiHelper.abi as Abi, functionName: "getDecimals" as const, args: [colls], chainId });
       }
     });
     return calls;
-  }, [uiHelperAddress, uiHelper, depositedResults]);
+  }, [uiHelperAddress, uiHelper, depositedResults, chainId]);
   const { data: collDecimalsResults } = useReadContracts({ allowFailure: true, contracts: collDecimalsCalls, query: { enabled: collDecimalsCalls.length > 0 } });
 
   // Helper: Convert Compound's per-second rate to an APR percentage.
