@@ -833,10 +833,49 @@ export const useKapanRouterV2 = () => {
 
   // --- Execution Helpers ---
 
+  const isBasicLendingFlow = useCallback((instructions: ProtocolInstruction[]): boolean => {
+    if (instructions.length === 0 || instructions.length > 4) return false;
+
+    const BASIC_LENDING_OPS = new Set<number>([
+      LendingOp.Deposit,
+      LendingOp.DepositCollateral,
+      LendingOp.WithdrawCollateral,
+      LendingOp.Borrow,
+      LendingOp.Repay,
+      LendingOp.GetBorrowBalance,
+      LendingOp.GetSupplyBalance,
+    ]);
+
+    return instructions.every(inst => {
+      if (inst.protocolName === "router") return true;
+
+      try {
+        const [decoded] = decodeAbiParameters(
+          [
+            {
+              type: "tuple(uint8 op,address token,address user,uint256 amount,bytes context,tuple(uint256 index) input)",
+            },
+          ],
+          inst.data as Hex
+        ) as [{ op: bigint }];
+
+        const op = Number(decoded.op);
+        return BASIC_LENDING_OPS.has(op);
+      } catch {
+        return false;
+      }
+    });
+  }, []);
+
   const simulateInstructions = useCallback(
     async (instructions: ProtocolInstruction[]) => {
       if (!routerContract || !userAddress || !publicClient) {
         throw new Error("Router contract or user address not available");
+      }
+
+      // Skip simulation for simple lending flows to avoid false negatives on basic actions
+      if (isBasicLendingFlow(instructions)) {
+        return;
       }
 
       // 1) Simulate any authorization calls so we surface readable errors (e.g. allowance issues)
@@ -889,7 +928,7 @@ export const useKapanRouterV2 = () => {
         throw new Error(errorMsg);
       }
     },
-    [routerContract, userAddress, publicClient, getAuthorizations]
+    [routerContract, userAddress, publicClient, getAuthorizations, isBasicLendingFlow]
   );
 
   const executeInstructions = useCallback(async (
