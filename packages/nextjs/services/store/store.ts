@@ -32,6 +32,14 @@ type GlobalState = {
   setBlockNumber: (blockNumber: bigint | undefined) => void;
   snBlockNumber?: bigint;
   setSnBlockNumber: (blockNumber: bigint | undefined) => void;
+  protocolTotals: Record<string, { supply: number; borrow: number }>;
+  totalSupplied: number;
+  totalBorrowed: number;
+  totalNet: number;
+  loadedProtocolCount: number;
+  expectedProtocolCount: number;
+  setProtocolTotals: (protocol: string, supply: number, borrow: number) => void;
+  resetTotals: (expectedCount: number) => void;
 };
 
 export const useGlobalState = create<GlobalState>(set => ({
@@ -56,4 +64,40 @@ export const useGlobalState = create<GlobalState>(set => ({
   setBlockNumber: (blockNumber: bigint | undefined) => set(() => ({ blockNumber })),
   snBlockNumber: undefined,
   setSnBlockNumber: (snBlockNumber: bigint | undefined) => set(() => ({ snBlockNumber })),
+  protocolTotals: {},
+  totalSupplied: 0,
+  totalBorrowed: 0,
+  totalNet: 0,
+  loadedProtocolCount: 0,
+  expectedProtocolCount: 0,
+  resetTotals: (expectedCount: number) =>
+    set(() => ({
+      protocolTotals: {},
+      totalSupplied: 0,
+      totalBorrowed: 0,
+      totalNet: 0,
+      loadedProtocolCount: 0,
+      expectedProtocolCount: expectedCount,
+    })),
+  setProtocolTotals: (protocol: string, supply: number, borrow: number) =>
+    set(state => {
+      const existing = state.protocolTotals[protocol];
+      const nextProtocolTotals = {
+        ...state.protocolTotals,
+        [protocol]: { supply, borrow },
+      };
+
+      const nextTotalSupplied = Object.values(nextProtocolTotals).reduce((sum, entry) => sum + entry.supply, 0);
+      const nextTotalBorrowed = Object.values(nextProtocolTotals).reduce((sum, entry) => sum + entry.borrow, 0);
+      const nextTotalNet = nextTotalSupplied - nextTotalBorrowed;
+      const loadedProtocolCount = existing ? state.loadedProtocolCount : state.loadedProtocolCount + 1;
+
+      return {
+        protocolTotals: nextProtocolTotals,
+        totalSupplied: nextTotalSupplied,
+        totalBorrowed: nextTotalBorrowed,
+        totalNet: nextTotalNet,
+        loadedProtocolCount,
+      };
+    }),
 }));

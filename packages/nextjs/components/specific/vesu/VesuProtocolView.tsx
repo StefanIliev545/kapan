@@ -18,6 +18,7 @@ import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAdd
 import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
+import { useGlobalState } from "~~/services/store/store";
 
 type VesuVersionKey = "v1" | "v2";
 
@@ -76,6 +77,8 @@ export const VesuProtocolView: FC = () => {
     v1: false,
     v2: false,
   }));
+
+  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   const computeMetrics = (rows: VesuPositionRow[]) => {
     if (rows.length === 0) {
@@ -181,6 +184,49 @@ export const VesuProtocolView: FC = () => {
       window.removeEventListener("txCompleted", handler);
     };
   }, [refetchPositionsV1, refetchPositionsV2]);
+
+  useEffect(() => {
+    const allRows = [
+      ...v1All.Genesis.rows,
+      ...v1All.CarmineRunes.rows,
+      ...v1All.Re7StarknetEcosystem.rows,
+      ...v1All.Re7xSTRK.rows,
+      ...v2All.Prime.rows,
+      ...v2All.Re7xBTC.rows,
+      ...v2All.Re7USDCCore.rows,
+      ...v2All.Re7USDCPrime.rows,
+      ...v2All.Re7USDCStableCore.rows,
+    ];
+
+    const anyDataLoaded = allRows.some(row => row.supply.balance !== 0 || (row.borrow && row.borrow.balance !== 0));
+    if (!anyDataLoaded && status !== "connected") {
+      return;
+    }
+
+    let totalSupplied = 0;
+    let totalBorrowed = 0;
+
+    for (const row of allRows) {
+      totalSupplied += row.supply.balance;
+      if (row.borrow) {
+        totalBorrowed += Math.abs(row.borrow.balance);
+      }
+    }
+
+    setProtocolTotals("Vesu", totalSupplied, totalBorrowed);
+  }, [
+    setProtocolTotals,
+    status,
+    v1All.CarmineRunes.rows,
+    v1All.Genesis.rows,
+    v1All.Re7StarknetEcosystem.rows,
+    v1All.Re7xSTRK.rows,
+    v2All.Prime.rows,
+    v2All.Re7USDCCore.rows,
+    v2All.Re7USDCPrime.rows,
+    v2All.Re7USDCStableCore.rows,
+    v2All.Re7xBTC.rows,
+  ]);
 
   const handleToggleMarkets = (version: VesuVersionKey) => {
     setIsMarketsOpen(previous => ({ ...previous, [version]: !previous[version] }));
