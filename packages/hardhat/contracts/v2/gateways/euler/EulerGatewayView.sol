@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {IEulerVault} from "../../interfaces/euler/IEulerVault.sol";
@@ -14,7 +13,6 @@ contract EulerGatewayView is Ownable {
     IEulerPriceOracle public immutable priceOracle;
 
     mapping(address => IEulerVault) public tokenToVault;
-    mapping(address => IERC20) public tokenToDebtToken;
 
     address[] private _vaults;
     mapping(address => bool) private _isRegistered;
@@ -33,29 +31,19 @@ contract EulerGatewayView is Ownable {
     }
 
     event EulerMarketAdded(address indexed token, address indexed vault);
-    event EulerDebtTokenSet(address indexed token, address indexed debtToken);
 
     constructor(address _priceOracle, address owner_) Ownable(owner_) {
         priceOracle = IEulerPriceOracle(_priceOracle);
     }
 
-    function addEulerMarket(address vault, address debtToken) external onlyOwner {
+    function addEulerMarket(address vault) external onlyOwner {
         address underlying = _getUnderlying(vault);
         tokenToVault[underlying] = IEulerVault(vault);
-        if (debtToken != address(0)) {
-            tokenToDebtToken[underlying] = IERC20(debtToken);
-            emit EulerDebtTokenSet(underlying, debtToken);
-        }
         if (!_isRegistered[vault]) {
             _isRegistered[vault] = true;
             _vaults.push(vault);
         }
         emit EulerMarketAdded(underlying, vault);
-    }
-
-    function setDebtToken(address underlying, address debtToken) external onlyOwner {
-        tokenToDebtToken[underlying] = IERC20(debtToken);
-        emit EulerDebtTokenSet(underlying, debtToken);
     }
 
     function allVaults() external view returns (address[] memory) {
@@ -135,9 +123,9 @@ contract EulerGatewayView is Ownable {
     }
 
     function getBorrowBalance(address token, address user) public view returns (uint256) {
-        IERC20 debt = tokenToDebtToken[token];
-        if (address(debt) == address(0)) return 0;
-        try debt.balanceOf(user) returns (uint256 bal) {
+        IEulerVault vault = tokenToVault[token];
+        if (address(vault) == address(0)) return 0;
+        try vault.debtOf(user) returns (uint256 bal) {
             return bal;
         } catch {
             return 0;

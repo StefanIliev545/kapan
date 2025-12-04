@@ -10,6 +10,8 @@ interface IEulerVault is IERC20 {
 
     function underlyingAsset() external view returns (address);
 
+    function maxWithdraw(address owner) external view returns (uint256);
+
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
 
     function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
@@ -22,7 +24,9 @@ interface IEulerVault is IERC20 {
 
     function totalAssets() external view returns (uint256);
 
-    function borrow(uint256 assets, address receiver, address owner) external returns (uint256 shares);
+    function borrow(uint256 assets, address receiver) external returns (uint256 shares);
 
     function repay(uint256 assets, address onBehalfOf) external returns (uint256 sharesRepaid);
+
+    function debtOf(address account) external view returns (uint256);
 }
