@@ -10,6 +10,8 @@ import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
+import { formatTokenAmount } from "~~/utils/protocols";
+import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 
 export type TokenWithRates = TokenMetadata & {
   borrowAPR: number;
@@ -43,7 +45,15 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 }) => {
   const [selectedToken, setSelectedToken] = useState<TokenWithRates | null>(null);
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
-  const [hoveredToken, setHoveredToken] = useState<string | null>(null);
+  const starkTokens = useMemo(
+    () =>
+      tokens.map(asset => ({
+        address: `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` as `0x${string}`,
+        decimals: asset.decimals,
+      })),
+    [tokens],
+  );
+  const { balances } = useWalletTokenBalances({ tokens: starkTokens, network: "starknet" });
 
   // Filter out the collateral asset from available tokens if provided
   const availableTokens = useMemo(
@@ -53,6 +63,28 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       ),
     [tokens, collateralAsset],
   );
+
+  const sortedTokens = useMemo(() => {
+    const withBalances = availableTokens.map(token => {
+      const address = `0x${BigInt(token.address).toString(16).padStart(64, "0")}`;
+      const balanceInfo = balances[address.toLowerCase()];
+      const balance = balanceInfo?.balance ?? 0n;
+      const displayBalance = parseFloat(formatTokenAmount(balance.toString(), token.decimals));
+
+      return {
+        token,
+        address,
+        hasBalance: balance > 0n,
+        displayBalance,
+        balanceLabel: formatTokenAmount(balance.toString(), token.decimals),
+      };
+    });
+
+    return withBalances.sort((a, b) => {
+      if (a.hasBalance !== b.hasBalance) return Number(b.hasBalance) - Number(a.hasBalance);
+      return b.displayBalance - a.displayBalance;
+    });
+  }, [availableTokens, balances]);
 
   const modalTitle = action === "borrow" ? "Select a Token to Borrow" : "Select a Token to Deposit";
 
@@ -67,11 +99,6 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
     }
     setSelectedToken(token);
     setIsTokenModalOpen(true);
-  };
-
-  // Handle token hover
-  const handleTokenHover = (tokenAddress: string | null) => {
-    setHoveredToken(tokenAddress);
   };
 
   // Handle modal close
@@ -106,9 +133,8 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
           </div>
 
           <div className="border border-base-300 divide-y divide-base-300 max-h-96 overflow-y-auto">
-            {availableTokens.length > 0 ? (
-              availableTokens.map(token => {
-                const address = `0x${BigInt(token.address).toString(16).padStart(64, "0")}`;
+            {sortedTokens.length > 0 ? (
+              sortedTokens.map(({ token, address, balanceLabel }) => {
                 const raw = feltToString(token.symbol);
                 const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
                 return (
@@ -116,17 +142,18 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                     key={address}
                     className="w-full flex items-center justify-between p-3 hover:bg-base-200/60"
                     onClick={() => handleSelectToken(token)}
-                    onMouseEnter={() => handleTokenHover(address)}
-                    onMouseLeave={() => handleTokenHover(null)}
                   >
                     <div className="flex items-center gap-2">
                       <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={16} height={16} className="w-4 h-4" />
                       <span className="text-sm font-medium">{symbol}</span>
                     </div>
-                    <div className="text-[11px] text-base-content/60">
-                      {formatPercentage(
-                        getDisplayRate(protocolName, action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0),
-                      )}% {rateLabel}
+                    <div className="flex flex-col text-right">
+                      <div className="text-[11px] text-base-content/60">
+                        {formatPercentage(
+                          getDisplayRate(protocolName, action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0),
+                        )}% {rateLabel}
+                      </div>
+                      <div className="text-xs text-base-content/80">Balance: {balanceLabel}</div>
                     </div>
                   </button>
                 );
