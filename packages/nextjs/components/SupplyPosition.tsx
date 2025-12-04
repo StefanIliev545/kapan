@@ -292,18 +292,17 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   return (
     <>
-      {/* Outer container - clickable to expand/collapse */}
+      {/* Container */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-4 pt-3 pb-0" : "p-4"} rounded-xl bg-gradient-to-r from-base-200/80 to-base-200/60 border border-base-300/40 ${
-          hasAnyActions ? "cursor-pointer hover:border-base-300 hover:shadow-md" : "cursor-default"
-        } transition-all duration-300 ${containerClassName ?? ""}`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-5 pt-4 pb-0" : "p-5"} rounded-xl bg-base-200/30 border border-base-300/40 ${hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default"
+          } transition-colors duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 relative gap-3 lg:gap-0">
-          {/* Header: Icon and Title */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 relative gap-4 lg:gap-0">
+          {/* Token */}
           <div className="order-1 lg:order-none lg:col-span-3 flex items-center min-w-0">
-            <div className="w-9 h-9 relative min-w-[36px] min-h-[36px] rounded-xl bg-base-100 p-1 ring-1 ring-base-300/50 shadow-sm">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-lg object-contain" />
+            <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-full bg-base-300/50 p-1.5">
+              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full object-contain" />
             </div>
             <div className="ml-3 flex items-center gap-1.5 min-w-0">
               <div className="flex flex-col min-w-0">
@@ -347,9 +346,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end">
             {hasAnyActions && showExpandIndicator && (
               <div
-                className={`flex items-center justify-center w-6 h-6 rounded-lg ${
-                  isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
-                } transition-all duration-200`}
+                className={`flex items-center justify-center w-6 h-6 rounded-lg ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
+                  } transition-all duration-200`}
               >
                 {isExpanded ? (
                   <FiChevronUp className="w-3.5 h-3.5 text-primary" />

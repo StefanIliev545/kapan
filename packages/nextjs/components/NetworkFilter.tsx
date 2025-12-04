@@ -221,35 +221,36 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
-      <div className="flex items-center gap-2">
-        {networks.map((network) => {
-          const isActive = selectedNetwork === network.id;
-          return (
-            <button
-              key={network.id}
-              type="button"
-              aria-pressed={isActive}
-              // Keep dimensions stable to avoid “jump” when styles change:
-              className={`btn btn-sm normal-case inline-flex items-center gap-2 ${isActive ? "btn-primary" : "btn-outline" // outline keeps width/border consistent
-                }`}
-              onClick={() => handleNetworkChange(network.id)}
-            // Don’t globally disable other buttons; let people click around quickly.
-            >
-              <div className="w-5 h-5 relative">
-                <Image
-                  src={network.logo}
-                  alt={network.name}
-                  fill
-                  sizes="20px"
-                  className="object-contain"
-                />
-              </div>
-              <span className="whitespace-nowrap">{network.name}</span>
-            </button>
-          );
-        })}
-      </div>
+    <div className="inline-flex items-center gap-1 p-1 bg-base-200/30 rounded-lg border border-base-300/40">
+      {networks.map((network) => {
+        const isActive = selectedNetwork === network.id;
+        return (
+          <button
+            key={network.id}
+            type="button"
+            aria-pressed={isActive}
+            className={`
+              flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150
+              ${isActive
+                ? "bg-base-100 text-base-content shadow-sm"
+                : "text-base-content/40 hover:text-base-content/70"
+              }
+            `}
+            onClick={() => handleNetworkChange(network.id)}
+          >
+            <div className="w-4 h-4 relative shrink-0">
+              <Image
+                src={network.logo}
+                alt={network.name}
+                fill
+                sizes="16px"
+                className="object-contain"
+              />
+            </div>
+            <span className="whitespace-nowrap">{network.name}</span>
+          </button>
+        );
+      })}
     </div>
   );
 };

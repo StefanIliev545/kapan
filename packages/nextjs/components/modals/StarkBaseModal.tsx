@@ -3,11 +3,6 @@ import { BaseModal } from "./BaseModal";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-stark/useScaffoldWriteContract";
 import { notification } from "~~/utils/scaffold-stark";
 
-interface VesuContext {
-  pool_id: string;
-  position_counterpart_token: string;
-}
-
 interface StarkBaseModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -67,17 +62,23 @@ export const StarkBaseModal: FC<StarkBaseModalProps> = ({
 
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass={maxWidthClass}>
-      <div className="p-6">
+      <div className="p-4">
         {children}
         <div className="mt-6 flex justify-end gap-3">
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button
+            className="px-4 py-2 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
+            onClick={onClose}
+          >
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={handleSubmit}>
+          <button
+            className="px-4 py-2 text-sm font-medium bg-base-content text-base-100 rounded-lg hover:bg-base-content/90 transition-colors"
+            onClick={handleSubmit}
+          >
             Submit
           </button>
         </div>
       </div>
     </BaseModal>
   );
-}; 
+};

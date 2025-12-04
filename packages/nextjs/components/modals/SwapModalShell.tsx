@@ -78,7 +78,7 @@ export interface SwapModalShellProps {
     fromReadOnly?: boolean;
     // If true, "To" is read-only (no selector, just display)
     toReadOnly?: boolean;
-    
+
     // Custom stats section (replaces default slippage/min output)
     customStats?: ReactNode;
     // Hide the default stats grid
@@ -181,26 +181,27 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
     return (
         <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-            <div className="modal-box bg-base-100 max-w-2xl p-6 rounded-none flex flex-col">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+            <div className="modal-box relative bg-base-100 max-w-2xl p-5 rounded-xl border border-base-300/50 flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
-                        <h3 className="font-semibold text-lg">{title}</h3>
-                        <div className="tabs tabs-boxed bg-base-200/50 p-1 h-auto">
-                            <a
-                                className={`tab tab-xs ${activeTab === "swap" ? "tab-active bg-base-100 shadow-sm" : ""}`}
+                        <h3 className="font-semibold text-lg text-base-content">{title}</h3>
+                        <div className="flex items-center gap-1 p-1 bg-base-200/50 rounded-lg">
+                            <button
+                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === "swap" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
                                 onClick={() => setActiveTab("swap")}
                             >
                                 Swap
-                            </a>
-                            <a
-                                className={`tab tab-xs ${activeTab === "info" ? "tab-active bg-base-100 shadow-sm" : ""}`}
+                            </button>
+                            <button
+                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === "info" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
                                 onClick={() => setActiveTab("info")}
                             >
                                 Info
-                            </a>
+                            </button>
                         </div>
                     </div>
-                    <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+                    <button className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors" onClick={onClose}>✕</button>
                 </div>
 
                 {activeTab === "info" ? (
@@ -364,44 +365,44 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
                         {/* Stats Grid */}
                         {customStats ? customStats : !hideDefaultStats && (
-                        <div className="grid grid-cols-2 gap-4 text-center bg-base-200/50 p-3 rounded">
-                            <div className="flex flex-col items-center">
-                                <div className="text-xs text-base-content/70 flex items-center gap-1">
-                                    Slippage
-                                    <div className="dropdown dropdown-top dropdown-hover">
-                                        <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                            <FiSettings className="w-3 h-3" />
-                                        </label>
-                                        <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                            {[0.1, 0.5, 1, 3].map((s) => (
-                                                <li key={s}>
-                                                    <a
-                                                        className={slippage === s ? "active" : ""}
-                                                        onClick={() => setSlippage(s)}
-                                                    >
-                                                        {s}%
-                                                    </a>
-                                                </li>
-                                            ))}
-                                        </ul>
+                            <div className="grid grid-cols-2 gap-4 text-center bg-base-200/50 p-3 rounded">
+                                <div className="flex flex-col items-center">
+                                    <div className="text-xs text-base-content/70 flex items-center gap-1">
+                                        Slippage
+                                        <div className="dropdown dropdown-top dropdown-hover">
+                                            <label tabIndex={0} className="cursor-pointer hover:text-primary">
+                                                <FiSettings className="w-3 h-3" />
+                                            </label>
+                                            <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
+                                                {[0.1, 0.5, 1, 3].map((s) => (
+                                                    <li key={s}>
+                                                        <a
+                                                            className={slippage === s ? "active" : ""}
+                                                            onClick={() => setSlippage(s)}
+                                                        >
+                                                            {s}%
+                                                        </a>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div className="font-medium text-sm">{slippage}%</div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-base-content/70">Min Output</div>
+                                    <div className="font-medium text-sm">
+                                        {minOutput ? (
+                                            <>
+                                                {parseFloat(minOutput).toFixed(6)}
+                                                <span className="text-xs text-base-content/60 ml-1">
+                                                    (${getUsdValue(minOutput, selectedTo?.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                                </span>
+                                            </>
+                                        ) : "-"}
                                     </div>
                                 </div>
-                                <div className="font-medium text-sm">{slippage}%</div>
                             </div>
-                            <div>
-                                <div className="text-xs text-base-content/70">Min Output</div>
-                                <div className="font-medium text-sm">
-                                    {minOutput ? (
-                                        <>
-                                            {parseFloat(minOutput).toFixed(6)}
-                                            <span className="text-xs text-base-content/60 ml-1">
-                                                (${getUsdValue(minOutput, selectedTo?.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                                            </span>
-                                        </>
-                                    ) : "-"}
-                                </div>
-                            </div>
-                        </div>
                         )}
 
                         {/* Warnings/Errors */}
@@ -448,9 +449,6 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     </div>
                 )}
             </div>
-            <form method="dialog" className="modal-backdrop" onClick={onClose}>
-                <button>close</button>
-            </form>
         </dialog>
     );
 };

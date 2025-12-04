@@ -80,9 +80,9 @@ const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercen
   return (
     <div className="flex items-center gap-2.5">
       <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`} 
-          style={{ width: `${Math.min(utilizationPercentage, 100)}%` }} 
+        <div
+          className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`}
+          style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
         />
       </div>
       <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
@@ -304,7 +304,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // const handleCloseDepositModal = () => undefined;
 
   return (
-    <div className="w-full flex flex-col hide-scrollbar p-4 space-y-4">
+    <div className="w-full flex flex-col hide-scrollbar p-3 space-y-2">
       {/* Protocol Header Card */}
       <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
         <div className="card-body px-5 py-3">
@@ -425,8 +425,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   {/* "Add Supply" button - pinned to bottom with gap */}
                   {!readOnly && (
                     <div className="mt-auto pt-4">
-                      <button 
-                        className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200" 
+                      <button
+                        className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200"
                         onClick={handleAddSupply}
                       >
                         <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
@@ -440,8 +440,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
                   <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                   {!readOnly && (
-                    <button 
-                      className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200" 
+                    <button
+                      className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
                       onClick={handleAddSupply}
                     >
                       <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
@@ -493,9 +493,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   {/* "Add Borrow" button - pinned to bottom with gap */}
                   {!readOnly && (
                     <div className="mt-auto pt-4">
-                      <button 
-                        className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/50 hover:text-secondary transition-all duration-200" 
+                      <button
+                        className={`group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                            ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary"
+                            : "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed"
+                          }`}
                         onClick={handleAddBorrow}
+                        disabled={filteredSuppliedPositions.length === 0}
+                        title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                       >
                         <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                         <span className="text-xs font-medium uppercase tracking-wider">Borrow</span>
@@ -508,9 +513,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
                   <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                   {!readOnly && (
-                    <button 
-                      className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary transition-all duration-200" 
+                    <button
+                      className={`group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                          ? "bg-primary/10 hover:bg-primary/20 text-primary"
+                          : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
+                        }`}
                       onClick={handleAddBorrow}
+                      disabled={filteredSuppliedPositions.length === 0}
+                      title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                     >
                       <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                       <span className="text-xs font-medium uppercase tracking-wider">Borrow Assets</span>
