@@ -206,6 +206,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         buildFlow,
         successMessage: "Debt Swapped successfully!",
         emptyFlowErrorMessage: "Failed to build swap instructions",
+        simulateWhenBatching: true,
     });
 
     const handleSwapWrapper = async () => {

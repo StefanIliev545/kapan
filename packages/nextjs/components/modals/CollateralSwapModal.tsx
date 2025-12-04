@@ -167,6 +167,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         buildFlow,
         successMessage: "Collateral Swapped successfully!",
         emptyFlowErrorMessage: "Failed to build swap instructions",
+        simulateWhenBatching: true,
     });
 
     const handleSwapWrapper = async () => {

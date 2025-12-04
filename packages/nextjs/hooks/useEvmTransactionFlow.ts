@@ -18,6 +18,7 @@ interface UseEvmTransactionFlowParams {
     | Promise<ProtocolInstruction[] | null | undefined>;
   emptyFlowErrorMessage?: string;
   chainSwitchErrorMessage?: string;
+  simulateWhenBatching?: boolean;
 }
 
 export const useEvmTransactionFlow = ({
@@ -28,6 +29,7 @@ export const useEvmTransactionFlow = ({
   successMessage,
   emptyFlowErrorMessage = "Failed to build transaction instructions",
   chainSwitchErrorMessage = "Please switch to the selected network to proceed",
+  simulateWhenBatching = false,
 }: UseEvmTransactionFlowParams) => {
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
@@ -64,7 +66,7 @@ export const useEvmTransactionFlow = ({
       }
 
       // For batched flows, run a client-side simulation to surface readable errors before bundling
-      if (batchingPreference.enabled) {
+      if (simulateWhenBatching && batchingPreference.enabled) {
         try {
           await simulateInstructions(instructions);
         } catch (error: any) {
@@ -85,6 +87,7 @@ export const useEvmTransactionFlow = ({
       successMessage,
       chainSwitchErrorMessage,
       emptyFlowErrorMessage,
+      simulateWhenBatching,
     ],
   );
 

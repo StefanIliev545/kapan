@@ -216,6 +216,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         buildFlow,
         successMessage: "Position closed successfully!",
         emptyFlowErrorMessage: "Failed to build close instructions",
+        simulateWhenBatching: true,
     });
 
     const handleSwapWrapper = async () => {
