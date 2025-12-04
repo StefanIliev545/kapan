@@ -52,15 +52,15 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     useEffect(() => {
         if (isOpen && !wasOpenRef.current) {
-            const modalOpenProps: Record<string, string | number | boolean | undefined> = {
+            const modalOpenProps = {
                 network: "evm",
                 protocol: protocolName,
                 chainId,
-                market,
+                market: market ?? null,
                 debtFromToken,
                 debtFromName,
-                availableAssets: availableAssets?.length,
-            };
+                availableAssets: availableAssets?.length ?? null,
+            } satisfies Record<string, string | number | boolean | null>;
 
             track("debt_swap_modal_open", modalOpenProps);
         }
@@ -231,21 +231,21 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     });
 
     const handleSwapWrapper = async () => {
-        const txBeginProps: Record<string, string | number | boolean | undefined> = {
+        const txBeginProps = {
             network: "evm",
             protocol: protocolName,
             chainId,
-            market,
+            market: market ?? null,
             fromToken: debtFromToken,
             fromName: debtFromName,
-            toToken: selectedTo?.address,
-            toName: selectedTo?.symbol,
+            toToken: selectedTo?.address ?? null,
+            toName: selectedTo?.symbol ?? null,
             amountIn,
             isMax,
             slippage,
             preferBatching,
-            flashLoanProvider: selectedProvider?.name,
-        };
+            flashLoanProvider: selectedProvider?.name ?? null,
+        } satisfies Record<string, string | number | boolean | null>;
 
         try {
             setIsSubmitting(true);

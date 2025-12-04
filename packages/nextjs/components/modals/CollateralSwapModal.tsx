@@ -57,16 +57,16 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     useEffect(() => {
         if (isOpen && !wasOpenRef.current) {
-            const modalOpenProps: Record<string, string | number | boolean | undefined> = {
+            const modalOpenProps = {
                 network: "evm",
                 protocol: protocolName,
                 chainId,
-                market,
+                market: market ?? null,
                 positionType: position.type,
                 positionToken: position.tokenAddress,
                 positionName: position.name,
-                initialFromTokenAddress,
-            };
+                initialFromTokenAddress: initialFromTokenAddress ?? null,
+            } satisfies Record<string, string | number | boolean | null>;
 
             track("collateral_swap_modal_open", modalOpenProps);
         }
@@ -193,21 +193,21 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     });
 
     const handleSwapWrapper = async () => {
-        const txBeginProps: Record<string, string | number | boolean | undefined> = {
+        const txBeginProps = {
             network: "evm",
             protocol: protocolName,
             chainId,
-            market,
-            fromToken: selectedFrom?.address,
-            fromName: selectedFrom?.symbol,
-            toToken: selectedTo?.address,
-            toName: selectedTo?.symbol,
+            market: market ?? null,
+            fromToken: selectedFrom?.address ?? null,
+            fromName: selectedFrom?.symbol ?? null,
+            toToken: selectedTo?.address ?? null,
+            toName: selectedTo?.symbol ?? null,
             amountIn,
             isMax,
             slippage,
             preferBatching,
-            flashLoanProvider: selectedProvider?.name,
-        };
+            flashLoanProvider: selectedProvider?.name ?? null,
+        } satisfies Record<string, string | number | boolean | null>;
 
         try {
             setIsSubmitting(true);

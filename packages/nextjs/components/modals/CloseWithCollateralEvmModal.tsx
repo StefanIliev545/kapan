@@ -56,15 +56,15 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     useEffect(() => {
         if (isOpen && !wasOpenRef.current) {
-            const modalOpenProps: Record<string, string | number | boolean | undefined> = {
+            const modalOpenProps = {
                 network: "evm",
                 protocol: protocolName,
                 debtToken: debtToken,
                 debtName,
                 chainId,
-                market,
-                availableCollaterals: availableCollaterals?.length,
-            };
+                market: market ?? null,
+                availableCollaterals: availableCollaterals?.length ?? null,
+            } satisfies Record<string, string | number | boolean | null>;
 
             track("close_with_collateral_modal_open", modalOpenProps);
         }
@@ -241,21 +241,21 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     });
 
     const handleSwapWrapper = async () => {
-        const txBeginProps: Record<string, string | number | boolean | undefined> = {
+        const txBeginProps = {
             network: "evm",
             protocol: protocolName,
             chainId,
             debtToken: debtToken,
             debtName,
-            collateralToken: selectedTo?.address,
-            collateralName: selectedTo?.symbol,
+            collateralToken: selectedTo?.address ?? null,
+            collateralName: selectedTo?.symbol ?? null,
             amountIn,
             isMax,
             slippage,
             preferBatching,
-            flashLoanProvider: selectedProvider?.name,
-            market,
-        };
+            flashLoanProvider: selectedProvider?.name ?? null,
+            market: market ?? null,
+        } satisfies Record<string, string | number | boolean | null>;
 
         try {
             setIsSubmitting(true);
