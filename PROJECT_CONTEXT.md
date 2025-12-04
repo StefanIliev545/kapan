@@ -13,7 +13,9 @@
 - Execute complex DeFi operations through batched transactions
 
 ### Core Value Proposition
-*"Move your debt to where it costs less, automatically."*
+*"Refinance Your DeFi Debt in One Click."*
+
+**Tagline**: Kapan scans your positions across lending protocols, finds better rates, and uses flash loans to move your debt and collateral—without closing positions or giving up custody.
 
 ---
 
