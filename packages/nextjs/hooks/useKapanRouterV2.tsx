@@ -833,12 +833,67 @@ export const useKapanRouterV2 = () => {
 
   // --- Execution Helpers ---
 
+  const isBasicLendingFlow = useCallback((instructions: ProtocolInstruction[]): boolean => {
+    if (instructions.length === 0 || instructions.length > 4) return false;
+
+    const BASIC_LENDING_OPS = new Set<number>([
+      LendingOp.Deposit,
+      LendingOp.DepositCollateral,
+      LendingOp.WithdrawCollateral,
+      LendingOp.Borrow,
+      LendingOp.Repay,
+      LendingOp.GetBorrowBalance,
+      LendingOp.GetSupplyBalance,
+    ]);
+
+    return instructions.every(inst => {
+      if (inst.protocolName === "router") return true;
+
+      try {
+        const [decoded] = decodeAbiParameters(
+          [
+            {
+              type: "tuple(uint8 op,address token,address user,uint256 amount,bytes context,tuple(uint256 index) input)",
+            },
+          ],
+          inst.data as Hex
+        ) as [{ op: bigint }];
+
+        const op = Number(decoded.op);
+        return BASIC_LENDING_OPS.has(op);
+      } catch {
+        return false;
+      }
+    });
+  }, []);
+
   const simulateInstructions = useCallback(
     async (instructions: ProtocolInstruction[]) => {
       if (!routerContract || !userAddress || !publicClient) {
         throw new Error("Router contract or user address not available");
       }
 
+      // Skip simulation for simple lending flows to avoid false negatives on basic actions
+      if (isBasicLendingFlow(instructions)) {
+        return;
+      }
+
+      // 1) Simulate any authorization calls so we surface readable errors (e.g. allowance issues)
+      const authCalls = await getAuthorizations(instructions);
+      for (const { target, data } of authCalls) {
+        if (!target || !data) continue;
+        const authResult = await simulateTransaction(publicClient, target as `0x${string}`, data, userAddress as `0x${string}`);
+        if (!authResult.success && authResult.error) {
+          const formatted = formatErrorForDisplay(authResult.error);
+          const errorMsg = formatted.suggestion
+            ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+            : `${formatted.title}: ${formatted.description}`;
+          throw new Error(errorMsg);
+        }
+      }
+
+      // 2) Simulate the router call. If it fails with allowance-style errors but we have authorization calls,
+      // let the caller proceed because the batch will include the required approvals.
       const protocolInstructions = instructions.map(inst => ({
         protocolName: inst.protocolName,
         data: inst.data as `0x${string}`,
@@ -859,13 +914,21 @@ export const useKapanRouterV2 = () => {
 
       if (!simResult.success && simResult.error) {
         const formatted = formatErrorForDisplay(simResult.error);
+
+        const isAllowanceRelated = /allowance|approved|approval/i.test(formatted.description || formatted.title);
+        if (authCalls.length > 0 && isAllowanceRelated) {
+          // Authorizations will be bundled with execution, so skip failing the simulation on expected allowance errors
+          console.info("Skipping allowance error during simulation because authorization calls are present", formatted);
+          return;
+        }
+
         const errorMsg = formatted.suggestion
           ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
           : `${formatted.title}: ${formatted.description}`;
         throw new Error(errorMsg);
       }
     },
-    [routerContract, userAddress, publicClient]
+    [routerContract, userAddress, publicClient, getAuthorizations, isBasicLendingFlow]
   );
 
   const executeInstructions = useCallback(async (
@@ -895,11 +958,6 @@ export const useKapanRouterV2 = () => {
           protocolName: inst.protocolName,
           data: inst.data as `0x${string}`,
         }));
-
-        // Simulate transaction first to get better error messages
-        if (publicClient) {
-          await simulateInstructions(instructions);
-        }
 
         transactionHash = await writeContractAsync({
           address: routerContract.address as `0x${string}`,
@@ -1023,7 +1081,7 @@ export const useKapanRouterV2 = () => {
       );
       throw new Error(message);
     }
-  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations, simulateInstructions]);
+  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
   const executeFlowWithApprovals = useCallback(async (
     instructions: ProtocolInstruction[],
