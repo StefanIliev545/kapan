@@ -1,4 +1,5 @@
-import { FC, useState, useMemo } from "react";
+import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
@@ -46,6 +47,26 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 }) => {
     const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 });
     const { buildDebtSwapFlow } = useKapanRouterV2();
+
+    const wasOpenRef = useRef(false);
+
+    useEffect(() => {
+        if (isOpen && !wasOpenRef.current) {
+            const modalOpenProps: Record<string, string | number | boolean | undefined> = {
+                network: "evm",
+                protocol: protocolName,
+                chainId,
+                market,
+                debtFromToken,
+                debtFromName,
+                availableAssets: availableAssets?.length,
+            };
+
+            track("debt_swap_modal_open", modalOpenProps);
+        }
+
+        wasOpenRef.current = isOpen;
+    }, [availableAssets?.length, chainId, debtFromName, debtFromToken, isOpen, market, protocolName]);
 
     // Flash Loan Providers
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -210,9 +231,34 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     });
 
     const handleSwapWrapper = async () => {
+        const txBeginProps: Record<string, string | number | boolean | undefined> = {
+            network: "evm",
+            protocol: protocolName,
+            chainId,
+            market,
+            fromToken: debtFromToken,
+            fromName: debtFromName,
+            toToken: selectedTo?.address,
+            toName: selectedTo?.symbol,
+            amountIn,
+            isMax,
+            slippage,
+            preferBatching,
+            flashLoanProvider: selectedProvider?.name,
+        };
+
         try {
             setIsSubmitting(true);
+            track("debt_swap_tx_begin", txBeginProps);
             await handleSwap(amountIn, isMax);
+            track("debt_swap_tx_complete", { ...txBeginProps, status: "success" });
+        } catch (e) {
+            track("debt_swap_tx_complete", {
+                ...txBeginProps,
+                status: "error",
+                error: e instanceof Error ? e.message : String(e),
+            });
+            throw e;
         } finally {
             setIsSubmitting(false);
         }
