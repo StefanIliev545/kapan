@@ -104,9 +104,59 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
 };
 
 // Smart connect button that shows the right wallet based on selected network
+const NETWORK_STORAGE_KEY = "kapan-network-filter-selection";
+
 const SmartConnectButton = () => {
   const searchParams = useSearchParams();
-  const selectedNetwork = searchParams?.get("network") || "base";
+  const [selectedNetwork, setSelectedNetwork] = useState("base");
+  
+  // Function to get current network from URL or cache
+  const getCurrentNetwork = useCallback(() => {
+    // Check URL first
+    const url = new URL(window.location.href);
+    const urlNetwork = url.searchParams.get("network");
+    if (urlNetwork) return urlNetwork;
+    
+    // Fall back to localStorage cache
+    try {
+      const cached = localStorage.getItem(NETWORK_STORAGE_KEY);
+      if (cached) return cached;
+    } catch { }
+    
+    return "base";
+  }, []);
+
+  // Initialize and sync with URL/cache
+  useEffect(() => {
+    setSelectedNetwork(getCurrentNetwork());
+  }, [searchParams, getCurrentNetwork]);
+
+  // Listen for popstate (browser back/forward)
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedNetwork(getCurrentNetwork());
+    };
+    
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [getCurrentNetwork]);
+
+  // Poll for URL changes (since NetworkFilter uses shallow updates that don't trigger React)
+  useEffect(() => {
+    let lastNetwork = selectedNetwork;
+    
+    const checkNetwork = () => {
+      const current = getCurrentNetwork();
+      if (current !== lastNetwork) {
+        lastNetwork = current;
+        setSelectedNetwork(current);
+      }
+    };
+    
+    const interval = setInterval(checkNetwork, 200);
+    return () => clearInterval(interval);
+  }, [selectedNetwork, getCurrentNetwork]);
+
   const isStarknet = selectedNetwork === "starknet";
 
   return (
