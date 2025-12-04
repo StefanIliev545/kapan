@@ -65,10 +65,12 @@ export const useEvmTransactionFlow = ({
         throw error;
       }
 
-      // For batched flows, run a client-side simulation to surface readable errors before bundling
+      // For batched flows, run a client-side simulation to surface readable errors before bundling.
+      // When batching, we pass skipWhenAuthCallsExist=true because simulation can't accurately predict
+      // atomic batch behavior - approvals are bundled with the main tx, so simulating separately gives false negatives.
       if (simulateWhenBatching && batchingPreference.enabled) {
         try {
-          await simulateInstructions(instructions);
+          await simulateInstructions(instructions, { skipWhenAuthCallsExist: true });
         } catch (error: any) {
           notification.error(error?.message || "Transaction simulation failed");
           throw error;
@@ -78,17 +80,7 @@ export const useEvmTransactionFlow = ({
       await executeFlowBatchedIfPossible(instructions, batchingPreference.enabled);
       // Transaction toast notifications are handled by executeFlowBatchedIfPossible
     },
-    [
-      ensureCorrectChain,
-      buildFlow,
-      executeFlowBatchedIfPossible,
-      batchingPreference.enabled,
-      simulateInstructions,
-      successMessage,
-      chainSwitchErrorMessage,
-      emptyFlowErrorMessage,
-      simulateWhenBatching,
-    ],
+    [ensureCorrectChain, buildFlow, executeFlowBatchedIfPossible, batchingPreference.enabled, simulateInstructions, chainSwitchErrorMessage, emptyFlowErrorMessage, simulateWhenBatching],
   );
 
   useEffect(() => {
