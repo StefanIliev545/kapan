@@ -408,7 +408,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 </div>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-success">
                   <span className="text-xs font-mono font-bold">{filteredSuppliedPositions.length}</span>
-                  <span className="text-[10px] uppercase tracking-wider opacity-70">assets</span>
+                  <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
                 </div>
               </div>
               {filteredSuppliedPositions.length > 0 ? (
@@ -475,7 +475,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 </div>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error/10 text-error">
                   <span className="text-xs font-mono font-bold">{filteredBorrowedPositions.length}</span>
-                  <span className="text-[10px] uppercase tracking-wider opacity-70">assets</span>
+                  <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
                 </div>
               </div>
               {filteredBorrowedPositions.length > 0 ? (
