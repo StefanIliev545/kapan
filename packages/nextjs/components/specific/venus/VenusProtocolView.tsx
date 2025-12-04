@@ -24,7 +24,7 @@
  * 4. Allow users to supply, borrow, repay, and migrate debt between protocols
  */
 
-import { FC, useMemo } from "react";
+import { FC, useEffect, useMemo } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
@@ -32,6 +32,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useGlobalState } from "~~/services/store/store";
 
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
@@ -244,6 +245,35 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
     : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+
+  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  useEffect(() => {
+    if (!vTokenAddresses || !marketDetails || !ratesData) return;
+    if (isLoadingVTokens || isLoadingMarketDetails || isLoadingRates) return;
+    if (connectedAddress && (isLoadingBalances || isLoadingCollateral)) return;
+
+    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
+    const totalBorrowed = filteredBorrowedPositions.reduce(
+      (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
+      0,
+    );
+
+    setProtocolTotals("Venus", totalSupplied, totalBorrowed);
+  }, [
+    connectedAddress,
+    filteredBorrowedPositions,
+    filteredSuppliedPositions,
+    isLoadingBalances,
+    isLoadingCollateral,
+    isLoadingMarketDetails,
+    isLoadingRates,
+    isLoadingVTokens,
+    marketDetails,
+    ratesData,
+    setProtocolTotals,
+    vTokenAddresses,
+  ]);
 
   // Get LTV (Loan-to-Value) for Venus
   // In Venus Protocol, this is typically around 50-75% depending on the asset

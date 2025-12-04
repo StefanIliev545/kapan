@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, useEffect, useMemo } from "react";
 import { ProtocolPosition } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
@@ -6,6 +6,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import type { ContractName } from "~~/utils/scaffold-eth/contract";
+import { useGlobalState } from "~~/services/store/store";
 
 interface AaveLikeProps {
   chainId?: number;
@@ -116,6 +117,21 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
     : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+
+  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  useEffect(() => {
+    if (!allTokensInfo) return;
+
+    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
+    const totalBorrowed = filteredBorrowedPositions.reduce(
+      (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
+      0,
+    );
+
+    const protoName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : "Aave";
+    setProtocolTotals(protoName, totalSupplied, totalBorrowed);
+  }, [allTokensInfo, contractName, filteredBorrowedPositions, filteredSuppliedPositions, setProtocolTotals]);
 
   return <>{children({ suppliedPositions: filteredSuppliedPositions, borrowedPositions: filteredBorrowedPositions, forceShowAll })}</>;
 };
