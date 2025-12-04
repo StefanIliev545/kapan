@@ -29,6 +29,7 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
     function addEulerMarket(address vault) external onlyOwner {
         IEulerVault v = IEulerVault(vault);
         address underlying = _getUnderlying(v);
+        require(underlying != address(0), "Euler: underlying missing");
         tokenToVault[underlying] = v;
         if (!_isRegistered[vault]) {
             _isRegistered[vault] = true;
@@ -136,7 +137,7 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         uint256 pre = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).forceApprove(address(vault), amount);
-        evc.callThroughEVC(user, address(vault), abi.encodeWithSelector(vault.repay.selector, amount, user));
+        vault.repay(amount, user);
         uint256 post = IERC20(token).balanceOf(address(this));
         uint256 spent = pre + amount - post;
         refund = amount > spent ? amount - spent : 0;
@@ -157,6 +158,11 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
 
+        address[] memory controllerVaults = new address[](instrs.length);
+        address[] memory collateralVaults = new address[](instrs.length);
+        uint256 controllerCount;
+        uint256 collateralCount;
+
         uint256 outCount;
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingOp op = instrs[i].op;
@@ -169,6 +175,20 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
             ) {
                 outCount++;
             }
+
+            if (op == ProtocolTypes.LendingOp.Borrow) {
+                IEulerVault vault = tokenToVault[instrs[i].token];
+                address vaultAddr = address(vault);
+                if (vaultAddr != address(0) && !_exists(controllerVaults, controllerCount, vaultAddr)) {
+                    controllerVaults[controllerCount++] = vaultAddr;
+                }
+            } else if (op == ProtocolTypes.LendingOp.DepositCollateral) {
+                IEulerVault vault = tokenToVault[instrs[i].token];
+                address vaultAddr = address(vault);
+                if (vaultAddr != address(0) && !_exists(collateralVaults, collateralCount, vaultAddr)) {
+                    collateralVaults[collateralCount++] = vaultAddr;
+                }
+            }
         }
         produced = new ProtocolTypes.Output[](outCount);
         uint256 pIdx;
@@ -180,8 +200,14 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
 
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 IEulerVault vault = tokenToVault[token];
-                uint256 requiredShares = _previewWithdrawShares(vault, ins.user, amount);
-                produced[pIdx++] = ProtocolTypes.Output({token: token, amount: amount});
+                uint256 maxAssets = _maxWithdrawAssets(vault, ins.user);
+                uint256 outAmount = amount;
+                if (amount == type(uint256).max || amount > maxAssets) {
+                    outAmount = maxAssets;
+                }
+
+                uint256 requiredShares = _previewWithdrawShares(vault, ins.user, outAmount);
+                produced[pIdx++] = ProtocolTypes.Output({token: token, amount: outAmount});
 
                 if (requiredShares == 0) continue;
 
@@ -192,36 +218,44 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
                 }
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
                 produced[pIdx++] = ProtocolTypes.Output({token: token, amount: amount});
-                bytes[] memory calls = new bytes[](3);
+                bytes[] memory calls = new bytes[](2 + controllerCount + collateralCount);
                 uint256 cIdx;
 
                 bool needOperator;
-                bool needController;
-                bool needCollateral;
                 try evc.isOperator(ins.user, address(this)) returns (bool isOp) {
                     needOperator = !isOp;
                 } catch {
                     needOperator = true;
                 }
-                try evc.isControllerEnabled(ins.user, address(tokenToVault[token])) returns (bool enabled) {
-                    needController = !enabled;
-                } catch {
-                    needController = true;
-                }
-                try evc.isCollateralEnabled(ins.user, address(tokenToVault[token])) returns (bool enabledCol) {
-                    needCollateral = !enabledCol;
-                } catch {
-                    needCollateral = true;
-                }
 
                 if (needOperator) {
                     calls[cIdx++] = abi.encodeWithSelector(IEVC.setOperator.selector, address(this), true);
                 }
-                if (needController) {
-                    calls[cIdx++] = abi.encodeWithSelector(IEVC.enableController.selector, address(tokenToVault[token]));
+
+                for (uint256 j = 0; j < controllerCount; j++) {
+                    address vaultAddr = controllerVaults[j];
+                    bool need;
+                    try evc.isControllerEnabled(ins.user, vaultAddr) returns (bool enabled) {
+                        need = !enabled;
+                    } catch {
+                        need = true;
+                    }
+                    if (need) {
+                        calls[cIdx++] = abi.encodeWithSelector(IEVC.enableController.selector, vaultAddr);
+                    }
                 }
-                if (needCollateral) {
-                    calls[cIdx++] = abi.encodeWithSelector(IEVC.enableCollateral.selector, address(tokenToVault[token]));
+
+                for (uint256 j = 0; j < collateralCount; j++) {
+                    address vaultAddr = collateralVaults[j];
+                    bool need;
+                    try evc.isCollateralEnabled(ins.user, vaultAddr) returns (bool enabledCol) {
+                        need = !enabledCol;
+                    } catch {
+                        need = true;
+                    }
+                    if (need) {
+                        calls[cIdx++] = abi.encodeWithSelector(IEVC.enableCollateral.selector, vaultAddr);
+                    }
                 }
 
                 if (cIdx > 0) {
@@ -269,6 +303,13 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
                 }
             }
         }
+    }
+
+    function _exists(address[] memory list, uint256 len, address target) internal pure returns (bool) {
+        for (uint256 i = 0; i < len; i++) {
+            if (list[i] == target) return true;
+        }
+        return false;
     }
 
     function _getUnderlying(IEulerVault vault) internal view returns (address token) {

@@ -38,6 +38,7 @@ contract EulerGatewayView is Ownable {
 
     function addEulerMarket(address vault) external onlyOwner {
         address underlying = _getUnderlying(vault);
+        require(underlying != address(0), "Euler: underlying missing");
         tokenToVault[underlying] = IEulerVault(vault);
         if (!_isRegistered[vault]) {
             _isRegistered[vault] = true;
