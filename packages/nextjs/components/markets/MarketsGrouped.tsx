@@ -2,6 +2,7 @@
 
 import { FC, useMemo, useState } from "react";
 import Image from "next/image";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { VESU_V1_POOLS } from "../specific/vesu/pools";
@@ -305,24 +306,39 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   };
 
   return (
-    <div>
-      <div className="flex justify-end mb-4">
-        <div className="join">
-          <button
-            className={`btn btn-xs join-item ${sortBy === "supply" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setSortBy("supply")}
-          >
-            Supply
-          </button>
-          <button
-            className={`btn btn-xs join-item ${sortBy === "borrow" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setSortBy("borrow")}
-          >
-            Borrow
-          </button>
+    <div className="space-y-6">
+      {/* Sort Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium">Sort by best</span>
+          <div className="flex rounded-lg bg-base-200/50 p-0.5">
+            <button
+              className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                sortBy === "supply" 
+                  ? "bg-success/20 text-success shadow-sm" 
+                  : "text-base-content/50 hover:text-base-content/80"
+              }`}
+              onClick={() => setSortBy("supply")}
+            >
+              Supply APY
+            </button>
+            <button
+              className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                sortBy === "borrow" 
+                  ? "bg-error/20 text-error shadow-sm" 
+                  : "text-base-content/50 hover:text-base-content/80"
+              }`}
+              onClick={() => setSortBy("borrow")}
+            >
+              Borrow APR
+            </button>
+          </div>
         </div>
+        <span className="text-[10px] text-base-content/30">{filtered.length} tokens</span>
       </div>
-      <div className="space-y-4">
+
+      {/* Market Groups */}
+      <div className="space-y-3">
         {filtered.map(group => {
           const sortInfo = groupSorts[group.name] || { column: "borrow", direction: "asc" };
           const sortedMarkets = [...group.markets].sort((a, b) => {
@@ -332,12 +348,19 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             return sortInfo.direction === "asc" ? aVal - bVal : bVal - aVal;
           });
           return (
-            <details key={group.name} className="collapse collapse-arrow rounded-lg">
-              <summary className="collapse-title p-0 list-none">
-                <div className="flex items-center gap-4 p-4 rounded-lg bg-base-100 border border-base-300 hover:bg-base-200 cursor-pointer">
-                  <Image src={group.icon} alt={group.name} width={24} height={24} className="rounded-full" />
-                  <span className="font-medium">{group.name}</span>
-                  <div className="ml-auto mr-8 flex gap-4">
+            <details key={group.name} className="group rounded-xl overflow-hidden">
+              <summary className="list-none cursor-pointer">
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-base-100 to-base-100/80 border border-base-200/60 hover:border-base-300 hover:shadow-lg transition-all duration-300">
+                  {/* Token Icon & Name */}
+                  <div className="flex items-center gap-3 min-w-[120px]">
+                    <div className="w-10 h-10 relative rounded-xl bg-base-200/60 p-1.5 ring-1 ring-base-300/30 shadow-sm">
+                      <Image src={group.icon} alt={group.name} fill className="rounded-lg object-contain" />
+                    </div>
+                    <span className="font-bold text-lg tracking-tight">{group.name}</span>
+                  </div>
+
+                  {/* Rates */}
+                  <div className="flex-1 flex items-center justify-center gap-6 md:gap-12">
                     <RatePill
                       variant="supply"
                       label="Supply Rate"
@@ -353,51 +376,101 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                       protocol={group.bestBorrow.protocol}
                     />
                   </div>
+
+                  {/* Markets count & expand indicator */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] uppercase tracking-wider text-base-content/40 font-medium">
+                      {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
+                    </span>
+                    <div className="w-6 h-6 rounded-lg bg-base-200/50 flex items-center justify-center group-open:bg-primary/20 transition-colors">
+                      <svg 
+                        className="w-3.5 h-3.5 text-base-content/50 group-open:text-primary group-open:rotate-180 transition-all duration-200" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </summary>
-              <div className="collapse-content p-0 mt-2 space-y-2">
-                <div className="grid grid-cols-5 gap-4 p-3 text-xs font-medium uppercase text-base-content/60">
-                  <span>Network</span>
-                  <span>Protocol</span>
-                  <span className="justify-self-center">Utilization</span>
+
+              {/* Expanded Content */}
+              <div className="mt-2 rounded-xl bg-base-200/30 border border-base-200/50 overflow-hidden">
+                {/* Table Header */}
+                <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-base-200/50">
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">Network</span>
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">Protocol</span>
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold text-center">Utilization</span>
                   <button
                     type="button"
-                    className="justify-self-center underline cursor-pointer"
+                    className={`text-[10px] uppercase tracking-widest font-semibold text-center transition-colors ${
+                      sortInfo.column === "supply" ? "text-success" : "text-base-content/40 hover:text-base-content/60"
+                    }`}
                     onClick={() => toggleGroupSort(group.name, "supply")}
                   >
-                    Supply Rate
+                    Supply APY {sortInfo.column === "supply" && (sortInfo.direction === "asc" ? "↑" : "↓")}
                   </button>
                   <button
                     type="button"
-                    className="justify-self-center underline cursor-pointer"
+                    className={`text-[10px] uppercase tracking-widest font-semibold text-center transition-colors ${
+                      sortInfo.column === "borrow" ? "text-error" : "text-base-content/40 hover:text-base-content/60"
+                    }`}
                     onClick={() => toggleGroupSort(group.name, "borrow")}
                   >
-                    Borrow Rate
+                    Borrow APR {sortInfo.column === "borrow" && (sortInfo.direction === "asc" ? "↑" : "↓")}
                   </button>
                 </div>
-                {sortedMarkets.map(m => (
-                  <div
-                    key={m.protocol + m.address}
-                    className="grid grid-cols-5 items-center gap-4 p-3 rounded-lg bg-base-100"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Image src={networkIcons[m.networkType]} alt={m.networkType} width={16} height={16} />
-                      <span>{networkNames[m.networkType]}</span>
+
+                {/* Table Rows */}
+                <div className="divide-y divide-base-200/30">
+                  {sortedMarkets.map((m, idx) => (
+                    <div
+                      key={m.protocol + m.address}
+                      className={`grid grid-cols-5 items-center gap-4 px-4 py-3 hover:bg-base-200/30 transition-colors ${
+                        idx === 0 ? "bg-base-100/50" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 relative">
+                          <Image src={networkIcons[m.networkType]} alt={m.networkType} fill className="object-contain" />
+                        </div>
+                        <span className="text-sm font-medium">{networkNames[m.networkType]}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 relative">
+                          <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="object-contain rounded" />
+                        </div>
+                        <span className="text-sm font-medium">{protocolNames[m.protocol]}</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-sm font-mono font-medium tabular-nums text-base-content/70">{m.utilization}%</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-sm font-mono font-semibold tabular-nums text-success">{m.supplyRate}</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-sm font-mono font-semibold tabular-nums text-error">{m.borrowRate}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Image src={protocolIcons[m.protocol]} alt={m.protocol} width={16} height={16} />
-                      <span className="capitalize">{protocolNames[m.protocol]}</span>
-                    </div>
-                    <div className="justify-self-center font-medium">{m.utilization}%</div>
-                    <div className="justify-self-center">{m.supplyRate}</div>
-                    <div className="justify-self-center">{m.borrowRate}</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </details>
           );
         })}
       </div>
+
+      {/* Empty State */}
+      {filtered.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-base-200/50 flex items-center justify-center mb-4">
+            <MagnifyingGlassIcon className="w-8 h-8 text-base-content/30" />
+          </div>
+          <p className="text-base-content/50 text-sm">No markets found</p>
+        </div>
+      )}
     </div>
   );
 };

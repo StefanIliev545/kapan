@@ -63,7 +63,7 @@ const ScaffoldEthApp = ({
   }, []);
 
   const isAppSubdomain = hostname?.startsWith("app.") ?? false;
-  const isAppExperience = pathname.startsWith("/app") || isAppSubdomain;
+  const isAppExperience = pathname.startsWith("/app") || pathname.startsWith("/markets") || isAppSubdomain;
   const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/automate");
 
   const renderHeader = () => {
