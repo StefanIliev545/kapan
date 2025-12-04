@@ -1,4 +1,5 @@
-import { FC, useState, useMemo } from "react";
+import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
@@ -50,6 +51,26 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 }) => {
     const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 });
     const { buildCloseWithCollateralFlow } = useKapanRouterV2();
+
+    const wasOpenRef = useRef(false);
+
+    useEffect(() => {
+        if (isOpen && !wasOpenRef.current) {
+            const modalOpenProps = {
+                network: "evm",
+                protocol: protocolName,
+                debtToken: debtToken,
+                debtName,
+                chainId,
+                market: market ?? null,
+                availableCollaterals: availableCollaterals?.length ?? null,
+            } satisfies Record<string, string | number | boolean | null>;
+
+            track("close_with_collateral_modal_open", modalOpenProps);
+        }
+
+        wasOpenRef.current = isOpen;
+    }, [availableCollaterals?.length, chainId, debtName, debtToken, isOpen, market, protocolName]);
 
     // Flash Loan Providers
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -220,9 +241,34 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     });
 
     const handleSwapWrapper = async () => {
+        const txBeginProps = {
+            network: "evm",
+            protocol: protocolName,
+            chainId,
+            debtToken: debtToken,
+            debtName,
+            collateralToken: selectedTo?.address ?? null,
+            collateralName: selectedTo?.symbol ?? null,
+            amountIn,
+            isMax,
+            slippage,
+            preferBatching,
+            flashLoanProvider: selectedProvider?.name ?? null,
+            market: market ?? null,
+        } satisfies Record<string, string | number | boolean | null>;
+
         try {
             setIsSubmitting(true);
+            track("close_with_collateral_tx_begin", txBeginProps);
             await handleSwap(amountIn, isMax);
+            track("close_with_collateral_tx_complete", { ...txBeginProps, status: "success" });
+        } catch (e) {
+            track("close_with_collateral_tx_complete", {
+                ...txBeginProps,
+                status: "error",
+                error: e instanceof Error ? e.message : String(e),
+            });
+            throw e;
         } finally {
             setIsSubmitting(false);
         }
