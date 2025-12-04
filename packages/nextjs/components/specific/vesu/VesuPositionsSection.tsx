@@ -61,13 +61,13 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [closeParams, setCloseParams] = useState<
     | {
-        collateral: { name: string; address: string; decimals: number; icon: string };
-        debt: { name: string; address: string; decimals: number; icon: string };
-        collateralBalance: bigint;
-        debtBalance: bigint;
-        poolKey: string;
-        protocolKey: VesuProtocolKey;
-      }
+      collateral: { name: string; address: string; decimals: number; icon: string };
+      debt: { name: string; address: string; decimals: number; icon: string };
+      collateralBalance: bigint;
+      debtBalance: bigint;
+      poolKey: string;
+      protocolKey: VesuProtocolKey;
+    }
     | null
   >(null);
 
@@ -289,12 +289,12 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                 availableActions={
                   row.hasDebt
                     ? {
-                        borrow: true,
-                        repay: true,
-                        move: supportsPoolDependentActions,
-                        close: supportsPoolDependentActions,
-                        swap: supportsPoolDependentActions,
-                      }
+                      borrow: true,
+                      repay: true,
+                      move: supportsPoolDependentActions,
+                      close: supportsPoolDependentActions,
+                      swap: supportsPoolDependentActions,
+                    }
                     : { borrow: true, repay: false, move: false, swap: false, close: false }
                 }
                 showNoDebtLabel={!row.hasDebt}
@@ -332,8 +332,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   };
 
   return (
-    <div className="card bg-base-100 shadow-md">
-      <div className="card-body space-y-4 p-4">
+    <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
             <h2 className="card-title text-lg">{title}</h2>
@@ -354,13 +354,12 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                 <span className="flex items-center gap-1">
                   <span>Net APY:</span>
                   <span
-                    className={`font-semibold ${
-                      netApyPercent == null
-                        ? "text-base-content"
-                        : netApyPercent >= 0
-                          ? "text-success"
-                          : "text-error"
-                    }`}
+                    className={`font-semibold ${netApyPercent == null
+                      ? "text-base-content"
+                      : netApyPercent >= 0
+                        ? "text-success"
+                        : "text-error"
+                      }`}
                   >
                     {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
                   </span>
@@ -378,7 +377,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
         <div className="space-y-4">
           {renderPositions()}
 
-          <div className="overflow-hidden rounded-md border border-dashed border-base-300">
+          <div className="overflow-hidden rounded-2xl border border-dashed border-base-300">
             <div className="grid grid-cols-1 divide-y divide-base-300 md:grid-cols-2 md:divide-x md:divide-y-0">
               <div className="flex h-full flex-col justify-center bg-base-200/60 p-3">
                 <div className="flex items-center justify-between gap-4">

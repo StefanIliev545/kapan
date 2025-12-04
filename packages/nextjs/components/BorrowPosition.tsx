@@ -249,9 +249,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
     ? React.cloneElement(collateralView as React.ReactElement, {
-        isVisible: isExpanded,
-        initialShowAll: false,
-      })
+      isVisible: isExpanded,
+      initialShowAll: false,
+    })
     : null;
 
   const defaultInfoButton = (
@@ -306,24 +306,23 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   return (
     <>
-      {/* Outer container - clickable to expand/collapse */}
+      {/* Container */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-4 pt-3 pb-0" : "p-4"} rounded-xl bg-gradient-to-r from-base-200/80 to-base-200/60 border border-base-300/40 ${
-          hasAnyActions ? "cursor-pointer hover:border-base-300 hover:shadow-md" : "cursor-default"
-        } transition-all duration-300 ${containerClassName ?? ""}`}
+        className={`w-full ${isExpanded && hasAnyActions ? "px-5 pt-4 pb-0" : "p-5"} rounded-xl bg-base-200/30 border border-base-300/40 ${hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default"
+          } transition-colors duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 relative gap-3 lg:gap-0">
-          {/* Header: Icon and Title */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 relative gap-4 lg:gap-0">
+          {/* Token */}
           <div className="order-1 lg:order-none lg:col-span-3 flex items-center">
-            <div className="w-9 h-9 relative min-w-[36px] min-h-[36px] rounded-xl bg-base-100 p-1 ring-1 ring-base-300/50 shadow-sm">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-lg object-contain" />
+            <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-full bg-base-300/50 p-1.5">
+              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full object-contain" />
             </div>
             <div className="ml-3 flex items-center gap-1.5">
               {renderName ? (
                 <>{renderName(name)}</>
               ) : (
-                <span className="font-bold text-base tracking-tight">{name}</span>
+                <span className="font-medium text-base text-base-content">{name}</span>
               )}
             </div>
             {infoButtonNode && (
@@ -337,9 +336,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${
-              hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
-            }`}
+            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+              }`}
           >
             {!hideBalanceColumn && (
               <div className="px-3 border-r border-base-300/50">
@@ -411,9 +409,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             )}
             {hasAnyActions && (
               <div
-                className={`flex items-center justify-center w-6 h-6 rounded-lg ${
-                  isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
-                } transition-all duration-200`}
+                className={`flex items-center justify-center w-6 h-6 rounded-lg ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
+                  } transition-all duration-200`}
               >
                 {isExpanded ? (
                   <FiChevronUp className="w-3.5 h-3.5 text-primary" />
@@ -434,21 +431,21 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 className="w-full"
                 autoCompact
                 actions={[
-                ...(showRepayButton
-                  ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
-                  : []),
-                ...(showBorrowButton
-                  ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
-                  : []),
-                ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showMoveButton
-                  ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
+                  ...(showRepayButton
+                    ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
+                    : []),
+                  ...(showBorrowButton
+                    ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
+                    : []),
+                  ...(showSwapButton
+                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showMoveButton
+                    ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showCloseButton
+                    ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
                 ]}
               />
             </div>
@@ -459,30 +456,30 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
                 className="w-full"
                 autoCompact
                 actions={[
-                ...(showRepayButton
-                  ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
-                  : []),
-                ...(showBorrowButton
-                  ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
-                  : []),
-                ...(showSwapButton
-                  ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showMoveButton
-                  ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
-                ...(showCloseButton
-                  ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
-                  : []),
+                  ...(showRepayButton
+                    ? [{ key: "repay", label: "Repay", icon: <FiMinus className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
+                    : []),
+                  ...(showBorrowButton
+                    ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <FiPlus className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
+                    : []),
+                  ...(showSwapButton
+                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showMoveButton
+                    ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
+                  ...(showCloseButton
+                    ? [{ key: "close", label: "Close", icon: <FiX className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
+                    : []),
                 ]}
               />
             </div>
 
-        {actionsDisabled && !suppressDisabledMessage && (
-          <div className="mt-3 text-sm text-base-content/50">
-            {disabledMessage}
-          </div>
-        )}
+            {actionsDisabled && !suppressDisabledMessage && (
+              <div className="mt-3 text-sm text-base-content/50">
+                {disabledMessage}
+              </div>
+            )}
 
             {extraActions && <div className="mt-3">{extraActions}</div>}
           </div>

@@ -8,6 +8,8 @@ import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
+import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
+import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
 import { arbitrum, base, optimism, linea } from "wagmi/chains";
 import { hardhat } from "viem/chains";
 
@@ -114,117 +116,138 @@ const App: NextPage = () => {
   ];
 
   return (
-    <div className="container mx-auto flex flex-col gap-6 p-0 min-h-[calc(100vh-6rem)] py-6">
-      <div className="flex-1 space-y-6">
-        <NetworkFilter
-          networks={networkOptions}
-          defaultNetwork="base"
-          onNetworkChange={handleNetworkChange}
-        />
-
-        {/* Small, non-blocking warning */}
-        {warnings[selectedNetwork as keyof typeof warnings] && (
-          <div className="my-4 text-sm text-warning text-center">
-            {warnings[selectedNetwork as keyof typeof warnings]}
-          </div>
-        )}
-
-        {/* ---- Network panes: only render the active selection ---- */}
-        {/* ARBITRUM */}
-        {selectedNetwork === "arbitrum" && (
-          <div className="space-y-4">
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-          </div>
-        )}
-
-        {/* BASE */}
-        {selectedNetwork === "base" && (
-          <div className="space-y-4">
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-          </div>
-        )}
-
-        {/* HARDHAT (conditionally enabled via NEXT_PUBLIC_ENABLE_HARDHAT_UI) */}
-        {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && selectedNetwork === "hardhat" && (
-          <div className="space-y-4">
-            <div className="my-2 text-warning text-sm text-center">
-              Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
+    <DashboardLayout>
+      <div className="flex flex-col gap-4">
+        {/* Header with metrics */}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-base-content tracking-tight">Positions</h1>
             </div>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
+
+            {/* Network Switcher */}
+            <NetworkFilter
+              networks={networkOptions}
+              defaultNetwork="base"
+              onNetworkChange={handleNetworkChange}
+            />
           </div>
+
+          {/* Compact metrics row */}
+          <DashboardMetrics
+            netWorth={0}
+            totalSupply={0}
+            totalDebt={0}
+            isLoading={false}
+          />
+        </div>
+
+        {/* Subtle warning */}
+        {warnings[selectedNetwork as keyof typeof warnings] && (
+          <p className="text-xs text-base-content/40 border-l-2 border-base-300 pl-3">
+            {warnings[selectedNetwork as keyof typeof warnings]}
+          </p>
         )}
 
-        {/* STARKNET */}
-        {selectedNetwork === "starknet" && (
-          <div className="space-y-4">
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <VesuProtocolView />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <NostraProtocolView />
-            </StableArea>
-          </div>
-        )}
+        {/* Protocols */}
+        <div className="space-y-3">
+          {/* ---- Network panes: only render the active selection ---- */}
+          {/* ARBITRUM */}
+          {selectedNetwork === "arbitrum" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
 
-        {/* OPTIMISM */}
-        {selectedNetwork === "optimism" && (
-          <div className="space-y-4">
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-          </div>
-        )}
+          {/* BASE */}
+          {selectedNetwork === "base" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
 
-        {/* LINEA */}
-        {selectedNetwork === "linea" && (
-          <div className="space-y-4">
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <ZeroLendProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-            <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
-              <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
-            </StableArea>
-          </div>
-        )}
+          {/* HARDHAT (conditionally enabled via NEXT_PUBLIC_ENABLE_HARDHAT_UI) */}
+          {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && selectedNetwork === "hardhat" && (
+            <div className="space-y-3">
+              <div className="alert alert-warning text-sm">
+                Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
+              </div>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
 
+          {/* STARKNET */}
+          {selectedNetwork === "starknet" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <VesuProtocolView />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <NostraProtocolView />
+              </StableArea>
+            </div>
+          )}
 
+          {/* OPTIMISM */}
+          {selectedNetwork === "optimism" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
 
-        <CallToAction sections={sections} />
+          {/* LINEA */}
+          {selectedNetwork === "linea" && (
+            <div className="space-y-6">
+              <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+                <ZeroLendProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-12">
+          <CallToAction sections={sections} />
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

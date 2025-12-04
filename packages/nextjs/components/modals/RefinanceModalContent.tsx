@@ -208,10 +208,11 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-2xl max-h-[90vh] p-6 rounded-none flex flex-col">
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="modal-box relative bg-base-100 max-w-2xl max-h-[90vh] p-5 rounded-xl border border-base-300/50 flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-lg">Refinance Position</h3>
-          <button className="btn btn-ghost btn-xs" onClick={onClose}>✕</button>
+          <h3 className="font-semibold text-lg text-base-content">Refinance Position</h3>
+          <button className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors" onClick={onClose}>✕</button>
         </div>
 
         <div className="space-y-4 overflow-y-auto">

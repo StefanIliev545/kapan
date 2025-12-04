@@ -119,20 +119,26 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   const selectedRawSymbol = selectedToken ? feltToString(selectedToken.symbol) : "";
   const selectedSymbol = selectedToken
     ? (selectedRawSymbol && selectedRawSymbol.trim().length > 0
-        ? selectedRawSymbol
-        : getTokenNameFallback(selectedAddress) ?? selectedRawSymbol)
+      ? selectedRawSymbol
+      : getTokenNameFallback(selectedAddress) ?? selectedRawSymbol)
     : "";
 
   return (
     <>
       <dialog className={`modal ${isOpen && !isTokenModalOpen ? "modal-open" : ""}`}>
-        <div className="modal-box max-w-md p-4 rounded-none">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-semibold text-xl">{modalTitle}</h3>
-            <button className="btn btn-sm btn-ghost" onClick={handleDone}>Close</button>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={handleDone} />
+        <div className="modal-box relative max-w-md p-4 rounded-xl bg-base-100 border border-base-300/50">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-semibold text-lg text-base-content">{modalTitle}</h3>
+            <button
+              className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
+              onClick={handleDone}
+            >
+              ✕
+            </button>
           </div>
 
-          <div className="border border-base-300 divide-y divide-base-300 max-h-96 overflow-y-auto">
+          <div className="border border-base-300/50 rounded-lg divide-y divide-base-300/50 max-h-96 overflow-y-auto">
             {sortedTokens.length > 0 ? (
               sortedTokens.map(({ token, address, balanceLabel }) => {
                 const raw = feltToString(token.symbol);
@@ -140,32 +146,29 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                 return (
                   <button
                     key={address}
-                    className="w-full flex items-center justify-between p-3 hover:bg-base-200/60"
+                    className="w-full flex items-center justify-between p-3 hover:bg-base-200/50 transition-colors"
                     onClick={() => handleSelectToken(token)}
                   >
-                    <div className="flex items-center gap-2">
-                      <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={16} height={16} className="w-4 h-4" />
-                      <span className="text-sm font-medium">{symbol}</span>
+                    <div className="flex items-center gap-3">
+                      <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={24} height={24} className="rounded-full" />
+                      <span className="text-sm font-medium text-base-content">{symbol}</span>
                     </div>
                     <div className="flex flex-col text-right">
-                      <div className="text-[11px] text-base-content/60">
+                      <div className="text-xs text-base-content/50">
                         {formatPercentage(
                           getDisplayRate(protocolName, action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0),
                         )}% {rateLabel}
                       </div>
-                      <div className="text-xs text-base-content/80">Balance: {balanceLabel}</div>
+                      <div className="text-xs text-base-content/70">Balance: {balanceLabel}</div>
                     </div>
                   </button>
                 );
               })
             ) : (
-              <div className="p-6 text-center text-sm text-base-content/70">No tokens available to {action === "borrow" ? "borrow" : "deposit"}</div>
+              <div className="p-6 text-center text-sm text-base-content/50">No tokens available to {action === "borrow" ? "borrow" : "deposit"}</div>
             )}
           </div>
         </div>
-        <form method="dialog" className="modal-backdrop" onClick={handleDone}>
-          <button>close</button>
-        </form>
       </dialog>
 
       {/* Render borrow modal if a token is selected */}
@@ -183,9 +186,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
             currentRate: selectedToken.borrowAPR ?? 0,
             usdPrice:
               selectedToken.price && selectedToken.price.is_valid
-              ? Number(selectedToken.price.value) / 1e18
-              : 0,
-            }}
+                ? Number(selectedToken.price.value) / 1e18
+                : 0,
+          }}
           protocolName={protocolName}
           currentDebt={0}
           vesuContext={

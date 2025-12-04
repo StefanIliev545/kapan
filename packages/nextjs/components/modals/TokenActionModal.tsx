@@ -55,14 +55,14 @@ const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFraction
 const HealthFactor = ({ value }: { value: number }) => {
   const isFiniteValue = Number.isFinite(value);
   const percent = isFiniteValue ? Math.min(100, Math.max(0, ((value - 1) / 3) * 100)) : 100;
-  const barColor = !isFiniteValue ? "progress-success" : value >= 4 ? "progress-success" : value > 2 ? "progress-warning" : "progress-error";
-  const textColor = !isFiniteValue ? "text-success" : value >= 4 ? "text-success" : value > 2 ? "text-warning" : "text-error";
   return (
     <div className="flex flex-col text-xs">
-      <span className="mb-1">Health Factor</span>
+      <span className="mb-1 text-base-content/50">Health Factor</span>
       <div className="flex items-center gap-2">
-        <progress className={`progress w-20 ${barColor}`} value={percent} max="100"></progress>
-        <span className={textColor}>{isFiniteValue ? value.toFixed(2) : "∞"}</span>
+        <div className="w-20 h-1.5 bg-base-300 rounded-full overflow-hidden">
+          <div className="h-full bg-base-content/60 rounded-full" style={{ width: `${percent}%` }} />
+        </div>
+        <span className="text-base-content font-medium">{isFiniteValue ? value.toFixed(2) : "∞"}</span>
       </div>
     </div>
   );
@@ -71,10 +71,12 @@ const HealthFactor = ({ value }: { value: number }) => {
 // Render a labeled bar with percentage for Loan To Value
 const LoanToValueBar = ({ value }: { value: number }) => (
   <div className="flex flex-col text-xs">
-    <span className="mb-1">Loan To Value</span>
+    <span className="mb-1 text-base-content/50">Loan To Value</span>
     <div className="flex items-center gap-2">
-      <progress className="progress progress-primary w-20" value={value} max="100"></progress>
-      <span>{formatPercentage(value)}%</span>
+      <div className="w-20 h-1.5 bg-base-300 rounded-full overflow-hidden">
+        <div className="h-full bg-base-content/60 rounded-full" style={{ width: `${value}%` }} />
+      </div>
+      <span className="text-base-content font-medium">{formatPercentage(value)}%</span>
     </div>
   </div>
 );
@@ -100,7 +102,7 @@ export const PercentInput: FC<{
 }> = ({ balance, decimals, price = 0, onChange, percentBase, max, resetTrigger, insufficientFunds }) => {
   const [amount, setAmount] = useState("");
   const [active, setActive] = useState<number | null>(null);
-  
+
   // Reset amount when resetTrigger changes (modal reopens)
   useEffect(() => {
     setAmount("");
@@ -141,7 +143,7 @@ export const PercentInput: FC<{
           value={amount}
           onChange={e => handleChange(e.target.value)}
           placeholder="0.0"
-          className="input input-bordered w-full pr-24"
+          className="w-full px-4 py-3 bg-base-200/50 border border-base-300/50 rounded-lg text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-base-content/30 pr-24"
         />
         {insufficientFunds && (
           <div className="absolute -top-4 right-1 z-10">
@@ -174,19 +176,13 @@ export const LeftMetrics: FC<{
   metricValue: number;
   token: TokenInfo;
 }> = ({ hf, ltv, metricLabel, metricValue, token }) => (
-  <div className="w-full md:w-56 p-6 space-y-3 text-sm bg-base-200 border-b md:border-b-0 md:border-r border-base-300">
-    <div className="font-semibold mb-2">Before</div>
-    <div className="text-xs">
-      <div className="py-2">
-        <HealthFactor value={hf} />
-      </div>
-      <div className="border-t border-base-300 my-2" />
-      <div className="py-2">
-        <LoanToValueBar value={ltv} />
-      </div>
-      <div className="border-t border-base-300 my-2" />
-      <div className="py-2 flex items-center gap-2">
-        <span>{metricLabel}</span>
+  <div className="w-full md:w-52 p-5 space-y-4 text-sm bg-base-200/50 border-b md:border-b-0 md:border-r border-base-300/50">
+    <div className="text-xs uppercase tracking-wider text-base-content/40 font-medium">Before</div>
+    <div className="space-y-4">
+      <HealthFactor value={hf} />
+      <LoanToValueBar value={ltv} />
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-base-content/50">{metricLabel}</span>
         <TokenPill value={metricValue} icon={token.icon} name={token.name} />
       </div>
     </div>
@@ -359,7 +355,8 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box max-w-2xl p-0 rounded-none overflow-hidden">
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={handleClose} />
+      <div className="modal-box relative max-w-2xl p-0 rounded-xl overflow-hidden bg-base-100 border border-base-300/50">
         <div className="flex flex-col md:flex-row">
           <LeftMetrics
             hf={beforeHfEffective}
@@ -369,15 +366,15 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             metricValue={before}
             token={token}
           />
-          <div className="flex-1 p-6 space-y-4">
+          <div className="flex-1 p-5 space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-xl">
+              <div className="flex items-center gap-3">
+                <Image src={token.icon} alt={token.name} width={28} height={28} className="rounded-full" />
+                <h3 className="font-semibold text-lg text-base-content">
                   {action} {token.name}
                 </h3>
-                <Image src={token.icon} alt={token.name} width={32} height={32} />
               </div>
-              {protocolName && <div className="text-sm text-base-content/70">{protocolName}</div>}
+              {protocolName && <div className="text-xs text-base-content/40 uppercase tracking-wider">{protocolName}</div>}
             </div>
             <div className="flex items-center justify-between text-xs text-base-content/70">
               <span>
@@ -402,10 +399,10 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               const hfTextColor = !Number.isFinite(afterHfEffective)
                 ? "text-success"
                 : afterHfEffective >= 4
-                ? "text-success"
-                : afterHfEffective > 2
-                ? "text-warning"
-                : "text-error";
+                  ? "text-success"
+                  : afterHfEffective > 2
+                    ? "text-warning"
+                    : "text-error";
               const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
               return (
                 <div className="text-xs pt-2">
@@ -449,9 +446,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
           </div>
         </div>
       </div>
-      <form method="dialog" className="modal-backdrop" onClick={handleClose}>
-        <button>close</button>
-      </form>
     </dialog>
   );
 };
@@ -553,10 +547,10 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
             const hfTextColor = !Number.isFinite(afterHfEffective)
               ? "text-success"
               : afterHfEffective >= 4
-              ? "text-success"
-              : afterHfEffective > 2
-              ? "text-warning"
-              : "text-error";
+                ? "text-success"
+                : afterHfEffective > 2
+                  ? "text-warning"
+                  : "text-error";
             const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
             return (
               <div className="text-xs pt-2">
