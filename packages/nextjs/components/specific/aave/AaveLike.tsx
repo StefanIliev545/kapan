@@ -10,7 +10,7 @@ import { useGlobalState } from "~~/services/store/store";
 
 interface AaveLikeProps {
   chainId?: number;
-  contractName: "AaveGatewayView" | "ZeroLendGatewayView";
+  contractName: "AaveGatewayView" | "ZeroLendGatewayView" | "EulerGatewayView";
   children: (props: {
     suppliedPositions: ProtocolPosition[];
     borrowedPositions: ProtocolPosition[];

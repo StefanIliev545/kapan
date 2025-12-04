@@ -45,6 +45,11 @@ const ZeroLendProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading ZeroLend" /> }
 );
 
+const EulerProtocolView = dynamic(
+  () => import("~~/components/specific/euler/EulerProtocolView").then(m => m.EulerProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Euler" /> }
+);
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "base", name: "Base", logo: "/logos/base.svg" },
@@ -186,6 +191,9 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <EulerProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
             </div>
           )}
 
@@ -204,6 +212,9 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <EulerProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
             </div>
           )}
 
@@ -221,6 +232,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <EulerProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
           )}
@@ -245,6 +259,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+                <EulerProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
           )}
