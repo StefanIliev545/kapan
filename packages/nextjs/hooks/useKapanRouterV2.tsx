@@ -839,6 +839,22 @@ export const useKapanRouterV2 = () => {
         throw new Error("Router contract or user address not available");
       }
 
+      // 1) Simulate any authorization calls so we surface readable errors (e.g. allowance issues)
+      const authCalls = await getAuthorizations(instructions);
+      for (const { target, data } of authCalls) {
+        if (!target || !data) continue;
+        const authResult = await simulateTransaction(publicClient, target as `0x${string}`, data, userAddress as `0x${string}`);
+        if (!authResult.success && authResult.error) {
+          const formatted = formatErrorForDisplay(authResult.error);
+          const errorMsg = formatted.suggestion
+            ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+            : `${formatted.title}: ${formatted.description}`;
+          throw new Error(errorMsg);
+        }
+      }
+
+      // 2) Simulate the router call. If it fails with allowance-style errors but we have authorization calls,
+      // let the caller proceed because the batch will include the required approvals.
       const protocolInstructions = instructions.map(inst => ({
         protocolName: inst.protocolName,
         data: inst.data as `0x${string}`,
@@ -859,13 +875,21 @@ export const useKapanRouterV2 = () => {
 
       if (!simResult.success && simResult.error) {
         const formatted = formatErrorForDisplay(simResult.error);
+
+        const isAllowanceRelated = /allowance|approved|approval/i.test(formatted.description || formatted.title);
+        if (authCalls.length > 0 && isAllowanceRelated) {
+          // Authorizations will be bundled with execution, so skip failing the simulation on expected allowance errors
+          console.info("Skipping allowance error during simulation because authorization calls are present", formatted);
+          return;
+        }
+
         const errorMsg = formatted.suggestion
           ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
           : `${formatted.title}: ${formatted.description}`;
         throw new Error(errorMsg);
       }
     },
-    [routerContract, userAddress, publicClient]
+    [routerContract, userAddress, publicClient, getAuthorizations]
   );
 
   const executeInstructions = useCallback(async (
