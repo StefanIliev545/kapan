@@ -959,11 +959,6 @@ export const useKapanRouterV2 = () => {
           data: inst.data as `0x${string}`,
         }));
 
-        // Simulate transaction first to get better error messages
-        if (publicClient) {
-          await simulateInstructions(instructions);
-        }
-
         transactionHash = await writeContractAsync({
           address: routerContract.address as `0x${string}`,
           abi: routerContract.abi,
@@ -1086,7 +1081,7 @@ export const useKapanRouterV2 = () => {
       );
       throw new Error(message);
     }
-  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations, simulateInstructions]);
+  }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
   const executeFlowWithApprovals = useCallback(async (
     instructions: ProtocolInstruction[],
