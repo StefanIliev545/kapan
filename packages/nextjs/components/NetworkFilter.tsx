@@ -220,19 +220,55 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     }
   };
 
+  // Track button refs for measuring positions
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
+
+  // Update indicator position when selection changes
+  useEffect(() => {
+    const button = buttonRefs.current.get(selectedNetwork);
+    const container = containerRef.current;
+    if (button && container) {
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      setIndicatorStyle({
+        left: buttonRect.left - containerRect.left,
+        width: buttonRect.width,
+      });
+    }
+  }, [selectedNetwork, networks]);
+
   return (
-    <div className="inline-flex items-center gap-1 p-1 bg-base-200/30 rounded-lg border border-base-300/40">
+    <div
+      ref={containerRef}
+      className="relative inline-flex items-center gap-1 p-1 bg-base-200/30 rounded-lg border border-base-300/40"
+    >
+      {/* Animated sliding indicator */}
+      {indicatorStyle && (
+        <div
+          className="absolute top-1 bottom-1 bg-base-100 rounded-md shadow-sm transition-all duration-300 ease-out"
+          style={{
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+          }}
+        />
+      )}
+
       {networks.map((network) => {
         const isActive = selectedNetwork === network.id;
         return (
           <button
             key={network.id}
+            ref={(el) => {
+              if (el) buttonRefs.current.set(network.id, el);
+            }}
             type="button"
             aria-pressed={isActive}
             className={`
-              flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150
+              relative z-10 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200
               ${isActive
-                ? "bg-base-100 text-base-content shadow-sm"
+                ? "text-base-content"
                 : "text-base-content/40 hover:text-base-content/70"
               }
             `}
