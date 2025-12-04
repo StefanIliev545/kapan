@@ -133,73 +133,70 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   };
 
   return (
-    <div className="card bg-base-100 shadow-md">
-      <div className="card-body space-y-4 p-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
+      <div className="card-body px-5 py-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          {/* Protocol name + icon */}
           <div className="flex items-center gap-3">
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-lg bg-base-200 p-1">
-              <Image src={iconSrc} alt={`${title} icon`} width={36} height={36} className="object-contain" />
+            <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+              <Image src={iconSrc} alt={`${title} icon`} width={24} height={24} className="object-contain drop-shadow-sm" />
             </div>
-            <div className="flex flex-col">
-              <div className="text-xl font-bold tracking-tight">{title}</div>
-              {userAddress && (
-                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70">
-                  <span className="flex items-center gap-1">
-                    <span>Balance:</span>
-                    <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
-                      {formatCurrency(netBalanceUsd)}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>30D Net Yield:</span>
-                    <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
-                      {formatCurrency(netYield30d)}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>Net APY:</span>
-                    <span
-                      className={`font-semibold ${
-                        netApyPercent == null
-                          ? "text-base-content"
-                          : netApyPercent >= 0
-                            ? "text-success"
-                            : "text-error"
-                      }`}
-                    >
-                      {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
-                    </span>
-                  </span>
-                </div>
-              )}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+              <span className="text-base font-bold tracking-tight">{title}</span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 md:ml-auto md:items-end">
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+
+          {/* Stats - spread evenly across available space */}
+          {userAddress && (
+            <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+              {/* Net Balance */}
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
+                  {formatCurrency(netBalanceUsd)}
+                </span>
+              </div>
+
+              {/* 30D Yield */}
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                  {formatCurrency(netYield30d)}
+                </span>
+              </div>
+
+              {/* Net APY */}
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                  {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Right side - status message + actions */}
+          <div className="flex items-center gap-3 ml-auto">
             {!userAddress ? (
-              <span className="text-right text-xs text-base-content/70">
-                Connect your Starknet wallet to view personalized positions
-              </span>
+              <span className="text-[11px] text-primary/80 font-medium">Connect Starknet wallet</span>
             ) : hasPositions ? (
-              <span className="text-right text-xs text-base-content/70">
-                Markets are hidden while you manage your positions
-              </span>
-            ) : (
-              <span className="text-right text-xs text-base-content/70">
-                No active positions yet – explore the markets below
-              </span>
-            )}
-            <div className="flex flex-wrap items-center justify-end gap-2 md:flex-nowrap">
-              <button className="btn btn-sm btn-ghost border border-base-300" type="button" onClick={onToggle}>
-                <span className="mr-2">Markets</span>
-                {isOpen ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
+              <span className="hidden md:inline text-[10px] text-base-content/40">Managing positions</span>
+            ) : null}
+            <div className="flex items-center gap-2 pl-2 border-l border-base-300/50">
+              <button className="btn btn-sm btn-ghost gap-1.5" type="button" onClick={onToggle}>
+                <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
+                {isOpen ? <FiChevronUp className="h-3.5 w-3.5" /> : <FiChevronDown className="h-3.5 w-3.5" />}
               </button>
-              {headerExtra && <div className="flex items-center justify-end">{headerExtra}</div>}
+              {headerExtra}
             </div>
           </div>
         </div>
 
-        {isOpen && <div className="space-y-4 border-t border-base-200 pt-4">{renderMarketContent()}</div>}
+        {isOpen && <div className="space-y-4 border-t border-base-200/50 pt-4 mt-3">{renderMarketContent()}</div>}
       </div>
     </div>
   );

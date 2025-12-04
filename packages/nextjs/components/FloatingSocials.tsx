@@ -1,13 +1,15 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { SwitchTheme } from "~~/components/SwitchTheme";
 
 /**
  * Floating social links banner
  */
 export const FloatingSocials = () => {
   return (
-    <div className="fixed flex justify-between items-center w-full z-10 p-4 bottom-0 left-0 pointer-events-none">
+    <div className="fixed flex justify-between items-end w-full z-10 p-4 bottom-0 left-0 pointer-events-none">
+      {/* Social links - left side */}
       <div className="flex flex-col md:flex-row gap-2 pointer-events-auto">
         <Link
           href="https://discord.gg/Vjk6NhkxGv"
@@ -54,6 +56,11 @@ export const FloatingSocials = () => {
             className="w-4 h-4 dark:invert dark:brightness-90"
           />
         </Link>
+      </div>
+
+      {/* Theme toggle - right side */}
+      <div className="pointer-events-auto">
+        <SwitchTheme className="btn-circle bg-base-100 dark:bg-base-200 shadow-md hover:shadow-lg border-0" />
       </div>
     </div>
   );
