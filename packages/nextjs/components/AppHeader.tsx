@@ -13,8 +13,6 @@ import {
   BanknotesIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
-import { SwitchTheme } from "~~/components/SwitchTheme";
-import { ThemeSettings } from "~~/components/ThemeSettings";
 import { GasTokenSelector } from "~~/components/GasTokenSelector";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
@@ -102,6 +100,57 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
         );
       })}
     </>
+  );
+};
+
+// Smart connect button that shows the right wallet based on selected network
+const SmartConnectButton = () => {
+  const searchParams = useSearchParams();
+  const selectedNetwork = searchParams?.get("network") || "base";
+  const isStarknet = selectedNetwork === "starknet";
+
+  return (
+    <div className="flex items-center">
+      <AnimatePresence mode="wait">
+        {isStarknet ? (
+          <motion.div
+            key="starknet"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center gap-2"
+          >
+            {/* Starknet glow effect */}
+            <div className="relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 rounded-2xl blur-sm opacity-40 animate-pulse" />
+              <div className="relative flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-2xl shadow-md">
+                <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
+                  <CustomConnectButton />
+                </div>
+                <div className="h-7 w-[1px] bg-base-300/50"></div>
+                <div className="px-3 py-1.5">
+                  <GasTokenSelector />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="evm"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-2xl shadow-md"
+          >
+            <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
+              <RainbowKitCustomConnectButton />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
@@ -309,21 +358,8 @@ export const AppHeader = () => {
                             <AppHeaderMenuLinks isMobile />
                           </ul>
                           <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
-                            <div className="flex flex-col space-y-2 items-stretch relative z-50">
-                              <div className="flex items-center bg-base-200 rounded-[18px] shadow-md relative p-0.5">
-                                <div className="relative flex-1 px-3 py-1.5">
-                                  <RainbowKitCustomConnectButton />
-                                </div>
-                              </div>
-                              <div className="flex items-center bg-base-200 rounded-[18px] shadow-md relative p-0.5">
-                                <div className="relative flex-1 px-3 py-1.5">
-                                  <CustomConnectButton />
-                                </div>
-                                <div className="h-7 w-[1px] bg-base-300"></div>
-                                <div className="px-3 py-1.5">
-                                  <GasTokenSelector />
-                                </div>
-                              </div>
+                            <div className="flex flex-col space-y-3 items-stretch relative z-50">
+                              <SmartConnectButton />
                             </div>
                           </div>
                         </div>
@@ -365,33 +401,17 @@ export const AppHeader = () => {
               {isPositionsPage && <AddressSearchBar />}
             </div>
 
-            {/* Right section - Wallet connection and settings */}
-            <div className="flex items-center gap-4">
-              {/* Connect button */}
+            {/* Right section - Wallet connection */}
+            <div className="flex items-center">
+              {/* Smart connect button - adapts to selected network */}
               <motion.div
-                className="hidden md:flex gap-2 items-center relative z-20"
+                className="hidden md:flex items-center relative z-20"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.5 }}
               >
-                <div className="flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-[18px] shadow-md relative">
-                  <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-                    <RainbowKitCustomConnectButton />
-                  </div>
-                  <div className="h-7 w-[1px] bg-base-300"></div>
-                  <div className="relative px-3 py-1.5 cursor-pointer">
-                    <CustomConnectButton />
-                  </div>
-                  <div className="h-7 w-[1px] bg-base-300"></div>
-                  <div className="px-3 py-1.5">
-                    <GasTokenSelector />
-                  </div>
-                </div>
+                <SmartConnectButton />
               </motion.div>
-              <div className="flex items-center gap-2">
-                <SwitchTheme />
-                <ThemeSettings />
-              </div>
             </div>
           </div>
         </div>

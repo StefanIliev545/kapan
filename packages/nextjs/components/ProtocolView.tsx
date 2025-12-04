@@ -70,18 +70,24 @@ interface ProtocolViewProps {
 // Health status indicator component that shows utilization percentage
 const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
   // Determine color based on utilization percentage
-  const getColor = () => {
-    if (utilizationPercentage < 50) return "bg-success";
-    if (utilizationPercentage < 70) return "bg-warning";
-    return "bg-error";
+  const getColorClasses = () => {
+    if (utilizationPercentage < 50) return { bar: "bg-success", text: "text-success", glow: "shadow-success/30" };
+    if (utilizationPercentage < 70) return { bar: "bg-warning", text: "text-warning", glow: "shadow-warning/30" };
+    return { bar: "bg-error", text: "text-error", glow: "shadow-error/30" };
   };
+  const colors = getColorClasses();
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-32 h-1.5 bg-base-300 rounded-full overflow-hidden">
-        <div className={`h-full ${getColor()}`} style={{ width: `${utilizationPercentage}%` }} />
+    <div className="flex items-center gap-2.5">
+      <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
+        <div 
+          className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`} 
+          style={{ width: `${Math.min(utilizationPercentage, 100)}%` }} 
+        />
       </div>
-      <span className="text-xs font-medium">{utilizationPercentage.toFixed(0)}%</span>
+      <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
+        {utilizationPercentage.toFixed(0)}%
+      </span>
     </div>
   );
 };
@@ -299,77 +305,80 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
   return (
     <div className="w-full flex flex-col hide-scrollbar p-4 space-y-4">
-      {/* Protocol Header Card - Enhanced with subtle effects */}
-      <div className="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
-        <div className="card-body p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+      {/* Protocol Header Card */}
+      <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
+        <div className="card-body px-5 py-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+            {/* Protocol name + icon */}
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 relative rounded-lg bg-base-200 p-1 flex items-center justify-center">
+              <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
                 <Image
                   src={protocolIcon}
                   alt={`${protocolName} icon`}
-                  width={36}
-                  height={36}
-                  className="object-contain"
+                  width={24}
+                  height={24}
+                  className="object-contain drop-shadow-sm"
                 />
               </div>
-              <div className="flex flex-col">
-                <div className="text-xl font-bold tracking-tight">{protocolName}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70">
-                  <span className="flex items-center gap-1">
-                    <span>Balance:</span>
-                    <span className={`font-semibold ${netBalance >= 0 ? "text-success" : "text-error"}`}>
-                      {formatCurrency(netBalance)}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>30D Net Yield:</span>
-                    <span className={`font-semibold ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
-                      {formatCurrency(netYield30d)}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>Net APY:</span>
-                    <span
-                      className={`font-semibold ${netApyPercent == null
-                        ? "text-base-content"
-                        : netApyPercent >= 0
-                          ? "text-success"
-                          : "text-error"
-                        }`}
-                    >
-                      {netApyPercent == null ? "--" : formatSignedPercentage(netApyPercent)}
-                    </span>
-                  </span>
-                </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+                <span className="text-base font-bold tracking-tight">{protocolName}</span>
               </div>
             </div>
 
-            {/* Utilization Section - Only show if not hidden */}
-            {!hideUtilization && (
-              <div className="flex flex-col items-start gap-1 order-3 md:order-2">
-                <span className="text-sm text-base-content">Protocol Utilization</span>
-                <HealthStatus utilizationPercentage={utilizationPercentage} />
-              </div>
-            )}
+            {/* Divider */}
+            <div className="hidden sm:block w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
 
-            {/* Show All Toggle - Hide if forceShowAll is true */}
-            <div
-              className={`flex items-center justify-end gap-2 order-2 md:order-3 ${hideUtilization ? "md:col-span-2" : ""}`}
-            >
+            {/* Stats - spread evenly across available space */}
+            <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+              {/* Net Balance */}
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+                  {formatCurrency(netBalance)}
+                </span>
+              </div>
+
+              {/* 30D Yield */}
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                  {formatCurrency(netYield30d)}
+                </span>
+              </div>
+
+              {/* Net APY */}
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                  {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
+                </span>
+              </div>
+
+              {/* Utilization */}
+              {!hideUtilization && (
+                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+                  <HealthStatus utilizationPercentage={utilizationPercentage} />
+                </div>
+              )}
+            </div>
+
+            {/* Show All Toggle */}
+            <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
               {!forceShowAll && (
                 <>
-                  <span className="text-sm text-base-content/70">Show all assets</span>
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Show all</span>
                   <input
                     type="checkbox"
-                    className="toggle toggle-primary toggle-sm"
+                    className="toggle toggle-primary toggle-xs"
                     checked={showAll}
                     onChange={e => setShowAll(e.target.checked)}
                   />
                 </>
               )}
               {forceShowAll && !readOnly && (
-                <span className="text-sm text-primary">Connect wallet to view your positions</span>
+                <span className="text-[11px] text-primary/80 font-medium">Connect wallet</span>
               )}
             </div>
           </div>
@@ -381,46 +390,56 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         {/* Supplied Assets */}
         <div className="h-full">
           <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 h-full rounded-lg">
-            <div className="card-body p-4">
+            <div className="card-body p-4 flex flex-col">
               <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
                 <span>Supplied Assets</span>
                 <span className="badge badge-primary badge-outline">{filteredSuppliedPositions.length}</span>
               </h2>
               {filteredSuppliedPositions.length > 0 ? (
-                <div className=" pt-2 space-y-3">
-                  {filteredSuppliedPositions.map((position, index) => (
-                    <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
-                      <SupplyPosition
-                        {...position}
-                        protocolName={protocolName}
-                        networkType={networkType}
-                        chainId={chainId}
-                        position={positionManager}
-                        disableMove={disableMoveSupply || readOnly}
-                        availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: true } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
-                        onSwap={() => handleSwap(position)}
-                        suppressDisabledMessage
-                        defaultExpanded={expandFirstPositions && index === 0}
-                      />
-                    </div>
-                  ))}
+                <div className="flex flex-col flex-1 pt-2">
+                  <div className="space-y-3">
+                    {filteredSuppliedPositions.map((position, index) => (
+                      <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
+                        <SupplyPosition
+                          {...position}
+                          protocolName={protocolName}
+                          networkType={networkType}
+                          chainId={chainId}
+                          position={positionManager}
+                          disableMove={disableMoveSupply || readOnly}
+                          availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: true } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
+                          onSwap={() => handleSwap(position)}
+                          suppressDisabledMessage
+                          defaultExpanded={expandFirstPositions && index === 0}
+                        />
+                      </div>
+                    ))}
+                  </div>
 
-                  {/* "Add Supply" button */}
+                  {/* "Add Supply" button - pinned to bottom with gap */}
                   {!readOnly && (
-                    <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddSupply}>
-                      <FiPlus className="w-4 h-4 mr-1" />
-                      Add Supply
-                    </button>
+                    <div className="mt-auto pt-4">
+                      <button 
+                        className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200" 
+                        onClick={handleAddSupply}
+                      >
+                        <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                        <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
-                  <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
-                  <p>{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
+                <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
+                  <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
+                  <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                   {!readOnly && (
-                    <button className="btn btn-sm btn-primary mt-3" onClick={handleAddSupply}>
-                      <FiPlus className="w-4 h-4 mr-1" />
-                      Supply Assets
+                    <button 
+                      className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200" 
+                      onClick={handleAddSupply}
+                    >
+                      <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                      <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
                     </button>
                   )}
                 </div>
@@ -432,47 +451,57 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         {/* Borrowed Assets */}
         <div className="h-full">
           <div className="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 h-full rounded-lg">
-            <div className="card-body p-4">
+            <div className="card-body p-4 flex flex-col">
               <h2 className="card-title justify-between text-lg border-b border-base-200 pb-2">
                 <span>Borrowed Assets</span>
                 <span className="badge badge-secondary badge-outline">{filteredBorrowedPositions.length}</span>
               </h2>
               {filteredBorrowedPositions.length > 0 ? (
-                <div className="pt-2 space-y-3">
-                  {filteredBorrowedPositions.map((position, index) => (
-                    <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
-                      <BorrowPosition
-                        {...position}
-                        protocolName={protocolName}
-                        networkType={networkType}
-                        chainId={chainId}
-                        position={positionManager}
-                        availableAssets={position.collaterals || availableCollaterals}
-                        availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: true, swap: enabledFeatures.swap ?? true }}
-                        onClosePosition={() => handleCloseWithCollateral(position)}
-                        onSwap={() => handleDebtSwap(position)}
-                        suppressDisabledMessage
-                        defaultExpanded={expandFirstPositions && index === 0}
-                      />
-                    </div>
-                  ))}
+                <div className="flex flex-col flex-1 pt-2">
+                  <div className="space-y-3">
+                    {filteredBorrowedPositions.map((position, index) => (
+                      <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
+                        <BorrowPosition
+                          {...position}
+                          protocolName={protocolName}
+                          networkType={networkType}
+                          chainId={chainId}
+                          position={positionManager}
+                          availableAssets={position.collaterals || availableCollaterals}
+                          availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: true, swap: enabledFeatures.swap ?? true }}
+                          onClosePosition={() => handleCloseWithCollateral(position)}
+                          onSwap={() => handleDebtSwap(position)}
+                          suppressDisabledMessage
+                          defaultExpanded={expandFirstPositions && index === 0}
+                        />
+                      </div>
+                    ))}
+                  </div>
 
-                  {/* "Add Borrow" button */}
+                  {/* "Add Borrow" button - pinned to bottom with gap */}
                   {!readOnly && (
-                    <button className="btn btn-sm btn-outline btn-block mt-2" onClick={handleAddBorrow}>
-                      <FiPlus className="w-4 h-4 mr-1" />
-                      Borrow
-                    </button>
+                    <div className="mt-auto pt-4">
+                      <button 
+                        className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/50 hover:text-secondary transition-all duration-200" 
+                        onClick={handleAddBorrow}
+                      >
+                        <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                        <span className="text-xs font-medium uppercase tracking-wider">Borrow</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg mt-2">
-                  <FiAlertTriangle className="w-10 h-10 mb-2 opacity-50" />
-                  <p>{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
+                <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
+                  <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
+                  <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                   {!readOnly && (
-                    <button className="btn btn-sm btn-primary mt-3" onClick={handleAddBorrow}>
-                      <FiPlus className="w-4 h-4 mr-1" />
-                      Borrow Assets
+                    <button 
+                      className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary transition-all duration-200" 
+                      onClick={handleAddBorrow}
+                    >
+                      <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                      <span className="text-xs font-medium uppercase tracking-wider">Borrow Assets</span>
                     </button>
                   )}
                 </div>
