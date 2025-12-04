@@ -868,7 +868,7 @@ export const useKapanRouterV2 = () => {
   }, []);
 
   const simulateInstructions = useCallback(
-    async (instructions: ProtocolInstruction[]) => {
+    async (instructions: ProtocolInstruction[], options?: { skipWhenAuthCallsExist?: boolean }) => {
       if (!routerContract || !userAddress || !publicClient) {
         throw new Error("Router contract or user address not available");
       }
@@ -878,8 +878,18 @@ export const useKapanRouterV2 = () => {
         return;
       }
 
-      // 1) Simulate any authorization calls so we surface readable errors (e.g. allowance issues)
+      // 1) Get authorization calls first - we need to know if batching will include approvals
       const authCalls = await getAuthorizations(instructions);
+
+      // 2) If caller requests to skip simulation when auth calls exist (for batched flows),
+      // skip entirely since simulation can't accurately predict atomic batch behavior.
+      // The approvals would be bundled atomically with the main tx, so simulating separately gives false negatives.
+      if (options?.skipWhenAuthCallsExist && authCalls.length > 0) {
+        console.info("Skipping simulation for batched flow with authorization calls");
+        return;
+      }
+
+      // 3) Simulate authorization calls to surface readable errors (e.g. allowance issues)
       for (const { target, data } of authCalls) {
         if (!target || !data) continue;
         const authResult = await simulateTransaction(publicClient, target as `0x${string}`, data, userAddress as `0x${string}`);
@@ -892,8 +902,7 @@ export const useKapanRouterV2 = () => {
         }
       }
 
-      // 2) Simulate the router call. If it fails with allowance-style errors but we have authorization calls,
-      // let the caller proceed because the batch will include the required approvals.
+      // 4) Simulate the router call
       const protocolInstructions = instructions.map(inst => ({
         protocolName: inst.protocolName,
         data: inst.data as `0x${string}`,
@@ -914,12 +923,21 @@ export const useKapanRouterV2 = () => {
 
       if (!simResult.success && simResult.error) {
         const formatted = formatErrorForDisplay(simResult.error);
+        const errorText = `${formatted.description || ""} ${formatted.title || ""}`.toLowerCase();
 
-        const isAllowanceRelated = /allowance|approved|approval/i.test(formatted.description || formatted.title);
-        if (authCalls.length > 0 && isAllowanceRelated) {
-          // Authorizations will be bundled with execution, so skip failing the simulation on expected allowance errors
-          console.info("Skipping allowance error during simulation because authorization calls are present", formatted);
-          return;
+        // 5) When auth calls exist, only fail on errors that are DEFINITELY not approval-related.
+        // These are errors that would still occur even after approvals are executed:
+        if (authCalls.length > 0) {
+          const definitelyNotApprovalRelated =
+            /health.?factor|liquidation|borrow.?cap|supply.?cap|frozen|paused|insufficient.?collateral|siloed|isolation.?mode|debt.?ceiling/i.test(errorText);
+
+          if (!definitelyNotApprovalRelated) {
+            // Approvals will be bundled with execution, so skip failing on errors that might be
+            // caused by missing approvals. Common false negatives include ERC20 transfer failures,
+            // "unknown error" from protocols, etc.
+            console.info("Skipping simulation error because authorization calls will be bundled:", formatted);
+            return;
+          }
         }
 
         const errorMsg = formatted.suggestion
