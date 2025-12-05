@@ -148,11 +148,12 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
 
     function authorize(
         ProtocolTypes.LendingInstruction[] calldata instrs,
-        address,
-        ProtocolTypes.Output[] calldata
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata inputs
     )
         external
         view
+        override
         returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced)
     {
         targets = new address[](instrs.length);
@@ -165,7 +166,9 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
 
         uint256 outCount;
         for (uint256 i = 0; i < instrs.length; i++) {
-            ProtocolTypes.LendingOp op = instrs[i].op;
+            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            (address token, ) = _resolve(ins, inputs);
+            ProtocolTypes.LendingOp op = ins.op;
             if (
                 op == ProtocolTypes.LendingOp.WithdrawCollateral ||
                 op == ProtocolTypes.LendingOp.Borrow ||
@@ -177,13 +180,13 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
             }
 
             if (op == ProtocolTypes.LendingOp.Borrow) {
-                IEulerVault vault = tokenToVault[instrs[i].token];
+                IEulerVault vault = tokenToVault[token];
                 address vaultAddr = address(vault);
                 if (vaultAddr != address(0) && !_exists(controllerVaults, controllerCount, vaultAddr)) {
                     controllerVaults[controllerCount++] = vaultAddr;
                 }
             } else if (op == ProtocolTypes.LendingOp.DepositCollateral) {
-                IEulerVault vault = tokenToVault[instrs[i].token];
+                IEulerVault vault = tokenToVault[token];
                 address vaultAddr = address(vault);
                 if (vaultAddr != address(0) && !_exists(collateralVaults, collateralCount, vaultAddr)) {
                     collateralVaults[collateralCount++] = vaultAddr;
@@ -195,11 +198,14 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
 
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            address token = ins.token;
-            uint256 amount = ins.amount;
+            (address token, uint256 amount) = _resolve(ins, inputs);
 
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 IEulerVault vault = tokenToVault[token];
+                if (address(vault) == address(0)) {
+                    produced[pIdx++] = ProtocolTypes.Output({token: token, amount: 0});
+                    continue;
+                }
                 uint256 maxAssets = _maxWithdrawAssets(vault, ins.user);
                 uint256 outAmount = amount;
                 if (amount == type(uint256).max || amount > maxAssets) {
@@ -278,23 +284,24 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         }
     }
 
-    function deauthorize(ProtocolTypes.LendingInstruction[] calldata instrs, address)
-        external
-        view
-        returns (address[] memory targets, bytes[] memory data)
-    {
+    function deauthorize(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address /*caller*/,
+        ProtocolTypes.Output[] calldata inputs
+    ) external view override returns (address[] memory targets, bytes[] memory data) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            (address token, ) = _resolve(ins, inputs);
             if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                IEulerVault vault = tokenToVault[ins.token];
+                IEulerVault vault = tokenToVault[token];
                 if (address(vault) != address(0)) {
                     targets[i] = address(vault);
                     data[i] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
                 }
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                IEulerVault vaultBorrow = tokenToVault[ins.token];
+                IEulerVault vaultBorrow = tokenToVault[token];
                 if (address(vaultBorrow) != address(0)) {
                     bytes[] memory calls = new bytes[](1);
                     calls[0] = abi.encodeWithSelector(IEVC.setOperator.selector, address(this), false);
@@ -302,6 +309,18 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
                     data[i] = abi.encodeWithSelector(IEVC.multicall.selector, calls);
                 }
             }
+        }
+    }
+
+    function _resolve(
+        ProtocolTypes.LendingInstruction calldata ins,
+        ProtocolTypes.Output[] calldata inputs
+    ) internal pure returns (address token, uint256 amount) {
+        token = ins.token;
+        amount = ins.amount;
+        if (ins.input.index < inputs.length) {
+            token = inputs[ins.input.index].token;
+            amount = inputs[ins.input.index].amount;
         }
     }
 
@@ -323,6 +342,7 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
     }
 
     function _maxWithdrawAssets(IEulerVault vault, address user) internal view returns (uint256) {
+        if (address(vault) == address(0)) return 0;
         try vault.maxWithdraw(user) returns (uint256 m) {
             return m;
         } catch {}
