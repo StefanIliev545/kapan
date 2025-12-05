@@ -65,6 +65,8 @@ interface ProtocolViewProps {
     swap?: boolean;
     move?: boolean;
   };
+  disableMarkets?: boolean;
+  inlineMarkets?: boolean;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -112,6 +114,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   expandFirstPositions = true,
   chainId,
   enabledFeatures = { swap: false, move: true },
+  disableMarkets = false,
+  inlineMarkets = false,
 }) => {
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -226,8 +230,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // Use effective showAll state (component state OR forced from props)
   const effectiveShowAll = isMarketsOpen || forceShowAll;
 
-  // Filter positions based on whether user has balance (markets shows all).
-  const filteredSuppliedPositions = (effectiveShowAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
+  // Filter positions based on wheter user has balance.
+  // If inlineMarkets is true (e.g. Compound), clicking "Markets" (isMarketsOpen) should reveal all assets in these lists.
+  // Otherwise (Aave), clicking "Markets" opens a separate section, so we keep these lists filtered to user positions.
+  const showAllInLists = forceShowAll || (inlineMarkets && isMarketsOpen);
+
+  const filteredSuppliedPositions = (showAllInLists ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
     readOnly
       ? {
         ...p,
@@ -238,9 +246,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   );
 
   // For borrowed positions:
-  // - If not showing all, only show positions with actual debt (negative balance)
-  // - If showing all, show everything in the borrowedPositions array
-  const filteredBorrowedPositions = (effectiveShowAll
+  const filteredBorrowedPositions = (showAllInLists
     ? borrowedPositions
     : borrowedPositions.filter(p => p.balance < 0 || (p.collateralValue ?? 0) > 0)).map(p =>
       readOnly
@@ -380,7 +386,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
             {/* Markets Toggle + Collapse */}
             <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
-              {!forceShowAll && (
+              {!forceShowAll && !disableMarkets && (
                 <button
                   className="btn btn-sm btn-ghost gap-1.5"
                   type="button"
@@ -401,8 +407,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
       </div>
 
-      {/* Markets Section - expandable */}
-      {isMarketsOpen && !isCollapsed && (
+      {/* Markets Section - expandable (only if not inlineMarkets) */}
+      {isMarketsOpen && !isCollapsed && !disableMarkets && !inlineMarkets && (
         <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
           <div className="card-body p-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

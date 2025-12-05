@@ -93,7 +93,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
   const { data: compoundResults } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
 
-// Batch collateral data per market
+  // Batch collateral data per market
   const depositedCalls = useMemo(() => {
     if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
     return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getDepositedCollaterals" as const, args: [t, queryAddress], chainId }));
@@ -301,6 +301,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         networkType="evm"
         chainId={chainId}
         enabledFeatures={enabledFeatures}
+        inlineMarkets={true}
       />
     </div>
   );
