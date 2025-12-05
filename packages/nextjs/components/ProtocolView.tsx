@@ -313,7 +313,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   return (
     <div className="w-full flex flex-col hide-scrollbar p-3 space-y-2">
       {/* Protocol Header Card */}
-      <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
+      <div className="card bg-base-200/40 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-300/50">
         <div className="card-body px-5 py-3">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             {/* Protocol name + icon */}
@@ -399,7 +399,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Supplied Assets */}
         <div className="h-full">
-          <div className="card bg-gradient-to-br from-base-100 to-base-100/80 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-200/50">
+          <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
             <div className="card-body p-4 flex flex-col">
               <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
                 <div className="flex items-center gap-2">
@@ -466,7 +466,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
         {/* Borrowed Assets */}
         <div className="h-full">
-          <div className="card bg-gradient-to-br from-base-100 to-base-100/80 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-200/50">
+          <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
             <div className="card-body p-4 flex flex-col">
               <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
                 <div className="flex items-center gap-2">
@@ -505,8 +505,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     <div className="mt-auto pt-4">
                       <button
                         className={`group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed transition-all duration-200 ${filteredSuppliedPositions.length > 0
-                            ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary"
-                            : "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed"
+                          ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary"
+                          : "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed"
                           }`}
                         onClick={handleAddBorrow}
                         disabled={filteredSuppliedPositions.length === 0}
@@ -525,8 +525,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   {!readOnly && (
                     <button
                       className={`group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
-                          ? "bg-primary/10 hover:bg-primary/20 text-primary"
-                          : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
+                        ? "bg-primary/10 hover:bg-primary/20 text-primary"
+                        : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
                         }`}
                       onClick={handleAddBorrow}
                       disabled={filteredSuppliedPositions.length === 0}
