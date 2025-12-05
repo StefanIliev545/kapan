@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, startTransition } from "react";
-import Image from "next/image";
+
 import type { NextPage } from "next";
 import dynamic from "next/dynamic";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
-import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
+import { SupportBanner } from "~~/components/common/SupportBanner";
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
@@ -97,32 +97,7 @@ const App: NextPage = () => {
     linea: "Linea support is experimental and pre-audit.",
   }), []);
 
-  const sections: CallToActionSectionProps[] = [
-    {
-      title: "⭐ Support on X",
-      description: "We're building with real purpose — your follow helps us reach more builders!",
-      buttonText: "Follow @KapanFinance",
-      buttonLink: "https://x.com/KapanFinance",
-    },
-    {
-      title: "🌱 Fund via Giveth",
-      description: "We strive to provide everything for free, but we need your help to keep going!",
-      buttonText: "Support on Giveth",
-      buttonLink: "https://giveth.io/project/kapan-finance-defi-lending-management-protocol",
-    },
-    {
-      title: "Join Our Community",
-      description: "Connect with developers and users in our Discord server",
-      buttonText: "Join Discord",
-      buttonLink: "https://discord.gg/Vjk6NhkxGv",
-      emoji: "💬 ",
-      icon: (
-        <div className="w-5 h-5 relative">
-          <Image src="/logos/discord.svg" alt="Discord" fill className="object-contain" />
-        </div>
-      ),
-    },
-  ];
+
 
   useEffect(() => {
     const protocolCountByNetwork: Record<string, number> = {
@@ -266,7 +241,7 @@ const App: NextPage = () => {
         </div>
 
         <div className="mt-12">
-          <CallToAction sections={sections} />
+          <SupportBanner />
         </div>
       </div>
     </DashboardLayout>
