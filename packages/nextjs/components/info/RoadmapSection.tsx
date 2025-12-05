@@ -2,226 +2,154 @@
 
 import React, { useRef } from "react";
 import Image from "next/image";
-import { type TargetAndTransition, type Variants, motion, useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import {
-  ArrowPathIcon,
-  ArrowTrendingUpIcon,
-  ArrowsPointingOutIcon,
-  BanknotesIcon,
-  BoltIcon,
-  BuildingLibraryIcon,
-  ChartBarIcon,
-  ChevronDoubleRightIcon,
-  CubeTransparentIcon,
-  DocumentChartBarIcon,
-  GlobeAltIcon,
-  RocketLaunchIcon,
-  ShieldCheckIcon,
-} from "@heroicons/react/24/outline";
+  FiCheck,
+  FiClock,
+  FiZap,
+  FiGlobe,
+  FiLayers,
+  FiTrendingUp,
+  FiActivity,
+} from "react-icons/fi";
 
 interface RoadmapPhase {
   phase: number;
   title: string;
   description: string;
   features: string[];
-  isActive?: boolean;
+  status: "completed" | "current" | "upcoming";
   icon: React.ReactNode;
+  protocols?: string[];
 }
 
-// Animation variants
-const cardVariants = {
-  hidden: { opacity: 0, y: 50 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, type: "spring", stiffness: 100 } },
-} as const;
-
-const featureVariants: Variants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: (i: number): TargetAndTransition => ({
-    opacity: 1,
-    x: 0,
-    transition: { delay: 0.3 + i * 0.1, duration: 0.4, type: "spring" },
-  }),
+const protocolLogos: Record<string, string> = {
+  "Aave V3": "aave.svg",
+  "Compound V3": "compound.svg",
+  "Venus": "venus.svg",
+  "Vesu": "vesu.svg",
+  "Nostra": "nostra.svg",
+  "Euler": "balancer.svg",
+  "Morpho": "morpho.svg",
+  "Arbitrum": "arb.svg",
+  "Optimism": "optimism.svg",
+  "Base": "base.svg",
+  "Starknet": "starknet.svg",
 };
-
-// Helper to render protocol logos within text when mentioned
-const enhanceWithProtocolLogos = (text: string) => {
-  // Check for mentions of protocols and wrap them with their logos
-  const protocolMatches = {
-    "Aave V3": "aave.svg",
-    Aave: "aave.svg",
-    "Compound V3": "compound.svg",
-    Compound: "compound.svg",
-    "Euler Finance": "balancer.svg", // Using balancer for now
-    "Morpho Labs": "morpho.svg", // Using ETH for now
-    "Spark Protocol": "spark.svg", // Using DAI for now
-    "Venus Protocol": "venus.svg", // Using USDC for now
-    Vesu: "vesu.svg",
-    Nostra: "nostra.svg",
-    Arbitrum: "arb.svg",
-    Optimism: "optimism.svg", // Using ETH for now as placeholder
-    Polygon: "eth.svg", // Using ETH for now as placeholder
-    Base: "base.svg", // Using ETH for now as placeholder
-  };
-
-  // Split the text by protocol mentions and create an array of React components
-  const parts: React.ReactNode[] = [];
-  let remainingText = text;
-  let lastIndex = 0;
-
-  // Sort protocols by length (longest first) to handle overlapping names correctly
-  const sortedProtocols = Object.keys(protocolMatches).sort((a, b) => b.length - a.length);
-
-  while (remainingText.length > 0) {
-    let earliestMatch: { protocol: string; index: number } | null = null;
-
-    // Find the earliest protocol mention
-    for (const protocol of sortedProtocols) {
-      const index = remainingText.indexOf(protocol);
-      if (index !== -1 && (earliestMatch === null || index < earliestMatch.index)) {
-        earliestMatch = { protocol, index };
-      }
-    }
-
-    if (earliestMatch === null) {
-      // No more protocols found, add remaining text
-      parts.push(remainingText);
-      break;
-    }
-
-    // Add text before the protocol mention
-    if (earliestMatch.index > 0) {
-      parts.push(remainingText.substring(0, earliestMatch.index));
-    }
-
-    // Add the protocol mention with logo
-    const protocol = earliestMatch.protocol;
-    const logo = protocolMatches[protocol as keyof typeof protocolMatches];
-
-    parts.push(
-      <span key={`${protocol}-${lastIndex}`} className="inline-flex items-center align-baseline">
-        <span className="inline-flex items-center justify-center w-4 h-4 mr-1 relative align-middle">
-          <Image src={`/logos/${logo}`} alt={protocol} width={16} height={16} className="object-contain" />
-        </span>
-        <span className="align-baseline">{protocol}</span>
-      </span>,
-    );
-
-    // Update remaining text and lastIndex
-    remainingText = remainingText.substring(earliestMatch.index + protocol.length);
-    lastIndex++;
-  }
-
-  return <>{parts}</>;
-};
-
-const Feature = ({ text, index, icon }: { text: string; index: number; icon?: React.ReactNode }) => (
-  <motion.li custom={index} variants={featureVariants} initial="hidden" animate="visible" className="py-2">
-    <div className="flex items-center gap-3">
-      <div className="p-1.5 rounded-lg bg-accent/10">
-        {icon || <ChevronDoubleRightIcon className="w-3.5 h-3.5 text-accent" />}
-      </div>
-      <span className="text-base-content/90">{enhanceWithProtocolLogos(text)}</span>
-    </div>
-  </motion.li>
-);
 
 const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.2 });
 
-  const iconMap: { [key: string]: React.ReactNode } = {
-    "Supply Assets": <BanknotesIcon className="w-3.5 h-3.5 text-accent" />,
-    "Repay Loans": <ArrowPathIcon className="w-3.5 h-3.5 text-accent" />,
-    "Atomic Debt Migration": <BoltIcon className="w-3.5 h-3.5 text-accent" />,
-    "Cross-Protocol Rate Comparison": <DocumentChartBarIcon className="w-3.5 h-3.5 text-accent" />,
-    "Collateral Switching": <ArrowPathIcon className="w-3.5 h-3.5 text-accent" />,
-    "Smart Debt Migration Routing": <CubeTransparentIcon className="w-3.5 h-3.5 text-accent" />,
-    "Cross-Protocol Collateral Detection": <ShieldCheckIcon className="w-3.5 h-3.5 text-accent" />,
-    "Multi-step Position Refinancing": <ArrowsPointingOutIcon className="w-3.5 h-3.5 text-accent" />,
-    "Interest Rate Predictions": <ChartBarIcon className="w-3.5 h-3.5 text-accent" />,
-    "Automated Debt Rebalancing": <ArrowPathIcon className="w-3.5 h-3.5 text-accent" />,
-    "Gas-optimized Migration Routes": <BoltIcon className="w-3.5 h-3.5 text-accent" />,
-    "Yield Optimization Strategies": <ArrowTrendingUpIcon className="w-3.5 h-3.5 text-accent" />,
-    "Loan Health Notifications": <DocumentChartBarIcon className="w-3.5 h-3.5 text-accent" />,
-    "DeFi Risk Analytics": <ShieldCheckIcon className="w-3.5 h-3.5 text-accent" />,
-    "Rate Change Alerts": <BoltIcon className="w-3.5 h-3.5 text-accent" />,
-  };
+  const isCompleted = phase.status === "completed";
+  const isCurrent = phase.status === "current";
 
   return (
     <motion.div
       ref={ref}
-      variants={cardVariants}
-      initial="hidden"
-      animate={isInView ? "visible" : "hidden"}
-      className={`relative z-10 overflow-hidden ${phase.isActive ? "bg-base-200/80 shadow-xl" : "bg-base-200/50"}`}
-      style={{
-        borderRadius: "24px",
-        backdropFilter: "blur(12px)",
-      }}
+      initial={{ opacity: 0, y: 30 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      className="relative"
     >
-      {/* Tech-style border */}
-      <div className="absolute inset-0 border border-accent/10 rounded-[24px] pointer-events-none z-20"></div>
-
-      {/* Tech-pattern background */}
-      <div className="absolute inset-0 z-0 opacity-5">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <pattern id={`tech-pattern-${index}`} width="30" height="30" patternUnits="userSpaceOnUse">
-            <circle cx="15" cy="15" r="1" fill="currentColor" />
-            <path d="M0,15 L30,15" stroke="currentColor" strokeWidth="0.5" />
-            <path d="M15,0 L15,30" stroke="currentColor" strokeWidth="0.5" />
-          </pattern>
-          <rect width="100%" height="100%" fill={`url(#tech-pattern-${index})`} />
-        </svg>
-      </div>
-
-      {/* Glow effect for active phase */}
-      {phase.isActive && (
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 via-accent/30 to-primary/30 rounded-[24px] z-0 animate-pulse-slow"></div>
+      {/* Timeline connector (hidden on last item) */}
+      {index < 5 && (
+        <div className="hidden md:block absolute left-1/2 top-full w-px h-8 bg-gradient-to-b from-base-300 to-transparent" />
       )}
 
-      <div className="p-6 relative z-10">
-        {/* Phase header with icon */}
-        <div className="flex justify-between items-start mb-5">
+      {/* Card */}
+      <div
+        className={`relative rounded-2xl p-6 transition-all duration-300 h-full flex flex-col ${
+          isCurrent
+            ? "bg-gradient-to-br from-primary/10 via-base-200 to-accent/10 border-2 border-primary/30 shadow-lg shadow-primary/5"
+            : isCompleted
+            ? "bg-base-200/60 border border-base-300/50"
+            : "bg-base-200/30 border border-base-300/30"
+        }`}
+      >
+        {/* Status badge */}
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div
-              className={`p-2.5 rounded-xl ${phase.isActive ? "bg-gradient-to-br from-primary to-accent text-base-100" : "bg-base-300/50 text-base-content/70"}`}
+              className={`p-2.5 rounded-xl ${
+                isCurrent
+                  ? "bg-primary text-primary-content"
+                  : isCompleted
+                  ? "bg-success/20 text-success"
+                  : "bg-base-300/50 text-base-content/50"
+              }`}
             >
               {phase.icon}
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div
-                  className={`text-xs font-medium uppercase tracking-widest ${phase.isActive ? "text-accent" : "text-base-content/60"}`}
-                >
-                  Phase {phase.phase}
-                </div>
-                {phase.isActive && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent/20 text-accent">
-                    Current
-                  </span>
-                )}
-              </div>
-              <h3 className="text-lg font-bold leading-tight">{phase.title}</h3>
+              <span className={`text-[10px] uppercase tracking-widest font-semibold ${
+                isCurrent ? "text-primary" : isCompleted ? "text-success" : "text-base-content/40"
+              }`}>
+                Phase {phase.phase}
+              </span>
+              <h3 className="text-lg font-bold text-base-content leading-tight">{phase.title}</h3>
             </div>
+          </div>
+          
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold ${
+            isCurrent
+              ? "bg-primary/20 text-primary"
+              : isCompleted
+              ? "bg-success/20 text-success"
+              : "bg-base-300/50 text-base-content/50"
+          }`}>
+            {isCompleted && <FiCheck className="w-3 h-3" />}
+            {isCurrent && <FiZap className="w-3 h-3" />}
+            {!isCompleted && !isCurrent && <FiClock className="w-3 h-3" />}
+            <span>{isCompleted ? "Done" : isCurrent ? "Active" : "Soon"}</span>
           </div>
         </div>
 
-        {/* Description with enhanced text */}
-        <div className="mb-5 text-base-content/80 text-sm">{enhanceWithProtocolLogos(phase.description)}</div>
+        {/* Description */}
+        <p className="text-sm text-base-content/70 mb-4 leading-relaxed">
+          {phase.description}
+        </p>
 
-        {/* Features with icons */}
-        <motion.ul className="space-y-0.5 text-sm">
+        {/* Features */}
+        <div className="space-y-2 flex-1">
           {phase.features.map((feature, idx) => (
-            <Feature key={idx} text={feature} index={idx} icon={iconMap[feature] || undefined} />
+            <div 
+              key={idx} 
+              className={`flex items-center gap-2 text-sm ${
+                isCompleted || isCurrent ? "text-base-content/80" : "text-base-content/50"
+              }`}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                isCompleted ? "bg-success" : isCurrent ? "bg-primary" : "bg-base-300"
+              }`} />
+              <span>{feature}</span>
+            </div>
           ))}
-        </motion.ul>
-      </div>
+        </div>
 
-      {/* Bottom tech corner accent */}
-      <div className="absolute -bottom-2 -right-2 w-16 h-16 overflow-hidden z-20">
-        <div
-          className={`absolute bottom-0 right-0 w-8 h-8 border-t border-l ${phase.isActive ? "border-accent/40" : "border-base-300"} transform rotate-45 translate-y-[5px]`}
-        ></div>
+        {/* Protocol logos if any */}
+        {phase.protocols && phase.protocols.length > 0 && (
+          <div className="flex items-center gap-2 pt-3 mt-auto border-t border-base-300/50">
+            <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium">Protocols:</span>
+            <div className="flex -space-x-1">
+              {phase.protocols.map((protocol) => (
+                <div
+                  key={protocol}
+                  className="w-6 h-6 rounded-lg bg-base-100 dark:bg-base-300 border border-base-300/50 p-1 relative"
+                  title={protocol}
+                >
+                  <Image
+                    src={`/logos/${protocolLogos[protocol] || "eth.svg"}`}
+                    alt={protocol}
+                    width={16}
+                    height={16}
+                    className="object-contain"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -231,207 +159,146 @@ const RoadmapSection = () => {
   const titleRef = useRef(null);
   const isInViewTitle = useInView(titleRef, { once: true });
 
-  const roadmapPhases = [
+  const roadmapPhases: RoadmapPhase[] = [
     {
       phase: 1,
-      title: "Initial Web3 Lending Platform Launch",
+      title: "Core Platform Launch",
       description:
-        "Core features supporting basic lending operations and atomic debt migration across Aave V3, Compound V3, and Venus Protocol.",
-      features: ["Supply Assets", "Repay Loans", "Atomic Debt Migration", "Cross-Protocol Rate Comparison"],
-      isActive: true,
-      icon: <RocketLaunchIcon className="w-5 h-5" />,
+        "Foundation for multi-protocol lending with atomic debt migration and real-time rate comparison.",
+      features: [
+        "Supply & withdraw assets",
+        "Borrow & repay loans",
+        "Atomic debt migration",
+        "Cross-protocol rate comparison",
+      ],
+      status: "completed",
+      icon: <FiZap className="w-5 h-5" />,
+      protocols: ["Aave V3", "Compound V3", "Venus"],
     },
     {
       phase: 2,
       title: "Starknet Deployment",
-      description: "Deployment on Starknet with full support for Vesu and Nostra lending protocols.",
+      description: "Full Starknet support with native protocol integrations and gasless transactions.",
       features: [
-        "Starknet Contracts",
-        "Vesu Support",
-        "Nostra Support",
-        "Cross-Protocol Rate Comparison",
+        "Starknet mainnet contracts",
+        "Vesu integration",
+        "Nostra integration",
+        "Paymaster support",
       ],
-      isActive: true,
-      icon: <GlobeAltIcon className="w-5 h-5" />,
+      status: "completed",
+      icon: <FiGlobe className="w-5 h-5" />,
+      protocols: ["Vesu", "Nostra", "Starknet"],
     },
     {
       phase: 3,
-      title: "Advanced DeFi Loan Management",
-      description: "Enhanced debt management with smart routing and cross-protocol collateral operations.",
+      title: "Advanced Position Management",
+      description: "Enhanced DeFi operations including collateral swaps and smart routing.",
       features: [
-        "Collateral Switching",
-        "Smart Debt Migration Routing",
-        "Cross-Protocol Collateral Detection",
-        "Multi-step Position Refinancing",
+        "Collateral switching",
+        "Smart debt routing",
+        "Multi-step refinancing",
+        "Position health monitoring",
       ],
-      isActive: true,
-      icon: <ArrowsPointingOutIcon className="w-5 h-5" />,
+      status: "current",
+      icon: <FiLayers className="w-5 h-5" />,
     },
     {
       phase: 4,
-      title: "Additional Protocol Integrations",
+      title: "Protocol Expansion",
       description:
-        "Expanding our atomic debt migration to support additional DeFi lending protocols for more refinancing options and better rates.",
-      features: ["Euler Finance", "Morpho Labs"],
-      icon: <BuildingLibraryIcon className="w-5 h-5" />,
+        "Integrating additional lending protocols to provide more refinancing options and better rates.",
+      features: [
+        "Euler Finance integration",
+        "Morpho Labs integration",
+        "Additional L2 networks",
+      ],
+      status: "upcoming",
+      icon: <FiGlobe className="w-5 h-5" />,
+      protocols: ["Euler", "Morpho"],
     },
     {
       phase: 5,
-      title: "DeFi Loan Rate Optimization",
+      title: "Rate Optimization Engine",
       description:
-        "Implementing sophisticated algorithms for finding and automatically executing the most profitable Web3 loan refinancing strategies.",
+        "AI-powered rate predictions and automated rebalancing for optimal yield strategies.",
       features: [
-        "Interest Rate Predictions",
-        "Automated Debt Rebalancing",
-        "Gas-optimized Migration Routes",
-        "Yield Optimization Strategies",
+        "Interest rate predictions",
+        "Automated debt rebalancing",
+        "Gas-optimized routes",
+        "Yield optimization",
       ],
-      icon: <ChartBarIcon className="w-5 h-5" />,
+      status: "upcoming",
+      icon: <FiTrendingUp className="w-5 h-5" />,
     },
     {
       phase: 6,
-      title: "Cross-chain Web3 Debt Migration & Advanced Features",
+      title: "Cross-chain & Analytics",
       description:
-        "Expanding atomic debt migration to multiple blockchain networks and implementing advanced DeFi portfolio management features.",
+        "Unified cross-chain experience with comprehensive risk analytics and alerts.",
       features: [
-        "Arbitrum",
-        "Optimism",
-        "Base",
-        "Loan Health Notifications",
-        "DeFi Risk Analytics",
-        "Rate Change Alerts",
+        "Cross-chain migration",
+        "Loan health notifications",
+        "DeFi risk analytics",
+        "Rate change alerts",
       ],
-      icon: <GlobeAltIcon className="w-5 h-5" />,
+      status: "upcoming",
+      icon: <FiActivity className="w-5 h-5" />,
+      protocols: ["Arbitrum", "Optimism", "Base"],
     },
   ];
 
   return (
-    <section className="py-16 relative">
-      {/* Tech-inspired background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-        {/* Circuit board style gradient background */}
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/5 via-transparent to-accent/5"></div>
+    <section className="py-20 relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-base-100 to-base-200 dark:from-base-200 dark:to-base-300" />
 
-        {/* Abstract tech shapes */}
-        <svg
-          className="absolute top-0 left-0 w-full h-full opacity-10"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 800 800"
-        >
-          <circle cx="400" cy="400" r="200" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="10,10" />
-          <path d="M100,400 L700,400" stroke="currentColor" strokeWidth="1" strokeDasharray="15,15" />
-          <path d="M400,100 L400,700" stroke="currentColor" strokeWidth="1" strokeDasharray="15,15" />
-        </svg>
-      </div>
-
-      {/* Section Title with tech-styled accent */}
+      {/* Section Header */}
       <motion.div
         ref={titleRef}
         initial={{ opacity: 0, y: 20 }}
         animate={isInViewTitle ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-20 relative"
+        className="text-center mb-16 relative z-10 px-5"
       >
         <motion.div
-          initial={{ width: 0 }}
-          animate={isInViewTitle ? { width: "100px" } : { width: 0 }}
-          transition={{ duration: 0.8, delay: 0.1 }}
-          className="h-0.5 bg-accent/50 mx-auto mb-8"
-        ></motion.div>
-
-        <motion.div
-          initial={{ y: -20, opacity: 0 }}
-          animate={isInViewTitle ? { y: 0, opacity: 1 } : { y: -20, opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          className="inline-block px-4 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium uppercase tracking-wider mb-3"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={isInViewTitle ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
+          transition={{ delay: 0.1 }}
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 mb-4"
         >
-          Development Timeline
+          <span className="text-xs font-semibold uppercase tracking-wider text-accent">Development Roadmap</span>
         </motion.div>
 
-        <motion.h2
-          initial={{ y: 20, opacity: 0 }}
-          animate={isInViewTitle ? { y: 0, opacity: 1 } : { y: 20, opacity: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-3xl font-bold mb-4"
-        >
-          DeFi Lending Aggregation Roadmap
-        </motion.h2>
+        <h2 className="text-3xl md:text-4xl font-bold text-base-content mb-4">
+          Building the Future of DeFi Lending
+        </h2>
 
-        <motion.p
-          initial={{ y: 20, opacity: 0 }}
-          animate={isInViewTitle ? { y: 0, opacity: 1 } : { y: 20, opacity: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-base-content/80 max-w-2xl mx-auto"
-        >
-          Our strategic development path outlines how we&apos;re building the future of cross-protocol Web3 lending and
-          debt refinancing solutions.
-        </motion.p>
-
-        <motion.div
-          initial={{ width: 0 }}
-          animate={isInViewTitle ? { width: "100px" } : { width: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="h-0.5 bg-accent/50 mx-auto mt-8"
-        ></motion.div>
+        <p className="text-base-content/70 max-w-2xl mx-auto text-base md:text-lg">
+          Our strategic path to becoming the unified lending layer across all major protocols and chains.
+        </p>
       </motion.div>
 
       {/* Phases Grid */}
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="max-w-6xl mx-auto px-5 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
           {roadmapPhases.map((phase, index) => (
             <PhaseCard key={index} phase={phase} index={index} />
           ))}
         </div>
-      </div>
 
-      {/* Tech-styled Note Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="flex justify-center mt-16"
-      >
-        <div className="bg-base-200/60 backdrop-blur-md p-4 max-w-md rounded-lg border border-base-300 relative overflow-hidden">
-          {/* Tech corner accent */}
-          <div className="absolute -top-1 -right-1 w-8 h-8 border-b border-r border-accent/30 transform rotate-45 translate-y-[-5px]"></div>
-
-          <p className="text-center text-sm text-base-content/80">
-            <span className="text-accent font-medium">Note:</span> This roadmap is subject to change based on market
-            conditions, technological advancements, and community feedback.
-          </p>
-        </div>
-      </motion.div>
-
-      {/* Mobile Navigation Hint */}
-      {roadmapPhases.length > 2 && (
+        {/* Note */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.5 }}
-          className="mt-8 text-center md:hidden"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.4 }}
+          className="mt-12 text-center"
         >
-          <p className="text-xs text-base-content/60">Swipe to explore all phases</p>
-          <div className="flex justify-center gap-1 mt-2">
-            {roadmapPhases.map((_, idx) => (
-              <motion.div
-                key={idx}
-                animate={{
-                  opacity: [0.3, 1, 0.3],
-                  scale: [1, 1.2, 1],
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  repeatType: "loop",
-                  delay: idx * 0.2,
-                }}
-                className="w-1.5 h-1.5 rounded-full bg-accent/60"
-              />
-            ))}
-          </div>
+          <p className="text-sm text-base-content/50 max-w-md mx-auto">
+            <span className="text-accent font-medium">Note:</span> Roadmap subject to change based on market conditions and community feedback.
+          </p>
         </motion.div>
-      )}
+      </div>
     </section>
   );
 };

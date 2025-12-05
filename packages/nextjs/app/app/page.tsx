@@ -12,6 +12,7 @@ import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
 import { arbitrum, base, optimism, linea } from "wagmi/chains";
 import { hardhat } from "viem/chains";
+import { useGlobalState } from "~~/services/store/store";
 
 // ---- Lazy-load heavy protocol views (client-only) ----
 const AaveProtocolView = dynamic(
@@ -57,7 +58,15 @@ const networkOptions: NetworkOption[] = [
 ];
 
 const App: NextPage = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<string>(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base");
+  const initialNetwork = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base";
+  const [selectedNetwork, setSelectedNetwork] = useState<string>(initialNetwork);
+  const totalSupplied = useGlobalState(state => state.totalSupplied);
+  const totalBorrowed = useGlobalState(state => state.totalBorrowed);
+  const totalNet = useGlobalState(state => state.totalNet);
+  const resetTotals = useGlobalState(state => state.resetTotals);
+  const allLoaded = useGlobalState(
+    state => state.expectedProtocolCount > 0 && state.loadedProtocolCount === state.expectedProtocolCount,
+  );
 
   // Tiny helper so the button click never feels blocked
   const handleNetworkChange = (id: string) => {
@@ -115,6 +124,19 @@ const App: NextPage = () => {
     },
   ];
 
+  useEffect(() => {
+    const protocolCountByNetwork: Record<string, number> = {
+      base: 4,
+      arbitrum: 3,
+      optimism: 2,
+      linea: 3,
+      starknet: 2,
+      hardhat: 3,
+    };
+
+    resetTotals(protocolCountByNetwork[selectedNetwork] ?? 0);
+  }, [resetTotals, selectedNetwork]);
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-4">
@@ -128,17 +150,17 @@ const App: NextPage = () => {
             {/* Network Switcher */}
             <NetworkFilter
               networks={networkOptions}
-              defaultNetwork="base"
+              defaultNetwork={initialNetwork}
               onNetworkChange={handleNetworkChange}
             />
           </div>
 
           {/* Compact metrics row */}
           <DashboardMetrics
-            netWorth={0}
-            totalSupply={0}
-            totalDebt={0}
-            isLoading={false}
+            netWorth={totalNet}
+            totalSupply={totalSupplied}
+            totalDebt={totalBorrowed}
+            isLoading={!allLoaded}
           />
         </div>
 

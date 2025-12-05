@@ -8,6 +8,7 @@ import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-
 import { Abi } from "abitype";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SwapAsset } from "../../modals/SwapModalShell";
+import { useGlobalState } from "~~/services/store/store";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -268,6 +269,20 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
     : borrowedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
+
+  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  useEffect(() => {
+    if (noMarkets) return;
+
+    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
+    const totalBorrowed = filteredBorrowedPositions.reduce(
+      (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
+      0,
+    );
+
+    setProtocolTotals("Compound", totalSupplied, totalBorrowed);
+  }, [filteredBorrowedPositions, filteredSuppliedPositions, noMarkets, setProtocolTotals]);
 
   // Hardcode current LTV (or fetch from contract if needed).
   const currentLtv = 75;

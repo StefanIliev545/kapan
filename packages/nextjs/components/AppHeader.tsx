@@ -40,73 +40,152 @@ const appMenuLinks: HeaderMenuLink[] = [
 
 const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
   const pathname = usePathname();
-  return (
-    <>
-      {appMenuLinks.map(({ label, href, icon }, index) => {
-        const isActive = pathname === href;
-        return (
-          <motion.li
-            key={href}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-            className="relative"
-          >
-            <Link
-              href={href}
-              passHref
-              className={`
-                relative group
-                ${isActive ? "text-primary dark:text-accent" : "text-base-content"}
-                hover:text-primary dark:hover:text-accent transition-colors duration-300
-                flex items-center gap-3 py-3 px-6 text-sm font-medium
-              `}
-            >
-              {/* Active background glow */}
-              {isActive && (
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 dark:from-accent/10 dark:via-accent/5 dark:to-accent/10 rounded-xl -z-10"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  style={{ filter: "blur(8px)" }}
-                />
-              )}
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
 
-              {/* Icon with subtle hover wiggle */}
-              <motion.div
-                whileHover={{ rotate: [0, -10, 10, -5, 5, 0], scale: 1.2 }}
-                transition={{ duration: 0.5 }}
-                className={`${isActive ? "text-primary dark:text-accent" : "text-base-content/70"} transition-colors duration-300`}
+  // Find active link
+  const activeHref = appMenuLinks.find(link => pathname === link.href || pathname.startsWith(link.href + "/"))?.href || appMenuLinks[0].href;
+
+  // Update indicator position
+  useEffect(() => {
+    const button = buttonRefs.current.get(activeHref);
+    const container = containerRef.current;
+    if (button && container) {
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      setIndicatorStyle({
+        left: buttonRect.left - containerRect.left,
+        width: buttonRect.width,
+      });
+    }
+  }, [activeHref, pathname]);
+
+  if (isMobile) {
+    // Mobile: vertical list style
+    return (
+      <>
+        {appMenuLinks.map(({ label, href, icon }) => {
+          const isActive = pathname === href || pathname.startsWith(href + "/");
+          return (
+            <li key={href} className="relative">
+              <Link
+                href={href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                  isActive 
+                    ? "bg-primary/10 dark:bg-accent/10 text-primary dark:text-accent" 
+                    : "text-base-content/70 hover:bg-base-200/50 hover:text-base-content"
+                }`}
               >
-                {icon}
-              </motion.div>
+                <span className={isActive ? "text-primary dark:text-accent" : ""}>{icon}</span>
+                <span className="font-medium">{label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </>
+    );
+  }
 
-              {/* Label + underline animations */}
-              <span className="relative">
-                {label}
-                {isActive ? (
-                  <motion.div
-                    initial={{ scaleX: 0, opacity: 0 }}
-                    animate={{ scaleX: 1, opacity: 1 }}
-                    exit={{ scaleX: 0, opacity: 0 }}
-                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-accent origin-left"
-                    transition={{ duration: 0.3 }}
-                  />
-                ) : (
-                  <motion.div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary dark:bg-accent scale-x-0 opacity-0 origin-left transition-transform group-hover:scale-x-100 group-hover:opacity-100 duration-300" />
-                )}
-              </span>
-            </Link>
-          </motion.li>
+  // Desktop: pill-style segmented control
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex items-center p-1 bg-base-200/50 rounded-xl border border-base-300/30"
+    >
+      {/* Sliding indicator */}
+      {indicatorStyle && (
+        <motion.div
+          className="absolute top-1 bottom-1 bg-gradient-to-r from-primary/20 to-accent/20 dark:from-primary/30 dark:to-accent/30 rounded-lg"
+          initial={false}
+          animate={{
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+          }}
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
+      )}
+      
+      {appMenuLinks.map(({ label, href, icon }) => {
+        const isActive = pathname === href || pathname.startsWith(href + "/");
+        return (
+          <Link
+            key={href}
+            href={href}
+            ref={(el) => {
+              if (el) buttonRefs.current.set(href, el);
+            }}
+            className={`relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              isActive 
+                ? "text-primary dark:text-accent" 
+                : "text-base-content/50 hover:text-base-content/80"
+            }`}
+          >
+            <span className={`transition-transform duration-200 ${isActive ? "scale-110" : ""}`}>
+              {icon}
+            </span>
+            <span>{label}</span>
+          </Link>
         );
       })}
-    </>
+    </div>
   );
 };
 
 // Smart connect button that shows the right wallet based on selected network
+const NETWORK_STORAGE_KEY = "kapan-network-filter-selection";
+
 const SmartConnectButton = () => {
   const searchParams = useSearchParams();
-  const selectedNetwork = searchParams?.get("network") || "base";
+  const [selectedNetwork, setSelectedNetwork] = useState("base");
+  
+  // Function to get current network from URL or cache
+  const getCurrentNetwork = useCallback(() => {
+    // Check URL first
+    const url = new URL(window.location.href);
+    const urlNetwork = url.searchParams.get("network");
+    if (urlNetwork) return urlNetwork;
+    
+    // Fall back to localStorage cache
+    try {
+      const cached = localStorage.getItem(NETWORK_STORAGE_KEY);
+      if (cached) return cached;
+    } catch { }
+    
+    return "base";
+  }, []);
+
+  // Initialize and sync with URL/cache
+  useEffect(() => {
+    setSelectedNetwork(getCurrentNetwork());
+  }, [searchParams, getCurrentNetwork]);
+
+  // Listen for popstate (browser back/forward)
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedNetwork(getCurrentNetwork());
+    };
+    
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [getCurrentNetwork]);
+
+  // Poll for URL changes (since NetworkFilter uses shallow updates that don't trigger React)
+  useEffect(() => {
+    let lastNetwork = selectedNetwork;
+    
+    const checkNetwork = () => {
+      const current = getCurrentNetwork();
+      if (current !== lastNetwork) {
+        lastNetwork = current;
+        setSelectedNetwork(current);
+      }
+    };
+    
+    const interval = setInterval(checkNetwork, 200);
+    return () => clearInterval(interval);
+  }, [selectedNetwork, getCurrentNetwork]);
+
   const isStarknet = selectedNetwork === "starknet";
 
   return (
@@ -390,9 +469,7 @@ export const AppHeader = () => {
               </Link>
               {/* Desktop Nav */}
               <div className="hidden lg:flex ml-6">
-                <ul className="flex items-center space-x-2">
-                  <AppHeaderMenuLinks />
-                </ul>
+                <AppHeaderMenuLinks />
               </div>
             </div>
 

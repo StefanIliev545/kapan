@@ -115,8 +115,10 @@ export const LandingHeader = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [heroButtonVisible, setHeroButtonVisible] = useState(true);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const isLandingPage = pathname === "/";
 
   const appUrl = useMemo(() => {
     if (typeof window === "undefined") return "/app";
@@ -150,6 +152,18 @@ export const LandingHeader = () => {
   useEffect(() => {
     setIsDrawerOpen(false);
   }, [pathname]);
+
+  // Listen for hero button visibility changes
+  useEffect(() => {
+    if (!isLandingPage) return;
+    
+    const handleHeroButtonVisibility = (e: CustomEvent<{ visible: boolean }>) => {
+      setHeroButtonVisible(e.detail.visible);
+    };
+    
+    window.addEventListener('heroButtonVisibility', handleHeroButtonVisibility as EventListener);
+    return () => window.removeEventListener('heroButtonVisibility', handleHeroButtonVisibility as EventListener);
+  }, [isLandingPage]);
 
   return (
     <>
@@ -279,15 +293,23 @@ export const LandingHeader = () => {
 
             {/* Right section - Launch App and Theme controls */}
             <div className="flex items-center gap-2">
-              <a
-                href="/app"
-                onClick={e => {
-                  e.preventDefault();
-                  window.location.assign(appUrl);
-                }}
-              >
-                <button className="btn btn-primary btn-xs md:btn-sm">Launch App</button>
-              </a>
+              <AnimatePresence>
+                {(!isLandingPage || !heroButtonVisible) && (
+                  <motion.a
+                    href="/app"
+                    onClick={e => {
+                      e.preventDefault();
+                      window.location.assign(appUrl);
+                    }}
+                    initial={{ opacity: 0, scale: 0.9, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, x: 20 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <button className="btn btn-primary btn-xs md:btn-sm">Launch App</button>
+                  </motion.a>
+                )}
+              </AnimatePresence>
               <SwitchTheme />
               <ThemeSettings />
             </div>

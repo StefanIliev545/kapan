@@ -5,7 +5,6 @@ import type { NextPage } from "next";
 import { ListBulletIcon, MagnifyingGlassIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import dynamic from "next/dynamic";
 import Spinner from "~~/components/common/Spinner";
-import { LendingSidebar } from "~~/components/LendingSidebar";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
@@ -112,65 +111,92 @@ const MarketsPage: NextPage = () => {
   });
 
   return (
-    <div className="container mx-auto flex flex-col gap-6 px-5 lg:flex-row lg:gap-10 min-h-[calc(100vh-6rem)] py-6">
-      <div className="hidden lg:block lg:flex-shrink-0">
-        <StableArea minHeight="32rem" className="sticky top-[4.5rem]">
-          <LendingSidebar />
-        </StableArea>
-      </div>
-      <div className="flex-1 space-y-6">
-        <div className="flex items-center mb-4">
-          {groupMode === "protocol" && (
-            <NetworkFilter
-              networks={networkOptions}
-              defaultNetwork={selectedNetwork}
-              onNetworkChange={handleNetworkChange}
-            />
-          )}
-          <div className="flex-1 flex justify-center">
-            <div className="relative w-full max-w-md">
-              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/50" />
-              <input
-                type="text"
-                placeholder="Search"
-                className="input input-bordered w-full rounded-full pl-10"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+    <div className="container mx-auto px-5 min-h-[calc(100vh-6rem)] py-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 mb-6">
+          {/* Title & Controls Row */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Markets</h1>
+              <p className="text-sm text-base-content/50 mt-0.5">Compare rates across protocols</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 ml-4">
-            {groupMode === "protocol" && (
-              <div className="join">
+            
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle (Protocol view only) */}
+              {groupMode === "protocol" && (
+                <div className="flex rounded-lg bg-base-200/50 p-0.5">
+                  <button
+                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                      viewMode === "list" 
+                        ? "bg-base-100 shadow-sm text-base-content" 
+                        : "text-base-content/50 hover:text-base-content/80"
+                    }`}
+                    onClick={() => setViewMode("list")}
+                    aria-label="List view"
+                  >
+                    <ListBulletIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                      viewMode === "grid" 
+                        ? "bg-base-100 shadow-sm text-base-content" 
+                        : "text-base-content/50 hover:text-base-content/80"
+                    }`}
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Grid view"
+                  >
+                    <Squares2X2Icon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Group Mode Toggle */}
+              <div className="flex rounded-lg bg-base-200/50 p-0.5">
                 <button
-                  className={`btn btn-xs join-item ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => setViewMode("list")}
-                  aria-label="List view"
+                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                    groupMode === "token" 
+                      ? "bg-base-100 shadow-sm text-base-content" 
+                      : "text-base-content/50 hover:text-base-content/80"
+                  }`}
+                  onClick={() => setGroupMode("token")}
                 >
-                  <ListBulletIcon className="h-4 w-4" />
+                  By Token
                 </button>
                 <button
-                  className={`btn btn-xs join-item ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => setViewMode("grid")}
-                  aria-label="Grid view"
+                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                    groupMode === "protocol" 
+                      ? "bg-base-100 shadow-sm text-base-content" 
+                      : "text-base-content/50 hover:text-base-content/80"
+                  }`}
+                  onClick={() => setGroupMode("protocol")}
                 >
-                  <Squares2X2Icon className="h-4 w-4" />
+                  By Protocol
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Search & Network Filter Row */}
+          <div className="flex items-center gap-4">
+            {groupMode === "protocol" && (
+              <NetworkFilter
+                networks={networkOptions}
+                defaultNetwork={selectedNetwork}
+                onNetworkChange={handleNetworkChange}
+              />
             )}
-            <div className="join">
-              <button
-                className={`btn btn-xs join-item ${groupMode === "token" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setGroupMode("token")}
-              >
-                Token
-              </button>
-              <button
-                className={`btn btn-xs join-item ${groupMode === "protocol" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setGroupMode("protocol")}
-              >
-                Protocol
-              </button>
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
+                <input
+                  type="text"
+                  placeholder="Search tokens..."
+                  className="w-full py-2 pl-10 pr-4 text-sm bg-base-200/50 border border-base-300/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-base-content/30"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>

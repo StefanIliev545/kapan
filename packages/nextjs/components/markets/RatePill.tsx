@@ -10,11 +10,6 @@ interface RatePillProps {
   showIcons?: boolean;
 }
 
-const networkIcons: Record<"evm" | "starknet", string> = {
-  evm: "/logos/arb.svg",
-  starknet: "/logos/starknet.svg",
-};
-
 const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
   aave: "/logos/aave.svg",
   nostra: "/logos/nostra.svg",
@@ -23,20 +18,29 @@ const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", s
   compound: "/logos/compound.svg",
 };
 
-export const RatePill: FC<RatePillProps> = ({ variant, label, rate, networkType, protocol, showIcons = true }) => {
-  const color = variant === "supply" ? "bg-success text-success-content" : "bg-warning text-warning-content";
+export const RatePill: FC<RatePillProps> = ({ variant, rate, protocol, showIcons = true }) => {
+  const isSupply = variant === "supply";
+  
   return (
-    <div className="flex items-center rounded-lg border border-base-300 text-sm overflow-hidden bg-base-100">
-      <span className={`px-3 py-1 ${color}`}>{label}</span>
-      <span className="px-3 py-1 flex items-center gap-2">
-        {rate}
-        {showIcons && (
-          <>
-            <Image src={networkIcons[networkType]} alt={networkType} width={16} height={16} />
-            <Image src={protocolIcons[protocol]} alt={protocol} width={16} height={16} />
-          </>
-        )}
+    <div className="flex flex-col items-center gap-1">
+      {/* Label */}
+      <span className="text-[9px] uppercase tracking-widest text-base-content/35 font-medium">
+        {isSupply ? "Best Supply" : "Best Borrow"}
       </span>
+      
+      {/* Rate with protocol icon */}
+      <div className="flex items-center gap-1.5">
+        <span className={`text-lg font-mono font-bold tabular-nums tracking-tight ${
+          isSupply ? "text-success" : "text-error"
+        }`}>
+          {rate}
+        </span>
+        {showIcons && (
+          <div className="w-4 h-4 relative opacity-60">
+            <Image src={protocolIcons[protocol]} alt={protocol} fill className="object-contain rounded" />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

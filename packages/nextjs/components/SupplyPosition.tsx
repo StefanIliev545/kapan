@@ -294,15 +294,91 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     <>
       {/* Container */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-5 pt-4 pb-0" : "p-5"} rounded-xl bg-base-200/30 border border-base-300/40 ${hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default"
+        className={`w-full ${isExpanded && hasAnyActions ? "px-4 sm:px-5 pt-4 pb-0" : "p-4 sm:p-5"} rounded-xl bg-base-200/30 border border-base-300/40 ${hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default"
           } transition-colors duration-200 ${containerClassName ?? ""}`}
         onClick={toggleExpanded}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 relative gap-4 lg:gap-0">
+        {/* Mobile Layout (< lg) - single row, spread out */}
+        <div className="lg:hidden flex items-center gap-2 sm:gap-3">
+          {/* Token icon + name */}
+          <div className="flex items-center gap-1.5 flex-shrink-0" title={name}>
+            <div className="w-7 h-7 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-0.5 ring-1 ring-base-300/50 flex-shrink-0">
+              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded object-contain" />
+            </div>
+            <span className="font-bold text-sm tracking-tight leading-none">
+              {renderName ? renderName(name) : name}
+            </span>
+            {infoButtonNode && (
+              <div className="flex-shrink-0 hidden sm:block" onClick={e => e.stopPropagation()}>
+                {infoButtonNode}
+              </div>
+            )}
+            {afterInfoContent && <div className="hidden sm:block" onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
+          </div>
+          
+          {/* Stats - spread out across available space */}
+          <div className="flex-1 flex items-center justify-around min-w-0">
+            {!hideBalanceColumn && (
+              <div className="flex flex-col items-center text-center">
+                <div className="text-[8px] uppercase tracking-widest text-base-content/40 font-medium">Bal</div>
+                <div className="text-[11px] font-mono font-semibold tabular-nums">
+                  <FiatBalance
+                    tokenAddress={tokenAddress}
+                    rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+                    price={tokenPrice}
+                    decimals={tokenDecimals}
+                    tokenSymbol={name}
+                    className="text-success"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col items-center text-center">
+              <div className="text-[8px] uppercase tracking-widest text-base-content/40 font-medium">APY</div>
+              <div className="text-[11px] font-mono font-semibold tabular-nums text-base-content">
+                {formatPercentage(currentRate)}%
+              </div>
+            </div>
+            {/* Best APY - hidden on very narrow screens */}
+            <div className="hidden min-[400px]:flex flex-col items-center text-center">
+              <div className="text-[8px] uppercase tracking-widest text-base-content/40 font-medium">Best</div>
+              <div className="flex items-center gap-0.5">
+                <span className="text-[11px] font-mono font-semibold tabular-nums text-success">
+                  {formatPercentage(displayedOptimalRate)}%
+                </span>
+                <div className="w-3 h-3 relative flex-shrink-0">
+                  <Image
+                    src={getProtocolLogo(displayedOptimalProtocol)}
+                    alt={displayedOptimalProtocol}
+                    fill
+                    className="object-contain rounded"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Expand indicator */}
+          {hasAnyActions && showExpandIndicator && (
+            <div
+              className={`flex items-center justify-center w-5 h-5 rounded-md flex-shrink-0 ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
+                } transition-all duration-200`}
+            >
+              {isExpanded ? (
+                <FiChevronUp className="w-3 h-3 text-primary" />
+              ) : (
+                <FiChevronDown className="w-3 h-3 text-base-content/50" />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Layout (>= lg) */}
+        <div className="hidden lg:grid lg:grid-cols-12 relative gap-0">
           {/* Token */}
-          <div className="order-1 lg:order-none lg:col-span-3 flex items-center min-w-0">
-            <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-full bg-base-300/50 p-1.5">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-full object-contain" />
+          <div className="lg:col-span-3 flex items-center min-w-0">
+            <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 ring-1 ring-base-300/50">
+              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-lg object-contain" />
             </div>
             <div className="ml-3 flex items-center gap-1.5 min-w-0">
               <div className="flex flex-col min-w-0">
@@ -323,13 +399,12 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 {infoButtonNode}
               </div>
             )}
-
             {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
           </div>
 
           {/* Stats: Rates */}
           <div
-            className={`order-2 lg:order-none lg:col-span-8 grid gap-0 items-center min-w-[200px] ${statGridClass}`}
+            className={`lg:col-span-8 grid gap-0 items-center min-w-[200px] ${statGridClass}`}
           >
             {statColumns.map((column, index) => {
               const isLast = index === statColumns.length - 1;
@@ -343,7 +418,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           </div>
 
           {/* Expand Indicator */}
-          <div className="order-3 lg:order-none lg:col-span-1 flex items-center justify-end">
+          <div className="lg:col-span-1 flex items-center justify-end">
             {hasAnyActions && showExpandIndicator && (
               <div
                 className={`flex items-center justify-center w-6 h-6 rounded-lg ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
