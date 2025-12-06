@@ -9,7 +9,11 @@ export const useStarknetCollateralSupport = (
   selectedProtocol: string,
   selectedVersion: "v1" | "v2",
   collaterals: any[],
-  isOpen: boolean
+  isOpen: boolean,
+  options?: {
+    vesuV1PoolId?: bigint;
+    vesuV2PoolAddress?: string;
+  }
 ) => {
   const { address: starkUserAddress } = useAccount();
 
@@ -26,6 +30,8 @@ export const useStarknetCollateralSupport = (
     protocolName: targetProtocolName as "Vesu" | "VesuV2" | "Nostra",
     userAddress: starkUserAddress || "0x0000000000000000000000000000000000000000",
     isOpen: isOpen && Boolean(targetProtocolName),
+    vesuV1PoolId: selectedVersion === "v1" ? options?.vesuV1PoolId : undefined,
+    vesuV2PoolAddress: selectedVersion === "v2" ? options?.vesuV2PoolAddress : undefined,
   });
 
   // Build support map by checking if source collaterals exist in target protocol
