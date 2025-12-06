@@ -161,12 +161,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   }, [suppliedPositions]);
 
 
-
-  // Sync markets visibility with forceShowAll prop; reset when wallet connects
-  useEffect(() => {
-    setIsMarketsOpen(forceShowAll);
-  }, [forceShowAll]);
-
   // Calculate net balance.
   const netBalance = useMemo(() => {
     const totalSupplied = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
@@ -226,6 +220,13 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     const formatted = formatPercentage(Math.abs(value));
     return `${value >= 0 ? "" : "-"}${formatted}%`;
   };
+
+  // Keep Markets section closed when forceShowAll is active to avoid auto-mounting extra hooks
+  useEffect(() => {
+    if (forceShowAll) {
+      setIsMarketsOpen(false);
+    }
+  }, [forceShowAll]);
 
   // Use effective showAll state (component state OR forced from props)
   const effectiveShowAll = isMarketsOpen || forceShowAll;
