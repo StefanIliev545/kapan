@@ -93,24 +93,54 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
   const { data: compoundResults } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
 
-// Batch collateral data per market
+  // Only fetch collateral details for markets where the user has a position.
+  const activeMarketsForCollateral = useMemo(() => {
+    if (!compoundResults || baseTokens.length === 0) return [] as { baseToken: Address; idx: number }[];
+
+    return baseTokens.reduce((acc, baseToken, idx) => {
+      const compound = compoundResults[idx]?.result as [bigint, bigint, bigint, bigint, bigint, bigint] | undefined;
+      const balanceRaw = compound?.[2] ?? 0n;
+      const borrowBalanceRaw = compound?.[3] ?? 0n;
+
+      if (balanceRaw > 0n || borrowBalanceRaw > 0n) {
+        acc.push({ baseToken, idx });
+      }
+
+      return acc;
+    }, [] as { baseToken: Address; idx: number }[]);
+  }, [baseTokens, compoundResults]);
+
+  const depositedIndexByBase = useMemo(() => {
+    const indexMap = new Map<number, number>();
+    activeMarketsForCollateral.forEach((market, order) => indexMap.set(market.idx, order));
+    return indexMap;
+  }, [activeMarketsForCollateral]);
+
+  // Batch collateral data per market
   const depositedCalls = useMemo(() => {
-    if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
-    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getDepositedCollaterals" as const, args: [t, queryAddress], chainId }));
-  }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
+    if (!gatewayAddress || !gateway || activeMarketsForCollateral.length === 0) return [] as any[];
+    return activeMarketsForCollateral.map(({ baseToken }) => ({
+      address: gatewayAddress,
+      abi: gateway.abi as Abi,
+      functionName: "getDepositedCollaterals" as const,
+      args: [baseToken, queryAddress],
+      chainId,
+    }));
+  }, [gatewayAddress, gateway, activeMarketsForCollateral, queryAddress, chainId]);
   const { data: depositedResults } = useReadContracts({ allowFailure: true, contracts: depositedCalls, query: { enabled: depositedCalls.length > 0 } });
 
   const pricesCalls = useMemo(() => {
     if (!gatewayAddress || !gateway || !depositedResults) return [] as any[];
     const calls: any[] = [];
     (depositedResults as any[]).forEach((res, i) => {
+      const baseToken = activeMarketsForCollateral[i]?.baseToken;
       const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
-      if (colls.length > 0) {
-        calls.push({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getPrices" as const, args: [baseTokens[i], colls], chainId });
+      if (colls.length > 0 && baseToken) {
+        calls.push({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getPrices" as const, args: [baseToken, colls], chainId });
       }
     });
     return calls;
-  }, [gatewayAddress, gateway, depositedResults, baseTokens, chainId]);
+  }, [gatewayAddress, gateway, depositedResults, activeMarketsForCollateral, chainId]);
   const { data: pricesResults } = useReadContracts({ allowFailure: true, contracts: pricesCalls, query: { enabled: pricesCalls.length > 0 } });
 
   const collDecimalsCalls = useMemo(() => {
@@ -157,32 +187,19 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
       // Collateral value for this base token
       let collateralValue = 0;
-      const depRes = depositedResults?.[idx]?.result as [Address[], bigint[], string[]] | undefined;
+      const depositResultIndex = depositedIndexByBase.get(idx);
+      const depRes = depositResultIndex === undefined
+        ? undefined
+        : (depositedResults?.[depositResultIndex]?.result as [Address[], bigint[], string[]] | undefined);
       const colls = depRes?.[0] ?? [];
       const balances = depRes?.[1] ?? [];
       const collNames = depRes?.[2] ?? [];
 
-      // locate prices/decimals array index among non-empty markets
-      const locateRank = (): number => {
-        if (!depositedResults) return -1;
-        let rank = -1;
-        let seen = 0;
-        for (let i = 0; i < depositedResults.length; i++) {
-          const r = depositedResults[i]?.result as [Address[], bigint[], string[]] | undefined;
-          if ((r?.[0]?.length ?? 0) > 0) {
-            if (i === idx) { rank = seen; break; }
-            seen++;
-          }
-        }
-        return rank;
-      };
-
       let marketPrices: bigint[] = [];
       let collDecs: bigint[] = [];
-      const nonEmptyRank = locateRank();
-      if (nonEmptyRank >= 0) {
-        marketPrices = (pricesResults?.[nonEmptyRank]?.result as bigint[] | undefined) ?? [];
-        collDecs = (collDecimalsResults?.[nonEmptyRank]?.result as bigint[] | undefined) ?? [];
+      if (depositResultIndex !== undefined) {
+        marketPrices = (pricesResults?.[depositResultIndex]?.result as bigint[] | undefined) ?? [];
+        collDecs = (collDecimalsResults?.[depositResultIndex]?.result as bigint[] | undefined) ?? [];
       }
 
       const swapCollaterals: SwapAsset[] = colls.map((collAddr, i) => {
@@ -257,6 +274,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     depositedResults,
     pricesResults,
     collDecimalsResults,
+    depositedIndexByBase,
     chainId,
   ]);
 
@@ -301,6 +319,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         networkType="evm"
         chainId={chainId}
         enabledFeatures={enabledFeatures}
+        inlineMarkets={true}
       />
     </div>
   );

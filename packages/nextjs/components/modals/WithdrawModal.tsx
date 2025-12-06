@@ -83,6 +83,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       percentBase={supplyBalance}
       max={maxInput}
       network="evm"
+      chainId={chainId}
       position={position}
       onConfirm={handleConfirm}
       renderExtraContent={() => isPreferenceLoaded ? (

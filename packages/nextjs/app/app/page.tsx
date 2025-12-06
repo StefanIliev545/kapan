@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, startTransition } from "react";
-import Image from "next/image";
+
 import type { NextPage } from "next";
 import dynamic from "next/dynamic";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
-import CallToAction, { CallToActionSectionProps } from "~~/components/common/CallToAction";
+import { SupportBanner } from "~~/components/common/SupportBanner";
 import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
@@ -97,32 +97,7 @@ const App: NextPage = () => {
     linea: "Linea support is experimental and pre-audit.",
   }), []);
 
-  const sections: CallToActionSectionProps[] = [
-    {
-      title: "⭐ Support on X",
-      description: "We're building with real purpose — your follow helps us reach more builders!",
-      buttonText: "Follow @KapanFinance",
-      buttonLink: "https://x.com/KapanFinance",
-    },
-    {
-      title: "🌱 Fund via Giveth",
-      description: "We strive to provide everything for free, but we need your help to keep going!",
-      buttonText: "Support on Giveth",
-      buttonLink: "https://giveth.io/project/kapan-finance-defi-lending-management-protocol",
-    },
-    {
-      title: "Join Our Community",
-      description: "Connect with developers and users in our Discord server",
-      buttonText: "Join Discord",
-      buttonLink: "https://discord.gg/Vjk6NhkxGv",
-      emoji: "💬 ",
-      icon: (
-        <div className="w-5 h-5 relative">
-          <Image src="/logos/discord.svg" alt="Discord" fill className="object-contain" />
-        </div>
-      ),
-    },
-  ];
+
 
   useEffect(() => {
     const protocolCountByNetwork: Record<string, number> = {
@@ -177,13 +152,13 @@ const App: NextPage = () => {
           {/* ARBITRUM */}
           {selectedNetwork === "arbitrum" && (
             <div className="space-y-3">
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
@@ -192,16 +167,16 @@ const App: NextPage = () => {
           {/* BASE */}
           {selectedNetwork === "base" && (
             <div className="space-y-3">
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
@@ -213,13 +188,13 @@ const App: NextPage = () => {
               <div className="alert alert-warning text-sm">
                 Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
               </div>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
@@ -228,10 +203,10 @@ const App: NextPage = () => {
           {/* STARKNET */}
           {selectedNetwork === "starknet" && (
             <div className="space-y-3">
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VesuProtocolView />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <NostraProtocolView />
               </StableArea>
             </div>
@@ -240,10 +215,10 @@ const App: NextPage = () => {
           {/* OPTIMISM */}
           {selectedNetwork === "optimism" && (
             <div className="space-y-3">
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="16rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
@@ -251,14 +226,14 @@ const App: NextPage = () => {
 
           {/* LINEA */}
           {selectedNetwork === "linea" && (
-            <div className="space-y-6">
-              <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <ZeroLendProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="28rem" className="block" innerClassName="h-full">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
@@ -266,7 +241,7 @@ const App: NextPage = () => {
         </div>
 
         <div className="mt-12">
-          <CallToAction sections={sections} />
+          <SupportBanner />
         </div>
       </div>
     </DashboardLayout>

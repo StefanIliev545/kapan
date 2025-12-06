@@ -8,7 +8,7 @@ import { BorrowModal } from "./modals/BorrowModal";
 import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
-import { FiAlertTriangle, FiPlus } from "react-icons/fi";
+import { FiAlertTriangle, FiPlus, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import type { SwapAsset } from "./modals/SwapModalShell";
 import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
@@ -65,6 +65,8 @@ interface ProtocolViewProps {
     swap?: boolean;
     move?: boolean;
   };
+  disableMarkets?: boolean;
+  inlineMarkets?: boolean;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -112,8 +114,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   expandFirstPositions = true,
   chainId,
   enabledFeatures = { swap: false, move: true },
+  disableMarkets = false,
+  inlineMarkets = false,
 }) => {
-  const [showAll, setShowAll] = useState(false);
+  const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
   const [isTokenBorrowModalOpen, setIsTokenBorrowModalOpen] = useState(false);
   const [isTokenBorrowSelectModalOpen, setIsTokenBorrowSelectModalOpen] = useState(false);
@@ -124,6 +128,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [selectedClosePosition, setSelectedClosePosition] = useState<ProtocolPosition | null>(null);
   const [isDebtSwapModalOpen, setIsDebtSwapModalOpen] = useState(false);
   const [selectedDebtSwapPosition, setSelectedDebtSwapPosition] = useState<ProtocolPosition | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleSwap = (position: ProtocolPosition) => {
     if (readOnly) return;
@@ -155,12 +160,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     }));
   }, [suppliedPositions]);
 
-
-
-  // Sync showAll with forceShowAll prop; reset when wallet connects
-  useEffect(() => {
-    setShowAll(forceShowAll);
-  }, [forceShowAll]);
 
   // Calculate net balance.
   const netBalance = useMemo(() => {
@@ -222,11 +221,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return `${value >= 0 ? "" : "-"}${formatted}%`;
   };
 
-  // Use effective showAll state (component state OR forced from props)
-  const effectiveShowAll = showAll || forceShowAll;
+  // Keep Markets section closed when forceShowAll is active to avoid auto-mounting extra hooks
+  useEffect(() => {
+    if (forceShowAll) {
+      setIsMarketsOpen(false);
+    }
+  }, [forceShowAll]);
 
-  // Filter positions based on showAll toggle.
-  const filteredSuppliedPositions = (effectiveShowAll ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
+  // Use effective showAll state (component state OR forced from props)
+  const effectiveShowAll = isMarketsOpen || forceShowAll;
+
+  // Filter positions based on wheter user has balance.
+  // If inlineMarkets is true (e.g. Compound), clicking "Markets" (isMarketsOpen) should reveal all assets in these lists.
+  // Otherwise (Aave), clicking "Markets" opens a separate section, so we keep these lists filtered to user positions.
+  const showAllInLists = forceShowAll || (inlineMarkets && isMarketsOpen);
+
+  const filteredSuppliedPositions = (showAllInLists ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
     readOnly
       ? {
         ...p,
@@ -237,9 +247,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   );
 
   // For borrowed positions:
-  // - If not showing all, only show positions with actual debt (negative balance)
-  // - If showing all, show everything in the borrowedPositions array
-  const filteredBorrowedPositions = (effectiveShowAll
+  const filteredBorrowedPositions = (showAllInLists
     ? borrowedPositions
     : borrowedPositions.filter(p => p.balance < 0 || (p.collateralValue ?? 0) > 0)).map(p =>
       readOnly
@@ -311,9 +319,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // const handleCloseDepositModal = () => undefined;
 
   return (
-    <div className="w-full flex flex-col hide-scrollbar p-3 space-y-2">
+    <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
       {/* Protocol Header Card */}
-      <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
+      <div
+        className="card bg-base-200/40 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-300/50 cursor-pointer select-none"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
         <div className="card-body px-5 py-3">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             {/* Protocol name + icon */}
@@ -374,174 +385,251 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               )}
             </div>
 
-            {/* Show All Toggle */}
+            {/* Markets Toggle + Collapse */}
             <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
-              {!forceShowAll && (
-                <>
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Show all</span>
-                  <input
-                    type="checkbox"
-                    className="toggle toggle-primary toggle-xs"
-                    checked={showAll}
-                    onChange={e => setShowAll(e.target.checked)}
-                  />
-                </>
+              {!forceShowAll && !disableMarkets && (
+                <button
+                  className="btn btn-sm btn-ghost gap-1.5"
+                  type="button"
+                  onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
+                >
+                  <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
+                  {isMarketsOpen ? <FiChevronUp className="h-3.5 w-3.5" /> : <FiChevronDown className="h-3.5 w-3.5" />}
+                </button>
               )}
               {forceShowAll && !readOnly && (
                 <span className="text-[11px] text-primary/80 font-medium">Connect wallet</span>
               )}
+              <FiChevronDown
+                className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Positions Container: Improved shadows and rounded corners */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* Supplied Assets */}
-        <div className="h-full">
-          <div className="card bg-gradient-to-br from-base-100 to-base-100/80 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-200/50">
-            <div className="card-body p-4 flex flex-col">
-              <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-5 rounded-full bg-success" />
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Supplied</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-success">
-                  <span className="text-xs font-mono font-bold">{filteredSuppliedPositions.length}</span>
-                  <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
-                </div>
-              </div>
-              {filteredSuppliedPositions.length > 0 ? (
-                <div className="flex flex-col flex-1 pt-2">
-                  <div className="space-y-3">
-                    {filteredSuppliedPositions.map((position, index) => (
-                      <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
-                        <SupplyPosition
-                          {...position}
-                          protocolName={protocolName}
-                          networkType={networkType}
-                          chainId={chainId}
-                          position={positionManager}
-                          disableMove={disableMoveSupply || readOnly}
-                          availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: true } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
-                          onSwap={() => handleSwap(position)}
-                          suppressDisabledMessage
-                          defaultExpanded={expandFirstPositions && index === 0}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* "Add Supply" button - pinned to bottom with gap */}
-                  {!readOnly && (
-                    <div className="mt-auto pt-4">
+      {/* Markets Section - expandable (only if not inlineMarkets) */}
+      {isMarketsOpen && !isCollapsed && !disableMarkets && !inlineMarkets && (
+        <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
+          <div className="card-body p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Suppliable Assets */}
+              {suppliedPositions.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                      Suppliable assets
+                    </div>
+                    {!readOnly && (
                       <button
-                        className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200"
+                        className="btn btn-xs btn-outline"
+                        type="button"
                         onClick={handleAddSupply}
                       >
-                        <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                        <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
+                        Deposit
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  {suppliedPositions.map(position => (
+                    <SupplyPosition
+                      key={`market-supply-${position.tokenAddress}`}
+                      {...position}
+                      protocolName={protocolName}
+                      networkType={networkType}
+                      chainId={chainId}
+                      hideBalanceColumn
+                      availableActions={{ deposit: false, withdraw: false, move: false, swap: false }}
+                      showInfoDropdown={false}
+                    />
+                  ))}
                 </div>
-              ) : (
-                <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
-                  <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
-                  <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
-                  {!readOnly && (
-                    <button
-                      className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
-                      onClick={handleAddSupply}
-                    >
-                      <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                      <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
-                    </button>
-                  )}
+              )}
+
+              {/* Borrowable Assets */}
+              {borrowedPositions.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                      Borrowable assets
+                    </div>
+                    {!readOnly && filteredSuppliedPositions.length > 0 && (
+                      <button
+                        className="btn btn-xs btn-outline"
+                        type="button"
+                        onClick={handleAddBorrow}
+                      >
+                        Borrow
+                      </button>
+                    )}
+                  </div>
+                  {borrowedPositions.map(position => (
+                    <BorrowPosition
+                      key={`market-borrow-${position.tokenAddress}`}
+                      {...position}
+                      protocolName={protocolName}
+                      networkType={networkType}
+                      chainId={chainId}
+                      hideBalanceColumn
+                      availableActions={{ borrow: false, repay: false, move: false, close: false, swap: false }}
+                      showInfoDropdown={false}
+                    />
+                  ))}
                 </div>
               )}
             </div>
           </div>
         </div>
+      )}
 
-        {/* Borrowed Assets */}
-        <div className="h-full">
-          <div className="card bg-gradient-to-br from-base-100 to-base-100/80 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-200/50">
-            <div className="card-body p-4 flex flex-col">
-              <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-5 rounded-full bg-error" />
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Borrowed</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error/10 text-error">
-                  <span className="text-xs font-mono font-bold">{filteredBorrowedPositions.length}</span>
-                  <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
-                </div>
-              </div>
-              {filteredBorrowedPositions.length > 0 ? (
-                <div className="flex flex-col flex-1 pt-2">
-                  <div className="space-y-3">
-                    {filteredBorrowedPositions.map((position, index) => (
-                      <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
-                        <BorrowPosition
-                          {...position}
-                          protocolName={protocolName}
-                          networkType={networkType}
-                          chainId={chainId}
-                          position={positionManager}
-                          availableAssets={position.collaterals || availableCollaterals}
-                          availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: true, swap: enabledFeatures.swap ?? true }}
-                          onClosePosition={() => handleCloseWithCollateral(position)}
-                          onSwap={() => handleDebtSwap(position)}
-                          suppressDisabledMessage
-                          defaultExpanded={expandFirstPositions && index === 0}
-                        />
-                      </div>
-                    ))}
+      {/* Positions Container - collapsible */}
+      {!isCollapsed && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {/* Supplied Assets */}
+          <div className="h-full">
+            <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
+              <div className="card-body p-4 flex flex-col">
+                <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-5 rounded-full bg-success" />
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Supplied</span>
                   </div>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-success">
+                    <span className="text-xs font-mono font-bold">{filteredSuppliedPositions.length}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
+                  </div>
+                </div>
+                {filteredSuppliedPositions.length > 0 ? (
+                  <div className="flex flex-col flex-1 pt-2">
+                    <div className="space-y-3">
+                      {filteredSuppliedPositions.map((position, index) => (
+                        <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
+                          <SupplyPosition
+                            {...position}
+                            protocolName={protocolName}
+                            networkType={networkType}
+                            chainId={chainId}
+                            position={positionManager}
+                            disableMove={disableMoveSupply || readOnly}
+                            availableActions={readOnly ? { deposit: true, withdraw: true, move: true, swap: true } : { deposit: true, withdraw: true, move: enabledFeatures.move ?? true, swap: enabledFeatures.swap ?? false }}
+                            onSwap={() => handleSwap(position)}
+                            suppressDisabledMessage
+                            defaultExpanded={expandFirstPositions && index === 0}
+                          />
+                        </div>
+                      ))}
+                    </div>
 
-                  {/* "Add Borrow" button - pinned to bottom with gap */}
-                  {!readOnly && (
-                    <div className="mt-auto pt-4">
+                    {/* "Add Supply" button - pinned to bottom with gap */}
+                    {!readOnly && (
+                      <div className="mt-auto pt-4">
+                        <button
+                          className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200"
+                          onClick={handleAddSupply}
+                        >
+                          <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
+                    <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
+                    <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
+                    {!readOnly && (
                       <button
-                        className={`group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                        className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
+                        onClick={handleAddSupply}
+                      >
+                        <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                        <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Borrowed Assets */}
+          <div className="h-full">
+            <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
+              <div className="card-body p-4 flex flex-col">
+                <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-5 rounded-full bg-error" />
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Borrowed</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error/10 text-error">
+                    <span className="text-xs font-mono font-bold">{filteredBorrowedPositions.length}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
+                  </div>
+                </div>
+                {filteredBorrowedPositions.length > 0 ? (
+                  <div className="flex flex-col flex-1 pt-2">
+                    <div className="space-y-3">
+                      {filteredBorrowedPositions.map((position, index) => (
+                        <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
+                          <BorrowPosition
+                            {...position}
+                            protocolName={protocolName}
+                            networkType={networkType}
+                            chainId={chainId}
+                            position={positionManager}
+                            availableAssets={position.collaterals || availableCollaterals}
+                            availableActions={readOnly ? { borrow: true, repay: true, move: true, close: false, swap: false } : { borrow: true, repay: true, move: enabledFeatures.move ?? true, close: true, swap: enabledFeatures.swap ?? true }}
+                            onClosePosition={() => handleCloseWithCollateral(position)}
+                            onSwap={() => handleDebtSwap(position)}
+                            suppressDisabledMessage
+                            defaultExpanded={expandFirstPositions && index === 0}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* "Add Borrow" button - pinned to bottom with gap */}
+                    {!readOnly && (
+                      <div className="mt-auto pt-4">
+                        <button
+                          className={`group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed transition-all duration-200 ${filteredSuppliedPositions.length > 0
                             ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary"
                             : "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed"
+                            }`}
+                          onClick={handleAddBorrow}
+                          disabled={filteredSuppliedPositions.length === 0}
+                          title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
+                        >
+                          <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <span className="text-xs font-medium uppercase tracking-wider">Borrow</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
+                    <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
+                    <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
+                    {!readOnly && (
+                      <button
+                        className={`group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                          ? "bg-primary/10 hover:bg-primary/20 text-primary"
+                          : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
                           }`}
                         onClick={handleAddBorrow}
                         disabled={filteredSuppliedPositions.length === 0}
                         title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                       >
                         <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                        <span className="text-xs font-medium uppercase tracking-wider">Borrow</span>
+                        <span className="text-xs font-medium uppercase tracking-wider">Borrow Assets</span>
                       </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
-                  <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
-                  <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
-                  {!readOnly && (
-                    <button
-                      className={`group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
-                          ? "bg-primary/10 hover:bg-primary/20 text-primary"
-                          : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
-                        }`}
-                      onClick={handleAddBorrow}
-                      disabled={filteredSuppliedPositions.length === 0}
-                      title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
-                    >
-                      <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                      <span className="text-xs font-medium uppercase tracking-wider">Borrow Assets</span>
-                    </button>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modals - Conditional based on network type */}
       {!readOnly && networkType === "starknet" ? (
