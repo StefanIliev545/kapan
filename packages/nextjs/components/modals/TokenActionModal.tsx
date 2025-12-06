@@ -6,8 +6,10 @@ import { FaGasPump } from "react-icons/fa";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import type { Call } from "starknet";
 import { formatUnits, parseUnits } from "viem";
+import { useAccount as useEvmAccount } from "wagmi";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
+import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import formatPercentage from "~~/utils/formatPercentage";
 import { formatRate } from "~~/utils/protocols";
 import { PositionManager } from "~~/utils/position";
@@ -35,6 +37,7 @@ export interface TokenActionModalProps {
   percentBase?: bigint;
   max?: bigint;
   network: Network;
+  chainId?: number;
   buildTx?: (amount: string, isMax: boolean) => any;
   buildCalls?: (
     amount: string,
@@ -203,6 +206,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   percentBase,
   max,
   network,
+  chainId,
   hf = 1.9,
   utilization = 65,
   ltv = 75,
@@ -211,6 +215,11 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   onConfirm,
   renderExtraContent,
 }) => {
+  const { address: evmAddress, chain } = useEvmAccount();
+  const { address: starkAddress } = useStarkAccount();
+
+  const decimals = token.decimals || 18;
+
   const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success" | "error">("idle");
@@ -240,26 +249,35 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
 
   const effectiveMax = useMemo(() => {
     if (action !== "Borrow" || !position || !token.usdPrice) return max;
-    const decimals = token.decimals || 18;
     const freeUsd = position.freeBorrowUsd();
     if (freeUsd <= 0 || token.usdPrice === 0) return 0n;
     const amount = Math.floor((freeUsd / token.usdPrice) * 10 ** decimals);
     return BigInt(amount);
-  }, [action, position, token.usdPrice, token.decimals, max]);
+  }, [action, position, token.usdPrice, decimals, max]);
 
-  // Check if user has insufficient funds for Repay action
-  // Re-checks whenever amount, balance, or token decimals change
-  const insufficientFunds = useMemo(() => {
-    if (action !== "Repay" || !amount || amount.trim() === "") return false;
-    const decimals = token.decimals || 18;
+  const parsedAmount = useMemo(() => {
+    if (!amount.trim()) return null;
     try {
-      const parsedAmount = parseUnits(amount, decimals);
-      return parsedAmount > balance;
+      return parseUnits(amount, decimals);
     } catch {
-      // If parsing fails (invalid input), don't show insufficient funds
-      return false;
+      return null;
     }
-  }, [action, amount, balance, token.decimals]);
+  }, [amount, decimals]);
+
+  const isAmountPositive = parsedAmount !== null && parsedAmount > 0n;
+
+  const insufficientFunds = useMemo(() => {
+    if (!parsedAmount || !isAmountPositive) return false;
+    // Borrow/withdraw amounts are clamped to protocol limits rather than wallet balance.
+    if (action === "Borrow" || action === "Withdraw") return false;
+    return parsedAmount > balance;
+  }, [action, balance, isAmountPositive, parsedAmount]);
+
+  const isCorrectChain = network !== "evm" || !chainId || chain?.id === chainId;
+  const isWalletConnected = network === "evm" ? Boolean(evmAddress) : Boolean(starkAddress);
+  const canSubmit = isAmountPositive && !insufficientFunds && isWalletConnected && isCorrectChain;
+  const isActionComplete = txState === "success";
+  const isConfirmDisabled = txState === "pending" || (!isActionComplete && !canSubmit);
 
   const afterValue = useMemo(() => {
     switch (action) {
@@ -380,11 +398,11 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               <span>
                 {apyLabel} {formatRate(apy)}%
               </span>
-              <span>Balance: {format(Number(formatUnits(balance, token.decimals || 18)))}</span>
+              <span>Balance: {format(Number(formatUnits(balance, decimals)))}</span>
             </div>
             <PercentInput
               balance={balance}
-              decimals={token.decimals || 18}
+              decimals={decimals}
               price={token.usdPrice}
               onChange={(val, maxed) => {
                 setAmount(val);
@@ -437,7 +455,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                         <FaGasPump className="text-gray-400" />
                       ) : undefined,
                     onClick: handleConfirm,
-                    disabled: txState === "pending" || insufficientFunds,
+                    disabled: isConfirmDisabled,
                     variant: "ghost",
                   },
                 ]}

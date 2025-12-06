@@ -84,6 +84,7 @@ export const RepayModal: FC<RepayModalProps> = ({
       percentBase={debtBalance}
       max={maxInput}
       network="evm"
+      chainId={chainId}
       position={position}
       onConfirm={handleRepay}
       renderExtraContent={() => isPreferenceLoaded ? (

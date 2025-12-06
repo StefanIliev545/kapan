@@ -62,6 +62,7 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       before={0}
       balance={balance}
       network="evm"
+      chainId={chainId}
       position={position}
       onConfirm={handleDeposit}
       renderExtraContent={() => isPreferenceLoaded ? (
