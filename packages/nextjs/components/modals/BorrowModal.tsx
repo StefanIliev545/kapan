@@ -62,6 +62,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
       before={currentDebt}
       balance={balance}
       network="evm"
+      chainId={chainId}
       position={position}
       onConfirm={handleBorrow}
       renderExtraContent={() => isPreferenceLoaded ? (
