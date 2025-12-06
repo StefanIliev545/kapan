@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Review the Kapan Finance privacy policy and learn how we protect your data.",
     }),
     alternates: {
-      canonical: "https://kapan.finance/privacy",
+      canonical: "/privacy",
     },
   };
 }

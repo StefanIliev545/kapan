@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
         "Learn how Kapan Finance optimizes DeFi lending with atomic debt migration, automation, and cross-protocol refinancing tools.",
     }),
     alternates: {
-      canonical: "https://kapan.finance/info",
+      canonical: "/info",
     },
   };
 }

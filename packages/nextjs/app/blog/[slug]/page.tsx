@@ -39,11 +39,11 @@ export async function generateMetadata({
     return {
       ...baseMetadata,
       alternates: {
-        canonical: `https://kapan.finance/blog/${slug}`,
+        canonical: `/blog/${slug}`,
       },
       openGraph: {
         ...baseMetadata.openGraph,
-        url: `https://kapan.finance/blog/${slug}`,
+        url: `/blog/${slug}`,
         type: "article",
       },
     };

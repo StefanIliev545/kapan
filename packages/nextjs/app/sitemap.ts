@@ -1,8 +1,11 @@
 import { MetadataRoute } from "next";
 import { getSortedPostsData } from "~~/utils/blog";
 
+const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : `http://localhost:${process.env.PORT || 3000}`;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://kapan.finance";
   const now = new Date();
 
   const posts = getSortedPostsData();

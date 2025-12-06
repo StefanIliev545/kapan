@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
         "Automate DeFi lending strategies with Kapan Finance. Move debt between protocols, rebalance collateral, and stay protected from liquidations.",
     }),
     alternates: {
-      canonical: "https://kapan.finance/automate",
+      canonical: "/automate",
     },
   };
 }

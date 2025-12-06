@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Compare DeFi lending and borrowing rates across protocols and networks in real time.",
     }),
     alternates: {
-      canonical: "https://kapan.finance/markets",
+      canonical: "/markets",
     },
   };
 }

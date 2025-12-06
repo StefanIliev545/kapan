@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
         "DeFi lending insights and Kapan Finance updates. Explore articles on optimizing borrowing costs, interest rates, and more.",
     }),
     alternates: {
-      canonical: "https://kapan.finance/blog",
+      canonical: "/blog",
     },
   };
 }

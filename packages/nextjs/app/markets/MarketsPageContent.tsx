@@ -7,6 +7,9 @@ import dynamic from "next/dynamic";
 import Spinner from "~~/components/common/Spinner";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
+import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
+import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import StableArea from "~~/components/common/StableArea";
 import { arbitrum, base, linea, optimism } from "wagmi/chains";
 
@@ -78,142 +81,229 @@ const networkProtocolMap: Record<string, ProtocolConfig[]> = {
 };
 
 const MarketsPageContent: NextPage = () => {
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkOption>(networkOptions[0]);
-  const [isGridView, setIsGridView] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("base");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [search, setSearch] = useState("");
+  const [groupMode, setGroupMode] = useState<"token" | "protocol">("token");
 
-  const protocolConfigs = networkProtocolMap[selectedNetwork.id] || [];
+  const [mountedNetworks, setMountedNetworks] = useState<Set<string>>(() => new Set(["base"]));
 
-  const handleNetworkSelect = useCallback((network: NetworkOption) => {
-    startTransition(() => setSelectedNetwork(network));
+  const handleNetworkChange = useCallback((networkId: string) => {
+    startTransition(() => setSelectedNetwork(networkId));
   }, []);
 
-  const handleSearch = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    startTransition(() => {
-      setSearchTerm(event.target.value);
+  useEffect(() => {
+    setMountedNetworks(prev => {
+      if (prev.has(selectedNetwork)) return prev;
+      const next = new Set(prev);
+      next.add(selectedNetwork);
+      return next;
     });
-  }, []);
-
-  useEffect(() => {
-    const savedNetwork = localStorage.getItem("markets_network");
-    const savedView = localStorage.getItem("markets_view");
-
-    if (savedNetwork) {
-      const network = networkOptions.find(n => n.id === savedNetwork);
-      if (network) setSelectedNetwork(network);
-    }
-
-    if (savedView) {
-      setIsGridView(savedView === "grid");
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("markets_network", selectedNetwork.id);
   }, [selectedNetwork]);
 
-  useEffect(() => {
-    localStorage.setItem("markets_view", isGridView ? "grid" : "list");
-  }, [isGridView]);
+  const poolId = VESU_V1_POOLS["Genesis"];
+
+  const { data: supportedAssets } = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_assets_ui",
+    args: [poolId],
+    refetchInterval: 0,
+  });
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <span className="text-xl">📊</span>
-            </div>
+    <div className="container mx-auto px-5 min-h-[calc(100vh-6rem)] py-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 mb-6">
+          {/* Title & Controls Row */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-base-content">Markets Overview</h1>
-              <p className="text-base-content/70">
-                Compare DeFi lending and borrowing markets across protocols to find the best yields and rates.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-base-content/70">Networks</p>
-              <NetworkFilter
-                networks={networkOptions}
-                defaultNetwork={selectedNetwork.id}
-                onNetworkChange={networkId => {
-                  const network = networkOptions.find(option => option.id === networkId);
-                  if (network) {
-                    handleNetworkSelect(network);
-                  }
-                }}
-              />
+              <h1 className="text-2xl font-bold tracking-tight">Markets</h1>
+              <p className="text-sm text-base-content/50 mt-0.5">Compare rates across protocols</p>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/60" />
-                <input
-                  type="text"
-                  placeholder="Search by asset or protocol"
-                  className="input input-bordered pl-10 w-full md:w-64"
-                  value={searchTerm}
-                  onChange={handleSearch}
-                />
-              </div>
+              {/* View Mode Toggle (Protocol view only) */}
+              {groupMode === "protocol" && (
+                <div className="flex rounded-lg bg-base-200/50 p-0.5">
+                  <button
+                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                      viewMode === "list"
+                        ? "bg-base-100 shadow-sm text-base-content"
+                        : "text-base-content/50 hover:text-base-content/80"
+                    }`}
+                    onClick={() => setViewMode("list")}
+                    aria-label="List view"
+                  >
+                    <ListBulletIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                      viewMode === "grid"
+                        ? "bg-base-100 shadow-sm text-base-content"
+                        : "text-base-content/50 hover:text-base-content/80"
+                    }`}
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Grid view"
+                  >
+                    <Squares2X2Icon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
 
-              <div className="btn-group">
-                <button className={`btn ${isGridView ? "btn-active" : ""}`} onClick={() => setIsGridView(true)}>
-                  <Squares2X2Icon className="w-5 h-5" />
+              {/* Group Mode Toggle */}
+              <div className="flex rounded-lg bg-base-200/50 p-0.5">
+                <button
+                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                    groupMode === "token"
+                      ? "bg-base-100 shadow-sm text-base-content"
+                      : "text-base-content/50 hover:text-base-content/80"
+                  }`}
+                  onClick={() => setGroupMode("token")}
+                >
+                  By Token
                 </button>
-                <button className={`btn ${!isGridView ? "btn-active" : ""}`} onClick={() => setIsGridView(false)}>
-                  <ListBulletIcon className="w-5 h-5" />
+                <button
+                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                    groupMode === "protocol"
+                      ? "bg-base-100 shadow-sm text-base-content"
+                      : "text-base-content/50 hover:text-base-content/80"
+                  }`}
+                  onClick={() => setGroupMode("protocol")}
+                >
+                  By Protocol
                 </button>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Stable Area */}
-        <StableArea minHeight={isGridView ? "24rem" : "16rem"} />
-
-        {/* Markets */}
-        <div className="grid grid-cols-1 gap-6">
-          {protocolConfigs.map(config => {
-            const keySuffix = "chainId" in config ? `-${config.chainId}` : "";
-
-            if (config.key === "vesu") {
-              return (
-                <VesuMarkets
-                  key={config.key}
-                  viewMode={isGridView ? "grid" : "list"}
-                  search={searchTerm}
+          {/* Search & Network Filter Row */}
+          <div className="flex items-center gap-4">
+            {groupMode === "protocol" && (
+              <NetworkFilter
+                networks={networkOptions}
+                defaultNetwork={selectedNetwork}
+                onNetworkChange={handleNetworkChange}
+              />
+            )}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
+                <input
+                  type="text"
+                  placeholder="Search tokens..."
+                  className="w-full py-2 pl-10 pr-4 text-sm bg-base-200/50 border border-base-300/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-base-content/30"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
                 />
-              );
-            }
-
-            if (config.key === "nostra") {
-              return <NostraMarkets key={config.key} viewMode={isGridView ? "grid" : "list"} search={searchTerm} />;
-            }
-
-            const sharedProps = {
-              viewMode: isGridView ? "grid" : "list",
-              search: searchTerm,
-              chainId: "chainId" in config ? config.chainId : undefined,
-            } as const;
-
-            switch (config.key as ProtocolKey) {
-              case "aave":
-                return <AaveMarkets key={`${config.key}${keySuffix}`} {...sharedProps} />;
-              case "compound":
-                return <CompoundMarkets key={`${config.key}${keySuffix}`} {...sharedProps} />;
-              case "venus":
-                return <VenusMarkets key={`${config.key}${keySuffix}`} {...sharedProps} />;
-              default:
-                return null;
-            }
-          })}
-
-          <MarketsGrouped search={searchTerm} />
+              </div>
+            </div>
+          </div>
         </div>
+        {groupMode === "token" ? (
+          <StableArea as="section" minHeight="32rem" innerClassName="h-full">
+            <MarketsGrouped search={search} />
+          </StableArea>
+        ) : (
+          <div className="space-y-6">
+            {networkOptions.map(option => {
+              if (!mountedNetworks.has(option.id)) return null;
+
+              const isActive = selectedNetwork === option.id;
+              const protocols = networkProtocolMap[option.id] ?? [];
+
+              if (protocols.length === 0) return null;
+
+              return (
+                <div
+                  key={option.id}
+                  className={isActive ? "space-y-6" : "space-y-6 hidden"}
+                  aria-hidden={isActive ? undefined : true}
+                >
+                  {protocols.map(protocol => {
+                    const key: ProtocolKey = protocol.key;
+
+                    if (key === "aave" && "chainId" in protocol) {
+                      return (
+                        <StableArea
+                          key={`${option.id}-aave`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <AaveMarkets viewMode={viewMode} search={search} chainId={protocol.chainId} />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "compound" && "chainId" in protocol) {
+                      return (
+                        <StableArea
+                          key={`${option.id}-compound`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <CompoundMarkets viewMode={viewMode} search={search} chainId={protocol.chainId} />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "venus" && "chainId" in protocol) {
+                      return (
+                        <StableArea
+                          key={`${option.id}-venus`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <VenusMarkets viewMode={viewMode} search={search} chainId={protocol.chainId} />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "vesu") {
+                      return (
+                        <StableArea
+                          key={`${option.id}-vesu`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <VesuMarkets
+                            supportedAssets={supportedAssets as ContractResponse | undefined}
+                            viewMode={viewMode}
+                            search={search}
+                          />
+                        </StableArea>
+                      );
+                    }
+
+                    if (key === "nostra") {
+                      return (
+                        <StableArea
+                          key={`${option.id}-nostra`}
+                          as="section"
+                          minHeight="30rem"
+                          className="block"
+                          innerClassName="h-full"
+                        >
+                          <NostraMarkets viewMode={viewMode} search={search} />
+                        </StableArea>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
