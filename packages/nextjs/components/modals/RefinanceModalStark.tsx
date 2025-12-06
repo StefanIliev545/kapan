@@ -225,7 +225,11 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     selectedProtocol,
     selectedVersion,
     collaterals,
-    isOpen
+    isOpen,
+    {
+      vesuV1PoolId: selectedPoolId,
+      vesuV2PoolAddress: selectedV2PoolAddress,
+    }
   );
 
   const effectiveSupportedMap = starknetSupportedMap;
