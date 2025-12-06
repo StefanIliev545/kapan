@@ -538,6 +538,111 @@ export const useKapanRouterV2 = () => {
     ];
   }, [userAddress, encodeCompoundMarket]);
 
+  type BuildMultiplyFlowParams = {
+    protocolName: string;
+    collateralToken: Address;
+    debtToken: Address;
+    initialCollateral: string;
+    flashLoanAmount: string;
+    minCollateralOut: string;
+    swapData: string;
+    collateralDecimals?: number;
+    debtDecimals?: number;
+    flashLoanProvider?: FlashLoanProvider;
+    market?: Address;
+    includeRefundPush?: boolean;
+  };
+
+  /**
+   * Build a leveraged "multiply" flow using a flash loan to loop collateral:
+   * 1) Pull + deposit initial collateral
+   * 2) Flash loan the debt asset
+   * 3) Swap debt -> collateral
+   * 4) Deposit acquired collateral
+   * 5) Borrow debt to repay the flash loan
+   */
+  const buildMultiplyFlow = useCallback((params: BuildMultiplyFlowParams): ProtocolInstruction[] => {
+    if (!userAddress) return [];
+
+    const {
+      protocolName,
+      collateralToken,
+      debtToken,
+      initialCollateral,
+      flashLoanAmount,
+      minCollateralOut,
+      swapData,
+      collateralDecimals = 18,
+      debtDecimals = 18,
+      flashLoanProvider = FlashLoanProvider.BalancerV2,
+      market,
+      includeRefundPush = true,
+    } = params;
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const isCompound = normalizedProtocol === "compound";
+    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
+    const depositOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
+
+    const initialCollateralAmount = parseUnits(initialCollateral, collateralDecimals);
+    const flashAmount = parseUnits(flashLoanAmount, debtDecimals);
+    const minCollateralOutBigInt = parseUnits(minCollateralOut, collateralDecimals);
+
+    const swapContext = encodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+      [collateralToken as Address, minCollateralOutBigInt, swapData as Hex]
+    );
+
+    // Output tracking:
+    // 0. Pull initial collateral
+    // 1. Approve lending gateway for initial collateral (dummy output)
+    // 2. ToOutput flash-loan debt amount
+    // 3. FlashLoan (debt) -> repayment amount
+    // 4. Approve debt for DEX (dummy)
+    // 5. Swap debt -> collateral (output collateral)
+    // 6. Swap refund (debt) if any
+    // 7. Approve collateral for lending gateway (dummy)
+    // 8. Borrow debt equal to flash repayment (stays in router to repay)
+    // 9. Optional: Push swap refund back to user
+
+    return [
+      // 0. Pull and deposit initial collateral
+      createRouterInstruction(encodePullToken(initialCollateralAmount, collateralToken, userAddress)),
+      createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, context, 0)
+      ),
+
+      // 1. Flash loan debt token
+      createRouterInstruction(encodeToOutput(flashAmount, debtToken)),
+      createRouterInstruction(encodeFlashLoan(flashLoanProvider, 2)),
+
+      // 2. Swap debt -> collateral via OneInch
+      createRouterInstruction(encodeApprove(3, "oneinch")),
+      createProtocolInstruction(
+        "oneinch",
+        encodeLendingInstruction(LendingOp.Swap, debtToken, userAddress, 0n, swapContext as string, 3)
+      ),
+
+      // 3. Deposit the acquired collateral
+      createRouterInstruction(encodeApprove(5, normalizedProtocol)),
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, context, 5)
+      ),
+
+      // 4. Borrow debt to cover flash-loan repayment
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Borrow, debtToken, userAddress, 0n, context, 3)
+      ),
+
+      // 5. Return any swap refund to the user (debt token)
+      ...(includeRefundPush ? [createRouterInstruction(encodePushToken(6, userAddress))] : []),
+    ];
+  }, [userAddress, encodeCompoundMarket]);
+
   /**
    * Build a "close with collateral" flow using flash loan:
    * Flash loan debt -> repay debt -> withdraw collateral -> swap collateral to debt -> repay flash loan.
@@ -1443,6 +1548,7 @@ export const useKapanRouterV2 = () => {
     buildRepayFlowAsync,
     buildWithdrawFlow,
     buildCollateralSwapFlow,
+    buildMultiplyFlow,
     buildCloseWithCollateralFlow,
     buildDebtSwapFlow,
     createMoveBuilder,
