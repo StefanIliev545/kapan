@@ -3,7 +3,9 @@ import { BlockIdentifier, ProviderInterface } from "starknet";
 export class ContractClassHashCache {
   private static instance: ContractClassHashCache;
   private cache = new Map<string, string>();
+  private failedUntil = new Map<string, number>();
   private pendingRequests = new Map<string, Promise<string | undefined>>();
+  private readonly retryDelayMs = 30_000;
 
   public static getInstance(): ContractClassHashCache {
     if (!ContractClassHashCache.instance) {
@@ -21,6 +23,11 @@ export class ContractClassHashCache {
 
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
+    }
+
+    const blockedUntil = this.failedUntil.get(cacheKey);
+    if (blockedUntil && blockedUntil > Date.now()) {
+      return undefined;
     }
 
     if (this.pendingRequests.has(cacheKey)) {
@@ -54,15 +61,18 @@ export class ContractClassHashCache {
         blockIdentifier,
       );
       this.cache.set(cacheKey, classHash);
+      this.failedUntil.delete(cacheKey);
       return classHash;
     } catch (error) {
       console.error("Failed to fetch class hash:", error);
+      this.failedUntil.set(cacheKey, Date.now() + this.retryDelayMs);
       return undefined;
     }
   }
 
   public clear(): void {
     this.cache.clear();
+    this.failedUntil.clear();
     this.pendingRequests.clear();
   }
 }

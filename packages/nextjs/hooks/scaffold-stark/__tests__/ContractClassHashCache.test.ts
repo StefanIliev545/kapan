@@ -65,6 +65,46 @@ describe("ContractClassHashCache", () => {
     expect(mockProvider.getClassHashAt).toHaveBeenCalledTimes(1);
   });
 
+  it("should backoff after failures to avoid spamming provider", async () => {
+    vi.useFakeTimers();
+    const address = "0x123";
+    const expectedHash = "0xdef";
+
+    try {
+      vi.mocked(mockProvider.getClassHashAt)!.mockRejectedValueOnce(
+        new Error("API Error"),
+      );
+
+      const firstAttempt = await cache.getClassHash(
+        mockProvider as ProviderInterface,
+        address,
+      );
+
+      const secondAttempt = await cache.getClassHash(
+        mockProvider as ProviderInterface,
+        address,
+      );
+
+      expect(firstAttempt).toBeUndefined();
+      expect(secondAttempt).toBeUndefined();
+      expect(mockProvider.getClassHashAt).toHaveBeenCalledTimes(1);
+
+      vi.mocked(mockProvider.getClassHashAt)!.mockResolvedValueOnce(expectedHash);
+
+      vi.advanceTimersByTime(30_000);
+
+      const afterBackoff = await cache.getClassHash(
+        mockProvider as ProviderInterface,
+        address,
+      );
+
+      expect(afterBackoff).toBe(expectedHash);
+      expect(mockProvider.getClassHashAt).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("should deduplicate concurrent requests", async () => {
     const address = "0x123";
     const expectedHash = "0xabc";

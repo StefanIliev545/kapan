@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { useDeployedContractInfo } from "../useDeployedContractInfo";
 import { useTargetNetwork } from "../useTargetNetwork";
 import { useIsMounted } from "usehooks-ts";
-import { useProvider } from "@starknet-react/core";
+import { useAccount, useProvider } from "@starknet-react/core";
 import { RpcProvider } from "starknet";
 import { ContractClassHashCache } from "../ContractClassHashCache";
 import { ContractCodeStatus } from "~~/utils/scaffold-stark/contract";
@@ -562,6 +562,7 @@ describe("useDeployedContractInfo", () => {
     });
     (useIsMounted as Mock).mockReturnValue(mockIsMounted);
     (useProvider as Mock).mockReturnValue({ provider: mockPublicClient });
+    (useAccount as Mock).mockReturnValue({ account: undefined });
 
     ContractClassHashCache.getInstance().clear();
   });
@@ -607,6 +608,26 @@ describe("useDeployedContractInfo", () => {
     });
 
     expect(mockPublicClient.getClassHashAt).toHaveBeenCalledTimes(1);
+  });
+
+  it("should prefer the connected account provider when available", async () => {
+    mockIsMounted.mockReturnValue(true);
+    const mockWalletProvider = { getClassHashAt: vi.fn().mockResolvedValue("0xabc") };
+
+    (useAccount as Mock).mockReturnValue({ account: { provider: mockWalletProvider } });
+    mockPublicClient.getClassHashAt.mockResolvedValue("0xignored");
+
+    const { result } = renderHook(() =>
+      //@ts-ignore using ts ignore so wont error in other devices
+      useDeployedContractInfo("YourContract"),
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(ContractCodeStatus.DEPLOYED);
+    });
+
+    expect(mockWalletProvider.getClassHashAt).toHaveBeenCalledTimes(1);
+    expect(mockPublicClient.getClassHashAt).not.toHaveBeenCalled();
   });
 
   it("should not update status if component is unmounted", async () => {
