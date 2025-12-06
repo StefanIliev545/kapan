@@ -5,17 +5,19 @@ import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
-import { VESU_V1_POOLS } from "../specific/vesu/pools";
+import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV1PoolNameFromId, getV2PoolDisplay } from "../specific/vesu/pools";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
-import { formatUnits } from "viem";
-import { useAccount } from "wagmi";
+import { Abi, Address, formatUnits } from "viem";
+import { useAccount, useReadContracts } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useScaffoldReadContract as useEvmReadContract } from "~~/hooks/scaffold-eth";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCompoundMarketData } from "~~/hooks/useCompoundMarketData";
+import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
+import { arbitrum, base, linea, optimism } from "wagmi/chains";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
 
@@ -40,36 +42,80 @@ const TOKEN_ALIASES: Record<string, string> = {
 
 const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
 
-const useAaveData = (): MarketData[] => {
+const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
+  [arbitrum.id]: "arbitrum",
+  [base.id]: "base",
+  [optimism.id]: "optimism",
+  [linea.id]: "linea",
+};
+
+const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
+const ZEROLEND_CHAIN_IDS = [base.id, linea.id];
+const VENUS_CHAIN_IDS = [arbitrum.id, base.id];
+
+const useAaveLikeData = (
+  contractName: "AaveGatewayView" | "ZeroLendGatewayView",
+  protocol: MarketData["protocol"],
+  chainIds: number[],
+): MarketData[] => {
   const { address: connectedAddress } = useAccount();
-  const { data: contractInfo } = useDeployedContractInfo({ contractName: "AaveGatewayView" });
-  const queryAddress = connectedAddress || contractInfo?.address;
-  const { data: allTokensInfo } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "AaveGatewayView",
-    functionName: "getAllTokensInfo",
-    args: [queryAddress],
-  });
-  return useMemo(() => {
-    if (!allTokensInfo) return [];
-    return (allTokensInfo as any[]).map(token => {
-      const supplyAPY = convertAaveRate(token.supplyRate);
-      const borrowAPY = convertAaveRate(token.borrowRate);
-      const price = Number(formatUnits(token.price, 8));
-      const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
-      return {
-        icon: tokenNameToLogo(token.symbol),
-        name: token.symbol,
-        supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
-        borrowRate: `${formatPercentage(borrowAPY, 2, false)}%`,
-        price: price.toFixed(2),
-        utilization: utilization.toFixed(2),
-        address: token.token,
-        networkType: "evm",
-        protocol: "aave",
-      } as MarketData;
+  const contractInfos = chainIds.map(chainId =>
+    useDeployedContractInfo({ contractName: contractName as any, chainId: chainId as any }),
+  );
+
+  const contracts = useMemo(() => {
+    return chainIds.flatMap((chainId, index) => {
+      const info = contractInfos[index]?.data;
+      const queryAddress = connectedAddress || info?.address;
+      if (!info?.address || !info?.abi || !queryAddress) return [];
+      return [
+        {
+          address: info.address as Address,
+          abi: info.abi as Abi,
+          functionName: "getAllTokensInfo" as const,
+          args: [queryAddress as Address],
+          chainId,
+        },
+      ];
     });
-  }, [allTokensInfo]);
+  }, [chainIds, contractInfos, connectedAddress]);
+
+  const { data: results } = useReadContracts({
+    contracts,
+    allowFailure: true,
+    query: {
+      enabled: contracts.length > 0,
+      staleTime: 10_000,
+    },
+  });
+
+  return useMemo(() => {
+    if (!results) return [];
+
+    return results.flatMap((result, index) => {
+      if (!result || result.status !== "success" || !result.result) return [];
+      const chainId = contracts[index]?.chainId;
+      const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
+      return (result.result as any[]).map(token => {
+        const supplyAPY = convertAaveRate(token.supplyRate);
+        const borrowAPY = convertAaveRate(token.borrowRate);
+        const price = Number(formatUnits(token.price, 8));
+        const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
+        return {
+          icon: tokenNameToLogo(token.symbol),
+          name: token.symbol,
+          supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowAPY, 2, false)}%`,
+          price: price.toFixed(2),
+          utilization: utilization.toFixed(2),
+          address: token.token,
+          networkType: "evm",
+          network,
+          protocol,
+        } as MarketData;
+      });
+    });
+  }, [contracts, results]);
 };
 
 const useNostraData = (): MarketData[] => {
@@ -127,6 +173,7 @@ const useNostraData = (): MarketData[] => {
         utilization: utilization.toFixed(2),
         address,
         networkType: "starknet",
+        network: "starknet",
         protocol: "nostra",
       } as MarketData;
     });
@@ -134,28 +181,40 @@ const useNostraData = (): MarketData[] => {
 };
 
 const useVenusData = (): MarketData[] => {
-  const { data: marketDetails } = useEvmReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getAllVenusMarkets",
-  });
-  const vTokens = marketDetails?.[0];
-  const { data: ratesData } = useEvmReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getMarketRates",
-    args: [vTokens],
-  });
+  const marketDetails = VENUS_CHAIN_IDS.map(chainId =>
+    useEvmReadContract({
+      contractName: "VenusGatewayView",
+      functionName: "getAllVenusMarkets",
+      chainId: chainId as any,
+    }),
+  );
+
+  const ratesData = marketDetails.map(({ data }, index) =>
+    useEvmReadContract({
+      contractName: "VenusGatewayView",
+      functionName: "getMarketRates",
+      args: [data?.[0]],
+      chainId: VENUS_CHAIN_IDS[index] as any,
+    }),
+  );
+
   return useMemo(() => {
-    if (!marketDetails || !ratesData) return [];
-    const [, tokens, symbols, , decimals] = marketDetails as unknown as any[];
-    const [prices, supplyRates, borrowRates] = ratesData as unknown as any[];
-    return tokens
-      .map((token: string, i: number) => {
-        if (token === "0x0000000000000000000000000000000000000000") return null;
+    const aggregated: MarketData[] = [];
+
+    marketDetails.forEach(({ data }, index) => {
+      const rates = ratesData[index].data;
+      if (!data || !rates) return;
+      const [, tokens, symbols, , decimals] = data as unknown as any[];
+      const [prices, supplyRates, borrowRates] = rates as unknown as any[];
+      const network = CHAIN_ID_TO_NETWORK[VENUS_CHAIN_IDS[index]];
+
+      tokens.forEach((token: string, i: number) => {
+        if (token === "0x0000000000000000000000000000000000000000") return;
         const supplyAPY = convertVenusRate(supplyRates[i]);
         const borrowAPY = convertVenusRate(borrowRates[i]);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
         const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
-        return {
+        aggregated.push({
           icon: tokenNameToLogo(symbols[i]),
           name: symbols[i],
           supplyRate: `${formatPercentage(supplyAPY, 2, false)}%`,
@@ -164,59 +223,113 @@ const useVenusData = (): MarketData[] => {
           utilization: utilization.toFixed(2),
           address: token,
           networkType: "evm",
+          network,
           protocol: "venus",
-        } as MarketData;
-      })
-      .filter(Boolean) as MarketData[];
+        });
+      });
+    });
+
+    return aggregated;
   }, [marketDetails, ratesData]);
 };
 
 const useVesuData = (): MarketData[] => {
-  const poolId = VESU_V1_POOLS["Genesis"];
-  const { data: supportedAssets } = useScaffoldReadContract({
-    contractName: "VesuGateway",
-    functionName: "get_supported_assets_ui",
-    args: [poolId],
-    refetchInterval: 0,
-  });
+  const v1Pools = Object.entries(VESU_V1_POOLS).map(([poolName, poolId]) => ({ poolName, poolId }));
+  const v1Assets = v1Pools.map(({ poolId }) =>
+    useScaffoldReadContract({
+      contractName: "VesuGateway",
+      functionName: "get_supported_assets_ui",
+      args: [poolId],
+      refetchInterval: 0,
+    }),
+  );
+
+  const v2Pools = Object.entries(VESU_V2_POOLS).map(([poolName, address]) => ({ poolName, address }));
+  const v2Assets = v2Pools.map(({ address }) => useVesuV2Assets(address));
+  const allowDeposit = false;
+
   return useMemo(() => {
-    if (!supportedAssets) return [];
-    return (supportedAssets as unknown as ContractResponse).map(asset => {
-      const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
-      const symbol = feltToString(asset.symbol);
-      const { borrowAPR, supplyAPY } = toAnnualRates(
-        asset.fee_rate,
-        asset.total_nominal_debt,
-        asset.last_rate_accumulator,
-        asset.reserve,
-        asset.scale,
-      );
-      return {
-        icon: tokenNameToLogo(symbol.toLowerCase()),
-        name: symbol,
-        supplyRate: formatRate(supplyAPY, false),
-        borrowRate: formatRate(borrowAPR, false),
-        price: formatPrice(asset.price.value),
-        utilization: formatUtilization(asset.utilization),
-        address,
-        networkType: "starknet",
-        protocol: "vesu",
-      } as MarketData;
+    const markets: MarketData[] = [];
+
+    v1Assets.forEach(({ data }, index) => {
+      if (!data) return;
+      const poolName = getV1PoolDisplay(v1Pools[index].poolName as any).name;
+      (data as unknown as ContractResponse).forEach(asset => {
+        const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
+        const raw = typeof (asset as any).symbol === "bigint" ? feltToString((asset as any).symbol) : String((asset as any).symbol ?? "");
+        const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
+        const { borrowAPR, supplyAPY } = toAnnualRates(
+          asset.fee_rate,
+          asset.total_nominal_debt,
+          asset.last_rate_accumulator,
+          asset.reserve,
+          asset.scale,
+        );
+        markets.push({
+          icon: tokenNameToLogo(symbol.toLowerCase()),
+          name: symbol,
+          supplyRate: formatRate(supplyAPY, false),
+          borrowRate: formatRate(borrowAPR, false),
+          price: formatPrice(asset.price.value),
+          utilization: formatUtilization(asset.utilization),
+          address,
+          networkType: "starknet",
+          network: "starknet",
+          protocol: "vesu",
+          allowDeposit,
+          poolName,
+        });
+      });
     });
-  }, [supportedAssets]);
+
+    v2Assets.forEach(({ assetsWithRates }, index) => {
+      const { name: poolName } = getV2PoolDisplay(v2Pools[index].poolName as any);
+      assetsWithRates.forEach(asset => {
+        const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
+        const rawSymbol = typeof asset.symbol === "bigint" ? feltToString(asset.symbol) : String(asset.symbol ?? "");
+        const symbol = rawSymbol && rawSymbol.trim().length > 0 ? rawSymbol : getTokenNameFallback(address) ?? rawSymbol;
+        const borrowAPR = asset.borrowAPR ?? 0;
+        const supplyAPY = asset.supplyAPY ?? 0;
+        markets.push({
+          icon: tokenNameToLogo(symbol.toLowerCase()),
+          name: symbol,
+          supplyRate: formatRate(supplyAPY, false),
+          borrowRate: formatRate(borrowAPR, false),
+          price: formatPrice(asset.price?.value ?? 0n),
+          utilization: formatUtilization(asset.utilization ?? 0n),
+          address,
+          networkType: "starknet",
+          network: "starknet",
+          protocol: "vesu",
+          allowDeposit,
+          poolName,
+        });
+      });
+    });
+
+    return markets;
+  }, [v1Assets, v1Pools, v2Assets, v2Pools]);
 };
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
-  const aave = useAaveData();
-  const compound = useCompoundMarketData();
+  const aave = useAaveLikeData("AaveGatewayView", "aave", AAVE_CHAIN_IDS);
+  const zerolend = useAaveLikeData("ZeroLendGatewayView", "zerolend", ZEROLEND_CHAIN_IDS);
+  const compoundArbitrum = useCompoundMarketData({ chainId: arbitrum.id });
+  const compoundBase = useCompoundMarketData({ chainId: base.id });
+  const compoundOptimism = useCompoundMarketData({ chainId: optimism.id });
+  const compoundLinea = useCompoundMarketData({ chainId: linea.id });
+  const compound = useMemo(
+    () => [...compoundArbitrum, ...compoundBase, ...compoundOptimism, ...compoundLinea],
+    [compoundArbitrum, compoundBase, compoundOptimism, compoundLinea],
+  );
   const nostra = useNostraData();
   const venus = useVenusData();
   const vesu = useVesuData();
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
 
   const all = useMemo(
-    () => [...aave, ...compound, ...nostra, ...venus, ...vesu],
-    [aave, compound, nostra, venus, vesu],
+    () => [...aave, ...zerolend, ...compound, ...nostra, ...venus, ...vesu],
+    [aave, zerolend, compound, nostra, venus, vesu],
   );
 
   const groups = useMemo(() => {
@@ -279,30 +392,38 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     });
   };
 
-  const networkIcons: Record<"evm" | "starknet", string> = {
-    evm: "/logos/arb.svg",
+  const networkIcons: Record<MarketData["network"], string> = {
+    arbitrum: "/logos/arb.svg",
+    base: "/logos/base.svg",
+    optimism: "/logos/optimism.svg",
+    linea: "/logos/linea.svg",
     starknet: "/logos/starknet.svg",
   };
 
-  const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
+  const protocolIcons: Record<MarketData["protocol"], string> = {
     aave: "/logos/aave.svg",
     nostra: "/logos/nostra.svg",
     venus: "/logos/venus.svg",
     vesu: "/logos/vesu.svg",
     compound: "/logos/compound.svg",
+    zerolend: "/logos/zerolend.svg",
   };
 
-  const networkNames: Record<"evm" | "starknet", string> = {
-    evm: "Arbitrum",
+  const networkNames: Record<MarketData["network"], string> = {
+    arbitrum: "Arbitrum",
+    base: "Base",
+    optimism: "Optimism",
+    linea: "Linea",
     starknet: "Starknet",
   };
 
-  const protocolNames: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
+  const protocolNames: Record<MarketData["protocol"], string> = {
     aave: "Aave",
     nostra: "Nostra",
     venus: "Venus",
     vesu: "Vesu",
     compound: "Compound",
+    zerolend: "ZeroLend",
   };
 
   return (
@@ -367,6 +488,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                       rate={group.bestSupply.supplyRate}
                       networkType={group.bestSupply.networkType}
                       protocol={group.bestSupply.protocol}
+                      poolName={group.bestSupply.poolName}
                     />
                     <RatePill
                       variant="borrow"
@@ -374,6 +496,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                       rate={group.bestBorrow.borrowRate}
                       networkType={group.bestBorrow.networkType}
                       protocol={group.bestBorrow.protocol}
+                      poolName={group.bestBorrow.poolName}
                     />
                   </div>
 
@@ -434,15 +557,18 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 relative">
-                          <Image src={networkIcons[m.networkType]} alt={m.networkType} fill className="object-contain" />
+                          <Image src={networkIcons[m.network]} alt={m.network} fill className="object-contain" />
                         </div>
-                        <span className="text-sm font-medium">{networkNames[m.networkType]}</span>
+                        <span className="text-sm font-medium">{networkNames[m.network]}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 relative">
                           <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="object-contain rounded" />
                         </div>
-                        <span className="text-sm font-medium">{protocolNames[m.protocol]}</span>
+                        <span className="text-sm font-medium">
+                          {protocolNames[m.protocol]}
+                          {m.poolName ? ` • ${m.poolName}` : ""}
+                        </span>
                       </div>
                       <div className="text-center">
                         <span className="text-sm font-mono font-medium tabular-nums text-base-content/70">{m.utilization}%</span>

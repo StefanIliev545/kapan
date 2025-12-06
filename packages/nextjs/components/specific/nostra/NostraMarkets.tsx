@@ -59,6 +59,7 @@ export const NostraMarkets: FC<NostraMarketsProps> = ({ viewMode, search }) => {
         utilization: utilization.toFixed(2),
         address,
         networkType: "starknet",
+        network: "starknet",
         protocol: "nostra",
       } as MarketData;
     });

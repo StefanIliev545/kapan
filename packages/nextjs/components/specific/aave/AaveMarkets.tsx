@@ -10,6 +10,13 @@ import formatPercentage from "~~/utils/formatPercentage";
 // Helper: Convert Aave RAY (1e27) rates to APY percentage
 const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 
+const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
+  42161: "arbitrum",
+  8453: "base",
+  10: "optimism",
+  59144: "linea",
+};
+
 interface AaveMarketsProps {
   viewMode: "list" | "grid";
   search: string;
@@ -31,6 +38,7 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
 
   const markets: MarketData[] = useMemo(() => {
     if (!allTokensInfo) return [];
+    const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
     return (allTokensInfo as any[]).map(token => {
       const supplyAPY = convertRateToAPY(token.supplyRate);
       const borrowAPY = convertRateToAPY(token.borrowRate);
@@ -45,10 +53,11 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
         utilization: utilization.toFixed(2),
         address: token.token,
         networkType: "evm",
+        network,
         protocol: "aave",
       } as MarketData;
     });
-  }, [allTokensInfo]);
+  }, [allTokensInfo, chainId]);
 
   return <MarketsSection title="Aave Markets" markets={markets} viewMode={viewMode} search={search} />;
 };

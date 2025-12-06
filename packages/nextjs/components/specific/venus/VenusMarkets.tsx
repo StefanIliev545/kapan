@@ -25,6 +25,11 @@ const getTokenDisplay = (tokenAddress: string, originalSymbol: string) => {
   return override ? { displayName: override.name, logo: override.logo } : { displayName: originalSymbol, logo: tokenNameToLogo(originalSymbol) };
 };
 
+const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
+  42161: "arbitrum",
+  8453: "base",
+};
+
 interface VenusMarketsProps {
   viewMode: "list" | "grid";
   search: string;
@@ -49,6 +54,7 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId 
 
   const markets: MarketData[] = useMemo(() => {
     if (!marketDetails || !ratesData) return [];
+    const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
     const [, tokens, symbols, , decimals] = marketDetails as unknown as any[];
     const [prices, supplyRates, borrowRates] = ratesData as unknown as any[];
     return tokens
@@ -68,11 +74,12 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId 
           utilization: utilization.toFixed(2),
           address: token,
           networkType: "evm",
+          network,
           protocol: "venus",
         } as MarketData;
       })
       .filter(Boolean) as MarketData[];
-  }, [marketDetails, ratesData]);
+  }, [marketDetails, ratesData, chainId]);
 
   return <MarketsSection title="Venus Markets" markets={markets} viewMode={viewMode} search={search} />;
 };

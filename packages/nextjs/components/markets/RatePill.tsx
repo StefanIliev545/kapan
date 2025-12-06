@@ -6,21 +6,23 @@ interface RatePillProps {
   label: string;
   rate: string;
   networkType: "evm" | "starknet";
-  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
+  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound" | "zerolend";
   showIcons?: boolean;
+  poolName?: string;
 }
 
-const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
+const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound" | "zerolend", string> = {
   aave: "/logos/aave.svg",
   nostra: "/logos/nostra.svg",
   venus: "/logos/venus.svg",
   vesu: "/logos/vesu.svg",
   compound: "/logos/compound.svg",
+  zerolend: "/logos/zerolend.svg",
 };
 
-export const RatePill: FC<RatePillProps> = ({ variant, rate, protocol, showIcons = true }) => {
+export const RatePill: FC<RatePillProps> = ({ variant, rate, protocol, showIcons = true, poolName }) => {
   const isSupply = variant === "supply";
-  
+
   return (
     <div className="flex flex-col items-center gap-1">
       {/* Label */}
@@ -41,6 +43,9 @@ export const RatePill: FC<RatePillProps> = ({ variant, rate, protocol, showIcons
           </div>
         )}
       </div>
+      {poolName && (
+        <span className="text-[10px] text-base-content/50 leading-none">{poolName}</span>
+      )}
     </div>
   );
 };

@@ -13,6 +13,8 @@ type MarketRowProps = {
   address: string;
   networkType: "evm" | "starknet";
   protocol: string;
+  network: "arbitrum" | "base" | "optimism" | "linea" | "starknet";
+  poolName?: string;
   allowDeposit?: boolean;
 };
 
