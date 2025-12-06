@@ -50,6 +50,7 @@ export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, s
         utilization: formatUtilization(asset.utilization),
         address,
         networkType: "starknet",
+        network: "starknet",
         protocol: "vesu",
         allowDeposit,
       } as MarketData;

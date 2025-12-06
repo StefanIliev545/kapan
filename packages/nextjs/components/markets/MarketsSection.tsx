@@ -11,8 +11,10 @@ export interface MarketData {
   utilization: string;
   address: string;
   networkType: "evm" | "starknet";
-  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
+  network: "arbitrum" | "base" | "optimism" | "linea" | "starknet";
+  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound" | "zerolend";
   allowDeposit?: boolean;
+  poolName?: string;
 }
 
 interface MarketsSectionProps {

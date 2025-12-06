@@ -4,11 +4,19 @@ import { useReadContracts } from "wagmi";
 import { MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useSelectedNetwork } from "~~/hooks/scaffold-eth/useSelectedNetwork";
 import formatPercentage from "~~/utils/formatPercentage";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
 const RATE_SCALE = 1e18;
+
+const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
+  42161: "arbitrum",
+  8453: "base",
+  10: "optimism",
+  59144: "linea",
+};
 
 const convertRateToApr = (ratePerSecond: bigint): number =>
   (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / RATE_SCALE;
@@ -18,13 +26,17 @@ type UseCompoundMarketDataParams = {
 };
 
 export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams = {}): MarketData[] => {
-  const { data: weth } = useDeployedContractInfo({ contractName: "eth", chainId: chainId as any });
-  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC", chainId: chainId as any });
-  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT", chainId: chainId as any });
-  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe", chainId: chainId as any });
+  const selectedNetwork = useSelectedNetwork(chainId as any);
+  const resolvedChainId = chainId ?? selectedNetwork.id;
+  const network = CHAIN_ID_TO_NETWORK[resolvedChainId] ?? "arbitrum";
+
+  const { data: weth } = useDeployedContractInfo({ contractName: "eth", chainId: resolvedChainId as any });
+  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC", chainId: resolvedChainId as any });
+  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT", chainId: resolvedChainId as any });
+  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe", chainId: resolvedChainId as any });
   const { data: compoundGateway } = useDeployedContractInfo({
     contractName: "CompoundGatewayView",
-    chainId: chainId as any,
+    chainId: resolvedChainId as any,
   });
 
   const baseTokens = useMemo(
@@ -59,9 +71,9 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
     return preparedTokens.map(token => ({
       ...contractBase,
       args: [token.address, ZERO_ADDRESS] as const,
-      ...(chainId ? { chainId } : {}),
+      ...(resolvedChainId ? { chainId: resolvedChainId } : {}),
     }));
-  }, [compoundGateway?.address, compoundGateway?.abi, preparedTokens, chainId]);
+  }, [compoundGateway?.address, compoundGateway?.abi, preparedTokens, resolvedChainId]);
 
   const { data: results } = useReadContracts({
     contracts,
@@ -105,10 +117,11 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
           utilization: utilization.toFixed(2),
           address: token.address,
           networkType: "evm",
+          network,
           protocol: "compound",
         } satisfies MarketData,
       ];
     });
-  }, [preparedTokens, results]);
+  }, [preparedTokens, results, network]);
 };
 
