@@ -7,9 +7,6 @@ import dynamic from "next/dynamic";
 import Spinner from "~~/components/common/Spinner";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
-import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
-import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import StableArea from "~~/components/common/StableArea";
 import { arbitrum, base, linea, optimism } from "wagmi/chains";
 
@@ -85,16 +82,7 @@ const MarketsPageContent: NextPage = () => {
   const [isGridView, setIsGridView] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: vesuPools } = useScaffoldReadContract<ContractResponse>({
-    contractName: "VesuAggregator",
-    functionName: "getAllPools",
-  });
-
-  const vesuPoolsData = vesuPools || VESU_V1_POOLS;
-
   const protocolConfigs = networkProtocolMap[selectedNetwork.id] || [];
-
-  const selectedProtocols = protocolConfigs.map(config => config.key);
 
   const handleNetworkSelect = useCallback((network: NetworkOption) => {
     startTransition(() => setSelectedNetwork(network));
@@ -148,7 +136,16 @@ const MarketsPageContent: NextPage = () => {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-2">
               <p className="text-sm text-base-content/70">Networks</p>
-              <NetworkFilter options={networkOptions} selected={selectedNetwork} onSelect={handleNetworkSelect} />
+              <NetworkFilter
+                networks={networkOptions}
+                defaultNetwork={selectedNetwork.id}
+                onNetworkChange={networkId => {
+                  const network = networkOptions.find(option => option.id === networkId);
+                  if (network) {
+                    handleNetworkSelect(network);
+                  }
+                }}
+              />
             </div>
 
             <div className="flex items-center gap-3">
@@ -176,34 +173,46 @@ const MarketsPageContent: NextPage = () => {
         </div>
 
         {/* Stable Area */}
-        <StableArea isGridView={isGridView} />
+        <StableArea minHeight={isGridView ? "24rem" : "16rem"} />
 
         {/* Markets */}
         <div className="grid grid-cols-1 gap-6">
           {protocolConfigs.map(config => {
+            const keySuffix = "chainId" in config ? `-${config.chainId}` : "";
+
             if (config.key === "vesu") {
-              return <VesuMarkets key={config.key} isGridView={isGridView} pools={vesuPoolsData} />;
+              return (
+                <VesuMarkets
+                  key={config.key}
+                  viewMode={isGridView ? "grid" : "list"}
+                  search={searchTerm}
+                />
+              );
             }
 
             if (config.key === "nostra") {
-              return <NostraMarkets key={config.key} isGridView={isGridView} />;
+              return <NostraMarkets key={config.key} viewMode={isGridView ? "grid" : "list"} search={searchTerm} />;
             }
 
-            const sharedProps = { isGridView, chainId: "chainId" in config ? config.chainId : undefined } as const;
+            const sharedProps = {
+              viewMode: isGridView ? "grid" : "list",
+              search: searchTerm,
+              chainId: "chainId" in config ? config.chainId : undefined,
+            } as const;
 
             switch (config.key as ProtocolKey) {
               case "aave":
-                return <AaveMarkets key={`${config.key}-${config.chainId}`} {...sharedProps} />;
+                return <AaveMarkets key={`${config.key}${keySuffix}`} {...sharedProps} />;
               case "compound":
-                return <CompoundMarkets key={`${config.key}-${config.chainId}`} {...sharedProps} />;
+                return <CompoundMarkets key={`${config.key}${keySuffix}`} {...sharedProps} />;
               case "venus":
-                return <VenusMarkets key={`${config.key}-${config.chainId}`} {...sharedProps} />;
+                return <VenusMarkets key={`${config.key}${keySuffix}`} {...sharedProps} />;
               default:
                 return null;
             }
           })}
 
-          <MarketsGrouped selectedProtocols={selectedProtocols} searchTerm={searchTerm} isGridView={isGridView} />
+          <MarketsGrouped search={searchTerm} />
         </div>
       </div>
     </div>

@@ -17,9 +17,13 @@ const mdxComponents = {
   a: (props: any) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
 };
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     const post = getPostData(slug);
 
     return {
@@ -40,9 +44,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default async function BlogPostPage({ params }: { params: { slug: string } }) {
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     const post = getPostData(slug);
     const allPosts = getSortedPostsData();
     const relatedPosts = allPosts
