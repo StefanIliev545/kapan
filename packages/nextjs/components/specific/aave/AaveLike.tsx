@@ -10,7 +10,7 @@ import { useGlobalState } from "~~/services/store/store";
 
 interface AaveLikeProps {
   chainId?: number;
-  contractName: "AaveGatewayView" | "ZeroLendGatewayView";
+  contractName: "AaveGatewayView" | "ZeroLendGatewayView" | "EulerGatewayView";
   children: (props: {
     suppliedPositions: ProtocolPosition[];
     borrowedPositions: ProtocolPosition[];
@@ -129,7 +129,12 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
       0,
     );
 
-    const protoName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : "Aave";
+    const protoName =
+      contractName === "ZeroLendGatewayView"
+        ? "ZeroLend"
+        : contractName === "EulerGatewayView"
+          ? "Euler"
+          : "Aave";
     setProtocolTotals(protoName, totalSupplied, totalBorrowed);
   }, [allTokensInfo, contractName, filteredBorrowedPositions, filteredSuppliedPositions, setProtocolTotals]);
 

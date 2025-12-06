@@ -107,7 +107,70 @@ const externalContracts = {
       logo: "/logos/ethereum.svg",
       richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
     },
-  },
+    EulerGatewayView: {
+      address: "0x0000000000000000000000000000000000000000",
+      abi: [
+        {
+          inputs: [],
+          name: "allVaults",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAllTokensInfo",
+          outputs: [
+            {
+              components: [
+                { internalType: "address", name: "token", type: "address" },
+                { internalType: "address", name: "vault", type: "address" },
+                { internalType: "uint256", name: "supplyRate", type: "uint256" },
+                { internalType: "uint256", name: "borrowRate", type: "uint256" },
+                { internalType: "string", name: "name", type: "string" },
+                { internalType: "string", name: "symbol", type: "string" },
+                { internalType: "uint256", name: "price", type: "uint256" },
+                { internalType: "uint256", name: "borrowBalance", type: "uint256" },
+                { internalType: "uint256", name: "balance", type: "uint256" },
+                { internalType: "uint8", name: "decimals", type: "uint8" },
+              ],
+              internalType: "struct EulerGatewayView.TokenInfo[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getAllEulerMarkets",
+          outputs: [
+            { internalType: "address[]", name: "vaults", type: "address[]" },
+            { internalType: "address[]", name: "tokens", type: "address[]" },
+            { internalType: "string[]", name: "symbols", type: "string[]" },
+            { internalType: "uint8[]", name: "decimals_", type: "uint8[]" },
+            { internalType: "uint256[]", name: "prices", type: "uint256[]" },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        ],
+        logo: "/logos/euler.svg",
+      },
+    },
   31337: {
     USDC: {
       address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
@@ -213,6 +276,69 @@ const externalContracts = {
       ],
       logo: "/logos/ethereum.svg",
       richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+    },
+    EulerGatewayView: {
+      address: "0x0000000000000000000000000000000000000000",
+      abi: [
+        {
+          inputs: [],
+          name: "allVaults",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAllTokensInfo",
+          outputs: [
+            {
+              components: [
+                { internalType: "address", name: "token", type: "address" },
+                { internalType: "address", name: "vault", type: "address" },
+                { internalType: "uint256", name: "supplyRate", type: "uint256" },
+                { internalType: "uint256", name: "borrowRate", type: "uint256" },
+                { internalType: "string", name: "name", type: "string" },
+                { internalType: "string", name: "symbol", type: "string" },
+                { internalType: "uint256", name: "price", type: "uint256" },
+                { internalType: "uint256", name: "borrowBalance", type: "uint256" },
+                { internalType: "uint256", name: "balance", type: "uint256" },
+                { internalType: "uint8", name: "decimals", type: "uint8" },
+              ],
+              internalType: "struct EulerGatewayView.TokenInfo[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getAllEulerMarkets",
+          outputs: [
+            { internalType: "address[]", name: "vaults", type: "address[]" },
+            { internalType: "address[]", name: "tokens", type: "address[]" },
+            { internalType: "string[]", name: "symbols", type: "string[]" },
+            { internalType: "uint8[]", name: "decimals_", type: "uint8[]" },
+            { internalType: "uint256[]", name: "prices", type: "uint256[]" },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      logo: "/logos/euler.svg",
     },
   },
 } as const;
