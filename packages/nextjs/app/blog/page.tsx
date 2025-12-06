@@ -2,14 +2,20 @@ import type { Metadata } from "next";
 import React from "react";
 import BlogContent from "./BlogContent";
 import { getSortedPostsData } from "~~/utils/blog";
+import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
-export const metadata: Metadata = {
-  title: "Kapan Finance Blog | DeFi Lending Guides and Updates",
-  description: "Read the latest DeFi lending insights, tutorials, and news from the Kapan Finance team.",
-  alternates: {
-    canonical: "https://kapan.finance/blog",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...getMetadata({
+      title: "Blog",
+      description:
+        "DeFi lending insights and Kapan Finance updates. Explore articles on optimizing borrowing costs, interest rates, and more.",
+    }),
+    alternates: {
+      canonical: "https://kapan.finance/blog",
+    },
+  };
+}
 
 export default function BlogPage() {
   // Get all blog posts using the utility function

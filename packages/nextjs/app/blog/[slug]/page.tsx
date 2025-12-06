@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import BlogPostContent from "./BlogPostContent";
 import { getPostData, getSortedPostsData } from "~~/utils/blog";
+import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 // Custom MDX components
 const mdxComponents = {
@@ -25,16 +26,23 @@ export async function generateMetadata({
   try {
     const { slug } = await params;
     const post = getPostData(slug);
+    const description =
+      post.excerpt || post.content?.slice(0, 155) || "Read the latest insights from Kapan Finance.";
+    const imageRelativePath =
+      typeof post.coverImage === "string" ? post.coverImage : post.coverImage?.src ?? "/thumbnail.png";
+    const baseMetadata = getMetadata({
+      title: post.title || "Kapan Finance Blog Post",
+      description,
+      imageRelativePath,
+    });
 
     return {
-      title: `${post.title} | Kapan Finance Blog`,
-      description: post.excerpt,
+      ...baseMetadata,
       alternates: {
         canonical: `https://kapan.finance/blog/${slug}`,
       },
       openGraph: {
-        title: `${post.title} | Kapan Finance Blog`,
-        description: post.excerpt,
+        ...baseMetadata.openGraph,
         url: `https://kapan.finance/blog/${slug}`,
         type: "article",
       },
@@ -56,12 +64,33 @@ export default async function BlogPostPage({
     const relatedPosts = allPosts
       .filter(p => p.slug !== slug)
       .slice(0, 3);
-    
+
     const content = post.content ? (
       <MDXRemote source={post.content} components={mdxComponents} />
     ) : null;
-    
-    return <BlogPostContent post={post} relatedPosts={relatedPosts} content={content} />;
+
+    const articleSchema = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: post.title,
+      datePublished: post.date,
+      description: post.excerpt,
+      url: `https://kapan.finance/blog/${post.slug}`,
+      image:
+        typeof post.coverImage === "string"
+          ? post.coverImage
+          : post.coverImage?.src ?? "https://kapan.finance/thumbnail.png",
+    };
+
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") }}
+        />
+        <BlogPostContent post={post} relatedPosts={relatedPosts} content={content} />
+      </>
+    );
   } catch (error) {
     console.error("Error loading post:", error);
     return notFound();

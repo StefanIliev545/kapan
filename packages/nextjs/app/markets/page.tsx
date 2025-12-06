@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import MarketsPageContent from "./MarketsPageContent";
+import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
-export const metadata: Metadata = {
-  title: "Kapan Markets – Compare DeFi Lending Rates | Kapan Finance",
-  description: "Explore DeFi lending and borrowing markets across protocols to find optimal rates with Kapan Finance.",
-  alternates: {
-    canonical: "https://kapan.finance/markets",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...getMetadata({
+      title: "Markets",
+      description: "Compare DeFi lending and borrowing rates across protocols and networks in real time.",
+    }),
+    alternates: {
+      canonical: "https://kapan.finance/markets",
+    },
+  };
+}
 
 const MarketsPage = () => {
   return <MarketsPageContent />;
