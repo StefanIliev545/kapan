@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ContractClassHashCache } from "./ContractClassHashCache";
 import { useTargetNetwork } from "./useTargetNetwork";
 import { useAccount, useProvider } from "@starknet-react/core";
-import { BlockIdentifier } from "starknet";
+import { AccountInterface, BlockIdentifier, ProviderInterface } from "starknet";
 import { useIsMounted } from "usehooks-ts";
 import { Contract, ContractCodeStatus, ContractName, contracts } from "~~/utils/scaffold-stark/contract";
 
@@ -15,6 +15,10 @@ export const useDeployedContractInfo = <TContractName extends ContractName>(cont
   const [status, setStatus] = useState<ContractCodeStatus>(ContractCodeStatus.LOADING);
   const { provider: publicClient } = useProvider();
   const { account } = useAccount();
+  const accountProvider =
+    account && "provider" in account
+      ? (account as AccountInterface & { provider?: ProviderInterface }).provider
+      : undefined;
 
   useEffect(() => {
     const checkContractDeployment = async () => {
@@ -27,9 +31,7 @@ export const useDeployedContractInfo = <TContractName extends ContractName>(cont
 
       const providersToTry = [
         { provider: publicClient, scope: "primary" },
-        ...(account?.provider
-          ? [{ provider: account.provider, scope: "account" as const }]
-          : []),
+        ...(accountProvider ? [{ provider: accountProvider, scope: "account" as const }] : []),
       ];
 
       let contractClassHash: string | undefined;
