@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import BlogPostContent from "./BlogPostContent";
@@ -16,9 +17,32 @@ const mdxComponents = {
   a: (props: any) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
 };
 
-export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   try {
-    const { slug } = await params;
+    const { slug } = params;
+    const post = getPostData(slug);
+
+    return {
+      title: `${post.title} | Kapan Finance Blog`,
+      description: post.excerpt,
+      alternates: {
+        canonical: `https://kapan.finance/blog/${slug}`,
+      },
+      openGraph: {
+        title: `${post.title} | Kapan Finance Blog`,
+        description: post.excerpt,
+        url: `https://kapan.finance/blog/${slug}`,
+        type: "article",
+      },
+    };
+  } catch {
+    return {};
+  }
+}
+
+export default async function BlogPostPage({ params }: { params: { slug: string } }) {
+  try {
+    const { slug } = params;
     const post = getPostData(slug);
     const allPosts = getSortedPostsData();
     const relatedPosts = allPosts

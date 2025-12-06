@@ -1,32 +1,17 @@
-"use client";
+import type { Metadata } from "next";
+import InfoPageContent from "./InfoPageContent";
 
-import React from "react";
-import BenefitsSection from "~~/components/info/BenefitsSection";
-import ContractsSection from "~~/components/info/ContractsSection";
-import FeaturesSection from "~~/components/info/FeaturesSection";
-import Footer from "~~/components/info/Footer";
-import Header from "~~/components/info/Header";
-import HowItWorksSection from "~~/components/info/HowItWorksSection";
-import RevolutionSection from "~~/components/info/RevolutionSection";
-import RoadmapSection from "~~/components/info/RoadmapSection";
-import AuditSection from "~~/components/info/AuditSection";
-import KeyFeaturesSection from "~~/components/info/KeyFeaturesSection";
+export const metadata: Metadata = {
+  title: "Kapan Info – DeFi Lending Aggregator Overview | Kapan Finance",
+  description:
+    "Learn how Kapan Finance optimizes DeFi lending with atomic debt migration, automation, and cross-protocol refinancing tools.",
+  alternates: {
+    canonical: "https://kapan.finance/info",
+  },
+};
 
 const InfoPage = () => {
-  return (
-    <div className="container mx-auto px-5 py-8">
-      <Header />
-      <KeyFeaturesSection />
-      <FeaturesSection />
-      <HowItWorksSection />
-      <BenefitsSection />
-      <RoadmapSection />
-      <ContractsSection />
-      <AuditSection />
-      <RevolutionSection />
-      <Footer />
-    </div>
-  );
+  return <InfoPageContent />;
 };
 
 export default InfoPage;
