@@ -1,8 +1,18 @@
+import type { Metadata } from "next";
 import React from "react";
+import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
-export const metadata = {
-  title: "Privacy Policy | Kapan Finance",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...getMetadata({
+      title: "Privacy Policy",
+      description: "Review the Kapan Finance privacy policy and learn how we protect your data.",
+    }),
+    alternates: {
+      canonical: "/privacy",
+    },
+  };
+}
 
 const PrivacyPage = () => {
   return (
