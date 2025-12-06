@@ -610,12 +610,12 @@ describe("useDeployedContractInfo", () => {
     expect(mockPublicClient.getClassHashAt).toHaveBeenCalledTimes(1);
   });
 
-  it("should prefer the connected account provider when available", async () => {
+  it("should fall back to the connected account provider when the public provider fails", async () => {
     mockIsMounted.mockReturnValue(true);
     const mockWalletProvider = { getClassHashAt: vi.fn().mockResolvedValue("0xabc") };
 
     (useAccount as Mock).mockReturnValue({ account: { provider: mockWalletProvider } });
-    mockPublicClient.getClassHashAt.mockResolvedValue("0xignored");
+    mockPublicClient.getClassHashAt.mockRejectedValue(new Error("primary down"));
 
     const { result } = renderHook(() =>
       //@ts-ignore using ts ignore so wont error in other devices
@@ -626,8 +626,8 @@ describe("useDeployedContractInfo", () => {
       expect(result.current.status).toBe(ContractCodeStatus.DEPLOYED);
     });
 
+    expect(mockPublicClient.getClassHashAt).toHaveBeenCalledTimes(1);
     expect(mockWalletProvider.getClassHashAt).toHaveBeenCalledTimes(1);
-    expect(mockPublicClient.getClassHashAt).not.toHaveBeenCalled();
   });
 
   it("should not update status if component is unmounted", async () => {

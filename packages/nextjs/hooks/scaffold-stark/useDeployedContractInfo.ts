@@ -24,11 +24,27 @@ export const useDeployedContractInfo = <TContractName extends ContractName>(cont
       }
 
       const classHashCache = ContractClassHashCache.getInstance();
-      const contractClassHash = await classHashCache.getClassHash(
-        account?.provider ?? publicClient,
-        deployedContract.address,
-        "latest" as BlockIdentifier,
-      );
+
+      const providersToTry = [
+        { provider: publicClient, scope: "primary" },
+        ...(account?.provider
+          ? [{ provider: account.provider, scope: "account" as const }]
+          : []),
+      ];
+
+      let contractClassHash: string | undefined;
+      for (const { provider, scope } of providersToTry) {
+        contractClassHash = await classHashCache.getClassHash(
+          provider,
+          deployedContract.address,
+          "latest" as BlockIdentifier,
+          scope,
+        );
+
+        if (contractClassHash !== undefined) {
+          break;
+        }
+      }
 
       if (!isMounted()) {
         return;
