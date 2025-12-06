@@ -5,7 +5,7 @@ import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
-import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV1PoolNameFromId, getV2PoolDisplay } from "../specific/vesu/pools";
+import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV2PoolDisplay } from "../specific/vesu/pools";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
 import { Abi, Address, formatUnits } from "viem";
@@ -59,13 +59,22 @@ const useAaveLikeData = (
   chainIds: number[],
 ): MarketData[] => {
   const { address: connectedAddress } = useAccount();
-  const contractInfos = chainIds.map(chainId =>
-    useDeployedContractInfo({ contractName: contractName as any, chainId: chainId as any }),
-  );
+
+  const arbInfo = useDeployedContractInfo({ contractName: contractName as any, chainId: arbitrum.id as any });
+  const baseInfo = useDeployedContractInfo({ contractName: contractName as any, chainId: base.id as any });
+  const optInfo = useDeployedContractInfo({ contractName: contractName as any, chainId: optimism.id as any });
+  const lineaInfo = useDeployedContractInfo({ contractName: contractName as any, chainId: linea.id as any });
 
   const contracts = useMemo(() => {
-    return chainIds.flatMap((chainId, index) => {
-      const info = contractInfos[index]?.data;
+    const entries: { chainId: number; data: typeof arbInfo.data }[] = [
+      { chainId: arbitrum.id, data: arbInfo.data },
+      { chainId: base.id, data: baseInfo.data },
+      { chainId: optimism.id, data: optInfo.data },
+      { chainId: linea.id, data: lineaInfo.data },
+    ].filter(entry => chainIds.includes(entry.chainId));
+
+    return entries.flatMap(entry => {
+      const info = entry.data;
       const queryAddress = connectedAddress || info?.address;
       if (!info?.address || !info?.abi || !queryAddress) return [];
       return [
@@ -74,11 +83,11 @@ const useAaveLikeData = (
           abi: info.abi as Abi,
           functionName: "getAllTokensInfo" as const,
           args: [queryAddress as Address],
-          chainId,
+          chainId: entry.chainId,
         },
       ];
     });
-  }, [chainIds, contractInfos, connectedAddress]);
+  }, [arbInfo.data, baseInfo.data, lineaInfo.data, optInfo.data, chainIds, connectedAddress]);
 
   const { data: results } = useReadContracts({
     contracts,
@@ -115,7 +124,7 @@ const useAaveLikeData = (
         } as MarketData;
       });
     });
-  }, [contracts, results]);
+  }, [contracts, protocol, results]);
 };
 
 const useNostraData = (): MarketData[] => {
@@ -181,32 +190,42 @@ const useNostraData = (): MarketData[] => {
 };
 
 const useVenusData = (): MarketData[] => {
-  const marketDetails = VENUS_CHAIN_IDS.map(chainId =>
-    useEvmReadContract({
-      contractName: "VenusGatewayView",
-      functionName: "getAllVenusMarkets",
-      chainId: chainId as any,
-    }),
-  );
+  const venusArbMarkets = useEvmReadContract({
+    contractName: "VenusGatewayView",
+    functionName: "getAllVenusMarkets",
+    chainId: arbitrum.id as any,
+  });
+  const venusBaseMarkets = useEvmReadContract({
+    contractName: "VenusGatewayView",
+    functionName: "getAllVenusMarkets",
+    chainId: base.id as any,
+  });
 
-  const ratesData = marketDetails.map(({ data }, index) =>
-    useEvmReadContract({
-      contractName: "VenusGatewayView",
-      functionName: "getMarketRates",
-      args: [data?.[0]],
-      chainId: VENUS_CHAIN_IDS[index] as any,
-    }),
-  );
+  const venusArbRates = useEvmReadContract({
+    contractName: "VenusGatewayView",
+    functionName: "getMarketRates",
+    args: [venusArbMarkets.data?.[0]],
+    chainId: arbitrum.id as any,
+  });
+  const venusBaseRates = useEvmReadContract({
+    contractName: "VenusGatewayView",
+    functionName: "getMarketRates",
+    args: [venusBaseMarkets.data?.[0]],
+    chainId: base.id as any,
+  });
 
   return useMemo(() => {
     const aggregated: MarketData[] = [];
+    const marketEntries = [
+      { markets: venusArbMarkets.data, rates: venusArbRates.data, chainId: arbitrum.id },
+      { markets: venusBaseMarkets.data, rates: venusBaseRates.data, chainId: base.id },
+    ];
 
-    marketDetails.forEach(({ data }, index) => {
-      const rates = ratesData[index].data;
-      if (!data || !rates) return;
-      const [, tokens, symbols, , decimals] = data as unknown as any[];
+    marketEntries.forEach(({ markets, rates, chainId }) => {
+      if (!markets || !rates) return;
+      const [, tokens, symbols, , decimals] = markets as unknown as any[];
       const [prices, supplyRates, borrowRates] = rates as unknown as any[];
-      const network = CHAIN_ID_TO_NETWORK[VENUS_CHAIN_IDS[index]];
+      const network = CHAIN_ID_TO_NETWORK[chainId];
 
       tokens.forEach((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return;
@@ -230,22 +249,59 @@ const useVenusData = (): MarketData[] => {
     });
 
     return aggregated;
-  }, [marketDetails, ratesData]);
+  }, [venusArbMarkets.data, venusArbRates.data, venusBaseMarkets.data, venusBaseRates.data]);
 };
 
 const useVesuData = (): MarketData[] => {
-  const v1Pools = Object.entries(VESU_V1_POOLS).map(([poolName, poolId]) => ({ poolName, poolId }));
-  const v1Assets = v1Pools.map(({ poolId }) =>
-    useScaffoldReadContract({
-      contractName: "VesuGateway",
-      functionName: "get_supported_assets_ui",
-      args: [poolId],
-      refetchInterval: 0,
-    }),
-  );
+  const v1Pools = [
+    { poolName: "Genesis", poolId: VESU_V1_POOLS.Genesis },
+    { poolName: "CarmineRunes", poolId: VESU_V1_POOLS.CarmineRunes },
+    { poolName: "Re7StarknetEcosystem", poolId: VESU_V1_POOLS.Re7StarknetEcosystem },
+    { poolName: "Re7xSTRK", poolId: VESU_V1_POOLS.Re7xSTRK },
+  ] as const;
 
-  const v2Pools = Object.entries(VESU_V2_POOLS).map(([poolName, address]) => ({ poolName, address }));
-  const v2Assets = v2Pools.map(({ address }) => useVesuV2Assets(address));
+  const vesuGenesis = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_assets_ui",
+    args: [VESU_V1_POOLS.Genesis],
+    refetchInterval: 0,
+  });
+  const vesuCarmineRunes = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_assets_ui",
+    args: [VESU_V1_POOLS.CarmineRunes],
+    refetchInterval: 0,
+  });
+  const vesuRe7StarknetEcosystem = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_assets_ui",
+    args: [VESU_V1_POOLS.Re7StarknetEcosystem],
+    refetchInterval: 0,
+  });
+  const vesuRe7xSTRK = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_supported_assets_ui",
+    args: [VESU_V1_POOLS.Re7xSTRK],
+    refetchInterval: 0,
+  });
+
+  const v1Assets = [vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK];
+
+  const v2Pools = [
+    { poolName: "Prime", address: VESU_V2_POOLS.Prime },
+    { poolName: "Re7xBTC", address: VESU_V2_POOLS.Re7xBTC },
+    { poolName: "Re7USDCCore", address: VESU_V2_POOLS.Re7USDCCore },
+    { poolName: "Re7USDCPrime", address: VESU_V2_POOLS.Re7USDCPrime },
+    { poolName: "Re7USDCStableCore", address: VESU_V2_POOLS.Re7USDCStableCore },
+  ] as const;
+
+  const vesuPrime = useVesuV2Assets(VESU_V2_POOLS.Prime);
+  const vesuRe7xBTC = useVesuV2Assets(VESU_V2_POOLS.Re7xBTC);
+  const vesuRe7USDCCore = useVesuV2Assets(VESU_V2_POOLS.Re7USDCCore);
+  const vesuRe7USDCPrime = useVesuV2Assets(VESU_V2_POOLS.Re7USDCPrime);
+  const vesuRe7USDCStableCore = useVesuV2Assets(VESU_V2_POOLS.Re7USDCStableCore);
+
+  const v2Assets = [vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore];
   const allowDeposit = false;
 
   return useMemo(() => {
@@ -308,7 +364,7 @@ const useVesuData = (): MarketData[] => {
     });
 
     return markets;
-  }, [v1Assets, v1Pools, v2Assets, v2Pools]);
+  }, [allowDeposit, v1Assets, v1Pools, v2Assets, v2Pools]);
 };
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
