@@ -8,7 +8,8 @@ import { Address } from "viem";
 
 export const ZeroLendProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
   const { address } = useAccount();
-  const { data: gateway } = useScaffoldContract({ contractName: "ZeroLendGatewayView", chainId: chainId as any });
+  // Type assertion needed because ZeroLendGatewayView may not be in ContractName yet
+  const { data: gateway } = useScaffoldContract({ contractName: "ZeroLendGatewayView" as any, chainId: chainId as any });
 
   const gatewayAddress = gateway?.address as Address | undefined;
 
