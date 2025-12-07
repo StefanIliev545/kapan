@@ -22,7 +22,7 @@ const Header = () => {
         >
           <div className="flex items-center justify-center gap-3 mb-2">
             <div className="h-1 w-12 bg-accent"></div>
-            <h3 className="text-sm md:text-base uppercase tracking-wider text-accent font-semibold">Web3 Finance Platform</h3>
+            <p className="text-sm md:text-base uppercase tracking-wider text-accent font-semibold">Web3 Finance Platform</p>
             <div className="h-1 w-12 bg-accent"></div>
           </div>
 

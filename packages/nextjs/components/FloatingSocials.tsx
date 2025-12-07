@@ -47,6 +47,7 @@ export const FloatingSocials = () => {
           rel="noopener noreferrer"
           className="flex items-center justify-center bg-base-100 dark:bg-base-200 rounded-full w-10 h-10 shadow-md hover:shadow-lg transition-all"
           title="Follow us on X"
+          aria-label="Follow us on X"
         >
           <Image
             src="/logos/x-logo.svg"
