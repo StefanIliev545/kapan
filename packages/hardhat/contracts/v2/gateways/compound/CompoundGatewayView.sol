@@ -223,14 +223,17 @@ contract CompoundGatewayView is Ownable {
         if (totalLiqAdjValue == 0) return 0;
 
         uint256 borrowBalance = comet.borrowBalanceOf(user);
-        return (borrowBalance * 10_000) / totalLiqAdjValue;
+        uint256 basePrice = getPrice(token);
+        if (basePrice == 0) return 0;
+
+        uint8 baseDecimals = 18;
+        try IERC20Metadata(token).decimals() returns (uint8 dec) { baseDecimals = dec; } catch {}
+
+        uint256 borrowValue = (borrowBalance * basePrice) / (10 ** uint256(baseDecimals));
+        return (borrowValue * 10_000) / totalLiqAdjValue;
     }
 
-    function getMaxLtv(address token) external view returns (uint256) {
-        return getMaxLtv(token, msg.sender);
-    }
-
-    function getMaxLtv(address token, address user) public view returns (uint256) {
+    function getMaxLtv(address token, address user) external view returns (uint256) {
         ICompoundComet comet = getComet(token);
         (uint256 totalCollValue, uint256 totalLiqAdjValue) = _collateralTotals(comet, user);
 

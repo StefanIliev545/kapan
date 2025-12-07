@@ -380,29 +380,19 @@ contract VenusGatewayView is Ownable {
         return collateralAddresses;
     }
     
-    function getLtv(address /* token */, address user) external view returns (uint256) {
-        if (user == address(0)) return 0;
-
+    function _weightedCollateralFactorBps(address user) internal view returns (uint256) {
         address[] memory assets = this.getAssetsIn(user);
-        uint256 totalCollateralValue = 0;
-        uint256 totalAllowedBorrow = 0;
+        uint256 totalCollateralValue;
+        uint256 totalAllowedBorrow;
 
         for (uint i = 0; i < assets.length; i++) {
             VTokenInterface vToken = VTokenInterface(assets[i]);
 
             uint256 vBalance;
-            try vToken.balanceOf(user) returns (uint256 b) {
-                vBalance = b;
-            } catch {
-                continue;
-            }
+            try vToken.balanceOf(user) returns (uint256 b) { vBalance = b; } catch { continue; }
 
             uint256 exchangeRate;
-            try vToken.exchangeRateStored() returns (uint256 rate) {
-                exchangeRate = rate;
-            } catch {
-                continue;
-            }
+            try vToken.exchangeRateStored() returns (uint256 rate) { exchangeRate = rate; } catch { continue; }
 
             uint256 underlyingAmount = (vBalance * exchangeRate) / 1e18;
             uint256 price = oracle.getUnderlyingPrice(assets[i]);
@@ -416,6 +406,16 @@ contract VenusGatewayView is Ownable {
         if (totalCollateralValue == 0) return 0;
 
         return (totalAllowedBorrow * 10_000) / totalCollateralValue;
+    }
+
+    function getMaxLtv(address /* token */, address user) external view returns (uint256) {
+        if (user == address(0)) return 0;
+        return _weightedCollateralFactorBps(user);
+    }
+
+    function getLtv(address /* token */, address user) external view returns (uint256) {
+        if (user == address(0)) return 0;
+        return _weightedCollateralFactorBps(user);
     }
 }
 
