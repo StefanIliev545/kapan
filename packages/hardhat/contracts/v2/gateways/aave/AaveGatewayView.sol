@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {IPoolAddressesProvider} from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import {IUiPoolDataProviderV3} from "../../../interfaces/aave/IUiDataProvider.sol";
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IPoolDataProvider} from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -135,6 +136,20 @@ contract AaveGatewayView {
 
     function getBorrowBalanceCurrent(address token, address user) external returns (uint256) {
         return getBorrowBalance(token, user);
+    }
+
+    /// @notice Returns the liquidation threshold (LLTV) for a given user in basis points.
+    function getMaxLtv(address user) external view returns (uint256) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        (, , , uint256 currentLiquidationThreshold, ,) = pool.getUserAccountData(user);
+        return currentLiquidationThreshold;
+    }
+
+    /// @notice Returns the protocol-level maximum LTV configuration for the user in basis points.
+    function getLtv(address user) external view returns (uint256) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        (, , , , uint256 ltv,) = pool.getUserAccountData(user);
+        return ltv;
     }
 
     /// @notice Returns the list of tokens that the user has borrowed.

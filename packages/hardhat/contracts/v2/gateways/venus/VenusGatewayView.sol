@@ -380,25 +380,42 @@ contract VenusGatewayView is Ownable {
         return collateralAddresses;
     }
     
-    function getLtv(address token, address user) external view returns (uint256) {
-        // For Venus, LTV is typically around 50-75% depending on the asset
-        // We would ideally get this from the Comptroller's collateralFactors for the specific vToken
-        
-        // Get the vToken address for this token
-        address vTokenAddress;
-        try this.getVTokenForUnderlying(token) returns (address vToken) {
-            vTokenAddress = vToken;
-        } catch {
-            // If token is not found in Venus, return 0 LTV
-            return 0;
+    function getLtv(address /* token */, address user) external view returns (uint256) {
+        if (user == address(0)) return 0;
+
+        address[] memory assets = this.getAssetsIn(user);
+        uint256 totalCollateralValue = 0;
+        uint256 totalAllowedBorrow = 0;
+
+        for (uint i = 0; i < assets.length; i++) {
+            VTokenInterface vToken = VTokenInterface(assets[i]);
+
+            uint256 vBalance;
+            try vToken.balanceOf(user) returns (uint256 b) {
+                vBalance = b;
+            } catch {
+                continue;
+            }
+
+            uint256 exchangeRate;
+            try vToken.exchangeRateStored() returns (uint256 rate) {
+                exchangeRate = rate;
+            } catch {
+                continue;
+            }
+
+            uint256 underlyingAmount = (vBalance * exchangeRate) / 1e18;
+            uint256 price = oracle.getUnderlyingPrice(assets[i]);
+            uint256 collateralValue = (underlyingAmount * price) / 1e18;
+            totalCollateralValue += collateralValue;
+
+            (, uint256 collateralFactor,) = comptroller.markets(assets[i]);
+            totalAllowedBorrow += (collateralValue * collateralFactor) / 1e18;
         }
-        
-        // In a real implementation, we would get the collateral factor from Comptroller:
-        // (, uint collateralFactorMantissa) = comptroller.markets(vTokenAddress);
-        
-        // For simplicity, we'll return a default LTV of 75% (expressed as 0.75 * 1e18)
-        // In a production environment, this should be replaced with the actual collateral factor
-        return 75 * 1e16; // 75% * 1e18 = 75 * 1e16
+
+        if (totalCollateralValue == 0) return 0;
+
+        return (totalAllowedBorrow * 10_000) / totalCollateralValue;
     }
 }
 

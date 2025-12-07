@@ -216,14 +216,27 @@ contract CompoundGatewayView is Ownable {
         return getBorrowBalance(token, user);
     }
 
-    function getLtv(address /* token */, address /* user */) external pure returns (uint256) {
-        // TODO: Implement
-        return 0;
+    function getLtv(address token, address user) external view returns (uint256) {
+        ICompoundComet comet = getComet(token);
+        (, uint256 totalLiqAdjValue) = _collateralTotals(comet, user);
+
+        if (totalLiqAdjValue == 0) return 0;
+
+        uint256 borrowBalance = comet.borrowBalanceOf(user);
+        return (borrowBalance * 10_000) / totalLiqAdjValue;
     }
 
-    function getMaxLtv(address /* token */) external pure returns (uint256) {
-        // TODO: Implement
-        return 0;
+    function getMaxLtv(address token) external view returns (uint256) {
+        return getMaxLtv(token, msg.sender);
+    }
+
+    function getMaxLtv(address token, address user) public view returns (uint256) {
+        ICompoundComet comet = getComet(token);
+        (uint256 totalCollValue, uint256 totalLiqAdjValue) = _collateralTotals(comet, user);
+
+        if (totalCollValue == 0) return 0;
+
+        return (totalLiqAdjValue * 10_000) / totalCollValue;
     }
 
     function getPossibleCollaterals(address token, address user) external view returns (
@@ -372,8 +385,28 @@ contract CompoundGatewayView is Ownable {
             ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
             collateralAddresses[i] = info.asset;
         }
-        
+
         return collateralAddresses;
+    }
+
+    function _collateralTotals(ICompoundComet comet, address account)
+        internal
+        view
+        returns (uint256 totalCollateralValue, uint256 totalLiquidationAdjusted)
+    {
+        uint8 numAssets = comet.numAssets();
+        for (uint8 i = 0; i < numAssets; i++) {
+            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
+            (uint128 colBalance,) = comet.userCollateral(account, info.asset);
+
+            if (colBalance == 0) continue;
+
+            uint256 price = comet.getPrice(info.priceFeed);
+            uint256 collateralValue = (uint256(colBalance) * price) / uint256(info.scale);
+
+            totalCollateralValue += collateralValue;
+            totalLiquidationAdjusted += (collateralValue * uint256(info.liquidateCollateralFactor)) / 1e18;
+        }
     }
 }
 
