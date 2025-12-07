@@ -101,9 +101,18 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
     queryFn: async (): Promise<TokenBalanceResult> => {
       if (!provider || !address) return {};
 
-      const parseBalanceResponse = (response?: unknown) => {
-        const balanceRaw = getCallResult(response)?.[0];
-        return balanceRaw ? BigInt(balanceRaw) : 0n;
+      const parseUint256 = (response?: unknown) => {
+        const result = getCallResult(response);
+
+        if (!result || result.length === 0) return 0n;
+
+        if (result.length >= 2) {
+          const low = BigInt(result[0]);
+          const high = BigInt(result[1]);
+          return (high << 128n) + low;
+        }
+
+        return BigInt(result[0]);
       };
 
       const balancesAndDecimals = await Promise.all(
@@ -116,7 +125,7 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
                 calldata: [address as `0x${string}`],
               });
 
-              return parseBalanceResponse(balanceResponse);
+              return parseUint256(balanceResponse);
             } catch (balanceOfError) {
               try {
                 const camelBalanceResponse = await provider.callContract({
@@ -125,7 +134,7 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
                   calldata: [address as `0x${string}`],
                 });
 
-                return parseBalanceResponse(camelBalanceResponse);
+                return parseUint256(camelBalanceResponse);
               } catch (camelBalanceError) {
                 console.warn("Failed to fetch Starknet balance for", token.address, balanceOfError, camelBalanceError);
                 return 0n;
