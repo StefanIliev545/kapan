@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
+import type { Address } from "viem";
 import Image from "next/image";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
