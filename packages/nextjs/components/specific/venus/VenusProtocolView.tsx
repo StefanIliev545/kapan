@@ -29,17 +29,29 @@ import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { formatUnits } from "viem";
+import { formatUnits, Address } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useGlobalState } from "~~/services/store/store";
+import { useRiskParams } from "~~/hooks/useRiskParams";
+import { useScaffoldContract } from "~~/hooks/scaffold-eth";
 
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
 
 export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
   const { address: connectedAddress } = useAccount();
- 
+
+  const { data: gateway } = useScaffoldContract({ contractName: "VenusGatewayView", chainId: chainId as any });
+  const gatewayAddress = gateway?.address as Address | undefined;
+
+  const { ltvBps, lltvBps } = useRiskParams({
+    gateway: gatewayAddress,
+    gatewayAbi: gateway?.abi,
+    marketOrToken: gatewayAddress,
+    user: connectedAddress as Address | undefined,
+  });
+
   // Get Comptroller address from VenusGatewayView
   const { data: comptrollerAddress } = useScaffoldReadContract({
     contractName: "VenusGatewayView",
@@ -275,18 +287,14 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     vTokenAddresses,
   ]);
 
-  // Get LTV (Loan-to-Value) for Venus
-  // In Venus Protocol, this is typically around 50-75% depending on the asset
-  // We'll use a fixed value here for simplicity
-  const ltv = 75; // 75% LTV
-  const maxLtv = 85; // 85% max LTV (liquidation threshold)
+  const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
 
   return (
     <ProtocolView
       protocolName="Venus"
       protocolIcon="/logos/venus.svg"
-      ltv={ltv}
-      maxLtv={maxLtv}
+      ltvBps={ltvBps}
+      lltvBps={lltvValue}
       suppliedPositions={filteredSuppliedPositions}
       borrowedPositions={filteredBorrowedPositions}
       forceShowAll={forceShowAll}

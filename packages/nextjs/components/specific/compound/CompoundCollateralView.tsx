@@ -10,6 +10,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { FiRepeat } from "react-icons/fi";
+import { formatBps } from "~~/utils/risk";
 
 interface CollateralPosition {
   icon: string;
@@ -136,6 +137,29 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
       enabled: shouldFetch,
     },
   });
+
+  const { data: collateralFactors } = useScaffoldReadContract({
+    contractName: "CompoundGatewayView",
+    functionName: "getCollateralFactors",
+    args: [baseToken],
+    chainId: chainId as any,
+    query: {
+      enabled: shouldFetch,
+    },
+  });
+
+  const factorMap = useMemo(() => {
+    if (!collateralFactors) return new Map<string, { ltvBps: bigint; lltvBps: bigint }>();
+    const [assets, ltvList, lltvList] = collateralFactors as [string[], bigint[], bigint[]];
+    const map = new Map<string, { ltvBps: bigint; lltvBps: bigint }>();
+    assets.forEach((asset, idx) => {
+      map.set(asset.toLowerCase(), {
+        ltvBps: ltvList?.[idx] ?? 0n,
+        lltvBps: lltvList?.[idx] ?? 0n,
+      });
+    });
+    return map;
+  }, [collateralFactors]);
 
   // Ensure baseTokenDecimals is in the expected array format
   const baseTokenDecimalsArray =
@@ -403,10 +427,20 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
               {collateralPositions.map((position: CollateralPosition) => (
                 <div
                   key={position.address}
-                  className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border 
-                    ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"} 
+                  className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border
+                    ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"}
                     hover:bg-base-200/50 flex items-center overflow-hidden`}
                 >
+                  {(() => {
+                    const factors = factorMap.get(position.address.toLowerCase());
+                    if (!factors) return null;
+                    return (
+                      <div className="hidden sm:flex flex-col items-start px-2 text-[10px] text-base-content/50 min-w-[88px]">
+                        <span>{`LTV ${formatBps(factors.ltvBps)}%`}</span>
+                        <span>{`LLTV ${formatBps(factors.lltvBps)}%`}</span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-1">
                     <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">
                       <button

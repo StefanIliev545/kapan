@@ -1,6 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Address } from "viem";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
 import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
@@ -18,6 +17,7 @@ import { CollateralSwapModal } from "./modals/CollateralSwapModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
+import { formatBps } from "~~/utils/risk";
 
 
 export interface ProtocolPosition {
@@ -50,8 +50,6 @@ export interface ProtocolPosition {
 interface ProtocolViewProps {
   protocolName: string;
   protocolIcon: string;
-  ltv: number;
-  maxLtv: number;
   suppliedPositions: ProtocolPosition[];
   borrowedPositions: ProtocolPosition[];
   hideUtilization?: boolean;
@@ -65,6 +63,8 @@ interface ProtocolViewProps {
     swap?: boolean;
     move?: boolean;
   };
+  ltvBps?: bigint;
+  lltvBps?: bigint;
   disableMarkets?: boolean;
   inlineMarkets?: boolean;
 }
@@ -114,6 +114,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   expandFirstPositions = true,
   chainId,
   enabledFeatures = { swap: false, move: true },
+  ltvBps = 0n,
+  lltvBps = 0n,
   disableMarkets = false,
   inlineMarkets = false,
 }) => {
@@ -183,14 +185,23 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return totalSupplied + totalCollateral - totalBorrowed;
   }, [suppliedPositions, borrowedPositions]);
 
-  // Calculate utilization percentage, using collateral values if no supplied positions exist
-  const utilizationPercentage = useMemo(() => {
+  const { utilizationPercentage, currentLtvBps } = useMemo(() => {
     const suppliedTotal = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
     const collateralTotal = borrowedPositions.reduce((acc, pos) => acc + (pos.collateralValue || 0), 0);
     const totalSupplied = suppliedTotal > 0 ? suppliedTotal : collateralTotal;
     const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
-    return totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
-  }, [suppliedPositions, borrowedPositions]);
+    const baseLtv = totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
+    const currentBps = totalSupplied > 0 ? BigInt(Math.round((totalBorrowed / totalSupplied) * 10000)) : 0n;
+
+    if (ltvBps > 0n) {
+      const usageBps = Number((currentBps * 10000n) / ltvBps) / 100;
+      return { utilizationPercentage: Math.min(usageBps, 100), currentLtvBps: currentBps };
+    }
+
+    return { utilizationPercentage: baseLtv, currentLtvBps: currentBps };
+  }, [borrowedPositions, suppliedPositions, ltvBps]);
+
+  const currentLtvLabel = useMemo(() => (currentLtvBps > 0n ? `${formatBps(currentLtvBps)}%` : undefined), [currentLtvBps]);
 
   const positionManager = useMemo(
     () => PositionManager.fromPositions(suppliedPositions, borrowedPositions),
@@ -375,12 +386,28 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
               {/* Utilization */}
               {!hideUtilization && (
-                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <div
+                  className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30"
+                  title={
+                    ltvBps > 0n || lltvBps > 0n
+                      ? `${currentLtvLabel ? `Current: ${currentLtvLabel} • ` : ""}LTV: ${formatBps(ltvBps)}%${
+                          lltvBps > 0n ? ` • LLTV: ${formatBps(lltvBps)}%` : ""
+                        }`
+                      : undefined
+                  }
+                >
                   <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">
                     <span className="hidden sm:inline">Utilization</span>
                     <span className="sm:hidden">LTV</span>
                   </span>
                   <HealthStatus utilizationPercentage={utilizationPercentage} />
+                  {(ltvBps > 0n || lltvBps > 0n) && (
+                    <span className="text-[10px] text-base-content/50 font-semibold tabular-nums">
+                      {currentLtvLabel ? `${currentLtvLabel} • ` : ""}
+                      {ltvBps > 0n ? `${formatBps(ltvBps)}%` : "—"}
+                      {lltvBps > 0n && ` • LLTV ${formatBps(lltvBps)}%`}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -889,8 +916,8 @@ export const ExampleProtocolView: FC = () => {
     <ProtocolView
       protocolName="Aave V3"
       protocolIcon="/logos/aave-logo.svg"
-      ltv={65}
-      maxLtv={80}
+      ltvBps={6500n}
+      lltvBps={8000n}
       suppliedPositions={exampleSuppliedPositions}
       borrowedPositions={exampleBorrowedPositions}
       networkType="evm"
