@@ -105,8 +105,8 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         VTokenInterface(vToken).transferFrom(user, address(this), requiredV);
 
         uint256 balanceBefore = IERC20(collateral).balanceOf(address(this));
-        uint err = VTokenInterface(vToken).redeem(requiredV);
-        require(err == 0, "Venus: redeem failed");
+        uint256 err2 = VTokenInterface(vToken).redeem(requiredV);
+        require(err2 == 0, "Venus: redeem failed");
         uint256 actualRedeemed = IERC20(collateral).balanceOf(address(this)) - balanceBefore;
         IERC20(collateral).safeTransfer(msg.sender, actualRedeemed);
         return (collateral, actualRedeemed);

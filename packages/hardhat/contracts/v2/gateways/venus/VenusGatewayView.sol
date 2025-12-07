@@ -381,7 +381,10 @@ contract VenusGatewayView is Ownable {
     }
     
     function _weightedCollateralFactorBps(address user) internal view returns (uint256) {
-        // Get assets directly from comptroller to avoid external self-call issues
+        // Ensure comptroller has code
+        if (address(comptroller).code.length == 0) return 0;
+        
+        // Get assets directly from comptroller
         VTokenInterface[] memory vTokens;
         try comptroller.getAssetsIn(user) returns (VTokenInterface[] memory v) {
             vTokens = v;
@@ -412,9 +415,16 @@ contract VenusGatewayView is Ownable {
             uint256 collateralValue = (underlyingAmount * price) / 1e18;
             totalCollateralValue += collateralValue;
 
-            try comptroller.markets(vTokenAddr) returns (bool, uint256 collateralFactor, bool) {
-                totalAllowedBorrow += (collateralValue * collateralFactor) / 1e18;
-            } catch { continue; }
+            // Venus v4: markets returns (isListed, collateralFactorMantissa, liquidationThresholdMantissa)
+            try comptroller.markets(vTokenAddr) returns (
+                bool /* isListed */,
+                uint256 collateralFactorMantissa,
+                uint256 /* liquidationThresholdMantissa */
+            ) {
+                totalAllowedBorrow += (collateralValue * collateralFactorMantissa) / 1e18;
+            } catch {
+                continue;
+            }
         }
 
         if (totalCollateralValue == 0) return 0;
@@ -425,7 +435,10 @@ contract VenusGatewayView is Ownable {
     /// @notice Calculate weighted liquidation threshold (LLTV) across user's collateral positions
     /// @dev Uses Venus V4's liquidationThreshold which is higher than collateralFactor
     function _weightedLiquidationThresholdBps(address user) internal view returns (uint256) {
-        // Get assets directly from comptroller to avoid external self-call issues
+        // Ensure comptroller has code
+        if (address(comptroller).code.length == 0) return 0;
+        
+        // Get assets directly from comptroller
         VTokenInterface[] memory vTokens;
         try comptroller.getAssetsIn(user) returns (VTokenInterface[] memory v) {
             vTokens = v;
@@ -456,19 +469,21 @@ contract VenusGatewayView is Ownable {
             uint256 collateralValue = (underlyingAmount * price) / 1e18;
             totalCollateralValue += collateralValue;
 
-            // Try to get liquidation threshold (Venus V4), fallback to collateral factor
-            uint256 liqThreshold;
-            try comptroller.liquidationThreshold(vTokenAddr) returns (uint256 lt) {
-                liqThreshold = lt;
+            // Venus v4: markets returns (isListed, collateralFactorMantissa, liquidationThresholdMantissa)
+            // Use liquidationThresholdMantissa when available, otherwise fall back to collateralFactorMantissa.
+            try comptroller.markets(vTokenAddr) returns (
+                bool /* isListed */,
+                uint256 collateralFactorMantissa,
+                uint256 liquidationThresholdMantissa
+            ) {
+                uint256 liqThreshold = liquidationThresholdMantissa == 0
+                    ? collateralFactorMantissa
+                    : liquidationThresholdMantissa;
+
+                totalLiquidationThreshold += (collateralValue * liqThreshold) / 1e18;
             } catch {
-                // Fallback: use collateral factor if liquidationThreshold not available
-                try comptroller.markets(vTokenAddr) returns (bool, uint256 collateralFactor, bool) {
-                    liqThreshold = collateralFactor;
-                } catch {
-                    continue;
-                }
+                continue;
             }
-            totalLiquidationThreshold += (collateralValue * liqThreshold) / 1e18;
         }
 
         if (totalCollateralValue == 0) return 0;
@@ -478,14 +493,14 @@ contract VenusGatewayView is Ownable {
 
     /// @notice Returns the LTV (borrowing power) for a user in basis points
     /// @dev Uses collateralFactor which determines how much can be borrowed
-    function getLtv(address /* token */, address user) external view returns (uint256) {
+    function getLtv(address /* token */, address user) external view returns (uint256 result) {
         if (user == address(0)) return 0;
         return _weightedCollateralFactorBps(user);
     }
 
     /// @notice Returns the LLTV (liquidation threshold) for a user in basis points
     /// @dev Uses liquidationThreshold which is higher than LTV - the point at which liquidation occurs
-    function getMaxLtv(address /* token */, address user) external view returns (uint256) {
+    function getMaxLtv(address /* token */, address user) external view returns (uint256 result) {
         if (user == address(0)) return 0;
         return _weightedLiquidationThresholdBps(user);
     }
