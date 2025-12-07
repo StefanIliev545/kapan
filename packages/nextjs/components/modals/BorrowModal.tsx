@@ -25,7 +25,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   chainId,
 }) => {
   const { buildBorrowFlow } = useKapanRouterV2();
-  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
+  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
   const normalizedProtocolName = protocolName.toLowerCase();
 
   if (token.decimals == null) {

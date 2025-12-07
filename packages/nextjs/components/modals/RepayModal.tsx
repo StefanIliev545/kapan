@@ -25,7 +25,7 @@ export const RepayModal: FC<RepayModalProps> = ({
   position,
   chainId,
 }) => {
-  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId);
+  const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
   const { buildRepayFlowAsync } = useKapanRouterV2();
   const normalizedProtocolName = protocolName.toLowerCase();
 

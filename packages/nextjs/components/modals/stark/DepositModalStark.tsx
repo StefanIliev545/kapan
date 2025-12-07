@@ -22,17 +22,18 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
   vesuContext,
   position,
 }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { balance, decimals } = useTokenBalance(token.address, "stark", undefined, token.decimals);
+  const decimalsForAction = decimals ?? token.decimals ?? 18;
   const { execute, buildCalls } = useLendingAction(
     "stark",
     "Deposit",
     token.address,
     protocolName,
-    decimals,
+    decimalsForAction,
     vesuContext,
   );
   if (token.decimals == null) {
-    token.decimals = decimals;
+    token.decimals = decimalsForAction;
   }
   return (
     <TokenActionModal

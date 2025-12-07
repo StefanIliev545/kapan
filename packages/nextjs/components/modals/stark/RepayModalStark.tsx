@@ -25,21 +25,22 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   vesuContext,
   position,
 }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { balance, decimals } = useTokenBalance(token.address, "stark", undefined, token.decimals);
+  const decimalsForAction = decimals ?? token.decimals ?? 18;
   const { execute, buildCalls } = useLendingAction(
     "stark",
     "Repay",
     token.address,
     protocolName,
-    decimals,
+    decimalsForAction,
     vesuContext,
     debtBalance,
     balance,
   );
   if (token.decimals == null) {
-    token.decimals = decimals;
+    token.decimals = decimalsForAction;
   }
-  const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
+  const before = decimalsForAction ? Number(formatUnits(debtBalance, decimalsForAction)) : 0;
   const bump = (debtBalance * 101n) / 100n;
   const maxInput = balance < bump ? balance : bump;
   return (
