@@ -134,7 +134,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
               {/* Social sharing */}
               <div className="flex justify-end mb-8">
                 <div className="flex gap-2">
-                  <button className="btn btn-circle btn-sm btn-ghost">
+                  <button className="btn btn-circle btn-sm btn-ghost" aria-label="Share this post">
                     <FiShare2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -150,7 +150,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
                     <span className="font-bold">Category:</span> {post.category}
                   </div>
                   <div className="flex gap-2">
-                    <button className="btn btn-sm btn-primary dark:btn-accent">
+                    <button className="btn btn-sm btn-primary dark:btn-accent" aria-label="Share this post">
                       <FiShare2 className="mr-2 h-4 w-4" />
                       Share
                     </button>

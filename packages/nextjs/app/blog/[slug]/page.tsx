@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import BlogPostContent from "./BlogPostContent";
@@ -16,7 +17,21 @@ const mdxComponents = {
   li: (props: any) => <li className="my-1" {...props} />,
   strong: (props: any) => <strong className="font-bold" {...props} />,
   a: (props: any) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
+  img: (props: any) => (
+    <Image
+      src={props.src}
+      alt={props.alt || ""}
+      width={props.width ?? 800}
+      height={props.height ?? 450}
+      sizes="(max-width: 768px) 100vw, 800px"
+      style={{ height: "auto", width: "100%" }}
+    />
+  ),
 };
+
+const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : `http://localhost:${process.env.PORT || 3000}`;
 
 export async function generateMetadata({
   params,
@@ -75,11 +90,13 @@ export default async function BlogPostPage({
       headline: post.title,
       datePublished: post.date,
       description: post.excerpt,
-      url: `https://kapan.finance/blog/${post.slug}`,
+      url: `${baseUrl}/blog/${post.slug}`,
       image:
         typeof post.coverImage === "string"
-          ? post.coverImage
-          : post.coverImage?.src ?? "https://kapan.finance/thumbnail.png",
+          ? `${baseUrl}${post.coverImage}`
+          : post.coverImage?.src
+            ? `${baseUrl}${post.coverImage.src}`
+            : `${baseUrl}/thumbnail.png`,
     };
 
     return (

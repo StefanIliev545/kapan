@@ -1,7 +1,14 @@
 import React from "react";
+import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export const metadata = {
-  title: "License | Kapan Finance",
+  ...getMetadata({
+    title: "License",
+    description: "Kapan Finance license terms covering code, documentation, and trademarks.",
+  }),
+  alternates: {
+    canonical: "/license",
+  },
 };
 
 const effectiveDate = "2025-10-22";

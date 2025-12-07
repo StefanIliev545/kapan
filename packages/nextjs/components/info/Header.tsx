@@ -20,9 +20,9 @@ const Header = () => {
           transition={{ duration: 0.5 }}
           className="max-w-4xl mx-auto"
         >
-          <div className="flex items-center justify-center gap-3 mb-2">
+          <div className="flex items-center justify-center gap-3 mb-2" aria-label="Web3 finance platform section">
             <div className="h-1 w-12 bg-accent"></div>
-            <h3 className="text-sm md:text-base uppercase tracking-wider text-accent font-semibold">Web3 Finance Platform</h3>
+            <p className="text-sm md:text-base uppercase tracking-wider text-accent font-semibold">Web3 Finance Platform</p>
             <div className="h-1 w-12 bg-accent"></div>
           </div>
 
