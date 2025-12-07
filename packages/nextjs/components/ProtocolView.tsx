@@ -603,19 +603,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                             <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
                           </button>
 
-                          <button
-                            className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200"
-                            onClick={handleOpenMultiply}
-                            disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
-                            title={
-                              availableCollaterals.length === 0 || debtOptions.length === 0
-                                ? "Supply collateral and have a debt option to build a loop"
-                                : "Build a flash-loan loop"
-                            }
-                          >
-                            <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                            <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
-                          </button>
+                          {/* Disable looping for Compound - needs fix for market context */}
+                          {!protocolName.toLowerCase().includes("compound") && (
+                            <button
+                              className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200"
+                              onClick={handleOpenMultiply}
+                              disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
+                              title={
+                                availableCollaterals.length === 0 || debtOptions.length === 0
+                                  ? "Supply collateral and have a debt option to build a loop"
+                                  : "Build a flash-loan loop"
+                              }
+                            >
+                              <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                              <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
