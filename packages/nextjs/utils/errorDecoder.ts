@@ -30,6 +30,12 @@ const KNOWN_ERRORS: Record<string, string> = {
   // General
   "0x08c379a0": "Transaction reverted", // Error(string) - will be decoded separately
   
+  // Venus / Compound errors
+  "0xbb55fd27": "Insufficient liquidity - you need to enter the market first or add more collateral",
+  "0x4ef4c3e1": "Mint not allowed - market may be paused or you haven't entered it",
+  "0x69609fc6": "Market not listed - this asset is not available on Venus",
+  "0x7a7fcb5a": "Enter markets failed - could not enable asset as collateral",
+  
   // Unknown errors we've seen (will be improved with more logging)
   "0x00b284f2": "Withdrawal failed - check Aave pool status and your collateral balance",
   "0xf0dbeea5": "Transaction failed - check protocol status and try again",
@@ -232,6 +238,15 @@ export function formatErrorForDisplay(error: string): { title: string; descripti
       title: "Insufficient Collateral",
       description: "You don't have enough collateral to support this borrow.",
       suggestion: "Add more collateral or borrow a smaller amount.",
+    };
+  }
+
+  // Venus insufficient liquidity / enter markets
+  if (error.includes("Insufficient liquidity") || error.includes("enter the market")) {
+    return {
+      title: "Market Entry Required",
+      description: "Your collateral needs to be enabled before you can borrow against it.",
+      suggestion: "The transaction should include an 'Enter Markets' step. Try again or contact support.",
     };
   }
 

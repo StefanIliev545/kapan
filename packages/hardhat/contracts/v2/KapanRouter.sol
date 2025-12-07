@@ -379,9 +379,10 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         // Simulation state (outputs)
         ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
 
-        // Results
-        address[] memory tmpTargets = new address[](instructions.length);
-        bytes[] memory tmpData = new bytes[](instructions.length);
+        // Results - allocate extra space since gateways can return multiple auths per instruction
+        // Each instruction could need: approval + enterMarkets + delegate approval = 3 max
+        address[] memory tmpTargets = new address[](instructions.length * 3);
+        bytes[] memory tmpData = new bytes[](instructions.length * 3);
         uint256 k;
 
         for (uint256 i = 0; i < instructions.length; i++) {
@@ -516,20 +517,19 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                 outputs
             );
 
-            if (t.length > 0 && t[0] != address(0) && d[0].length > 0) {
-                tmpTargets[k] = t[0];
-                tmpData[k] = d[0];
-            } else {
-                tmpTargets[k] = address(0);
-                tmpData[k] = bytes("");
+            // Handle ALL authorization calls from the gateway (not just the first)
+            for (uint256 j = 0; j < t.length; j++) {
+                if (t[j] != address(0) && d[j].length > 0) {
+                    tmpTargets[k] = t[j];
+                    tmpData[k] = d[j];
+                    k++;
+                }
             }
 
             // Update simulation state
             if (produced.length > 0) {
                 outputs = _concatOutputsMemory(outputs, produced);
             }
-
-            k++;
         }
 
         // Compact

@@ -9840,7 +9840,7 @@ const contracts = {
   },
   31337: {
     AaveGatewayView: {
-      address: "0x4ccf5a92812EBf90fAd06d3e41b4660a1401940C",
+      address: "0x5d15ea6ef7D37DcfD2D3095c387FB985f187281D",
       abi: [
         {
           inputs: [
@@ -10067,6 +10067,54 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMaxLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -10218,7 +10266,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xa3E7bd684468280e86a1DB7CEdF413e206b90be5",
+      address: "0xD181A34e37A4e49B0Af13E996330fbaBd5F6bb83",
       abi: [
         {
           inputs: [
@@ -10676,7 +10724,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x21Fa838887658C482799C3C43258C8A66Edb166E",
+      address: "0x8125ffDBcafDd31D6c13eD89D27E1bb4A0857469",
       abi: [
         {
           inputs: [
@@ -10980,6 +11028,35 @@ const contracts = {
               name: "market",
               type: "address",
             },
+          ],
+          name: "getCollateralFactors",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "assets",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "ltvBps",
+              type: "uint256[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "lltvBps",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "asset",
@@ -11103,12 +11180,12 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "",
+              name: "token",
               type: "address",
             },
             {
               internalType: "address",
-              name: "",
+              name: "user",
               type: "address",
             },
           ],
@@ -11120,14 +11197,19 @@ const contracts = {
               type: "uint256",
             },
           ],
-          stateMutability: "pure",
+          stateMutability: "view",
           type: "function",
         },
         {
           inputs: [
             {
               internalType: "address",
-              name: "",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
               type: "address",
             },
           ],
@@ -11139,7 +11221,7 @@ const contracts = {
               type: "uint256",
             },
           ],
-          stateMutability: "pure",
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -11452,7 +11534,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x1eAcad8eE597857F3E503C0AE22adFB7BE5795D8",
+      address: "0xdBeFD25F918C089BcAf93a35fae125340949f88f",
       abi: [
         {
           inputs: [
@@ -12090,7 +12172,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xc6A9A5AB5d8A204E834137Fd76b5868548267253",
+      address: "0xC4171F580d76aF9C790A53EFe2760933bA6a668C",
       abi: [
         {
           inputs: [
@@ -12741,7 +12823,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x6225EDfDa354690315992a44dbF3B08F76F6f639",
+      address: "0x5Dc582650DA8dD1082437FAACbbf4E74e14a0AF1",
       abi: [
         {
           inputs: [
@@ -12962,7 +13044,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x2a55951DCDEcBb8B5D43847dB1a9DB1f8882e29C",
+      address: "0x580510A5DD34427A2f293d1c23200681f7DbE719",
       abi: [
         {
           inputs: [
@@ -13383,7 +13465,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xC9B125cc71C2Ad802508F2f58cb2bea302c32837",
+      address: "0xac3ED21B4573f68f336d5F3587d66Ede8bdb6D16",
       abi: [
         {
           inputs: [
@@ -13408,7 +13490,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x95610CfE57f5994585747d2e011eE82Df028CfB7",
+      address: "0x66890f4457a185F105E04f6f8d12EC99d51ecbf4",
       abi: [
         {
           inputs: [
@@ -13732,7 +13814,7 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "token",
+              name: "",
               type: "address",
             },
             {
@@ -13776,6 +13858,30 @@ const contracts = {
               internalType: "uint256[]",
               name: "borrowRates",
               type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMaxLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -14015,7 +14121,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0xCBBD77f662Bb26dDFA8FBAc33429640254B9BCEC",
+      address: "0xD5D57003CcaDdBFd671e3D144BF243f151c8Afb9",
       abi: [
         {
           inputs: [
@@ -14455,7 +14561,7 @@ const contracts = {
       },
     },
     ZeroLendGatewayView: {
-      address: "0xc1eed27674FBefc7B140417304a7a9308C2dC0A0",
+      address: "0x426e747F309b8ae4dc4B86450aA1adEDbc2eD37E",
       abi: [
         {
           inputs: [
@@ -14691,6 +14797,54 @@ const contracts = {
               type: "address",
             },
           ],
+          name: "getLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMaxLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
           name: "getPossibleCollaterals",
           outputs: [
             {
@@ -14820,7 +14974,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x2CFF8b8E959Bbd754069950358a1aA571d10b434",
+      address: "0xeD2FeE4E82FDaE8bE4F10d243b50c2De583D6890",
       abi: [
         {
           inputs: [

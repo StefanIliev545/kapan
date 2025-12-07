@@ -172,26 +172,16 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
 
             if (
                 ins.op == ProtocolTypes.LendingOp.Deposit ||
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
-                ins.op == ProtocolTypes.LendingOp.Repay
+                ins.op == ProtocolTypes.LendingOp.DepositCollateral
             ) {
-                uint256 amountWithBuffer = amount == 0 ? 0 : (amount * 1001) / 1000;
-                uint256 cur = IERC20(token).allowance(caller, address(this));
-                // 1. Approval
-                if (amount == 0 || cur < amountWithBuffer) {
+                // Enter Markets - required for collateral to count
+                address vToken = _getVTokenForUnderlying(token);
+                bool member = false;
+                try comptroller.checkMembership(caller, vToken) returns (bool m) {
+                    member = m;
+                } catch {}
+                if (!member) {
                     authCount++;
-                }
-
-                // 2. Enter Markets (Only for Deposit/DepositCollateral)
-                if (ins.op != ProtocolTypes.LendingOp.Repay) {
-                    address vToken = _getVTokenForUnderlying(token);
-                    bool member = false;
-                    try comptroller.checkMembership(caller, vToken) returns (bool m) {
-                        member = m;
-                    } catch {}
-                    if (!member) {
-                        authCount++;
-                    }
                 }
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address vToken = _getVTokenForUnderlying(token);
@@ -234,39 +224,27 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
 
             if (
                 ins.op == ProtocolTypes.LendingOp.Deposit ||
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
-                ins.op == ProtocolTypes.LendingOp.Repay
+                ins.op == ProtocolTypes.LendingOp.DepositCollateral
             ) {
-                uint256 amountWithBuffer = amount == 0 ? 0 : (amount * 1001) / 1000;
-                uint256 cur = IERC20(token).allowance(caller, address(this));
-
-                // 1. Approval
-                if (amount == 0 || cur < amountWithBuffer) {
-                    targets[k] = address(0);
-                    data[k] = bytes("");
+                // Enter Markets - required for collateral to count
+                address vToken = _getVTokenForUnderlying(token);
+                bool member = false;
+                try comptroller.checkMembership(caller, vToken) returns (bool m) {
+                    member = m;
+                } catch {
+                    // If checkMembership fails, assume not a member to be safe
+                    member = false;
+                }
+                if (!member) {
+                    address[] memory markets = new address[](1);
+                    markets[0] = vToken;
+                    targets[k] = address(comptroller);
+                    data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets);
                     k++;
                 }
-
-                // 2. Enter Markets (Deposit only)
-                if (ins.op != ProtocolTypes.LendingOp.Repay) {
-                    address vToken = _getVTokenForUnderlying(token);
-                    bool member = false;
-                    try comptroller.checkMembership(caller, vToken) returns (bool m) {
-                        member = m;
-                    } catch {}
-                    if (!member) {
-                        address[] memory markets = new address[](1);
-                        markets[0] = vToken;
-                        targets[k] = address(comptroller);
-                        data[k] = abi.encodeWithSelector(ComptrollerInterface.enterMarkets.selector, markets);
-                        k++;
-                    }
-                }
-
-                if (ins.op == ProtocolTypes.LendingOp.Repay) {
-                    produced[p] = ProtocolTypes.Output({ token: token, amount: 0 });
-                    p++;
-                }
+            } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
+                produced[p] = ProtocolTypes.Output({ token: token, amount: 0 });
+                p++;
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
                 address vToken = _getVTokenForUnderlying(token);
                 uint rate = VTokenInterface(vToken).exchangeRateStored();

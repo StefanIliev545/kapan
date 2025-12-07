@@ -381,26 +381,40 @@ contract VenusGatewayView is Ownable {
     }
     
     function _weightedCollateralFactorBps(address user) internal view returns (uint256) {
-        address[] memory assets = this.getAssetsIn(user);
+        // Get assets directly from comptroller to avoid external self-call issues
+        VTokenInterface[] memory vTokens;
+        try comptroller.getAssetsIn(user) returns (VTokenInterface[] memory v) {
+            vTokens = v;
+        } catch {
+            return 0;
+        }
+        
+        if (vTokens.length == 0) return 0;
+        
         uint256 totalCollateralValue;
         uint256 totalAllowedBorrow;
 
-        for (uint i = 0; i < assets.length; i++) {
-            VTokenInterface vToken = VTokenInterface(assets[i]);
-
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+            
             uint256 vBalance;
-            try vToken.balanceOf(user) returns (uint256 b) { vBalance = b; } catch { continue; }
+            try vTokens[i].balanceOf(user) returns (uint256 b) { vBalance = b; } catch { continue; }
+            if (vBalance == 0) continue;
 
             uint256 exchangeRate;
-            try vToken.exchangeRateStored() returns (uint256 rate) { exchangeRate = rate; } catch { continue; }
+            try vTokens[i].exchangeRateStored() returns (uint256 rate) { exchangeRate = rate; } catch { continue; }
 
             uint256 underlyingAmount = (vBalance * exchangeRate) / 1e18;
-            uint256 price = oracle.getUnderlyingPrice(assets[i]);
+            
+            uint256 price;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) { price = p; } catch { continue; }
+            
             uint256 collateralValue = (underlyingAmount * price) / 1e18;
             totalCollateralValue += collateralValue;
 
-            (, uint256 collateralFactor,) = comptroller.markets(assets[i]);
-            totalAllowedBorrow += (collateralValue * collateralFactor) / 1e18;
+            try comptroller.markets(vTokenAddr) returns (bool, uint256 collateralFactor, bool) {
+                totalAllowedBorrow += (collateralValue * collateralFactor) / 1e18;
+            } catch { continue; }
         }
 
         if (totalCollateralValue == 0) return 0;
@@ -408,14 +422,72 @@ contract VenusGatewayView is Ownable {
         return (totalAllowedBorrow * 10_000) / totalCollateralValue;
     }
 
-    function getMaxLtv(address /* token */, address user) external view returns (uint256) {
+    /// @notice Calculate weighted liquidation threshold (LLTV) across user's collateral positions
+    /// @dev Uses Venus V4's liquidationThreshold which is higher than collateralFactor
+    function _weightedLiquidationThresholdBps(address user) internal view returns (uint256) {
+        // Get assets directly from comptroller to avoid external self-call issues
+        VTokenInterface[] memory vTokens;
+        try comptroller.getAssetsIn(user) returns (VTokenInterface[] memory v) {
+            vTokens = v;
+        } catch {
+            return 0;
+        }
+        
+        if (vTokens.length == 0) return 0;
+        
+        uint256 totalCollateralValue;
+        uint256 totalLiquidationThreshold;
+
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+
+            uint256 vBalance;
+            try vTokens[i].balanceOf(user) returns (uint256 b) { vBalance = b; } catch { continue; }
+            if (vBalance == 0) continue;
+
+            uint256 exchangeRate;
+            try vTokens[i].exchangeRateStored() returns (uint256 rate) { exchangeRate = rate; } catch { continue; }
+
+            uint256 underlyingAmount = (vBalance * exchangeRate) / 1e18;
+            
+            uint256 price;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) { price = p; } catch { continue; }
+            
+            uint256 collateralValue = (underlyingAmount * price) / 1e18;
+            totalCollateralValue += collateralValue;
+
+            // Try to get liquidation threshold (Venus V4), fallback to collateral factor
+            uint256 liqThreshold;
+            try comptroller.liquidationThreshold(vTokenAddr) returns (uint256 lt) {
+                liqThreshold = lt;
+            } catch {
+                // Fallback: use collateral factor if liquidationThreshold not available
+                try comptroller.markets(vTokenAddr) returns (bool, uint256 collateralFactor, bool) {
+                    liqThreshold = collateralFactor;
+                } catch {
+                    continue;
+                }
+            }
+            totalLiquidationThreshold += (collateralValue * liqThreshold) / 1e18;
+        }
+
+        if (totalCollateralValue == 0) return 0;
+
+        return (totalLiquidationThreshold * 10_000) / totalCollateralValue;
+    }
+
+    /// @notice Returns the LTV (borrowing power) for a user in basis points
+    /// @dev Uses collateralFactor which determines how much can be borrowed
+    function getLtv(address /* token */, address user) external view returns (uint256) {
         if (user == address(0)) return 0;
         return _weightedCollateralFactorBps(user);
     }
 
-    function getLtv(address /* token */, address user) external view returns (uint256) {
+    /// @notice Returns the LLTV (liquidation threshold) for a user in basis points
+    /// @dev Uses liquidationThreshold which is higher than LTV - the point at which liquidation occurs
+    function getMaxLtv(address /* token */, address user) external view returns (uint256) {
         if (user == address(0)) return 0;
-        return _weightedCollateralFactorBps(user);
+        return _weightedLiquidationThresholdBps(user);
     }
 }
 

@@ -305,6 +305,24 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     return (borrowDetails.borrowValue / totalCollateralValue) * 100;
   }, [borrowDetails.borrowValue, totalCollateralValue]);
 
+  // Calculate weighted LLTV based on user's collateral positions
+  const weightedLltvBps = useMemo(() => {
+    if (totalCollateralValue <= 0 || allCollateralPositions.length === 0) return 0n;
+    let totalWeightedLltv = 0n;
+    let totalWeight = 0n;
+    for (const pos of allCollateralPositions) {
+      if (pos.usdValue > 0) {
+        const factors = factorMap.get(pos.address.toLowerCase());
+        if (factors?.lltvBps) {
+          const weight = BigInt(Math.floor(pos.usdValue * 100));
+          totalWeightedLltv += factors.lltvBps * weight;
+          totalWeight += weight;
+        }
+      }
+    }
+    return totalWeight > 0n ? totalWeightedLltv / totalWeight : 0n;
+  }, [allCollateralPositions, factorMap, totalCollateralValue]);
+
   // Check if any position has a balance and auto-show all if none do, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
     // Skip this logic if initialShowAll was explicitly provided
@@ -399,10 +417,29 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
                 {/* Utilization indicator - lowest priority, will disappear first */}
                 {totalCollateralValue > 0 && (
-                  <div className="hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
+                  <div className="group/util hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
                     <span className="text-xs text-base-content/70 whitespace-nowrap">Utilization:</span>
-                    <UserUtilization utilizationPercentage={utilizationPercentage} />
-                    <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline">
+                    {/* Default: show bar */}
+                    <div className="group-hover/util:hidden">
+                      <UserUtilization utilizationPercentage={utilizationPercentage} />
+                    </div>
+                    {/* On hover: show Current and LLTV breakdown */}
+                    <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
+                      <span className="text-base-content/70">
+                        <span className="text-[10px] text-base-content/50">Current </span>
+                        {utilizationPercentage.toFixed(1)}%
+                      </span>
+                      {weightedLltvBps > 0n && (
+                        <>
+                          <span className="text-base-content/30">•</span>
+                          <span className="text-base-content/70">
+                            <span className="text-[10px] text-base-content/50">LLTV </span>
+                            {formatBps(weightedLltvBps)}%
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline group-hover/util:hidden">
                       ({formatUSD(borrowDetails.borrowValue)} / {formatUSD(totalCollateralValue)})
                     </span>
                   </div>
@@ -431,16 +468,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                     ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"}
                     hover:bg-base-200/50 flex items-center overflow-hidden`}
                 >
-                  {(() => {
-                    const factors = factorMap.get(position.address.toLowerCase());
-                    if (!factors) return null;
-                    return (
-                      <div className="hidden sm:flex flex-col items-start px-2 text-[10px] text-base-content/50 min-w-[88px]">
-                        <span>{`LTV ${formatBps(factors.ltvBps)}%`}</span>
-                        <span>{`LLTV ${formatBps(factors.lltvBps)}%`}</span>
-                      </div>
-                    );
-                  })()}
                   <div className="flex gap-1">
                     <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">
                       <button

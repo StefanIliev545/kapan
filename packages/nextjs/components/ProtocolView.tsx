@@ -204,8 +204,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const currentLtvLabel = useMemo(() => (currentLtvBps > 0n ? `${formatBps(currentLtvBps)}%` : undefined), [currentLtvBps]);
 
   const positionManager = useMemo(
-    () => PositionManager.fromPositions(suppliedPositions, borrowedPositions),
-    [suppliedPositions, borrowedPositions],
+    () => PositionManager.fromPositions(suppliedPositions, borrowedPositions, Number(ltvBps)),
+    [suppliedPositions, borrowedPositions, ltvBps],
   );
 
   const { netYield30d, netApyPercent } = useMemo(
@@ -386,28 +386,37 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
               {/* Utilization */}
               {!hideUtilization && (
-                <div
-                  className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30"
-                  title={
-                    ltvBps > 0n || lltvBps > 0n
-                      ? `${currentLtvLabel ? `Current: ${currentLtvLabel} • ` : ""}LTV: ${formatBps(ltvBps)}%${
-                          lltvBps > 0n ? ` • LLTV: ${formatBps(lltvBps)}%` : ""
-                        }`
-                      : undefined
-                  }
-                >
+                <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                   <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">
                     <span className="hidden sm:inline">Utilization</span>
                     <span className="sm:hidden">LTV</span>
                   </span>
-                  <HealthStatus utilizationPercentage={utilizationPercentage} />
-                  {(ltvBps > 0n || lltvBps > 0n) && (
-                    <span className="text-[10px] text-base-content/50 font-semibold tabular-nums">
-                      {currentLtvLabel ? `${currentLtvLabel} • ` : ""}
-                      {ltvBps > 0n ? `${formatBps(ltvBps)}%` : "—"}
-                      {lltvBps > 0n && ` • LLTV ${formatBps(lltvBps)}%`}
-                    </span>
-                  )}
+                  {/* Default: show bar */}
+                  <div className="group-hover/util:hidden">
+                    <HealthStatus utilizationPercentage={utilizationPercentage} />
+                  </div>
+                  {/* On hover: show Current and LLTV breakdown */}
+                  <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
+                    {currentLtvBps > 0n || lltvBps > 0n ? (
+                      <>
+                        <span className="text-base-content/70">
+                          <span className="text-[10px] text-base-content/50">Current </span>
+                          {currentLtvLabel || "0%"}
+                        </span>
+                        {lltvBps > 0n && (
+                          <>
+                            <span className="text-base-content/30">•</span>
+                            <span className="text-base-content/70">
+                              <span className="text-[10px] text-base-content/50">LLTV </span>
+                              {formatBps(lltvBps)}%
+                            </span>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-base-content/50">—</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -150,4 +150,12 @@ interface ComptrollerInterface {
      * @return The address of the oracle
      */
     function oracle() external view returns (address);
+
+    /**
+     * @notice Returns the liquidation threshold for a vToken market (Venus V4)
+     * @dev This is higher than collateralFactor - collateralFactor is LTV, liquidationThreshold is LLTV
+     * @param vToken The vToken market address
+     * @return The liquidation threshold mantissa (scaled by 1e18)
+     */
+    function liquidationThreshold(address vToken) external view returns (uint256);
 }

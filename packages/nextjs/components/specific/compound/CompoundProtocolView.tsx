@@ -329,8 +329,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
           forceShowAll={forceShowAll}
           networkType="evm"
           chainId={chainId}
-        enabledFeatures={enabledFeatures}
-        inlineMarkets={true}
+          enabledFeatures={enabledFeatures}
+          inlineMarkets={true}
+          hideUtilization={true}
       />
     </div>
   );
