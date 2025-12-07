@@ -895,6 +895,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               collaterals={availableCollaterals}
               debtOptions={debtOptions}
               market={protocolName.toLowerCase().includes("compound") ? (availableCollaterals[0]?.address as Address) : undefined}
+              maxLtvBps={ltvBps > 0n ? ltvBps : 8000n}
+              lltvBps={lltvBps > 0n ? lltvBps : 8500n}
             />
           )}
 
