@@ -181,6 +181,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return availableCollaterals;
   }, [availableCollaterals, borrowedPositions]);
 
+  // APY maps for multiply modal
+  const supplyApyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    suppliedPositions.forEach(p => { map[p.tokenAddress.toLowerCase()] = p.currentRate; });
+    return map;
+  }, [suppliedPositions]);
+
+  const borrowApyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    borrowedPositions.forEach(p => { map[p.tokenAddress.toLowerCase()] = Math.abs(p.currentRate); });
+    return map;
+  }, [borrowedPositions]);
 
   // Calculate net balance.
   const netBalance = useMemo(() => {
@@ -897,6 +909,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               market={protocolName.toLowerCase().includes("compound") ? (availableCollaterals[0]?.address as Address) : undefined}
               maxLtvBps={ltvBps > 0n ? ltvBps : 8000n}
               lltvBps={lltvBps > 0n ? lltvBps : 8500n}
+              supplyApyMap={supplyApyMap}
+              borrowApyMap={borrowApyMap}
             />
           )}
 
