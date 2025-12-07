@@ -18,7 +18,7 @@ interface DepositModalProps {
 
 export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId, market }) => {
   const { buildDepositFlow } = useKapanRouterV2();
-  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId);
+  const { balance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
   const normalizedProtocolName = protocolName.toLowerCase();
 
   if (token.decimals == null) {

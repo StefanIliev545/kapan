@@ -24,24 +24,25 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
   currentDebt,
   position,
 }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "stark");
+  const { balance, decimals } = useTokenBalance(token.address, "stark", undefined, token.decimals);
+  const decimalsForAction = decimals ?? token.decimals ?? 18;
   const { execute, buildCalls } = useLendingAction(
     "stark",
     "Borrow",
     token.address,
     protocolName,
-    decimals,
+    decimalsForAction,
     vesuContext,
   );
   if (token.decimals == null) {
-    token.decimals = decimals;
+    token.decimals = decimalsForAction;
   }
   return (
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
       action="Borrow"
-      token={{ ...token, decimals }}
+      token={{ ...token, decimals: decimalsForAction }}
       protocolName={protocolName}
       apyLabel="Borrow APY"
       apy={token.currentRate}

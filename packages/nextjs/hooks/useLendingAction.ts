@@ -29,7 +29,7 @@ export const useLendingAction = (
   // Starknet hooks
   const { address: starkAddress, account: starkAccount } = useStarkAccount();
   const sendTxn = useSmartTransactor();
-  const { balance: starkWalletBalanceHook = 0n } = useTokenBalance(tokenAddress, "stark");
+  const { balance: starkWalletBalanceHook = 0n } = useTokenBalance(tokenAddress, "stark", undefined, decimals);
   const { data: starkRouterGateway } = useStarkDeployedContractInfo("RouterGateway");
   const starkWalletBalance = walletBalanceParam ?? starkWalletBalanceHook;
   const { getAuthorizations, isReady: isAuthReady } = useLendingAuthorizations();
@@ -72,7 +72,7 @@ export const useLendingAction = (
 
   // Build Starknet calls
   const buildStarkCalls = async (amount: string, isMax = false): Promise<Call[] | null> => {
-    if (!starkAddress || !starkAccount || !decimals) return null;
+    if (!starkAddress || !starkAccount || decimals == null) return null;
     
     // For VesuV2 direct vault interactions (vToken positions with zero counterpart)
     const shouldUseDirectVault = isVesuV2 && vtokenAddress && isVTokenPositionCheck && (

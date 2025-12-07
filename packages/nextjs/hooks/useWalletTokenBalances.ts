@@ -16,7 +16,13 @@ type TokenBalanceResult = Record<string, { balance: bigint; decimals?: number }>
 
 export const normalizeAddress = (address: string) => address.toLowerCase();
 
-const getCallResult = (response: unknown) => (response as { result?: string[] })?.result;
+const getCallResult = (response: unknown): string[] | undefined => {
+  // starknet.js v6+ returns array directly, older versions return { result: [...] }
+  if (Array.isArray(response)) {
+    return response as string[];
+  }
+  return (response as { result?: string[] })?.result;
+};
 
 const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
   const { address } = useEvmAccount();
@@ -101,41 +107,68 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
     queryFn: async (): Promise<TokenBalanceResult> => {
       if (!provider || !address) return {};
 
+      const parseUint256 = (response?: unknown) => {
+        const result = getCallResult(response);
+
+        if (!result || result.length === 0) return 0n;
+
+        if (result.length >= 2) {
+          const low = BigInt(result[0]);
+          const high = BigInt(result[1]);
+          return (high << 128n) + low;
+        }
+
+        return BigInt(result[0]);
+      };
+
       const balancesAndDecimals = await Promise.all(
         tokens.map(async token => {
-          try {
-            const [balanceResponse, decimalsResponse] = await Promise.all([
-              provider.callContract({
+          const fetchBalance = async () => {
+            try {
+              const balanceResponse = await provider.callContract({
                 contractAddress: token.address as `0x${string}`,
                 entrypoint: "balance_of",
                 calldata: [address as `0x${string}`],
-              }),
-              token.decimals === undefined
-                ? provider.callContract({
-                    contractAddress: token.address as `0x${string}`,
-                    entrypoint: "decimals",
-                    calldata: [],
-                  })
-                : Promise.resolve(null),
-            ]);
+              });
 
-            const balanceRaw = getCallResult(balanceResponse)?.[0];
-            const balance = balanceRaw ? BigInt(balanceRaw) : 0n;
+              return parseUint256(balanceResponse);
+            } catch (balanceOfError) {
+              try {
+                const camelBalanceResponse = await provider.callContract({
+                  contractAddress: token.address as `0x${string}`,
+                  entrypoint: "balanceOf",
+                  calldata: [address as `0x${string}`],
+                });
 
-            const decimalsResult = decimalsResponse ? getCallResult(decimalsResponse)?.[0] : undefined;
+                return parseUint256(camelBalanceResponse);
+              } catch (camelBalanceError) {
+                console.warn("Failed to fetch Starknet balance for", token.address, balanceOfError, camelBalanceError);
+                return 0n;
+              }
+            }
+          };
 
-            const decimals =
-              token.decimals !== undefined
-                ? token.decimals
-                : decimalsResult !== undefined
-                  ? Number(BigInt(decimalsResult))
-                  : undefined;
+          const fetchDecimals = async () => {
+            if (token.decimals !== undefined) return token.decimals;
 
-            return { balance, decimals };
-          } catch (error) {
-            console.warn("Failed to fetch Starknet balance for", token.address, error);
-            return { balance: 0n, decimals: token.decimals };
-          }
+            try {
+              const decimalsResponse = await provider.callContract({
+                contractAddress: token.address as `0x${string}`,
+                entrypoint: "decimals",
+                calldata: [],
+              });
+
+              const decimalsResult = getCallResult(decimalsResponse)?.[0];
+              return decimalsResult !== undefined ? Number(BigInt(decimalsResult)) : undefined;
+            } catch (decimalsError) {
+              console.warn("Failed to fetch Starknet decimals for", token.address, decimalsError);
+              return undefined;
+            }
+          };
+
+          const [balance, decimals] = await Promise.all([fetchBalance(), fetchDecimals()]);
+
+          return { balance, decimals };
         }),
       );
 
