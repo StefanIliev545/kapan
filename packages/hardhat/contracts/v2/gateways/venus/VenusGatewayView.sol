@@ -380,25 +380,129 @@ contract VenusGatewayView is Ownable {
         return collateralAddresses;
     }
     
-    function getLtv(address token, address user) external view returns (uint256) {
-        // For Venus, LTV is typically around 50-75% depending on the asset
-        // We would ideally get this from the Comptroller's collateralFactors for the specific vToken
+    function _weightedCollateralFactorBps(address user) internal view returns (uint256) {
+        // Ensure comptroller has code
+        if (address(comptroller).code.length == 0) return 0;
         
-        // Get the vToken address for this token
-        address vTokenAddress;
-        try this.getVTokenForUnderlying(token) returns (address vToken) {
-            vTokenAddress = vToken;
+        // Get assets directly from comptroller
+        VTokenInterface[] memory vTokens;
+        try comptroller.getAssetsIn(user) returns (VTokenInterface[] memory v) {
+            vTokens = v;
         } catch {
-            // If token is not found in Venus, return 0 LTV
             return 0;
         }
         
-        // In a real implementation, we would get the collateral factor from Comptroller:
-        // (, uint collateralFactorMantissa) = comptroller.markets(vTokenAddress);
+        if (vTokens.length == 0) return 0;
         
-        // For simplicity, we'll return a default LTV of 75% (expressed as 0.75 * 1e18)
-        // In a production environment, this should be replaced with the actual collateral factor
-        return 75 * 1e16; // 75% * 1e18 = 75 * 1e16
+        uint256 totalCollateralValue;
+        uint256 totalAllowedBorrow;
+
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+            
+            uint256 vBalance;
+            try vTokens[i].balanceOf(user) returns (uint256 b) { vBalance = b; } catch { continue; }
+            if (vBalance == 0) continue;
+
+            uint256 exchangeRate;
+            try vTokens[i].exchangeRateStored() returns (uint256 rate) { exchangeRate = rate; } catch { continue; }
+
+            uint256 underlyingAmount = (vBalance * exchangeRate) / 1e18;
+            
+            uint256 price;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) { price = p; } catch { continue; }
+            
+            uint256 collateralValue = (underlyingAmount * price) / 1e18;
+            totalCollateralValue += collateralValue;
+
+            // Venus v4: markets returns (isListed, collateralFactorMantissa, liquidationThresholdMantissa)
+            try comptroller.markets(vTokenAddr) returns (
+                bool /* isListed */,
+                uint256 collateralFactorMantissa,
+                uint256 /* liquidationThresholdMantissa */
+            ) {
+                totalAllowedBorrow += (collateralValue * collateralFactorMantissa) / 1e18;
+            } catch {
+                continue;
+            }
+        }
+
+        if (totalCollateralValue == 0) return 0;
+
+        return (totalAllowedBorrow * 10_000) / totalCollateralValue;
+    }
+
+    /// @notice Calculate weighted liquidation threshold (LLTV) across user's collateral positions
+    /// @dev Uses Venus V4's liquidationThreshold which is higher than collateralFactor
+    function _weightedLiquidationThresholdBps(address user) internal view returns (uint256) {
+        // Ensure comptroller has code
+        if (address(comptroller).code.length == 0) return 0;
+        
+        // Get assets directly from comptroller
+        VTokenInterface[] memory vTokens;
+        try comptroller.getAssetsIn(user) returns (VTokenInterface[] memory v) {
+            vTokens = v;
+        } catch {
+            return 0;
+        }
+        
+        if (vTokens.length == 0) return 0;
+        
+        uint256 totalCollateralValue;
+        uint256 totalLiquidationThreshold;
+
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+
+            uint256 vBalance;
+            try vTokens[i].balanceOf(user) returns (uint256 b) { vBalance = b; } catch { continue; }
+            if (vBalance == 0) continue;
+
+            uint256 exchangeRate;
+            try vTokens[i].exchangeRateStored() returns (uint256 rate) { exchangeRate = rate; } catch { continue; }
+
+            uint256 underlyingAmount = (vBalance * exchangeRate) / 1e18;
+            
+            uint256 price;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) { price = p; } catch { continue; }
+            
+            uint256 collateralValue = (underlyingAmount * price) / 1e18;
+            totalCollateralValue += collateralValue;
+
+            // Venus v4: markets returns (isListed, collateralFactorMantissa, liquidationThresholdMantissa)
+            // Use liquidationThresholdMantissa when available, otherwise fall back to collateralFactorMantissa.
+            try comptroller.markets(vTokenAddr) returns (
+                bool /* isListed */,
+                uint256 collateralFactorMantissa,
+                uint256 liquidationThresholdMantissa
+            ) {
+                uint256 liqThreshold = liquidationThresholdMantissa == 0
+                    ? collateralFactorMantissa
+                    : liquidationThresholdMantissa;
+
+                totalLiquidationThreshold += (collateralValue * liqThreshold) / 1e18;
+            } catch {
+                continue;
+            }
+        }
+
+        if (totalCollateralValue == 0) return 0;
+
+        return (totalLiquidationThreshold * 10_000) / totalCollateralValue;
+    }
+
+    /// @notice Returns the LTV (borrowing power) for a user in basis points
+    /// @dev Uses collateralFactor which determines how much can be borrowed
+    function getLtv(address /* token */, address user) external view returns (uint256 result) {
+        if (user == address(0)) return 0;
+        return _weightedCollateralFactorBps(user);
+    }
+
+    /// @notice Returns the LLTV (liquidation threshold) for a user in basis points
+    /// @dev Uses liquidationThreshold which is higher than LTV - the point at which liquidation occurs
+    function getMaxLtv(address /* token */, address user) external view returns (uint256 result) {
+        if (user == address(0)) return 0;
+        return _weightedLiquidationThresholdBps(user);
     }
 }
 

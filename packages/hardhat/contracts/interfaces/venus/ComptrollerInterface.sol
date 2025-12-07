@@ -84,12 +84,21 @@ interface ComptrollerInterface {
     
     /**
      * @notice Return information about a specific market
+     * @dev On Venus v4 core pool, the third value is the liquidation threshold,
+     *      NOT an "isComped" flag as on some older Comptroller variants.
      * @param vToken The vToken address to get market data for
      * @return isListed Whether the market is listed
-     * @return collateralFactorMantissa The collateral factor for the market
-     * @return isComped Whether the market is included in XVS distribution
+     * @return collateralFactorMantissa The collateral factor (LTV) for the market (scaled by 1e18)
+     * @return liquidationThresholdMantissa The liquidation threshold (LLTV) for the market (scaled by 1e18)
      */
-    function markets(address vToken) external view returns (bool isListed, uint collateralFactorMantissa, bool isComped);
+    function markets(address vToken)
+        external
+        view
+        returns (
+            bool isListed,
+            uint256 collateralFactorMantissa,
+            uint256 liquidationThresholdMantissa
+        );
     
     /**
      * @notice Get the account liquidity information

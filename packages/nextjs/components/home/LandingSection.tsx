@@ -180,8 +180,8 @@ const LandingSection = () => {
                 <ProtocolView
                   protocolName="Vesu"
                   protocolIcon="/logos/vesu.svg"
-                  ltv={62}
-                  maxLtv={80}
+                  ltvBps={6200n}
+                  lltvBps={8000n}
                   suppliedPositions={[
                     { icon: "/logos/usdc.svg", name: "USDC", tokenPrice: 100000000n, balance: 12000, tokenBalance: BigInt(12000 * 10 ** 6), currentRate: 3.1, tokenAddress: "0x01", tokenDecimals: 6 },
                   ]}
@@ -203,8 +203,8 @@ const LandingSection = () => {
                 <ProtocolView
                   protocolName="Nostra"
                   protocolIcon="/logos/nostra.svg"
-                  ltv={58}
-                  maxLtv={75}
+                  ltvBps={5800n}
+                  lltvBps={7500n}
                   suppliedPositions={[
                     { icon: "/logos/weth.svg", name: "ETH", tokenPrice: 320000000000n, balance: 3200, tokenBalance: BigInt(1 * 10 ** 18), currentRate: 2.7, tokenAddress: "0x03", tokenDecimals: 18 },
                   ]}
@@ -228,8 +228,8 @@ const LandingSection = () => {
                 <ProtocolView
                   protocolName="Aave"
                   protocolIcon="/logos/aave.svg"
-                  ltv={65}
-                  maxLtv={80}
+                  ltvBps={6500n}
+                  lltvBps={8000n}
                   suppliedPositions={[
                     { icon: "/logos/eth.svg", name: "ETH", tokenPrice: 425000000000n, balance: 5240.21, tokenBalance: BigInt(5.5 * 10 ** 18), currentRate: 2.8, tokenAddress: "0x0000000000000000000000000000000000000000", tokenDecimals: 18 },
                   ]}
@@ -251,8 +251,8 @@ const LandingSection = () => {
                 <ProtocolView
                   protocolName="Compound"
                   protocolIcon="/logos/compound.svg"
-                  ltv={60}
-                  maxLtv={75}
+                  ltvBps={6000n}
+                  lltvBps={7500n}
                   suppliedPositions={[
                     { icon: "/logos/usdc.svg", name: "USDC", tokenPrice: 100000000n, balance: 1250.0, tokenBalance: BigInt(750 * 10 ** 6), currentRate: 3.2, tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", tokenDecimals: 6 },
                   ]}

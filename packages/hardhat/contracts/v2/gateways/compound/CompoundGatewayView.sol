@@ -216,14 +216,22 @@ contract CompoundGatewayView is Ownable {
         return getBorrowBalance(token, user);
     }
 
-    function getLtv(address /* token */, address /* user */) external pure returns (uint256) {
-        // TODO: Implement
-        return 0;
+    function getLtv(address token, address user) external view returns (uint256) {
+        ICompoundComet comet = getComet(token);
+        (uint256 totalCollateralValue, uint256 totalBorrowAdjusted) = _collateralTotalsWithFactor(comet, user, false);
+
+        if (totalCollateralValue == 0) return 0;
+
+        return (totalBorrowAdjusted * 10_000) / totalCollateralValue;
     }
 
-    function getMaxLtv(address /* token */) external pure returns (uint256) {
-        // TODO: Implement
-        return 0;
+    function getMaxLtv(address token, address user) external view returns (uint256) {
+        ICompoundComet comet = getComet(token);
+        (uint256 totalCollValue, uint256 totalLiqAdjValue) = _collateralTotalsWithFactor(comet, user, true);
+
+        if (totalCollValue == 0) return 0;
+
+        return (totalLiqAdjValue * 10_000) / totalCollValue;
     }
 
     function getPossibleCollaterals(address token, address user) external view returns (
@@ -372,8 +380,51 @@ contract CompoundGatewayView is Ownable {
             ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
             collateralAddresses[i] = info.asset;
         }
-        
+
         return collateralAddresses;
+    }
+
+    function getCollateralFactors(address market)
+        external
+        view
+        returns (address[] memory assets, uint256[] memory ltvBps, uint256[] memory lltvBps)
+    {
+        ICompoundComet comet = getComet(market);
+        uint8 numAssets = comet.numAssets();
+
+        assets = new address[](numAssets);
+        ltvBps = new uint256[](numAssets);
+        lltvBps = new uint256[](numAssets);
+
+        for (uint8 i = 0; i < numAssets; i++) {
+            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
+            assets[i] = info.asset;
+            ltvBps[i] = (uint256(info.borrowCollateralFactor) * 10_000) / 1e18;
+            lltvBps[i] = (uint256(info.liquidateCollateralFactor) * 10_000) / 1e18;
+        }
+    }
+
+    function _collateralTotalsWithFactor(ICompoundComet comet, address account, bool useLiquidationFactor)
+        internal
+        view
+        returns (uint256 totalCollateralValue, uint256 totalAdjusted)
+    {
+        uint8 numAssets = comet.numAssets();
+        for (uint8 i = 0; i < numAssets; i++) {
+            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
+            (uint128 colBalance,) = comet.userCollateral(account, info.asset);
+
+            if (colBalance == 0) continue;
+
+            uint256 price = comet.getPrice(info.priceFeed);
+            uint256 collateralValue = (uint256(colBalance) * price) / uint256(info.scale);
+
+            totalCollateralValue += collateralValue;
+            uint256 factor = useLiquidationFactor
+                ? uint256(info.liquidateCollateralFactor)
+                : uint256(info.borrowCollateralFactor);
+            totalAdjusted += (collateralValue * factor) / 1e18;
+        }
     }
 }
 

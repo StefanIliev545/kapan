@@ -124,6 +124,22 @@ contract AaveGatewayViewBase {
         return getBorrowBalance(token, user);
     }
 
+    /// @notice Returns the liquidation threshold (LLTV) for a given user in basis points.
+    /// @dev The market parameter is unused and kept for interface consistency across gateways.
+    function getMaxLtv(address /* market */, address user) external view returns (uint256) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        (, , , uint256 currentLiquidationThreshold, ,) = pool.getUserAccountData(user);
+        return currentLiquidationThreshold;
+    }
+
+    /// @notice Returns the configured maximum LTV for the user in basis points.
+    /// @dev The market parameter is unused and kept for interface consistency across gateways.
+    function getLtv(address /* market */, address user) external view returns (uint256) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        (, , , , uint256 ltv,) = pool.getUserAccountData(user);
+        return ltv;
+    }
+
     function borrowedTokens(address user) external view returns (address[] memory) {
         IPool pool = IPool(poolAddressesProvider.getPool());
         IPoolDataProvider dataProvider = IPoolDataProvider(poolAddressesProvider.getPoolDataProvider());

@@ -26,8 +26,6 @@ export const NostraProtocolView: FC = () => {
     <ProtocolView
       protocolName="Nostra"
       protocolIcon="/logos/nostra.svg"
-      ltv={75}
-      maxLtv={90}
       suppliedPositions={suppliedPositions}
       borrowedPositions={borrowedPositions}
       forceShowAll={!viewingAddress}

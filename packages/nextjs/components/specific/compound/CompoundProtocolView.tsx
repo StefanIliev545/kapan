@@ -9,6 +9,7 @@ import { Abi } from "abitype";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SwapAsset } from "../../modals/SwapModalShell";
 import { useGlobalState } from "~~/services/store/store";
+import { useRiskParams } from "~~/hooks/useRiskParams";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -109,6 +110,18 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       return acc;
     }, [] as { baseToken: Address; idx: number }[]);
   }, [baseTokens, compoundResults]);
+
+  const marketForRisk = useMemo(() => {
+    if (activeMarketsForCollateral.length > 0) return activeMarketsForCollateral[0].baseToken;
+    return baseTokens[0];
+  }, [activeMarketsForCollateral, baseTokens]);
+
+  const { ltvBps, lltvBps } = useRiskParams({
+    gateway: gatewayAddress,
+    gatewayAbi: gateway?.abi,
+    marketOrToken: marketForRisk,
+    user: queryAddress,
+  });
 
   const depositedIndexByBase = useMemo(() => {
     const indexMap = new Map<number, number>();
@@ -302,24 +315,23 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     setProtocolTotals("Compound", totalSupplied, totalBorrowed);
   }, [filteredBorrowedPositions, filteredSuppliedPositions, noMarkets, setProtocolTotals]);
 
-  // Hardcode current LTV (or fetch from contract if needed).
-  const currentLtv = 75;
+  const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
 
   return (
     <div>
-      <ProtocolView
-        protocolName="Compound V3"
-        protocolIcon="/logos/compound.svg"
-        ltv={currentLtv as any}
-        maxLtv={undefined as any}
-        suppliedPositions={filteredSuppliedPositions}
-        borrowedPositions={filteredBorrowedPositions}
-        hideUtilization={true}
-        forceShowAll={forceShowAll}
-        networkType="evm"
-        chainId={chainId}
-        enabledFeatures={enabledFeatures}
-        inlineMarkets={true}
+        <ProtocolView
+          protocolName="Compound V3"
+          protocolIcon="/logos/compound.svg"
+          ltvBps={ltvBps}
+          lltvBps={lltvValue}
+          suppliedPositions={filteredSuppliedPositions}
+          borrowedPositions={filteredBorrowedPositions}
+          forceShowAll={forceShowAll}
+          networkType="evm"
+          chainId={chainId}
+          enabledFeatures={enabledFeatures}
+          inlineMarkets={true}
+          hideUtilization={true}
       />
     </div>
   );

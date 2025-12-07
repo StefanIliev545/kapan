@@ -10,6 +10,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { FiRepeat } from "react-icons/fi";
+import { formatBps } from "~~/utils/risk";
 
 interface CollateralPosition {
   icon: string;
@@ -136,6 +137,29 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
       enabled: shouldFetch,
     },
   });
+
+  const { data: collateralFactors } = useScaffoldReadContract({
+    contractName: "CompoundGatewayView",
+    functionName: "getCollateralFactors",
+    args: [baseToken],
+    chainId: chainId as any,
+    query: {
+      enabled: shouldFetch,
+    },
+  });
+
+  const factorMap = useMemo(() => {
+    if (!collateralFactors) return new Map<string, { ltvBps: bigint; lltvBps: bigint }>();
+    const [assets, ltvList, lltvList] = collateralFactors as [string[], bigint[], bigint[]];
+    const map = new Map<string, { ltvBps: bigint; lltvBps: bigint }>();
+    assets.forEach((asset, idx) => {
+      map.set(asset.toLowerCase(), {
+        ltvBps: ltvList?.[idx] ?? 0n,
+        lltvBps: lltvList?.[idx] ?? 0n,
+      });
+    });
+    return map;
+  }, [collateralFactors]);
 
   // Ensure baseTokenDecimals is in the expected array format
   const baseTokenDecimalsArray =
@@ -281,6 +305,24 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     return (borrowDetails.borrowValue / totalCollateralValue) * 100;
   }, [borrowDetails.borrowValue, totalCollateralValue]);
 
+  // Calculate weighted LLTV based on user's collateral positions
+  const weightedLltvBps = useMemo(() => {
+    if (totalCollateralValue <= 0 || allCollateralPositions.length === 0) return 0n;
+    let totalWeightedLltv = 0n;
+    let totalWeight = 0n;
+    for (const pos of allCollateralPositions) {
+      if (pos.usdValue > 0) {
+        const factors = factorMap.get(pos.address.toLowerCase());
+        if (factors?.lltvBps) {
+          const weight = BigInt(Math.floor(pos.usdValue * 100));
+          totalWeightedLltv += factors.lltvBps * weight;
+          totalWeight += weight;
+        }
+      }
+    }
+    return totalWeight > 0n ? totalWeightedLltv / totalWeight : 0n;
+  }, [allCollateralPositions, factorMap, totalCollateralValue]);
+
   // Check if any position has a balance and auto-show all if none do, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
     // Skip this logic if initialShowAll was explicitly provided
@@ -375,10 +417,29 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
                 {/* Utilization indicator - lowest priority, will disappear first */}
                 {totalCollateralValue > 0 && (
-                  <div className="hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
+                  <div className="group/util hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
                     <span className="text-xs text-base-content/70 whitespace-nowrap">Utilization:</span>
-                    <UserUtilization utilizationPercentage={utilizationPercentage} />
-                    <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline">
+                    {/* Default: show bar */}
+                    <div className="group-hover/util:hidden">
+                      <UserUtilization utilizationPercentage={utilizationPercentage} />
+                    </div>
+                    {/* On hover: show Current and LLTV breakdown */}
+                    <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
+                      <span className="text-base-content/70">
+                        <span className="text-[10px] text-base-content/50">Current </span>
+                        {utilizationPercentage.toFixed(1)}%
+                      </span>
+                      {weightedLltvBps > 0n && (
+                        <>
+                          <span className="text-base-content/30">•</span>
+                          <span className="text-base-content/70">
+                            <span className="text-[10px] text-base-content/50">LLTV </span>
+                            {formatBps(weightedLltvBps)}%
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline group-hover/util:hidden">
                       ({formatUSD(borrowDetails.borrowValue)} / {formatUSD(totalCollateralValue)})
                     </span>
                   </div>
@@ -403,8 +464,8 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
               {collateralPositions.map((position: CollateralPosition) => (
                 <div
                   key={position.address}
-                  className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border 
-                    ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"} 
+                  className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border
+                    ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"}
                     hover:bg-base-200/50 flex items-center overflow-hidden`}
                 >
                   <div className="flex gap-1">
