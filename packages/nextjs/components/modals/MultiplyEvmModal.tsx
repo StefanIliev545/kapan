@@ -280,19 +280,28 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   className="flex-1 bg-transparent text-xl font-medium outline-none min-w-0 placeholder:text-base-content/30"
                 />
                 <div className="dropdown dropdown-end">
-                  <label tabIndex={0} className="btn btn-xs gap-1 bg-primary/20 border-0 hover:bg-primary/30 rounded-full px-2">
+                  <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
                     {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
                     <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                    <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </label>
-                  <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-40 border border-base-300/30 mt-2">
-                    {collateralsWithWalletBalance.map(c => (
-                      <li key={c.address}>
-                        <a onClick={() => setCollateral(c)} className={`flex items-center gap-2 text-sm ${collateral?.address === c.address ? "active" : ""}`}>
-                          <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
-                          {c.symbol}
-                        </a>
-                      </li>
-                    ))}
+                  <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                    {collateralsWithWalletBalance.map(c => {
+                      const bal = Number(formatUnits(c.walletBalance, c.decimals));
+                      return (
+                        <li key={c.address}>
+                          <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
+                            <div className="flex items-center gap-2">
+                              <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
+                              {c.symbol}
+                            </div>
+                            <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                          </a>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
@@ -315,19 +324,28 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   {shortAmount > 0 ? shortAmount.toFixed(4) : "0"}
                 </div>
                 <div className="dropdown dropdown-end">
-                  <label tabIndex={0} className="btn btn-xs gap-1 bg-base-300/50 border-0 hover:bg-base-300/70 rounded-full px-2 cursor-pointer">
+                  <label tabIndex={0} className="btn btn-xs gap-1.5 bg-base-300/30 border-0 hover:bg-base-300/50 rounded-lg px-2 cursor-pointer">
                     {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
                     <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                    <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </label>
-                  <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-40 border border-base-300/30 mt-2">
-                    {debtOptions.map(d => (
-                      <li key={d.address}>
-                        <a onClick={() => setDebt(d)} className={`flex items-center gap-2 text-sm ${debt?.address === d.address ? "active" : ""}`}>
-                          <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
-                          {d.symbol}
-                        </a>
-                      </li>
-                    ))}
+                  <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                    {debtOptions.map(d => {
+                      const bal = Number(formatUnits(d.rawBalance, d.decimals));
+                      return (
+                        <li key={d.address}>
+                          <a onClick={() => setDebt(d)} className={`flex items-center justify-between text-sm ${debt?.address === d.address ? "active" : ""}`}>
+                            <div className="flex items-center gap-2">
+                              <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
+                              {d.symbol}
+                            </div>
+                            <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                          </a>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
@@ -401,24 +419,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           </div>
 
           {/* Metrics - Horizontal Grid */}
-          <div className="grid grid-cols-5 gap-2 mb-4 text-sm">
+          <div className="grid grid-cols-4 gap-2 mb-4 text-sm">
             <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">Health</div>
-              <div className={`text-sm ${metrics.healthFactor < 1.5 ? "text-error font-medium" : metrics.healthFactor < 2 ? "text-warning font-medium" : "font-medium"}`}>
-                {Number.isFinite(metrics.healthFactor) && metrics.healthFactor > 0 ? metrics.healthFactor.toFixed(2) : "∞"}
-              </div>
+              <div className="text-base-content/50 text-xs mb-0.5">LTV / Max</div>
+              <div className="font-medium text-sm">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(lltvBps)}%</div>
             </div>
             <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">LTV</div>
-              <div className="font-medium text-sm">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"}</div>
-            </div>
-            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">Liq. Price</div>
-              <div className="font-medium text-sm">{metrics.liquidationPrice && metrics.liquidationPrice > 0 ? `$${metrics.liquidationPrice.toFixed(2)}` : "-"}</div>
-            </div>
-            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">Price</div>
+              <div className="text-base-content/50 text-xs mb-0.5">{collateral?.symbol} Price</div>
               <div className="font-medium text-sm">{collateralPrice > 0 ? `$${collateralPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "-"}</div>
+            </div>
+            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
+              <div className="text-base-content/50 text-xs mb-0.5">{debt?.symbol} Price</div>
+              <div className="font-medium text-sm">{debt ? `$${Number(formatUnits(debt.price ?? 0n, 8)).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "-"}</div>
             </div>
             <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
               <div className="text-base-content/50 text-xs mb-0.5">Net APY</div>
