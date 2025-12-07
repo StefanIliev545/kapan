@@ -19,6 +19,7 @@ import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { formatBps } from "~~/utils/risk";
+import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
 
 
 export interface ProtocolPosition {
@@ -127,6 +128,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [selectedToken, setSelectedToken] = useState<ProtocolPosition | null>(null);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [selectedSwapPosition, setSelectedSwapPosition] = useState<ProtocolPosition | null>(null);
+  const [isMultiplyModalOpen, setIsMultiplyModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [selectedClosePosition, setSelectedClosePosition] = useState<ProtocolPosition | null>(null);
   const [isDebtSwapModalOpen, setIsDebtSwapModalOpen] = useState(false);
@@ -162,6 +164,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       price: p.tokenPrice,
     }));
   }, [suppliedPositions]);
+
+  const debtOptions = useMemo(() => {
+    const mapped = borrowedPositions.map(p => ({
+      symbol: p.name,
+      address: p.tokenAddress,
+      decimals: p.tokenDecimals || 18,
+      rawBalance: p.tokenBalance,
+      balance: p.balance,
+      icon: p.icon,
+      usdValue: p.balance,
+      price: p.tokenPrice,
+    }));
+
+    if (mapped.length > 0) return mapped;
+    return availableCollaterals;
+  }, [availableCollaterals, borrowedPositions]);
 
 
   // Calculate net balance.
@@ -278,6 +296,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const handleAddSupply = () => {
     if (readOnly) return;
     setIsTokenSelectModalOpen(true);
+  };
+
+  const handleOpenMultiply = () => {
+    if (readOnly) return;
+    setIsMultiplyModalOpen(true);
   };
 
   // Handle closing the token select modal for supply
@@ -556,16 +579,32 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       ))}
                     </div>
 
-                    {/* "Add Supply" button - pinned to bottom with gap */}
+                    {/* Primary actions pinned to bottom */}
                     {!readOnly && (
-                      <div className="mt-auto pt-4">
-                        <button
-                          className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200"
-                          onClick={handleAddSupply}
-                        >
-                          <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                          <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
-                        </button>
+                      <div className="mt-auto pt-4 flex flex-col gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200"
+                            onClick={handleAddSupply}
+                          >
+                            <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
+                          </button>
+
+                          <button
+                            className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200"
+                            onClick={handleOpenMultiply}
+                            disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
+                            title={
+                              availableCollaterals.length === 0 || debtOptions.length === 0
+                                ? "Supply collateral and have a debt option to build a loop"
+                                : "Build a flash-loan loop"
+                            }
+                          >
+                            <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -844,6 +883,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 balance: selectedSwapPosition.balance,
                 type: "supply"
               }}
+            />
+          )}
+
+          {isMultiplyModalOpen && (
+            <MultiplyEvmModal
+              isOpen={isMultiplyModalOpen}
+              onClose={() => setIsMultiplyModalOpen(false)}
+              protocolName={protocolName}
+              chainId={chainId || 1}
+              collaterals={availableCollaterals}
+              debtOptions={debtOptions}
+              market={protocolName.toLowerCase().includes("compound") ? (availableCollaterals[0]?.address as Address) : undefined}
             />
           )}
 
