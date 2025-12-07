@@ -6,6 +6,10 @@ import BuiltForConvenience from "../components/home/BuiltForConvenience";
 import RoadmapSection from "../components/info/RoadmapSection";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
+const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : `http://localhost:${process.env.PORT || 3000}`;
+
 export async function generateMetadata(): Promise<Metadata> {
   return getMetadata({
     title: "Kapan Finance – DeFi Lending Aggregator",
@@ -21,8 +25,8 @@ const Home: NextPage = () => {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Kapan Finance",
-    url: "https://kapan.finance",
-    logo: "https://kapan.finance/thumbnail.png",
+    url: baseUrl,
+    logo: `${baseUrl}/thumbnail.png`,
   };
 
   return (
