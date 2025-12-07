@@ -16,7 +16,13 @@ type TokenBalanceResult = Record<string, { balance: bigint; decimals?: number }>
 
 export const normalizeAddress = (address: string) => address.toLowerCase();
 
-const getCallResult = (response: unknown) => (response as { result?: string[] })?.result;
+const getCallResult = (response: unknown): string[] | undefined => {
+  // starknet.js v6+ returns array directly, older versions return { result: [...] }
+  if (Array.isArray(response)) {
+    return response as string[];
+  }
+  return (response as { result?: string[] })?.result;
+};
 
 const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
   const { address } = useEvmAccount();
