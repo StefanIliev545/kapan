@@ -10,7 +10,7 @@
  * @returns The sanitized symbol in uppercase with only letters and dots
  * 
  * @example
- * sanitizeSymbol("USDT₮") // Returns "USDTT"
+ * sanitizeSymbol("USD₮") // Returns "USDT"
  * sanitizeSymbol("W-ETH") // Returns "WETH"
  */
 export const sanitizeSymbol = (name: string): string => {

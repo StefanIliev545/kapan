@@ -229,6 +229,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const symbolKey = sanitizeSymbol(symbol).toLowerCase();
       const apiUsdPrice = usdPriceMap[symbolKey];
       const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
+      // API returns 0 when price is not found, so > 0 check is appropriate for fallback
       const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0 ? apiUsdPrice : fallbackPrice;
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
@@ -263,6 +264,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const collName = collNames[i] || "Collateral";
         const collateralSymbolKey = sanitizeSymbol(collName).toLowerCase();
         const directUsdPrice = usdPriceMap[collateralSymbolKey];
+        // API returns 0 when price is not found, so > 0 check is appropriate for fallback
         const collateralUsdPrice = typeof directUsdPrice === "number" && directUsdPrice > 0
           ? directUsdPrice
           : collateralPriceInBase * price;
