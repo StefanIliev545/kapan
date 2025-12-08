@@ -20,6 +20,9 @@ const ERC20_META_ABI = [
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
+// Token filter for non-connected wallet display
+const TOKEN_FILTER = new Set(["BTC", "ETH", "WETH", "USDC", "USDT", "USDC.E"]);
+
 // Helper: derive decimals from a priceScale bigint (e.g., 1e8 -> 8)
 const decimalsFromScale = (scale: bigint) => {
   if (scale <= 1n) return 0;
@@ -368,14 +371,12 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     chainId,
   ]);
 
-  const tokenFilter = new Set(["BTC", "ETH", "WETH", "USDC", "USDT", "USDC.E"]);
-
   const filteredSuppliedPositions = isWalletConnected
     ? suppliedPositions
-    : suppliedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
+    : suppliedPositions.filter(p => TOKEN_FILTER.has(sanitizeSymbol(p.name)));
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
+    : borrowedPositions.filter(p => TOKEN_FILTER.has(sanitizeSymbol(p.name)));
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
