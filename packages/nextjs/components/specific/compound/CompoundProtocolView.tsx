@@ -186,7 +186,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       });
     });
 
-    return Array.from(symbolsForPrices);
+    // Sort the array for stable reference across renders when symbols are the same
+    return Array.from(symbolsForPrices).sort();
   }, [symbols, depositedResults]);
 
   const { data: usdPriceMap = {} } = useQuery({
