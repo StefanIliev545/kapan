@@ -69,6 +69,7 @@ interface ProtocolViewProps {
   lltvBps?: bigint;
   disableMarkets?: boolean;
   inlineMarkets?: boolean;
+  disableLoop?: boolean;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -120,6 +121,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   lltvBps = 0n,
   disableMarkets = false,
   inlineMarkets = false,
+  disableLoop = false,
 }) => {
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -272,6 +274,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
   // Use effective showAll state (component state OR forced from props)
   const effectiveShowAll = isMarketsOpen || forceShowAll;
+
+  const loopingDisabled = disableLoop || protocolName.toLowerCase().includes("compound");
 
   // Filter positions based on wheter user has balance.
   // If inlineMarkets is true (e.g. Compound), clicking "Markets" (isMarketsOpen) should reveal all assets in these lists.
@@ -604,7 +608,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                           </button>
 
                           {/* Disable looping for Compound - needs fix for market context */}
-                          {!protocolName.toLowerCase().includes("compound") && (
+                          {!loopingDisabled && (
                             <button
                               className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200"
                               onClick={handleOpenMultiply}

@@ -31,6 +31,7 @@ export const NostraProtocolView: FC = () => {
       forceShowAll={!viewingAddress}
       networkType="starknet"
       disableMoveSupply
+      disableLoop
       readOnly={isViewingOtherAddress}
     />
   );
