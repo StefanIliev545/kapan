@@ -215,18 +215,22 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       if (!oldData || typeof oldData !== 'object') return newData;
       if (!newData || typeof newData !== 'object') return newData;
       
-      // If both are empty objects, return the old reference
-      if (Object.keys(oldData).length === 0 && Object.keys(newData).length === 0) {
-        return oldData;
+      const oldKeys = Object.keys(oldData);
+      const newKeys = Object.keys(newData);
+      
+      // Quick check: different number of keys means data changed
+      if (oldKeys.length !== newKeys.length) return newData;
+      
+      // Check if all keys and values are the same
+      // No need to sort since we just need to check if all keys exist with same values
+      for (const key of newKeys) {
+        if (!(key in oldData) || oldData[key] !== newData[key]) {
+          return newData;
+        }
       }
-      // If keys and values are the same, return old reference
-      const oldKeys = Object.keys(oldData).sort();
-      const newKeys = Object.keys(newData).sort();
-      if (oldKeys.length === newKeys.length &&
-          oldKeys.every((key, i) => key === newKeys[i] && oldData[key] === newData[key])) {
-        return oldData;
-      }
-      return newData;
+      
+      // Data is identical, return old reference to prevent rerender
+      return oldData;
     },
   });
 
