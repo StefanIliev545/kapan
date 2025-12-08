@@ -190,7 +190,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     return Array.from(symbolsForPrices).sort();
   }, [symbols, depositedResults]);
 
-  const { data: usdPriceMap = {} } = useQuery({
+  const { data: priceResolution } = useQuery({
     queryKey: ["compoundUsdPrices", chainId, priceSymbols.join(",")],
     enabled: priceSymbols.length > 0,
     staleTime: 60_000,
@@ -201,10 +201,26 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       if (!res.ok) {
         throw new Error(`Failed to fetch token prices: ${res.status} ${res.statusText}`);
       }
-      const json = (await res.json()) as { prices?: Record<string, number> };
-      return json.prices || {};
+      const json = (await res.json()) as { prices?: Record<string, number>; unresolved?: string[] };
+      return { prices: json.prices || {}, unresolved: json.unresolved || [] };
     },
   });
+
+  const usdPriceMap = priceResolution?.prices || {};
+  const unresolvedSymbols = useMemo(() => new Set(priceResolution?.unresolved || []), [priceResolution]);
+
+  const logFallbackUsage = (symbol: string, reason: string) => {
+    if (process.env.NODE_ENV !== "development") return;
+    const unresolvedNote = unresolvedSymbols.has(symbol) ? " (unresolved from API)" : "";
+    console.warn(`CompoundProtocolView: fallback price used for ${symbol}${unresolvedNote} -> ${reason}`);
+  };
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if ((priceResolution?.unresolved?.length || 0) > 0) {
+      console.warn("CompoundProtocolView: unresolved token prices", priceResolution?.unresolved);
+    }
+  }, [priceResolution]);
 
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
@@ -231,6 +247,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
       // API returns 0 when price is not found, so > 0 check is appropriate for fallback
       const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0 ? apiUsdPrice : fallbackPrice;
+      if (!(typeof apiUsdPrice === "number" && apiUsdPrice > 0)) {
+        logFallbackUsage(symbolKey, "using on-chain base token price");
+      }
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
@@ -268,6 +287,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const collateralUsdPrice = typeof directUsdPrice === "number" && directUsdPrice > 0
           ? directUsdPrice
           : collateralPriceInBase * price;
+        if (!(typeof directUsdPrice === "number" && directUsdPrice > 0)) {
+          logFallbackUsage(collateralSymbolKey, "derived from base-token price");
+        }
         const usdValue = Number.isFinite(collateralUsdPrice) ? bal * collateralUsdPrice : 0;
         if (Number.isFinite(usdValue)) {
           collateralValue += usdValue;
