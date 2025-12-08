@@ -628,13 +628,32 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
                     <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                     {!readOnly && (
-                      <button
-                        className="group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
-                        onClick={handleAddSupply}
-                      >
-                        <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
-                        <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
-                      </button>
+                      <div className="mt-4 flex items-center gap-2">
+                        <button
+                          className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
+                          onClick={handleAddSupply}
+                        >
+                          <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
+                        </button>
+                        
+                        {/* Disable looping for Compound - needs fix for market context */}
+                        {!protocolName.toLowerCase().includes("compound") && (
+                          <button
+                            className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
+                            onClick={handleOpenMultiply}
+                            disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
+                            title={
+                              availableCollaterals.length === 0 || debtOptions.length === 0
+                                ? "Supply collateral and have a debt option to build a loop"
+                                : "Build a flash-loan loop"
+                            }
+                          >
+                            <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -702,7 +721,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                     {!readOnly && (
                       <button
-                        className={`group mt-4 flex items-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                        className={`group mt-4 flex items-center justify-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
                           ? "bg-primary/10 hover:bg-primary/20 text-primary"
                           : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
                           }`}
