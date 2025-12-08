@@ -257,6 +257,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const dec = Number(collDecs[i] ?? 18n);
         const bal = Number(formatUnits(balRaw, dec));
         const collateralPriceInBase = Number(formatUnits(marketPrices[i] ?? 0n, priceDecimals));
+        const name = collNames[i] || "Collateral";
         const collateralSymbolKey = sanitizeSymbol(name).toLowerCase();
         const directUsdPrice = usdPriceMap[collateralSymbolKey];
         const collateralUsdPrice = directUsdPrice ?? collateralPriceInBase * price;
@@ -268,8 +269,6 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const collateralPrice = Number.isFinite(collateralUsdPrice)
           ? BigInt(Math.round(collateralUsdPrice * 1e8))
           : undefined;
-
-        const name = collNames[i] || "Collateral";
 
         return {
           symbol: name,
