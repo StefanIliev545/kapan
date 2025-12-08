@@ -6,10 +6,11 @@ import { useAccount, useReadContracts } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { Abi } from "abitype";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SwapAsset } from "../../modals/SwapModalShell";
 import { useGlobalState } from "~~/services/store/store";
 import { useRiskParams } from "~~/hooks/useRiskParams";
+import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -169,6 +170,42 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   }, [uiHelperAddress, uiHelper, depositedResults, chainId]);
   const { data: collDecimalsResults } = useReadContracts({ allowFailure: true, contracts: collDecimalsCalls, query: { enabled: collDecimalsCalls.length > 0 } });
 
+  const priceSymbols = useMemo(() => {
+    const symbolsForPrices = new Set<string>();
+
+    symbols.forEach(sym => {
+      const clean = sanitizeSymbol(sym);
+      if (clean) symbolsForPrices.add(clean);
+    });
+
+    (depositedResults as any[] | undefined)?.forEach(res => {
+      const names = (res?.result?.[2] as string[] | undefined) || [];
+      names.forEach(n => {
+        const clean = sanitizeSymbol(n);
+        if (clean) symbolsForPrices.add(clean);
+      });
+    });
+
+    // Sort the array for stable reference across renders when symbols are the same
+    return Array.from(symbolsForPrices).sort();
+  }, [symbols, depositedResults]);
+
+  const { data: usdPriceMap = {} } = useQuery({
+    queryKey: ["compoundUsdPrices", chainId, priceSymbols.join(",")],
+    enabled: priceSymbols.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      searchParams.set("symbols", priceSymbols.join(","));
+      const res = await fetch(`/api/tokenPrice?${searchParams.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch token prices: ${res.status} ${res.statusText}`);
+      }
+      const json = (await res.json()) as { prices?: Record<string, number> };
+      return json.prices || {};
+    },
+  });
+
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
     const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
@@ -189,7 +226,11 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
       const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, priceRaw, priceScale] = compound;
       const priceDecimals = decimalsFromScale(priceScale ?? 1n);
-      const price = Number(formatUnits(priceRaw, priceDecimals));
+      const symbolKey = sanitizeSymbol(symbol).toLowerCase();
+      const apiUsdPrice = usdPriceMap[symbolKey];
+      const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
+      // API returns 0 when price is not found, so > 0 check is appropriate for fallback
+      const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0 ? apiUsdPrice : fallbackPrice;
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
@@ -220,7 +261,13 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const dec = Number(collDecs[i] ?? 18n);
         const bal = Number(formatUnits(balRaw, dec));
         const collateralPriceInBase = Number(formatUnits(marketPrices[i] ?? 0n, priceDecimals));
-        const collateralUsdPrice = collateralPriceInBase * price;
+        const collName = collNames[i] || "Collateral";
+        const collateralSymbolKey = sanitizeSymbol(collName).toLowerCase();
+        const directUsdPrice = usdPriceMap[collateralSymbolKey];
+        // API returns 0 when price is not found, so > 0 check is appropriate for fallback
+        const collateralUsdPrice = typeof directUsdPrice === "number" && directUsdPrice > 0
+          ? directUsdPrice
+          : collateralPriceInBase * price;
         const usdValue = Number.isFinite(collateralUsdPrice) ? bal * collateralUsdPrice : 0;
         if (Number.isFinite(usdValue)) {
           collateralValue += usdValue;
@@ -230,15 +277,13 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
           ? BigInt(Math.round(collateralUsdPrice * 1e8))
           : undefined;
 
-        const name = collNames[i] || "Collateral";
-
         return {
-          symbol: name,
+          symbol: collName,
           address: collAddr as Address,
           decimals: dec,
           rawBalance: balRaw,
           balance: bal,
-          icon: tokenNameToLogo(name) || "/logos/token.svg",
+          icon: tokenNameToLogo(collName) || "/logos/token.svg",
           usdValue,
           price: collateralPrice,
         };
@@ -247,6 +292,11 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const safeName = (symbol || "").replace("₮", "T");
       const icon = tokenNameToLogo(safeName) || "/logos/token.svg";
 
+      // Convert price to standard 8-decimal format for consistency
+      // If price is finite (from API or fallback), convert to bigint with 8 decimals
+      // Otherwise, use raw on-chain price which should also be in the same scale
+      const tokenPriceUsd = Number.isFinite(price) ? BigInt(Math.round(price * 1e8)) : priceRaw;
+
       supplied.push({
         icon,
         name: safeName || "Token",
@@ -254,7 +304,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         tokenBalance: balanceRaw ?? 0n,
         currentRate: supplyAPR,
         tokenAddress: base,
-        tokenPrice: priceRaw,
+        tokenPrice: tokenPriceUsd,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
       });
@@ -267,12 +317,19 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         tokenBalance: borrowBalanceRaw ?? 0n,
         currentRate: borrowAPR,
         tokenAddress: base,
-        tokenPrice: priceRaw,
+        tokenPrice: tokenPriceUsd,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
         collaterals: swapCollaterals,
         collateralView: (
-          <CompoundCollateralView baseToken={base} baseTokenDecimals={decimals} compoundData={compound} chainId={chainId} />
+          <CompoundCollateralView
+            baseToken={base}
+            baseTokenDecimals={decimals}
+            compoundData={compound}
+            chainId={chainId}
+            priceMap={usdPriceMap}
+            baseTokenSymbol={safeName}
+          />
         ),
       });
     });
@@ -288,18 +345,18 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     pricesResults,
     collDecimalsResults,
     depositedIndexByBase,
+    usdPriceMap,
     chainId,
   ]);
 
   const tokenFilter = new Set(["BTC", "ETH", "WETH", "USDC", "USDT", "USDC.E"]);
-  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
   const filteredSuppliedPositions = isWalletConnected
     ? suppliedPositions
-    : suppliedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
+    : suppliedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
+    : borrowedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 

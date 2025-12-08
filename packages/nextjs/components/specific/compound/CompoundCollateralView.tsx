@@ -11,6 +11,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { FiRepeat } from "react-icons/fi";
 import { formatBps } from "~~/utils/risk";
+import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 
 interface CollateralPosition {
   icon: string;
@@ -49,6 +50,8 @@ interface CompoundCollateralViewProps {
   isVisible?: boolean; // New prop to indicate if the collateral view is visible
   initialShowAll?: boolean; // Prop to control initial showAll state
   chainId?: number;
+  priceMap?: Record<string, number>;
+  baseTokenSymbol?: string;
 }
 
 export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
@@ -58,6 +61,8 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   isVisible = false, // Default to false if not provided
   initialShowAll = undefined, // Default to undefined (use component logic) if not provided
   chainId,
+  priceMap,
+  baseTokenSymbol,
 }) => {
   const [showAll, setShowAll] = useState(initialShowAll === undefined ? false : initialShowAll);
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
@@ -138,6 +143,8 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     },
   });
 
+  const baseTokenSymbolKey = useMemo(() => sanitizeSymbol(baseTokenSymbol || "").toLowerCase(), [baseTokenSymbol]);
+
   const { data: collateralFactors } = useScaffoldReadContract({
     contractName: "CompoundGatewayView",
     functionName: "getCollateralFactors",
@@ -167,9 +174,14 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   // Extract baseToken price in USD
   const baseTokenUsdPrice = useMemo(() => {
+    const apiPrice = priceMap?.[baseTokenSymbolKey];
+    if (typeof apiPrice === "number" && apiPrice > 0) {
+      return BigInt(Math.round(apiPrice * 1e8));
+    }
+
     if (!baseTokenPrice) return 0n;
     return baseTokenPrice;
-  }, [baseTokenPrice]);
+  }, [baseTokenPrice, priceMap, baseTokenSymbolKey]);
 
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
@@ -187,9 +199,10 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     const borrowBalance = borrowBalanceRaw ? Number(formatUnits(borrowBalanceRaw, decimals)) : 0;
 
     // Calculate USD value of the borrowed amount (price is in 8 decimals)
-    const borrowUsdValue = borrowBalance * Number(formatUnits(price, 8));
+    const price8 = baseTokenUsdPrice && baseTokenUsdPrice > 0n ? baseTokenUsdPrice : price;
+    const borrowUsdValue = borrowBalance * Number(formatUnits(price8, 8));
     return { borrowBalance, borrowValue: borrowUsdValue };
-  }, [compoundData, baseTokenDecimalsArray]);
+  }, [compoundData, baseTokenDecimalsArray, baseTokenUsdPrice]);
 
   // Process collateral data with prices
   const allCollateralPositions = useMemo(() => {
@@ -198,9 +211,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     }
 
     const [addresses, balances, displayNames] = collateralData;
-
-    // Base token price converted to a number with 8 decimals
-    const baseTokenUsdPriceNumber = baseTokenUsdPrice ? Number(formatUnits(baseTokenUsdPrice, 8)) : 0;
 
     // Create positions with price data
     const positions = addresses.map((address: string, index: number) => {
@@ -217,14 +227,19 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
       // Get collateral price in terms of baseToken
       const collateralToBasePrice = collateralPrices && index < collateralPrices.length ? collateralPrices[index] : 0n;
+      const collateralSymbolKey = sanitizeSymbol(name).toLowerCase();
+      const directUsdPrice = priceMap?.[collateralSymbolKey];
 
       // Calculate USD value using both conversion rates:
-      // 1. Convert collateral to baseToken value 
+      // 1. Convert collateral to baseToken value
       // 2. Convert baseToken value to USD
       let usdValue = 0;
       let effectiveUsdPrice = 0n;
 
-      if (collateralToBasePrice > 0n && baseTokenUsdPrice > 0n) {
+      if (typeof directUsdPrice === "number" && directUsdPrice > 0) {
+        effectiveUsdPrice = BigInt(Math.round(directUsdPrice * 1e8));
+        usdValue = balance * directUsdPrice;
+      } else if (collateralToBasePrice > 0n && baseTokenUsdPrice > 0n) {
         // Calculate the effective USD price by combining both rates
         // Convert to BigInt calculation to avoid precision issues
         const scaleFactor = 10n ** 8n; // Both prices have 8 decimals, result will have 8 decimals
@@ -247,18 +262,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     });
 
     return positions;
-  }, [collateralData, collateralPrices, collateralDecimals, baseTokenUsdPrice]);
-
-  // Refresh data when visibility changes
-  useEffect(() => {
-    if (isVisible) {
-      // You could trigger a manual refetch here if needed
-      console.log("Collateral view is now visible", {
-        baseToken,
-        baseTokenUsdPrice: baseTokenUsdPrice ? baseTokenUsdPrice.toString() : "0",
-      });
-    }
-  }, [isVisible, baseToken, baseTokenUsdPrice]);
+  }, [collateralData, collateralPrices, collateralDecimals, baseTokenUsdPrice, priceMap]);
 
   // Auto-expand all tokens when the component becomes visible, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
@@ -280,24 +284,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   const totalCollateralValue = useMemo(() => {
     return allCollateralPositions.reduce((total: number, position: CollateralPosition) => total + position.usdValue, 0);
   }, [allCollateralPositions]);
-
-  // Log debug information about pricing
-  useEffect(() => {
-    if (isVisible && baseTokenUsdPrice && allCollateralPositions.length > 0) {
-      console.log("Collateral pricing debug:", {
-        baseToken,
-        baseTokenUsdPrice: baseTokenUsdPrice.toString(),
-        baseTokenUsdValue: Number(formatUnits(baseTokenUsdPrice, 8)),
-        totalCollateralValue,
-        positions: allCollateralPositions.map(pos => ({
-          name: pos.name,
-          balance: pos.balance,
-          usdValue: pos.usdValue,
-          rawPrice: pos.rawPrice.toString(),
-        }))
-      });
-    }
-  }, [isVisible, baseToken, baseTokenUsdPrice, allCollateralPositions, totalCollateralValue]);
 
   // Calculate utilization percentage (borrowed USD / total collateral USD)
   const utilizationPercentage = useMemo(() => {
