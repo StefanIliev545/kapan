@@ -92,9 +92,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     ...c, walletBalance: walletBalances[c.address.toLowerCase()]?.balance ?? 0n,
   })), [collaterals, walletBalances]);
 
-  const currentCollateral = useMemo(() => 
+  const currentCollateral = useMemo(() =>
     collateral ? collateralsWithWalletBalance.find(c => c.address === collateral.address) : undefined,
-  [collateral, collateralsWithWalletBalance]);
+    [collateral, collateralsWithWalletBalance]);
 
   const walletBalance = currentCollateral?.walletBalance ?? 0n;
 
@@ -164,25 +164,25 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
     const cPrice = Number(formatUnits(collateral.price ?? 0n, 8));
     const dPrice = Number(formatUnits(debt.price ?? 0n, 8));
-    
+
     // Use token amounts directly for accuracy
     const marginTokens = Number(formatUnits(marginAmountRaw, collateral.decimals));
     const swappedTokens = Number(minCollateralOut.formatted);
     const totalCollateralTokens = marginTokens + swappedTokens;
     const totalCollateralUsd = totalCollateralTokens * cPrice;
-    
+
     const debtTokens = Number(formatUnits(flashLoanAmountRaw, debt.decimals));
     const debtUsd = debtTokens * dPrice;
-    
+
     const ltv = totalCollateralUsd > 0 ? (debtUsd / totalCollateralUsd) * 100 : 0;
     const lltv = Number(lltvBps) / 10000;
     const healthFactor = debtUsd > 0 ? (totalCollateralUsd * lltv) / debtUsd : Infinity;
-    
+
     // Liquidation price: price at which collateral * lltv = debt
-    const liquidationPrice = debtUsd > 0 && totalCollateralTokens > 0 
-      ? debtUsd / (totalCollateralTokens * lltv) 
+    const liquidationPrice = debtUsd > 0 && totalCollateralTokens > 0
+      ? debtUsd / (totalCollateralTokens * lltv)
       : null;
-    
+
     return { totalCollateralUsd, debtUsd, ltv, liquidationPrice, healthFactor, totalCollateralTokens };
   }, [collateral, debt, marginAmountRaw, minCollateralOut.formatted, flashLoanAmountRaw, lltvBps]);
 
@@ -191,15 +191,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     if (!collateral || !debt || metrics.totalCollateralUsd === 0) return null;
     const supplyApy = supplyApyMap[collateral.address.toLowerCase()] ?? 0;
     const borrowApy = borrowApyMap[debt.address.toLowerCase()] ?? 0;
-    
+
     // Weighted: (collateral * supplyAPY - debt * borrowAPY) / equity
     const equity = metrics.totalCollateralUsd - metrics.debtUsd;
     if (equity <= 0) return null;
-    
+
     const earnedYield = (metrics.totalCollateralUsd * supplyApy) / 100;
     const paidInterest = (metrics.debtUsd * borrowApy) / 100;
     const netYieldUsd = earnedYield - paidInterest;
-    
+
     return (netYieldUsd / equity) * 100; // as percentage
   }, [collateral, debt, metrics, supplyApyMap, borrowApyMap]);
 
@@ -250,7 +250,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       <div className="modal-box relative bg-base-100 max-w-2xl p-0 rounded-2xl border border-base-300/30">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-base-300/30">
-          <h3 className="text-lg font-semibold">Multiply Position</h3>
+          <h3 className="text-lg font-semibold">Loop Position</h3>
           <div className="flex items-center gap-3">
             <span className="text-sm text-base-content/50">{protocolName}</span>
             <button className="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content" onClick={onClose}>✕</button>
@@ -445,8 +445,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-base-content/60">Swap Route</span>
               <span className="font-medium">
-                {isSwapQuoteLoading ? <span className="loading loading-dots loading-xs" /> : 
-                 flashLoanAmountRaw > 0n ? `${shortAmount.toFixed(4)} ${debt?.symbol} → ${Number(minCollateralOut.formatted).toFixed(4)} ${collateral?.symbol}` : "-"}
+                {isSwapQuoteLoading ? <span className="loading loading-dots loading-xs" /> :
+                  flashLoanAmountRaw > 0n ? `${shortAmount.toFixed(4)} ${debt?.symbol} → ${Number(minCollateralOut.formatted).toFixed(4)} ${collateral?.symbol}` : "-"}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -487,7 +487,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               disabled={!canSubmit || isSubmitting}
               className="btn btn-ghost btn-sm text-primary disabled:text-base-content/30"
             >
-              {isSubmitting ? <span className="loading loading-spinner loading-sm" /> : isSwapQuoteLoading ? "Loading..." : "Open position"}
+              {isSubmitting ? <span className="loading loading-spinner loading-sm" /> : isSwapQuoteLoading ? "Loading..." : "Loop it"}
             </button>
           </div>
         </div>
