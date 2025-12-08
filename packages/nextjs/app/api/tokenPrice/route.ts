@@ -5,6 +5,14 @@ const CG = "https://api.coingecko.com/api/v3";
 
 const ethLikeRe = /\b(w?eth|steth|reth|cbeth|aeth|beth)\b/i;
 const usdLikeRe = /\busd\b|usdc|usdt|tusd|susd|fdusd|usde|usdd/i;
+const optimismLikeRe = /\b(op|optimism)\b/i;
+const arbitrumLikeRe = /\b(arb|arbitrum)\b/i;
+const wstEthLikeRe = /^wsteth$/i;
+
+type SymbolResolution = {
+  prices: Record<string, number>;
+  unresolved: string[];
+};
 
 type ResolvedCoin = { symbol: string; id: string | null };
 
@@ -52,12 +60,15 @@ const resolveCoinGeckoId = async (symbol: string): Promise<string | null> => {
 const fallbackIdForSymbol = (symbol: string): string | null => {
   if (ethLikeRe.test(symbol)) return "ethereum";
   if (usdLikeRe.test(symbol)) return "usd-coin";
+  if (optimismLikeRe.test(symbol)) return "optimism";
+  if (arbitrumLikeRe.test(symbol)) return "arbitrum";
+  if (wstEthLikeRe.test(symbol)) return "wrapped-steth";
   return null;
 };
 
-const resolvePricesForSymbols = async (symbols: string[], vs: string) => {
-  const uniqueSymbols = Array.from(new Set(symbols.map(s => s.trim()).filter(Boolean)));
-  if (uniqueSymbols.length === 0) return {} as Record<string, number>;
+const resolvePricesForSymbols = async (symbols: string[], vs: string): Promise<SymbolResolution> => {
+  const uniqueSymbols = Array.from(new Set(symbols.map(s => s.trim().toLowerCase()).filter(Boolean)));
+  if (uniqueSymbols.length === 0) return { prices: {}, unresolved: [] };
 
   // Note: This makes concurrent API calls to CoinGecko for each symbol.
   // For large batches, consider implementing rate limiting or batching to avoid
@@ -73,6 +84,7 @@ const resolvePricesForSymbols = async (symbols: string[], vs: string) => {
   const pricesById = await fetchPriceForIds(ids, vs);
 
   const prices: Record<string, number> = {};
+  const unresolved: string[] = [];
 
   for (const res of resolutions) {
     const fallbackId = fallbackIdForSymbol(res.symbol);
@@ -81,13 +93,16 @@ const resolvePricesForSymbols = async (symbols: string[], vs: string) => {
 
     const price = priceFromId ?? priceFromFallback ?? 0;
     prices[res.symbol] = price;
+    if (!(price > 0)) {
+      unresolved.push(res.symbol);
+    }
   }
 
-  return prices;
+  return { prices, unresolved };
 };
 
 const resolvePriceForSymbol = async (symbol: string, vs: string): Promise<number> => {
-  const prices = await resolvePricesForSymbols([symbol], vs);
+  const { prices } = await resolvePricesForSymbols([symbol], vs);
   return prices[symbol.toLowerCase()] ?? 0;
 };
 
@@ -107,10 +122,10 @@ export async function GET(req: NextRequest) {
   // Batch mode: ?symbols=eth,usdc
   if (symbols.length > 0) {
     try {
-      const prices = await resolvePricesForSymbols(symbols, vs);
-      return Response.json({ prices }, { status: 200 });
+      const { prices, unresolved } = await resolvePricesForSymbols(symbols, vs);
+      return Response.json({ prices, unresolved }, { status: 200 });
     } catch {
-      return Response.json({ prices: {} }, { status: 200 });
+      return Response.json({ prices: {}, unresolved: symbols.map(s => s.trim().toLowerCase()).filter(Boolean) }, { status: 200 });
     }
   }
 
