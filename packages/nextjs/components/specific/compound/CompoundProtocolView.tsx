@@ -46,10 +46,10 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   // Contracts via scaffold-eth registry
   const { data: gateway } = useScaffoldContract({ contractName: "CompoundGatewayView", chainId: chainId as any });
   const gatewayAddress = gateway?.address as Address | undefined;
-  const gatewayAbi = useMemo(() => gateway?.abi, [gateway?.abi]);
+  const gatewayAbi = useMemo(() => gateway?.abi, [gateway]);
   const { data: uiHelper } = useScaffoldContract({ contractName: "UiHelper", chainId: chainId as any });
   const uiHelperAddress = uiHelper?.address as Address | undefined;
-  const uiHelperAbi = useMemo(() => uiHelper?.abi, [uiHelper?.abi]);
+  const uiHelperAbi = useMemo(() => uiHelper?.abi, [uiHelper]);
 
   // Fetch active base tokens from view helper (unions view + write gateway on-chain)
   const { data: activeBaseTokens } = useScaffoldReadContract({
@@ -211,18 +211,20 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     },
     // Use structuralSharing to prevent rerenders when data hasn't changed
     structuralSharing: (oldData, newData) => {
+      // Ensure both oldData and newData are valid objects
+      if (!oldData || typeof oldData !== 'object') return newData;
+      if (!newData || typeof newData !== 'object') return newData;
+      
       // If both are empty objects, return the old reference
-      if (oldData && Object.keys(oldData).length === 0 && Object.keys(newData).length === 0) {
+      if (Object.keys(oldData).length === 0 && Object.keys(newData).length === 0) {
         return oldData;
       }
       // If keys and values are the same, return old reference
-      if (oldData) {
-        const oldKeys = Object.keys(oldData).sort();
-        const newKeys = Object.keys(newData).sort();
-        if (oldKeys.length === newKeys.length &&
-            oldKeys.every((key, i) => key === newKeys[i] && oldData[key] === newData[key])) {
-          return oldData;
-        }
+      const oldKeys = Object.keys(oldData).sort();
+      const newKeys = Object.keys(newData).sort();
+      if (oldKeys.length === newKeys.length &&
+          oldKeys.every((key, i) => key === newKeys[i] && oldData[key] === newData[key])) {
+        return oldData;
       }
       return newData;
     },
