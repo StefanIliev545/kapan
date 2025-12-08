@@ -363,7 +363,13 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   useEffect(() => {
     if (noMarkets) return;
 
-    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
+    const collateralSupplied = filteredBorrowedPositions.reduce(
+      (sum, position) => sum + (position.collateralValue ?? 0),
+      0,
+    );
+
+    const totalSupplied =
+      filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0) + collateralSupplied;
     const totalBorrowed = filteredBorrowedPositions.reduce(
       (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
       0,
