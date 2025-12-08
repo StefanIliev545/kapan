@@ -210,10 +210,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       return json.prices || {};
     },
     // Use structuralSharing to prevent rerenders when data hasn't changed
-    structuralSharing: (oldData, newData) => {
-      // Ensure both oldData and newData are valid objects
-      if (!oldData || typeof oldData !== 'object') return newData;
-      if (!newData || typeof newData !== 'object') return newData;
+    structuralSharing: (oldData: Record<string, number> | undefined, newData: Record<string, number>) => {
+      // If oldData is falsy or not a plain object, return newData
+      if (!oldData) return newData;
       
       const oldKeys = Object.keys(oldData);
       const newKeys = Object.keys(newData);
