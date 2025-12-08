@@ -11,6 +11,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { FiRepeat } from "react-icons/fi";
 import { formatBps } from "~~/utils/risk";
+import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 
 interface CollateralPosition {
   icon: string;
@@ -22,8 +23,6 @@ interface CollateralPosition {
   rawPrice: bigint; // Store the raw price for debugging
   decimals: number; // Store the decimals
 }
-
-const sanitizeSymbol = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
 // User position utilization indicator component
 const UserUtilization: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
