@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SwapAsset } from "../../modals/SwapModalShell";
 import { useGlobalState } from "~~/services/store/store";
 import { useRiskParams } from "~~/hooks/useRiskParams";
+import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -18,8 +19,6 @@ const ERC20_META_ABI = [
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-const sanitizeSymbol = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
 // Helper: derive decimals from a priceScale bigint (e.g., 1e8 -> 8)
 const decimalsFromScale = (scale: bigint) => {
@@ -187,7 +186,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       });
     });
 
-    return Array.from(symbolsForPrices);
+    // Sort the array for stable reference across renders when symbols are the same
+    return Array.from(symbolsForPrices).sort();
   }, [symbols, depositedResults]);
 
   const { data: usdPriceMap = {} } = useQuery({
@@ -195,9 +195,12 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     enabled: priceSymbols.length > 0,
     staleTime: 60_000,
     queryFn: async () => {
-      const sp = new URLSearchParams();
-      sp.set("symbols", priceSymbols.join(","));
-      const res = await fetch(`/api/tokenPrice?${sp.toString()}`);
+      const searchParams = new URLSearchParams();
+      searchParams.set("symbols", priceSymbols.join(","));
+      const res = await fetch(`/api/tokenPrice?${searchParams.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch token prices: ${res.status} ${res.statusText}`);
+      }
       const json = (await res.json()) as { prices?: Record<string, number> };
       return json.prices || {};
     },
@@ -226,7 +229,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const symbolKey = sanitizeSymbol(symbol).toLowerCase();
       const apiUsdPrice = usdPriceMap[symbolKey];
       const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
-      const price = apiUsdPrice ?? fallbackPrice;
+      // API returns 0 when price is not found, so > 0 check is appropriate for fallback
+      const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0 ? apiUsdPrice : fallbackPrice;
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
@@ -257,10 +261,13 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const dec = Number(collDecs[i] ?? 18n);
         const bal = Number(formatUnits(balRaw, dec));
         const collateralPriceInBase = Number(formatUnits(marketPrices[i] ?? 0n, priceDecimals));
-        const name = collNames[i] || "Collateral";
-        const collateralSymbolKey = sanitizeSymbol(name).toLowerCase();
+        const collName = collNames[i] || "Collateral";
+        const collateralSymbolKey = sanitizeSymbol(collName).toLowerCase();
         const directUsdPrice = usdPriceMap[collateralSymbolKey];
-        const collateralUsdPrice = directUsdPrice ?? collateralPriceInBase * price;
+        // API returns 0 when price is not found, so > 0 check is appropriate for fallback
+        const collateralUsdPrice = typeof directUsdPrice === "number" && directUsdPrice > 0
+          ? directUsdPrice
+          : collateralPriceInBase * price;
         const usdValue = Number.isFinite(collateralUsdPrice) ? bal * collateralUsdPrice : 0;
         if (Number.isFinite(usdValue)) {
           collateralValue += usdValue;
@@ -271,12 +278,12 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
           : undefined;
 
         return {
-          symbol: name,
+          symbol: collName,
           address: collAddr as Address,
           decimals: dec,
           rawBalance: balRaw,
           balance: bal,
-          icon: tokenNameToLogo(name) || "/logos/token.svg",
+          icon: tokenNameToLogo(collName) || "/logos/token.svg",
           usdValue,
           price: collateralPrice,
         };
@@ -285,6 +292,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const safeName = (symbol || "").replace("₮", "T");
       const icon = tokenNameToLogo(safeName) || "/logos/token.svg";
 
+      // Convert price to standard 8-decimal format for consistency
+      // If price is finite (from API or fallback), convert to bigint with 8 decimals
+      // Otherwise, use raw on-chain price which should also be in the same scale
       const tokenPriceUsd = Number.isFinite(price) ? BigInt(Math.round(price * 1e8)) : priceRaw;
 
       supplied.push({

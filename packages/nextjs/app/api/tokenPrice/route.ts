@@ -59,6 +59,9 @@ const resolvePricesForSymbols = async (symbols: string[], vs: string) => {
   const uniqueSymbols = Array.from(new Set(symbols.map(s => s.trim()).filter(Boolean)));
   if (uniqueSymbols.length === 0) return {} as Record<string, number>;
 
+  // Note: This makes concurrent API calls to CoinGecko for each symbol.
+  // For large batches, consider implementing rate limiting or batching to avoid
+  // hitting API rate limits. CoinGecko's free tier has strict rate limits.
   const resolutions: ResolvedCoin[] = await Promise.all(
     uniqueSymbols.map(async s => ({ symbol: s.toLowerCase(), id: await resolveCoinGeckoId(s) })),
   );

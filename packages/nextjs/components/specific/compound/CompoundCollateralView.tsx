@@ -11,6 +11,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { FiRepeat } from "react-icons/fi";
 import { formatBps } from "~~/utils/risk";
+import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 
 interface CollateralPosition {
   icon: string;
@@ -22,8 +23,6 @@ interface CollateralPosition {
   rawPrice: bigint; // Store the raw price for debugging
   decimals: number; // Store the decimals
 }
-
-const sanitizeSymbol = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
 // User position utilization indicator component
 const UserUtilization: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
@@ -265,17 +264,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     return positions;
   }, [collateralData, collateralPrices, collateralDecimals, baseTokenUsdPrice, priceMap]);
 
-  // Refresh data when visibility changes
-  useEffect(() => {
-    if (isVisible) {
-      // You could trigger a manual refetch here if needed
-      console.log("Collateral view is now visible", {
-        baseToken,
-        baseTokenUsdPrice: baseTokenUsdPrice ? baseTokenUsdPrice.toString() : "0",
-      });
-    }
-  }, [isVisible, baseToken, baseTokenUsdPrice]);
-
   // Auto-expand all tokens when the component becomes visible, but only if initialShowAll wasn't explicitly set
   useEffect(() => {
     // Skip this logic if initialShowAll was explicitly provided
@@ -296,24 +284,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   const totalCollateralValue = useMemo(() => {
     return allCollateralPositions.reduce((total: number, position: CollateralPosition) => total + position.usdValue, 0);
   }, [allCollateralPositions]);
-
-  // Log debug information about pricing
-  useEffect(() => {
-    if (isVisible && baseTokenUsdPrice && allCollateralPositions.length > 0) {
-      console.log("Collateral pricing debug:", {
-        baseToken,
-        baseTokenUsdPrice: baseTokenUsdPrice.toString(),
-        baseTokenUsdValue: Number(formatUnits(baseTokenUsdPrice, 8)),
-        totalCollateralValue,
-        positions: allCollateralPositions.map(pos => ({
-          name: pos.name,
-          balance: pos.balance,
-          usdValue: pos.usdValue,
-          rawPrice: pos.rawPrice.toString(),
-        }))
-      });
-    }
-  }, [isVisible, baseToken, baseTokenUsdPrice, allCollateralPositions, totalCollateralValue]);
 
   // Calculate utilization percentage (borrowed USD / total collateral USD)
   const utilizationPercentage = useMemo(() => {
