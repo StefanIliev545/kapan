@@ -6,7 +6,7 @@ import { useAccount, useReadContracts } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldContract, useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { Abi } from "abitype";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SwapAsset } from "../../modals/SwapModalShell";
 import { useGlobalState } from "~~/services/store/store";
 import { useRiskParams } from "~~/hooks/useRiskParams";
@@ -18,6 +18,8 @@ const ERC20_META_ABI = [
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const sanitizeSymbol = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
 // Helper: derive decimals from a priceScale bigint (e.g., 1e8 -> 8)
 const decimalsFromScale = (scale: bigint) => {
@@ -169,6 +171,38 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   }, [uiHelperAddress, uiHelper, depositedResults, chainId]);
   const { data: collDecimalsResults } = useReadContracts({ allowFailure: true, contracts: collDecimalsCalls, query: { enabled: collDecimalsCalls.length > 0 } });
 
+  const priceSymbols = useMemo(() => {
+    const symbolsForPrices = new Set<string>();
+
+    symbols.forEach(sym => {
+      const clean = sanitizeSymbol(sym);
+      if (clean) symbolsForPrices.add(clean);
+    });
+
+    (depositedResults as any[] | undefined)?.forEach(res => {
+      const names = (res?.result?.[2] as string[] | undefined) || [];
+      names.forEach(n => {
+        const clean = sanitizeSymbol(n);
+        if (clean) symbolsForPrices.add(clean);
+      });
+    });
+
+    return Array.from(symbolsForPrices);
+  }, [symbols, depositedResults]);
+
+  const { data: usdPriceMap = {} } = useQuery({
+    queryKey: ["compoundUsdPrices", chainId, priceSymbols.join(",")],
+    enabled: priceSymbols.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const sp = new URLSearchParams();
+      sp.set("symbols", priceSymbols.join(","));
+      const res = await fetch(`/api/tokenPrice?${sp.toString()}`);
+      const json = (await res.json()) as { prices?: Record<string, number> };
+      return json.prices || {};
+    },
+  });
+
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
     const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
@@ -189,7 +223,10 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
       const [supplyRate, borrowRate, balanceRaw, borrowBalanceRaw, priceRaw, priceScale] = compound;
       const priceDecimals = decimalsFromScale(priceScale ?? 1n);
-      const price = Number(formatUnits(priceRaw, priceDecimals));
+      const symbolKey = sanitizeSymbol(symbol).toLowerCase();
+      const apiUsdPrice = usdPriceMap[symbolKey];
+      const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
+      const price = apiUsdPrice ?? fallbackPrice;
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
@@ -220,7 +257,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         const dec = Number(collDecs[i] ?? 18n);
         const bal = Number(formatUnits(balRaw, dec));
         const collateralPriceInBase = Number(formatUnits(marketPrices[i] ?? 0n, priceDecimals));
-        const collateralUsdPrice = collateralPriceInBase * price;
+        const collateralSymbolKey = sanitizeSymbol(name).toLowerCase();
+        const directUsdPrice = usdPriceMap[collateralSymbolKey];
+        const collateralUsdPrice = directUsdPrice ?? collateralPriceInBase * price;
         const usdValue = Number.isFinite(collateralUsdPrice) ? bal * collateralUsdPrice : 0;
         if (Number.isFinite(usdValue)) {
           collateralValue += usdValue;
@@ -247,6 +286,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const safeName = (symbol || "").replace("₮", "T");
       const icon = tokenNameToLogo(safeName) || "/logos/token.svg";
 
+      const tokenPriceUsd = Number.isFinite(price) ? BigInt(Math.round(price * 1e8)) : priceRaw;
+
       supplied.push({
         icon,
         name: safeName || "Token",
@@ -254,7 +295,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         tokenBalance: balanceRaw ?? 0n,
         currentRate: supplyAPR,
         tokenAddress: base,
-        tokenPrice: priceRaw,
+        tokenPrice: tokenPriceUsd,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
       });
@@ -267,12 +308,19 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         tokenBalance: borrowBalanceRaw ?? 0n,
         currentRate: borrowAPR,
         tokenAddress: base,
-        tokenPrice: priceRaw,
+        tokenPrice: tokenPriceUsd,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
         collaterals: swapCollaterals,
         collateralView: (
-          <CompoundCollateralView baseToken={base} baseTokenDecimals={decimals} compoundData={compound} chainId={chainId} />
+          <CompoundCollateralView
+            baseToken={base}
+            baseTokenDecimals={decimals}
+            compoundData={compound}
+            chainId={chainId}
+            priceMap={usdPriceMap}
+            baseTokenSymbol={safeName}
+          />
         ),
       });
     });
@@ -288,18 +336,18 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     pricesResults,
     collDecimalsResults,
     depositedIndexByBase,
+    usdPriceMap,
     chainId,
   ]);
 
   const tokenFilter = new Set(["BTC", "ETH", "WETH", "USDC", "USDT", "USDC.E"]);
-  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z.]/g, "").toUpperCase();
 
   const filteredSuppliedPositions = isWalletConnected
     ? suppliedPositions
-    : suppliedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
+    : suppliedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
   const filteredBorrowedPositions = isWalletConnected
     ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.has(sanitize(p.name)));
+    : borrowedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
