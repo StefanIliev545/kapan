@@ -43,8 +43,10 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   // Contracts via scaffold-eth registry
   const { data: gateway } = useScaffoldContract({ contractName: "CompoundGatewayView", chainId: chainId as any });
   const gatewayAddress = gateway?.address as Address | undefined;
+  const gatewayAbi = useMemo(() => gateway?.abi, [gateway?.abi]);
   const { data: uiHelper } = useScaffoldContract({ contractName: "UiHelper", chainId: chainId as any });
   const uiHelperAddress = uiHelper?.address as Address | undefined;
+  const uiHelperAbi = useMemo(() => uiHelper?.abi, [uiHelper?.abi]);
 
   // Fetch active base tokens from view helper (unions view + write gateway on-chain)
   const { data: activeBaseTokens } = useScaffoldReadContract({
@@ -90,9 +92,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
   // Batch market data getCompoundData(baseToken, user)
   const compoundCalls = useMemo(() => {
-    if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
-    return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getCompoundData" as const, args: [t, queryAddress], chainId }));
-  }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
+    if (!gatewayAddress || !gatewayAbi || baseTokens.length === 0) return [] as any[];
+    return baseTokens.map(t => ({ address: gatewayAddress, abi: gatewayAbi as Abi, functionName: "getCompoundData" as const, args: [t, queryAddress], chainId }));
+  }, [gatewayAddress, gatewayAbi, baseTokens, queryAddress, chainId]);
   const { data: compoundResults } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
 
   // Only fetch collateral details for markets where the user has a position.
@@ -119,7 +121,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
   const { ltvBps, lltvBps } = useRiskParams({
     gateway: gatewayAddress,
-    gatewayAbi: gateway?.abi,
+    gatewayAbi: gatewayAbi,
     marketOrToken: marketForRisk,
     user: queryAddress,
   });
@@ -132,42 +134,42 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
   // Batch collateral data per market
   const depositedCalls = useMemo(() => {
-    if (!gatewayAddress || !gateway || activeMarketsForCollateral.length === 0) return [] as any[];
+    if (!gatewayAddress || !gatewayAbi || activeMarketsForCollateral.length === 0) return [] as any[];
     return activeMarketsForCollateral.map(({ baseToken }) => ({
       address: gatewayAddress,
-      abi: gateway.abi as Abi,
+      abi: gatewayAbi as Abi,
       functionName: "getDepositedCollaterals" as const,
       args: [baseToken, queryAddress],
       chainId,
     }));
-  }, [gatewayAddress, gateway, activeMarketsForCollateral, queryAddress, chainId]);
+  }, [gatewayAddress, gatewayAbi, activeMarketsForCollateral, queryAddress, chainId]);
   const { data: depositedResults } = useReadContracts({ allowFailure: true, contracts: depositedCalls, query: { enabled: depositedCalls.length > 0 } });
 
   const pricesCalls = useMemo(() => {
-    if (!gatewayAddress || !gateway || !depositedResults) return [] as any[];
+    if (!gatewayAddress || !gatewayAbi || !depositedResults) return [] as any[];
     const calls: any[] = [];
     (depositedResults as any[]).forEach((res, i) => {
       const baseToken = activeMarketsForCollateral[i]?.baseToken;
       const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
       if (colls.length > 0 && baseToken) {
-        calls.push({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getPrices" as const, args: [baseToken, colls], chainId });
+        calls.push({ address: gatewayAddress, abi: gatewayAbi as Abi, functionName: "getPrices" as const, args: [baseToken, colls], chainId });
       }
     });
     return calls;
-  }, [gatewayAddress, gateway, depositedResults, activeMarketsForCollateral, chainId]);
+  }, [gatewayAddress, gatewayAbi, depositedResults, activeMarketsForCollateral, chainId]);
   const { data: pricesResults } = useReadContracts({ allowFailure: true, contracts: pricesCalls, query: { enabled: pricesCalls.length > 0 } });
 
   const collDecimalsCalls = useMemo(() => {
-    if (!uiHelperAddress || !uiHelper || !depositedResults) return [] as any[];
+    if (!uiHelperAddress || !uiHelperAbi || !depositedResults) return [] as any[];
     const calls: any[] = [];
     (depositedResults as any[]).forEach(res => {
       const colls = ((res?.result?.[0] as Address[] | undefined) || []) as Address[];
       if (colls.length > 0) {
-        calls.push({ address: uiHelperAddress, abi: uiHelper.abi as Abi, functionName: "getDecimals" as const, args: [colls], chainId });
+        calls.push({ address: uiHelperAddress, abi: uiHelperAbi as Abi, functionName: "getDecimals" as const, args: [colls], chainId });
       }
     });
     return calls;
-  }, [uiHelperAddress, uiHelper, depositedResults, chainId]);
+  }, [uiHelperAddress, uiHelperAbi, depositedResults, chainId]);
   const { data: collDecimalsResults } = useReadContracts({ allowFailure: true, contracts: collDecimalsCalls, query: { enabled: collDecimalsCalls.length > 0 } });
 
   const priceSymbols = useMemo(() => {
