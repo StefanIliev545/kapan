@@ -16,6 +16,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
     bytes32 constant INSTRUCTION_STACK = keccak256("KapanRouter:instructionStack");
     bytes32 constant OUTPUTS_SLOT = keccak256("KapanRouter:outputs");
+    bytes32 constant ROUTER_KEY = keccak256(abi.encode("router"));
     mapping(string => IGateway) public gateways;
 
     constructor(address owner) Ownable(owner) {}
@@ -98,10 +99,14 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         isEmpty = (len - 1 == 0);
     }
 
-    function processProtocolInstructions(ProtocolTypes.ProtocolInstruction[] calldata instructions) external {
+    function processProtocolInstructions(ProtocolTypes.ProtocolInstruction[] calldata instructions) external nonReentrant {
         verifyInstructionAuthorization(instructions);
-        convertToStack(instructions);
-        runStack();
+        (bool hasFlash, uint256 flashIndex) = _findFlashInstruction(instructions);
+        if (hasFlash) {
+            _executeUntilFlash(instructions, flashIndex);
+        } else {
+            _executeAllInMemory(instructions);
+        }
         deleteOutputs();
     }
 
@@ -110,11 +115,71 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         TBytes.set(OUTPUTS_SLOT, bytes(""));
     }
 
+    function _findFlashInstruction(
+        ProtocolTypes.ProtocolInstruction[] calldata instructions
+    ) internal pure returns (bool hasFlash, uint256 index) {
+        for (uint256 i = 0; i < instructions.length; i++) {
+            ProtocolTypes.ProtocolInstruction calldata instruction = instructions[i];
+            if (keccak256(abi.encode(instruction.protocolName)) != ROUTER_KEY) {
+                continue;
+            }
+            if (instruction.data.length == 0) {
+                continue;
+            }
+            RouterInstruction memory routerInstruction = abi.decode(instruction.data, (RouterInstruction));
+            if (routerInstruction.instructionType == RouterInstructionType.FlashLoan) {
+                return (true, i);
+            }
+        }
+    }
+
+    function _executeAllInMemory(ProtocolTypes.ProtocolInstruction[] calldata instructions) internal {
+        ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
+        for (uint256 i = 0; i < instructions.length; i++) {
+            ProtocolTypes.ProtocolInstruction calldata instruction = instructions[i];
+            if (keccak256(abi.encode(instruction.protocolName)) == ROUTER_KEY) {
+                outputs = _processRouterInstructionInMemory(instruction, outputs);
+            } else {
+                outputs = _processGatewayInstructionInMemory(instruction, outputs);
+            }
+        }
+    }
+
+    function _executeUntilFlash(
+        ProtocolTypes.ProtocolInstruction[] calldata instructions,
+        uint256 flashIndex
+    ) internal {
+        ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
+        for (uint256 i = 0; i < flashIndex; i++) {
+            ProtocolTypes.ProtocolInstruction calldata instruction = instructions[i];
+            if (keccak256(abi.encode(instruction.protocolName)) == ROUTER_KEY) {
+                outputs = _processRouterInstructionInMemory(instruction, outputs);
+            } else {
+                outputs = _processGatewayInstructionInMemory(instruction, outputs);
+            }
+        }
+
+        uint256 remaining = instructions.length - flashIndex - 1;
+        ProtocolTypes.ProtocolInstruction[] memory reversed = new ProtocolTypes.ProtocolInstruction[](remaining);
+        for (uint256 i = 0; i < remaining; i++) {
+            reversed[i] = instructions[instructions.length - 1 - i];
+        }
+        TBytes.set(INSTRUCTION_STACK, abi.encode(reversed));
+        TBytes.set(OUTPUTS_SLOT, abi.encode(outputs));
+
+        (, FlashLoanProvider provider, ProtocolTypes.InputPtr memory inputPtr, address pool) = abi.decode(
+            instructions[flashIndex].data,
+            (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address)
+        );
+
+        processFlashLoan(provider, inputPtr, pool);
+    }
+
     function verifyInstructionAuthorization(ProtocolTypes.ProtocolInstruction[] calldata instructions) internal view {
         for (uint256 i = 0; i < instructions.length; i++) {
             ProtocolTypes.ProtocolInstruction calldata instruction = instructions[i];
             // Skip router instructions (they have their own authorization)
-            if (keccak256(abi.encode(instruction.protocolName)) != keccak256(abi.encode("router"))) {
+            if (keccak256(abi.encode(instruction.protocolName)) != ROUTER_KEY) {
                 ProtocolTypes.LendingInstruction memory lendingInstr = abi.decode(
                     instruction.data,
                     (ProtocolTypes.LendingInstruction)
@@ -137,7 +202,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         uint256 instrIndex = 0;
         while (true) {
             console.log("KapanRouter: Processing instruction %s: %s", instrIndex, instruction.protocolName);
-            if (keccak256(abi.encode(instruction.protocolName)) == keccak256(abi.encode("router"))) {
+            if (keccak256(abi.encode(instruction.protocolName)) == ROUTER_KEY) {
                 bool halt = processRouterInstruction(instruction);
                 if (halt) {
                     return;
@@ -162,6 +227,119 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             (instruction, isEmpty) = popStack();
             instrIndex++;
         }
+    }
+
+    function _processRouterInstructionInMemory(
+        ProtocolTypes.ProtocolInstruction calldata instruction,
+        ProtocolTypes.Output[] memory outputs
+    ) internal returns (ProtocolTypes.Output[] memory) {
+        RouterInstruction memory routerInstruction = abi.decode(instruction.data, (RouterInstruction));
+
+        if (routerInstruction.instructionType == RouterInstructionType.FlashLoan) {
+            revert("FlashLoan requires transient stack");
+        } else if (routerInstruction.instructionType == RouterInstructionType.PullToken) {
+            require(routerInstruction.user == msg.sender, "Not authorized");
+            IERC20(routerInstruction.token).safeTransferFrom(msg.sender, address(this), routerInstruction.amount);
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount }));
+        } else if (routerInstruction.instructionType == RouterInstructionType.PushToken) {
+            (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr)
+            );
+            require(inputPtr.index < outputs.length, "PushToken: bad index");
+            ProtocolTypes.Output memory output = outputs[inputPtr.index];
+            require(output.token != address(0), "PushToken: zero token");
+            if (output.amount != 0) {
+                IERC20(output.token).safeTransfer(routerInstruction.user, output.amount);
+            }
+            outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+        } else if (routerInstruction.instructionType == RouterInstructionType.ToOutput) {
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount }));
+        } else if (routerInstruction.instructionType == RouterInstructionType.Approve) {
+            (, string memory targetProtocol, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
+                instruction.data,
+                (RouterInstruction, string, ProtocolTypes.InputPtr)
+            );
+            require(inputPtr.index < outputs.length, "Approve: bad index");
+            address target;
+            if (keccak256(abi.encode(targetProtocol)) == ROUTER_KEY) {
+                target = address(this);
+            } else {
+                target = address(gateways[targetProtocol]);
+            }
+            require(target != address(0), "Approve: target not found");
+
+            address tokenToApprove = outputs[inputPtr.index].token;
+            uint256 amountToApprove = outputs[inputPtr.index].amount;
+
+            IERC20(tokenToApprove).approve(target, 0);
+            IERC20(tokenToApprove).approve(target, amountToApprove);
+
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
+        } else if (routerInstruction.instructionType == RouterInstructionType.Split) {
+            (, ProtocolTypes.InputPtr memory inputPtr, uint256 bp) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr, uint256)
+            );
+            require(inputPtr.index < outputs.length, "Split: bad index");
+            ProtocolTypes.Output memory orig = outputs[inputPtr.index];
+            require(orig.token != address(0) && orig.amount > 0, "Split: no value");
+            require(bp <= 10000, "Split: fraction too large");
+
+            uint256 feeAmount = (orig.amount * bp + 10000 - 1) / 10000;
+            if (feeAmount > orig.amount) feeAmount = orig.amount;
+            uint256 remainder = orig.amount - feeAmount;
+
+            outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: feeAmount }));
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: remainder }));
+        } else if (routerInstruction.instructionType == RouterInstructionType.Add) {
+            (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+            );
+            require(ptrA.index < outputs.length && ptrB.index < outputs.length, "Add: bad index");
+            ProtocolTypes.Output memory outA = outputs[ptrA.index];
+            ProtocolTypes.Output memory outB = outputs[ptrB.index];
+            require(outA.token != address(0) && outB.token != address(0), "Add: zero token");
+            require(outA.token == outB.token, "Add: token mismatch");
+            uint256 total = outA.amount + outB.amount;
+            outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: total }));
+        } else if (routerInstruction.instructionType == RouterInstructionType.Subtract) {
+            (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
+                instruction.data,
+                (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
+            );
+            require(ptrA.index < outputs.length && ptrB.index < outputs.length, "Subtract: bad index");
+            ProtocolTypes.Output memory outA = outputs[ptrA.index];
+            ProtocolTypes.Output memory outB = outputs[ptrB.index];
+            require(outA.token != address(0) && outB.token != address(0), "Subtract: zero token");
+            require(outA.token == outB.token, "Subtract: token mismatch");
+            require(outA.amount >= outB.amount, "Subtract: underflow");
+            uint256 diff = outA.amount - outB.amount;
+            outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
+            outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: diff }));
+        }
+
+        return outputs;
+    }
+
+    function _processGatewayInstructionInMemory(
+        ProtocolTypes.ProtocolInstruction calldata instruction,
+        ProtocolTypes.Output[] memory outputs
+    ) internal returns (ProtocolTypes.Output[] memory) {
+        IGateway gw = gateways[instruction.protocolName];
+        if (address(gw) == address(0)) {
+            revert("Gateway not found");
+        }
+        ProtocolTypes.Output[] memory produced = gw.processLendingInstruction(outputs, instruction.data);
+        if (produced.length > 0) {
+            outputs = _concatOutputsMemory(outputs, produced);
+        }
+        return outputs;
     }
 
     function processRouterInstruction(
@@ -194,7 +372,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             ProtocolTypes.Output[] memory inputs = _getOutputs();
             require(inputPtr.index < inputs.length, "Approve: bad index");
             address target;
-            if (keccak256(abi.encode(targetProtocol)) == keccak256(abi.encode("router"))) {
+            if (keccak256(abi.encode(targetProtocol)) == ROUTER_KEY) {
                 target = address(this);
             } else {
                 target = address(gateways[targetProtocol]);
@@ -389,7 +567,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
 
             // Router step
-            if (keccak256(abi.encode(pi.protocolName)) == keccak256(abi.encode("router"))) {
+            if (keccak256(abi.encode(pi.protocolName)) == ROUTER_KEY) {
                 RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
 
                 // Default no auth
@@ -557,7 +735,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
 
             // --- ROUTER INSTRUCTIONS ---
-            if (keccak256(abi.encode(pi.protocolName)) == keccak256(abi.encode("router"))) {
+            if (keccak256(abi.encode(pi.protocolName)) == ROUTER_KEY) {
                 RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
 
                 if (r.instructionType == RouterInstructionType.PullToken) {
