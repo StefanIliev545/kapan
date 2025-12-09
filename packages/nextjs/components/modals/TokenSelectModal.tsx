@@ -140,7 +140,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               icon: selectedToken.icon,
               currentRate: selectedToken.currentRate,
               address: selectedToken.tokenAddress,
-              usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
+              usdPrice: selectedToken.usdPrice ?? (selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0),
             }}
             protocolName={protocolName}
             chainId={chainId}
@@ -160,7 +160,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               icon: selectedToken.icon,
               currentRate: selectedToken.currentRate,
               address: selectedToken.tokenAddress,
-              usdPrice: selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0,
+              usdPrice: selectedToken.usdPrice ?? (selectedToken.tokenPrice ? Number(selectedToken.tokenPrice) / 1e8 : 0),
             }}
             protocolName={protocolName}
             position={position}
