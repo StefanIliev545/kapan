@@ -205,7 +205,14 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         throw new Error(`Failed to fetch token prices: ${res.status} ${res.statusText}`);
       }
       const json = (await res.json()) as { prices?: Record<string, number> };
-      return json.prices || {};
+      const prices = json.prices || {};
+
+      // Normalize API responses to lower-case sanitized keys for consistent lookups
+      return Object.entries(prices).reduce<Record<string, number>>((acc, [key, value]) => {
+        const normalizedKey = sanitizeSymbol(key).toLowerCase();
+        if (normalizedKey) acc[normalizedKey] = value;
+        return acc;
+      }, {});
     },
   });
 
