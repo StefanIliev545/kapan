@@ -11,6 +11,7 @@ import {
   SparklesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { track } from "@vercel/analytics";
 import { SwitchTheme } from "~~/components/SwitchTheme";
 import { ThemeSettings } from "~~/components/ThemeSettings";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
@@ -299,6 +300,7 @@ export const LandingHeader = () => {
                     href="/app"
                     onClick={e => {
                       e.preventDefault();
+                      track("To App conversion", { button: "Header" });
                       window.location.assign(appUrl);
                     }}
                     initial={{ opacity: 0, scale: 0.9, x: 20 }}
