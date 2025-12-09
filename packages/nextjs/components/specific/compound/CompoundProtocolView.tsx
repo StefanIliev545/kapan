@@ -206,6 +206,11 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     },
   });
 
+  const stableSymbols = useMemo(
+    () => new Set(["usdc", "usdc.e", "usdt", "dai", "gusd", "susd", "lusd", "usdp", "busd"]),
+    [],
+  );
+
   // Helper: Convert Compound's per-second rate to an APR percentage.
   const convertRateToAPR = (ratePerSecond: bigint): number => {
     const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
@@ -228,9 +233,24 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const priceDecimals = decimalsFromScale(priceScale ?? 1n);
       const symbolKey = sanitizeSymbol(symbol).toLowerCase();
       const apiUsdPrice = usdPriceMap[symbolKey];
+      const ethUsdPrice = typeof usdPriceMap.eth === "number" && usdPriceMap.eth > 0
+        ? usdPriceMap.eth
+        : usdPriceMap.weth;
       const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
+      // When the API price is unavailable and the on-chain feed is denominated in ETH (e.g., USDC price ~0.0005),
+      // convert it to USD using the ETH price to keep modal calculations in sync with the dashboard.
+      const shouldConvertFromEth = (!apiUsdPrice || apiUsdPrice <= 0)
+        && typeof ethUsdPrice === "number"
+        && ethUsdPrice > 0
+        && fallbackPrice > 0
+        && fallbackPrice < 5
+        && stableSymbols.has(symbolKey);
       // API returns 0 when price is not found, so > 0 check is appropriate for fallback
-      const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0 ? apiUsdPrice : fallbackPrice;
+      const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0
+        ? apiUsdPrice
+        : shouldConvertFromEth
+          ? fallbackPrice * ethUsdPrice
+          : fallbackPrice;
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
@@ -305,6 +325,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         currentRate: supplyAPR,
         tokenAddress: base,
         tokenPrice: tokenPriceUsd,
+        usdPrice: price,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
       });
@@ -318,6 +339,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         currentRate: borrowAPR,
         tokenAddress: base,
         tokenPrice: tokenPriceUsd,
+        usdPrice: price,
         tokenDecimals: decimals,
         tokenSymbol: safeName,
         collaterals: swapCollaterals,

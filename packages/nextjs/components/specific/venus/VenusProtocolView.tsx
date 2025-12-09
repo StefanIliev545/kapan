@@ -205,11 +205,12 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
         currentRate: supplyAPY,
         tokenAddress: tokenAddress,
         tokenPrice: priceWith8Decimals, // Add the token price with 8 decimals
+        usdPrice: tokenPrice,
         tokenDecimals: Number(decimal), // Add the token decimals
         tokenSymbol: symbol, // Use the original symbol for price overrides
         protocolName: "Venus",
         afterInfoContent: comptrollerAddress ? (
-          <VenusMarketEntry 
+          <VenusMarketEntry
             vTokenAddress={vTokens[i]} 
             comptrollerAddress={comptrollerAddress}
             tokenSymbol={symbol}
@@ -237,6 +238,7 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
         currentRate: borrowAPY,
         tokenAddress: tokenAddress,
         tokenPrice: priceWith8Decimals, // Add the token price with 8 decimals
+        usdPrice: tokenPrice,
         tokenDecimals: Number(decimal), // Add the token decimals
         tokenSymbol: symbol, // Use the original symbol for price overrides
       });
