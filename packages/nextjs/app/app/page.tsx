@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, startTransition } from "react";
+import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 
 import type { NextPage } from "next";
 import dynamic from "next/dynamic";
@@ -12,6 +12,8 @@ import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
 import { arbitrum, base, optimism, linea } from "wagmi/chains";
 import { hardhat } from "viem/chains";
+import { useAccount as useEvmAccount } from "wagmi";
+import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
 import { useGlobalState } from "~~/services/store/store";
 
 // ---- Lazy-load heavy protocol views (client-only) ----
@@ -57,6 +59,15 @@ const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
+const protocolCountByNetwork: Record<string, number> = {
+  base: 4,
+  arbitrum: 3,
+  optimism: 2,
+  linea: 3,
+  starknet: 2,
+  hardhat: 3,
+};
+
 const App: NextPage = () => {
   const initialNetwork = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base";
   const [selectedNetwork, setSelectedNetwork] = useState<string>(initialNetwork);
@@ -67,6 +78,11 @@ const App: NextPage = () => {
   const allLoaded = useGlobalState(
     state => state.expectedProtocolCount > 0 && state.loadedProtocolCount === state.expectedProtocolCount,
   );
+  const { address: evmAddress } = useEvmAccount();
+  const { viewingAddress: starknetAddress } = useStarknetAccount();
+  const lastSeenAddresses = useRef<{ evm?: string; starknet?: string }>({});
+
+  const expectedProtocolCount = protocolCountByNetwork[selectedNetwork] ?? 0;
 
   // Tiny helper so the button click never feels blocked
   const handleNetworkChange = (id: string) => {
@@ -100,17 +116,22 @@ const App: NextPage = () => {
 
 
   useEffect(() => {
-    const protocolCountByNetwork: Record<string, number> = {
-      base: 4,
-      arbitrum: 3,
-      optimism: 2,
-      linea: 3,
-      starknet: 2,
-      hardhat: 3,
-    };
+    resetTotals(expectedProtocolCount);
+  }, [resetTotals, expectedProtocolCount]);
 
-    resetTotals(protocolCountByNetwork[selectedNetwork] ?? 0);
-  }, [resetTotals, selectedNetwork]);
+  useEffect(() => {
+    const nextEvm = evmAddress ?? "";
+    const nextStarknet = starknetAddress ?? "";
+    const { evm: prevEvm, starknet: prevStarknet } = lastSeenAddresses.current;
+
+    if (prevEvm === nextEvm && prevStarknet === nextStarknet) return;
+
+    lastSeenAddresses.current = { evm: nextEvm, starknet: nextStarknet };
+
+    if (!nextEvm && !nextStarknet) return;
+
+    resetTotals(expectedProtocolCount);
+  }, [evmAddress, starknetAddress, expectedProtocolCount, resetTotals]);
 
   return (
     <DashboardLayout>
