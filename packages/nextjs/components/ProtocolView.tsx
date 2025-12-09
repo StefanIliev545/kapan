@@ -222,7 +222,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const { utilizationPercentage, currentLtvBps } = useMemo(() => {
     const suppliedTotal = suppliedPositions.reduce((acc, pos) => acc + pos.balance, 0);
     const collateralTotal = borrowedPositions.reduce((acc, pos) => acc + (pos.collateralValue || 0), 0);
-    const totalSupplied = suppliedTotal > 0 ? suppliedTotal : collateralTotal;
+    const totalSupplied = suppliedTotal + collateralTotal;
     const totalBorrowed = borrowedPositions.reduce((acc, pos) => acc + Math.abs(pos.balance), 0);
     const baseLtv = totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
     const currentBps = totalSupplied > 0 ? BigInt(Math.round((totalBorrowed / totalSupplied) * 10000)) : 0n;
