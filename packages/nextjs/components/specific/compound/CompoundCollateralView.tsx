@@ -144,6 +144,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   });
 
   const baseTokenSymbolKey = useMemo(() => sanitizeSymbol(baseTokenSymbol || "").toLowerCase(), [baseTokenSymbol]);
+  const ethUsdPrice = priceMap?.eth || priceMap?.weth;
 
   const { data: collateralFactors } = useScaffoldReadContract({
     contractName: "CompoundGatewayView",
@@ -180,8 +181,14 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     }
 
     if (!baseTokenPrice) return 0n;
+
+    const baseTokenInEth = Number(formatUnits(baseTokenPrice, 8));
+    if (typeof ethUsdPrice === "number" && ethUsdPrice > 0) {
+      return BigInt(Math.round(baseTokenInEth * ethUsdPrice * 1e8));
+    }
+
     return baseTokenPrice;
-  }, [baseTokenPrice, priceMap, baseTokenSymbolKey]);
+  }, [baseTokenPrice, priceMap, baseTokenSymbolKey, ethUsdPrice]);
 
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
