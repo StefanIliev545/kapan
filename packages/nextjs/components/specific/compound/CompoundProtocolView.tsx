@@ -186,6 +186,9 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       });
     });
 
+    // Always include ETH so we can convert Compound's ETH-denominated oracle prices to USD
+    symbolsForPrices.add("ETH");
+
     // Sort the array for stable reference across renders when symbols are the same
     return Array.from(symbolsForPrices).sort();
   }, [symbols, depositedResults]);
@@ -229,8 +232,13 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
       const symbolKey = sanitizeSymbol(symbol).toLowerCase();
       const apiUsdPrice = usdPriceMap[symbolKey];
       const fallbackPrice = Number(formatUnits(priceRaw, priceDecimals));
+      const ethUsdPrice = usdPriceMap["eth"];
+
       // API returns 0 when price is not found, so > 0 check is appropriate for fallback
-      const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0 ? apiUsdPrice : fallbackPrice;
+      // Compound oracle prices are denominated in ETH, so convert fallback values using ETH/USD when needed.
+      const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0
+        ? apiUsdPrice
+        : fallbackPrice * (typeof ethUsdPrice === "number" && ethUsdPrice > 0 ? ethUsdPrice : 1);
       const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
       const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
 
