@@ -49,14 +49,25 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
     const gatewayContract = await ethers.getContractAt("PendleGateway", gateway.address);
     if ((await gatewayContract.adapter()) !== adapter.address) {
         console.log("Setting adapter in PendleGateway...");
-        await execute("PendleGateway", { from: deployer, log: true, waitConfirmations: 3 }, "setAdapter", adapter.address);
+        await execute(
+            "PendleGateway",
+            { from: deployer, log: true, waitConfirmations: 3 },
+            "setAdapter",
+            adapter.address
+        );
     }
 
     const routerContract = await ethers.getContractAt("KapanRouter", router.address);
     const existingGateway = await routerContract.gateways("pendle");
     if (existingGateway !== gateway.address) {
         console.log("Registering PendleGateway in KapanRouter...");
-        await execute("KapanRouter", { from: deployer, log: true, waitConfirmations: 3 }, "addGateway", "pendle", gateway.address);
+        await execute(
+            "KapanRouter",
+            { from: deployer, log: true, waitConfirmations: 3 },
+            "addGateway",
+            "pendle",
+            gateway.address
+        );
     }
 
     console.log("Pendle integration deployed!");

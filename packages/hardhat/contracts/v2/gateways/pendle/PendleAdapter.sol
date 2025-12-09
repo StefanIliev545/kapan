@@ -4,7 +4,6 @@ pragma solidity ^0.8.30;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 
 contract PendleAdapter is Ownable {
     using SafeERC20 for IERC20;
@@ -33,6 +32,9 @@ contract PendleAdapter is Ownable {
         uint256 minAmountOut,
         bytes calldata data
     ) external onlyGateway returns (uint256 amountReceived, uint256 amountRefunded) {
+        require(tokenIn != address(0) && tokenOut != address(0), "Adapter: zero token");
+        require(amountIn > 0, "Adapter: zero amount");
+
         // 1. Approve Pendle Router
         if (IERC20(tokenIn).allowance(address(this), PENDLE_ROUTER) < amountIn) {
             IERC20(tokenIn).forceApprove(PENDLE_ROUTER, type(uint256).max);
@@ -59,13 +61,7 @@ contract PendleAdapter is Ownable {
         uint256 balanceOutAfter = IERC20(tokenOut).balanceOf(address(this));
         uint256 balanceInAfter = IERC20(tokenIn).balanceOf(address(this));
 
-        console.log("PendleAdapter: tokenIn=%s, tokenOut=%s", tokenIn, tokenOut);
-        console.log("PendleAdapter: amountIn=%s, minAmountOut=%s", amountIn, minAmountOut);
-        console.log("PendleAdapter: balanceOutBefore=%s, balanceOutAfter=%s", balanceOutBefore, balanceOutAfter);
-        console.log("PendleAdapter: balanceInAfter=%s", balanceInAfter);
-
         amountReceived = balanceOutAfter - balanceOutBefore;
-        console.log("PendleAdapter: amountReceived=%s", amountReceived);
         require(amountReceived >= minAmountOut, "Adapter: High Slippage");
 
         amountRefunded = balanceInAfter;
