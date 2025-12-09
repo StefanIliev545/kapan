@@ -314,7 +314,8 @@ export const VesuProtocolView: FC = () => {
         ).map(([rawName, data]) => {
           const disp = getV1PoolDisplay(rawName as any);
           const name = disp.name;
-          if (data.rows.length === 0) return null;
+          const shouldRender = data.rows.length > 0 || rawName === "Genesis";
+          if (!shouldRender) return null;
           const metrics = computeMetrics(data.rows);
           return (
             <div key={`v1-${name}`} className="space-y-4">
@@ -414,7 +415,8 @@ export const VesuProtocolView: FC = () => {
         ).map(([rawName, data]) => {
           const disp = getV2PoolDisplay(rawName as any);
           const name = disp.name;
-          if (data.rows.length === 0) return null;
+          const shouldRender = data.rows.length > 0 || rawName === "Prime";
+          if (!shouldRender) return null;
           const metrics = computeMetrics(data.rows);
           return (
             <div key={`v2-${name}`} className="space-y-4">
