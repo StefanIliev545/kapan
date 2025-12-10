@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { track } from "@vercel/analytics";
 import { FiArrowRight, FiZap, FiShield, FiTrendingUp } from "react-icons/fi";
 
 const EnterAppCTA = () => {
@@ -126,6 +127,7 @@ const EnterAppCTA = () => {
             href="/app"
             onClick={event => {
               event.preventDefault();
+              track("To App conversion", { button: "After Demo" });
               window.location.assign(appUrl);
             }}
             whileHover={{ scale: 1.02 }}

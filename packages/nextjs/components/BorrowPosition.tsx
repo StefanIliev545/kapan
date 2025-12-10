@@ -74,6 +74,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   protocolName,
   tokenAddress,
   tokenPrice,
+  usdPrice: usdPriceOverride,
   tokenDecimals,
   collateralView,
   collateralValue,
@@ -112,7 +113,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
 
-  const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const usdPrice = useMemo(() => {
+    if (typeof usdPriceOverride === "number") return usdPriceOverride;
+    return tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  }, [tokenPrice, usdPriceOverride]);
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
   // Stable position object for RefinanceModal (avoid hook re-ordering; defined at top-level)

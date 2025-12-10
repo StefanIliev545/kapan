@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ProtocolView } from "../ProtocolView";
 import { motion } from "framer-motion";
 import { FiArrowRight } from "react-icons/fi";
+import { track } from "@vercel/analytics";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 
 const protocols = [
@@ -154,6 +155,7 @@ const LandingSection = () => {
                 href="/app"
                 onClick={e => {
                   e.preventDefault();
+                  track("To App conversion", { button: "Initial" });
                   window.location.assign(appUrl);
                 }}
                 initial={{ opacity: 0, scale: 0.95 }}

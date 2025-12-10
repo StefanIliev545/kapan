@@ -17,7 +17,7 @@ export class PositionManager {
   ): PositionManager {
     const suppliedTotal = supplied.reduce((acc, p) => acc + p.balance, 0);
     const collateralTotal = borrowed.reduce((acc, p) => acc + (p.collateralValue || 0), 0);
-    const totalSupplied = suppliedTotal > 0 ? suppliedTotal : collateralTotal;
+    const totalSupplied = suppliedTotal + collateralTotal;
     const borrowedTotal = borrowed.reduce((acc, p) => acc + Math.abs(p.balance), 0);
     return new PositionManager(totalSupplied, borrowedTotal, ltvBps);
   }

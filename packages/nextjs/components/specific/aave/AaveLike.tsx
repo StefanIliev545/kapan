@@ -85,6 +85,7 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
         currentRate: supplyAPY,
         tokenAddress: token.token,
         tokenPrice: token.price,
+        usdPrice: tokenPrice,
         tokenDecimals: decimals,
         tokenSymbol: token.symbol,
       });
@@ -100,6 +101,7 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
         currentRate: borrowAPY,
         tokenAddress: token.token,
         tokenPrice: token.price,
+        usdPrice: tokenPrice,
         tokenDecimals: decimals,
         tokenSymbol: token.symbol,
       });
