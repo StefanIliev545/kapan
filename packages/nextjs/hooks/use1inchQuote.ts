@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Address } from "viem";
 import { fetch1inchSwap, OneInchSwapResponse } from "../utils/1inch";
+import { getEffectiveChainId } from "../utils/forkChain";
 import { useDebounceValue } from "usehooks-ts";
 
 type Use1inchQuoteProps = {
@@ -37,7 +38,7 @@ export const use1inchQuote = ({
         queryFn: async () => {
             try {
                 return await fetch1inchSwap(
-                    chainId === 31337 ? 42161 : chainId,
+                    getEffectiveChainId(chainId),
                     {
                         src,
                         dst,

@@ -3,6 +3,7 @@ import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
+import { usePendleConvert } from "~~/hooks/usePendleConvert";
 
 // Aave flash loan fee buffer: 9 bps (0.09%)
 // When using Aave with isMax, we need to quote for a reduced amount
@@ -15,7 +16,7 @@ import { BasicCollateral, useMovePositionData } from "~~/hooks/useMovePositionDa
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { FiAlertTriangle, FiInfo } from "react-icons/fi";
-import { SwapModalShell, SwapAsset } from "./SwapModalShell";
+import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
 // Extended type to include price info passed from parent
 interface ExtendedCollateral extends BasicCollateral {
@@ -51,7 +52,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     position,
 }) => {
     const { data: oneInchAdapter } = useDeployedContractInfo("OneInchAdapter");
+    // PendleAdapter is only on certain chains - use type assertion since we check for existence
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: pendleAdapter } = useDeployedContractInfo("PendleAdapter" as any);
     const { buildCollateralSwapFlow } = useKapanRouterV2();
+
+    // Swap router selection (1inch or Pendle)
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>("1inch");
 
     const wasOpenRef = useRef(false);
 
@@ -150,22 +157,59 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     }, [amountIn, selectedFrom?.decimals, selectedFrom?.rawBalance, isMax, selectedProvider?.providerEnum]);
 
     // 1inch Quote - uses reduced amount when Aave + isMax
-    const { data: quote, isLoading: isQuoteLoading, error: quoteError } = use1inchQuote({
+    const { data: oneInchQuote, isLoading: is1inchLoading, error: oneInchError } = use1inchQuote({
         chainId,
         src: selectedFrom?.address as Address,
         dst: selectedTo?.address as Address,
         amount: quoteAmount,
         from: oneInchAdapter?.address || "",
         slippage: slippage,
-        enabled: !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
+        enabled: swapRouter === "1inch" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
     });
 
-    const amountOut = quote ? formatUnits(BigInt(quote.dstAmount), selectedTo?.decimals || 18) : "0";
+    // Pendle Quote
+    const { data: pendleQuote, isLoading: isPendleLoading, error: pendleError } = usePendleConvert({
+        chainId,
+        receiver: pendleAdapter?.address as Address,
+        tokensIn: selectedFrom?.address as Address,
+        tokensOut: selectedTo?.address as Address,
+        amountsIn: quoteAmount,
+        slippage: slippage / 100, // Pendle uses decimal slippage (0.03 = 3%)
+        enabled: swapRouter === "pendle" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!pendleAdapter,
+    });
+
+    // Unified quote data
+    const isQuoteLoading = swapRouter === "1inch" ? is1inchLoading : isPendleLoading;
+    const quoteError = swapRouter === "1inch" ? oneInchError : pendleError;
+    
+    const amountOut = useMemo(() => {
+        if (swapRouter === "1inch" && oneInchQuote) {
+            return formatUnits(BigInt(oneInchQuote.dstAmount), selectedTo?.decimals || 18);
+        }
+        if (swapRouter === "pendle" && pendleQuote) {
+            const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
+            return formatUnits(BigInt(outAmount), selectedTo?.decimals || 18);
+        }
+        return "0";
+    }, [swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals]);
 
     const buildFlow = () => {
-        if (!quote || !selectedFrom || !selectedTo || !oneInchAdapter) return [];
+        if (!selectedFrom || !selectedTo) return [];
+        
+        // Get swap data based on selected router
+        let swapData: string;
+        let minOut: string;
+        
+        if (swapRouter === "1inch") {
+            if (!oneInchQuote || !oneInchAdapter) return [];
+            swapData = oneInchQuote.tx.data;
+            minOut = "1"; // 1inch handles slippage internally
+        } else {
+            if (!pendleQuote || !pendleAdapter) return [];
+            swapData = pendleQuote.transaction.data;
+            minOut = pendleQuote.data.minPtOut || pendleQuote.data.minTokenOut || "1";
+        }
 
-        const minAmountOut = 1n;
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
 
         return buildCollateralSwapFlow(
@@ -173,12 +217,14 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             selectedFrom.address,
             selectedTo.address,
             amountIn,
-            minAmountOut.toString(),
-            quote.tx.data,
+            minOut,
+            swapData,
             selectedFrom.decimals,
             market,
             isMax,
-            providerEnum
+            providerEnum,
+            false, // isExactOut
+            swapRouter === "1inch" ? "oneinch" : "pendle"
         );
     };
 
@@ -207,6 +253,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             slippage,
             preferBatching,
             flashLoanProvider: selectedProvider?.name ?? null,
+            swapRouter,
         } satisfies Record<string, string | number | boolean | null>;
 
         try {
@@ -228,7 +275,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
 
-    const canSubmit = !!quote && parseFloat(amountIn) > 0;
+    const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
+    const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
+    const canSubmit = hasQuote && hasAdapter && parseFloat(amountIn) > 0;
 
     // Info content for "How it works" tab
     const infoContent = (
@@ -264,7 +313,12 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     </div>
                     <div className="pb-4">
                         <h4 className="font-medium text-sm">Swap</h4>
-                        <p className="text-xs text-base-content/70">We swap your current collateral for the new asset using 1inch.</p>
+                        <p className="text-xs text-base-content/70">
+                            We swap your current collateral for the new asset using {swapRouter === "pendle" ? "Pendle" : "1inch"}.
+                        </p>
+                        <div className="mt-1 text-xs bg-base-200 p-1 rounded inline-block">
+                            Router: {swapRouter === "pendle" ? "Pendle" : "1inch"}
+                        </div>
                     </div>
                 </div>
 
@@ -295,16 +349,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // Warnings
     const warnings = (
         <>
-            {quote && oneInchAdapter && quote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
+            {swapRouter === "1inch" && oneInchQuote && oneInchAdapter && oneInchQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                 <div className="alert alert-warning text-xs py-2">
                     <FiAlertTriangle className="w-4 h-4" />
                     <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
                 </div>
             )}
-            {!oneInchAdapter && isOpen && (
+            {swapRouter === "1inch" && !oneInchAdapter && isOpen && (
                 <div className="alert alert-warning text-xs py-2">
                     <FiAlertTriangle className="w-4 h-4" />
-                    <span>1inch Adapter not found on this network. Swaps unavailable.</span>
+                    <span>1inch Adapter not found on this network. Try Pendle for PT swaps.</span>
+                </div>
+            )}
+            {swapRouter === "pendle" && !pendleAdapter && isOpen && (
+                <div className="alert alert-warning text-xs py-2">
+                    <FiAlertTriangle className="w-4 h-4" />
+                    <span>Pendle Adapter not found on this network.</span>
                 </div>
             )}
         </>
@@ -346,6 +406,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             warnings={warnings}
             fromLabel="Swap From"
             toLabel="Swap To"
+            swapRouter={swapRouter}
+            setSwapRouter={setSwapRouter}
         />
     );
 };

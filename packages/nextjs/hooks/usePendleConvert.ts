@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useDebounceValue } from "usehooks-ts";
+import { getEffectiveChainId } from "../utils/forkChain";
 import { PendleConvertParams, PendleConvertResponse, fetchPendleConvert } from "../utils/pendle";
 
 type UsePendleConvertProps = PendleConvertParams & {
@@ -52,7 +53,7 @@ export const usePendleConvert = ({
             params.aggregators,
         ],
         queryFn: () =>
-            fetchPendleConvert(chainId, {
+            fetchPendleConvert(getEffectiveChainId(chainId), {
                 ...params,
                 amountsIn: debouncedAmounts,
             }),

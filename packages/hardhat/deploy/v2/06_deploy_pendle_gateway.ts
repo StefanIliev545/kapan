@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ethers } from "hardhat";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
 const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre;
@@ -10,16 +11,19 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
 
     const router = await deployments.get("KapanRouter");
 
+    // Pendle Router addresses per chain (same address on all supported chains)
     const PENDLE_ROUTERS: { [key: number]: string } = {
         1: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Mainnet
         10: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Optimism
         42161: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Arbitrum
         8453: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Base
-        31337: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Hardhat (mirror mainnet)
     };
 
-    const chainId = await hre.getChainId();
-    const pendleRouter = PENDLE_ROUTERS[parseInt(chainId)];
+    const chainId = parseInt(await hre.getChainId());
+    const effectiveChainId = getEffectiveChainId(chainId);
+    logForkConfig(chainId);
+
+    const pendleRouter = PENDLE_ROUTERS[effectiveChainId];
 
     if (!pendleRouter) {
         console.warn(`No Pendle Router address found for chainId ${chainId}. Skipping PendleGateway deployment.`);

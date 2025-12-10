@@ -15,6 +15,53 @@ import generateTsAbis from "./scripts/generateTsAbis";
 // If not set, it uses ours Alchemy's default API key.
 // You can get your own at https://dashboard.alchemyapi.io
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
+
+// Fork chain configuration - set FORK_CHAIN to switch between chains
+// Supported: arbitrum (default), ethereum, base, optimism, linea
+// Also accepts short forms: arb, eth, op
+const FORK_CHAIN_INPUT = (process.env.FORK_CHAIN || "arbitrum").toLowerCase();
+const FORK_RPC_URLS: Record<string, string> = {
+  arbitrum: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  arb: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  ethereum: `https://eth-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  eth: `https://eth-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  mainnet: `https://eth-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  base: `https://base-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  optimism: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  op: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  linea: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+};
+
+// Fuzzy match for typos like "etheum" -> "ethereum"
+function matchForkChain(input: string): string {
+  if (FORK_RPC_URLS[input]) return input;
+  for (const key of Object.keys(FORK_RPC_URLS)) {
+    if (key.startsWith(input) || input.startsWith(key)) return key;
+  }
+  return "arbitrum";
+}
+
+const FORK_CHAIN = matchForkChain(FORK_CHAIN_INPUT);
+const forkUrl = FORK_RPC_URLS[FORK_CHAIN];
+
+// Pin to specific block numbers for faster caching (update periodically)
+const FORK_BLOCK_NUMBERS: Record<string, number> = {
+  ethereum: 21350000,  // ~Dec 2024
+  eth: 21350000,
+  mainnet: 21350000,
+  arbitrum: 280000000, // ~Dec 2024
+  arb: 280000000,
+  base: 23500000,      // ~Dec 2024
+  optimism: 129000000, // ~Dec 2024
+  op: 129000000,
+  linea: 13000000,     // ~Dec 2024
+};
+const forkBlockNumber = FORK_BLOCK_NUMBERS[FORK_CHAIN];
+
+if (FORK_CHAIN_INPUT !== FORK_CHAIN) {
+  console.log(`⚠️  FORK_CHAIN="${FORK_CHAIN_INPUT}" matched to "${FORK_CHAIN}"`);
+}
+console.log(`🍴 Forking ${FORK_CHAIN} (${forkUrl.split('/v2/')[0]})${forkBlockNumber ? ` at block ${forkBlockNumber}` : ''}`);
 // If not set, it uses the hardhat account 0 private key.
 // You can generate a random account with `yarn generate` or `yarn account:import` to import your existing PK
 const deployerPrivateKey =
@@ -64,13 +111,11 @@ const config: HardhatUserConfig = {
     hardhat: {
       hardfork: "cancun",
       forking: {
-        // Default to Base mainnet Alchemy; override via ALCHEMY_API_KEY
-        // url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        url: `https://arb-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        //url: `https://base-mainnet.g.alchemy.com/v2/${providerApiKey}`,
-        //blockNumber: 396136412,
-        //        blockNumber: 37791583,
+        // Fork chain controlled by FORK_CHAIN env var (arbitrum, ethereum, base, optimism, linea)
+        url: forkUrl,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
+        // Pin to block number for faster caching (set FORK_BLOCK=latest to disable)
+        ...(forkBlockNumber && process.env.FORK_BLOCK !== "latest" ? { blockNumber: forkBlockNumber } : {}),
       },
       mining: {
         auto: true,

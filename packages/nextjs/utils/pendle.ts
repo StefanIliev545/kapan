@@ -17,6 +17,7 @@ export type PendleConvertParams = {
 export type PendleConvertTransaction = {
     to: Address;
     data: Hex;
+    from?: Address;
     value?: string;
     gas?: string;
 };
@@ -28,9 +29,34 @@ export type PendleConvertData = {
     minTokenOut?: string;
 };
 
+// Normalized response type (converted from raw API response)
 export type PendleConvertResponse = {
     transaction: PendleConvertTransaction;
     data: PendleConvertData;
+};
+
+// Raw API response types (v2 API structure)
+type PendleRouteOutput = {
+    token: Address;
+    amount: string;
+};
+
+type PendleRoute = {
+    tx: {
+        data: Hex;
+        to: Address;
+        from: Address;
+    };
+    outputs: PendleRouteOutput[];
+    contractParamInfo?: {
+        method: string;
+        contractCallParams: unknown[];
+    };
+};
+
+type PendleRawResponse = {
+    action: string;
+    routes: PendleRoute[];
 };
 
 const appendValue = (searchParams: URLSearchParams, key: string, value?: string | number | boolean | string[]) => {
@@ -75,7 +101,27 @@ export const fetchPendleConvert = async (
         throw new Error(error.error || error.description || error.message || "Pendle convert request failed");
     }
 
-    return json as PendleConvertResponse;
+    // Transform raw API response to normalized format
+    const raw = json as PendleRawResponse;
+    
+    if (!raw.routes || raw.routes.length === 0) {
+        throw new Error("Pendle API returned no routes");
+    }
+
+    const bestRoute = raw.routes[0];
+    const outputAmount = bestRoute.outputs?.[0]?.amount || "0";
+
+    return {
+        transaction: {
+            to: bestRoute.tx.to,
+            data: bestRoute.tx.data,
+            from: bestRoute.tx.from,
+        },
+        data: {
+            amountTokenOut: outputAmount,
+            amountPtOut: outputAmount, // Use same value for compatibility
+        },
+    } as PendleConvertResponse;
 };
 
 export const encodePendleContext = (tokenOut: Address, minAmountOut: bigint, callData: Hex): Hex => {

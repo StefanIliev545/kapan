@@ -7,7 +7,7 @@ export async function GET(
     const { chainId } = await params;
     const searchParams = request.nextUrl.searchParams;
 
-    const url = `https://api.pendle.finance/core/v2/sdk/${chainId}/convert?${searchParams.toString()}`;
+    const url = `https://api-v2.pendle.finance/core/v2/sdk/${chainId}/convert?${searchParams.toString()}`;
 
     try {
         const response = await fetch(url, {

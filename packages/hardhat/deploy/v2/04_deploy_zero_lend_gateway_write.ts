@@ -4,14 +4,19 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
 /**
  * Gate deployment by a per-chain address map only.
  * If the current chainId isn't present, we skip deployment.
  * ZeroLend reuses Aave contracts for now.
+ * For Hardhat (31337), uses FORK_CHAIN env to determine which addresses to use.
  */
 const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
+  const effectiveChainId = getEffectiveChainId(chainId);
+  logForkConfig(chainId);
+
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
@@ -27,14 +32,9 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
       UI: "0x0A1198DDb5247a283F76077Bb1E45e5858ee100b", // ZeroLend UiPoolDataProviderV3 (Base)
       REFERRAL: 0,
     },
-    31337: {
-      PROVIDER: "0x5213ab3997a596c75Ac6ebF81f8aEb9cf9A31007", // hh PoolAddressesProvider (Base)
-      UI: "0x0A1198DDb5247a283F76077Bb1E45e5858ee100b", // hh UiPoolDataProviderV3 (Base)
-      REFERRAL: 0,
-    },
   };
 
-  const entry = MAP[chainId];
+  const entry = MAP[effectiveChainId];
   if (!entry) {
     console.warn(`ZeroLend: no address map for chainId=${chainId}. Skipping deployment.`);
     return;

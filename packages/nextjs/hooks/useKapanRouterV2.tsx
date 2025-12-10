@@ -382,7 +382,8 @@ export const useKapanRouterV2 = () => {
     market?: Address,
     isMax = false,
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
-    isExactOut = false
+    isExactOut = false,
+    swapProtocol: "oneinch" | "pendle" = "oneinch"
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
@@ -450,12 +451,12 @@ export const useKapanRouterV2 = () => {
         // Creates Output[3] = repayment amount (principal + fee ≈ original supply)
         createRouterInstruction(encodeFlashLoan(flashLoanProvider, 2)),
 
-        // 3. Approve OneInch for TokenIn using Output[2] (the actual principal we received)
-        createRouterInstruction(encodeApprove(2, "oneinch")),
+        // 3. Approve swap protocol for TokenIn using Output[2] (the actual principal we received)
+        createRouterInstruction(encodeApprove(2, swapProtocol)),
 
         // 4. Swap TokenIn using Output[2] (principal) -> Output[5] (TokenOut) + Output[6] (Refund)
         createProtocolInstruction(
-          "oneinch",
+          swapProtocol,
           encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 2)
         ),
 
@@ -508,12 +509,12 @@ export const useKapanRouterV2 = () => {
       // 1. Flash Loan (uses Output[0]) -> Output[1] (Borrowed Funds)
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
 
-      // 2. Approve TokenIn (Output[1]) for OneInchGateway -> Output[2] (dummy)
-      createRouterInstruction(encodeApprove(1, "oneinch")),
+      // 2. Approve TokenIn (Output[1]) for swap protocol -> Output[2] (dummy)
+      createRouterInstruction(encodeApprove(1, swapProtocol)),
 
       // 3. Swap TokenIn (Output[1]) -> Output[3] (TokenOut) + Output[4] (Refund)
       createProtocolInstruction(
-        "oneinch",
+        swapProtocol,
         encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 1)
       ),
 

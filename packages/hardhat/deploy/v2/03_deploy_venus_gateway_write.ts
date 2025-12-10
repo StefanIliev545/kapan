@@ -4,13 +4,18 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
 /**
  * Gate deployment by a per-chain address map only.
  * If the current chainId isn't present, we skip deployment.
+ * For Hardhat (31337), uses FORK_CHAIN env to determine which addresses to use.
  */
 const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
+  const effectiveChainId = getEffectiveChainId(chainId);
+  logForkConfig(chainId);
+
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
@@ -35,13 +40,9 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
       COMPTROLLER: "0xe22af1e6b78318e1Fe1053Edbd7209b8Fc62c4Fe",
       ORACLE: "0x86D04d6FE928D888076851122dc6739551818f7E",
     },
-    31337: { // Hardhat (Forking Arbitrum)
-      COMPTROLLER: "0x317c1A5739F39046E20b08ac9BeEa3f10fD43326",
-      ORACLE: "0xd55A98150e0F9f5e3F6280FC25617A5C93d96007",
-    },
   };
 
-  const entry = VENUS[chainId];
+  const entry = VENUS[effectiveChainId];
   if (!entry) {
     console.warn(`Venus: no address map for chainId=${chainId}. Skipping deployment.`);
     return;

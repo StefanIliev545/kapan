@@ -65,7 +65,7 @@ const protocolCountByNetwork: Record<string, number> = {
   optimism: 2,
   linea: 3,
   starknet: 2,
-  hardhat: 3,
+  hardhat: 4, // Aave, ZeroLend, Compound, Venus
 };
 
 const App: NextPage = () => {
@@ -211,6 +211,9 @@ const App: NextPage = () => {
               </div>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <ZeroLendProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
