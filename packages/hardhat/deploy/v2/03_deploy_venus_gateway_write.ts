@@ -16,6 +16,13 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   // Core Pool maps (extend as needed)
   const VENUS: Record<number, { COMPTROLLER: string; ORACLE: string }> = {
+    // Ethereum mainnet - Core Pool
+    1: {
+      // From Venus docs: https://docs-v4.venus.io/deployed-contracts/markets#ethereum
+      COMPTROLLER: "0x687a01ecF6d3907658f7A7c714749fAC32336D1B",
+      // Use the Bound Validator (resilient oracle) as the oracle source
+      ORACLE: "0x1Cd5f336A1d28Dff445619CC63d3A0329B4d8a58",
+    },
     42161: { // Arbitrum One
       COMPTROLLER: "0x317c1A5739F39046E20b08ac9BeEa3f10fD43326",
       ORACLE: "0xd55A98150e0F9f5e3F6280FC25617A5C93d96007",

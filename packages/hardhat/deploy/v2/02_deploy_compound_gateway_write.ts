@@ -8,6 +8,16 @@ import { deterministicSalt } from "../../utils/deploySalt";
 const ZERO = "0x0000000000000000000000000000000000000000";
 
 const DEFAULT_COMETS: Record<number, string[]> = {
+  // Ethereum mainnet
+  1: [
+    // Compound III (Comet) markets on mainnet
+    // USDC base market
+    "0xc3d688B66703497DAA19211EEdff47f25384cdc3",
+    // WETH base market
+    "0xa17581A9E3356d8AC78c1cbb6B4BfCD9b0Fbe3c",
+    // WBTC base market
+    "0x8A0A1E5D3D1d3EAfBF99f6619c86A3C2bA9c7ECA",
+  ],
   // Arbitrum One (42161)
   42161: [
     "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // cUSDCv3

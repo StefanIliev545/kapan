@@ -14,8 +14,16 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  // ---- Address map (Arbitrum + Base + Optimism + Linea). No chain in map => skip.
+  // ---- Address map (Mainnet + Arbitrum + Base + Optimism + Linea). No chain in map => skip.
   const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
+    // Ethereum mainnet V3 Core Market
+    1: {
+      // PoolAddressesProvider + UiPoolDataProvider from Aave docs:
+      // https://aave.com/docs/resources/addresses  (Ethereum V3 Core Market, Mainnet, V3)
+      PROVIDER: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e", // PoolAddressesProvider
+      UI:       "0x3F78BBD206e4D3c504Eb854232EdA7e47E9Fd8FC", // UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
     42161: {
       PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
       UI: "0x5c5228aC8BC1528482514aF3e27E692495148717", // Arbitrum UiPoolDataProviderV3

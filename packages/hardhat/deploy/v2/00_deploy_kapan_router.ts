@@ -17,14 +17,22 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
   const WAIT = 3;
 
   const BALANCER: Record<number, { VAULT_V2?: string; VAULT_V3?: string }> = {
+    // Ethereum mainnet
+    1: {
+      VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+      VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
+    },
+    // Arbitrum
     42161: {
       VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
     },
+    // Base
     8453: {
       VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
     },
+    // Optimism
     10: {
       VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
@@ -38,6 +46,11 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
 
   // Aave V3 PoolAddressesProvider map (same as in AaveGatewayWrite deployment)
   const AAVE: Record<number, { PROVIDER: string }> = {
+    // Ethereum mainnet v3 Core market
+    1: {
+      // PoolAddressesProvider for Ethereum V3 Core Market
+      PROVIDER: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+    },
     42161: {
       PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
     },
