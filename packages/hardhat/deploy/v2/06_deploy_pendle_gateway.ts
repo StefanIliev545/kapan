@@ -17,6 +17,7 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
         10: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Optimism
         42161: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Arbitrum
         8453: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Base
+        9745: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Plasma
     };
 
     const chainId = parseInt(await hre.getChainId());

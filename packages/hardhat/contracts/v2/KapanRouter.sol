@@ -497,7 +497,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
 
     function processPushToken(ProtocolTypes.ProtocolInstruction memory instruction) internal {
         // instruction.data encodes: (RouterInstruction, ProtocolTypes.InputPtr input)
-        (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
+    (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
             instruction.data,
             (RouterInstruction, ProtocolTypes.InputPtr)
         );
