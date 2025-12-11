@@ -35,6 +35,13 @@ const localhost = defineChain({
       http: ["http://127.0.0.1:8545"],
     },
   },
+  contracts: {
+    // Multicall3 is deployed on most chains at this address
+    // When forking mainnet/arbitrum/etc, it will be available
+    multicall3: {
+      address: "0xcA11bde05977b3631167028862bE2a173976CA11",
+    },
+  },
 });
 
 const scaffoldConfig = {

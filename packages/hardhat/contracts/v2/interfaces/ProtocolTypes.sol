@@ -22,7 +22,8 @@ library ProtocolTypes {
         GetBorrowBalance,
         GetSupplyBalance,
         Swap,
-        SwapExactOut
+        SwapExactOut,
+        SetEMode  // Aave V3 E-Mode: amount encodes categoryId (0 = disable E-Mode)
     }
     struct InputPtr {
         uint256 index;

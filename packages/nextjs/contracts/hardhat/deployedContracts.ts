@@ -10076,7 +10076,7 @@ const contracts = {
   },
   31337: {
     AaveGatewayView: {
-      address: "0x43b004427182E79c661Bb492Fa959837486AD407",
+      address: "0xB95BDa9b4E3eF6DB652150D218D4cA4F9a6582E7",
       abi: [
         {
           inputs: [
@@ -10207,6 +10207,82 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAllTokensInfoWithEMode",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "supplyRate",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "borrowRate",
+                  type: "uint256",
+                },
+                {
+                  internalType: "string",
+                  name: "name",
+                  type: "string",
+                },
+                {
+                  internalType: "string",
+                  name: "symbol",
+                  type: "string",
+                },
+                {
+                  internalType: "uint256",
+                  name: "price",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "borrowBalance",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "balance",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "aToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "decimals",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AaveGatewayView.TokenInfo[]",
+              name: "tokens",
+              type: "tuple[]",
+            },
+            {
+              internalType: "uint8",
+              name: "userEModeCategory",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -10294,6 +10370,56 @@ const contracts = {
               internalType: "bool",
               name: "",
               type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getEModes",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "uint8",
+                  name: "id",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint16",
+                  name: "ltv",
+                  type: "uint16",
+                },
+                {
+                  internalType: "uint16",
+                  name: "liquidationThreshold",
+                  type: "uint16",
+                },
+                {
+                  internalType: "uint16",
+                  name: "liquidationBonus",
+                  type: "uint16",
+                },
+                {
+                  internalType: "string",
+                  name: "label",
+                  type: "string",
+                },
+                {
+                  internalType: "uint128",
+                  name: "collateralBitmap",
+                  type: "uint128",
+                },
+                {
+                  internalType: "uint128",
+                  name: "borrowableBitmap",
+                  type: "uint128",
+                },
+              ],
+              internalType: "struct AaveGatewayView.EModeInfo[]",
+              name: "emodes",
+              type: "tuple[]",
             },
           ],
           stateMutability: "view",
@@ -10452,6 +10578,25 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserEMode",
+          outputs: [
+            {
+              internalType: "uint8",
+              name: "categoryId",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "market",
               type: "address",
             },
@@ -10502,7 +10647,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xB84c79584C9e5b2DF7ebbA8C5F106177CEc91696",
+      address: "0x839d8F14CF2F4387E94a6d722Cb8d4f3F832DFaA",
       abi: [
         {
           inputs: [
@@ -10825,6 +10970,43 @@ const contracts = {
           name: "deposit",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint8",
+              name: "categoryId",
+              type: "uint8",
+            },
+          ],
+          name: "encodeSetEMode",
+          outputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "callData",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getPool",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -11770,7 +11952,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xF2AED5c8B29fb298D65e8F1FC65aC45B48f83D6E",
+      address: "0x0e987EB3eFf766218011440FED571eEdb573751F",
       abi: [
         {
           inputs: [
@@ -12408,7 +12590,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x9D3e64d3173283976884DDD93138F4623a297107",
+      address: "0x56407EeE430285Cc6060Ba8edCC2e0fbb2eB6F39",
       abi: [
         {
           inputs: [
@@ -13124,7 +13306,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x162AC52515f6e024dAB5BCe8221e01191AE95303",
+      address: "0x9e089CC6A5B3633C5CCE90D5C4Bd0168CcfD6aBB",
       abi: [
         {
           inputs: [
@@ -13345,7 +13527,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0xBFB1b931F0B14d0862d80d2bA4fBeA82ee2BE6ED",
+      address: "0x9d39cfef30cE44E762bACb16486987bAecbAf888",
       abi: [
         {
           inputs: [
@@ -13766,7 +13948,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0x56567571BDafc5753037bF5002aFa826Ab6B80B9",
+      address: "0x1C4350f02E258939A09d80E3F39f845781bf5b61",
       abi: [
         {
           inputs: [
@@ -13987,7 +14169,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x3D25e5062c0BCC6d7eA19836c7f880D99a98B34d",
+      address: "0x4bBFa1aA740a4EF3A2c9B4f5E628D0256A360cF4",
       abi: [
         {
           inputs: [
@@ -15064,7 +15246,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0xE1824e7927e14dDc9343F93f60Bc8E5aB0cB1C18",
+      address: "0x4E5a6519ee08B57B67b3a1df51BAF4Ad71AC58C2",
       abi: [
         {
           inputs: [

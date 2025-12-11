@@ -213,13 +213,7 @@ const App: NextPage = () => {
                 <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <ZeroLendProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VenusProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
             </div>
           )}

@@ -71,6 +71,10 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             // NO BUFFER in execution
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: token, amount: bal });
+        } else if (instr.op == ProtocolTypes.LendingOp.SetEMode) {
+            // Note: SetEMode is handled specially - it produces approval targets
+            // for the user to call the Pool directly (see authorize function)
+            outputs = new ProtocolTypes.Output[](0);
         } else {
             revert("Unknown op");
         }
@@ -251,6 +255,12 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                 pIdx++;
                 targets[i] = address(0);
                 data[i] = bytes("");
+            } else if (ins.op == ProtocolTypes.LendingOp.SetEMode) {
+                // SetEMode: user calls Pool.setUserEMode(categoryId) directly
+                // amount encodes the categoryId
+                address pool = poolAddressesProvider.getPool();
+                targets[i] = pool;
+                data[i] = abi.encodeWithSignature("setUserEMode(uint8)", uint8(amount));
             } else {
                 // Deposit / DepositCollateral produce NO output
                 targets[i] = address(0);
@@ -287,10 +297,25 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                     data[i] = abi.encodeWithSignature("approveDelegation(address,uint256)", address(this), 0);
                 }
             } else {
+                // SetEMode and other ops don't need deauthorization
                 targets[i] = address(0);
                 data[i] = bytes("");
             }
         }
+    }
+
+    /// @notice Returns the Aave Pool address for direct calls (e.g., setUserEMode)
+    function getPool() external view returns (address) {
+        return poolAddressesProvider.getPool();
+    }
+
+    /// @notice Helper to encode setUserEMode calldata
+    /// @param categoryId The E-Mode category ID (0 = disable E-Mode)
+    /// @return target The Aave Pool address
+    /// @return callData The encoded function call
+    function encodeSetEMode(uint8 categoryId) external view returns (address target, bytes memory callData) {
+        target = poolAddressesProvider.getPool();
+        callData = abi.encodeWithSignature("setUserEMode(uint8)", categoryId);
     }
 
     function _getAToken(address underlying) internal view returns (address) {

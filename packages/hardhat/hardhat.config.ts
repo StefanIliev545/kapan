@@ -46,7 +46,7 @@ const forkUrl = FORK_RPC_URLS[FORK_CHAIN];
 
 // Pin to specific block numbers for faster caching (update periodically)
 const FORK_BLOCK_NUMBERS: Record<string, number> = {
-  ethereum: 21350000,  // ~Dec 2024
+  ethereum: 23988682,
   eth: 21350000,
   mainnet: 21350000,
   arbitrum: 280000000, // ~Dec 2024
