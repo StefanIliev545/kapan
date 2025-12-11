@@ -10,8 +10,9 @@ import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContra
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
+import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
-import { SwapAsset } from "./SwapModalShell";
+import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
 
@@ -74,6 +75,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [leverageInput, setLeverageInput] = useState<string>("1.00");
   const [slippage, setSlippage] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [swapRouter, setSwapRouter] = useState<SwapRouter>("1inch");
+  // Zap mode: deposit debt token instead of collateral (e.g., USDe → PT-USDe)
+  const [zapMode, setZapMode] = useState(false);
 
   const maxLeverage = useMemo(() => calculateMaxLeverage(maxLtvBps, protocolName), [maxLtvBps, protocolName]);
 
@@ -83,20 +87,41 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     setLeverageInput(clamped.toFixed(2));
   };
 
+  // Fetch wallet balances for both collaterals and debt options (for zap mode)
+  const allTokens = useMemo(() => {
+    const tokens = [...collaterals.map(c => ({ address: c.address, decimals: c.decimals }))];
+    debtOptions.forEach(d => {
+      if (!tokens.find(t => t.address.toLowerCase() === d.address.toLowerCase())) {
+        tokens.push({ address: d.address, decimals: d.decimals });
+      }
+    });
+    return tokens;
+  }, [collaterals, debtOptions]);
+
   const { balances: walletBalances } = useWalletTokenBalances({
-    tokens: collaterals.map(c => ({ address: c.address, decimals: c.decimals })),
-    network: "evm", chainId,
+    tokens: allTokens, network: "evm", chainId,
   });
 
   const collateralsWithWalletBalance = useMemo(() => collaterals.map(c => ({
     ...c, walletBalance: walletBalances[c.address.toLowerCase()]?.balance ?? 0n,
   })), [collaterals, walletBalances]);
 
+  const debtWithWalletBalance = useMemo(() => debtOptions.map(d => ({
+    ...d, walletBalance: walletBalances[d.address.toLowerCase()]?.balance ?? 0n,
+  })), [debtOptions, walletBalances]);
+
   const currentCollateral = useMemo(() =>
     collateral ? collateralsWithWalletBalance.find(c => c.address === collateral.address) : undefined,
     [collateral, collateralsWithWalletBalance]);
 
-  const walletBalance = currentCollateral?.walletBalance ?? 0n;
+  const currentDebt = useMemo(() =>
+    debt ? debtWithWalletBalance.find(d => d.address === debt.address) : undefined,
+    [debt, debtWithWalletBalance]);
+
+  // In zap mode, wallet balance is the debt token; otherwise collateral
+  const walletBalance = zapMode ? (currentDebt?.walletBalance ?? 0n) : (currentCollateral?.walletBalance ?? 0n);
+  const depositToken = zapMode ? debt : collateral;
+  const depositDecimals = depositToken?.decimals ?? 18;
 
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
@@ -114,16 +139,33 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const { data: oneInchAdapter } = useDeployedContractInfo({
     contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144,
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: pendleAdapter } = useDeployedContractInfo("PendleAdapter" as any);
 
+  // In zap mode, margin is in debt token terms; otherwise collateral
   const marginAmountRaw = useMemo(() => {
-    try { return collateral ? parseUnits(marginAmount || "0", collateral.decimals) : 0n; }
+    try { return depositToken ? parseUnits(marginAmount || "0", depositDecimals) : 0n; }
     catch { return 0n; }
-  }, [collateral, marginAmount]);
+  }, [depositToken, depositDecimals, marginAmount]);
 
   const flashLoanAmountRaw = useMemo(() => {
     if (!collateral || !debt || leverage <= 1 || marginAmountRaw === 0n) return 0n;
+    
+    if (zapMode) {
+      // In zap mode, margin is in debt terms, so calculate flash loan differently
+      // marginAmount is in debt tokens, flash loan = margin * (leverage - 1)
+      const leverageMultiplier = Math.round((leverage - 1) * 10000);
+      return (marginAmountRaw * BigInt(leverageMultiplier)) / 10000n;
+    }
+    
     return calculateFlashLoanAmount(marginAmountRaw, leverage, collateral.price ?? 0n, debt.price ?? 0n, collateral.decimals, debt.decimals);
-  }, [collateral, debt, leverage, marginAmountRaw]);
+  }, [collateral, debt, leverage, marginAmountRaw, zapMode]);
+
+  // Total amount to swap in zap mode (deposit + flash loan)
+  const totalSwapAmount = useMemo(() => {
+    if (!zapMode) return flashLoanAmountRaw;
+    return marginAmountRaw + flashLoanAmountRaw;
+  }, [zapMode, marginAmountRaw, flashLoanAmountRaw]);
 
   const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
     isOpen, networkType: "evm", fromProtocol: protocolName, chainId,
@@ -142,21 +184,47 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     tokenAddress: debt?.address as Address, amount: flashLoanAmountRaw, chainId,
   });
 
-  const { data: swapQuote, isLoading: isSwapQuoteLoading } = use1inchQuote({
+  // Swap amount: in zap mode, swap everything (deposit + flash loan); otherwise just flash loan
+  const swapQuoteAmount = zapMode ? totalSwapAmount : flashLoanAmountRaw;
+
+  // 1inch Quote
+  const { data: oneInchQuote, isLoading: is1inchLoading } = use1inchQuote({
     chainId, src: (debt?.address as Address) || "0x0000000000000000000000000000000000000000",
     dst: (collateral?.address as Address) || "0x0000000000000000000000000000000000000000",
-    amount: flashLoanAmountRaw.toString(), from: (oneInchAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
-    slippage, enabled: isOpen && !!collateral && !!debt && flashLoanAmountRaw > 0n && !!oneInchAdapter,
+    amount: swapQuoteAmount.toString(), from: (oneInchAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
+    slippage, enabled: swapRouter === "1inch" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!oneInchAdapter,
   });
 
+  // Pendle Quote
+  const { data: pendleQuote, isLoading: isPendleLoading } = usePendleConvert({
+    chainId,
+    receiver: pendleAdapter?.address as Address,
+    tokensIn: debt?.address as Address,
+    tokensOut: collateral?.address as Address,
+    amountsIn: swapQuoteAmount.toString(),
+    slippage: slippage / 100, // Pendle uses decimal slippage
+    enabled: swapRouter === "pendle" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!pendleAdapter,
+  });
+
+  // Unified loading state
+  const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchLoading : isPendleLoading;
+
   const minCollateralOut = useMemo(() => {
-    if (!swapQuote || !collateral) return { raw: 0n, formatted: "0" };
-    const quoted = BigInt(swapQuote.dstAmount || "0");
+    if (!collateral) return { raw: 0n, formatted: "0" };
+    
+    let quoted = 0n;
+    if (swapRouter === "1inch" && oneInchQuote) {
+      quoted = BigInt(oneInchQuote.dstAmount || "0");
+    } else if (swapRouter === "pendle" && pendleQuote) {
+      const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
+      quoted = BigInt(outAmount);
+    }
+    
     if (quoted === 0n) return { raw: 0n, formatted: "0" };
     const bufferBps = BigInt(Math.round(slippage * 100));
     const buffered = (quoted * (10000n - bufferBps)) / 10000n;
     return { raw: buffered, formatted: formatUnits(buffered, collateral.decimals) };
-  }, [collateral, slippage, swapQuote]);
+  }, [collateral, slippage, swapRouter, oneInchQuote, pendleQuote]);
 
   const metrics = useMemo(() => {
     if (!collateral || !debt || marginAmountRaw === 0n) {
@@ -165,10 +233,17 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     const cPrice = Number(formatUnits(collateral.price ?? 0n, 8));
     const dPrice = Number(formatUnits(debt.price ?? 0n, 8));
 
-    // Use token amounts directly for accuracy
-    const marginTokens = Number(formatUnits(marginAmountRaw, collateral.decimals));
-    const swappedTokens = Number(minCollateralOut.formatted);
-    const totalCollateralTokens = marginTokens + swappedTokens;
+    // In zap mode, all collateral comes from the swap; otherwise margin + swap
+    let totalCollateralTokens: number;
+    if (zapMode) {
+      // All collateral is from the swap (deposit + flash loan → collateral)
+      totalCollateralTokens = Number(minCollateralOut.formatted);
+    } else {
+      // Initial margin (in collateral) + swapped collateral
+      const marginTokens = Number(formatUnits(marginAmountRaw, collateral.decimals));
+      const swappedTokens = Number(minCollateralOut.formatted);
+      totalCollateralTokens = marginTokens + swappedTokens;
+    }
     const totalCollateralUsd = totalCollateralTokens * cPrice;
 
     const debtTokens = Number(formatUnits(flashLoanAmountRaw, debt.decimals));
@@ -184,7 +259,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       : null;
 
     return { totalCollateralUsd, debtUsd, ltv, liquidationPrice, healthFactor, totalCollateralTokens };
-  }, [collateral, debt, marginAmountRaw, minCollateralOut.formatted, flashLoanAmountRaw, lltvBps]);
+  }, [collateral, debt, marginAmountRaw, minCollateralOut.formatted, flashLoanAmountRaw, lltvBps, zapMode]);
 
   // Net APY calculation
   const netApy = useMemo(() => {
@@ -206,19 +281,51 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const { buildMultiplyFlow } = useKapanRouterV2();
 
   const buildFlow = () => {
-    if (!collateral || !debt || !swapQuote?.tx?.data || flashLoanAmountRaw === 0n) return [];
-    return buildMultiplyFlow({
+    if (!collateral || !debt || flashLoanAmountRaw === 0n) return [];
+    
+    // Get swap data based on selected router
+    let swapData: string;
+    let minOut: string;
+    
+    if (swapRouter === "1inch") {
+      if (!oneInchQuote || !oneInchAdapter) return [];
+      swapData = oneInchQuote.tx.data;
+      minOut = minCollateralOut.formatted;
+    } else {
+      if (!pendleQuote || !pendleAdapter) return [];
+      swapData = pendleQuote.transaction.data;
+      minOut = pendleQuote.data.minPtOut || pendleQuote.data.minTokenOut || minCollateralOut.formatted;
+    }
+    
+    const flowParams = {
       protocolName, collateralToken: collateral.address as Address, debtToken: debt.address as Address,
-      initialCollateral: marginAmount || "0", flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-      minCollateralOut: minCollateralOut.formatted, swapData: swapQuote.tx.data,
+      initialCollateral: zapMode ? "0" : (marginAmount || "0"), // In zap mode, no initial collateral
+      flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
+      minCollateralOut: minOut, swapData,
       collateralDecimals: collateral.decimals, debtDecimals: debt.decimals,
       flashLoanProvider: selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2, market,
+      swapRouter: swapRouter === "1inch" ? "oneinch" : "pendle",
+      zapMode,
+      depositAmount: zapMode ? marginAmount : undefined, // In zap mode, margin is the deposit amount
+    };
+    
+    console.log("[MultiplyEvmModal] buildFlow params:", {
+      zapMode,
+      marginAmount,
+      flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
+      depositAmount: flowParams.depositAmount,
+      collateral: collateral.symbol,
+      debt: debt.symbol,
     });
+    
+    const flow = buildMultiplyFlow(flowParams);
+    console.log("[MultiplyEvmModal] buildFlow result:", flow.length, "instructions");
+    return flow;
   };
 
   const { handleConfirm, batchingPreference } = useEvmTransactionFlow({
     isOpen, chainId, onClose, buildFlow, successMessage: "Loop position opened!",
-    emptyFlowErrorMessage: "Unable to build loop instructions", simulateWhenBatching: true,
+    emptyFlowErrorMessage: "Unable to build loop instructions", simulateWhenBatching: false, // Disabled for now - zap mode has complex flows
   });
 
   const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
@@ -226,7 +333,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      track("multiply_tx_begin", { protocol: protocolName, chainId, collateral: collateral?.symbol ?? "unknown", debt: debt?.symbol ?? "unknown", marginAmount, leverage, flashLoanProvider: selectedProvider?.name ?? "unknown" });
+      track("multiply_tx_begin", { protocol: protocolName, chainId, collateral: collateral?.symbol ?? "unknown", debt: debt?.symbol ?? "unknown", marginAmount, leverage, flashLoanProvider: selectedProvider?.name ?? "unknown", swapRouter });
       await handleConfirm(marginAmount);
       track("multiply_tx_complete", { status: "success" });
     } catch (e) {
@@ -235,9 +342,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     } finally { setIsSubmitting(false); }
   };
 
-  const canSubmit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && !!swapQuote && !isSwapQuoteLoading;
-  const marginUsd = collateral && marginAmount ? Number(marginAmount) * Number(formatUnits(collateral.price ?? 0n, 8)) : 0;
-  const walletBalanceFormatted = collateral ? Number(formatUnits(walletBalance, collateral.decimals)) : 0;
+  const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
+  const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
+  const canSubmit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
+  // In zap mode, margin is in debt terms; otherwise collateral terms
+  const marginUsd = depositToken && marginAmount 
+    ? Number(marginAmount) * Number(formatUnits(depositToken.price ?? 0n, 8)) 
+    : 0;
+  const walletBalanceFormatted = depositToken ? Number(formatUnits(walletBalance, depositDecimals)) : 0;
   const collateralPrice = collateral ? Number(formatUnits(collateral.price ?? 0n, 8)) : 0;
   const shortAmount = debt ? Number(formatUnits(flashLoanAmountRaw, debt.decimals)) : 0;
 
@@ -260,13 +372,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         <div className="p-5">
           {/* Two Column Layout: Collateral | Borrow */}
           <div className="grid grid-cols-2 gap-3 mb-4">
-            {/* Collateral: Deposit → Total */}
+            {/* Deposit section */}
             <div className="bg-base-200/40 rounded-xl p-4 border border-base-300/20">
               <div className="flex items-center justify-between text-sm text-base-content/60 mb-2">
                 <span>Deposit</span>
                 <button
                   className="hover:text-primary transition-colors text-xs"
-                  onClick={() => collateral && setMarginAmount(formatUnits(walletBalance, collateral.decimals))}
+                  onClick={() => depositToken && setMarginAmount(formatUnits(walletBalance, depositDecimals))}
                 >
                   Bal: {walletBalanceFormatted.toFixed(2)}
                 </button>
@@ -279,38 +391,94 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   placeholder="0"
                   className="flex-1 bg-transparent text-xl font-medium outline-none min-w-0 placeholder:text-base-content/30"
                 />
-                <div className="dropdown dropdown-end">
-                  <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
-                    {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
-                    <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
-                    <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </label>
-                  <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
-                    {collateralsWithWalletBalance.map(c => {
-                      const bal = Number(formatUnits(c.walletBalance, c.decimals));
-                      return (
+                {/* In zap mode, show debt token selector (deposit = debt); otherwise show collateral selector */}
+                {zapMode ? (
+                  <div className="dropdown dropdown-end">
+                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                      {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
+                      <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </label>
+                    <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                      {debtWithWalletBalance.map(d => {
+                        const bal = Number(formatUnits(d.walletBalance, d.decimals));
+                        return (
+                          <li key={d.address}>
+                            <a onClick={() => setDebt(d)} className={`flex items-center justify-between text-sm ${debt?.address === d.address ? "active" : ""}`}>
+                              <div className="flex items-center gap-2">
+                                <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
+                                {d.symbol}
+                              </div>
+                              <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="dropdown dropdown-end">
+                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                      {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
+                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </label>
+                    <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                      {collateralsWithWalletBalance.map(c => {
+                        const bal = Number(formatUnits(c.walletBalance, c.decimals));
+                        return (
+                          <li key={c.address}>
+                            <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
+                              <div className="flex items-center gap-2">
+                                <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
+                                {c.symbol}
+                              </div>
+                              <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              {/* In zap mode, show collateral selector and swap arrow */}
+              {zapMode && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                  <div className="flex items-center gap-1.5 text-xs text-base-content/60">
+                    <span>↓ swap to</span>
+                  </div>
+                  <div className="dropdown dropdown-end">
+                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-success/10 border-0 hover:bg-success/20 rounded-lg px-2">
+                      {collateral && <Image src={collateral.icon} alt="" width={14} height={14} className="rounded-full" />}
+                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </label>
+                    <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                      {collaterals.map(c => (
                         <li key={c.address}>
-                          <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
-                            <div className="flex items-center gap-2">
-                              <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
-                              {c.symbol}
-                            </div>
-                            <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                          <a onClick={() => setCollateral(c)} className={`flex items-center gap-2 text-sm ${collateral?.address === c.address ? "active" : ""}`}>
+                            <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
+                            {c.symbol}
                           </a>
                         </li>
-                      );
-                    })}
-                  </ul>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
+              )}
               {/* Show total after leverage inline */}
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
                 <span className="text-xs text-base-content/50">≈ ${marginUsd.toFixed(2)}</span>
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-base-content/40">→</span>
-                  <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)}</span>
+                  <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)} {collateral?.symbol}</span>
                   <span className="text-base-content/50">(${metrics.totalCollateralUsd.toFixed(2)})</span>
                 </div>
               </div>
@@ -379,8 +547,38 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               ))}
             </div>
 
-            {/* Slippage Row */}
+            {/* Zap Mode Toggle - for PT loops (deposit underlying → swap to PT collateral) */}
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-base-300/30">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-base-content/60">Zap Mode</span>
+                <span className="text-[10px] text-base-content/40">(deposit → swap → collateral)</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={zapMode}
+                onChange={e => setZapMode(e.target.checked)}
+                className="toggle toggle-primary toggle-xs"
+              />
+            </div>
+
+            {/* Swap Router Row */}
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-base-content/60">Swap Router</span>
+              <div className="flex gap-1">
+                {SWAP_ROUTER_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setSwapRouter(opt.value)}
+                    className={`px-2 py-0.5 text-xs rounded transition-colors ${swapRouter === opt.value ? "bg-primary text-primary-content" : "bg-base-300/50 hover:bg-base-300"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Slippage Row */}
+            <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-base-content/60">Slippage</span>
               <div className="flex gap-1">
                 {[0.5, 1, 2, 3].map(s => (
@@ -443,7 +641,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           {/* Details */}
           <div className="bg-base-200/40 rounded-lg p-3 border border-base-300/20 mb-4 text-xs space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-base-content/60">Swap Route</span>
+              <span className="text-base-content/60">Swap Route ({swapRouter === "pendle" ? "Pendle" : "1inch"})</span>
               <span className="font-medium">
                 {isSwapQuoteLoading ? <span className="loading loading-dots loading-xs" /> :
                   flashLoanAmountRaw > 0n ? `${shortAmount.toFixed(4)} ${debt?.symbol} → ${Number(minCollateralOut.formatted).toFixed(4)} ${collateral?.symbol}` : "-"}

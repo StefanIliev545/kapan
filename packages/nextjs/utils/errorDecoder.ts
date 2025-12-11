@@ -14,6 +14,7 @@ const KNOWN_ERRORS: Record<string, string> = {
   "0x366eb54d": "Health factor too low - would put position at liquidation risk",
   "0xe3fa20f5": "Insufficient collateral to cover new borrow",
   "0xb7f5e224": "Not enough available balance",
+  "0x6679996d": "Collateral cannot be used for borrowing - this asset has LTV=0 on Aave (e.g., PT tokens)",
   
   // 1inch / Swap errors
   "0x9a446475": "Swap slippage too high - try increasing slippage tolerance",

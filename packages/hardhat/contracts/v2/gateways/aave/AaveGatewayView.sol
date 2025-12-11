@@ -37,11 +37,46 @@ contract AaveGatewayView {
 
     /// @notice Returns all token info for a given user.
     /// @dev This function caches the reserves and user reserves data to avoid multiple heavy calls.
+    struct EModeInfo {
+        uint8 id;
+        uint16 ltv;
+        uint16 liquidationThreshold;
+        uint16 liquidationBonus;
+        string label;
+        uint128 collateralBitmap;
+        uint128 borrowableBitmap;
+    }
+
+    /// @notice Returns the user's current E-Mode category ID
+    /// @param user The address of the user
+    /// @return categoryId The E-Mode category ID (0 = no E-Mode)
+    function getUserEMode(address user) external view returns (uint8 categoryId) {
+        (, categoryId) = uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+    }
+
+    /// @notice Returns all available E-Mode categories
+    /// @return emodes Array of E-Mode categories with their configurations
+    function getEModes() external view returns (EModeInfo[] memory emodes) {
+        IUiPoolDataProviderV3.Emode[] memory rawEmodes = uiPoolDataProvider.getEModes(poolAddressesProvider);
+        emodes = new EModeInfo[](rawEmodes.length);
+        for (uint256 i = 0; i < rawEmodes.length; i++) {
+            emodes[i] = EModeInfo({
+                id: rawEmodes[i].id,
+                ltv: rawEmodes[i].eMode.ltv,
+                liquidationThreshold: rawEmodes[i].eMode.liquidationThreshold,
+                liquidationBonus: rawEmodes[i].eMode.liquidationBonus,
+                label: rawEmodes[i].eMode.label,
+                collateralBitmap: rawEmodes[i].eMode.collateralBitmap,
+                borrowableBitmap: rawEmodes[i].eMode.borrowableBitmap
+            });
+        }
+    }
+
     function getAllTokensInfo(address user) external view returns (TokenInfo[] memory) {
         // Fetch reserves data once.
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        // Fetch user reserves data once.
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+        // Fetch user reserves data once (including E-Mode category)
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, /* uint8 userEModeCategory */) = 
             uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
 
         TokenInfo[] memory tokens = new TokenInfo[](reserves.length);
@@ -68,6 +103,42 @@ contract AaveGatewayView {
             });
         }
         return tokens;
+    }
+
+    /// @notice Returns all token info for a user along with their E-Mode category
+    /// @param user The address of the user
+    /// @return tokens Array of TokenInfo structs
+    /// @return userEModeCategory The user's current E-Mode category ID (0 = no E-Mode)
+    function getAllTokensInfoWithEMode(address user) external view returns (TokenInfo[] memory tokens, uint8 userEModeCategory) {
+        // Fetch reserves data once.
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+        // Fetch user reserves data once (including E-Mode category)
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, uint8 eModeCat) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+        userEModeCategory = eModeCat;
+
+        tokens = new TokenInfo[](reserves.length);
+        for (uint256 i = 0; i < reserves.length; i++) {
+            uint256 balance = _getBalanceFromReserveData(reserves[i], user, userReserves);
+            uint256 borrowBalance = _getBorrowBalanceFromReserveData(reserves[i], user, userReserves);
+            uint8 dec = 18;
+            try ERC20(reserves[i].underlyingAsset).decimals() returns (uint8 d) {
+                dec = d;
+            } catch {
+            }
+            tokens[i] = TokenInfo({
+                token: reserves[i].underlyingAsset,
+                supplyRate: reserves[i].liquidityRate,
+                borrowRate: reserves[i].variableBorrowRate,
+                name: reserves[i].name,
+                symbol: reserves[i].symbol,
+                price: reserves[i].priceInMarketReferenceCurrency,
+                borrowBalance: borrowBalance,
+                balance: balance,
+                aToken: reserves[i].aTokenAddress,
+                decimals: dec
+            });
+        }
     }
 
     function getBorrowRate(address token) external view returns (uint256, bool) {

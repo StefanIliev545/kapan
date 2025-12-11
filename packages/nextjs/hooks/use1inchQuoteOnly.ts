@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 import { fetch1inchQuote, OneInchQuoteResponse } from "../utils/1inch";
+import { getEffectiveChainId } from "../utils/forkChain";
 import { useDebounceValue } from "usehooks-ts";
 
 type Use1inchQuoteOnlyProps = {
@@ -30,7 +31,7 @@ export const use1inchQuoteOnly = ({
         queryFn: async () => {
             try {
                 return await fetch1inchQuote(
-                    chainId === 31337 ? 42161 : chainId,
+                    getEffectiveChainId(chainId),
                     {
                         src,
                         dst,

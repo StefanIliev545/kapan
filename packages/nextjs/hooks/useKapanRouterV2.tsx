@@ -34,6 +34,7 @@ import {
   encodeLendingInstruction,
   encodeFlashLoan,
   encodeSplit,
+  encodeAdd,
   FlashLoanProvider,
   LendingOp,
   normalizeProtocolName,
@@ -382,7 +383,8 @@ export const useKapanRouterV2 = () => {
     market?: Address,
     isMax = false,
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
-    isExactOut = false
+    isExactOut = false,
+    swapProtocol: "oneinch" | "pendle" = "oneinch"
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
@@ -450,12 +452,12 @@ export const useKapanRouterV2 = () => {
         // Creates Output[3] = repayment amount (principal + fee ≈ original supply)
         createRouterInstruction(encodeFlashLoan(flashLoanProvider, 2)),
 
-        // 3. Approve OneInch for TokenIn using Output[2] (the actual principal we received)
-        createRouterInstruction(encodeApprove(2, "oneinch")),
+        // 3. Approve swap protocol for TokenIn using Output[2] (the actual principal we received)
+        createRouterInstruction(encodeApprove(2, swapProtocol)),
 
         // 4. Swap TokenIn using Output[2] (principal) -> Output[5] (TokenOut) + Output[6] (Refund)
         createProtocolInstruction(
-          "oneinch",
+          swapProtocol,
           encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 2)
         ),
 
@@ -508,12 +510,12 @@ export const useKapanRouterV2 = () => {
       // 1. Flash Loan (uses Output[0]) -> Output[1] (Borrowed Funds)
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
 
-      // 2. Approve TokenIn (Output[1]) for OneInchGateway -> Output[2] (dummy)
-      createRouterInstruction(encodeApprove(1, "oneinch")),
+      // 2. Approve TokenIn (Output[1]) for swap protocol -> Output[2] (dummy)
+      createRouterInstruction(encodeApprove(1, swapProtocol)),
 
       // 3. Swap TokenIn (Output[1]) -> Output[3] (TokenOut) + Output[4] (Refund)
       createProtocolInstruction(
-        "oneinch",
+        swapProtocol,
         encodeLendingInstruction(swapOp, tokenInAddress, userAddress, 0n, swapContext as string, 1)
       ),
 
@@ -551,6 +553,10 @@ export const useKapanRouterV2 = () => {
     flashLoanProvider?: FlashLoanProvider;
     market?: Address;
     includeRefundPush?: boolean;
+    swapRouter?: "oneinch" | "pendle";
+    // Zap mode: deposit debt token and swap everything (deposit + flash loan) to collateral
+    zapMode?: boolean;
+    depositAmount?: string; // Amount of debt token to deposit (used in zap mode)
   };
 
   /**
@@ -577,6 +583,9 @@ export const useKapanRouterV2 = () => {
       flashLoanProvider = FlashLoanProvider.BalancerV2,
       market,
       includeRefundPush = true,
+      swapRouter = "oneinch",
+      zapMode = false,
+      depositAmount,
     } = params;
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -587,11 +596,68 @@ export const useKapanRouterV2 = () => {
     const initialCollateralAmount = parseUnits(initialCollateral, collateralDecimals);
     const flashAmount = parseUnits(flashLoanAmount, debtDecimals);
     const minCollateralOutBigInt = parseUnits(minCollateralOut, collateralDecimals);
+    const depositAmountRaw = depositAmount ? parseUnits(depositAmount, debtDecimals) : 0n;
 
     const swapContext = encodeAbiParameters(
       [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
       [collateralToken as Address, minCollateralOutBigInt, swapData as Hex]
     );
+
+    console.log("[buildMultiplyFlow] zapMode:", zapMode, "depositAmountRaw:", depositAmountRaw.toString(), "flashAmount:", flashAmount.toString());
+
+    // ZAP MODE: deposit debt token, combine with flash loan, swap everything to collateral
+    if (zapMode && depositAmountRaw > 0n) {
+      console.log("[buildMultiplyFlow] Using ZAP MODE flow");
+      // Output tracking for zap mode:
+      // 0. Pull deposit (debt token) -> Output[0]
+      // 1. ToOutput flash-loan amount -> Output[1]
+      // 2. FlashLoan -> Output[2] (repayment amount)
+      // 3. Add deposit + flash loan amounts -> Output[3] (total to swap)
+      // 4. Approve for swap -> Output[4] (dummy)
+      // 5. Swap all debt -> collateral -> Output[5] (collateral), Output[6] (refund)
+      // 6. Approve collateral for lending -> Output[7] (dummy)
+      // 7. Deposit collateral
+      // 8. Borrow debt for flash repayment (Output[2])
+      // 9. Optional: Push swap refund
+
+      return [
+        // 0. Pull deposit (debt token) from user
+        createRouterInstruction(encodePullToken(depositAmountRaw, debtToken, userAddress)),
+
+        // 1. Flash loan debt token
+        createRouterInstruction(encodeToOutput(flashAmount, debtToken)),
+        createRouterInstruction(encodeFlashLoan(flashLoanProvider, 1)),
+
+        // 2. Combine deposit (Output[0]) + flash loan (Output[1]) for swap
+        // Use Add instruction to sum outputs: Output[3] = Output[0] + Output[1]
+        createRouterInstruction(encodeAdd(0, 1)),
+
+        // 3. Swap combined debt -> collateral
+        createRouterInstruction(encodeApprove(3, swapRouter)),
+        createProtocolInstruction(
+          swapRouter,
+          encodeLendingInstruction(LendingOp.Swap, debtToken, userAddress, 0n, swapContext as string, 3)
+        ),
+
+        // 4. Deposit all acquired collateral (Output[5])
+        createRouterInstruction(encodeApprove(5, normalizedProtocol)),
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, context, 5)
+        ),
+
+        // 5. Borrow debt to cover flash-loan repayment (Output[2])
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.Borrow, debtToken, userAddress, 0n, context, 2)
+        ),
+
+        // 6. Return any swap refund to the user (debt token)
+        ...(includeRefundPush ? [createRouterInstruction(encodePushToken(6, userAddress))] : []),
+      ];
+    }
+
+    // STANDARD MODE: deposit collateral directly, then leverage with flash loan
 
     // Output tracking:
     // 0. Pull initial collateral -> Output[0]
@@ -618,12 +684,12 @@ export const useKapanRouterV2 = () => {
       createRouterInstruction(encodeToOutput(flashAmount, debtToken)),
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 2)),
 
-      // 2. Swap debt -> collateral via OneInch
+      // 2. Swap debt -> collateral via selected router (1inch or Pendle)
       // CRITICAL: Use Output[2] (actual tokens received), NOT Output[3] (repayment amount)!
       // For Aave, Output[3] includes fee we don't have yet.
-      createRouterInstruction(encodeApprove(2, "oneinch")),
+      createRouterInstruction(encodeApprove(2, swapRouter)),
       createProtocolInstruction(
-        "oneinch",
+        swapRouter,
         encodeLendingInstruction(LendingOp.Swap, debtToken, userAddress, 0n, swapContext as string, 2)
       ),
 

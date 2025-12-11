@@ -4,6 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -11,11 +12,23 @@ import { deterministicSalt } from "../../utils/deploySalt";
  */
 const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
+  const effectiveChainId = getEffectiveChainId(chainId);
+  logForkConfig(chainId);
+
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
 
-  // ---- Address map (Arbitrum + Base + Optimism + Linea). No chain in map => skip.
+  // ---- Address map (Mainnet + Arbitrum + Base + Optimism + Linea). No chain in map => skip.
+  // For Hardhat (31337), uses FORK_CHAIN env to determine which addresses to use.
   const MAP: Record<number, { PROVIDER: string; UI: string; REFERRAL: number }> = {
+    // Ethereum mainnet V3 Core Market
+    1: {
+      // PoolAddressesProvider + UiPoolDataProvider from Aave docs:
+      // https://aave.com/docs/resources/addresses  (Ethereum V3 Core Market, Mainnet, V3)
+      PROVIDER: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e", // PoolAddressesProvider
+      UI:       "0x3F78BBD206e4D3c504Eb854232EdA7e47E9Fd8FC", // UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
     42161: {
       PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // Arbitrum v3 PoolAddressesProvider
       UI: "0x5c5228aC8BC1528482514aF3e27E692495148717", // Arbitrum UiPoolDataProviderV3
@@ -36,14 +49,14 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
       UI: "0xf751969521E20A972A0776CDB0497Fad0F773F1F", // Linea UiPoolDataProviderV3
       REFERRAL: 0,
     },
-    31337: { // hardhat
-      PROVIDER: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb", // hh v3 PoolAddressesProvider (Arbitrum)
-      UI: "0x5c5228aC8BC1528482514aF3e27E692495148717", // hh UiPoolDataProviderV3 (Arbitrum)
+    9745: {
+      PROVIDER: "0x061D8e131F26512348ee5FA42e2DF1bA9d6505E9", // Plasma v3 PoolAddressesProvider
+      UI: "0xc851e6147dcE6A469CC33BE3121b6B2D4CaD2763", // Plasma UiPoolDataProviderV3
       REFERRAL: 0,
     },
   };
 
-  const entry = MAP[chainId];
+  const entry = MAP[effectiveChainId];
   if (!entry) {
     console.warn(`Aave: no address map for chainId=${chainId}. Skipping deployment.`);
     return;
@@ -69,7 +82,8 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   console.log(`AaveGatewayWrite deployed to: ${aaveGatewayWrite.address}`);
 
   // On Base, deploy the Base-specific view implementation but keep the deployment name "AaveGatewayView"
-  const isBaseChain = chainId === 8453 || chainId === 84532;
+  // Use effectiveChainId to handle Hardhat forks of Base
+  const isBaseChain = effectiveChainId === 8453 || effectiveChainId === 84532;
   const aaveGatewayView = await deploy("AaveGatewayView", {
     from: deployer,
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],

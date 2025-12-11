@@ -4,10 +4,22 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
+// For Hardhat (31337), uses FORK_CHAIN env to determine which addresses to use.
 const DEFAULT_COMETS: Record<number, string[]> = {
+  // Ethereum mainnet
+  1: [
+    // Compound III (Comet) markets on mainnet
+    // USDC base market
+    "0xc3d688B66703497DAA19211EEdff47f25384cdc3",
+    // WETH base market
+    "0xa17581A9E3356d8AC78c1cbb6B4BfCD9b0Fbe3c",
+    // WBTC base market
+    "0x8A0A1E5D3D1d3EAfBF99f6619c86A3C2bA9c7ECA",
+  ],
   // Arbitrum One (42161)
   42161: [
     "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // cUSDCv3
@@ -31,24 +43,19 @@ const DEFAULT_COMETS: Record<number, string[]> = {
   59144: [
     "0x8D38A3d6B3c3B7d96D6536DA7Eef94A9d7dbC991", // cUSDCv3 (Comet proxy)
   ],
-  // Hardhat (31337) - mapped to Arbitrum
-  31337: [
-    "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf", // cUSDCv3
-    "0xd98Be00b5D27fc98112BdE293e487f8D4cA57d07", // cUSDTv3
-    "0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA", // cUSDC.e (USDbC)
-    "0x6f7D514bbD4aFf3BcD1140B7344b32f063dEe486", // cWETHv3
-  ],
 };
 
 const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
+  const effectiveChainId = getEffectiveChainId(chainId);
+  logForkConfig(chainId);
   const { deployer } = await hre.getNamedAccounts();
   const { deploy, execute, get } = hre.deployments;
   const { ethers } = hre;
 
   // ---- Gate purely by map: no chain in map => no deploy
-  if (!DEFAULT_COMETS[chainId]) {
-    console.warn(`Compound: no address map for chainId=${chainId}. Skipping deployment.`);
+  if (!DEFAULT_COMETS[effectiveChainId]) {
+    console.warn(`Compound: no address map for chainId=${chainId} (effective: ${effectiveChainId}). Skipping deployment.`);
     return;
   }
 
@@ -78,7 +85,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   const normalize = (a: string) => (ethers.isAddress(a) ? ethers.getAddress(a) : a);
   const isAddr = (a: string) => ethers.isAddress(a) && a !== ZERO;
 
-  const defaultsRaw = DEFAULT_COMETS[chainId] || [];
+  const defaultsRaw = DEFAULT_COMETS[effectiveChainId] || [];
   const defaults = defaultsRaw.map(normalize).filter(isAddr);
 
   // Only use env if it yields at least 1 valid address
