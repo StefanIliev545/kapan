@@ -52,6 +52,7 @@ const scaffoldConfig = {
     chains.base,
     chains.optimism,
     chains.linea,
+    chains.plasma,
     // Conditionally include Hardhat (localhost) for local development only
     ...(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? [localhost] : []),
   ],

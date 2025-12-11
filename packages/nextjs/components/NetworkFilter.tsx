@@ -4,12 +4,23 @@ import { track } from "@vercel/analytics";
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
+import { useTheme } from "next-themes";
 import Image from "next/image";
+
+// Helper to get the correct logo based on theme
+const getNetworkLogo = (network: NetworkOption, isDarkMode: boolean): string => {
+  // In dark mode, use the light logo (logo). In light mode, use logoDark if available
+  if (!isDarkMode && network.logoDark) {
+    return network.logoDark;
+  }
+  return network.logo;
+};
 
 export interface NetworkOption {
   id: string;
   name: string;
   logo: string;
+  logoDark?: string; // Optional dark mode logo (if different from light mode)
 }
 
 interface NetworkFilterProps {
@@ -43,6 +54,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const pathname = usePathname();
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
+  const { resolvedTheme } = useTheme();
+  const isDarkMode = resolvedTheme === "dark";
 
   const [selectedNetwork, setSelectedNetwork] = useState<string>(defaultNetwork);
   const selectedRef = useRef(selectedNetwork);
@@ -276,7 +289,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
           >
             <div className="w-4 h-4 relative shrink-0">
               <Image
-                src={network.logo}
+                src={getNetworkLogo(network, isDarkMode)}
                 alt={network.name}
                 fill
                 sizes="16px"

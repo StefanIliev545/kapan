@@ -63,6 +63,9 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     59144: {
       PROVIDER: "0x89502c3731F69DDC95B65753708A07F8Cd0373F4", // Linea v3 PoolAddressesProvider
     },
+    9745: {
+      PROVIDER: "0x061D8e131F26512348ee5FA42e2DF1bA9d6505E9", // Plasma v3 PoolAddressesProvider
+    },
   };
 
   const kapanRouter = await deploy("KapanRouter", {

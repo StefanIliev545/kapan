@@ -49,6 +49,11 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
       UI: "0xf751969521E20A972A0776CDB0497Fad0F773F1F", // Linea UiPoolDataProviderV3
       REFERRAL: 0,
     },
+    9745: {
+      PROVIDER: "0x061D8e131F26512348ee5FA42e2DF1bA9d6505E9", // Plasma v3 PoolAddressesProvider
+      UI: "0xc851e6147dcE6A469CC33BE3121b6B2D4CaD2763", // Plasma UiPoolDataProviderV3
+      REFERRAL: 0,
+    },
   };
 
   const entry = MAP[effectiveChainId];

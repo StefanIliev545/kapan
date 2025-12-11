@@ -26,6 +26,7 @@ const FORK_CHAIN_MAP: Record<string, number> = {
   optimism: 10,
   op: 10,
   linea: 59144,
+  plasma: 9745,
 };
 
 /**

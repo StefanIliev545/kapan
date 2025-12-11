@@ -10,7 +10,7 @@ import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
-import { arbitrum, base, optimism, linea } from "wagmi/chains";
+import { arbitrum, base, optimism, linea, plasma } from "wagmi/chains";
 import { hardhat } from "viem/chains";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
@@ -50,6 +50,7 @@ const ZeroLendProtocolView = dynamic(
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "plasma", name: "Plasma", logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
   { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
@@ -65,6 +66,7 @@ const protocolCountByNetwork: Record<string, number> = {
   optimism: 2,
   linea: 3,
   starknet: 2,
+  plasma: 1,
   hardhat: 4, // Aave, ZeroLend, Compound, Venus
 };
 
@@ -253,6 +255,15 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
+
+          {/* PLASMA */}
+          {selectedNetwork === "plasma" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={plasma.id} enabledFeatures={{ swap: true, move: false }} />
               </StableArea>
             </div>
           )}

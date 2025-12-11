@@ -30,6 +30,7 @@ const FORK_RPC_URLS: Record<string, string> = {
   optimism: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
   op: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
   linea: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  plasma: `https://plasma-mainnet.g.alchemy.com/v2/${providerApiKey}`,
 };
 
 // Fuzzy match for typos like "etheum" -> "ethereum"
@@ -55,6 +56,7 @@ const FORK_BLOCK_NUMBERS: Record<string, number> = {
   optimism: 129000000, // ~Dec 2024
   op: 129000000,
   linea: 13000000,     // ~Dec 2024
+  plasma: 5000000,     // ~Dec 2025
 };
 const forkBlockNumber = FORK_BLOCK_NUMBERS[FORK_CHAIN];
 
@@ -157,6 +159,11 @@ const config: HardhatUserConfig = {
     linea: {
       url: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
       chainId: 59144,
+      accounts: [deployerPrivateKey],
+    },
+    plasma: {
+      url: `https://plasma-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 9745,
       accounts: [deployerPrivateKey],
     },
     polygon: {
