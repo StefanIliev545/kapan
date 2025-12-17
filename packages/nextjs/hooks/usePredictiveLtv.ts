@@ -102,8 +102,8 @@ export function useAaveReserveConfigs(
 ) {
   const { data: gatewayInfo } = useDeployedContractInfo({
     contractName: "AaveGatewayView",
-    chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745 | undefined,
-  });
+    chainId: chainId,
+  } as any);
 
   const { data, isLoading, error } = useReadContract({
     address: gatewayInfo?.address,
@@ -139,8 +139,8 @@ export function useCompoundReserveConfigs(
 ) {
   const { data: gatewayInfo } = useDeployedContractInfo({
     contractName: "CompoundGatewayView",
-    chainId: chainId as 31337 | 42161 | 10 | 8453 | undefined,
-  });
+    chainId: chainId,
+  } as any);
 
   const { data, isLoading, error } = useReadContract({
     address: gatewayInfo?.address,
@@ -175,8 +175,8 @@ export function useVenusReserveConfigs(
 ) {
   const { data: gatewayInfo } = useDeployedContractInfo({
     contractName: "VenusGatewayView",
-    chainId: chainId as 31337 | 56 | undefined,
-  });
+    chainId: chainId,
+  } as any);
 
   const { data, isLoading, error } = useReadContract({
     address: gatewayInfo?.address,

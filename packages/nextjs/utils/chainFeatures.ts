@@ -1,12 +1,98 @@
 /**
- * Centralized configuration for chain-specific feature availability.
+ * Simple chain feature availability maps.
  * 
- * This file defines which chains support:
- * - Flash loan providers (Balancer V2, Balancer V3, Aave V3)
- * - Swap routers (1inch, Pendle)
+ * 1inch: Available on all EVM chains EXCEPT Plasma
+ * Pendle: Mainnet, Arbitrum, Base, Optimism, Plasma (per deploy script)
  */
 
-// Chain IDs
+import deployedContracts from "~~/contracts/hardhat/deployedContracts";
+import { Address } from "viem";
+
+// Chains where 1inch is NOT available
+const ONEINCH_UNAVAILABLE = new Set([
+  9745, // Plasma - 1inch not supported
+]);
+
+// Chains where Pendle IS available (from deploy script PENDLE_ROUTERS)
+const PENDLE_AVAILABLE = new Set([
+  1,     // Mainnet
+  10,    // Optimism
+  42161, // Arbitrum
+  8453,  // Base
+  9745,  // Plasma
+  31337, // Hardhat (for local dev)
+]);
+
+// Flash loan provider availability
+const AAVE_V3_AVAILABLE = new Set([
+  1,     // Mainnet
+  10,    // Optimism
+  42161, // Arbitrum
+  8453,  // Base
+  59144, // Linea
+  9745,  // Plasma
+  31337, // Hardhat
+]);
+
+const BALANCER_V2_AVAILABLE = new Set([
+  42161, // Arbitrum
+  8453,  // Base
+  10,    // Optimism
+  31337, // Hardhat
+]);
+
+const BALANCER_V3_AVAILABLE = new Set([
+  42161, // Arbitrum
+  8453,  // Base
+  10,    // Optimism
+  31337, // Hardhat
+]);
+
+// ==================== SWAP ROUTERS ====================
+
+export function is1inchSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return !ONEINCH_UNAVAILABLE.has(chainId);
+}
+
+export function isPendleSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return PENDLE_AVAILABLE.has(chainId);
+}
+
+export function getDefaultSwapRouter(chainId: number | undefined): "1inch" | "pendle" | undefined {
+  if (chainId === undefined) return undefined;
+  // Prefer 1inch if available, otherwise Pendle
+  if (is1inchSupported(chainId)) return "1inch";
+  if (isPendleSupported(chainId)) return "pendle";
+  return undefined;
+}
+
+export function getAvailableSwapRouters(chainId: number | undefined): Array<"1inch" | "pendle"> {
+  const routers: Array<"1inch" | "pendle"> = [];
+  if (is1inchSupported(chainId)) routers.push("1inch");
+  if (isPendleSupported(chainId)) routers.push("pendle");
+  return routers;
+}
+
+// ==================== FLASH LOANS ====================
+
+export function isAaveV3Supported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return AAVE_V3_AVAILABLE.has(chainId);
+}
+
+export function isBalancerV2Supported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return BALANCER_V2_AVAILABLE.has(chainId);
+}
+
+export function isBalancerV3Supported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return BALANCER_V3_AVAILABLE.has(chainId);
+}
+
+// Legacy exports for backwards compatibility
 export const CHAIN_IDS = {
   MAINNET: 1,
   ARBITRUM: 42161,
@@ -17,110 +103,27 @@ export const CHAIN_IDS = {
   HARDHAT: 31337,
 } as const;
 
-// Flash loan provider availability by chain
-export const FLASH_LOAN_CHAINS = {
-  // Balancer V2 is available on these chains
-  BALANCER_V2: [
-    CHAIN_IDS.ARBITRUM,
-    CHAIN_IDS.BASE,
-    CHAIN_IDS.OPTIMISM,
-    CHAIN_IDS.HARDHAT,
-  ],
-  // Balancer V3 is available on these chains
-  BALANCER_V3: [
-    CHAIN_IDS.ARBITRUM,
-    CHAIN_IDS.BASE,
-    CHAIN_IDS.OPTIMISM,
-    CHAIN_IDS.HARDHAT,
-  ],
-  // Aave V3 is available on these chains
-  AAVE_V3: [
-    CHAIN_IDS.ARBITRUM,
-    CHAIN_IDS.BASE,
-    CHAIN_IDS.OPTIMISM,
-    CHAIN_IDS.LINEA,
-    CHAIN_IDS.PLASMA,
-    CHAIN_IDS.HARDHAT,
-  ],
-} as const;
+// ==================== ADAPTER ADDRESSES ====================
+// Get adapter addresses directly from deployed contracts - no RPC calls needed
 
-// Swap router availability by chain
-export const SWAP_ROUTER_CHAINS = {
-  // 1inch is available on these chains
-  ONEINCH: [
-    CHAIN_IDS.MAINNET,
-    CHAIN_IDS.ARBITRUM,
-    CHAIN_IDS.BASE,
-    CHAIN_IDS.OPTIMISM,
-    CHAIN_IDS.LINEA,
-    CHAIN_IDS.HARDHAT,
-    // Note: 1inch is NOT available on Plasma
-  ],
-  // Pendle is available on these chains
-  PENDLE: [
-    CHAIN_IDS.MAINNET,
-    CHAIN_IDS.ARBITRUM,
-    CHAIN_IDS.BASE,
-    CHAIN_IDS.OPTIMISM,
-    CHAIN_IDS.PLASMA,
-    CHAIN_IDS.HARDHAT,
-    // Note: Pendle availability depends on PT/YT markets existing
-  ],
-} as const;
+const contracts = deployedContracts as unknown as Record<number, Record<string, { address: Address; abi: unknown[] }>>;
 
-// Helper functions
+export function getPendleAdapterAddress(chainId: number | undefined): Address | undefined {
+  if (!chainId || !isPendleSupported(chainId)) return undefined;
+  return contracts[chainId]?.PendleAdapter?.address;
+}
 
-/**
- * Check if Balancer V2 flash loans are supported on a chain
- */
-export const isBalancerV2Supported = (chainId: number | undefined): boolean => {
-  return chainId !== undefined && FLASH_LOAN_CHAINS.BALANCER_V2.includes(chainId as typeof FLASH_LOAN_CHAINS.BALANCER_V2[number]);
-};
+export function getOneInchAdapterAddress(chainId: number | undefined): Address | undefined {
+  if (!chainId || !is1inchSupported(chainId)) return undefined;
+  return contracts[chainId]?.OneInchAdapter?.address;
+}
 
-/**
- * Check if Balancer V3 flash loans are supported on a chain
- */
-export const isBalancerV3Supported = (chainId: number | undefined): boolean => {
-  return chainId !== undefined && FLASH_LOAN_CHAINS.BALANCER_V3.includes(chainId as typeof FLASH_LOAN_CHAINS.BALANCER_V3[number]);
-};
+export function getPendleAdapterInfo(chainId: number | undefined) {
+  if (!chainId || !isPendleSupported(chainId)) return undefined;
+  return contracts[chainId]?.PendleAdapter;
+}
 
-/**
- * Check if Aave V3 flash loans are supported on a chain
- */
-export const isAaveV3Supported = (chainId: number | undefined): boolean => {
-  return chainId !== undefined && FLASH_LOAN_CHAINS.AAVE_V3.includes(chainId as typeof FLASH_LOAN_CHAINS.AAVE_V3[number]);
-};
-
-/**
- * Check if 1inch swap router is supported on a chain
- */
-export const is1inchSupported = (chainId: number | undefined): boolean => {
-  return chainId !== undefined && SWAP_ROUTER_CHAINS.ONEINCH.includes(chainId as typeof SWAP_ROUTER_CHAINS.ONEINCH[number]);
-};
-
-/**
- * Check if Pendle swap router is supported on a chain
- */
-export const isPendleSupported = (chainId: number | undefined): boolean => {
-  return chainId !== undefined && SWAP_ROUTER_CHAINS.PENDLE.includes(chainId as typeof SWAP_ROUTER_CHAINS.PENDLE[number]);
-};
-
-/**
- * Get available swap routers for a chain
- */
-export const getAvailableSwapRouters = (chainId: number | undefined): Array<"1inch" | "pendle"> => {
-  const routers: Array<"1inch" | "pendle"> = [];
-  if (is1inchSupported(chainId)) routers.push("1inch");
-  if (isPendleSupported(chainId)) routers.push("pendle");
-  return routers;
-};
-
-/**
- * Get the default swap router for a chain
- * Returns "1inch" if available, otherwise "pendle", or undefined if none available
- */
-export const getDefaultSwapRouter = (chainId: number | undefined): "1inch" | "pendle" | undefined => {
-  if (is1inchSupported(chainId)) return "1inch";
-  if (isPendleSupported(chainId)) return "pendle";
-  return undefined;
-};
+export function getOneInchAdapterInfo(chainId: number | undefined) {
+  if (!chainId || !is1inchSupported(chainId)) return undefined;
+  return contracts[chainId]?.OneInchAdapter;
+}

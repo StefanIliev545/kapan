@@ -6,7 +6,6 @@ import { FiCheck } from "react-icons/fi";
 
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
@@ -16,7 +15,7 @@ import { usePredictiveMaxLeverage } from "~~/hooks/usePredictiveLtv";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -184,11 +183,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     if (debtOptions.length > 0 && !debt) setDebt(debtOptions[0]);
   }, [collaterals, debtOptions, collateral, debt]);
 
-  const { data: oneInchAdapter } = useDeployedContractInfo({
-    contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: pendleAdapter } = useDeployedContractInfo({ contractName: "PendleAdapter" as any, chainId: chainId as any });
+  // Get adapter info directly from deployed contracts - no RPC calls needed
+  const oneInchAdapter = getOneInchAdapterInfo(chainId);
+  const pendleAdapter = getPendleAdapterInfo(chainId);
 
   // In zap mode, margin is in debt token terms; otherwise collateral
   const marginAmountRaw = useMemo(() => {
@@ -240,7 +237,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     chainId, src: (debt?.address as Address) || "0x0000000000000000000000000000000000000000",
     dst: (collateral?.address as Address) || "0x0000000000000000000000000000000000000000",
     amount: swapQuoteAmount.toString(), from: (oneInchAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
-    slippage, enabled: swapRouter === "1inch" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!oneInchAdapter,
+    slippage, enabled: oneInchAvailable && swapRouter === "1inch" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!oneInchAdapter,
   });
 
   // Pendle Quote
@@ -251,7 +248,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     tokensOut: collateral?.address as Address,
     amountsIn: swapQuoteAmount.toString(),
     slippage: slippage / 100, // Pendle uses decimal slippage
-    enabled: swapRouter === "pendle" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!pendleAdapter,
+    enabled: pendleAvailable && swapRouter === "pendle" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!pendleAdapter,
   });
 
   // Unified loading state

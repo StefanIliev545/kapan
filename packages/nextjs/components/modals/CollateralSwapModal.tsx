@@ -11,11 +11,10 @@ import { usePendleConvert } from "~~/hooks/usePendleConvert";
 const AAVE_FEE_BUFFER_BPS = 9n;
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { BasicCollateral, useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo } from "react-icons/fi";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
@@ -52,15 +51,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     market,
     position,
 }) => {
-    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745 });
-    // PendleAdapter is only on certain chains - use type assertion since we check for existence
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: pendleAdapter } = useDeployedContractInfo({ contractName: "PendleAdapter" as any, chainId: chainId as any });
     const { buildCollateralSwapFlow } = useKapanRouterV2();
 
-    // Check swap router availability for this chain
+    // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
     const pendleAvailable = isPendleSupported(chainId);
+    const oneInchAdapter = getOneInchAdapterInfo(chainId);
+    const pendleAdapter = getPendleAdapterInfo(chainId);
     const defaultRouter = getDefaultSwapRouter(chainId);
 
     // Swap router selection (1inch or Pendle) - default based on chain availability
@@ -179,7 +176,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         amount: quoteAmount,
         from: oneInchAdapter?.address || "",
         slippage: slippage,
-        enabled: swapRouter === "1inch" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
+        enabled: oneInchAvailable && swapRouter === "1inch" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
     });
 
     // Pendle Quote
@@ -190,7 +187,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         tokensOut: selectedTo?.address as Address,
         amountsIn: quoteAmount,
         slippage: slippage / 100, // Pendle uses decimal slippage (0.03 = 3%)
-        enabled: swapRouter === "pendle" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!pendleAdapter,
+        enabled: pendleAvailable && swapRouter === "pendle" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!pendleAdapter,
     });
 
     // Unified quote data
