@@ -12,6 +12,7 @@ import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
+import { usePredictiveMaxLeverage } from "~~/hooks/usePredictiveLtv";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
@@ -97,7 +98,36 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // Zap mode: deposit debt token instead of collateral (e.g., USDe → PT-USDe)
   const [zapMode, setZapMode] = useState(false);
 
-  const maxLeverage = useMemo(() => calculateMaxLeverage(maxLtvBps, protocolName), [maxLtvBps, protocolName]);
+  // Fetch predictive LTV data for the selected collateral/debt pair
+  const {
+    maxLeverage: predictiveMaxLeverage,
+    liquidationThreshold: predictiveLiqThreshold,
+    collateralConfig,
+  } = usePredictiveMaxLeverage(
+    protocolName,
+    collateral?.address,
+    debt?.address,
+    market,
+    chainId,
+    SAFETY_BUFFER
+  );
+
+  // Use predictive max leverage if available, otherwise fall back to prop-based calculation
+  const maxLeverage = useMemo(() => {
+    if (predictiveMaxLeverage > 1 && collateralConfig) {
+      return predictiveMaxLeverage;
+    }
+    // Fallback to prop-based calculation
+    return calculateMaxLeverage(maxLtvBps, protocolName);
+  }, [predictiveMaxLeverage, collateralConfig, maxLtvBps, protocolName]);
+
+  // Use predictive liquidation threshold if available
+  const effectiveLltvBps = useMemo(() => {
+    if (predictiveLiqThreshold > 0 && collateralConfig) {
+      return BigInt(Math.round(predictiveLiqThreshold * 100)); // Convert % to bps
+    }
+    return lltvBps;
+  }, [predictiveLiqThreshold, collateralConfig, lltvBps]);
 
   const updateLeverage = (val: number) => {
     const clamped = Math.min(Math.max(1, val), maxLeverage);
@@ -158,7 +188,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: pendleAdapter } = useDeployedContractInfo("PendleAdapter" as any);
+  const { data: pendleAdapter } = useDeployedContractInfo({ contractName: "PendleAdapter" as any, chainId: chainId as any });
 
   // In zap mode, margin is in debt token terms; otherwise collateral
   const marginAmountRaw = useMemo(() => {
@@ -268,7 +298,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     const debtUsd = debtTokens * dPrice;
 
     const ltv = totalCollateralUsd > 0 ? (debtUsd / totalCollateralUsd) * 100 : 0;
-    const lltv = Number(lltvBps) / 10000;
+    const lltv = Number(effectiveLltvBps) / 10000;
     const healthFactor = debtUsd > 0 ? (totalCollateralUsd * lltv) / debtUsd : Infinity;
 
     // Liquidation price: price at which collateral * lltv = debt
@@ -277,7 +307,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       : null;
 
     return { totalCollateralUsd, debtUsd, ltv, liquidationPrice, healthFactor, totalCollateralTokens };
-  }, [collateral, debt, marginAmountRaw, minCollateralOut.formatted, flashLoanAmountRaw, lltvBps, zapMode]);
+  }, [collateral, debt, marginAmountRaw, minCollateralOut.formatted, flashLoanAmountRaw, effectiveLltvBps, zapMode]);
 
   // Net APY calculation
   const netApy = useMemo(() => {
@@ -635,8 +665,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           {/* Metrics - Horizontal Grid */}
           <div className="grid grid-cols-4 gap-2 mb-4 text-sm">
             <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">LTV / Max</div>
-              <div className="font-medium text-sm">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(lltvBps)}%</div>
+              <div className="text-base-content/50 text-xs mb-0.5">LTV / Liq. Threshold</div>
+              <div className="font-medium text-sm">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(effectiveLltvBps)}%</div>
             </div>
             <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
               <div className="text-base-content/50 text-xs mb-0.5">{collateral?.symbol} Price</div>

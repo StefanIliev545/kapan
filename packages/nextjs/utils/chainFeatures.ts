@@ -62,6 +62,7 @@ export const SWAP_ROUTER_CHAINS = {
     CHAIN_IDS.ARBITRUM,
     CHAIN_IDS.BASE,
     CHAIN_IDS.OPTIMISM,
+    CHAIN_IDS.PLASMA,
     CHAIN_IDS.HARDHAT,
     // Note: Pendle availability depends on PT/YT markets existing
   ],

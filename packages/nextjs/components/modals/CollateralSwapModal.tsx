@@ -52,10 +52,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     market,
     position,
 }) => {
-    const { data: oneInchAdapter } = useDeployedContractInfo("OneInchAdapter");
+    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745 });
     // PendleAdapter is only on certain chains - use type assertion since we check for existence
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: pendleAdapter } = useDeployedContractInfo("PendleAdapter" as any);
+    const { data: pendleAdapter } = useDeployedContractInfo({ contractName: "PendleAdapter" as any, chainId: chainId as any });
     const { buildCollateralSwapFlow } = useKapanRouterV2();
 
     // Check swap router availability for this chain
