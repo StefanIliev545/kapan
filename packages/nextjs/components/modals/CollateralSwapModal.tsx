@@ -15,6 +15,7 @@ import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContra
 import { BasicCollateral, useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo } from "react-icons/fi";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
@@ -57,8 +58,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const { data: pendleAdapter } = useDeployedContractInfo("PendleAdapter" as any);
     const { buildCollateralSwapFlow } = useKapanRouterV2();
 
-    // Swap router selection (1inch or Pendle)
-    const [swapRouter, setSwapRouter] = useState<SwapRouter>("1inch");
+    // Check swap router availability for this chain
+    const oneInchAvailable = is1inchSupported(chainId);
+    const pendleAvailable = isPendleSupported(chainId);
+    const defaultRouter = getDefaultSwapRouter(chainId);
+
+    // Swap router selection (1inch or Pendle) - default based on chain availability
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+    
+    // Update swap router if chain changes and current router is not available
+    useEffect(() => {
+        if (swapRouter === "1inch" && !oneInchAvailable) {
+            setSwapRouter(pendleAvailable ? "pendle" : "1inch");
+        } else if (swapRouter === "pendle" && !pendleAvailable) {
+            setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+        }
+    }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
@@ -407,7 +422,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             fromLabel="Swap From"
             toLabel="Swap To"
             swapRouter={swapRouter}
-            setSwapRouter={setSwapRouter}
+            setSwapRouter={oneInchAvailable && pendleAvailable ? setSwapRouter : undefined}
         />
     );
 };

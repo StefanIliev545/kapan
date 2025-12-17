@@ -15,6 +15,7 @@ import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { getProtocolLogo } from "~~/utils/protocol";
+import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported } from "~~/utils/chainFeatures";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -99,28 +100,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     query: { enabled: isOpen && !!chainId && !!routerContract?.address },
   });
 
-  // Chain-based provider availability (from deployment script)
-  // Balancer is only available on Arbitrum, Base, and Optimism
-  // Aave V3 is available on Arbitrum, Base, Optimism, Linea, and Plasma
-  const BALANCER_CHAINS = [42161, 8453, 10, 31337]; // Arbitrum, Base, Optimism, Hardhat
-  const AAVE_CHAINS = [42161, 8453, 10, 59144, 9745, 31337]; // Arbitrum, Base, Optimism, Linea, Plasma, Hardhat
-
   // Filter available flash loan providers based on what's enabled AND chain support
-  // Only include providers once we've finished loading their status
+  // Chain support is defined in chainFeatures.ts
   const availableFlashLoanProviders = useMemo(() => {
     const providers: FlashLoanProvider[] = [];
 
     // Only check if we're not loading (to avoid showing providers that will be filtered out)
-    // Also check chain support - Balancer is not available on Linea
-    if (!isLoadingBalancerV2 && balancerV2Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
+    if (!isLoadingBalancerV2 && balancerV2Enabled === true && isBalancerV2Supported(chainId)) {
       providers.push(ALL_FLASH_LOAN_PROVIDERS[0]);
     }
 
-    if (!isLoadingBalancerV3 && balancerV3Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
+    if (!isLoadingBalancerV3 && balancerV3Enabled === true && isBalancerV3Supported(chainId)) {
       providers.push(ALL_FLASH_LOAN_PROVIDERS[1]);
     }
 
-    if (!isLoadingAave && aaveEnabled === true && chainId && AAVE_CHAINS.includes(chainId)) {
+    if (!isLoadingAave && aaveEnabled === true && isAaveV3Supported(chainId)) {
       providers.push(ALL_FLASH_LOAN_PROVIDERS[2]);
     }
 

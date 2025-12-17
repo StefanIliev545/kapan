@@ -62,7 +62,9 @@ const deepMergeContracts = <L extends Record<PropertyKey, any>, E extends Record
 // - Deployed contracts come from 31337 (our contracts deployed to Hardhat)
 // - External contracts (tokens) come from the forked chain (NEXT_PUBLIC_FORK_CHAIN_ID)
 const buildContractsData = () => {
-  const result = deepMergeContracts(deployedContractsData, externalContractsData);
+  const merged = deepMergeContracts(deployedContractsData, externalContractsData);
+  // Cast to mutable to allow fork chain modifications
+  const result = { ...merged } as Record<number, Record<string, any>>;
   const effectiveForkChainId = getEffectiveChainId(31337);
   
   // If forking a different chain, use that chain's external contracts for 31337
@@ -80,7 +82,7 @@ const buildContractsData = () => {
     }
   }
   
-  return result;
+  return result as typeof merged;
 };
 
 const contractsData = buildContractsData();

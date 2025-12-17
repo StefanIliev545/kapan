@@ -404,6 +404,73 @@ contract CompoundGatewayView is Ownable {
         }
     }
 
+    /// @notice Reserve configuration for LTV calculations (matches Aave/Venus pattern)
+    struct ReserveConfigData {
+        address token;
+        uint256 price;              // Price from Comet oracle (8 decimals typically)
+        uint256 ltv;                // Borrow collateral factor in basis points (0-10000)
+        uint256 liquidationThreshold; // Liquidate collateral factor in basis points
+        uint8 decimals;
+        uint64 scale;               // Compound's scale for this asset
+    }
+
+    /// @notice Get reserve configuration data for a Compound market (for frontend LTV calculations)
+    /// @dev Returns price, LTV (borrow collateral factor), liquidation threshold for each collateral
+    /// @param market The base token address (e.g., USDC) to identify the Comet
+    /// @return configs Array of reserve configuration data for all collaterals in this market
+    function getReserveConfigs(address market) external view returns (ReserveConfigData[] memory configs) {
+        ICompoundComet comet = getComet(market);
+        uint8 numAssets = comet.numAssets();
+
+        configs = new ReserveConfigData[](numAssets);
+
+        for (uint8 i = 0; i < numAssets; i++) {
+            ICompoundComet.AssetInfo memory info = comet.getAssetInfo(i);
+
+            // Get price from Comet's oracle
+            uint256 price = comet.getPrice(info.priceFeed);
+
+            // Get decimals
+            uint8 dec = 18;
+            try ERC20(info.asset).decimals() returns (uint8 d) {
+                dec = d;
+            } catch {}
+
+            configs[i] = ReserveConfigData({
+                token: info.asset,
+                price: price,
+                ltv: (uint256(info.borrowCollateralFactor) * 10_000) / 1e18,
+                liquidationThreshold: (uint256(info.liquidateCollateralFactor) * 10_000) / 1e18,
+                decimals: dec,
+                scale: info.scale
+            });
+        }
+    }
+
+    /// @notice Get base token info for a market (debt token)
+    /// @param market The base token address
+    /// @return baseToken The base token address
+    /// @return price The base token price
+    /// @return decimals The base token decimals
+    /// @return priceScale The Comet's price scale
+    function getBaseTokenInfo(address market) external view returns (
+        address baseToken,
+        uint256 price,
+        uint8 decimals,
+        uint256 priceScale
+    ) {
+        ICompoundComet comet = getComet(market);
+        baseToken = comet.baseToken();
+        price = getPrice(market);
+        priceScale = comet.priceScale();
+        
+        try ERC20(baseToken).decimals() returns (uint8 d) {
+            decimals = d;
+        } catch {
+            decimals = 18;
+        }
+    }
+
     function _collateralTotalsWithFactor(ICompoundComet comet, address account, bool useLiquidationFactor)
         internal
         view

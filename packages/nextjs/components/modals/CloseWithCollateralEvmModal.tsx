@@ -49,7 +49,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     availableCollaterals,
     market,
 }) => {
-    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 });
+    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745 });
     const { buildCloseWithCollateralFlow } = useKapanRouterV2();
 
     const wasOpenRef = useRef(false);

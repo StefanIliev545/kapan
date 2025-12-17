@@ -1,7 +1,17 @@
 import { useMemo } from "react";
-import { Address } from "viem";
-import { useAccount } from "wagmi";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { Address, encodeFunctionData } from "viem";
+import { useAccount, useWriteContract } from "wagmi";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+
+// Minimal ABI for Aave Pool setUserEMode
+const POOL_SET_EMODE_ABI = [
+  {
+    name: "setUserEMode",
+    type: "function",
+    inputs: [{ name: "categoryId", type: "uint8" }],
+    outputs: [],
+  },
+] as const;
 
 export interface EModeCategory {
   id: number;
@@ -23,39 +33,40 @@ export function useAaveEMode(chainId?: number) {
   const { address: userAddress } = useAccount();
 
   // Fetch user's current E-Mode category
+  // Note: Type cast needed until AaveGatewayView is redeployed to all chains with getUserEMode
   const { data: userEModeRaw, isLoading: isLoadingUserEMode, refetch: refetchUserEMode } = useScaffoldReadContract({
-    contractName: "AaveGatewayView" as any,
+    contractName: "AaveGatewayView",
     functionName: "getUserEMode",
     args: [userAddress as Address],
     query: {
       enabled: !!userAddress,
     },
-  });
+  } as any);
 
   // Fetch all available E-Mode categories
   const { data: eModesRaw, isLoading: isLoadingEModes } = useScaffoldReadContract({
-    contractName: "AaveGatewayView" as any,
+    contractName: "AaveGatewayView",
     functionName: "getEModes",
     args: [],
     query: {
       enabled: true,
     },
-  });
+  } as any);
 
   // Get the Aave Pool address for direct setUserEMode calls
   const { data: poolAddress } = useScaffoldReadContract({
-    contractName: "AaveGatewayWrite" as any,
+    contractName: "AaveGatewayWrite",
     functionName: "getPool",
     args: [],
     query: {
       enabled: true,
     },
-  });
+  } as any);
 
   // Parse E-Mode categories
   const emodes = useMemo((): EModeCategory[] => {
     if (!eModesRaw) return [];
-    return (eModesRaw as any[]).map((e: any) => ({
+    return (eModesRaw as unknown as any[]).map((e: any) => ({
       id: Number(e.id),
       ltv: Number(e.ltv),
       liquidationThreshold: Number(e.liquidationThreshold),
@@ -85,12 +96,26 @@ export function useAaveEMode(chainId?: number) {
     return true;
   };
 
+  // Helper to encode setUserEMode call for use in multicall or sendTransaction
+  const encodeSetEModeCall = (categoryId: number): { to: Address; data: `0x${string}` } | null => {
+    if (!poolAddress) return null;
+    const data = encodeFunctionData({
+      abi: POOL_SET_EMODE_ABI,
+      functionName: "setUserEMode",
+      args: [categoryId],
+    });
+    return {
+      to: poolAddress as unknown as Address,
+      data,
+    };
+  };
+
   return {
     // Data
     userEModeId,
     userEMode,
     emodes,
-    poolAddress: poolAddress as Address | undefined,
+    poolAddress: poolAddress as unknown as Address | undefined,
 
     // Loading states
     isLoading: isLoadingUserEMode || isLoadingEModes,
@@ -100,33 +125,23 @@ export function useAaveEMode(chainId?: number) {
     // Actions
     refetchUserEMode,
     canSwitchToEMode,
-
-    // Helper to encode setUserEMode call
-    encodeSetEModeCall: (categoryId: number): { to: Address; data: `0x${string}` } | null => {
-      if (!poolAddress) return null;
-      // Encode setUserEMode(uint8 categoryId)
-      const data = `0x28530a47${categoryId.toString(16).padStart(64, "0")}` as `0x${string}`;
-      return {
-        to: poolAddress as Address,
-        data,
-      };
-    },
+    encodeSetEModeCall,
   };
 }
 
 /**
- * Hook for setting E-Mode (direct Pool call)
+ * Hook for setting E-Mode via direct Pool contract call
  */
 export function useSetEMode() {
-  const { writeContractAsync, isPending } = useScaffoldWriteContract("AaveGatewayWrite" as any);
+  const { writeContractAsync, isPending } = useWriteContract();
 
   const setEMode = async (poolAddress: Address, categoryId: number) => {
-    // We need to call the Pool contract directly, not through the gateway
-    // This requires using wagmi's useWriteContract directly
-    // For now, this is a placeholder - the actual implementation would use:
-    // writeContract({ address: poolAddress, abi: poolAbi, functionName: 'setUserEMode', args: [categoryId] })
-    console.log("setEMode called with categoryId:", categoryId, "poolAddress:", poolAddress);
-    throw new Error("Direct pool call not yet implemented - use wagmi useWriteContract");
+    return writeContractAsync({
+      address: poolAddress,
+      abi: POOL_SET_EMODE_ABI,
+      functionName: "setUserEMode",
+      args: [categoryId],
+    });
   };
 
   return {
@@ -134,4 +149,3 @@ export function useSetEMode() {
     isPending,
   };
 }
-

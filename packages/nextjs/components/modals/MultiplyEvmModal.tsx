@@ -15,6 +15,7 @@ import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter } from "~~/utils/chainFeatures";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -75,7 +76,24 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [leverageInput, setLeverageInput] = useState<string>("1.00");
   const [slippage, setSlippage] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [swapRouter, setSwapRouter] = useState<SwapRouter>("1inch");
+  
+  // Check swap router availability for this chain
+  const oneInchAvailable = is1inchSupported(chainId);
+  const pendleAvailable = isPendleSupported(chainId);
+  const defaultRouter = getDefaultSwapRouter(chainId);
+  
+  // Swap router selection - default based on chain availability
+  const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+  
+  // Update swap router if chain changes and current router is not available
+  useEffect(() => {
+    if (swapRouter === "1inch" && !oneInchAvailable) {
+      setSwapRouter(pendleAvailable ? "pendle" : "1inch");
+    } else if (swapRouter === "pendle" && !pendleAvailable) {
+      setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+    }
+  }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+  
   // Zap mode: deposit debt token instead of collateral (e.g., USDe → PT-USDe)
   const [zapMode, setZapMode] = useState(false);
 
@@ -137,7 +155,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }, [collaterals, debtOptions, collateral, debt]);
 
   const { data: oneInchAdapter } = useDeployedContractInfo({
-    contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144,
+    contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: pendleAdapter } = useDeployedContractInfo("PendleAdapter" as any);
@@ -304,19 +322,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       minCollateralOut: minOut, swapData,
       collateralDecimals: collateral.decimals, debtDecimals: debt.decimals,
       flashLoanProvider: selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2, market,
-      swapRouter: swapRouter === "1inch" ? "oneinch" : "pendle",
+      swapRouter: (swapRouter === "1inch" ? "oneinch" : "pendle") as "oneinch" | "pendle",
       zapMode,
       depositAmount: zapMode ? marginAmount : undefined, // In zap mode, margin is the deposit amount
     };
-    
-    console.log("[MultiplyEvmModal] buildFlow params:", {
-      zapMode,
-      marginAmount,
-      flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-      depositAmount: flowParams.depositAmount,
-      collateral: collateral.symbol,
-      debt: debt.symbol,
-    });
     
     const flow = buildMultiplyFlow(flowParams);
     console.log("[MultiplyEvmModal] buildFlow result:", flow.length, "instructions");
@@ -561,21 +570,28 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               />
             </div>
 
-            {/* Swap Router Row */}
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-base-content/60">Swap Router</span>
-              <div className="flex gap-1">
-                {SWAP_ROUTER_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setSwapRouter(opt.value)}
-                    className={`px-2 py-0.5 text-xs rounded transition-colors ${swapRouter === opt.value ? "bg-primary text-primary-content" : "bg-base-300/50 hover:bg-base-300"}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+            {/* Swap Router Row - only show if multiple routers available */}
+            {oneInchAvailable && pendleAvailable ? (
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-base-content/60">Swap Router</span>
+                <div className="flex gap-1">
+                  {SWAP_ROUTER_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSwapRouter(opt.value)}
+                      className={`px-2 py-0.5 text-xs rounded transition-colors ${swapRouter === opt.value ? "bg-primary text-primary-content" : "bg-base-300/50 hover:bg-base-300"}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-base-content/60">Swap Router</span>
+                <span className="text-xs">{swapRouter === "pendle" ? "Pendle" : "1inch"}</span>
+              </div>
+            )}
 
             {/* Slippage Row */}
             <div className="flex items-center justify-between mt-3">

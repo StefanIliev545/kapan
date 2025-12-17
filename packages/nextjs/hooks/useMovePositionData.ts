@@ -82,9 +82,7 @@ export type UseMovePositionDataResult = {
   vesuPools?: VesuPoolsData;
 };
 
-// EVM-only provider chains
-const BALANCER_CHAINS = [42161, 8453, 10, 31337]; // Arbitrum, Base, Optimism, Hardhat
-const AAVE_CHAINS = [42161, 8453, 10, 59144, 9745, 31337]; // Arbitrum, Base, Optimism, Linea, Plasma, Hardhat
+import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported } from "~~/utils/chainFeatures";
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
   const { isOpen, networkType, fromProtocol, chainId, position } = params;
@@ -336,13 +334,13 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     if (isLoadingBalancerV2 || isLoadingBalancerV3 || isLoadingAave) return;
 
     const providers: FlashLoanProviderOption[] = [];
-    if (balancerV2Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
+    if (balancerV2Enabled === true && isBalancerV2Supported(chainId)) {
       providers.push({ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 });
     }
-    if (balancerV3Enabled === true && chainId && BALANCER_CHAINS.includes(chainId)) {
+    if (balancerV3Enabled === true && isBalancerV3Supported(chainId)) {
       providers.push({ name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 });
     }
-    if (aaveEnabled === true && chainId && AAVE_CHAINS.includes(chainId)) {
+    if (aaveEnabled === true && isAaveV3Supported(chainId)) {
       providers.push({ name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 });
     }
 

@@ -504,5 +504,122 @@ contract VenusGatewayView is Ownable {
         if (user == address(0)) return 0;
         return _weightedLiquidationThresholdBps(user);
     }
+
+    /// @notice Reserve configuration for LTV calculations (matches Aave/Compound pattern)
+    struct ReserveConfigData {
+        address token;
+        address vToken;
+        uint256 price;              // Price from oracle (18 decimals)
+        uint256 ltv;                // Collateral factor in basis points (0-10000)
+        uint256 liquidationThreshold; // Liquidation threshold in basis points
+        uint8 decimals;
+        bool isListed;
+    }
+
+    /// @notice Get reserve configuration data for all Venus markets (for frontend LTV calculations)
+    /// @dev Returns price, LTV (collateral factor), liquidation threshold for each market
+    /// @return configs Array of reserve configuration data
+    function getReserveConfigs() external view returns (ReserveConfigData[] memory configs) {
+        VTokenInterface[] memory vTokens = comptroller.getAllMarkets();
+        configs = new ReserveConfigData[](vTokens.length);
+
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+            VTokenInterface vToken = vTokens[i];
+
+            // Get underlying token
+            address underlying;
+            try vToken.underlying() returns (address u) {
+                underlying = u;
+            } catch {
+                underlying = address(0); // e.g., vBNB
+            }
+
+            // Get decimals
+            uint8 dec = 18;
+            if (underlying != address(0)) {
+                try IERC20Metadata(underlying).decimals() returns (uint8 d) {
+                    dec = d;
+                } catch {}
+            }
+
+            // Get price
+            uint256 price = 0;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) {
+                price = p;
+            } catch {}
+
+            // Get market config (isListed, collateralFactorMantissa, liquidationThresholdMantissa)
+            bool isListed = false;
+            uint256 ltvBps = 0;
+            uint256 liqThresholdBps = 0;
+
+            try comptroller.markets(vTokenAddr) returns (
+                bool _isListed,
+                uint256 collateralFactorMantissa,
+                uint256 liquidationThresholdMantissa
+            ) {
+                isListed = _isListed;
+                // Convert from 1e18 scale to basis points (10000 = 100%)
+                ltvBps = (collateralFactorMantissa * 10_000) / 1e18;
+                // Use liquidationThreshold if available, otherwise use collateralFactor
+                uint256 liqThreshold = liquidationThresholdMantissa == 0 
+                    ? collateralFactorMantissa 
+                    : liquidationThresholdMantissa;
+                liqThresholdBps = (liqThreshold * 10_000) / 1e18;
+            } catch {}
+
+            configs[i] = ReserveConfigData({
+                token: underlying,
+                vToken: vTokenAddr,
+                price: price,
+                ltv: ltvBps,
+                liquidationThreshold: liqThresholdBps,
+                decimals: dec,
+                isListed: isListed
+            });
+        }
+    }
+
+    /// @notice Get collateral factors for all markets (similar to Compound's getCollateralFactors)
+    /// @return assets Array of underlying token addresses
+    /// @return ltvBps Array of LTV values in basis points
+    /// @return lltvBps Array of liquidation threshold values in basis points
+    function getCollateralFactors() external view returns (
+        address[] memory assets,
+        uint256[] memory ltvBps,
+        uint256[] memory lltvBps
+    ) {
+        VTokenInterface[] memory vTokens = comptroller.getAllMarkets();
+        uint256 numMarkets = vTokens.length;
+
+        assets = new address[](numMarkets);
+        ltvBps = new uint256[](numMarkets);
+        lltvBps = new uint256[](numMarkets);
+
+        for (uint i = 0; i < numMarkets; i++) {
+            address vTokenAddr = address(vTokens[i]);
+
+            // Get underlying token
+            try vTokens[i].underlying() returns (address u) {
+                assets[i] = u;
+            } catch {
+                assets[i] = address(0);
+            }
+
+            // Get market config
+            try comptroller.markets(vTokenAddr) returns (
+                bool /* isListed */,
+                uint256 collateralFactorMantissa,
+                uint256 liquidationThresholdMantissa
+            ) {
+                ltvBps[i] = (collateralFactorMantissa * 10_000) / 1e18;
+                uint256 liqThreshold = liquidationThresholdMantissa == 0 
+                    ? collateralFactorMantissa 
+                    : liquidationThresholdMantissa;
+                lltvBps[i] = (liqThreshold * 10_000) / 1e18;
+            } catch {}
+        }
+    }
 }
 
