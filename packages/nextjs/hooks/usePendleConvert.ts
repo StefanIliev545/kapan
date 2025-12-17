@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useDebounceValue } from "usehooks-ts";
 import { getEffectiveChainId } from "../utils/forkChain";
 import { PendleConvertParams, PendleConvertResponse, fetchPendleConvert } from "../utils/pendle";
+import { isPendleSupported } from "../utils/chainFeatures";
 
 type UsePendleConvertProps = PendleConvertParams & {
     chainId: number;
@@ -33,10 +34,13 @@ export const usePendleConvert = ({
 }: UsePendleConvertProps) => {
     const [debouncedAmounts] = useDebounceValue(params.amountsIn, 400);
 
+    // Check chain support and use debounced amounts for consistency
+    const chainSupported = isPendleSupported(chainId);
     const isReady =
+        chainSupported &&
         enabled &&
         !!params.receiver &&
-        hasPositiveAmount(params.amountsIn) &&
+        hasPositiveAmount(debouncedAmounts) && // Use debounced value for consistency
         (Array.isArray(params.tokensIn) ? params.tokensIn.length > 0 : !!params.tokensIn) &&
         (Array.isArray(params.tokensOut) ? params.tokensOut.length > 0 : !!params.tokensOut);
 

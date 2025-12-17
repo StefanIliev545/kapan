@@ -151,27 +151,51 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     });
 
     // Step 1: Get unit quote (1 collateral -> X debt) to estimate exchange rate
+    // Use 1inch on supported chains, Pendle otherwise
     const unitQuoteAmount = useMemo(() => {
         if (!selectedTo) return "0";
         return parseUnits("1", selectedTo.decimals).toString();
     }, [selectedTo]);
 
-    const { data: unitQuote, isLoading: isUnitQuoteLoading } = use1inchQuoteOnly({
+    // 1inch unit quote (for chains that support it)
+    const { data: oneInchUnitQuote, isLoading: isOneInchUnitQuoteLoading } = use1inchQuoteOnly({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtToken,
         amount: unitQuoteAmount,
-        enabled: !!selectedTo && isOpen,
+        enabled: oneInchAvailable && !!selectedTo && isOpen,
     });
+
+    // Pendle unit quote (for Pendle-only chains like Plasma)
+    const { data: pendleUnitQuote, isLoading: isPendleUnitQuoteLoading } = usePendleConvert({
+        chainId,
+        receiver: pendleAdapter?.address as Address,
+        tokensIn: selectedTo?.address as Address,
+        tokensOut: debtToken,
+        amountsIn: unitQuoteAmount,
+        slippage: 0.03, // 3% for unit quote
+        enabled: !oneInchAvailable && pendleAvailable && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
+    });
+
+    const isUnitQuoteLoading = oneInchAvailable ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required collateral based on debt to repay
     // We want to sell just enough collateral to get repayAmountRaw of debt token
     // The slippage % from UI is used as buffer for price movement between quote and execution
     const { requiredCollateral, requiredCollateralFormatted, exchangeRate } = useMemo(() => {
-        if (!unitQuote || !selectedTo || repayAmountRaw === 0n) {
+        if (!selectedTo || repayAmountRaw === 0n) {
             return { requiredCollateral: 0n, requiredCollateralFormatted: "0", exchangeRate: "0" };
         }
-        const unitOut = BigInt(unitQuote.dstAmount); // 1 collateral -> X debt
+
+        // Get unit output from whichever quote is available
+        let unitOut = 0n;
+        if (oneInchUnitQuote) {
+            unitOut = BigInt(oneInchUnitQuote.dstAmount);
+        } else if (pendleUnitQuote) {
+            const outAmount = pendleUnitQuote.data.amountPtOut || pendleUnitQuote.data.amountTokenOut || "0";
+            unitOut = BigInt(outAmount);
+        }
+
         if (unitOut === 0n) {
             return { requiredCollateral: 0n, requiredCollateralFormatted: "0", exchangeRate: "0" };
         }
@@ -193,7 +217,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             requiredCollateralFormatted: formatUnits(required, selectedTo.decimals),
             exchangeRate: rate,
         };
-    }, [unitQuote, selectedTo, repayAmountRaw, debtDecimals, slippage]);
+    }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtDecimals, slippage]);
 
     // Check if user has enough collateral
     const hasEnoughCollateral = selectedTo ? requiredCollateral <= selectedTo.rawBalance : false;
@@ -219,9 +243,9 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         chainId,
         receiver: pendleAdapter?.address as Address,
         slippage: slippage / 100, // Pendle uses decimal (0.03 = 3%)
-        tokensIn: [selectedTo?.address as Address],
-        tokensOut: [debtToken],
-        amountsIn: [requiredCollateral.toString()],
+        tokensIn: selectedTo?.address as Address,
+        tokensOut: debtToken,
+        amountsIn: requiredCollateral.toString(),
         enableAggregator: true,
         enabled: pendleSwapEnabled,
     });

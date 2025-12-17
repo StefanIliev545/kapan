@@ -137,27 +137,51 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [amountIn, debtFromDecimals]);
 
     // Step 1: Get unit quote (1 newDebt -> X currentDebt) to estimate exchange rate
+    // Use 1inch on supported chains, Pendle otherwise
     const unitQuoteAmount = useMemo(() => {
         if (!selectedTo) return "0";
         return parseUnits("1", selectedTo.decimals).toString();
     }, [selectedTo]);
 
-    const { data: unitQuote, isLoading: isUnitQuoteLoading } = use1inchQuoteOnly({
+    // 1inch unit quote (for chains that support it)
+    const { data: oneInchUnitQuote, isLoading: isOneInchUnitQuoteLoading } = use1inchQuoteOnly({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtFromToken,
         amount: unitQuoteAmount,
-        enabled: !!selectedTo && isOpen,
+        enabled: oneInchAvailable && !!selectedTo && isOpen,
     });
+
+    // Pendle unit quote (for Pendle-only chains like Plasma)
+    const { data: pendleUnitQuote, isLoading: isPendleUnitQuoteLoading } = usePendleConvert({
+        chainId,
+        receiver: pendleAdapter?.address as Address,
+        tokensIn: selectedTo?.address as Address,
+        tokensOut: debtFromToken,
+        amountsIn: unitQuoteAmount,
+        slippage: 0.03, // 3% for unit quote
+        enabled: !oneInchAvailable && pendleAvailable && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
+    });
+
+    const isUnitQuoteLoading = oneInchAvailable ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required newDebt input based on unit quote
     // We want to borrow just enough newDebt to swap and get repayAmountRaw of currentDebt
     // The slippage % from UI is used as buffer for price movement between quote and execution
     const { requiredNewDebt, requiredNewDebtFormatted, exchangeRate } = useMemo(() => {
-        if (!unitQuote || !selectedTo || repayAmountRaw === 0n) {
+        if (!selectedTo || repayAmountRaw === 0n) {
             return { requiredNewDebt: 0n, requiredNewDebtFormatted: "0", exchangeRate: "0" };
         }
-        const unitOut = BigInt(unitQuote.dstAmount); // 1 newDebt -> X currentDebt
+
+        // Get unit output from whichever quote is available
+        let unitOut = 0n;
+        if (oneInchUnitQuote) {
+            unitOut = BigInt(oneInchUnitQuote.dstAmount);
+        } else if (pendleUnitQuote) {
+            const outAmount = pendleUnitQuote.data.amountPtOut || pendleUnitQuote.data.amountTokenOut || "0";
+            unitOut = BigInt(outAmount);
+        }
+
         if (unitOut === 0n) {
             return { requiredNewDebt: 0n, requiredNewDebtFormatted: "0", exchangeRate: "0" };
         }
@@ -180,7 +204,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             requiredNewDebtFormatted: formatUnits(required, selectedTo.decimals),
             exchangeRate: rate,
         };
-    }, [unitQuote, selectedTo, repayAmountRaw, debtFromDecimals, slippage]);
+    }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtFromDecimals, slippage]);
 
     // Flash Loan selection - check liquidity for the NEW debt token we're flash loaning
     // We flash loan `requiredNewDebt` of the new debt token, swap it to current debt, repay, then borrow to cover flash
@@ -213,9 +237,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         chainId,
         receiver: pendleAdapter?.address as Address,
         slippage: slippage / 100, // Pendle uses decimal (0.03 = 3%)
-        tokensIn: [selectedTo?.address as Address],
-        tokensOut: [debtFromToken],
-        amountsIn: [requiredNewDebt.toString()],
+        tokensIn: selectedTo?.address as Address,
+        tokensOut: debtFromToken,
+        amountsIn: requiredNewDebt.toString(),
         enableAggregator: true,
         enabled: pendleSwapEnabled,
     });

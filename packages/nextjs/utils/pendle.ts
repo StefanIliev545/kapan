@@ -78,14 +78,13 @@ export const fetchPendleConvert = async (
 
     appendValue(searchParams, "receiver", params.receiver);
     appendValue(searchParams, "slippage", params.slippage);
-    appendValue(searchParams, "enableAggregator", params.enableAggregator);
+    appendValue(searchParams, "enableAggregator", true); // Always enable aggregators
     appendValue(searchParams, "deadline", params.deadline);
 
     appendValue(searchParams, "tokensIn", Array.isArray(params.tokensIn) ? params.tokensIn : [params.tokensIn]);
     appendValue(searchParams, "tokensOut", Array.isArray(params.tokensOut) ? params.tokensOut : [params.tokensOut]);
     appendValue(searchParams, "amountsIn", Array.isArray(params.amountsIn) ? params.amountsIn : [params.amountsIn]);
     appendValue(searchParams, "aggregators", params.aggregators);
-    appendValue(searchParams, "enableAggregator", "true");
 
     const url = `${PENDLE_API_BASE}/${chainId}/convert?${searchParams.toString()}`;
 
