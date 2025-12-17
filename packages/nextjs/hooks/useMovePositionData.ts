@@ -84,7 +84,7 @@ export type UseMovePositionDataResult = {
 
 // EVM-only provider chains
 const BALANCER_CHAINS = [42161, 8453, 10, 31337]; // Arbitrum, Base, Optimism, Hardhat
-const AAVE_CHAINS = [42161, 8453, 10, 59144, 31337]; // Arbitrum, Base, Optimism, Linea, Hardhat
+const AAVE_CHAINS = [42161, 8453, 10, 59144, 9745, 31337]; // Arbitrum, Base, Optimism, Linea, Plasma, Hardhat
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
   const { isOpen, networkType, fromProtocol, chainId, position } = params;

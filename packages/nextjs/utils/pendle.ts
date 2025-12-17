@@ -85,6 +85,7 @@ export const fetchPendleConvert = async (
     appendValue(searchParams, "tokensOut", Array.isArray(params.tokensOut) ? params.tokensOut : [params.tokensOut]);
     appendValue(searchParams, "amountsIn", Array.isArray(params.amountsIn) ? params.amountsIn : [params.amountsIn]);
     appendValue(searchParams, "aggregators", params.aggregators);
+    appendValue(searchParams, "enableAggregator", "true");
 
     const url = `${PENDLE_API_BASE}/${chainId}/convert?${searchParams.toString()}`;
 

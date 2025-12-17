@@ -101,9 +101,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   // Chain-based provider availability (from deployment script)
   // Balancer is only available on Arbitrum, Base, and Optimism
-  // Aave V3 is available on Arbitrum, Base, Optimism, and Linea
-  const BALANCER_CHAINS = [42161, 8453, 10]; // Arbitrum, Base, Optimism
-  const AAVE_CHAINS = [42161, 8453, 10, 59144]; // Arbitrum, Base, Optimism, Linea
+  // Aave V3 is available on Arbitrum, Base, Optimism, Linea, and Plasma
+  const BALANCER_CHAINS = [42161, 8453, 10, 31337]; // Arbitrum, Base, Optimism, Hardhat
+  const AAVE_CHAINS = [42161, 8453, 10, 59144, 9745, 31337]; // Arbitrum, Base, Optimism, Linea, Plasma, Hardhat
 
   // Filter available flash loan providers based on what's enabled AND chain support
   // Only include providers once we've finished loading their status

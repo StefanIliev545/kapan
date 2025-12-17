@@ -234,7 +234,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                 ) : (
                     <div className="space-y-6">
                         {/* Provider Selectors Row */}
-                        {((flashLoanProviders && flashLoanProviders.length > 1 && setSelectedProvider) || setSwapRouter) && (
+                        {((flashLoanProviders && flashLoanProviders.length >= 1 && setSelectedProvider) || setSwapRouter) && (
                             <div className="flex justify-end gap-2 mb-[-10px]">
                                 {/* Swap Router Selector */}
                                 {setSwapRouter && (
@@ -251,7 +251,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                     </select>
                                 )}
 
-                                {/* Flash Loan Provider Selector */}
+                                {/* Flash Loan Provider Selector - show dropdown if multiple, read-only if single */}
                                 {flashLoanProviders && flashLoanProviders.length > 1 && setSelectedProvider && (
                                     <select
                                         className="select select-xs select-ghost font-normal text-base-content/60"
@@ -272,6 +272,12 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                             );
                                         })}
                                     </select>
+                                )}
+                                {/* Show read-only flash loan provider when only one is available */}
+                                {flashLoanProviders && flashLoanProviders.length === 1 && selectedProvider && (
+                                    <span className="text-xs text-base-content/60 py-1">
+                                        Flash Loan: {selectedProvider.name}
+                                    </span>
                                 )}
                             </div>
                         )}

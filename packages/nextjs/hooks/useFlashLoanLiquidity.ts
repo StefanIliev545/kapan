@@ -29,7 +29,7 @@ export const useFlashLoanLiquidity = (
     amount: bigint,
     chainId: number
 ) => {
-    const { data: routerInfo } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 });
+    const { data: routerInfo } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745 });
     const publicClient = usePublicClient({ chainId });
 
     const [liquidityData, setLiquidityData] = useState<FlashLoanLiquidity[]>([]);
