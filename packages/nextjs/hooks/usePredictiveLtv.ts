@@ -232,8 +232,27 @@ export function useReserveConfigs(
 }
 
 /**
+ * E-Mode category data (matches useAaveEMode)
+ */
+export interface EModeCategory {
+  id: number;
+  ltv: number; // in basis points
+  liquidationThreshold: number; // in basis points
+  liquidationBonus: number; // in basis points
+  label: string;
+}
+
+/**
  * Hook for predictive LTV in multiply/leverage modals
  * Returns the max leverage based on the specific collateral's LTV
+ * 
+ * @param protocol - Protocol name (e.g., "aave")
+ * @param collateralToken - Collateral token address
+ * @param debtToken - Debt token address
+ * @param market - Market address (for Compound)
+ * @param chainId - Chain ID
+ * @param safetyBuffer - Safety buffer for max leverage calculation (default 0.90)
+ * @param eMode - Optional E-Mode category that overrides LTV/liquidation threshold
  */
 export function usePredictiveMaxLeverage(
   protocol: string,
@@ -241,7 +260,8 @@ export function usePredictiveMaxLeverage(
   debtToken: Address | undefined,
   market?: Address,
   chainId?: number,
-  safetyBuffer: number = 0.90
+  safetyBuffer: number = 0.90,
+  eMode?: EModeCategory | null
 ) {
   const tokens = useMemo(() => {
     const result: Address[] = [];
@@ -264,28 +284,41 @@ export function usePredictiveMaxLeverage(
       c => c.token.toLowerCase() === collateralToken?.toLowerCase()
     );
 
-    if (!collateralConfig) {
+    // Check if E-Mode is active
+    const isEModeActive = eMode && eMode.id > 0;
+
+    // If no collateral config AND no E-Mode, return safe defaults
+    if (!collateralConfig && !isEModeActive) {
       return {
         maxLtv: 0,
         liquidationThreshold: 0,
         maxLeverage: 2, // Safe default
         collateralConfig: undefined,
         debtConfig: undefined,
+        isEModeActive: false,
       };
     }
 
-    // Calculate max leverage from collateral's LTV
-    const maxLtvPercent = Number(collateralConfig.ltv) / 100; // bps to %
-    const liqThresholdPercent = Number(collateralConfig.liquidationThreshold) / 100;
+    // Use E-Mode LTV/liquidation threshold if active, otherwise use asset's standard values
+    // E-Mode takes priority since it overrides asset-specific values
+    const maxLtvBps = isEModeActive ? eMode.ltv : Number(collateralConfig?.ltv || 0);
+    const liqThresholdBps = isEModeActive ? eMode.liquidationThreshold : Number(collateralConfig?.liquidationThreshold || 0);
+
+    // Convert from basis points to percentage
+    const maxLtvPercent = maxLtvBps / 100; // bps to % (e.g., 9300 -> 93)
+    const liqThresholdPercent = liqThresholdBps / 100;
+    
+    // Calculate max leverage: 1 / (1 - LTV)
+    // The protocol's LTV vs liquidation threshold gap is the safety margin
     const effectiveLtv = (maxLtvPercent / 100) * safetyBuffer;
     
     let maxLeverage: number;
-    if (effectiveLtv >= 0.95) {
-      maxLeverage = 2; // Cap at 2x for very high LTV
-    } else if (effectiveLtv <= 0) {
+    if (effectiveLtv <= 0) {
       maxLeverage = 1; // No leverage if LTV is 0
+    } else if (effectiveLtv >= 0.99) {
+      maxLeverage = 100; // Cap at 100x for extremely high LTV
     } else {
-      maxLeverage = Math.min(1 / (1 - effectiveLtv), 10);
+      maxLeverage = 1 / (1 - effectiveLtv);
     }
 
     const debtConfig = configs.find(
@@ -298,8 +331,9 @@ export function usePredictiveMaxLeverage(
       maxLeverage: Math.round(maxLeverage * 100) / 100,
       collateralConfig,
       debtConfig,
+      isEModeActive: !!isEModeActive,
     };
-  }, [configs, collateralToken, debtToken, safetyBuffer]);
+  }, [configs, collateralToken, debtToken, safetyBuffer, eMode]);
 
   return {
     ...result,

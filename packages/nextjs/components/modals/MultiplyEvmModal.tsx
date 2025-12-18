@@ -12,6 +12,7 @@ import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import { usePredictiveMaxLeverage } from "~~/hooks/usePredictiveLtv";
+import { useAaveEMode } from "~~/hooks/useAaveEMode";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
@@ -31,7 +32,8 @@ interface MultiplyEvmModalProps {
   borrowApyMap?: Record<string, number>; // address -> APY %
 }
 
-const SAFETY_BUFFER = 0.90;
+// No additional safety buffer - the protocol's LTV vs liquidation threshold gap is sufficient
+const SAFETY_BUFFER = 1.0;
 
 const PROTOCOL_DEFAULT_LTV: Record<string, number> = {
   aave: 8000, compound: 7500, venus: 7500, euler: 8500, default: 7500,
@@ -48,9 +50,10 @@ const getProtocolDefaultLtv = (protocolName: string): bigint => {
 const calculateMaxLeverage = (ltvBps: bigint, protocolName: string): number => {
   const minReasonableLtv = 5000n;
   const effectiveLtvBps = ltvBps >= minReasonableLtv ? ltvBps : getProtocolDefaultLtv(protocolName);
-  const effectiveLtv = (Number(effectiveLtvBps) / 10000) * SAFETY_BUFFER;
-  if (effectiveLtv >= 0.95) return 2;
-  return Math.round(Math.min(1 / (1 - effectiveLtv), 10) * 100) / 100;
+  const effectiveLtv = Number(effectiveLtvBps) / 10000;
+  if (effectiveLtv <= 0) return 1;
+  if (effectiveLtv >= 0.99) return 100;
+  return Math.round((1 / (1 - effectiveLtv)) * 100) / 100;
 };
 
 const calculateFlashLoanAmount = (
@@ -97,36 +100,59 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // Zap mode: deposit debt token instead of collateral (e.g., USDe → PT-USDe)
   const [zapMode, setZapMode] = useState(false);
 
+  // Fetch E-Mode data for Aave - E-Mode overrides LTV/liquidation threshold
+  const isAaveProtocol = protocolName.toLowerCase().includes("aave");
+  const { userEMode } = useAaveEMode(isAaveProtocol ? chainId : undefined);
+
   // Fetch predictive LTV data for the selected collateral/debt pair
   const {
     maxLeverage: predictiveMaxLeverage,
     liquidationThreshold: predictiveLiqThreshold,
     collateralConfig,
+    isEModeActive,
   } = usePredictiveMaxLeverage(
     protocolName,
     collateral?.address,
     debt?.address,
     market,
     chainId,
-    SAFETY_BUFFER
+    SAFETY_BUFFER,
+    isAaveProtocol ? userEMode : null
   );
 
-  // Use predictive max leverage if available, otherwise fall back to prop-based calculation
+  // Use predictive max leverage if available (from collateral config or E-Mode)
+  // Adjust for slippage: with slippage s, actual LTV = (L-1) / (1 + (L-1)*(1-s))
+  // To achieve target LTV T with slippage s: L = (1 + T*s) / (1 - T*(1-s))
   const maxLeverage = useMemo(() => {
-    if (predictiveMaxLeverage > 1 && collateralConfig) {
-      return predictiveMaxLeverage;
+    let baseLeverage: number;
+    if (predictiveMaxLeverage > 1 && (collateralConfig || isEModeActive)) {
+      baseLeverage = predictiveMaxLeverage;
+    } else {
+      baseLeverage = calculateMaxLeverage(maxLtvBps, protocolName);
     }
-    // Fallback to prop-based calculation
-    return calculateMaxLeverage(maxLtvBps, protocolName);
-  }, [predictiveMaxLeverage, collateralConfig, maxLtvBps, protocolName]);
+    
+    // Adjust max leverage to account for swap slippage
+    // If we use leverage L with slippage s, actual LTV = (L-1) / (1 + (L-1)*(1-s))
+    // This is higher than (L-1)/L, so we need to reduce max leverage
+    // Formula: targetLTV = (L-1) / (1 + (L-1)*(1-s))
+    // Solving for L when we want actual LTV to hit target:
+    // L = (1 + targetLTV * slippageDecimal) / (1 - targetLTV * (1 - slippageDecimal))
+    const slippageDecimal = slippage / 100; // Convert 1% to 0.01
+    const targetLtv = (baseLeverage - 1) / baseLeverage; // The LTV we want to achieve
+    
+    if (targetLtv >= 0.99 || slippageDecimal >= 1) return baseLeverage;
+    
+    const adjustedLeverage = (1 + targetLtv * slippageDecimal) / (1 - targetLtv * (1 - slippageDecimal));
+    return Math.round(Math.min(adjustedLeverage, baseLeverage) * 100) / 100;
+  }, [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage]);
 
-  // Use predictive liquidation threshold if available
+  // Use predictive liquidation threshold if available (from collateral config or E-Mode)
   const effectiveLltvBps = useMemo(() => {
-    if (predictiveLiqThreshold > 0 && collateralConfig) {
+    if (predictiveLiqThreshold > 0 && (collateralConfig || isEModeActive)) {
       return BigInt(Math.round(predictiveLiqThreshold * 100)); // Convert % to bps
     }
     return lltvBps;
-  }, [predictiveLiqThreshold, collateralConfig, lltvBps]);
+  }, [predictiveLiqThreshold, collateralConfig, isEModeActive, lltvBps]);
 
   const updateLeverage = (val: number) => {
     const clamped = Math.min(Math.max(1, val), maxLeverage);
