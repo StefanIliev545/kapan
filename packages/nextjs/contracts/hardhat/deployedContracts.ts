@@ -12777,7 +12777,7 @@ const contracts = {
   },
   9745: {
     AaveGatewayView: {
-      address: "0x3D61cE07e29502E581C40235A38C847760Ee2c6E",
+      address: "0x4fA0F6a3362A3Dd8d60e48CFad8FD0f206654430",
       abi: [
         {
           inputs: [
@@ -13514,7 +13514,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x2Da6EF0a715D85CB95004b50C00f825aeaeD9e30",
+      address: "0x95650eA3B5B5038a5BeAC701Fae0a5420FDcEa32",
       abi: [
         {
           inputs: [
@@ -14009,7 +14009,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x447c16589117541D9a7C6AE45329D9cAa2CCad5e",
+      address: "0x2545E11ce884D92562DdB6e465c534C559989a29",
       abi: [
         {
           inputs: [
@@ -14725,7 +14725,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xaB27C45B9d30712F69651BcA99b6Eb9fecA1a540",
+      address: "0x3D0f2788C7Bd1723787322c76f21E296998dC6B3",
       abi: [
         {
           inputs: [
@@ -14946,7 +14946,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0xb8b4cC1ba90A9A0C48D711E03448ff948979fE27",
+      address: "0x7784a097373B4bb7612886a700a8cc907F75f3b8",
       abi: [
         {
           inputs: [
@@ -15367,7 +15367,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x93BC2345237Fef5E521b73b77b661b414BD65388",
+      address: "0x4D7595875519fC6Bf69b4372B81a7506f6Ad2598",
       abi: [
         {
           inputs: [

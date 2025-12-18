@@ -293,6 +293,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             providerEnum,
             market,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
+            swapRouter === "1inch" ? "oneinch" : "pendle",  // map "1inch" -> "oneinch"
         );
     };
 

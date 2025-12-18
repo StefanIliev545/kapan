@@ -334,6 +334,14 @@ const config: HardhatUserConfig = {
           browserURL: "https://testnet.bscscan.com",
         },
       },
+      {
+        network: "plasma",
+        chainId: 9745,
+        urls: {
+          apiURL: "https://plasmascan.to/api",
+          browserURL: "https://plasmascan.to",
+        },
+      },
     ],
   },
   // configuration for etherscan-verify from hardhat-deploy plugin

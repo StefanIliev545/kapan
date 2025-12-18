@@ -28,7 +28,9 @@ contract PendleGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     ) external override returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
 
-        if (ins.op == ProtocolTypes.LendingOp.Swap) {
+        // Both Swap and SwapExactOut use the same logic - Pendle's router handles both
+        // The Pendle API provides appropriate calldata for each swap type
+        if (ins.op == ProtocolTypes.LendingOp.Swap || ins.op == ProtocolTypes.LendingOp.SwapExactOut) {
             address tokenIn = ins.token;
             uint256 amountIn = ins.amount;
 
@@ -93,7 +95,7 @@ contract PendleGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
 
         uint256 outCount = 0;
         for (uint256 i = 0; i < instrs.length; i++) {
-            if (instrs[i].op == ProtocolTypes.LendingOp.Swap) {
+            if (instrs[i].op == ProtocolTypes.LendingOp.Swap || instrs[i].op == ProtocolTypes.LendingOp.SwapExactOut) {
                 outCount += 2;
             }
         }
@@ -103,7 +105,7 @@ contract PendleGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
 
-            if (ins.op == ProtocolTypes.LendingOp.Swap) {
+            if (ins.op == ProtocolTypes.LendingOp.Swap || ins.op == ProtocolTypes.LendingOp.SwapExactOut) {
                 targets[i] = address(0);
                 data[i] = bytes("");
 

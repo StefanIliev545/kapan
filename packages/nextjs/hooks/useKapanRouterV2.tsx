@@ -732,6 +732,7 @@ export const useKapanRouterV2 = () => {
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
     market?: Address,
     isMax = false,
+    swapRouter: "oneinch" | "pendle" = "oneinch",
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -798,14 +799,14 @@ export const useKapanRouterV2 = () => {
         encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralToken, userAddress, 0n, context, 4)
       ),
       
-      // 6. Approve OneInch on withdrawn collateral (Output[5])
-      createRouterInstruction(encodeApprove(5, "oneinch")),
+      // 6. Approve swap router on withdrawn collateral (Output[5])
+      createRouterInstruction(encodeApprove(5, swapRouter)),
       
       // 7. SwapExactOut collateral -> debt token
       // Output[7] = debt token, Output[8] = collateral refund
       // The swap minAmountOut (in swapContext) should cover flash loan repayment!
       createProtocolInstruction(
-        "oneinch",
+        swapRouter,
         encodeLendingInstruction(LendingOp.SwapExactOut, collateralToken, userAddress, 0n, swapContext as string, 5)
       ),
       
@@ -831,10 +832,11 @@ export const useKapanRouterV2 = () => {
     debtToToken: string,              // e.g., USDT (new debt to take on)
     currentDebtFrom: bigint,          // amount to repay in debtFrom (ignored if isMax)
     maxDebtToInForSwap: bigint,       // max input for USDT->USDC swap (flash loan amount)
-    swapData: string,                 // 1inch calldata for USDT->USDC
+    swapData: string,                 // swap calldata (1inch or Pendle)
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
     market?: Address,
     isMax = false,
+    swapRouter: "oneinch" | "pendle" = "oneinch",
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -865,12 +867,12 @@ export const useKapanRouterV2 = () => {
         createRouterInstruction(encodeToOutput(maxDebtToInForSwap, debtToToken)),
         // 2. Flash loan debtTo using input[1] (appends output[2])
         createRouterInstruction(encodeFlashLoan(flashLoanProvider, 1)),
-        // 3. Approve OneInch for debtTo (using input[1] for amount)
-        createRouterInstruction(encodeApprove(1, "oneinch")),
+        // 3. Approve swap router for debtTo (using input[1] for amount)
+        createRouterInstruction(encodeApprove(1, swapRouter)),
         // 4. SwapExactOut debtTo->debtFrom (output[4]: debtFrom, output[5]: debtTo refund)
         // Uses input[1] for swap input amount
         createProtocolInstruction(
-          "oneinch",
+          swapRouter,
           encodeLendingInstruction(LendingOp.SwapExactOut, debtToToken, userAddress, 0n, swapExactOutContext as string, 1)
         ),
         // 5. Approve protocol on debtFrom (output[4])
@@ -899,11 +901,11 @@ export const useKapanRouterV2 = () => {
       createRouterInstruction(encodeToOutput(maxDebtToInForSwap, debtToToken)),
       // 1. Flash loan debtTo using input[0] (appends output[1])
       createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
-      // 2. Approve OneInch for debtTo (approve read from input[0], consistent with tests/authorization)
-      createRouterInstruction(encodeApprove(0, "oneinch")),
+      // 2. Approve swap router for debtTo (approve read from input[0], consistent with tests/authorization)
+      createRouterInstruction(encodeApprove(0, swapRouter)),
       // 3. SwapExactOut debtTo->debtFrom for exact currentDebtFrom (output[3]: debtFrom, output[4]: debtTo refund)
       createProtocolInstruction(
-        "oneinch",
+        swapRouter,
         encodeLendingInstruction(LendingOp.SwapExactOut, debtToToken, userAddress, 0n, swapExactOutContext as string, 0)
       ),
       // 4. Approve Aave on debtFrom (USDC) at output[3]
