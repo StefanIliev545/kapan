@@ -20,6 +20,7 @@ import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModa
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { formatBps } from "~~/utils/risk";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
+import { useAaveEMode } from "~~/hooks/useAaveEMode";
 
 
 export interface ProtocolPosition {
@@ -154,9 +155,49 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     setIsDebtSwapModalOpen(true);
   };
 
+  // E-Mode handling for Aave - fetch user's E-Mode and filter assets
+  const isAaveProtocol = protocolName.toLowerCase().includes("aave");
+  const { userEMode } = useAaveEMode(isAaveProtocol && chainId ? chainId : undefined);
+
+  // Helper to filter assets by E-Mode compatibility (heuristic based on label)
+  const filterByEMode = useMemo(() => {
+    if (!userEMode || userEMode.id === 0) return (assets: SwapAsset[]) => assets;
+    
+    const label = userEMode.label.toLowerCase();
+    
+    return (assets: SwapAsset[]) => {
+      // Pendle E-Mode: show PT tokens and their underlying
+      if (label.includes("pendle")) {
+        return assets.filter(a => {
+          const sym = a.symbol.toLowerCase();
+          return sym.startsWith("pt-") || sym.includes("usde") || sym.includes("susde");
+        });
+      }
+      
+      // ETH correlated E-Mode: show ETH derivatives
+      if (label.includes("eth")) {
+        return assets.filter(a => {
+          const sym = a.symbol.toLowerCase();
+          return sym.includes("eth") || sym.includes("wsteth") || sym.includes("reth") || sym.includes("cbeth");
+        });
+      }
+      
+      // Stablecoin E-Mode: show USD stables
+      if (label.includes("stable") || label.includes("usd")) {
+        return assets.filter(a => {
+          const sym = a.symbol.toLowerCase();
+          return sym.includes("usd") || sym.includes("dai") || sym.includes("frax") || sym.includes("lusd");
+        });
+      }
+      
+      // Default: show all
+      return assets;
+    };
+  }, [userEMode]);
+
   // Convert suppliedPositions to BasicCollateral for the modal
   const availableCollaterals = useMemo(() => {
-    return suppliedPositions.map(p => ({
+    const all = suppliedPositions.map(p => ({
       symbol: p.name,
       address: p.tokenAddress,
       decimals: p.tokenDecimals || 18,
@@ -166,7 +207,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       usdValue: p.balance,
       price: p.tokenPrice,
     }));
-  }, [suppliedPositions]);
+    // Apply E-Mode filter for Aave
+    return isAaveProtocol ? filterByEMode(all) : all;
+  }, [suppliedPositions, isAaveProtocol, filterByEMode]);
 
   const debtOptions = useMemo(() => {
     const mapped = borrowedPositions.map(p => ({
@@ -180,9 +223,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       price: p.tokenPrice,
     }));
 
-    if (mapped.length > 0) return mapped;
-    return availableCollaterals;
-  }, [availableCollaterals, borrowedPositions]);
+    const result = mapped.length > 0 ? mapped : availableCollaterals;
+    // Apply E-Mode filter for Aave
+    return isAaveProtocol ? filterByEMode(result) : result;
+  }, [availableCollaterals, borrowedPositions, isAaveProtocol, filterByEMode]);
 
   // APY maps for multiply modal
   const supplyApyMap = useMemo(() => {
@@ -939,6 +983,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               lltvBps={lltvBps > 0n ? lltvBps : 8500n}
               supplyApyMap={supplyApyMap}
               borrowApyMap={borrowApyMap}
+              eMode={isAaveProtocol ? userEMode : undefined}
             />
           )}
 

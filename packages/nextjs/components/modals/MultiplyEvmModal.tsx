@@ -11,8 +11,7 @@ import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
-import { usePredictiveMaxLeverage } from "~~/hooks/usePredictiveLtv";
-import { useAaveEMode } from "~~/hooks/useAaveEMode";
+import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveLtv";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
@@ -23,13 +22,14 @@ interface MultiplyEvmModalProps {
   onClose: () => void;
   protocolName: string;
   chainId: number;
-  collaterals: SwapAsset[];
-  debtOptions: SwapAsset[];
+  collaterals: SwapAsset[];  // Should be pre-filtered by caller if needed (e.g., E-Mode compatible)
+  debtOptions: SwapAsset[];  // Should be pre-filtered by caller if needed
   market?: Address;
   maxLtvBps?: bigint;
   lltvBps?: bigint;
   supplyApyMap?: Record<string, number>; // address -> APY %
   borrowApyMap?: Record<string, number>; // address -> APY %
+  eMode?: EModeCategory | null;  // Optional E-Mode for LTV/liquidation threshold override
 }
 
 // No additional safety buffer - the protocol's LTV vs liquidation threshold gap is sufficient
@@ -69,7 +69,7 @@ const calculateFlashLoanAmount = (
 
 export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   isOpen, onClose, protocolName, chainId, collaterals, debtOptions, market,
-  maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = {}, borrowApyMap = {},
+  maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = {}, borrowApyMap = {}, eMode,
 }) => {
   const wasOpenRef = useRef(false);
   const [collateral, setCollateral] = useState<SwapAsset | undefined>(collaterals[0]);
@@ -100,11 +100,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // Zap mode: deposit debt token instead of collateral (e.g., USDe → PT-USDe)
   const [zapMode, setZapMode] = useState(false);
 
-  // Fetch E-Mode data for Aave - E-Mode overrides LTV/liquidation threshold
-  const isAaveProtocol = protocolName.toLowerCase().includes("aave");
-  const { userEMode } = useAaveEMode(isAaveProtocol ? chainId : undefined);
-
   // Fetch predictive LTV data for the selected collateral/debt pair
+  // E-Mode is passed as prop for protocols that support it (e.g., Aave)
   const {
     maxLeverage: predictiveMaxLeverage,
     liquidationThreshold: predictiveLiqThreshold,
@@ -117,7 +114,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     market,
     chainId,
     SAFETY_BUFFER,
-    isAaveProtocol ? userEMode : null
+    eMode ?? null
   );
 
   // Use predictive max leverage if available (from collateral config or E-Mode)
@@ -175,13 +172,31 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     tokens: allTokens, network: "evm", chainId,
   });
 
-  const collateralsWithWalletBalance = useMemo(() => collaterals.map(c => ({
-    ...c, walletBalance: walletBalances[c.address.toLowerCase()]?.balance ?? 0n,
-  })), [collaterals, walletBalances]);
+  // Add wallet balances and sort by balance (highest first)
+  // Note: Collaterals/debtOptions should already be filtered by the parent if needed (e.g., E-Mode)
+  const collateralsWithWalletBalance = useMemo(() => {
+    const withBalance = collaterals.map(c => ({
+      ...c, walletBalance: walletBalances[c.address.toLowerCase()]?.balance ?? 0n,
+    }));
+    // Sort by wallet balance descending (tokens with balance first)
+    return withBalance.sort((a, b) => {
+      if (a.walletBalance > b.walletBalance) return -1;
+      if (a.walletBalance < b.walletBalance) return 1;
+      return 0;
+    });
+  }, [collaterals, walletBalances]);
 
-  const debtWithWalletBalance = useMemo(() => debtOptions.map(d => ({
-    ...d, walletBalance: walletBalances[d.address.toLowerCase()]?.balance ?? 0n,
-  })), [debtOptions, walletBalances]);
+  const debtWithWalletBalance = useMemo(() => {
+    const withBalance = debtOptions.map(d => ({
+      ...d, walletBalance: walletBalances[d.address.toLowerCase()]?.balance ?? 0n,
+    }));
+    // Sort by wallet balance descending (tokens with balance first)
+    return withBalance.sort((a, b) => {
+      if (a.walletBalance > b.walletBalance) return -1;
+      if (a.walletBalance < b.walletBalance) return 1;
+      return 0;
+    });
+  }, [debtOptions, walletBalances]);
 
   const currentCollateral = useMemo(() =>
     collateral ? collateralsWithWalletBalance.find(c => c.address === collateral.address) : undefined,
@@ -204,10 +219,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     wasOpenRef.current = isOpen;
   }, [isOpen, protocolName, chainId]);
 
+  // Set initial collateral/debt from filtered lists (sorted by balance)
   useEffect(() => {
-    if (collaterals.length > 0 && !collateral) setCollateral(collaterals[0]);
-    if (debtOptions.length > 0 && !debt) setDebt(debtOptions[0]);
-  }, [collaterals, debtOptions, collateral, debt]);
+    if (collateralsWithWalletBalance.length > 0 && !collateral) {
+      setCollateral(collateralsWithWalletBalance[0]);
+    }
+    if (debtWithWalletBalance.length > 0 && !debt) {
+      setDebt(debtWithWalletBalance[0]);
+    }
+  }, [collateralsWithWalletBalance, debtWithWalletBalance, collateral, debt]);
 
   // Get adapter info directly from deployed contracts - no RPC calls needed
   const oneInchAdapter = getOneInchAdapterInfo(chainId);
@@ -523,14 +543,20 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                       </svg>
                     </label>
                     <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
-                      {collaterals.map(c => (
-                        <li key={c.address}>
-                          <a onClick={() => setCollateral(c)} className={`flex items-center gap-2 text-sm ${collateral?.address === c.address ? "active" : ""}`}>
-                            <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
-                            {c.symbol}
-                          </a>
-                        </li>
-                      ))}
+                      {collateralsWithWalletBalance.map(c => {
+                        const bal = Number(formatUnits(c.walletBalance, c.decimals));
+                        return (
+                          <li key={c.address}>
+                            <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
+                              <div className="flex items-center gap-2">
+                                <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
+                                {c.symbol}
+                              </div>
+                              <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                            </a>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>
@@ -562,8 +588,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                     </svg>
                   </label>
                   <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
-                    {debtOptions.map(d => {
-                      const bal = Number(formatUnits(d.rawBalance, d.decimals));
+                    {debtWithWalletBalance.map(d => {
+                      const bal = Number(formatUnits(d.walletBalance, d.decimals));
                       return (
                         <li key={d.address}>
                           <a onClick={() => setDebt(d)} className={`flex items-center justify-between text-sm ${debt?.address === d.address ? "active" : ""}`}>
@@ -609,131 +635,126 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               ))}
             </div>
 
-            {/* Zap Mode Toggle - for PT loops (deposit underlying → swap to PT collateral) */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-base-300/30">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-base-content/60">Zap Mode</span>
-                <span className="text-[10px] text-base-content/40">(deposit → swap → collateral)</span>
+            {/* Config Grid - compact 2x2 layout with dropdowns */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 pt-3 border-t border-base-300/30 text-xs">
+              {/* Zap Mode */}
+              <div className="flex items-center justify-between">
+                <span className="text-base-content/60">Zap Mode</span>
+                <input
+                  type="checkbox"
+                  checked={zapMode}
+                  onChange={e => setZapMode(e.target.checked)}
+                  className="toggle toggle-primary toggle-xs"
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={zapMode}
-                onChange={e => setZapMode(e.target.checked)}
-                className="toggle toggle-primary toggle-xs"
-              />
-            </div>
 
-            {/* Swap Router Row - only show if multiple routers available */}
-            {oneInchAvailable && pendleAvailable ? (
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-base-content/60">Swap Router</span>
-                <div className="flex gap-1">
-                  {SWAP_ROUTER_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setSwapRouter(opt.value)}
-                      className={`px-2 py-0.5 text-xs rounded transition-colors ${swapRouter === opt.value ? "bg-primary text-primary-content" : "bg-base-300/50 hover:bg-base-300"}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-base-content/60">Swap Router</span>
-                <span className="text-xs">{swapRouter === "pendle" ? "Pendle" : "1inch"}</span>
-              </div>
-            )}
-
-            {/* Slippage Row */}
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-base-content/60">Slippage</span>
-              <div className="flex gap-1">
-                {[0.5, 1, 2, 3].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setSlippage(s)}
-                    className={`px-2 py-0.5 text-xs rounded transition-colors ${slippage === s ? "bg-primary text-primary-content" : "bg-base-300/50 hover:bg-base-300"}`}
+              {/* Swap Router Dropdown */}
+              <div className="flex items-center justify-between">
+                <span className="text-base-content/60">Swap Router</span>
+                {oneInchAvailable && pendleAvailable ? (
+                  <select
+                    value={swapRouter}
+                    onChange={e => setSwapRouter(e.target.value as SwapRouter)}
+                    className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
                   >
-                    {s}%
-                  </button>
-                ))}
+                    {SWAP_ROUTER_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="font-medium">{swapRouter === "pendle" ? "Pendle" : "1inch"}</span>
+                )}
               </div>
-            </div>
 
-            {/* Flash Loan Provider Row */}
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-base-content/60">Flash Loan</span>
-              <div className="flex gap-1">
-                {providerOptions.map(p => {
-                  const liq = liquidityData.find(l => l.provider === p.providerEnum);
-                  const hasLiquidity = liq?.hasLiquidity ?? true; // Default true if no data yet
-                  const isSelected = selectedProvider?.name === p.name;
-                  return (
-                    <button
-                      key={p.name}
-                      onClick={() => setSelectedProvider(p)}
-                      className={`px-2 py-0.5 text-xs rounded transition-colors flex items-center gap-1 ${isSelected ? "bg-primary text-primary-content" : "bg-base-300/50 hover:bg-base-300"}`}
-                    >
-                      {p.name}
-                      {liq && (hasLiquidity ? <span className="text-success">✓</span> : <span className="text-warning">⚠</span>)}
-                    </button>
-                  );
-                })}
+              {/* Slippage Dropdown */}
+              <div className="flex items-center justify-between">
+                <span className="text-base-content/60">Slippage</span>
+                <select
+                  value={slippage}
+                  onChange={e => setSlippage(parseFloat(e.target.value))}
+                  className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                >
+                  {[0.5, 1, 2, 3].map(s => (
+                    <option key={s} value={s}>{s}%</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Flash Loan Dropdown */}
+              <div className="flex items-center justify-between">
+                <span className="text-base-content/60">Flash Loan</span>
+                <select
+                  value={selectedProvider?.name || ""}
+                  onChange={e => {
+                    const p = providerOptions.find(p => p.name === e.target.value);
+                    if (p) setSelectedProvider(p);
+                  }}
+                  className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                >
+                  {providerOptions.map(p => {
+                    const liq = liquidityData.find(l => l.provider === p.providerEnum);
+                    const hasLiquidity = liq?.hasLiquidity ?? true;
+                    return (
+                      <option key={p.name} value={p.name}>
+                        {p.name} {liq && (hasLiquidity ? "✓" : "⚠")}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
             </div>
           </div>
 
-          {/* Metrics - Horizontal Grid */}
-          <div className="grid grid-cols-4 gap-2 mb-4 text-sm">
-            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">LTV / Liq. Threshold</div>
-              <div className="font-medium text-sm">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(effectiveLltvBps)}%</div>
+          {/* Metrics - Compact horizontal layout */}
+          <div className="flex justify-between items-center gap-2 mb-3 text-xs bg-base-200/40 rounded-lg p-2 border border-base-300/20">
+            <div className="text-center flex-1">
+              <div className="text-base-content/50 mb-0.5">LTV</div>
+              <div className="font-medium">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(effectiveLltvBps)}%</div>
             </div>
-            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">{collateral?.symbol} Price</div>
-              <div className="font-medium text-sm">{collateralPrice > 0 ? `$${collateralPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "-"}</div>
+            <div className="w-px h-6 bg-base-300/50" />
+            <div className="text-center flex-1">
+              <div className="text-base-content/50 mb-0.5">{collateral?.symbol}</div>
+              <div className="font-medium">${collateralPrice > 0 ? collateralPrice.toFixed(2) : "-"}</div>
             </div>
-            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">{debt?.symbol} Price</div>
-              <div className="font-medium text-sm">{debt ? `$${Number(formatUnits(debt.price ?? 0n, 8)).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "-"}</div>
+            <div className="w-px h-6 bg-base-300/50" />
+            <div className="text-center flex-1">
+              <div className="text-base-content/50 mb-0.5">{debt?.symbol}</div>
+              <div className="font-medium">${debt ? Number(formatUnits(debt.price ?? 0n, 8)).toFixed(2) : "-"}</div>
             </div>
-            <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20">
-              <div className="text-base-content/50 text-xs mb-0.5">Net APY</div>
-              <div className={`font-medium text-sm ${netApy !== null && netApy > 0 ? "text-success" : netApy !== null && netApy < 0 ? "text-error" : ""}`}>
+            <div className="w-px h-6 bg-base-300/50" />
+            <div className="text-center flex-1">
+              <div className="text-base-content/50 mb-0.5">Net APY</div>
+              <div className={`font-medium ${netApy !== null && netApy > 0 ? "text-success" : netApy !== null && netApy < 0 ? "text-error" : ""}`}>
                 {netApy !== null ? `${netApy > 0 ? "+" : ""}${netApy.toFixed(2)}%` : "-"}
               </div>
             </div>
           </div>
 
-          {/* Details */}
-          <div className="bg-base-200/40 rounded-lg p-3 border border-base-300/20 mb-4 text-xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">Swap Route ({swapRouter === "pendle" ? "Pendle" : "1inch"})</span>
-              <span className="font-medium">
-                {isSwapQuoteLoading ? <span className="loading loading-dots loading-xs" /> :
-                  flashLoanAmountRaw > 0n ? `${shortAmount.toFixed(4)} ${debt?.symbol} → ${Number(minCollateralOut.formatted).toFixed(4)} ${collateral?.symbol}` : "-"}
-              </span>
+          {/* Details - Compact 2-column grid */}
+          <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20 mb-3 text-xs">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="flex justify-between">
+                <span className="text-base-content/50">Swap</span>
+                <span className="truncate ml-2 text-right">
+                  {isSwapQuoteLoading ? <span className="loading loading-dots loading-xs" /> :
+                    flashLoanAmountRaw > 0n ? `${shortAmount.toFixed(2)} → ${Number(minCollateralOut.formatted).toFixed(2)}` : "-"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-base-content/50">FL Fee</span>
+                <span>{selectedProvider?.name.includes("Balancer") ? "0%" : "0.05%"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-base-content/50">Supply APY</span>
+                <span className="text-success">+{(supplyApyMap[collateral?.address.toLowerCase() ?? ""] ?? 0).toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-base-content/50">Borrow APY</span>
+                <span className="text-error">-{(borrowApyMap[debt?.address.toLowerCase() ?? ""] ?? 0).toFixed(2)}%</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">Min. Received</span>
-              <span>{flashLoanAmountRaw > 0n ? `${Number(minCollateralOut.formatted).toFixed(4)} ${collateral?.symbol}` : "-"}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">Flash Loan Fee</span>
-              <span>{selectedProvider?.name.includes("Balancer") ? "0%" : selectedProvider?.name.includes("Aave") ? "0.05%" : "~0.05%"}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-base-300/30 pt-2 mt-2">
-              <span className="text-base-content/60">Supply APY ({collateral?.symbol})</span>
-              <span className="text-success">{collateral ? `+${(supplyApyMap[collateral.address.toLowerCase()] ?? 0).toFixed(2)}%` : "-"}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">Borrow APY ({debt?.symbol})</span>
-              <span className="text-error">{debt ? `-${(borrowApyMap[debt.address.toLowerCase()] ?? 0).toFixed(2)}%` : "-"}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-base-300/30 pt-2 mt-2">
-              <span className="text-base-content/60">Total Position</span>
+            <div className="flex justify-between mt-1.5 pt-1.5 border-t border-base-300/30">
+              <span className="text-base-content/50">Total Position</span>
               <span className="font-medium">${metrics.totalCollateralUsd.toFixed(2)} ({leverage.toFixed(2)}×)</span>
             </div>
           </div>
