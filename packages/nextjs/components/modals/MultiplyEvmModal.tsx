@@ -438,6 +438,41 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const walletBalanceFormatted = depositToken ? Number(formatUnits(walletBalance, depositDecimals)) : 0;
   const collateralPrice = collateral ? Number(formatUnits(collateral.price ?? 0n, 8)) : 0;
   const shortAmount = debt ? Number(formatUnits(flashLoanAmountRaw, debt.decimals)) : 0;
+  const debtPrice = debt ? Number(formatUnits(debt.price ?? 0n, 8)) : 0;
+
+  // Calculate fees breakdown
+  const fees = useMemo(() => {
+    const flashLoanAmountUsd = shortAmount * debtPrice;
+    
+    // Flash loan fee: Aave = 0.05%, Balancer = 0%
+    const isBalancer = selectedProvider?.name.includes("Balancer");
+    const flashLoanFeePercent = isBalancer ? 0 : 0.05;
+    const flashLoanFeeUsd = flashLoanAmountUsd * (flashLoanFeePercent / 100);
+    
+    // Swap price impact from Pendle (already a decimal like -0.0001)
+    const priceImpact = swapRouter === "pendle" ? (pendleQuote?.data?.priceImpact ?? 0) : 0;
+    const priceImpactPercent = Math.abs(priceImpact * 100); // Convert to positive percentage
+    const priceImpactUsd = flashLoanAmountUsd * Math.abs(priceImpact);
+    
+    // Total fee
+    const totalFeePercent = flashLoanFeePercent + priceImpactPercent;
+    const totalFeeUsd = flashLoanFeeUsd + priceImpactUsd;
+    
+    // Fee as percentage of total position
+    const totalPositionUsd = metrics.totalCollateralUsd;
+    const feeOfPositionPercent = totalPositionUsd > 0 ? (totalFeeUsd / totalPositionUsd) * 100 : 0;
+    
+    return {
+      flashLoanFeePercent,
+      flashLoanFeeUsd,
+      priceImpactPercent,
+      priceImpactUsd,
+      totalFeePercent,
+      totalFeeUsd,
+      flashLoanAmountUsd,
+      feeOfPositionPercent,
+    };
+  }, [shortAmount, debtPrice, selectedProvider, swapRouter, pendleQuote, metrics.totalCollateralUsd]);
 
   // Slider tick marks (simplified)
   const ticks = [1, (1 + maxLeverage) / 2, maxLeverage];
@@ -678,7 +713,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   onChange={e => setSlippage(parseFloat(e.target.value))}
                   className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
                 >
-                  {[0.5, 1, 2, 3].map(s => (
+                  {[0.1, 0.3, 0.5, 1, 2, 3].map(s => (
                     <option key={s} value={s}>{s}%</option>
                   ))}
                 </select>
@@ -745,8 +780,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-base-content/50">FL Fee</span>
-                <span>{selectedProvider?.name.includes("Balancer") ? "0%" : "0.05%"}</span>
+                <span className="text-base-content/50">Loop Fee</span>
+                <span className={fees.totalFeeUsd > 0 ? "text-warning" : ""}>
+                  {fees.totalFeeUsd > 0.01 
+                    ? `$${fees.totalFeeUsd.toFixed(2)} (${fees.feeOfPositionPercent.toFixed(3)}%)` 
+                    : fees.totalFeePercent > 0 
+                      ? `${fees.totalFeePercent.toFixed(3)}%` 
+                      : "free"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-base-content/50">Supply APY</span>
@@ -757,6 +798,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 <span className="text-error">-{(borrowApyMap[debt?.address.toLowerCase() ?? ""] ?? 0).toFixed(2)}%</span>
               </div>
             </div>
+            {/* Fee breakdown tooltip */}
+            {fees.totalFeeUsd > 0 && (
+              <div className="mt-1.5 pt-1.5 border-t border-base-300/30 text-[10px] text-base-content/40">
+                <span>FL: {fees.flashLoanFeePercent > 0 ? `${fees.flashLoanFeePercent}%` : "free"}</span>
+                {fees.priceImpactPercent > 0.001 && (
+                  <span className="ml-2">Impact: {fees.priceImpactPercent.toFixed(3)}%</span>
+                )}
+              </div>
+            )}
             <div className="flex justify-between mt-1.5 pt-1.5 border-t border-base-300/30">
               <span className="text-base-content/50">Total Position</span>
               <span className="font-medium">${metrics.totalCollateralUsd.toFixed(2)} ({leverage.toFixed(2)}×)</span>

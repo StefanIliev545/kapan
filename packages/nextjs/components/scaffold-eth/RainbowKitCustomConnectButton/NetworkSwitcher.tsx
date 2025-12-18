@@ -11,46 +11,56 @@ import { getTargetNetworks } from "~~/utils/scaffold-eth";
 
 const allowedNetworks = getTargetNetworks();
 
-// Network logo mapping
-const networkLogos: Record<string, string> = {
-  Arbitrum: "/logos/arb.svg",
-  "Arbitrum One": "/logos/arb.svg",  // The actual chain name from Wagmi
-  Ethereum: "/logos/ethereum.svg", 
-  Optimism: "/logos/optimism.svg",
-  Base: "/logos/base.svg",
-  Linea: "/logos/linea.svg",
-  "Arbitrum Sepolia": "/logos/arb.svg",
-  // Add more networks as needed
+// Network logo mapping with theme support
+// logo = dark mode, logoDark = light mode (following NetworkFilter pattern)
+interface NetworkLogoConfig {
+  logo: string;
+  logoDark?: string;
+}
+
+const networkLogos: Record<string, NetworkLogoConfig> = {
+  Arbitrum: { logo: "/logos/arb.svg" },
+  "Arbitrum One": { logo: "/logos/arb.svg" },
+  Ethereum: { logo: "/logos/ethereum.svg" },
+  Optimism: { logo: "/logos/optimism.svg" },
+  Base: { logo: "/logos/base.svg" },
+  Linea: { logo: "/logos/linea.svg" },
+  Plasma: { logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
+  "Arbitrum Sepolia": { logo: "/logos/arb.svg" },
+};
+
+// Chain ID to logo config mapping
+const chainIdLogos: Record<number, NetworkLogoConfig> = {
+  42161: { logo: "/logos/arb.svg" }, // Arbitrum
+  1: { logo: "/logos/ethereum.svg" }, // Ethereum Mainnet
+  10: { logo: "/logos/optimism.svg" }, // Optimism
+  8453: { logo: "/logos/base.svg" }, // Base
+  59144: { logo: "/logos/linea.svg" }, // Linea
+  9745: { logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" }, // Plasma
+  130: { logo: "/logos/unichain.svg" }, // Base Sepolia
 };
 
 /**
- * Helper function to get network logo by ID or name
+ * Helper function to get network logo by ID or name, theme-aware
  */
-const getNetworkLogo = (chain: Chain | null | undefined): string => {
+const getNetworkLogo = (chain: Chain | null | undefined, isDarkMode: boolean): string => {
   if (!chain) return "/logos/eth.svg";
   
-  // Try to get logo by name first
-  if (networkLogos[chain.name]) {
-    return networkLogos[chain.name];
+  // Try to get logo config by name first
+  let config = networkLogos[chain.name];
+  
+  // If not found by name, check by chain ID
+  if (!config) {
+    config = chainIdLogos[chain.id];
   }
   
-  // If not found, check by chain ID
-  switch (chain.id) {
-    case 42161: // Arbitrum
-      return "/logos/arb.svg";
-    case 1: // Ethereum Mainnet
-      return "/logos/ethereum.svg";
-    case 10: // Optimism
-      return "/logos/optimism.svg";
-    case 8453: // Base
-      return "/logos/base.svg";
-    case 59144: // Linea
-      return "/logos/linea.svg";
-    case 130: // Base Sepolia
-      return "/logos/unichain.svg";
-    default:
-      return "/logos/eth.svg";
+  if (!config) return "/logos/eth.svg";
+  
+  // In dark mode, use logo. In light mode, use logoDark if available
+  if (!isDarkMode && config.logoDark) {
+    return config.logoDark;
   }
+  return config.logo;
 };
 
 /**
@@ -70,7 +80,7 @@ export const NetworkSwitcher = () => {
   if (!chain) return null;
   
   const networkColor = getNetworkColor(chain as Chain, isDarkMode);
-  const networkLogo = getNetworkLogo(chain);
+  const networkLogo = getNetworkLogo(chain, isDarkMode);
   
   return (
     <div ref={dropdownRef} className="relative flex-1">
@@ -101,7 +111,7 @@ export const NetworkSwitcher = () => {
           <div className="max-h-80 overflow-y-auto">
             {allowedNetworks.map(network => {
               const isActive = network.id === chain?.id;
-              const networkLogo = getNetworkLogo(network);
+              const networkLogo = getNetworkLogo(network, isDarkMode);
               
               return (
                 <button

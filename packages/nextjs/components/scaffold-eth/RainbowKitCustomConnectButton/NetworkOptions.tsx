@@ -7,15 +7,32 @@ import { getTargetNetworks } from "~~/utils/scaffold-eth";
 
 const allowedNetworks = getTargetNetworks();
 
-// Network logo mapping
-const networkLogos: Record<string, string> = {
-  Arbitrum: "/logos/arb.svg",
-  Ethereum: "/logos/ethereum.svg",
-  Optimism: "/logos/optimism.svg",
-  Base: "/logos/base.svg",
-  Linea: "/logos/linea.svg",
-  "Arbitrum Sepolia": "/logos/arb.svg",
-  // Add more networks as needed
+// Network logo mapping with theme support
+interface NetworkLogoConfig {
+  logo: string;
+  logoDark?: string;
+}
+
+const networkLogos: Record<string, NetworkLogoConfig> = {
+  Arbitrum: { logo: "/logos/arb.svg" },
+  Ethereum: { logo: "/logos/ethereum.svg" },
+  Optimism: { logo: "/logos/optimism.svg" },
+  Base: { logo: "/logos/base.svg" },
+  Linea: { logo: "/logos/linea.svg" },
+  Plasma: { logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
+  "Arbitrum Sepolia": { logo: "/logos/arb.svg" },
+};
+
+// Helper to get theme-aware logo
+const getNetworkLogo = (networkName: string, isDarkMode: boolean): string => {
+  const config = networkLogos[networkName];
+  if (!config) return "/logos/eth.svg";
+  
+  // In dark mode, use logo. In light mode, use logoDark if available
+  if (!isDarkMode && config.logoDark) {
+    return config.logoDark;
+  }
+  return config.logo;
 };
 
 type NetworkOptionsProps = {
@@ -43,16 +60,14 @@ export const NetworkOptions = ({ hidden = false }: NetworkOptionsProps) => {
             >
               <div className="flex items-center gap-2">
                 <ArrowsRightLeftIcon className="h-5 w-4 ml-2 sm:ml-0" />
-                {networkLogos[allowedNetwork.name] && (
-                  <div className="relative w-4 h-4">
-                    <Image 
-                      src={networkLogos[allowedNetwork.name] || "/logos/eth.svg"} 
-                      alt={allowedNetwork.name}
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                )}
+                <div className="relative w-4 h-4">
+                  <Image 
+                    src={getNetworkLogo(allowedNetwork.name, isDarkMode)} 
+                    alt={allowedNetwork.name}
+                    fill
+                    className="object-contain"
+                  />
+                </div>
               </div>
               <span>
                 Switch to{" "}

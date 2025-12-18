@@ -27,6 +27,7 @@ export type PendleConvertData = {
     amountTokenOut?: string;
     minPtOut?: string;
     minTokenOut?: string;
+    priceImpact?: number; // Price impact as decimal (e.g., -0.0001 for -0.01%)
 };
 
 // Normalized response type (converted from raw API response)
@@ -51,6 +52,10 @@ type PendleRoute = {
     contractParamInfo?: {
         method: string;
         contractCallParams: unknown[];
+    };
+    data?: {
+        priceImpact?: number;
+        aggregatorType?: string;
     };
 };
 
@@ -110,6 +115,7 @@ export const fetchPendleConvert = async (
 
     const bestRoute = raw.routes[0];
     const outputAmount = bestRoute.outputs?.[0]?.amount || "0";
+    const priceImpact = bestRoute.data?.priceImpact;
 
     return {
         transaction: {
@@ -120,6 +126,7 @@ export const fetchPendleConvert = async (
         data: {
             amountTokenOut: outputAmount,
             amountPtOut: outputAmount, // Use same value for compatibility
+            priceImpact,
         },
     } as PendleConvertResponse;
 };
