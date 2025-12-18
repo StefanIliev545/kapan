@@ -15,7 +15,7 @@ import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveL
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported } from "~~/utils/chainFeatures";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -267,8 +267,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const providerOptions = useMemo(() => {
     if (flashLoanProviders?.length) return flashLoanProviders;
     if (defaultFlashLoanProvider) return [defaultFlashLoanProvider];
+    // Chain-appropriate fallback - prefer Aave on chains where Balancer isn't available
+    if (isAaveV3Supported(chainId) && !isBalancerV2Supported(chainId)) {
+      return [{ name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: FlashLoanProvider.AaveV3 }];
+    }
     return [{ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: FlashLoanProvider.BalancerV2 }];
-  }, [defaultFlashLoanProvider, flashLoanProviders]);
+  }, [defaultFlashLoanProvider, flashLoanProviders, chainId]);
 
   const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
     flashLoanProviders: providerOptions, defaultProvider: defaultFlashLoanProvider ?? providerOptions[0],
