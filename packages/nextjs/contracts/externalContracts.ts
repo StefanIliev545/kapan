@@ -235,6 +235,16 @@ export const tokenNameToLogo = (tokenName: string) => {
   }
   const lower = tokenName.toLowerCase();
 
+  // Handle Pendle PT tokens (e.g., "PT-USDe-15JAN2026" -> "ptusde")
+  // Strip dates like "-15JAN2026" and normalize to ptXXX format
+  if (lower.startsWith("pt-")) {
+    // Extract base token: "pt-usde-15jan2026" -> "usde"
+    const withoutPrefix = lower.slice(3); // Remove "pt-"
+    // Remove date suffix (pattern: -DDMMMYYYY like -15jan2026)
+    const baseToken = withoutPrefix.replace(/-\d{1,2}[a-z]{3}\d{4}$/i, "");
+    return `/logos/pt${baseToken}.svg`;
+  }
+
   // Central PNG logo overrides for tokens that don't have svgs
   const pngLogoMap: Record<string, string> = {
     ekubo: "/logos/ekubo.png",

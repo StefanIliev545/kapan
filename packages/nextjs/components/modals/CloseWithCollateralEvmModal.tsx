@@ -4,14 +4,15 @@ import { formatUnits, parseUnits, Address } from "viem";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { use1inchQuoteOnly } from "~~/hooks/use1inchQuoteOnly";
+import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo, FiSettings } from "react-icons/fi";
-import { SwapModalShell, SwapAsset } from "./SwapModalShell";
+import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
 // Aave flash loan fee: 5 bps (0.05%)
 // We add a small buffer (10 bps total) to ensure swap covers repayment
@@ -49,8 +50,26 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     availableCollaterals,
     market,
 }) => {
-    const { data: oneInchAdapter } = useDeployedContractInfo({ contractName: "OneInchAdapter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 });
     const { buildCloseWithCollateralFlow } = useKapanRouterV2();
+
+    // Check swap router availability and get adapter info directly from deployed contracts
+    const oneInchAvailable = is1inchSupported(chainId);
+    const pendleAvailable = isPendleSupported(chainId);
+    const oneInchAdapter = getOneInchAdapterInfo(chainId);
+    const pendleAdapter = getPendleAdapterInfo(chainId);
+    const defaultRouter = getDefaultSwapRouter(chainId);
+
+    // Swap router selection - default based on chain availability
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+
+    // Update swap router if chain changes and current router is not available
+    useEffect(() => {
+        if (swapRouter === "1inch" && !oneInchAvailable) {
+            setSwapRouter(pendleAvailable ? "pendle" : "1inch");
+        } else if (swapRouter === "pendle" && !pendleAvailable) {
+            setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+        }
+    }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
@@ -132,27 +151,51 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     });
 
     // Step 1: Get unit quote (1 collateral -> X debt) to estimate exchange rate
+    // Use 1inch on supported chains, Pendle otherwise
     const unitQuoteAmount = useMemo(() => {
         if (!selectedTo) return "0";
         return parseUnits("1", selectedTo.decimals).toString();
     }, [selectedTo]);
 
-    const { data: unitQuote, isLoading: isUnitQuoteLoading } = use1inchQuoteOnly({
+    // 1inch unit quote (for chains that support it)
+    const { data: oneInchUnitQuote, isLoading: isOneInchUnitQuoteLoading } = use1inchQuoteOnly({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtToken,
         amount: unitQuoteAmount,
-        enabled: !!selectedTo && isOpen,
+        enabled: oneInchAvailable && !!selectedTo && isOpen,
     });
+
+    // Pendle unit quote (for Pendle-only chains like Plasma)
+    const { data: pendleUnitQuote, isLoading: isPendleUnitQuoteLoading } = usePendleConvert({
+        chainId,
+        receiver: pendleAdapter?.address as Address,
+        tokensIn: selectedTo?.address as Address,
+        tokensOut: debtToken,
+        amountsIn: unitQuoteAmount,
+        slippage: 0.03, // 3% for unit quote
+        enabled: !oneInchAvailable && pendleAvailable && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
+    });
+
+    const isUnitQuoteLoading = oneInchAvailable ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required collateral based on debt to repay
     // We want to sell just enough collateral to get repayAmountRaw of debt token
     // The slippage % from UI is used as buffer for price movement between quote and execution
     const { requiredCollateral, requiredCollateralFormatted, exchangeRate } = useMemo(() => {
-        if (!unitQuote || !selectedTo || repayAmountRaw === 0n) {
+        if (!selectedTo || repayAmountRaw === 0n) {
             return { requiredCollateral: 0n, requiredCollateralFormatted: "0", exchangeRate: "0" };
         }
-        const unitOut = BigInt(unitQuote.dstAmount); // 1 collateral -> X debt
+
+        // Get unit output from whichever quote is available
+        let unitOut = 0n;
+        if (oneInchUnitQuote) {
+            unitOut = BigInt(oneInchUnitQuote.dstAmount);
+        } else if (pendleUnitQuote) {
+            const outAmount = pendleUnitQuote.data.amountPtOut || pendleUnitQuote.data.amountTokenOut || "0";
+            unitOut = BigInt(outAmount);
+        }
+
         if (unitOut === 0n) {
             return { requiredCollateral: 0n, requiredCollateralFormatted: "0", exchangeRate: "0" };
         }
@@ -174,32 +217,65 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             requiredCollateralFormatted: formatUnits(required, selectedTo.decimals),
             exchangeRate: rate,
         };
-    }, [unitQuote, selectedTo, repayAmountRaw, debtDecimals, slippage]);
+    }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtDecimals, slippage]);
 
     // Check if user has enough collateral
     const hasEnoughCollateral = selectedTo ? requiredCollateral <= selectedTo.rawBalance : false;
 
     // Step 2: Get actual swap quote with the required collateral amount (needs `from` for tx.data)
     const minSwapAmount = selectedTo ? parseUnits("0.0001", selectedTo.decimals) : 0n;
-    const swapEnabled = requiredCollateral > minSwapAmount && !!selectedTo && !!oneInchAdapter && isOpen;
+    const oneInchSwapEnabled = oneInchAvailable && swapRouter === "1inch" && requiredCollateral > minSwapAmount && !!selectedTo && !!oneInchAdapter && isOpen;
+    const pendleSwapEnabled = pendleAvailable && swapRouter === "pendle" && requiredCollateral > minSwapAmount && !!selectedTo && !!pendleAdapter && isOpen;
 
-    const { data: swapQuote, isLoading: isSwapQuoteLoading, error: quoteError } = use1inchQuote({
+    // 1inch quote
+    const { data: oneInchSwapQuote, isLoading: is1inchSwapQuoteLoading, error: oneInchQuoteError } = use1inchQuote({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtToken,
         amount: requiredCollateral.toString(),
         from: oneInchAdapter?.address || ("" as Address),
         slippage,
-        enabled: swapEnabled,
+        enabled: oneInchSwapEnabled,
     });
 
+    // Pendle quote
+    const { data: pendleQuoteData, isLoading: isPendleQuoteLoading, error: pendleQuoteError } = usePendleConvert({
+        chainId,
+        receiver: pendleAdapter?.address as Address,
+        slippage: slippage / 100, // Pendle uses decimal (0.03 = 3%)
+        tokensIn: selectedTo?.address as Address,
+        tokensOut: debtToken,
+        amountsIn: requiredCollateral.toString(),
+        enableAggregator: true,
+        enabled: pendleSwapEnabled,
+    });
+
+    // Combine quote data based on selected router
+    const swapQuote = useMemo(() => {
+        if (swapRouter === "pendle" && pendleQuoteData) {
+            const outAmount = pendleQuoteData.data.amountPtOut || pendleQuoteData.data.amountTokenOut || "0";
+            return {
+                dstAmount: outAmount,
+                tx: { data: pendleQuoteData.transaction.data },
+                srcUSD: null,
+                dstUSD: null,
+            };
+        }
+        return oneInchSwapQuote;
+    }, [swapRouter, pendleQuoteData, oneInchSwapQuote]);
+
+    const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchSwapQuoteLoading : isPendleQuoteLoading;
+    const quoteError = swapRouter === "1inch" ? oneInchQuoteError : pendleQuoteError;
     const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading;
+    
+    // Check adapter availability
+    const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
     // amountOut = required collateral (what user will sell)
     const amountOut = requiredCollateralFormatted;
 
     const buildFlow = () => {
-        if (!swapQuote || !selectedTo || !oneInchAdapter || requiredCollateral === 0n) return [];
+        if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
 
@@ -227,6 +303,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             providerEnum,            // flash loan provider
             market,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
+            swapRouter === "1inch" ? "oneinch" : "pendle",  // map "1inch" -> "oneinch"
         );
     };
 
@@ -254,6 +331,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             slippage,
             preferBatching,
             flashLoanProvider: selectedProvider?.name ?? null,
+            swapRouter,
             market: market ?? null,
         } satisfies Record<string, string | number | boolean | null>;
 
@@ -277,7 +355,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
 
     // Can submit if we have a quote and user has enough collateral
-    const canSubmit = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral;
+    const canSubmit = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;
 
     // What the swap will actually produce
     const expectedOutput = swapQuote 
@@ -384,7 +462,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                     </div>
                     <div className="pb-4">
                         <h4 className="font-medium text-sm">Swap</h4>
-                        <p className="text-xs text-base-content/70">Collateral is swapped for the debt token using 1inch.</p>
+                        <p className="text-xs text-base-content/70">Collateral is swapped for the debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
                     </div>
                 </div>
 
@@ -417,16 +495,16 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                     </span>
                 </div>
             )}
-            {swapQuote && oneInchAdapter && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
+            {swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                 <div className="alert alert-warning text-xs py-2">
                     <FiAlertTriangle className="w-4 h-4" />
                     <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
                 </div>
             )}
-            {!oneInchAdapter && isOpen && (
+            {!hasAdapter && isOpen && (
                 <div className="alert alert-warning text-xs py-2">
                     <FiAlertTriangle className="w-4 h-4" />
-                    <span>1inch Adapter not found on this network. Swaps unavailable.</span>
+                    <span>{swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.</span>
                 </div>
             )}
         </>
@@ -457,6 +535,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             selectedProvider={selectedProvider}
             setSelectedProvider={setSelectedProvider}
             flashLoanLiquidityData={liquidityData}
+            swapRouter={swapRouter}
+            setSwapRouter={oneInchAvailable && pendleAvailable ? setSwapRouter : undefined}
             preferBatching={preferBatching}
             setPreferBatching={setPreferBatching}
             onSubmit={handleSwapWrapper}

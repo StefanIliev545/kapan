@@ -35,13 +35,58 @@ contract AaveGatewayView {
         uint8 decimals;
     }
 
-    /// @notice Returns all token info for a given user.
-    /// @dev This function caches the reserves and user reserves data to avoid multiple heavy calls.
+    struct EModeInfo {
+        uint8 id;
+        uint16 ltv;
+        uint16 liquidationThreshold;
+        uint16 liquidationBonus;
+        string label;
+        uint128 collateralBitmap;
+        uint128 borrowableBitmap;
+    }
+
+    /// @notice Reserve configuration for LTV calculations
+    struct ReserveConfigData {
+        address token;
+        uint256 price;              // Price in base currency (8 decimals)
+        uint256 ltv;                // Loan-to-value in basis points (0-10000)
+        uint256 liquidationThreshold; // Liquidation threshold in basis points
+        uint256 liquidationBonus;   // Liquidation bonus in basis points
+        uint8 decimals;
+        bool usageAsCollateralEnabled;
+        bool borrowingEnabled;
+    }
+
+    /// @notice Returns the user's current E-Mode category ID
+    /// @param user The address of the user
+    /// @return categoryId The E-Mode category ID (0 = no E-Mode)
+    function getUserEMode(address user) external view returns (uint8 categoryId) {
+        (, categoryId) = uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+    }
+
+    /// @notice Returns all available E-Mode categories
+    /// @return emodes Array of E-Mode categories with their configurations
+    function getEModes() external view returns (EModeInfo[] memory emodes) {
+        IUiPoolDataProviderV3.Emode[] memory rawEmodes = uiPoolDataProvider.getEModes(poolAddressesProvider);
+        emodes = new EModeInfo[](rawEmodes.length);
+        for (uint256 i = 0; i < rawEmodes.length; i++) {
+            emodes[i] = EModeInfo({
+                id: rawEmodes[i].id,
+                ltv: rawEmodes[i].eMode.ltv,
+                liquidationThreshold: rawEmodes[i].eMode.liquidationThreshold,
+                liquidationBonus: rawEmodes[i].eMode.liquidationBonus,
+                label: rawEmodes[i].eMode.label,
+                collateralBitmap: rawEmodes[i].eMode.collateralBitmap,
+                borrowableBitmap: rawEmodes[i].eMode.borrowableBitmap
+            });
+        }
+    }
+
     function getAllTokensInfo(address user) external view returns (TokenInfo[] memory) {
         // Fetch reserves data once.
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
-        // Fetch user reserves data once.
-        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, ) = 
+        // Fetch user reserves data once (including E-Mode category)
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, /* uint8 userEModeCategory */) = 
             uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
 
         TokenInfo[] memory tokens = new TokenInfo[](reserves.length);
@@ -70,6 +115,117 @@ contract AaveGatewayView {
         return tokens;
     }
 
+    /// @notice Returns all token info for a user along with their E-Mode category
+    /// @param user The address of the user
+    /// @return tokens Array of TokenInfo structs
+    /// @return userEModeCategory The user's current E-Mode category ID (0 = no E-Mode)
+    function getAllTokensInfoWithEMode(address user) external view returns (TokenInfo[] memory tokens, uint8 userEModeCategory) {
+        // Fetch reserves data once.
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+        // Fetch user reserves data once (including E-Mode category)
+        (IUiPoolDataProviderV3.UserReserveData[] memory userReserves, uint8 eModeCat) = 
+            uiPoolDataProvider.getUserReservesData(poolAddressesProvider, user);
+        userEModeCategory = eModeCat;
+
+        tokens = new TokenInfo[](reserves.length);
+        for (uint256 i = 0; i < reserves.length; i++) {
+            uint256 balance = _getBalanceFromReserveData(reserves[i], user, userReserves);
+            uint256 borrowBalance = _getBorrowBalanceFromReserveData(reserves[i], user, userReserves);
+            uint8 dec = 18;
+            try ERC20(reserves[i].underlyingAsset).decimals() returns (uint8 d) {
+                dec = d;
+            } catch {
+            }
+            tokens[i] = TokenInfo({
+                token: reserves[i].underlyingAsset,
+                supplyRate: reserves[i].liquidityRate,
+                borrowRate: reserves[i].variableBorrowRate,
+                name: reserves[i].name,
+                symbol: reserves[i].symbol,
+                price: reserves[i].priceInMarketReferenceCurrency,
+                borrowBalance: borrowBalance,
+                balance: balance,
+                aToken: reserves[i].aTokenAddress,
+                decimals: dec
+            });
+        }
+    }
+
+    /// @notice Get reserve configuration data for multiple tokens (for frontend LTV calculations)
+    /// @dev Returns price, LTV, liquidation threshold, and other config for each token
+    /// @param tokens Array of token addresses to get config for
+    /// @return configs Array of reserve configuration data
+    function getReserveConfigs(address[] calldata tokens) external view returns (ReserveConfigData[] memory configs) {
+        IPoolDataProvider dataProvider = IPoolDataProvider(IPoolAddressesProvider(poolAddressesProvider).getPoolDataProvider());
+        (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves,) = uiPoolDataProvider.getReservesData(poolAddressesProvider);
+
+        configs = new ReserveConfigData[](tokens.length);
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address token = tokens[i];
+            
+            // Find price from reserves data
+            uint256 price = 0;
+            for (uint256 j = 0; j < reserves.length; j++) {
+                if (reserves[j].underlyingAsset == token) {
+                    price = reserves[j].priceInMarketReferenceCurrency;
+                    break;
+                }
+            }
+
+            // Get decimals
+            uint8 decimals = 18;
+            try ERC20(token).decimals() returns (uint8 d) { decimals = d; } catch {}
+
+            // Get reserve configuration
+            uint256 ltv = 0;
+            uint256 liquidationThreshold = 0;
+            uint256 liquidationBonus = 0;
+            bool usageAsCollateralEnabled = false;
+            bool borrowingEnabled = false;
+
+            try dataProvider.getReserveConfigurationData(token) returns (
+                uint256 /* _decimals */,
+                uint256 _ltv,
+                uint256 _liquidationThreshold,
+                uint256 _liquidationBonus,
+                uint256 /* reserveFactor */,
+                bool _usageAsCollateralEnabled,
+                bool _borrowingEnabled,
+                bool /* stableBorrowRateEnabled */,
+                bool /* isActive */,
+                bool /* isFrozen */
+            ) {
+                ltv = _ltv;
+                liquidationThreshold = _liquidationThreshold;
+                liquidationBonus = _liquidationBonus;
+                usageAsCollateralEnabled = _usageAsCollateralEnabled;
+                borrowingEnabled = _borrowingEnabled;
+            } catch {}
+
+            configs[i] = ReserveConfigData({
+                token: token,
+                price: price,
+                ltv: ltv,
+                liquidationThreshold: liquidationThreshold,
+                liquidationBonus: liquidationBonus,
+                decimals: decimals,
+                usageAsCollateralEnabled: usageAsCollateralEnabled,
+                borrowingEnabled: borrowingEnabled
+            });
+        }
+    }
+
+    /// @notice Get reserve config for a single token
+    /// @param token The token address
+    /// @return config The reserve configuration data
+    function getReserveConfig(address token) external view returns (ReserveConfigData memory config) {
+        address[] memory tokens = new address[](1);
+        tokens[0] = token;
+        ReserveConfigData[] memory configs = this.getReserveConfigs(tokens);
+        return configs[0];
+    }
+
     function getBorrowRate(address token) external view returns (uint256, bool) {
         (IUiPoolDataProviderV3.AggregatedReserveData[] memory reserves, ) = 
             uiPoolDataProvider.getReservesData(poolAddressesProvider);
@@ -93,7 +249,6 @@ contract AaveGatewayView {
     }
 
     /// @notice Gets the balance for a given token and user.
-    /// @dev First attempts to call balanceOf on the associated aToken; if that fails, falls back to user reserves data.
     function getBalance(address token, address user) public view returns (uint256) {
         (address aToken, , bool found) = _getReserveAddresses(token);
         if (found && aToken != address(0)) {
@@ -114,7 +269,6 @@ contract AaveGatewayView {
     }
 
     /// @notice Gets the borrow balance for a given token and user.
-    /// @dev First attempts to call balanceOf on the associated variable debt token; if that fails, falls back to user reserves data.
     function getBorrowBalance(address token, address user) public view returns (uint256) {
         (, address variableDebtToken, bool found) = _getReserveAddresses(token);
         if (found && variableDebtToken != address(0)) {
@@ -139,7 +293,6 @@ contract AaveGatewayView {
     }
 
     /// @notice Returns the liquidation threshold (LLTV) for a given user in basis points.
-    /// @dev The market parameter is unused and kept for interface consistency across gateways.
     function getMaxLtv(address /* market */, address user) external view returns (uint256) {
         IPool pool = IPool(poolAddressesProvider.getPool());
         (, , , uint256 currentLiquidationThreshold, ,) = pool.getUserAccountData(user);
@@ -147,11 +300,30 @@ contract AaveGatewayView {
     }
 
     /// @notice Returns the protocol-level maximum LTV configuration for the user in basis points.
-    /// @dev The market parameter is unused and kept for interface consistency across gateways.
     function getLtv(address /* market */, address user) external view returns (uint256) {
         IPool pool = IPool(poolAddressesProvider.getPool());
         (, , , , uint256 ltv,) = pool.getUserAccountData(user);
         return ltv;
+    }
+
+    /// @notice Returns full user account data from Aave
+    /// @param user The user address
+    /// @return totalCollateralBase Total collateral in base currency
+    /// @return totalDebtBase Total debt in base currency
+    /// @return availableBorrowsBase Available borrows in base currency
+    /// @return currentLiquidationThreshold Current liquidation threshold (bps)
+    /// @return ltv Current LTV (bps)
+    /// @return healthFactor Health factor (1e18 scale)
+    function getUserAccountData(address user) external view returns (
+        uint256 totalCollateralBase,
+        uint256 totalDebtBase,
+        uint256 availableBorrowsBase,
+        uint256 currentLiquidationThreshold,
+        uint256 ltv,
+        uint256 healthFactor
+    ) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        return pool.getUserAccountData(user);
     }
 
     /// @notice Returns the list of tokens that the user has borrowed.

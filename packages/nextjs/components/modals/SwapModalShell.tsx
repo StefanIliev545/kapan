@@ -17,6 +17,14 @@ export interface SwapAsset {
     price?: bigint;
 }
 
+// Swap router options
+export type SwapRouter = "1inch" | "pendle";
+
+export const SWAP_ROUTER_OPTIONS: { value: SwapRouter; label: string }[] = [
+    { value: "1inch", label: "1inch" },
+    { value: "pendle", label: "Pendle" },
+];
+
 export interface SwapModalShellProps {
     isOpen: boolean;
     onClose: () => void;
@@ -83,6 +91,10 @@ export interface SwapModalShellProps {
     customStats?: ReactNode;
     // Hide the default stats grid
     hideDefaultStats?: boolean;
+
+    // Swap router selection (optional - for choosing between 1inch/Pendle)
+    swapRouter?: SwapRouter;
+    setSwapRouter?: (router: SwapRouter) => void;
 }
 
 export const SwapModalShell: FC<SwapModalShellProps> = ({
@@ -124,6 +136,8 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     toReadOnly = false,
     customStats,
     hideDefaultStats = false,
+    swapRouter,
+    setSwapRouter,
 }) => {
     const [activeTab, setActiveTab] = useState<"swap" | "info">("swap");
 
@@ -219,28 +233,52 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        {/* Flash Loan Provider Selector */}
-                        {flashLoanProviders && flashLoanProviders.length > 1 && setSelectedProvider && (
-                            <div className="flex justify-end mb-[-10px]">
-                                <select
-                                    className="select select-xs select-ghost font-normal text-base-content/60"
-                                    value={selectedProvider?.name || ""}
-                                    onChange={(e) => {
-                                        const p = flashLoanProviders.find(p => p.name === e.target.value);
-                                        if (p) setSelectedProvider(p);
-                                    }}
-                                >
-                                    {flashLoanProviders.map(p => {
-                                        const liq = flashLoanLiquidityData?.find(l => l.provider === p.providerEnum);
-                                        // Show indicator but don't disable - liquidity check may be inaccurate
-                                        const hasLiquidity = liq?.hasLiquidity ?? true; // Default to true if no data
-                                        return (
-                                            <option key={p.name} value={p.name}>
-                                                Flash Loan: {p.name} {liq ? (hasLiquidity ? "✓" : "⚠️") : ""}
+                        {/* Provider Selectors Row */}
+                        {((flashLoanProviders && flashLoanProviders.length >= 1 && setSelectedProvider) || setSwapRouter) && (
+                            <div className="flex justify-end gap-2 mb-[-10px]">
+                                {/* Swap Router Selector */}
+                                {setSwapRouter && (
+                                    <select
+                                        className="select select-xs select-ghost font-normal text-base-content/60"
+                                        value={swapRouter || "1inch"}
+                                        onChange={(e) => setSwapRouter(e.target.value as SwapRouter)}
+                                    >
+                                        {SWAP_ROUTER_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>
+                                                Swap: {opt.label}
                                             </option>
-                                        );
-                                    })}
-                                </select>
+                                        ))}
+                                    </select>
+                                )}
+
+                                {/* Flash Loan Provider Selector - show dropdown if multiple, read-only if single */}
+                                {flashLoanProviders && flashLoanProviders.length > 1 && setSelectedProvider && (
+                                    <select
+                                        className="select select-xs select-ghost font-normal text-base-content/60"
+                                        value={selectedProvider?.name || ""}
+                                        onChange={(e) => {
+                                            const p = flashLoanProviders.find(p => p.name === e.target.value);
+                                            if (p) setSelectedProvider(p);
+                                        }}
+                                    >
+                                        {flashLoanProviders.map(p => {
+                                            const liq = flashLoanLiquidityData?.find(l => l.provider === p.providerEnum);
+                                            // Show indicator but don't disable - liquidity check may be inaccurate
+                                            const hasLiquidity = liq?.hasLiquidity ?? true; // Default to true if no data
+                                            return (
+                                                <option key={p.name} value={p.name}>
+                                                    Flash Loan: {p.name} {liq ? (hasLiquidity ? "✓" : "⚠️") : ""}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                )}
+                                {/* Show read-only flash loan provider when only one is available */}
+                                {flashLoanProviders && flashLoanProviders.length === 1 && selectedProvider && (
+                                    <span className="text-xs text-base-content/60 py-1">
+                                        Flash Loan: {selectedProvider.name}
+                                    </span>
+                                )}
                             </div>
                         )}
 

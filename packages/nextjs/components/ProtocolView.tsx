@@ -20,6 +20,8 @@ import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModa
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { formatBps } from "~~/utils/risk";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
+import { useAaveEMode } from "~~/hooks/useAaveEMode";
+import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
 
 
 export interface ProtocolPosition {
@@ -154,9 +156,53 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     setIsDebtSwapModalOpen(true);
   };
 
+  // E-Mode handling for Aave - fetch user's E-Mode and filter assets
+  const isAaveProtocol = protocolName.toLowerCase().includes("aave");
+  const { userEMode } = useAaveEMode(isAaveProtocol && chainId ? chainId : undefined);
+
+  // Fetch PT token yields from Pendle
+  const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(chainId);
+  
+
+  // Helper to filter assets by E-Mode compatibility (heuristic based on label)
+  const filterByEMode = useMemo(() => {
+    if (!userEMode || userEMode.id === 0) return (assets: SwapAsset[]) => assets;
+    
+    const label = userEMode.label.toLowerCase();
+    
+    return (assets: SwapAsset[]) => {
+      // Pendle E-Mode: show PT tokens and their underlying
+      if (label.includes("pendle")) {
+        return assets.filter(a => {
+          const sym = a.symbol.toLowerCase();
+          return sym.startsWith("pt-") || sym.includes("usde") || sym.includes("susde");
+        });
+      }
+      
+      // ETH correlated E-Mode: show ETH derivatives
+      if (label.includes("eth")) {
+        return assets.filter(a => {
+          const sym = a.symbol.toLowerCase();
+          return sym.includes("eth") || sym.includes("wsteth") || sym.includes("reth") || sym.includes("cbeth");
+        });
+      }
+      
+      // Stablecoin E-Mode: show USD stables
+      if (label.includes("stable") || label.includes("usd")) {
+        return assets.filter(a => {
+          const sym = a.symbol.toLowerCase();
+          return sym.includes("usd") || sym.includes("dai") || sym.includes("frax") || sym.includes("lusd");
+        });
+      }
+      
+      // Default: show all
+      return assets;
+    };
+  }, [userEMode]);
+
   // Convert suppliedPositions to BasicCollateral for the modal
   const availableCollaterals = useMemo(() => {
-    return suppliedPositions.map(p => ({
+    const all = suppliedPositions.map(p => ({
       symbol: p.name,
       address: p.tokenAddress,
       decimals: p.tokenDecimals || 18,
@@ -166,7 +212,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       usdValue: p.balance,
       price: p.tokenPrice,
     }));
-  }, [suppliedPositions]);
+    // Apply E-Mode filter for Aave
+    return isAaveProtocol ? filterByEMode(all) : all;
+  }, [suppliedPositions, isAaveProtocol, filterByEMode]);
 
   const debtOptions = useMemo(() => {
     const mapped = borrowedPositions.map(p => ({
@@ -180,16 +228,33 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       price: p.tokenPrice,
     }));
 
-    if (mapped.length > 0) return mapped;
-    return availableCollaterals;
-  }, [availableCollaterals, borrowedPositions]);
+    const result = mapped.length > 0 ? mapped : availableCollaterals;
+    // Apply E-Mode filter for Aave
+    return isAaveProtocol ? filterByEMode(result) : result;
+  }, [availableCollaterals, borrowedPositions, isAaveProtocol, filterByEMode]);
 
   // APY maps for multiply modal
+  // For PT tokens, use fixed yield from Pendle instead of lending APY
   const supplyApyMap = useMemo(() => {
     const map: Record<string, number> = {};
-    suppliedPositions.forEach(p => { map[p.tokenAddress.toLowerCase()] = p.currentRate; });
+    suppliedPositions.forEach(p => {
+      const addrLower = p.tokenAddress.toLowerCase();
+      
+      // Check if this is a PT token and we have yield data
+      if (isPTToken(p.name)) {
+        // Try to find yield by address first, then by symbol
+        const ptYield = yieldsByAddress.get(addrLower) || yieldsBySymbol.get(p.name.toLowerCase());
+        if (ptYield) {
+          map[addrLower] = ptYield.fixedApy;
+          return;
+        }
+      }
+      
+      // Default to lending APY
+      map[addrLower] = p.currentRate;
+    });
     return map;
-  }, [suppliedPositions]);
+  }, [suppliedPositions, yieldsByAddress, yieldsBySymbol]);
 
   const borrowApyMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -242,12 +307,25 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     [suppliedPositions, borrowedPositions, ltvBps],
   );
 
+  // Create supplied positions with PT yields applied for net yield calculation
+  const suppliedPositionsWithPTYields = useMemo(() => {
+    return suppliedPositions.map(p => {
+      if (isPTToken(p.name)) {
+        const ptYield = yieldsByAddress.get(p.tokenAddress.toLowerCase()) || yieldsBySymbol.get(p.name.toLowerCase());
+        if (ptYield) {
+          return { ...p, currentRate: ptYield.fixedApy };
+        }
+      }
+      return p;
+    });
+  }, [suppliedPositions, yieldsByAddress, yieldsBySymbol]);
+
   const { netYield30d, netApyPercent } = useMemo(
     () =>
-      calculateNetYieldMetrics(suppliedPositions, borrowedPositions, {
+      calculateNetYieldMetrics(suppliedPositionsWithPTYields, borrowedPositions, {
         netBalanceOverride: netBalance,
       }),
-    [suppliedPositions, borrowedPositions, netBalance],
+    [suppliedPositionsWithPTYields, borrowedPositions, netBalance],
   );
 
   // Format currency with sign.
@@ -283,15 +361,25 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // Otherwise (Aave), clicking "Markets" opens a separate section, so we keep these lists filtered to user positions.
   const showAllInLists = forceShowAll || (inlineMarkets && isMarketsOpen);
 
-  const filteredSuppliedPositions = (showAllInLists ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p =>
-    readOnly
+  const filteredSuppliedPositions = (showAllInLists ? suppliedPositions : suppliedPositions.filter(p => p.balance > 0)).map(p => {
+    // Override currentRate with PT fixed yield if available
+    let currentRate = p.currentRate;
+    if (isPTToken(p.name)) {
+      const ptYield = yieldsByAddress.get(p.tokenAddress.toLowerCase()) || yieldsBySymbol.get(p.name.toLowerCase());
+      if (ptYield) {
+        currentRate = ptYield.fixedApy;
+      }
+    }
+    
+    return readOnly
       ? {
         ...p,
+        currentRate,
         actionsDisabled: true,
         moveSupport: p.moveSupport ? { ...p.moveSupport, disableCollateralSelection: true } : undefined,
       }
-      : p,
-  );
+      : { ...p, currentRate };
+  });
 
   // For borrowed positions:
   const filteredBorrowedPositions = (showAllInLists
@@ -507,18 +595,27 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       </button>
                     )}
                   </div>
-                  {suppliedPositions.map(position => (
-                    <SupplyPosition
-                      key={`market-supply-${position.tokenAddress}`}
-                      {...position}
-                      protocolName={protocolName}
-                      networkType={networkType}
-                      chainId={chainId}
-                      hideBalanceColumn
-                      availableActions={{ deposit: false, withdraw: false, move: false, swap: false }}
-                      showInfoDropdown={false}
-                    />
-                  ))}
+                  {suppliedPositions.map(position => {
+                    // Override currentRate with PT fixed yield if available
+                    let currentRate = position.currentRate;
+                    if (isPTToken(position.name)) {
+                      const ptYield = yieldsByAddress.get(position.tokenAddress.toLowerCase()) || yieldsBySymbol.get(position.name.toLowerCase());
+                      if (ptYield) currentRate = ptYield.fixedApy;
+                    }
+                    return (
+                      <SupplyPosition
+                        key={`market-supply-${position.tokenAddress}`}
+                        {...position}
+                        currentRate={currentRate}
+                        protocolName={protocolName}
+                        networkType={networkType}
+                        chainId={chainId}
+                        hideBalanceColumn
+                        availableActions={{ deposit: false, withdraw: false, move: false, swap: false }}
+                        showInfoDropdown={false}
+                      />
+                    );
+                  })}
                 </div>
               )}
 
@@ -939,6 +1036,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               lltvBps={lltvBps > 0n ? lltvBps : 8500n}
               supplyApyMap={supplyApyMap}
               borrowApyMap={borrowApyMap}
+              eMode={isAaveProtocol ? userEMode : undefined}
             />
           )}
 

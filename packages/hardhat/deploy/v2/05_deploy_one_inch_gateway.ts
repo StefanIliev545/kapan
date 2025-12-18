@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ethers } from "hardhat";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
 const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre;
@@ -10,6 +11,7 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
 
     const router = await deployments.get("KapanRouter");
 
+    // 1inch uses the same router address on all supported chains
     const ONE_INCH_ROUTERS: { [key: number]: string } = {
         1: "0x111111125421ca6dc452d289314280a0f8842a65", // Mainnet
         42161: "0x111111125421ca6dc452d289314280a0f8842a65", // Arbitrum
@@ -18,11 +20,13 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
         56: "0x111111125421ca6dc452d289314280a0f8842a65", // BSC
         8453: "0x111111125421ca6dc452d289314280a0f8842a65", // Base
         59144: "0x111111125421ca6dc452d289314280a0f8842a65", // Linea
-        31337: "0x111111125421ca6dc452d289314280a0f8842a65", // Hardhat (Arbitrum)
     };
 
-    const chainId = await hre.getChainId();
-    const oneInchRouter = ONE_INCH_ROUTERS[parseInt(chainId)];
+    const chainId = parseInt(await hre.getChainId());
+    const effectiveChainId = getEffectiveChainId(chainId);
+    logForkConfig(chainId);
+
+    const oneInchRouter = ONE_INCH_ROUTERS[effectiveChainId];
 
     if (!oneInchRouter) {
         console.warn(`No 1inch Router address found for chainId ${chainId}. Skipping OneInchAdapter deployment.`);

@@ -28,6 +28,7 @@ import { WriteContractVariables } from "wagmi/query";
 import deployedContractsData from "~~/contracts/hardhat/deployedContracts";
 import externalContractsData from "~~/contracts/externalContracts";
 import scaffoldConfig from "~~/scaffold.config";
+import { getEffectiveChainId } from "~~/utils/forkChain";
 
 type AddExternalFlag<T> = {
   [ChainId in keyof T]: {
@@ -57,7 +58,34 @@ const deepMergeContracts = <L extends Record<PropertyKey, any>, E extends Record
   return result as MergeDeepRecord<AddExternalFlag<L>, AddExternalFlag<E>, { arrayMergeMode: "replace" }>;
 };
 
-const contractsData = deepMergeContracts(deployedContractsData, externalContractsData);
+// Build contracts data with special handling for Hardhat fork
+// - Deployed contracts come from 31337 (our contracts deployed to Hardhat)
+// - External contracts (tokens) come from the forked chain (NEXT_PUBLIC_FORK_CHAIN_ID)
+const buildContractsData = () => {
+  const merged = deepMergeContracts(deployedContractsData, externalContractsData);
+  // Cast to mutable to allow fork chain modifications
+  const result = { ...merged } as Record<number, Record<string, any>>;
+  const effectiveForkChainId = getEffectiveChainId(31337);
+  
+  // If forking a different chain, use that chain's external contracts for 31337
+  if (effectiveForkChainId !== 31337) {
+    const forkedExternals = externalContractsData[effectiveForkChainId as keyof typeof externalContractsData];
+    if (forkedExternals) {
+      const amendedExternal = Object.fromEntries(
+        Object.entries(forkedExternals as Record<string, Record<string, unknown>>).map(
+          ([contractName, declaration]) => [contractName, { ...declaration, external: true }]
+        ),
+      );
+      // Keep deployed contracts from 31337, but use external contracts from forked chain
+      const deployed31337 = deployedContractsData[31337 as keyof typeof deployedContractsData] || {};
+      result[31337] = { ...deployed31337, ...amendedExternal };
+    }
+  }
+  
+  return result as typeof merged;
+};
+
+const contractsData = buildContractsData();
 
 export type InheritedFunctions = { readonly [key: string]: string };
 
