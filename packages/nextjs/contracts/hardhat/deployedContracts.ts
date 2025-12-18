@@ -8,7 +8,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const contracts = {
   10: {
     AaveGatewayView: {
-      address: "0xEb29AB7C8798766DDEcF902982F8e9439DdEC7fC",
+      address: "0x214fa203c312370cc823ab113e84829a03A108Ae",
       abi: [
         {
           inputs: [
@@ -745,7 +745,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xF10d3e9C6079C38f4C4549D46Ca4Ec80Be649E0A",
+      address: "0x89138baE3fB2f979ce9d74552fF23bEf1fd63616",
       abi: [
         {
           inputs: [
@@ -1240,7 +1240,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0xE9A37c872b624aF0E9FcC5C6f38A57a8C0903345",
+      address: "0x2731a686b704da51885E146E62B76434b438fD7E",
       abi: [
         {
           inputs: [
@@ -2135,7 +2135,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x45278984f6BdA756af85C130DfE0892B8877A126",
+      address: "0x07f80EF2a4aD99bC0EDaCbffe1C60e12e4c971B9",
       abi: [
         {
           inputs: [
@@ -2773,7 +2773,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x5d8De4AfA28B870Dd948A40B731c65771Af32CdE",
+      address: "0x58D2e32660c0c0464Ba3F078a3150Fa546a435F7",
       abi: [
         {
           inputs: [
@@ -3489,7 +3489,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x24c6f49D8053c43Fb74F2c2AAB73839c723814C2",
+      address: "0x6b012d0A6B108f1c09306E73139Ba07c7Da1318e",
       abi: [
         {
           inputs: [
@@ -3710,7 +3710,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x8928258b8d598469a273cd0AEf79f14cB71808C8",
+      address: "0x711E822D7DCD0d8EaAa1bdb6910c482EbAdFE4d0",
       abi: [
         {
           inputs: [
@@ -4551,7 +4551,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0x09927c9041Ec6E4Eaf62fC364FE69B4deAE3E788",
+      address: "0xa53dc8B06e1769975411A5103f19e811eb71ff2d",
       abi: [
         {
           inputs: [
@@ -4772,7 +4772,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x98840C15378784bCC3168685C097dc7a80B031f1",
+      address: "0x16CcB775E6aD22EE7533336EaB5843Cf17934980",
       abi: [
         {
           inputs: [
@@ -5193,7 +5193,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x5fc9Aabe4223C513D576B4A68B274c284933523A",
+      address: "0xB04017a577445c761Fae8a63343ef9Abe97ACF56",
       abi: [
         {
           inputs: [
@@ -5220,7 +5220,7 @@ const contracts = {
   },
   8453: {
     AaveGatewayView: {
-      address: "0x73a43bF9c9702FabA7a540FAebc75248Ec04F936",
+      address: "0xD609eeab4015a801258c92Df0CC9aF27D694f6A9",
       abi: [
         {
           inputs: [
@@ -5944,7 +5944,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x13Ad5b0C23b7404aE11C273CF4e366DF428b2E2D",
+      address: "0x5435055b4037b0E9dA482b7fdd48F7966259801F",
       abi: [
         {
           inputs: [
@@ -6439,7 +6439,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x22c65f73119a07B4790f629f23350488F4480882",
+      address: "0x4E16C8C1dC41d38C961b7f0b671f945362DA5d67",
       abi: [
         {
           inputs: [
@@ -7334,7 +7334,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x8377151086EeD7952C23fD2A20eec4daC8D8699c",
+      address: "0x247d9A2122f88C69edA6a2535030A6Bdbf8e0612",
       abi: [
         {
           inputs: [
@@ -7972,7 +7972,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xcaA455F2afa4e1656e1f66Ab73D32F2F30a6d53e",
+      address: "0x7A7Be417C82cE90Cd70363Cf7A233F965b670ac3",
       abi: [
         {
           inputs: [
@@ -8688,7 +8688,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0xBbcc3D570768aFd030e6bcCf5C6b2608953cC963",
+      address: "0xE3B247E3d3D7E116da6Fb04e5bd57D62e68AF724",
       abi: [
         {
           inputs: [
@@ -8909,7 +8909,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0xd369384690C4b004350B6C98B65FDe4752cb3Fb3",
+      address: "0x969Eb951800F1a4505fD082afcd1B3B958BB35B7",
       abi: [
         {
           inputs: [
@@ -9750,7 +9750,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0x1F9b1Fe22eBa307DeD003a95B44F0115A6725018",
+      address: "0x25ae3b1D606655A8552ac9F854d435c5852b1D01",
       abi: [
         {
           inputs: [
@@ -9971,7 +9971,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x6F8c6D7AB48Bd83243D56CA725291105d4db3F6A",
+      address: "0x59AEF0356682076AE9a610657b2426A6680D4c5f",
       abi: [
         {
           inputs: [
@@ -10392,7 +10392,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x7b8F8850fC00a90347b3749A4aa527F5Fa328581",
+      address: "0xDADCD09E9dbA75364f4168762Df27c1b671d1885",
       abi: [
         {
           inputs: [
@@ -10417,7 +10417,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x8712f63b17602D972EFd827f693Fb1d2ac5a1109",
+      address: "0x67B02273a2C5C656c79DF6577baE1e7D94595b71",
       abi: [
         {
           inputs: [
@@ -11121,7 +11121,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x20452a316Dc6812eb3cC2F3AF46f4553AB348E77",
+      address: "0x479D85B6382634290D0A6355A62fCdd8EE411C6a",
       abi: [
         {
           inputs: [
@@ -11561,7 +11561,7 @@ const contracts = {
       },
     },
     ZeroLendGatewayView: {
-      address: "0x29d7fF44ac6859e3A35A7835e1571Cb788d9f381",
+      address: "0x8c6759525F9AB91D6454091017082Aa4AEbc376e",
       abi: [
         {
           inputs: [
@@ -12285,7 +12285,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x2d95Cc48672af17dC5acCEe8689F7461fA6C07f1",
+      address: "0xa07FefF07110A6E67F83d28a69fF849ba459E1fe",
       abi: [
         {
           inputs: [
@@ -21006,7 +21006,7 @@ const contracts = {
   },
   42161: {
     AaveGatewayView: {
-      address: "0xcB5940c6C8395fADD8D9Dc38200e6bf522258a81",
+      address: "0xD31d4Bd3c095323882fA9870d12D448446Af13D9",
       abi: [
         {
           inputs: [
@@ -21743,7 +21743,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xf1632F04651FCAbC9B0B6Ea62fe680637C1dF742",
+      address: "0xC04f98E95bBC2cA3E7BA83f0d46237a3766DC180",
       abi: [
         {
           inputs: [
@@ -22238,7 +22238,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x31B67DDF28915d228036Ae297f5694E1A8b83A9d",
+      address: "0xDc55E37571d60A17b66f885096BF08674A4F1115",
       abi: [
         {
           inputs: [
@@ -23133,7 +23133,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xBCB1e1CaEA8222FF8D3Fea72c722C9cCFF1192D1",
+      address: "0x2fE50C433a4532b8914eF0Ed9E3680a33092B3A1",
       abi: [
         {
           inputs: [
@@ -23771,7 +23771,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x4A8ac7F8AE76328801F5Dcd9566e5e9052c211Ec",
+      address: "0x26Bb8f9e98a922B9a44bc7b6b87CAF9cA26d850f",
       abi: [
         {
           inputs: [
@@ -24487,7 +24487,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x2Bc7B1F1c2BE71c2FA14694b9714e76548169dE8",
+      address: "0x2fE67DACd639899d1101ce29F09571A198FC6eC3",
       abi: [
         {
           inputs: [
@@ -24708,7 +24708,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x9cBe3F51f6bA60Ac4A798B3a3f1cfaD9939EbCA1",
+      address: "0xD1B07E220c5Fe0739A8E627b7547b89E8b91C3D0",
       abi: [
         {
           inputs: [
@@ -25549,7 +25549,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xF1862C0712E4811e4Ff1c4D91C842D1eb5eD237F",
+      address: "0x16EEC48b535C0fe757cB5F7A8118cf1d243328Db",
       abi: [
         {
           inputs: [
@@ -25770,7 +25770,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x81856b54A0eA4b97c1DEC6ca9a5cC3a67e7f6200",
+      address: "0xE045aE402cF4E50a6224b96c7117B7D22DE596e0",
       abi: [
         {
           inputs: [
@@ -26191,7 +26191,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x225F76cE57cD85d0b62cdcEAb00E9c2f8aCAac02",
+      address: "0xe0A190EC1CFCa49884fD760060491902a148BF3d",
       abi: [
         {
           inputs: [
@@ -26216,7 +26216,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0xECFcDa943Cb709cDfFC3eC01D4D70dF29F77783b",
+      address: "0x32D952849Eb2F04C496A7bE22f180499aCB70dCd",
       abi: [
         {
           inputs: [
@@ -26920,7 +26920,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x6d6eC5531824b09d62730d1067D6EAfB6c8B9ac7",
+      address: "0xdd550151aD94f347ad3E863A9137Bdff87841878",
       abi: [
         {
           inputs: [
@@ -27362,7 +27362,7 @@ const contracts = {
   },
   59144: {
     AaveGatewayView: {
-      address: "0x04068D47A0CcF4a77f5c7B205981CE610E40d913",
+      address: "0x3F10f22722a5F6d2146F993491a536D42e2fce37",
       abi: [
         {
           inputs: [
@@ -28099,7 +28099,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x7c46161cbB4F03E0643D9e50BB6816df9A7aDA33",
+      address: "0xA581AE2043E37da2AE9A9EB755615C08E335Eae8",
       abi: [
         {
           inputs: [
@@ -28594,7 +28594,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x9364EfdB29865bE138557d2FF6bE0d1669599ee6",
+      address: "0x9E1EB441eD525C7f1EBFBb24D608234B7b767F21",
       abi: [
         {
           inputs: [
@@ -29489,7 +29489,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x547647eCd89d2108da2Ad13AFC700cdcF3A6F1b2",
+      address: "0xB40729B15311A30610044D9b86Be13886916348d",
       abi: [
         {
           inputs: [
@@ -30127,7 +30127,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xc6793024516663aD9a5cfE3E0Fb293F4F4B94a7f",
+      address: "0x63f9A00Ac816EA764dD182c4e531D3fa054c361d",
       abi: [
         {
           inputs: [
@@ -30843,7 +30843,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0xFa0A2D038CA64c7FbA117B56c6ecE0A7dda84a96",
+      address: "0x188c9D72f0E73B6EAa1f28787fEC725FF18e5A86",
       abi: [
         {
           inputs: [
@@ -31064,7 +31064,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0xF14c721d80A8E0300ADE04ca90ed9ac968762670",
+      address: "0x849FCd13dDBc69f27f3C6bcF895623177D77CB09",
       abi: [
         {
           inputs: [
@@ -31905,7 +31905,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x2091F34F9E25668Fc244A5D59b1D0091287337F3",
+      address: "0xdA1520C12665cBaD33023fc3Ed8A26D0cc9D5dD6",
       abi: [
         {
           inputs: [
@@ -31930,7 +31930,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayView: {
-      address: "0x1A6ad51575aF84fB3F1F91AB83489414FDe72988",
+      address: "0x23F50BB05DaEF08FCa084068C8422872857A3408",
       abi: [
         {
           inputs: [
@@ -32654,7 +32654,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x31b60AE8A5421504C6FfdC07A15e8172013A2e1E",
+      address: "0xD701B4a780f36E82EaF18193474af7e9E1523186",
       abi: [
         {
           inputs: [
