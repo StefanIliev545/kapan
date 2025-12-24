@@ -20,6 +20,7 @@ export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?:
     gatewayAbi: gateway?.abi,
     marketOrToken: gatewayAddress,
     user: address as Address | undefined,
+    chainId,
   });
 
   const { userEMode, userEModeId } = useAaveEMode(chainId);

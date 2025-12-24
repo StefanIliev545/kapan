@@ -18,6 +18,7 @@ export const ZeroLendProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     gatewayAbi: gateway?.abi,
     marketOrToken: gatewayAddress,
     user: address as Address | undefined,
+    chainId,
   });
 
   const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
