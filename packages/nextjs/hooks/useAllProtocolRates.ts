@@ -3,6 +3,7 @@ import { useReadContracts } from "wagmi";
 import { Address, Abi } from "viem";
 import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useAccount } from "wagmi";
+import { UseScaffoldReadConfig } from "~~/utils/scaffold-eth/contract";
 
 type ProtocolKey = "aave" | "compound" | "venus" | "zerolend";
 
@@ -49,12 +50,13 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
   // Type assertion because ZeroLendGatewayView is not yet part of the ContractName union
   const zeroLendGatewayName = "ZeroLendGatewayView" as any;
   const { data: zeroLendGateway } = useDeployedContractInfo({ contractName: zeroLendGatewayName });
-  const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract<any, any>({
+  const zeroLendReadConfig = {
     contractName: zeroLendGatewayName,
     functionName: "getAllTokensInfo",
     args: [queryAddress],
     query: { enabled: enabled && !!zeroLendGateway?.address },
-  } as any);
+  } as unknown as UseScaffoldReadConfig<any, any>;
+  const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract(zeroLendReadConfig);
 
   // Venus: getAllVenusMarkets + getMarketRates (batched)
   const { data: venusMarkets, isLoading: venusMarketsLoading } = useScaffoldReadContract({
