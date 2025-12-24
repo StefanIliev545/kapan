@@ -292,13 +292,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     const baseLtv = totalSupplied > 0 ? (totalBorrowed / totalSupplied) * 100 : 0;
     const currentBps = totalSupplied > 0 ? BigInt(Math.round((totalBorrowed / totalSupplied) * 10000)) : 0n;
 
-    if (ltvBps > 0n) {
-      const usageBps = Number((currentBps * 10000n) / ltvBps) / 100;
+    const thresholdBps = lltvBps > 0n ? lltvBps : ltvBps;
+    if (thresholdBps > 0n) {
+      const usageBps = Number((currentBps * 10000n) / thresholdBps) / 100;
       return { utilizationPercentage: Math.min(usageBps, 100), currentLtvBps: currentBps };
     }
 
     return { utilizationPercentage: baseLtv, currentLtvBps: currentBps };
-  }, [borrowedPositions, suppliedPositions, ltvBps]);
+  }, [borrowedPositions, suppliedPositions, lltvBps, ltvBps]);
 
   const currentLtvLabel = useMemo(() => (currentLtvBps > 0n ? `${formatBps(currentLtvBps)}%` : undefined), [currentLtvBps]);
 
