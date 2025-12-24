@@ -38,6 +38,7 @@ export function useAaveEMode(chainId?: number) {
     contractName: "AaveGatewayView",
     functionName: "getUserEMode",
     args: [userAddress as Address],
+    chainId,
     query: {
       enabled: !!userAddress,
     },
@@ -48,6 +49,7 @@ export function useAaveEMode(chainId?: number) {
     contractName: "AaveGatewayView",
     functionName: "getEModes",
     args: [],
+    chainId,
     query: {
       enabled: true,
     },
@@ -58,6 +60,7 @@ export function useAaveEMode(chainId?: number) {
     contractName: "AaveGatewayWrite",
     functionName: "getPool",
     args: [],
+    chainId,
     query: {
       enabled: true,
     },
