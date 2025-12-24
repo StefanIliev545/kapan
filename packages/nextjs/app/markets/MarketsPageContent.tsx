@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import Spinner from "~~/components/common/Spinner";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
+import NetworkTokenBalances from "~~/components/markets/NetworkTokenBalances";
 import { ContractResponse } from "~~/components/specific/vesu/VesuMarkets";
 import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
@@ -220,6 +221,10 @@ const MarketsPageContent: NextPage = () => {
                   className={isActive ? "space-y-6" : "space-y-6 hidden"}
                   aria-hidden={isActive ? undefined : true}
                 >
+                  <NetworkTokenBalances
+                    networkId={option.id as "base" | "arbitrum" | "optimism" | "linea" | "starknet"}
+                    supportedStarknetAssets={option.id === "starknet" ? (supportedAssets as ContractResponse | undefined) : undefined}
+                  />
                   {protocols.map(protocol => {
                     const key: ProtocolKey = protocol.key;
 
