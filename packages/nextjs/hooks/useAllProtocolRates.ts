@@ -46,9 +46,11 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     query: { enabled },
   });
 
-  const { data: zeroLendGateway } = useDeployedContractInfo({ contractName: "ZeroLendGatewayView" });
+  // Type assertion because ZeroLendGatewayView is not yet part of the ContractName union
+  const zeroLendGatewayName = "ZeroLendGatewayView" as any;
+  const { data: zeroLendGateway } = useDeployedContractInfo({ contractName: zeroLendGatewayName });
   const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract({
-    contractName: "ZeroLendGatewayView",
+    contractName: zeroLendGatewayName,
     functionName: "getAllTokensInfo",
     args: [queryAddress],
     query: { enabled: enabled && !!zeroLendGateway?.address },
