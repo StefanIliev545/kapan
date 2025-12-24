@@ -135,8 +135,10 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
       }
     };
 
+    const zerolendArray = Array.isArray(zerolendTokensInfo) ? [...zerolendTokensInfo] : [];
+
     addAaveLikeRates(aaveTokensInfo as any[], "aave");
-    addAaveLikeRates(zerolendTokensInfo as any[], "zerolend");
+    addAaveLikeRates(zerolendArray as any[], "zerolend");
 
     // Venus rates
     if (venusMarkets && venusRates && Array.isArray(venusMarkets) && Array.isArray(venusRates)) {
