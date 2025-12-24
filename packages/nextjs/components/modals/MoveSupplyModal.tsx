@@ -1,9 +1,10 @@
 import { ChangeEvent, FC, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { BaseModal } from "./BaseModal";
 import { formatUnits, parseUnits } from "viem";
+import { base, linea } from "viem/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { BaseModal } from "./BaseModal";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
@@ -62,16 +63,6 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = useBatchingPreference();
   const { data: rates, isLoading: ratesLoading } = useProtocolRates(token.address);
 
-  // Debug token balance (can be removed in production)
-  useEffect(() => {
-    console.debug("Token balance in MoveSupplyModal:", {
-      rawBalance: token.rawBalance,
-      balanceString: token.rawBalance.toString(),
-      decimals: token.decimals,
-      price: token.price?.toString() || "undefined",
-    });
-  }, [token.rawBalance, token.decimals, token.price]);
-
   // Update transferAmount when token balance changes
   useEffect(() => {
     setTransferAmount(token.rawBalance);
@@ -83,6 +74,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
       aave: "Aave V3",
       compound: "Compound V3",
       venus: "Venus",
+      zerolend: "ZeroLend",
     };
     return protocolNameMap[protocolId.toLowerCase()] || protocolId;
   };
@@ -284,10 +276,21 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   };
 
   // Filter and sort protocols (exclude current)
+  const isZerolendSupported = useMemo(() => chainId === base.id || chainId === linea.id, [chainId]);
+
   const protocols =
     rates
       ?.filter(rate => normalizeProtocolName(rate.protocol) !== normalizeProtocolName(fromProtocol))
+      .filter(rate => (normalizeProtocolName(rate.protocol) === "zerolend" ? isZerolendSupported : true))
       .sort((a, b) => b.supplyRate - a.supplyRate) || [];
+
+  useEffect(() => {
+    if (protocols.length === 0) return;
+    const hasSelection = protocols.some(p => p.protocol === selectedProtocol);
+    if (!selectedProtocol || !hasSelection) {
+      setSelectedProtocol(protocols[0].protocol);
+    }
+  }, [protocols, selectedProtocol]);
 
   const selectedRate = protocols.find(p => p.protocol === selectedProtocol)?.supplyRate || 0;
   const rateDifference = selectedRate - token.currentRate;
@@ -305,17 +308,16 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
 
     return (
       <div
-        className={`p-4 bg-base-200 rounded-lg mb-5 cursor-pointer ${
-          !isEditingAmount ? "hover:bg-base-300 transition-colors duration-150" : ""
+        className={`p-4 rounded-2xl border border-base-300/60 bg-base-100/80 shadow-sm transition-colors ${
+          !isEditingAmount ? "hover:border-primary/40 hover:bg-base-100" : "ring-1 ring-primary/20"
         }`}
         onClick={startEditing}
       >
         {isEditingAmount ? (
-          <div className="flex flex-col" style={{ minHeight: "60px" }}>
-            {/* Header row with labels */}
-            <div className="flex justify-between items-center" style={{ height: "24px" }}>
-              <span className="text-sm font-medium text-base-content/80">Transfer Amount</span>
-              <div className="text-xs text-base-content/70 text-right" style={{ minWidth: "60px" }}>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-base-content/90">Transfer amount</span>
+              <div className="text-xs text-base-content/70 text-right min-w-[80px]">
                 <FiatBalance
                   tokenAddress={token.address}
                   rawValue={transferAmount}
@@ -327,12 +329,11 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
               </div>
             </div>
 
-            {/* Input container using flex instead of absolute positioning */}
-            <div className="flex mt-2 h-10 items-center w-full border rounded-md bg-base-100 overflow-hidden focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30">
+            <div className="flex h-12 items-center w-full border rounded-xl bg-base-100 overflow-hidden focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
               <input
                 ref={inputRef}
                 type="text"
-                className="flex-grow h-full px-3 bg-transparent border-none outline-none focus:outline-none"
+                className="flex-grow h-full px-4 bg-transparent border-none outline-none focus:outline-none text-lg"
                 value={inputValue}
                 onChange={handleAmountChangeCallback}
                 onBlur={handleFinishEditingCallback}
@@ -342,9 +343,9 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
                 autoCorrect="off"
                 spellCheck="false"
               />
-              <div className="flex-shrink-0 px-2">
+              <div className="flex-shrink-0 px-3">
                 <button
-                  className="btn btn-xs btn-primary h-7 min-h-0 px-3"
+                  className="btn btn-xs btn-primary h-8 min-h-0 px-3"
                   onClick={handleSetMaxAmountCallback}
                   type="button"
                 >
@@ -355,9 +356,12 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
           </div>
         ) : (
           <div className="flex justify-between items-center min-h-[60px]">
-            <span className="text-sm">Amount to Move:</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-base-content/70">Amount to move</span>
+              <span className="text-xs text-base-content/50">Click to edit</span>
+            </div>
             <div className="text-right">
-              <span className="font-medium">
+              <span className="font-semibold text-lg">
                 <FiatBalance
                   tokenAddress={token.address}
                   rawValue={transferAmount}
@@ -370,11 +374,11 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
                   maximumFractionDigits={2}
                 />
               </span>
-              {transferAmount < token.rawBalance && (
-                <div className="text-xs text-base-content/60">
-                  {((Number(transferAmount) / Number(token.rawBalance)) * 100).toFixed(0)}% of balance
-                </div>
-              )}
+              <div className="text-xs text-base-content/60">
+                {transferAmount < token.rawBalance
+                  ? `${((Number(transferAmount) / Number(token.rawBalance)) * 100).toFixed(0)}% of balance`
+                  : "Using full balance"}
+              </div>
             </div>
           </div>
         )}
@@ -397,68 +401,48 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
 
   const ProtocolSelectorComponent = useCallback(
     () => (
-      <div className="bg-base-200 p-4 rounded-lg flex-1 w-full">
-        <div className="text-sm font-medium mb-2">To Protocol</div>
+      <div className="p-4 rounded-2xl border border-base-300/60 bg-base-100/80 flex-1 w-full shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-semibold text-base-content/80">Destination protocol</div>
+          {selectedProtocol && (
+            <span className="badge badge-sm border-0 bg-primary/10 text-primary">
+              {isRateImprovement ? "Better APY" : rateDifference === 0 ? "Same APY" : "Lower APY"}
+            </span>
+          )}
+        </div>
         {ratesLoading ? (
           <div className="flex justify-center py-4">
             <span className="loading loading-spinner loading-md"></span>
           </div>
         ) : (
           <div className="dropdown dropdown-bottom w-full">
-            <div tabIndex={0} role="button" className="cursor-pointer w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 relative">
-                  {selectedProtocol ? (
-                    <Image
-                      src={getProtocolLogo(selectedProtocol)}
-                      alt={selectedProtocol}
-                      fill
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-base-300 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-5 h-5 text-base-content/40"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="font-medium">
-                    {selectedProtocol ? (
-                      formatProtocolName(selectedProtocol)
-                    ) : (
-                      <span className="text-base-content/50">Select protocol</span>
-                    )}
-                  </div>
-                  {selectedProtocol && (
-                    <div className="text-sm text-base-content/70 flex items-center">
-                      <span
-                        className={
-                          isRateImprovement
-                            ? "bg-gradient-to-r from-green-500 to-teal-500 bg-clip-text text-transparent font-medium"
-                            : rateDifference < 0
-                              ? "text-error font-medium"
-                              : ""
-                        }
-                      >
-                        {formatRate(selectedRate)} APY
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
             <div
               tabIndex={0}
-              className="dropdown-content z-50 menu shadow-lg bg-base-100 rounded-box w-full overflow-hidden"
-              style={{ minWidth: "100%" }}
+              role="button"
+              className="cursor-pointer w-full rounded-xl border border-base-300/60 p-3 flex items-center justify-between hover:border-primary/40 transition-colors"
             >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 relative rounded-full bg-base-200 overflow-hidden">
+                  {selectedProtocol ? (
+                    <Image src={getProtocolLogo(selectedProtocol)} alt={selectedProtocol} fill className="object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-base-content/50 text-sm">
+                      Pick
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">
+                    {selectedProtocol ? formatProtocolName(selectedProtocol) : "Select protocol"}
+                  </span>
+                  <span className="text-xs text-base-content/60">
+                    {selectedProtocol ? `${formatRate(selectedRate)} APY` : "Choose where to move your supply"}
+                  </span>
+                </div>
+              </div>
+              <ArrowRightIcon className="w-5 h-5 text-base-content/50" />
+            </div>
+            <div tabIndex={0} className="dropdown-content z-50 menu shadow-xl bg-base-100 rounded-2xl w-full p-0 border border-base-200 overflow-hidden">
               {protocols.length === 0 ? (
                 <div className="px-4 py-3 text-base-content/50">No protocols available</div>
               ) : (
@@ -468,7 +452,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
                     return (
                       <div
                         key={protocol}
-                        className="px-4 py-3 hover:bg-base-200 cursor-pointer border-b border-base-200 last:border-b-0"
+                        className="px-4 py-3 hover:bg-base-200 cursor-pointer border-b border-base-200 last:border-b-0 transition-colors"
                         onClick={() => setSelectedProtocol(protocol)}
                       >
                         <div className="flex items-center justify-between w-full">
@@ -514,8 +498,8 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
   const StatusContent = () => {
     if (status === MoveStatus.Success) {
       return (
-        <div className="flex flex-col items-center justify-center py-6">
-          <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mb-4">
+        <div className="flex flex-col items-center justify-center py-6 rounded-2xl border border-base-300/60 bg-base-100/80">
+          <div className="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center mb-4">
             <CheckIcon className="w-10 h-10 text-success" />
           </div>
           <h3 className="text-2xl font-bold mb-2">Position Moved Successfully</h3>
@@ -523,7 +507,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
             Your {token.name} position has been moved from {fromProtocol} to {formatProtocolName(selectedProtocol)}.
           </p>
           {transactionHash && (
-            <div className="w-full bg-base-300 rounded-md p-3 mb-4">
+            <div className="w-full bg-base-200/60 rounded-md p-3 mb-4 border border-base-300/60">
               <p className="text-sm text-base-content/70 mb-1">Transaction Hash:</p>
               <p className="text-xs font-mono truncate">{transactionHash}</p>
             </div>
@@ -536,8 +520,8 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     }
     if (status === MoveStatus.Error) {
       return (
-        <div className="flex flex-col items-center justify-center py-6">
-          <div className="w-16 h-16 rounded-full bg-error/20 flex items-center justify-center mb-4">
+        <div className="flex flex-col items-center justify-center py-6 rounded-2xl border border-base-300/60 bg-base-100/80">
+          <div className="w-16 h-16 rounded-full bg-error/15 flex items-center justify-center mb-4">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-10 h-10 text-error"
@@ -574,102 +558,135 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     const yieldData = calculateAnnualYield();
 
     return (
-      <>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-xl font-bold">Move Supply Position</h3>
-          <div className="flex items-center gap-2">
-            <Image src={token.icon} alt={token.name} width={24} height={24} className="rounded-full" />
-            <span className="font-semibold">{token.name}</span>
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 relative rounded-full overflow-hidden border border-base-300/60">
+              <Image src={token.icon} alt={token.name} fill className="object-cover" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-base-content/50">Moving supply</p>
+              <h3 className="text-lg font-semibold text-base-content">{token.name}</h3>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-base-200/80 border border-base-300/60">
+            <span className="text-xs text-base-content/60">Current APY</span>
+            <span className="font-semibold">{formatRate(token.currentRate)}</span>
           </div>
         </div>
-        <AmountInputComponent />
-        <div className="flex flex-col md:flex-row gap-4 mb-6 items-center">
-          <div className="bg-base-200 p-4 rounded-lg flex-1 w-full">
-            <div className="text-sm font-medium mb-2">From Protocol</div>
+
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] items-center">
+          <div className="p-4 rounded-2xl border border-base-300/60 bg-base-100/80 shadow-sm">
+            <div className="text-sm font-semibold text-base-content/80 mb-2">From protocol</div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 relative">
-                <Image src={getProtocolLogo(fromProtocol)} alt={fromProtocol} fill className="rounded-full" />
+              <div className="w-12 h-12 relative rounded-full overflow-hidden bg-base-200">
+                <Image src={getProtocolLogo(fromProtocol)} alt={fromProtocol} fill className="object-cover" />
               </div>
               <div>
-                <div className="font-medium">{fromProtocol}</div>
-                <div className="text-sm text-base-content/70">{formatRate(token.currentRate)} APY</div>
+                <div className="font-semibold">{fromProtocol}</div>
+                <div className="text-xs text-base-content/60">{formatRate(token.currentRate)} APY</div>
               </div>
             </div>
           </div>
-          <div className="hidden md:flex">
-            <div className="p-2 bg-primary rounded-full">
+          <div className="hidden md:flex items-center justify-center">
+            <div className="p-2 bg-primary rounded-full shadow-lg shadow-primary/20">
               <ArrowRightIcon className="w-6 h-6 text-white" />
             </div>
           </div>
-          <div className="flex md:hidden">
-            <div className="p-2 bg-primary rounded-full transform rotate-90">
+          <div className="flex md:hidden items-center justify-center">
+            <div className="p-2 bg-primary rounded-full shadow-lg shadow-primary/20 rotate-90">
               <ArrowRightIcon className="w-5 h-5 text-white" />
             </div>
           </div>
           <ProtocolSelectorComponent />
         </div>
+
+        <AmountInputComponent />
+
         {selectedProtocol && (
-          <div className="p-4 bg-base-200 rounded-lg mb-6">
-            <div className="text-sm font-medium mb-2">Rate Comparison</div>
-            <div className="flex justify-between mb-2">
-              <span>Rate Change:</span>
+          <div className="rounded-2xl border border-base-300/60 bg-base-100/80 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold text-base-content/80">Rate comparison</div>
               <span
-                className={
+                className={`badge badge-sm border-0 ${
                   rateDifference > 0
-                    ? "text-success font-medium"
+                    ? "bg-success/15 text-success"
                     : rateDifference < 0
-                      ? "text-error font-medium"
-                      : "font-medium"
-                }
+                      ? "bg-error/15 text-error"
+                      : "bg-base-200 text-base-content/70"
+                }`}
               >
-                {rateDifference > 0 ? "+" : ""}
-                {formatRate(rateDifference)}
+                {rateDifference > 0 ? "Improved" : rateDifference < 0 ? "Reduced" : "Unchanged"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>Estimated Annual Yield:</span>
-              <div className="text-right">
-                <span className={yieldData.isImprovement ? "text-success font-medium" : "text-error font-medium"}>
-                  {yieldData.newYield}
-                </span>
-                <div className="text-xs text-base-content/60">Current: {yieldData.currentYield}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-base-200/70 p-3">
+                <span className="text-xs text-base-content/60">Rate change</span>
+                <div
+                  className={`text-lg font-semibold ${
+                    rateDifference > 0 ? "text-success" : rateDifference < 0 ? "text-error" : ""
+                  }`}
+                >
+                  {rateDifference > 0 ? "+" : ""}
+                  {formatRate(rateDifference)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-base-200/70 p-3">
+                <span className="text-xs text-base-content/60">Estimated annual yield</span>
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className={yieldData.isImprovement ? "text-success font-semibold" : "text-error font-semibold"}>
+                    {yieldData.newYield}
+                  </span>
+                  <span className="text-xs text-base-content/60">Current: {yieldData.currentYield}</span>
+                </div>
               </div>
             </div>
           </div>
         )}
-        <button
-          className="btn btn-primary w-full"
-          onClick={handleMove}
-          disabled={!selectedProtocol || isLoading || !address}
-        >
-          {isLoading ? (
-            <>
-              <span className="loading loading-spinner loading-sm"></span>
-              Moving Position...
-            </>
-          ) : (
-            "Move Position"
-          )}
-        </button>
-        {isPreferenceLoaded && (
-          <div className="pt-2 pb-1 border-t border-base-300 mt-4">
-            <label className="label cursor-pointer gap-2 justify-start">
+
+        <div className="space-y-3">
+          <button
+            className="btn btn-primary w-full"
+            onClick={handleMove}
+            disabled={!selectedProtocol || isLoading || !address}
+          >
+            {isLoading ? (
+              <>
+                <span className="loading loading-spinner loading-sm"></span>
+                Moving position...
+              </>
+            ) : (
+              "Move position"
+            )}
+          </button>
+          {isPreferenceLoaded && (
+            <div className="rounded-2xl border border-base-300/60 bg-base-100/80 px-4 py-3 flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={preferBatching}
                 onChange={(e) => setPreferBatching(e.target.checked)}
                 className="checkbox checkbox-sm"
               />
-              <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-            </label>
-          </div>
-        )}
-      </>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">Batch transactions with Smart Account</span>
+                <span className="text-xs text-base-content/60">
+                  Reduce signing steps when batching is supported on this chain.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
   return (
-    <BaseModal isOpen={isOpen} onClose={status === MoveStatus.Initial ? onClose : resetModal} maxWidthClass="max-w-2xl">
+    <BaseModal
+      isOpen={isOpen}
+      onClose={status === MoveStatus.Initial ? onClose : resetModal}
+      maxWidthClass="max-w-2xl"
+      title="Move Supply Position"
+    >
       <div className="p-6">{renderContent()}</div>
     </BaseModal>
   );

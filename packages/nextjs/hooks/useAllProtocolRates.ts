@@ -4,11 +4,13 @@ import { Address, Abi } from "viem";
 import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useAccount } from "wagmi";
 
+type ProtocolKey = "aave" | "compound" | "venus" | "zerolend";
+
 interface TokenRate {
   token: Address;
   supplyRate: number;
   borrowRate: number;
-  protocol: "aave" | "compound" | "venus";
+  protocol: ProtocolKey;
 }
 
 // Rate conversion helpers
@@ -36,13 +38,24 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
   const { address: userAddress } = useAccount();
   const queryAddress = (userAddress || "0x0000000000000000000000000000000000000000") as Address;
 
-  // Aave: getAllTokensInfo already includes rates for all tokens
+  // Aave-like protocols: getAllTokensInfo already includes rates for all tokens
   const { data: aaveTokensInfo, isLoading: aaveLoading } = useScaffoldReadContract({
     contractName: "AaveGatewayView",
     functionName: "getAllTokensInfo",
     args: [queryAddress],
     query: { enabled },
   });
+
+  // Type assertion because ZeroLendGatewayView is not yet part of the ContractName union
+  const zeroLendGatewayName = "ZeroLendGatewayView" as any;
+  const { data: zeroLendGateway } = useDeployedContractInfo({ contractName: zeroLendGatewayName });
+  const zeroLendReadConfig = {
+    contractName: zeroLendGatewayName,
+    functionName: "getAllTokensInfo",
+    args: [queryAddress],
+    query: { enabled: enabled && !!zeroLendGateway?.address },
+  };
+  const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract(zeroLendReadConfig as any);
 
   // Venus: getAllVenusMarkets + getMarketRates (batched)
   const { data: venusMarkets, isLoading: venusMarketsLoading } = useScaffoldReadContract({
@@ -99,27 +112,33 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
   // Map structure: tokenAddress -> { protocol -> rate }
   const ratesMap = useMemo(() => {
     if (!enabled) {
-      return new Map<Address, Map<"aave" | "compound" | "venus", TokenRate>>();
+      return new Map<Address, Map<ProtocolKey, TokenRate>>();
     }
-    const map = new Map<Address, Map<"aave" | "compound" | "venus", TokenRate>>();
+    const map = new Map<Address, Map<ProtocolKey, TokenRate>>();
 
-    // Aave rates
-    if (aaveTokensInfo && Array.isArray(aaveTokensInfo)) {
-      (aaveTokensInfo as any[]).forEach((tokenInfo: any) => {
-        if (tokenInfo?.token) {
-          const token = tokenInfo.token as Address;
-          if (!map.has(token)) {
-            map.set(token, new Map());
+    const addAaveLikeRates = (tokensInfo: any[] | undefined, protocol: Extract<ProtocolKey, "aave" | "zerolend">) => {
+      if (tokensInfo && Array.isArray(tokensInfo)) {
+        tokensInfo.forEach((tokenInfo: any) => {
+          if (tokenInfo?.token) {
+            const token = tokenInfo.token as Address;
+            if (!map.has(token)) {
+              map.set(token, new Map());
+            }
+            map.get(token)?.set(protocol, {
+              token,
+              supplyRate: convertAaveRate(BigInt(tokenInfo.supplyRate || 0)),
+              borrowRate: convertAaveRate(BigInt(tokenInfo.borrowRate || 0)),
+              protocol,
+            });
           }
-          map.get(token)?.set("aave", {
-            token,
-            supplyRate: convertAaveRate(BigInt(tokenInfo.supplyRate || 0)),
-            borrowRate: convertAaveRate(BigInt(tokenInfo.borrowRate || 0)),
-            protocol: "aave",
-          });
-        }
-      });
-    }
+        });
+      }
+    };
+
+    const zerolendArray = Array.isArray(zerolendTokensInfo) ? [...zerolendTokensInfo] : [];
+
+    addAaveLikeRates(aaveTokensInfo as any[], "aave");
+    addAaveLikeRates(zerolendArray as any[], "zerolend");
 
     // Venus rates
     if (venusMarkets && venusRates && Array.isArray(venusMarkets) && Array.isArray(venusRates)) {
@@ -163,10 +182,10 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     }
 
     return map;
-  }, [enabled, aaveTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
+  }, [enabled, aaveTokensInfo, zerolendTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
 
   const isLoading = enabled
-    ? aaveLoading || venusMarketsLoading || venusRatesLoading || compoundBaseLoading || compoundDataLoading
+    ? aaveLoading || zerolendLoading || venusMarketsLoading || venusRatesLoading || compoundBaseLoading || compoundDataLoading
     : false;
 
   return {
@@ -198,6 +217,14 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
         });
       }
       
+      const zerolendRate = protocolRates.get("zerolend");
+      if (zerolendRate) {
+        candidates.push({
+          protocol: "zerolend",
+          rate: type === "supply" ? zerolendRate.supplyRate : zerolendRate.borrowRate,
+        });
+      }
+      
       const venusRate = protocolRates.get("venus");
       if (venusRate) {
         candidates.push({
@@ -225,4 +252,3 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     }, [ratesMap]),
   };
 };
-
