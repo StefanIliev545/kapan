@@ -122,6 +122,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     gatewayAbi: gateway?.abi,
     marketOrToken: marketForRisk,
     user: queryAddress,
+    chainId,
   });
 
   const depositedIndexByBase = useMemo(() => {

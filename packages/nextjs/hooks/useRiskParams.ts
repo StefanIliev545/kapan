@@ -9,8 +9,9 @@ export function useRiskParams(options: {
   gatewayAbi?: Abi;
   marketOrToken?: Address;
   user?: Address;
+  chainId?: number;
 }) {
-  const { gateway, gatewayAbi, marketOrToken = ZERO_ADDRESS, user } = options;
+  const { gateway, gatewayAbi, marketOrToken = ZERO_ADDRESS, user, chainId } = options;
   const enabled = Boolean(gateway && gatewayAbi && user && user !== ZERO_ADDRESS);
 
   const { data, isLoading, error } = useReadContracts({
@@ -26,12 +27,14 @@ export function useRiskParams(options: {
               abi: gatewayAbi,
               functionName: "getLtv",
               args: [marketOrToken, user],
+              chainId,
             },
             {
               address: gateway,
               abi: gatewayAbi,
               functionName: "getMaxLtv",
               args: [marketOrToken, user],
+              chainId,
             },
           ]
         : [],

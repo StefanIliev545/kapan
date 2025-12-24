@@ -50,6 +50,7 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     gatewayAbi: gateway?.abi,
     marketOrToken: gatewayAddress,
     user: connectedAddress as Address | undefined,
+    chainId,
   });
 
   // Get Comptroller address from VenusGatewayView
