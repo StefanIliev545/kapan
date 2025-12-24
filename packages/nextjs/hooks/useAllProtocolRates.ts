@@ -49,12 +49,12 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
   // Type assertion because ZeroLendGatewayView is not yet part of the ContractName union
   const zeroLendGatewayName = "ZeroLendGatewayView" as any;
   const { data: zeroLendGateway } = useDeployedContractInfo({ contractName: zeroLendGatewayName });
-  const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract({
+  const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract<any, any>({
     contractName: zeroLendGatewayName,
     functionName: "getAllTokensInfo",
     args: [queryAddress],
     query: { enabled: enabled && !!zeroLendGateway?.address },
-  });
+  } as any);
 
   // Venus: getAllVenusMarkets + getMarketRates (batched)
   const { data: venusMarkets, isLoading: venusMarketsLoading } = useScaffoldReadContract({
