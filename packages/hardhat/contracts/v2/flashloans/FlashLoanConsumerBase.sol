@@ -39,7 +39,7 @@ interface IUniswapV3Pool {
     function flash(address recipient, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
 
-/// @notice Abstract base supporting Balancer v2/v3, Aave v3 and Uniswap v3 flash sources.
+/// @notice Abstract base supporting Balancer v2/v3, Aave v3 (and forks like ZeroLend) and Uniswap v3 flash sources.
 ///         Providers are *configurable*; zero address = disabled (and requests revert).
 abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     using SafeERC20 for IERC20;
@@ -47,7 +47,10 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     // ----------------- Providers (config) -----------------
     IFlashLoanProvider public balancerV2Vault; // Balancer v2 Vault
     IVaultV3 public balancerV3Vault; // Balancer v3 Vault
-    IAaveV3Pool public aaveV3Pool; // Aave v3 Pool (flashLoanSimple)
+
+    // Aave-compatible pools (Aave v3, ZeroLend, etc.) - registered by string key
+    mapping(bytes32 => address) public aaveCompatiblePools; // key hash => pool address
+    mapping(address => bool) public isAaveCompatiblePool;   // for callback validation
 
     // We gate Uniswap v3 availability by storing a *factory or sentinel address*.
     // The actual pool is passed per-request.
@@ -70,8 +73,35 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
         balancerV3Vault = IVaultV3(vault);
     }
 
-    function _setAaveV3(address pool) internal {
-        aaveV3Pool = IAaveV3Pool(pool);
+    /// @notice Register an Aave-compatible pool (Aave v3, ZeroLend, etc.) by key.
+    /// @param key Human-readable key (e.g., "aave", "zerolend")
+    /// @param pool The pool address implementing flashLoanSimple
+    function _addAaveCompatiblePool(string memory key, address pool) internal {
+        bytes32 keyHash = keccak256(abi.encodePacked(key));
+        // Remove old pool from validation set if replacing
+        address oldPool = aaveCompatiblePools[keyHash];
+        if (oldPool != address(0)) {
+            isAaveCompatiblePool[oldPool] = false;
+        }
+        aaveCompatiblePools[keyHash] = pool;
+        if (pool != address(0)) {
+            isAaveCompatiblePool[pool] = true;
+        }
+    }
+
+    /// @notice Remove an Aave-compatible pool by key.
+    function _removeAaveCompatiblePool(string memory key) internal {
+        bytes32 keyHash = keccak256(abi.encodePacked(key));
+        address pool = aaveCompatiblePools[keyHash];
+        if (pool != address(0)) {
+            isAaveCompatiblePool[pool] = false;
+            aaveCompatiblePools[keyHash] = address(0);
+        }
+    }
+
+    /// @notice Get the pool address for a given key.
+    function getAaveCompatiblePool(string memory key) public view returns (address) {
+        return aaveCompatiblePools[keccak256(abi.encodePacked(key))];
     }
 
     /// @dev Any non-zero address works as an enable switch (factory, router, sentinel).
@@ -88,8 +118,9 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
         return address(balancerV3Vault) != address(0);
     }
 
-    function aaveEnabled() public view returns (bool) {
-        return address(aaveV3Pool) != address(0);
+    /// @notice Check if a specific Aave-compatible pool is enabled by key.
+    function aaveEnabledForKey(string memory key) public view returns (bool) {
+        return aaveCompatiblePools[keccak256(abi.encodePacked(key))] != address(0);
     }
 
     function uniswapEnabled() public view returns (bool) {
@@ -191,22 +222,35 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
     }
 
     // ============================================================
-    //                            AAVE V3
+    //                   AAVE V3 & COMPATIBLE FORKS
     // ============================================================
 
-    /// @notice Request an Aave v3 flash loan (simple mode).
+    /// @notice Request a flash loan from an Aave-compatible pool by key (e.g., "aave", "zerolend").
+    /// @param poolKey Key identifying the registered pool
     /// @param token Asset to borrow
     /// @param amount Amount to borrow
     /// @param userData Arbitrary data forwarded to executeOperation and to _afterFlashLoan
-    function _requestAaveV3(
+    function _requestAaveCompatible(
+        string memory poolKey,
         address token,
         uint256 amount,
         bytes memory userData
-    ) internal authorizeFlashLoan(address(aaveV3Pool)) {
-        require(aaveEnabled(), "Aave v3 disabled");
-        emit FlashRequested("AAVE_V3", token, amount);
+    ) internal {
+        address pool = aaveCompatiblePools[keccak256(abi.encodePacked(poolKey))];
+        require(pool != address(0), "Aave pool not registered for key");
+        _requestAaveCompatibleInternal(pool, token, amount, userData);
+    }
+
+    /// @dev Internal implementation for Aave-compatible flash loan request.
+    function _requestAaveCompatibleInternal(
+        address pool,
+        address token,
+        uint256 amount,
+        bytes memory userData
+    ) private authorizeFlashLoan(pool) {
+        emit FlashRequested("AAVE_COMPATIBLE", token, amount);
         // referralCode = 0
-        aaveV3Pool.flashLoanSimple(address(this), token, amount, userData, 0);
+        IAaveV3Pool(pool).flashLoanSimple(address(this), token, amount, userData, 0);
     }
 
     /// @notice Aave v3 callback. Approve Pool for principal+premium; return true to finalize.
@@ -217,7 +261,7 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
         address initiator,
         bytes calldata params
     ) external override flashLoanOnly returns (bool) {
-        require(msg.sender == address(aaveV3Pool), "Unauthorized Aave pool");
+        require(isAaveCompatiblePool[msg.sender], "Unauthorized Aave pool");
         require(initiator == address(this), "Bad initiator");
 
         uint256 repayment = amount + premium;
@@ -225,11 +269,11 @@ abstract contract FlashLoanConsumerBase is IAaveFlashLoanSimpleReceiver {
 
         // Repay: approve Pool to pull principal + premium
         // Reset approval to 0 first, then approve new amount (safeApprove pattern for compatibility)
-        IERC20(asset).approve(address(aaveV3Pool), 0);
-        IERC20(asset).approve(address(aaveV3Pool), repayment);
+        IERC20(asset).approve(msg.sender, 0);
+        IERC20(asset).approve(msg.sender, repayment);
 
-        emit FlashRepaid("AAVE_V3", asset, repayment);
-        console.log("FlashLoanConsumerBase: AaveV3 executeOperation after repayment");
+        emit FlashRepaid("AAVE_COMPATIBLE", asset, repayment);
+        console.log("FlashLoanConsumerBase: AaveCompatible executeOperation after repayment");
         return true;
     }
 

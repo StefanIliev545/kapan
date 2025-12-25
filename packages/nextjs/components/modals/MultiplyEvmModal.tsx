@@ -269,7 +269,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     if (defaultFlashLoanProvider) return [defaultFlashLoanProvider];
     // Chain-appropriate fallback - prefer Aave on chains where Balancer isn't available
     if (isAaveV3Supported(chainId) && !isBalancerV2Supported(chainId)) {
-      return [{ name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: FlashLoanProvider.AaveV3 }];
+      return [{ name: "Aave", icon: "/logos/aave.svg", version: "aave", providerEnum: FlashLoanProvider.Aave }];
     }
     return [{ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: FlashLoanProvider.BalancerV2 }];
   }, [defaultFlashLoanProvider, flashLoanProviders, chainId]);

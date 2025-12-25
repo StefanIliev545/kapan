@@ -109,16 +109,16 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
       const poolAddress = await provider.getPool();
 
       if (poolAddress && poolAddress !== ethers.ZeroAddress) {
-        await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setAaveV3", poolAddress);
-        console.log(`Aave V3 pool set: ${poolAddress}`);
+        await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setAavePool", poolAddress);
+        console.log(`Aave pool set: ${poolAddress}`);
       } else {
-        console.warn(`Aave V3 pool address is zero for chainId=${chainId}. Skipping setAaveV3.`);
+        console.warn(`Aave pool address is zero for chainId=${chainId}. Skipping setAavePool.`);
       }
     } catch (error) {
-      console.warn(`Failed to set Aave V3 pool for chainId=${chainId}:`, error);
+      console.warn(`Failed to set Aave pool for chainId=${chainId}:`, error);
     }
   } else {
-    console.warn(`No Aave V3 for chainId=${chainId}. Skipping setAaveV3.`);
+    console.warn(`No Aave for chainId=${chainId}. Skipping setAavePool.`);
   }
 
   // Temporarily disable Etherscan verification for v2 deploys

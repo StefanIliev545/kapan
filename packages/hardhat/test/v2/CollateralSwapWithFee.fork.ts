@@ -149,7 +149,7 @@ describe("v2 Collateral Swap with Aave Flash Loan Fee (fork)", function () {
       ),
 
       // 1. Flash Loan using Aave (has ~5bps fee) -> Output[1] = amount + fee
-      createRouterInstruction(encodeFlashLoan(FlashLoanProvider.AaveV3, 0)),
+      createRouterInstruction(encodeFlashLoan(FlashLoanProvider.Aave, 0)),
 
       // 2. Approve OneInch for USDC
       createRouterInstruction(encodeApprove(1, "oneinch")),
@@ -320,7 +320,7 @@ describe("v2 Collateral Swap with Aave Flash Loan Fee (fork)", function () {
       // 2. Flash Loan using Aave with the REDUCED amount (Output[2])
       // Creates Output[3] = repayment amount (principal + fee ≈ original supply)
       // NOTE: Router receives Output[2] worth of tokens, but Output[3] tracks repayment!
-      createRouterInstruction(encodeFlashLoan(FlashLoanProvider.AaveV3, 2)),
+      createRouterInstruction(encodeFlashLoan(FlashLoanProvider.Aave, 2)),
 
       // 3. Approve OneInch for USDC using Output[2] (the actual principal we received)
       // NOT Output[3] which is the repayment amount (more than we have!)

@@ -50,8 +50,8 @@ const FORK_BLOCK_NUMBERS: Record<string, number> = {
   ethereum: 23988682,
   eth: 21350000,
   mainnet: 21350000,
-  arbitrum: 280000000, // ~Dec 2024
-  arb: 280000000,
+  arbitrum: 414376815, // ~Dec 2025
+  arb: 414376815,
   base: 23500000,      // ~Dec 2024
   optimism: 129000000, // ~Dec 2024
   op: 129000000,

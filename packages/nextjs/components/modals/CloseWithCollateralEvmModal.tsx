@@ -282,7 +282,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         // For Aave flash loans, the swap needs to output enough to cover the flash loan repayment
         // (principal + 0.05% fee). We add a buffer to be safe.
         // For Balancer/others (no fee), we just use the exact debt amount.
-        const isAave = providerEnum === FlashLoanProvider.AaveV3;
+        const isAave = providerEnum === FlashLoanProvider.Aave || providerEnum === FlashLoanProvider.ZeroLend;
         const swapMinAmountOut = isAave
             ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS / 10000n)
             : repayAmountRaw;

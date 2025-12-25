@@ -408,7 +408,8 @@ export const useKapanRouterV2 = () => {
     // Aave V3 flash loans have a fee (~5-9 bps). When isMax=true, we need to use Split
     // to reduce the flash loan principal so that (principal + fee) fits within our supply balance.
     // Balancer V2/V3 have no fees, so we can flash the full amount.
-    const needsFeeSplit = isMax && flashLoanProvider === FlashLoanProvider.AaveV3;
+    // Aave-compatible providers have fees, need special handling for max withdrawals
+    const needsFeeSplit = isMax && (flashLoanProvider === FlashLoanProvider.Aave || flashLoanProvider === FlashLoanProvider.ZeroLend);
     
     // Aave flash loan fee buffer: 9 bps (0.09%) - slightly higher than typical 5 bps for safety
     const AAVE_FEE_BUFFER_BPS = 9;
@@ -1485,7 +1486,7 @@ export const useKapanRouterV2 = () => {
 
   // --- Move Flow Builder ---
 
-  type FlashConfig = { version: "v3" | "v2" | "aave"; premiumBps?: number; bufferBps?: number; };
+  type FlashConfig = { version: "v3" | "v2" | "aave" | "zerolend"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
   };
@@ -1544,7 +1545,11 @@ export const useKapanRouterV2 = () => {
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
 
         // 2. Flash Loan (creates UTXO)
-        const provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.AaveV3 : (version === "v3" ? FlashLoanProvider.BalancerV3 : FlashLoanProvider.BalancerV2);
+        // Map version string to FlashLoanProvider enum
+        const provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.Aave 
+          : version === "zerolend" ? FlashLoanProvider.ZeroLend
+          : version === "v3" ? FlashLoanProvider.BalancerV3 
+          : FlashLoanProvider.BalancerV2;
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount;
         addRouter(flashData as `0x${string}`, true);

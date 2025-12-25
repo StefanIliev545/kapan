@@ -151,7 +151,7 @@ export const useFlashLoanLiquidity = (
                     }) as bigint;
 
                     results.push({
-                        provider: FlashLoanProvider.AaveV3,
+                        provider: FlashLoanProvider.Aave,
                         liquidity: balance,
                         hasLiquidity: balance >= amount,
                     });
@@ -159,7 +159,7 @@ export const useFlashLoanLiquidity = (
                     console.error("Aave V3 liquidity check failed", err);
                     // Likely token not supported on Aave or no reserve data
                     results.push({
-                        provider: FlashLoanProvider.AaveV3,
+                        provider: FlashLoanProvider.Aave,
                         liquidity: 0n,
                         hasLiquidity: false,
                     });

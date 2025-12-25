@@ -147,7 +147,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         
         // If using Aave flash loan with isMax, reduce the quote amount by fee buffer
         // This ensures the 1inch swap data matches the actual amount we'll swap
-        const isAaveWithMax = isMax && selectedProvider?.providerEnum === FlashLoanProvider.AaveV3;
+        const isAaveWithMax = isMax && (selectedProvider?.providerEnum === FlashLoanProvider.Aave || selectedProvider?.providerEnum === FlashLoanProvider.ZeroLend);
         if (isAaveWithMax && baseAmount > 0n) {
             // IMPORTANT: Must match on-chain Split rounding exactly!
             // On-chain: feeAmount = (amount * bp + 10000 - 1) / 10000  (rounds UP)
