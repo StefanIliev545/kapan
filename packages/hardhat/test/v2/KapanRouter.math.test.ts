@@ -117,7 +117,10 @@ describe("KapanRouter Math Instructions", function () {
       // Try to split a non-existent UTXO
       const instrs = [createRouterInstruction(encodeSplit(0, 30))]; // No UTXO[0] exists
 
-      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWith("Split: bad index");
+      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWithCustomError(
+        router,
+        "BadIndex"
+      );
     });
 
     it("should revert on fraction > 100%", async function () {
@@ -146,8 +149,9 @@ describe("KapanRouter Math Instructions", function () {
         createRouterInstruction(encodeSplit(0, 10100)), // 101%
       ];
 
-      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWith(
-        "Split: fraction too large"
+      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWithCustomError(
+        router,
+        "FractionTooLarge"
       );
     });
   });
@@ -232,7 +236,10 @@ describe("KapanRouter Math Instructions", function () {
         createRouterInstruction(encodeAdd(0, 1)), // Should fail - different tokens
       ];
 
-      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWith("Add: token mismatch");
+      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWithCustomError(
+        router,
+        "TokenMismatch"
+      );
     });
 
     it("should revert on invalid input indices", async function () {
@@ -246,7 +253,10 @@ describe("KapanRouter Math Instructions", function () {
       // Try to add non-existent UTXOs
       const instrs = [createRouterInstruction(encodeAdd(0, 1))];
 
-      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWith("Add: bad index");
+      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWithCustomError(
+        router,
+        "BadIndex"
+      );
     });
   });
 
@@ -335,7 +345,10 @@ describe("KapanRouter Math Instructions", function () {
         createRouterInstruction(encodeSubtract(0, 1)), // 30 - 100 = underflow
       ];
 
-      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWith("Subtract: underflow");
+      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWithCustomError(
+        router,
+        "Underflow"
+      );
     });
 
     it("should revert when tokens don't match", async function () {
@@ -368,8 +381,9 @@ describe("KapanRouter Math Instructions", function () {
         createRouterInstruction(encodeSubtract(0, 1)),
       ];
 
-      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWith(
-        "Subtract: token mismatch"
+      await expect(router.connect(user).processProtocolInstructions(instrs)).to.be.revertedWithCustomError(
+        router,
+        "TokenMismatch"
       );
     });
   });

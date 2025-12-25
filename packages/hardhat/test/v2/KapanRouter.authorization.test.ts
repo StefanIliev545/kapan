@@ -39,7 +39,7 @@ describe("v2 Router Authorization", function () {
     // Attempt to execute - should revert
     await expect(
       router.connect(user).processProtocolInstructions([borrowInstr])
-    ).to.be.revertedWith("Not authorized: sender must match user");
+    ).to.be.revertedWithCustomError(router, "NotAuthorized");
   });
 
   it("should revert when user tries to withdraw collateral on behalf of another user", async function () {
@@ -74,7 +74,7 @@ describe("v2 Router Authorization", function () {
     // Attempt to execute - should revert
     await expect(
       router.connect(user).processProtocolInstructions([withdrawInstr])
-    ).to.be.revertedWith("Not authorized: sender must match user");
+    ).to.be.revertedWithCustomError(router, "NotAuthorized");
   });
 
   it("should allow user to borrow on their own behalf", async function () {
@@ -216,7 +216,7 @@ describe("v2 Router Authorization", function () {
     // Should revert immediately, even if there were other instructions before it
     await expect(
       router.connect(user).processProtocolInstructions([borrowInstr])
-    ).to.be.revertedWith("Not authorized: sender must match user");
+    ).to.be.revertedWithCustomError(router, "NotAuthorized");
   });
 });
 
