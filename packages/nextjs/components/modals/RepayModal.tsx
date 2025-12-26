@@ -14,6 +14,8 @@ interface RepayModalProps {
   debtBalance: bigint;
   position?: PositionManager;
   chainId?: number;
+  /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+  context?: string;
 }
 
 export const RepayModal: FC<RepayModalProps> = ({
@@ -24,6 +26,7 @@ export const RepayModal: FC<RepayModalProps> = ({
   debtBalance,
   position,
   chainId,
+  context,
 }) => {
   const { balance: walletBalance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
   const { buildRepayFlowAsync } = useKapanRouterV2();
@@ -46,9 +49,11 @@ export const RepayModal: FC<RepayModalProps> = ({
         token.decimals || decimals || 18,
         isMax,
         maxInput,
+        context,
       ),
     [
       buildRepayFlowAsync,
+      context,
       decimals,
       maxInput,
       normalizedProtocolName,

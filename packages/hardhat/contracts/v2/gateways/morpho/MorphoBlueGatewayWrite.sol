@@ -199,21 +199,28 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
 
         loanToken.safeTransferFrom(msg.sender, address(this), amount);
         loanToken.approve(address(morpho), 0);
-        loanToken.approve(address(morpho), type(uint256).max);
+        loanToken.approve(address(morpho), amount);
 
-        // Get user's actual borrow shares to repay exactly what's owed
+        // Get user's actual debt to decide repay strategy
         bytes32 marketId = params.id();
         Position memory pos = morpho.position(marketId, user);
         
         uint256 repaid;
         if (pos.borrowShares > 0) {
-            // Repay by SHARES to avoid overflow when assets exceed debt
-            // This ensures we repay exactly the user's debt, no more
-            (repaid, ) = morpho.repay(params, 0, pos.borrowShares, user, "");
-        }
+            // Calculate current debt in assets
+            Market memory mkt = morpho.market(marketId);
+            uint256 debtAssets = mkt.totalBorrowShares > 0
+                ? (uint256(pos.borrowShares) * uint256(mkt.totalBorrowAssets) + uint256(mkt.totalBorrowShares) - 1) / uint256(mkt.totalBorrowShares)
+                : 0;
 
-        // Reset approval for security
-        loanToken.approve(address(morpho), 0);
+            if (amount >= debtAssets) {
+                // Full repay: use shares to avoid overflow/rounding issues
+                (repaid, ) = morpho.repay(params, 0, pos.borrowShares, user, "");
+            } else {
+                // Partial repay: use assets
+                (repaid, ) = morpho.repay(params, amount, 0, user, "");
+            }
+        }
 
         uint256 post = loanToken.balanceOf(address(this));
         refund = post > pre ? post - pre : 0;
@@ -287,6 +294,7 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
 
         // Check if caller has authorized this gateway on Morpho
         bool isAuth = morpho.isAuthorized(caller, address(this));
+        bool authEmitted = false; // Only emit setAuthorization once
 
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
@@ -303,23 +311,25 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
                 produced[pIdx] = ProtocolTypes.Output({ token: params.collateralToken, amount: amount });
                 pIdx++;
 
-                if (isAuth) {
+                if (isAuth || authEmitted) {
                     targets[i] = address(0);
                     data[i] = "";
                 } else {
                     targets[i] = address(morpho);
                     data[i] = abi.encodeWithSelector(IMorphoBlue.setAuthorization.selector, address(this), true);
+                    authEmitted = true;
                 }
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
                 produced[pIdx] = ProtocolTypes.Output({ token: params.loanToken, amount: amount });
                 pIdx++;
 
-                if (isAuth) {
+                if (isAuth || authEmitted) {
                     targets[i] = address(0);
                     data[i] = "";
                 } else {
                     targets[i] = address(morpho);
                     data[i] = abi.encodeWithSelector(IMorphoBlue.setAuthorization.selector, address(this), true);
+                    authEmitted = true;
                 }
             } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
                 uint256 bal = _getBorrowBalanceView(params, ins.user);

@@ -7,6 +7,8 @@ import {
   encodePullToken,
   encodeApprove,
   encodePushToken,
+  encodeFlashLoan,
+  FlashLoanProvider,
   LendingOp,
 } from "./helpers/instructionHelpers";
 
@@ -191,9 +193,10 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       const morphoCode = await ethers.provider.getCode(morphoAddress);
       if (morphoCode === "0x") this.skip();
 
+      const [deployer] = await ethers.getSigners();
       // Deploy view gateway
       const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
-      const viewGateway = await ViewGateway.deploy(morphoAddress);
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
       await viewGateway.waitForDeployment();
 
       // Use market based on chain
@@ -223,8 +226,9 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       const morphoCode = await ethers.provider.getCode(morphoAddress);
       if (morphoCode === "0x") this.skip();
 
+      const [deployer] = await ethers.getSigners();
       const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
-      const viewGateway = await ViewGateway.deploy(morphoAddress);
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
       await viewGateway.waitForDeployment();
 
       const market = chainId === 1 ? ETH_MARKETS.wstETH_USDC : ARB_MARKETS.wstETH_USDC;
@@ -240,6 +244,186 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       const computedId = await viewGateway.computeMarketId(marketParams);
       expect(computedId.toLowerCase()).to.equal(market.key.toLowerCase());
       console.log(`✓ Market ID verified: ${computedId}`);
+    });
+
+    it("should register markets and enumerate them", async function () {
+      const morphoCode = await ethers.provider.getCode(morphoAddress);
+      if (morphoCode === "0x") this.skip();
+
+      const [deployer] = await ethers.getSigners();
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      // Register multiple markets
+      const markets = chainId === 1
+        ? [ETH_MARKETS.wstETH_USDC, ETH_MARKETS.WBTC_USDC]
+        : [ARB_MARKETS.wstETH_USDC, ARB_MARKETS.WBTC_USDC];
+
+      const marketParamsList = markets.map(m => ({
+        loanToken: m.loanToken,
+        collateralToken: m.collateralToken,
+        oracle: m.oracle,
+        irm: m.irm,
+        lltv: m.lltv,
+      }));
+
+      await viewGateway.registerMarkets(marketParamsList);
+
+      const registeredIds = await viewGateway.getRegisteredMarketIds();
+      expect(registeredIds.length).to.equal(2);
+      console.log(`✓ Registered ${registeredIds.length} markets`);
+
+      // Verify market count
+      const count = await viewGateway.registeredMarketCount();
+      expect(count).to.equal(2);
+    });
+
+    it("should get oracle price", async function () {
+      const morphoCode = await ethers.provider.getCode(morphoAddress);
+      if (morphoCode === "0x") this.skip();
+
+      const [deployer] = await ethers.getSigners();
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      const market = chainId === 1 ? ETH_MARKETS.wstETH_USDC : ARB_MARKETS.wstETH_USDC;
+      const marketParams = {
+        loanToken: market.loanToken,
+        collateralToken: market.collateralToken,
+        oracle: market.oracle,
+        irm: market.irm,
+        lltv: market.lltv,
+      };
+
+      const oraclePrice = await viewGateway.getOraclePrice(marketParams);
+      console.log(`✓ Oracle price (collateral/loan, 36 decimals): ${oraclePrice}`);
+      // wstETH/USDC should have a price reflecting ETH price in USDC terms
+      expect(oraclePrice).to.be.gt(0);
+    });
+
+    it("should get borrow and supply APR", async function () {
+      const morphoCode = await ethers.provider.getCode(morphoAddress);
+      if (morphoCode === "0x") this.skip();
+
+      const [deployer] = await ethers.getSigners();
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      const market = chainId === 1 ? ETH_MARKETS.wstETH_USDC : ARB_MARKETS.wstETH_USDC;
+      const marketParams = {
+        loanToken: market.loanToken,
+        collateralToken: market.collateralToken,
+        oracle: market.oracle,
+        irm: market.irm,
+        lltv: market.lltv,
+      };
+
+      const borrowApr = await viewGateway.getBorrowApr(marketParams);
+      const supplyApr = await viewGateway.getSupplyApr(marketParams);
+
+      console.log(`✓ Borrow APR: ${(Number(borrowApr) / 1e16).toFixed(2)}%`);
+      console.log(`✓ Supply APR: ${(Number(supplyApr) / 1e16).toFixed(2)}%`);
+
+      // APRs should be reasonable (< 100%)
+      expect(borrowApr).to.be.lt(ethers.parseEther("1")); // < 100%
+    });
+
+    it("should get comprehensive market info", async function () {
+      const morphoCode = await ethers.provider.getCode(morphoAddress);
+      if (morphoCode === "0x") this.skip();
+
+      const [deployer] = await ethers.getSigners();
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      const market = chainId === 1 ? ETH_MARKETS.wstETH_USDC : ARB_MARKETS.wstETH_USDC;
+      const marketParams = {
+        loanToken: market.loanToken,
+        collateralToken: market.collateralToken,
+        oracle: market.oracle,
+        irm: market.irm,
+        lltv: market.lltv,
+      };
+
+      const info = await viewGateway.getMarketInfo(marketParams);
+
+      console.log(`✓ Market Info:`);
+      console.log(`  Loan Token: ${info.loanSymbol} (${info.loanDecimals} decimals)`);
+      console.log(`  Collateral Token: ${info.collateralSymbol} (${info.collateralDecimals} decimals)`);
+      console.log(`  LLTV: ${(Number(info.lltv) / 1e16).toFixed(1)}%`);
+      console.log(`  Total Supply: ${ethers.formatUnits(info.totalSupplyAssets, info.loanDecimals)}`);
+      console.log(`  Total Borrow: ${ethers.formatUnits(info.totalBorrowAssets, info.loanDecimals)}`);
+      console.log(`  Utilization: ${(Number(info.utilizationRate) / 1e16).toFixed(2)}%`);
+      console.log(`  Borrow APR: ${(Number(info.borrowRate) / 1e16).toFixed(2)}%`);
+      console.log(`  Supply APR: ${(Number(info.supplyRate) / 1e16).toFixed(2)}%`);
+
+      expect(info.loanSymbol).to.equal("USDC");
+      expect(info.totalSupplyAssets).to.be.gt(0);
+    });
+
+    it("should get all markets info after registration", async function () {
+      const morphoCode = await ethers.provider.getCode(morphoAddress);
+      if (morphoCode === "0x") this.skip();
+
+      const [deployer] = await ethers.getSigners();
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      // Register markets
+      const markets = chainId === 1
+        ? [ETH_MARKETS.wstETH_USDC, ETH_MARKETS.WBTC_USDC]
+        : [ARB_MARKETS.wstETH_USDC, ARB_MARKETS.WBTC_USDC];
+
+      const marketParamsList = markets.map(m => ({
+        loanToken: m.loanToken,
+        collateralToken: m.collateralToken,
+        oracle: m.oracle,
+        irm: m.irm,
+        lltv: m.lltv,
+      }));
+
+      await viewGateway.registerMarkets(marketParamsList);
+
+      const allInfos = await viewGateway.getAllMarketsInfo();
+      expect(allInfos.length).to.equal(2);
+
+      console.log(`✓ Got info for ${allInfos.length} registered markets:`);
+      for (const info of allInfos) {
+        console.log(`  - ${info.collateralSymbol}/${info.loanSymbol}: ${(Number(info.utilizationRate) / 1e16).toFixed(2)}% util`);
+      }
+    });
+
+    it("should get market configs", async function () {
+      const morphoCode = await ethers.provider.getCode(morphoAddress);
+      if (morphoCode === "0x") this.skip();
+
+      const [deployer] = await ethers.getSigners();
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      const markets = chainId === 1
+        ? [ETH_MARKETS.wstETH_USDC]
+        : [ARB_MARKETS.wstETH_USDC];
+
+      const marketParamsList = markets.map(m => ({
+        loanToken: m.loanToken,
+        collateralToken: m.collateralToken,
+        oracle: m.oracle,
+        irm: m.irm,
+        lltv: m.lltv,
+      }));
+
+      const configs = await viewGateway.getMarketConfigs(marketParamsList);
+      expect(configs.length).to.equal(1);
+      expect(configs[0].isActive).to.be.true;
+      expect(configs[0].lltv).to.equal(markets[0].lltv);
+      console.log(`✓ Market config: LLTV ${(Number(configs[0].lltv) / 1e16).toFixed(1)}%, active: ${configs[0].isActive}`);
     });
   });
 
@@ -501,7 +685,7 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
 
       // Debug: Check remaining debt after repay
       const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
-      const viewGateway = await ViewGateway.deploy(morphoAddress);
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
       await viewGateway.waitForDeployment();
 
       const marketParams = {
@@ -580,6 +764,242 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       console.log(`Repaid: exact debt via GetBorrowBalance`);
       console.log(`Collateral withdrawn: ${ethers.formatUnits(userWBTCFinal, 8)} WBTC`);
       console.log("✓ All operations completed successfully!");
+    });
+  });
+
+  describe("Refinance: Aave → Morpho Blue", function () {
+    // Constants for Arbitrum
+    const AAVE_POOL_PROVIDER = "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
+    const BALANCER_VAULT3 = "0xbA1333333333a1BA1108E8412f11850A5C319bA9";
+    const USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+    const WETH = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
+    const WETH_WHALE = BALANCER_VAULT3;
+
+    it("should refinance a WETH/USDC position from Aave to Morpho Blue", async function () {
+      this.timeout(300000);
+
+      // Check we're on Arbitrum fork (31337 is hardhat local, but we're forking Arbitrum)
+      const chainId = Number((await ethers.provider.getNetwork()).chainId);
+      if (chainId !== 42161 && chainId !== 31337) {
+        console.log(`Skipping: Arbitrum only (got chain ${chainId})`);
+        this.skip();
+      }
+
+      // Use Arbitrum Morpho address (works for both 42161 and 31337 fork)
+      const morphoAddress = MORPHO_BY_CHAIN[42161];
+      if (!morphoAddress) {
+        console.log("Skipping: No Morpho Blue address for Arbitrum");
+        this.skip();
+      }
+
+      // Use wstETH/USDC market (has good liquidity on Arbitrum)
+      const market = ARB_MARKETS.wstETH_USDC;
+      const wstETH = "0x5979D7b546E38E414F7E9822514be443A4800529";
+
+      console.log("\n=== Refinance: Aave → Morpho Blue ===");
+      console.log(`Market: wstETH/USDC (Arbitrum)`);
+
+      const [deployer] = await ethers.getSigners();
+      const user = ethers.Wallet.createRandom().connect(ethers.provider);
+      await deployer.sendTransaction({ to: user.address, value: ethers.parseEther("1") });
+      const userAddress = user.address;
+
+      // Setup tokens
+      const wstEth = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", wstETH);
+      const usdc = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", USDC);
+
+      // ============ Phase 1: Deploy Infrastructure ============
+      console.log("\n--- Phase 1: Deploy Infrastructure ---");
+
+      // Deploy Router
+      const Router = await ethers.getContractFactory("KapanRouter");
+      const router = await Router.deploy(deployer.address);
+      await router.waitForDeployment();
+      const routerAddress = await router.getAddress();
+      await router.setBalancerV3(BALANCER_VAULT3);
+      console.log(`1. Router deployed: ${routerAddress}`);
+
+      // Deploy Aave Gateway
+      const AaveFactory = await ethers.getContractFactory("AaveGatewayWrite");
+      const aaveGateway = await AaveFactory.deploy(routerAddress, AAVE_POOL_PROVIDER, 0);
+      await router.addGateway("aave", await aaveGateway.getAddress());
+      console.log(`2. Aave Gateway: ${await aaveGateway.getAddress()}`);
+
+      // Deploy Morpho Blue Gateway
+      const MorphoFactory = await ethers.getContractFactory("MorphoBlueGatewayWrite");
+      const morphoGateway = await MorphoFactory.deploy(routerAddress, deployer.address, morphoAddress);
+      await morphoGateway.waitForDeployment();
+      const morphoGatewayAddress = await morphoGateway.getAddress();
+      await router.addGateway("morpho-blue", morphoGatewayAddress);
+      console.log(`3. Morpho Gateway: ${morphoGatewayAddress}`);
+
+      // Register market
+      await morphoGateway.registerMarket({
+        loanToken: market.loanToken,
+        collateralToken: market.collateralToken,
+        oracle: market.oracle,
+        irm: market.irm,
+        lltv: market.lltv,
+      });
+      console.log(`4. Market registered`);
+
+      // ============ Phase 2: Setup Aave Position ============
+      console.log("\n--- Phase 2: Setup Aave Position ---");
+
+      // Fund user with wstETH using known whale
+      const wstETH_WHALE = ARB_WHALES.wstETH;
+      await network.provider.send("hardhat_setBalance", [wstETH_WHALE, "0x56BC75E2D63100000"]);
+      await network.provider.request({ method: "hardhat_impersonateAccount", params: [wstETH_WHALE] });
+      const wstEthWhale = await ethers.getSigner(wstETH_WHALE);
+      
+      const collateralAmount = ethers.parseEther("1"); // 1 wstETH
+      await wstEth.connect(wstEthWhale).transfer(userAddress, collateralAmount);
+      console.log(`Funded user with ${ethers.formatEther(collateralAmount)} wstETH`);
+
+      // Deposit to Aave and borrow USDC
+      await wstEth.connect(user).approve(routerAddress, collateralAmount);
+
+      const borrowAmount = BigInt(500 * 1e6); // 500 USDC
+      // UTXO Flow:
+      // 0: PullToken -> wstETH
+      // 1: Approve -> empty
+      // (DepositCollateral produces 0 outputs)
+      // 2: Borrow -> USDC
+      const setupInstrs = [
+        createRouterInstruction(encodePullToken(collateralAmount, wstETH, userAddress)),
+        createRouterInstruction(encodeApprove(0, "aave")),
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.DepositCollateral, wstETH, userAddress, 0n, "0x", 0)),
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddress, borrowAmount, "0x", 999)),
+        createRouterInstruction(encodePushToken(2, userAddress)), // Push borrowed USDC (index 2)
+      ];
+
+      // Authorize Aave
+      const [setupTargets, setupData] = await router.authorizeInstructions(setupInstrs, userAddress);
+      for (let i = 0; i < setupTargets.length; i++) {
+        if (setupTargets[i] !== ethers.ZeroAddress && setupData[i] !== "0x") {
+          await user.sendTransaction({ to: setupTargets[i], data: setupData[i] });
+        }
+      }
+
+      await router.connect(user).processProtocolInstructions(setupInstrs);
+      console.log(`✓ Aave position created: ${ethers.formatEther(collateralAmount)} wstETH collateral, ${ethers.formatUnits(borrowAmount, 6)} USDC debt`);
+
+      // ============ Phase 3: Refinance to Morpho Blue ============
+      console.log("\n--- Phase 3: Refinance to Morpho Blue ---");
+
+      const morphoContext = encodeMarketParamsContext(
+        market.loanToken,
+        market.collateralToken,
+        market.oracle,
+        market.irm,
+        market.lltv
+      );
+
+      /**
+       * UTXO Flow:
+       * 0: Aave.GetBorrowBalance(USDC) -> exact debt
+       * 1: FlashLoan(Balancer, Input=0) -> [repayAmount]
+       * 2: Approve(Aave, UTXO[1])
+       * 3: Aave.Repay(USDC, Input=0) -> refund
+       * 4: Aave.GetSupplyBalance(wstETH) -> exact collateral
+       * 5: Aave.WithdrawCollateral(wstETH, Input=4) -> collateral
+       * 6: Approve(Morpho, UTXO[5])
+       * 7: Morpho.DepositCollateral(wstETH, Input=4)
+       * 8: Morpho.Borrow(USDC, Input=1) -> borrowed USDC to repay flash loan
+       */
+      const refinanceInstrs = [
+        // Query Aave debt
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
+        // Flash loan exact debt
+        createRouterInstruction(encodeFlashLoan(FlashLoanProvider.BalancerV3, 0)),
+        // Approve Aave for repay
+        createRouterInstruction(encodeApprove(1, "aave")),
+        // Repay Aave debt
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Repay, USDC, userAddress, 0n, "0x", 0)),
+        // Query Aave collateral
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetSupplyBalance, wstETH, userAddress, 0n, "0x", 999)),
+        // Withdraw collateral from Aave
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.WithdrawCollateral, wstETH, userAddress, 0n, "0x", 4)),
+        // Approve Morpho for deposit
+        createRouterInstruction(encodeApprove(5, "morpho-blue")),
+        // Deposit collateral to Morpho
+        createProtocolInstruction("morpho-blue", encodeLendingInstruction(LendingOp.DepositCollateral, wstETH, userAddress, 0n, morphoContext, 4)),
+        // Borrow from Morpho to repay flash loan
+        createProtocolInstruction("morpho-blue", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddress, 0n, morphoContext, 1)),
+      ];
+
+      // Authorize both protocols
+      const [refTargets, refData] = await router.authorizeInstructions(refinanceInstrs, userAddress);
+      let authCount = 0;
+      for (let i = 0; i < refTargets.length; i++) {
+        if (refTargets[i] !== ethers.ZeroAddress && refData[i] !== "0x") {
+          console.log(`Authorizing: ${refTargets[i]}`);
+          await user.sendTransaction({ to: refTargets[i], data: refData[i] });
+          authCount++;
+        }
+      }
+      console.log(`✓ Sent ${authCount} authorization transactions`);
+
+      // Authorize Morpho gateway to act on behalf of user (if not already done via authorizeInstructions)
+      const morpho = await ethers.getContractAt("IMorphoBlue", morphoAddress);
+      const isAlreadyAuthorized = await morpho.isAuthorized(userAddress, morphoGatewayAddress);
+      if (!isAlreadyAuthorized) {
+        await morpho.connect(user).setAuthorization(morphoGatewayAddress, true);
+        console.log(`✓ Authorized Morpho gateway`);
+      } else {
+        console.log(`✓ Morpho gateway already authorized`);
+      }
+
+      // Execute refinance
+      const tx = await router.connect(user).processProtocolInstructions(refinanceInstrs);
+      const receipt = await tx.wait();
+      console.log(`✓ Refinance executed! Gas: ${receipt.gasUsed}`);
+
+      // ============ Phase 4: Verify ============
+      console.log("\n--- Phase 4: Verify Positions ---");
+
+      // Check Aave position (should be ~0)
+      const poolProvider = await ethers.getContractAt(
+        "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
+        AAVE_POOL_PROVIDER
+      );
+      const aaveDataProvider = await ethers.getContractAt(
+        "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol:IPoolDataProvider",
+        await poolProvider.getPoolDataProvider()
+      );
+      const aaveData = await aaveDataProvider.getUserReserveData(wstETH, userAddress);
+      const aaveCollateral = aaveData[0];
+      const aaveUsdcData = await aaveDataProvider.getUserReserveData(USDC, userAddress);
+      const aaveDebt = aaveUsdcData[1] + aaveUsdcData[2]; // variable + stable
+
+      console.log(`Aave wstETH: ${ethers.formatEther(aaveCollateral)} (should be ~0)`);
+      console.log(`Aave USDC debt: ${ethers.formatUnits(aaveDebt, 6)} (should be ~0)`);
+
+      // Check Morpho position
+      const ViewGateway = await ethers.getContractFactory("MorphoBlueGatewayView");
+      const viewGateway = await ViewGateway.deploy(morphoAddress, deployer.address);
+      await viewGateway.waitForDeployment();
+
+      const marketParams = {
+        loanToken: market.loanToken,
+        collateralToken: market.collateralToken,
+        oracle: market.oracle,
+        irm: market.irm,
+        lltv: market.lltv,
+      };
+      const morphoCollateral = await viewGateway.getCollateralBalance(marketParams, userAddress);
+      const morphoDebt = await viewGateway.getBorrowBalance(marketParams, userAddress);
+
+      console.log(`Morpho wstETH: ${ethers.formatEther(morphoCollateral)} (should be ~${ethers.formatEther(collateralAmount)})`);
+      console.log(`Morpho USDC debt: ${ethers.formatUnits(morphoDebt, 6)} (should be ~${ethers.formatUnits(borrowAmount, 6)})`);
+
+      // Assertions
+      expect(aaveCollateral).to.be.lt(ethers.parseEther("0.001")); // Dust
+      expect(aaveDebt).to.be.lt(BigInt(1e6)); // Less than 1 USDC
+      expect(morphoCollateral).to.be.closeTo(collateralAmount, ethers.parseEther("0.01"));
+      expect(morphoDebt).to.be.gte(borrowAmount);
+
+      console.log("\n✓ Refinance successful: Aave → Morpho Blue!");
     });
   });
 });

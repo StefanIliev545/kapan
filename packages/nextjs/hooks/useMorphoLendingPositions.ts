@@ -1,0 +1,371 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { formatUnits } from "viem";
+import type { ProtocolPosition } from "~~/components/ProtocolView";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+
+// ============ Types ============
+
+export interface MorphoMarketAsset {
+  address: string;
+  symbol: string;
+  decimals: number;
+  priceUsd: number | null;
+}
+
+export interface MorphoMarketState {
+  supplyAssets: number;
+  borrowAssets: number;
+  utilization: number;
+  supplyApy: number;
+  borrowApy: number;
+  liquidityAssets?: number;
+}
+
+export interface MorphoMarket {
+  id: string;
+  uniqueKey: string;
+  collateralAsset: MorphoMarketAsset | null;
+  loanAsset: MorphoMarketAsset;
+  oracle: { address: string } | null;
+  irmAddress: string;
+  lltv: string; // BigInt string like "860000000000000000"
+  state: MorphoMarketState;
+}
+
+export interface MorphoPosition {
+  market: MorphoMarket;
+  supplyShares: string;
+  supplyAssets: number;
+  borrowShares: string;
+  borrowAssets: number;
+  collateral: number;
+  healthFactor: number | null;
+}
+
+export interface MorphoUserData {
+  address: string;
+  marketPositions: MorphoPosition[];
+}
+
+// ============ Market Context (for lending instructions) ============
+
+export interface MorphoMarketContext {
+  marketId: string;
+  loanToken: string;
+  collateralToken: string;
+  oracle: string;
+  irm: string;
+  lltv: bigint;
+}
+
+export function createMorphoContext(market: MorphoMarket): MorphoMarketContext {
+  return {
+    marketId: market.uniqueKey,
+    loanToken: market.loanAsset.address,
+    collateralToken: market.collateralAsset?.address || "",
+    oracle: market.oracle?.address || "",
+    irm: market.irmAddress,
+    lltv: BigInt(market.lltv),
+  };
+}
+
+// ============ Position Row (for display) ============
+
+export interface MorphoPositionRow {
+  key: string;
+  market: MorphoMarket;
+  context: MorphoMarketContext;
+  collateralSymbol: string;
+  loanSymbol: string;
+  // Collateral position
+  collateralBalance: bigint;
+  collateralBalanceUsd: number;
+  collateralDecimals: number;
+  // Borrow position  
+  borrowBalance: bigint;
+  borrowBalanceUsd: number;
+  borrowDecimals: number;
+  // Rates
+  supplyApy: number;
+  borrowApy: number;
+  // Risk
+  lltv: number; // as percentage (0-100)
+  currentLtv: number | null; // as percentage
+  healthFactor: number | null;
+  isHealthy: boolean;
+  // Display
+  hasCollateral: boolean;
+  hasDebt: boolean;
+}
+
+// ============ API Fetchers ============
+
+async function fetchMorphoMarkets(chainId: number): Promise<MorphoMarket[]> {
+  try {
+    const response = await fetch(`/api/morpho/${chainId}/markets?first=100`);
+    if (!response.ok) {
+      console.error(`[useMorphoLendingPositions] Markets API error: ${response.status}`);
+      return [];
+    }
+    const data = await response.json();
+    return data?.markets?.items || [];
+  } catch (error) {
+    console.error("[useMorphoLendingPositions] Failed to fetch markets:", error);
+    return [];
+  }
+}
+
+async function fetchMorphoPositions(
+  chainId: number,
+  userAddress: string
+): Promise<MorphoPosition[]> {
+  try {
+    const response = await fetch(
+      `/api/morpho/${chainId}/positions?user=${userAddress}`
+    );
+    if (!response.ok) {
+      console.error(`[useMorphoLendingPositions] Positions API error: ${response.status}`);
+      return [];
+    }
+    const data = await response.json();
+    return data?.userByAddress?.marketPositions || [];
+  } catch (error) {
+    console.error("[useMorphoLendingPositions] Failed to fetch positions:", error);
+    return [];
+  }
+}
+
+// ============ Hook Result ============
+
+interface UseMorphoLendingPositionsResult {
+  // All markets available on this chain
+  markets: MorphoMarket[];
+  // User positions as rows
+  rows: MorphoPositionRow[];
+  // Positions with collateral (for supply display)
+  suppliedPositions: ProtocolPosition[];
+  // Positions with debt (for borrow display)
+  borrowedPositions: ProtocolPosition[];
+  // Loading states
+  isLoadingMarkets: boolean;
+  isLoadingPositions: boolean;
+  hasLoadedOnce: boolean;
+  isUpdating: boolean;
+  // Refetch
+  refetchPositions: () => void;
+  refetchMarkets: () => void;
+  // Errors
+  marketsError: unknown;
+  positionsError: unknown;
+}
+
+// ============ Main Hook ============
+
+export function useMorphoLendingPositions(
+  chainId: number,
+  userAddress: string | undefined
+): UseMorphoLendingPositionsResult {
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  // Fetch markets
+  const {
+    data: markets = [],
+    isLoading: isLoadingMarkets,
+    isFetching: isFetchingMarkets,
+    error: marketsError,
+    refetch: refetchMarkets,
+  } = useQuery({
+    queryKey: ["morpho-markets", chainId],
+    queryFn: () => fetchMorphoMarkets(chainId),
+    staleTime: 60_000, // 1 minute
+    refetchOnWindowFocus: false,
+    enabled: chainId > 0,
+  });
+
+  // Fetch user positions
+  const {
+    data: positions = [],
+    isLoading: isLoadingPositions,
+    isFetching: isFetchingPositions,
+    error: positionsError,
+    refetch: refetchPositions,
+  } = useQuery({
+    queryKey: ["morpho-positions", chainId, userAddress],
+    queryFn: () => fetchMorphoPositions(chainId, userAddress as string),
+    staleTime: 30_000, // 30 seconds
+    refetchOnWindowFocus: false,
+    enabled: chainId > 0 && !!userAddress,
+  });
+
+  // Track first load
+  useEffect(() => {
+    if (!isLoadingPositions && !hasLoadedOnce && userAddress) {
+      setHasLoadedOnce(true);
+    }
+  }, [isLoadingPositions, hasLoadedOnce, userAddress]);
+
+  // Reset on address change
+  useEffect(() => {
+    setHasLoadedOnce(false);
+  }, [userAddress]);
+
+  // Build position rows
+  const rows = useMemo<MorphoPositionRow[]>(() => {
+    if (!positions.length) return [];
+
+    return positions
+      .filter((pos) => pos.collateral > 0 || pos.borrowAssets > 0)
+      .map((pos): MorphoPositionRow => {
+        const market = pos.market;
+        const context = createMorphoContext(market);
+
+        const collateralDecimals = market.collateralAsset?.decimals || 18;
+        const loanDecimals = market.loanAsset.decimals;
+
+        const collateralBalance = BigInt(Math.floor(pos.collateral));
+        const borrowBalance = BigInt(Math.floor(pos.borrowAssets));
+
+        const collateralPriceUsd = market.collateralAsset?.priceUsd || 0;
+        const loanPriceUsd = market.loanAsset.priceUsd || 0;
+
+        const collateralBalanceNum = Number(
+          formatUnits(collateralBalance, collateralDecimals)
+        );
+        const borrowBalanceNum = Number(formatUnits(borrowBalance, loanDecimals));
+
+        const collateralBalanceUsd = collateralBalanceNum * collateralPriceUsd;
+        const borrowBalanceUsd = borrowBalanceNum * loanPriceUsd;
+
+        // LTV calculation
+        const lltv = Number(market.lltv) / 1e18;
+        let currentLtv: number | null = null;
+        if (collateralBalanceUsd > 0 && borrowBalanceUsd > 0) {
+          currentLtv = (borrowBalanceUsd / collateralBalanceUsd) * 100;
+        }
+
+        return {
+          key: market.uniqueKey,
+          market,
+          context,
+          collateralSymbol: market.collateralAsset?.symbol || "?",
+          loanSymbol: market.loanAsset.symbol,
+          collateralBalance,
+          collateralBalanceUsd,
+          collateralDecimals,
+          borrowBalance,
+          borrowBalanceUsd,
+          borrowDecimals: loanDecimals,
+          supplyApy: market.state.supplyApy * 100,
+          borrowApy: market.state.borrowApy * 100,
+          lltv: lltv * 100,
+          currentLtv,
+          healthFactor: pos.healthFactor,
+          isHealthy: pos.healthFactor === null || pos.healthFactor >= 1,
+          hasCollateral: pos.collateral > 0,
+          hasDebt: pos.borrowAssets > 0,
+        };
+      });
+  }, [positions]);
+
+  // Convert to ProtocolPosition format for compatibility
+  const suppliedPositions = useMemo<ProtocolPosition[]>(() => {
+    return rows
+      .filter((r) => r.hasCollateral)
+      .map((row) => ({
+        icon: tokenNameToLogo(row.collateralSymbol.toLowerCase()),
+        name: row.collateralSymbol,
+        balance: row.collateralBalanceUsd,
+        tokenBalance: row.collateralBalance,
+        currentRate: row.supplyApy,
+        tokenAddress: row.market.collateralAsset?.address || "",
+        tokenDecimals: row.collateralDecimals,
+        tokenPrice: BigInt(
+          Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)
+        ),
+        tokenSymbol: row.collateralSymbol,
+      }));
+  }, [rows]);
+
+  const borrowedPositions = useMemo<ProtocolPosition[]>(() => {
+    return rows
+      .filter((r) => r.hasDebt)
+      .map((row) => ({
+        icon: tokenNameToLogo(row.loanSymbol.toLowerCase()),
+        name: row.loanSymbol,
+        balance: row.borrowBalanceUsd,
+        tokenBalance: row.borrowBalance,
+        currentRate: row.borrowApy,
+        tokenAddress: row.market.loanAsset.address,
+        tokenDecimals: row.borrowDecimals,
+        tokenPrice: BigInt(
+          Math.floor((row.market.loanAsset.priceUsd || 0) * 1e8)
+        ),
+        tokenSymbol: row.loanSymbol,
+      }));
+  }, [rows]);
+
+  const isUpdating =
+    (isFetchingMarkets && !isLoadingMarkets) ||
+    (isFetchingPositions && !isLoadingPositions);
+
+  return {
+    markets,
+    rows,
+    suppliedPositions,
+    borrowedPositions,
+    isLoadingMarkets,
+    isLoadingPositions,
+    hasLoadedOnce,
+    isUpdating,
+    refetchPositions: useCallback(() => refetchPositions(), [refetchPositions]),
+    refetchMarkets: useCallback(() => refetchMarkets(), [refetchMarkets]),
+    marketsError,
+    positionsError,
+  };
+}
+
+// ============ Markets-only Hook (for market selection UI) ============
+
+export function useMorphoMarkets(chainId: number) {
+  const {
+    data: markets = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["morpho-markets", chainId],
+    queryFn: () => fetchMorphoMarkets(chainId),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    enabled: chainId > 0,
+  });
+
+  // Filter to only markets with both collateral and loan assets
+  const validMarkets = useMemo(() => {
+    return markets.filter(
+      (m) => m.collateralAsset && m.loanAsset && m.state.supplyAssets > 0
+    );
+  }, [markets]);
+
+  // Group by collateral/loan pair for display
+  const marketPairs = useMemo(() => {
+    const pairs = new Map<string, MorphoMarket[]>();
+    validMarkets.forEach((m) => {
+      const key = `${m.collateralAsset?.symbol}/${m.loanAsset.symbol}`;
+      const existing = pairs.get(key) || [];
+      existing.push(m);
+      pairs.set(key, existing);
+    });
+    return pairs;
+  }, [validMarkets]);
+
+  return {
+    markets: validMarkets,
+    marketPairs,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+

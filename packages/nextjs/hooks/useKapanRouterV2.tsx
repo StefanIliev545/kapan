@@ -294,6 +294,7 @@ export const useKapanRouterV2 = () => {
    * @param decimals - Token decimals (default: 18)
    * @param isMax - Whether to repay maximum (uses wallet balance, not MaxUint256)
    * @param maxPullAmount - Optional cap for the amount pulled from the wallet when repaying max
+   * @param context - Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address)
    */
   const buildRepayFlowAsync = useCallback(async (
     protocolName: string,
@@ -301,7 +302,8 @@ export const useKapanRouterV2 = () => {
     amount: string,
     decimals = 18,
     isMax = false,
-    maxPullAmount?: bigint
+    maxPullAmount?: bigint,
+    context = "0x"
   ): Promise<ProtocolInstruction[]> => {
     if (!userAddress || !publicClient) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -332,11 +334,11 @@ export const useKapanRouterV2 = () => {
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.GetBorrowBalance, tokenAddress, userAddress, 0n, "0x", 999)
+        encodeLendingInstruction(LendingOp.GetBorrowBalance, tokenAddress, userAddress, 0n, context, 999)
       ),
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, "0x", isMax ? 2 : 0)
+        encodeLendingInstruction(LendingOp.Repay, tokenAddress, userAddress, 0n, context, isMax ? 2 : 0)
       ),
       // Note: Repay will produce a refund output (index 3)
       createRouterInstruction(encodePushToken(3, userAddress)),

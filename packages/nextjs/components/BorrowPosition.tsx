@@ -83,6 +83,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   position,
   availableAssets: availableAssetsList,
   vesuContext,
+  protocolContext,
   moveSupport,
   actionsDisabled = false,
   actionsDisabledReason,
@@ -686,6 +687,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
             chainId={chainId}
+            context={protocolContext}
           />
           {moveModal.isOpen && (
             <RefinanceModal

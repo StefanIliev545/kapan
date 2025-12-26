@@ -44,6 +44,8 @@ export interface ProtocolPosition {
     borrow?: VesuContext;
     repay?: VesuContext;
   };
+  /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+  protocolContext?: string;
   moveSupport?: {
     preselectedCollaterals?: CollateralWithAmount[];
     disableCollateralSelection?: boolean;

@@ -230,6 +230,45 @@ export function createVenusInstruction(
 }
 
 /**
+ * Morpho market context interface
+ */
+export interface MorphoMarketContextForEncoding {
+  marketId: string;
+  loanToken: string;
+  collateralToken: string;
+  oracle: string;
+  irm: string;
+  lltv: bigint;
+}
+
+/**
+ * Encode Morpho market context into bytes for lending instructions
+ * Morpho expects MarketParams: (address loanToken, address collateralToken, address oracle, address irm, uint256 lltv)
+ */
+export function encodeMorphoContext(context: MorphoMarketContextForEncoding): string {
+  const coder = AbiCoder.defaultAbiCoder();
+  return coder.encode(
+    ["tuple(address loanToken, address collateralToken, address oracle, address irm, uint256 lltv)"],
+    [[context.loanToken, context.collateralToken, context.oracle, context.irm, context.lltv]]
+  );
+}
+
+/**
+ * Helper to create a lending instruction for Morpho Blue
+ */
+export function createMorphoInstruction(
+  op: LendingOp,
+  token: string,
+  user: string,
+  amount: bigint,
+  morphoContext: MorphoMarketContextForEncoding,
+  inputIndex = 999
+): ProtocolInstruction {
+  const context = encodeMorphoContext(morphoContext);
+  return createProtocolInstruction("morpho-blue", encodeLendingInstruction(op, token, user, amount, context, inputIndex));
+}
+
+/**
  * Helper to create a GetSupplyBalance instruction
  * This queries the user's supply/deposit balance and produces an output
  */
