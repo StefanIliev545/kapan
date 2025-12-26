@@ -4,7 +4,6 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
-import type { Address } from "viem";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -13,10 +12,11 @@ interface DepositModalProps {
   protocolName: string;
   position?: PositionManager;
   chainId?: number;
-  market?: Address; // Market address for Compound (baseToken/comet address)
+  /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+  context?: string;
 }
 
-export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId, market }) => {
+export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, protocolName, position, chainId, context }) => {
   const { buildDepositFlow } = useKapanRouterV2();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
   const normalizedProtocolName = protocolName.toLowerCase();
@@ -27,11 +27,11 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
 
   const buildFlow = useCallback(
     (amount: string) =>
-      buildDepositFlow(normalizedProtocolName, token.address, amount, token.decimals || decimals || 18, market),
+      buildDepositFlow(normalizedProtocolName, token.address, amount, token.decimals || decimals || 18, context),
     [
       buildDepositFlow,
+      context,
       decimals,
-      market,
       normalizedProtocolName,
       token.address,
       token.decimals,

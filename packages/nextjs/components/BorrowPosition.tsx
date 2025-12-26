@@ -11,7 +11,7 @@ import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { SwapAsset } from "./modals/SwapModalShell";
-import { Address } from "viem";
+import { Address, encodeAbiParameters } from "viem";
 import { FiChevronDown, FiChevronUp, FiInfo, FiMinus, FiPlus, FiRepeat, FiX, FiArrowRight } from "react-icons/fi";
 import { SegmentedActionBar } from "./common/SegmentedActionBar";
 import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
@@ -83,6 +83,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   position,
   availableAssets: availableAssetsList,
   vesuContext,
+  protocolContext,
   moveSupport,
   actionsDisabled = false,
   actionsDisabledReason,
@@ -670,6 +671,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             currentDebt={debtAmount}
             position={position}
             chainId={chainId}
+            context={protocolContext}
           />
           <RepayModal
             isOpen={repayModal.isOpen}
@@ -686,6 +688,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
             chainId={chainId}
+            context={protocolContext}
           />
           {moveModal.isOpen && (
             <RefinanceModal
@@ -709,8 +712,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtPrice={tokenPrice}
             debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             availableCollaterals={availableAssetsList as SwapAsset[]}
-            market={
-              protocolName.toLowerCase().includes("compound") ? (tokenAddress as Address) : undefined
+            context={
+              protocolName.toLowerCase().includes("compound")
+                ? encodeAbiParameters([{ type: "address" }], [tokenAddress as Address]) as `0x${string}`
+                : protocolContext
             }
           />
           <DebtSwapEvmModal
@@ -725,8 +730,10 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtFromDecimals={tokenDecimals || 18}
             debtFromPrice={tokenPrice}
             availableAssets={availableAssetsList as SwapAsset[]}
-            market={
-              protocolName.toLowerCase().includes("compound") ? (tokenAddress as Address) : undefined
+            context={
+              protocolName.toLowerCase().includes("compound")
+                ? encodeAbiParameters([{ type: "address" }], [tokenAddress as Address]) as `0x${string}`
+                : protocolContext
             }
           />
         </>

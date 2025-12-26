@@ -99,7 +99,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         AAVE_POOL_PROVIDER
       );
       const aavePool = await poolProvider.getPool();
-      await (await router.setAaveV3(aavePool)).wait();
+      await (await router.setAavePool(aavePool)).wait();
 
       // Deploy Aave gateway
       const AaveGateway = await ethers.getContractFactory("AaveGatewayWrite");
@@ -272,7 +272,7 @@ describe("v2 Refinance Positions - Linea (fork)", function () {
         // 0. Query actual Aave debt balance -> UTXO[0] (exact current debt amount)
         createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.GetBorrowBalance, USDC, userAddress, 0n, "0x", 999)),
         // 1. Flash loan USDC using exact debt amount from UTXO[0] via Aave V3 -> UTXO[1] (flash loan output with repayment amount)
-        createRouterInstruction(encodeFlashLoan(FlashLoanProvider.AaveV3, 0)), // Use UTXO[0] as input
+        createRouterInstruction(encodeFlashLoan(FlashLoanProvider.Aave, 0)), // Use UTXO[0] as input
         // 2. Approve Aave gateway for flash loan UTXO[1] (for repay) -> UTXO[2] (empty)
         createRouterInstruction(encodeApprove(1, "aave")),
         // 3. Repay Aave debt using exact queried balance from UTXO[0] -> UTXO[3] (repay refund, if any)

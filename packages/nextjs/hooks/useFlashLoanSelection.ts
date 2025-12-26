@@ -68,7 +68,7 @@ export const useFlashLoanSelection = ({
         // Priority: Balancer V2 > Aave V3 > Balancer V3
         const priority = [
             FlashLoanProvider.BalancerV2,
-            FlashLoanProvider.AaveV3,
+            FlashLoanProvider.Aave,
             FlashLoanProvider.BalancerV3
         ];
 

@@ -28,8 +28,8 @@ interface DebtSwapEvmModalProps {
     currentDebtBalance: bigint;
     // Available assets for "To" selection
     availableAssets: SwapAsset[];
-    // Optional market (Compound)
-    market?: Address;
+    /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+    context?: string;
 }
 
 export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
@@ -44,7 +44,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     debtFromPrice,
     currentDebtBalance,
     availableAssets,
-    market,
+    context,
 }) => {
     const { buildDebtSwapFlow } = useKapanRouterV2();
 
@@ -75,7 +75,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 network: "evm",
                 protocol: protocolName,
                 chainId,
-                market: market ?? null,
+                market: context ?? null,
                 debtFromToken,
                 debtFromName,
                 availableAssets: availableAssets?.length ?? null,
@@ -85,7 +85,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         }
 
         wasOpenRef.current = isOpen;
-    }, [availableAssets?.length, chainId, debtFromName, debtFromToken, isOpen, market, protocolName]);
+    }, [availableAssets?.length, chainId, debtFromName, debtFromToken, isOpen, context, protocolName]);
 
     // Flash Loan Providers
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -291,7 +291,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             requiredNewDebt,         // max amount of newDebt to borrow
             swapQuote.tx.data,       // swap data
             providerEnum,
-            market,
+            context,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
             swapRouter === "1inch" ? "oneinch" : "pendle",  // map "1inch" -> "oneinch"
         );
@@ -312,7 +312,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             network: "evm",
             protocol: protocolName,
             chainId,
-            market: market ?? null,
+            market: context ?? null,
             fromToken: debtFromToken,
             fromName: debtFromName,
             toToken: selectedTo?.address ?? null,

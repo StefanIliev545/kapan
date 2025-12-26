@@ -24,6 +24,8 @@ error Underflow();
 error FlashLoanRequiresTransientStack();
 error UnsupportedFlashLoanProvider();
 error UniswapV3RequiresPoolAddress();
+error AavePoolNotRegistered();
+error ZeroLendPoolNotRegistered();
 
 contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     using SafeERC20 for IERC20;
@@ -51,12 +53,18 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         _setBalancerV3(vault);
     }
 
-    function setAaveV3(address pool) external onlyOwner {
-        _setAaveV3(pool);
+    /// @notice Set the Aave V3 pool address.
+    function setAavePool(address pool) external onlyOwner {
+        _addAaveCompatiblePool("aave", pool);
+    }
+
+    /// @notice Set the ZeroLend pool address.
+    function setZeroLendPool(address pool) external onlyOwner {
+        _addAaveCompatiblePool("zerolend", pool);
     }
 
     function setUniswapV3Enabled(address factoryOrSentinel) external onlyOwner {
-        _setUniswapV3Enabled(factoryOrSentinel);
+        _setUniswapV3Factory(factoryOrSentinel);
     }
 
     enum RouterInstructionType {
@@ -72,7 +80,8 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     enum FlashLoanProvider {
         BalancerV2,
         BalancerV3,
-        AaveV3,
+        Aave,
+        ZeroLend,
         UniswapV3
     }
     struct RouterInstruction {
@@ -198,12 +207,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     instruction.data,
                     (ProtocolTypes.LendingInstruction)
                 );
-                if (
-                    lendingInstr.op == ProtocolTypes.LendingOp.Borrow ||
-                    lendingInstr.op == ProtocolTypes.LendingOp.WithdrawCollateral
-                ) {
-                    if (lendingInstr.user != msg.sender) revert NotAuthorized();
-                }
+                // Verify msg.sender matches the user in the instruction for ALL operations
+                // This prevents attackers from executing operations on behalf of other users
+                if (lendingInstr.user != msg.sender) revert NotAuthorized();
             }
         }
     }
@@ -353,7 +359,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         RouterInstruction memory routerInstruction = abi.decode(instruction.data, (RouterInstruction));
         if (routerInstruction.instructionType == RouterInstructionType.FlashLoan) {
             // instruction.data encodes: (RouterInstruction, FlashLoanProvider, InputPtr, address pool)
-            // pool is only used for UniswapV3, otherwise address(0)
+            // pool is only used for UniswapV3 (the actual pool address)
             (, FlashLoanProvider provider, ProtocolTypes.InputPtr memory inputPtr, address pool) = abi.decode(
                 instruction.data,
                 (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address)
@@ -473,13 +479,15 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         if (input.token == address(0)) revert ZeroToken();
         if (input.amount == 0) revert ZeroAmount();
 
-        // Route to the appropriate provider
+        // Route to the appropriate provider - enum directly maps to the pool
         if (provider == FlashLoanProvider.BalancerV2) {
             _requestBalancerV2(input.token, input.amount, bytes(""));
         } else if (provider == FlashLoanProvider.BalancerV3) {
             _requestBalancerV3(input.token, input.amount);
-        } else if (provider == FlashLoanProvider.AaveV3) {
-            _requestAaveV3(input.token, input.amount, bytes(""));
+        } else if (provider == FlashLoanProvider.Aave) {
+            _requestAaveCompatible("aave", input.token, input.amount, bytes(""));
+        } else if (provider == FlashLoanProvider.ZeroLend) {
+            _requestAaveCompatible("zerolend", input.token, input.amount, bytes(""));
         } else if (provider == FlashLoanProvider.UniswapV3) {
             if (pool == address(0)) revert UniswapV3RequiresPoolAddress();
             _requestUniswapV3(pool, input.token, input.amount, bytes(""));

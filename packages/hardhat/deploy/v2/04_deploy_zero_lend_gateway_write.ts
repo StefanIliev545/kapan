@@ -77,18 +77,16 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
   await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "zerolend", zeroLendGatewayWrite.address);
   console.log(`ZeroLendGatewayWrite registered with KapanRouter as "zerolend"`);
 
-  // Temporarily disable Etherscan verification for v2 deploys
-  if (!["hardhat", "localhost"].includes(hre.network.name)) {
-    await verifyContract(hre, zeroLendGatewayWrite.address, [
-      kapanRouter.address,
-      POOL_ADDRESSES_PROVIDER,
-      REFERRAL_CODE,
-    ]);
-    await verifyContract(hre, zeroLendGatewayView.address, [
-      POOL_ADDRESSES_PROVIDER,
-      UI_POOL_DATA_PROVIDER,
-    ]);
-  }
+  // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
+  await verifyContract(hre, zeroLendGatewayWrite.address, [
+    kapanRouter.address,
+    POOL_ADDRESSES_PROVIDER,
+    REFERRAL_CODE,
+  ]);
+  await verifyContract(hre, zeroLendGatewayView.address, [
+    POOL_ADDRESSES_PROVIDER,
+    UI_POOL_DATA_PROVIDER,
+  ]);
 };
 
 export default deployZeroLendGatewayWrite;

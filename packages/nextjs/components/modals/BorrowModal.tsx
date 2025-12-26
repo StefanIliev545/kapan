@@ -13,6 +13,8 @@ interface BorrowModalProps {
   currentDebt: number;
   position?: PositionManager;
   chainId?: number;
+  /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+  context?: string;
 }
 
 export const BorrowModal: FC<BorrowModalProps> = ({
@@ -23,6 +25,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   currentDebt,
   position,
   chainId,
+  context,
 }) => {
   const { buildBorrowFlow } = useKapanRouterV2();
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
@@ -34,8 +37,8 @@ export const BorrowModal: FC<BorrowModalProps> = ({
 
   const buildFlow = useCallback(
     (amount: string) =>
-      buildBorrowFlow(normalizedProtocolName, token.address, amount, token.decimals || decimals || 18),
-    [buildBorrowFlow, decimals, normalizedProtocolName, token.address, token.decimals],
+      buildBorrowFlow(normalizedProtocolName, token.address, amount, token.decimals || decimals || 18, context),
+    [buildBorrowFlow, context, decimals, normalizedProtocolName, token.address, token.decimals],
   );
 
   const { handleConfirm: handleBorrow, batchingPreference } = useEvmTransactionFlow({

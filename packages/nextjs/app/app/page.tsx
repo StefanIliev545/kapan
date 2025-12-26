@@ -47,6 +47,11 @@ const ZeroLendProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading ZeroLend" /> }
 );
 
+const MorphoProtocolView = dynamic(
+  () => import("~~/components/specific/morpho/MorphoProtocolView").then(m => m.MorphoProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Morpho" /> }
+);
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "base", name: "Base", logo: "/logos/base.svg" },
@@ -61,13 +66,13 @@ const networkOptions: NetworkOption[] = [
 ];
 
 const protocolCountByNetwork: Record<string, number> = {
-  base: 4,
-  arbitrum: 3,
+  base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
+  arbitrum: 4, // Aave, Compound, Venus, Morpho
   optimism: 2,
   linea: 3,
   starknet: 2,
   plasma: 1,
-  hardhat: 4, // Aave, ZeroLend, Compound, Venus
+  hardhat: 3, // Aave, Morpho, Compound
 };
 
 const App: NextPage = () => {
@@ -101,6 +106,7 @@ const App: NextPage = () => {
         import("~~/components/specific/aave/AaveProtocolView");
         import("~~/components/specific/compound/CompoundProtocolView");
         import("~~/components/specific/venus/VenusProtocolView");
+        import("~~/components/specific/morpho/MorphoProtocolView");
       } else {
         import("~~/components/specific/vesu/VesuProtocolView");
         import("~~/components/specific/nostra/NostraProtocolView");
@@ -179,6 +185,9 @@ const App: NextPage = () => {
                 <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={arbitrum.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
@@ -197,6 +206,9 @@ const App: NextPage = () => {
                 <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={base.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
@@ -213,6 +225,9 @@ const App: NextPage = () => {
               </div>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={hardhat.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />

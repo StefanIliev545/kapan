@@ -1,5 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
-import type { Address } from "viem";
+import { Address, encodeAbiParameters } from "viem";
 import Image from "next/image";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
@@ -44,6 +44,8 @@ export interface ProtocolPosition {
     borrow?: VesuContext;
     repay?: VesuContext;
   };
+  /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+  protocolContext?: string;
   moveSupport?: {
     preselectedCollaterals?: CollateralWithAmount[];
     disableCollateralSelection?: boolean;
@@ -951,10 +953,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               debtPrice={selectedClosePosition.tokenPrice}
               debtBalance={selectedClosePosition.tokenBalance}
               availableCollaterals={selectedClosePosition.collaterals || availableCollaterals}
-              market={
+              context={
                 protocolName.toLowerCase().includes("compound")
-                  ? (selectedClosePosition.tokenAddress as Address)
-                  : undefined
+                  ? encodeAbiParameters([{ type: "address" }], [selectedClosePosition.tokenAddress as Address]) as `0x${string}`
+                  : selectedClosePosition.protocolContext
               }
             />
           )}
@@ -973,10 +975,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               debtFromPrice={selectedDebtSwapPosition.tokenPrice}
               currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
               availableAssets={selectedDebtSwapPosition.collaterals || availableCollaterals}
-              market={
+              context={
                 protocolName.toLowerCase().includes("compound")
-                  ? (selectedDebtSwapPosition.tokenAddress as Address)
-                  : undefined
+                  ? encodeAbiParameters([{ type: "address" }], [selectedDebtSwapPosition.tokenAddress as Address]) as `0x${string}`
+                  : selectedDebtSwapPosition.protocolContext
               }
             />
           )}

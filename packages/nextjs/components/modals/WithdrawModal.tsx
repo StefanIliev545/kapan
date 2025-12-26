@@ -4,7 +4,6 @@ import { formatUnits } from "viem";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
-import type { Address } from "viem";
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -14,7 +13,8 @@ interface WithdrawModalProps {
   supplyBalance: bigint;
   position?: PositionManager;
   chainId?: number;
-  market?: Address; // Market address for Compound (baseToken/comet address)
+  /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+  context?: string;
 }
 
 export const WithdrawModal: FC<WithdrawModalProps> = ({
@@ -25,7 +25,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   supplyBalance,
   position,
   chainId,
-  market,
+  context,
 }) => {
   const { buildWithdrawFlow } = useKapanRouterV2();
   const decimals = token.decimals;
@@ -39,12 +39,12 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
         amount,
         token.decimals || decimals || 18,
         isMax || false,
-        market,
+        context,
       ),
     [
       buildWithdrawFlow,
+      context,
       decimals,
-      market,
       normalizedProtocolName,
       token.address,
       token.decimals,

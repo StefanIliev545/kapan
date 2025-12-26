@@ -2,11 +2,27 @@
 
 This document explains how contracts are automatically verified on Etherscan when deployed, and how to manually verify contracts if needed.
 
+## Disabling Verification (Development Security)
+
+**⚠️ IMPORTANT: During development, disable automatic verification to prevent bots from scanning your contracts!**
+
+Set this environment variable in your `.env` file:
+
+```bash
+DISABLE_VERIFICATION=true
+```
+
+This will skip all contract verification, making it harder for exploit bots to analyze your source code. **Only remove this flag when you're ready for production deployment.**
+
 ## Automatic Verification
 
 All contracts deployed using the deployment scripts will be automatically verified on Etherscan (or the appropriate block explorer) when deployed to supported networks.
 
 The verification happens after a 60-second delay to allow the block explorer to index the contract.
+
+**Note:** Verification is automatically disabled for:
+- Local networks (`hardhat`, `localhost`)
+- When `DISABLE_VERIFICATION=true` is set
 
 ### Supported Networks
 
@@ -22,8 +38,11 @@ The following networks have automatic verification configured:
 
 To use the verification features, set the following environment variables in your `.env` file:
 
-```
-# Block explorer API keys
+```bash
+# Disable verification during development (prevents bot scanning)
+DISABLE_VERIFICATION=true
+
+# Block explorer API keys (only needed when verification is enabled)
 ETHERSCAN_MAINNET_API_KEY=your_etherscan_api_key
 ETHERSCAN_OPTIMISTIC_API_KEY=your_optimism_api_key
 BASESCAN_API_KEY=your_basescan_api_key

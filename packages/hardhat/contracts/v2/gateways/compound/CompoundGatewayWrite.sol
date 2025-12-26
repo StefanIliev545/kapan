@@ -53,7 +53,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
     function processLendingInstruction(
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
-    ) external returns (ProtocolTypes.Output[] memory outputs) {
+    ) external onlyRouter returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
         address market = _decodeMarket(ins.context);
         address token = ins.token;
@@ -107,7 +107,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         }
     }
 
-    function deposit(address token, address onBehalfOf, uint256 amount) public onlyRouter nonReentrant {
+    function deposit(address token, address onBehalfOf, uint256 amount) internal nonReentrant {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -121,7 +121,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         address collateral,
         uint256 amount,
         address receiver
-    ) public onlyRouter nonReentrant {
+    ) internal nonReentrant {
         ICompoundComet comet = tokenToComet[market];
         require(address(comet) != address(0), "Compound: market comet not found");
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
@@ -135,7 +135,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         address collateral,
         address user,
         uint256 amount
-    ) public onlyRouterOrSelf(user) nonReentrant returns (address, uint256) {
+    ) internal nonReentrant returns (address, uint256) {
         ICompoundComet comet = tokenToComet[market];
         require(address(comet) != address(0), "Compound: market comet not found");
 
@@ -145,14 +145,14 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         return (collateral, amount);
     }
 
-    function borrow(address token, address user, uint256 amount) public onlyRouterOrSelf(user) nonReentrant {
+    function borrow(address token, address user, uint256 amount) internal nonReentrant {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         comet.withdrawFrom(user, address(this), token, amount);
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function repay(address token, address user, uint256 amount) public onlyRouter nonReentrant {
+    function repay(address token, address user, uint256 amount) internal nonReentrant {
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);

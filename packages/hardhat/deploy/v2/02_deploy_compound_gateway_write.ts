@@ -201,10 +201,9 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   }
   console.log(`CompoundGatewayWrite registered with KapanRouter as "compound"`);
 
-  if (!["hardhat", "localhost"].includes(hre.network.name)) {
-    await verifyContract(hre, compoundGatewayWrite.address, [kapanRouter.address, deployer]);
-    await verifyContract(hre, compoundGatewayView.address, [deployer]);
-  }
+  // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
+  await verifyContract(hre, compoundGatewayWrite.address, [kapanRouter.address, deployer]);
+  await verifyContract(hre, compoundGatewayView.address, [deployer]);
 };
 
 export default deployCompoundGatewayWrite;

@@ -341,7 +341,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       providers.push({ name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 });
     }
     if (aaveEnabled === true && isAaveV3Supported(chainId)) {
-      providers.push({ name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 });
+      providers.push({ name: "Aave", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 });
     }
 
     const currentProviders = stringifyWithBigInt(providers);

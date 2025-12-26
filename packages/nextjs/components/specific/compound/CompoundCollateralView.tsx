@@ -3,7 +3,7 @@ import Image from "next/image";
 import { DepositModal } from "~~/components/modals/DepositModal";
 import { WithdrawModal } from "~~/components/modals/WithdrawModal";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
-import { formatUnits } from "viem";
+import { formatUnits, encodeAbiParameters } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -12,6 +12,7 @@ import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { FiRepeat } from "react-icons/fi";
 import { formatBps } from "~~/utils/risk";
 import { sanitizeSymbol } from "~~/utils/tokenSymbols";
+import type { Address } from "viem";
 
 interface CollateralPosition {
   icon: string;
@@ -53,6 +54,11 @@ interface CompoundCollateralViewProps {
   priceMap?: Record<string, number>;
   baseTokenSymbol?: string;
 }
+
+// Helper to encode Compound market address as context
+const encodeCompoundMarket = (marketAddress: Address): string => {
+  return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;
+};
 
 export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   baseToken,
@@ -602,7 +608,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           }}
           protocolName="compound"
           chainId={chainId}
-          market={baseToken as `0x${string}`}
+          context={encodeCompoundMarket(baseToken as Address)}
         />
       )}
       {selectedCollateral && selectedAction === "withdraw" && (
@@ -619,7 +625,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           protocolName="compound"
           supplyBalance={selectedCollateral.balanceRaw}
           chainId={chainId}
-          market={baseToken as `0x${string}`}
+          context={encodeCompoundMarket(baseToken as Address)}
         />
       )}
       {selectedCollateral && selectedAction === "swap" && (
@@ -639,7 +645,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           }))}
           initialFromTokenAddress={selectedCollateral.address}
           chainId={chainId || 1}
-          market={baseToken as `0x${string}`}
+          context={encodeCompoundMarket(baseToken as Address)}
           position={{
             name: selectedCollateral.name,
             tokenAddress: selectedCollateral.address,

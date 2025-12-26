@@ -25,7 +25,7 @@ contract OneInchGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     function processLendingInstruction(
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
-    ) external override returns (ProtocolTypes.Output[] memory outputs) {
+    ) external onlyRouter override returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
 
         if (ins.op == ProtocolTypes.LendingOp.Swap) {

@@ -31,7 +31,8 @@ interface CollateralSwapModalProps {
     availableAssets: ExtendedCollateral[];
     initialFromTokenAddress?: string;
     chainId: number;
-    market?: Address; // For Compound
+    /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+    context?: string;
     position: {
         name: string;
         tokenAddress: string;
@@ -48,7 +49,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     availableAssets,
     initialFromTokenAddress,
     chainId,
-    market,
+    context,
     position,
 }) => {
     const { buildCollateralSwapFlow } = useKapanRouterV2();
@@ -80,7 +81,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 network: "evm",
                 protocol: protocolName,
                 chainId,
-                market: market ?? null,
+                market: context ?? null,
                 positionType: position.type,
                 positionToken: position.tokenAddress,
                 positionName: position.name,
@@ -91,7 +92,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
 
         wasOpenRef.current = isOpen;
-    }, [chainId, initialFromTokenAddress, isOpen, market, position.name, position.tokenAddress, position.type, protocolName]);
+    }, [chainId, initialFromTokenAddress, isOpen, context, position.name, position.tokenAddress, position.type, protocolName]);
 
     // Fetch Flash Loan Providers using existing hook logic
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -147,7 +148,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         
         // If using Aave flash loan with isMax, reduce the quote amount by fee buffer
         // This ensures the 1inch swap data matches the actual amount we'll swap
-        const isAaveWithMax = isMax && selectedProvider?.providerEnum === FlashLoanProvider.AaveV3;
+        const isAaveWithMax = isMax && (selectedProvider?.providerEnum === FlashLoanProvider.Aave || selectedProvider?.providerEnum === FlashLoanProvider.ZeroLend);
         if (isAaveWithMax && baseAmount > 0n) {
             // IMPORTANT: Must match on-chain Split rounding exactly!
             // On-chain: feeAmount = (amount * bp + 10000 - 1) / 10000  (rounds UP)
@@ -232,7 +233,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             minOut,
             swapData,
             selectedFrom.decimals,
-            market,
+            context,
             isMax,
             providerEnum,
             false, // isExactOut
@@ -255,7 +256,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             network: "evm",
             protocol: protocolName,
             chainId,
-            market: market ?? null,
+            market: context ?? null,
             fromToken: selectedFrom?.address ?? null,
             fromName: selectedFrom?.symbol ?? null,
             toToken: selectedTo?.address ?? null,

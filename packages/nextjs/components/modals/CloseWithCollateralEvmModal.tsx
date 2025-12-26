@@ -32,8 +32,8 @@ interface CloseWithCollateralEvmModalProps {
     debtBalance: bigint;
     // Available collateral assets for "To" selection (collateral to sell)
     availableCollaterals: SwapAsset[];
-    // Optional market (Compound)
-    market?: Address;
+    /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+    context?: string;
 }
 
 export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> = ({
@@ -48,7 +48,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     debtDecimals,
     debtBalance,
     availableCollaterals,
-    market,
+    context,
 }) => {
     const { buildCloseWithCollateralFlow } = useKapanRouterV2();
 
@@ -81,7 +81,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 debtToken: debtToken,
                 debtName,
                 chainId,
-                market: market ?? null,
+                market: context ?? null,
                 availableCollaterals: availableCollaterals?.length ?? null,
             } satisfies Record<string, string | number | boolean | null>;
 
@@ -89,7 +89,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         }
 
         wasOpenRef.current = isOpen;
-    }, [availableCollaterals?.length, chainId, debtName, debtToken, isOpen, market, protocolName]);
+    }, [availableCollaterals?.length, chainId, debtName, debtToken, isOpen, context, protocolName]);
 
     // Flash Loan Providers
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -282,7 +282,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         // For Aave flash loans, the swap needs to output enough to cover the flash loan repayment
         // (principal + 0.05% fee). We add a buffer to be safe.
         // For Balancer/others (no fee), we just use the exact debt amount.
-        const isAave = providerEnum === FlashLoanProvider.AaveV3;
+        const isAave = providerEnum === FlashLoanProvider.Aave || providerEnum === FlashLoanProvider.ZeroLend;
         const swapMinAmountOut = isAave
             ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS / 10000n)
             : repayAmountRaw;
@@ -301,7 +301,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             swapMinAmountOut,        // minAmountOut for swap (includes Aave fee if applicable)
             swapQuote.tx.data,       // swap data
             providerEnum,            // flash loan provider
-            market,
+            context,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
             swapRouter === "1inch" ? "oneinch" : "pendle",  // map "1inch" -> "oneinch"
         );
@@ -332,7 +332,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             preferBatching,
             flashLoanProvider: selectedProvider?.name ?? null,
             swapRouter,
-            market: market ?? null,
+            market: context ?? null,
         } satisfies Record<string, string | number | boolean | null>;
 
         try {
