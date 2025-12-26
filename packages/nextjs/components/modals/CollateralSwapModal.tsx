@@ -31,7 +31,8 @@ interface CollateralSwapModalProps {
     availableAssets: ExtendedCollateral[];
     initialFromTokenAddress?: string;
     chainId: number;
-    market?: Address; // For Compound
+    /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
+    context?: string;
     position: {
         name: string;
         tokenAddress: string;
@@ -48,7 +49,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     availableAssets,
     initialFromTokenAddress,
     chainId,
-    market,
+    context,
     position,
 }) => {
     const { buildCollateralSwapFlow } = useKapanRouterV2();
@@ -80,7 +81,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 network: "evm",
                 protocol: protocolName,
                 chainId,
-                market: market ?? null,
+                market: context ?? null,
                 positionType: position.type,
                 positionToken: position.tokenAddress,
                 positionName: position.name,
@@ -91,7 +92,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
 
         wasOpenRef.current = isOpen;
-    }, [chainId, initialFromTokenAddress, isOpen, market, position.name, position.tokenAddress, position.type, protocolName]);
+    }, [chainId, initialFromTokenAddress, isOpen, context, position.name, position.tokenAddress, position.type, protocolName]);
 
     // Fetch Flash Loan Providers using existing hook logic
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -232,7 +233,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             minOut,
             swapData,
             selectedFrom.decimals,
-            market,
+            context,
             isMax,
             providerEnum,
             false, // isExactOut
@@ -255,7 +256,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             network: "evm",
             protocol: protocolName,
             chainId,
-            market: market ?? null,
+            market: context ?? null,
             fromToken: selectedFrom?.address ?? null,
             fromName: selectedFrom?.symbol ?? null,
             toToken: selectedTo?.address ?? null,

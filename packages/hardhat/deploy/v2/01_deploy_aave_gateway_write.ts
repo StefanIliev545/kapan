@@ -100,18 +100,16 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "aave", aaveGatewayWrite.address);
   console.log(`AaveGatewayWrite registered with KapanRouter as "aave"`);
 
-  // Temporarily disable Etherscan verification for v2 deploys
-  if (!["hardhat", "localhost"].includes(hre.network.name)) {
-    await verifyContract(hre, aaveGatewayWrite.address, [
-      kapanRouter.address,
-      POOL_ADDRESSES_PROVIDER,
-      REFERRAL_CODE,
-    ]);
-    await verifyContract(hre, aaveGatewayView.address, [
-      POOL_ADDRESSES_PROVIDER,
-      UI_POOL_DATA_PROVIDER,
-    ]);
-  }
+  // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
+  await verifyContract(hre, aaveGatewayWrite.address, [
+    kapanRouter.address,
+    POOL_ADDRESSES_PROVIDER,
+    REFERRAL_CODE,
+  ]);
+  await verifyContract(hre, aaveGatewayView.address, [
+    POOL_ADDRESSES_PROVIDER,
+    UI_POOL_DATA_PROVIDER,
+  ]);
 };
 
 export default deployAaveGatewayWrite;

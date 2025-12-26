@@ -218,15 +218,18 @@ export const useKapanRouterV2 = () => {
     tokenAddress: string,
     amount: string,
     decimals = 18,
-    market?: Address
+    context = "0x"
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = parseUnits(amount, decimals);
     const isCompound = normalizedProtocol === "compound";
-    const lendingOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
-    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
+    const isMorpho = normalizedProtocol === "morpho-blue";
+    // Morpho uses DepositCollateral for collateral deposits (which is what we do when there's a position with debt)
+    // Compound also uses DepositCollateral
+    // Other protocols use Deposit
+    const lendingOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     return [
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
@@ -236,13 +239,14 @@ export const useKapanRouterV2 = () => {
         encodeLendingInstruction(lendingOp, tokenAddress, userAddress, 0n, context, 0)
       ),
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   const buildBorrowFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
     amount: string,
-    decimals = 18
+    decimals = 18,
+    context = "0x"
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -251,7 +255,7 @@ export const useKapanRouterV2 = () => {
     return [
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Borrow, tokenAddress, userAddress, amountBigInt, "0x", 999)
+        encodeLendingInstruction(LendingOp.Borrow, tokenAddress, userAddress, amountBigInt, context, 999)
       ),
       createRouterInstruction(encodePushToken(0, userAddress)),
     ];
@@ -351,15 +355,13 @@ export const useKapanRouterV2 = () => {
     amount: string,
     decimals = 18,
     isMax = false,
-    market?: Address
+    context = "0x"
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = isMax || amount.toLowerCase() === "max"
       ? (2n ** 256n - 1n)
       : parseUnits(amount, decimals);
-    const isCompound = normalizedProtocol === "compound";
-    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     return [
       createProtocolInstruction(
@@ -372,7 +374,7 @@ export const useKapanRouterV2 = () => {
       ),
       createRouterInstruction(encodePushToken(1, userAddress)),
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   const buildCollateralSwapFlow = useCallback((
     protocolName: string,
@@ -382,7 +384,7 @@ export const useKapanRouterV2 = () => {
     minAmountOut: string,
     swapData: string,
     decimalsIn: number,
-    market?: Address,
+    context = "0x",
     isMax = false,
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
     isExactOut = false,
@@ -396,7 +398,6 @@ export const useKapanRouterV2 = () => {
     const isCompound = normalizedProtocol === "compound";
     const depositOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
     const withdrawOp = LendingOp.WithdrawCollateral;
-    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     // Encode Swap Context: (tokenOut, minAmountOut, swapData)
     // For SwapExactOut, minAmountOut is interpreted as exactAmountOut
@@ -733,14 +734,12 @@ export const useKapanRouterV2 = () => {
     exactDebtOut: bigint,
     swapData: string,
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
-    market?: Address,
+    context = "0x",
     isMax = false,
     swapRouter: "oneinch" | "pendle" = "oneinch",
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
-    const isCompound = normalizedProtocol === "compound";
-    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     // Swap context: (tokenOut, minAmountOut, swapData)
     // We swap collateral -> debt, need at least exactDebtOut to repay flash loan
@@ -837,14 +836,12 @@ export const useKapanRouterV2 = () => {
     maxDebtToInForSwap: bigint,       // max input for USDT->USDC swap (flash loan amount)
     swapData: string,                 // swap calldata (1inch or Pendle)
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
-    market?: Address,
+    context = "0x",
     isMax = false,
     swapRouter: "oneinch" | "pendle" = "oneinch",
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
-    const isCompound = normalizedProtocol === "compound";
-    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
 
     // For isMax, we still need currentDebtFrom for the swap's minAmountOut
     // The actual repay amount will come from GetBorrowBalance

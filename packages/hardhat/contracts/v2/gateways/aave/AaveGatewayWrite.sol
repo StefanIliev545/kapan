@@ -32,7 +32,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     function processLendingInstruction(
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
-    ) external returns (ProtocolTypes.Output[] memory outputs) {
+    ) external onlyRouter returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory instr = abi.decode(data, (ProtocolTypes.LendingInstruction));
         address token = instr.token;
         uint256 amount = instr.amount;
@@ -81,7 +81,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         console.log("AaveGateway: processLendingInstruction complete, returning %s outputs", outputs.length);
     }
 
-    function deposit(address token, address onBehalfOf, uint256 amount) public onlyRouter nonReentrant {
+    function deposit(address token, address onBehalfOf, uint256 amount) internal nonReentrant {
         address pool = poolAddressesProvider.getPool();
         require(pool != address(0), "Pool not set");
         // Router should approve this gateway to pull from router balance
@@ -95,7 +95,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address underlying,
         address user,
         uint256 amount
-    ) public onlyRouter nonReentrant returns (address, uint256) {
+    ) internal nonReentrant returns (address, uint256) {
         console.log("AaveGateway: withdraw called, underlying=%s, user=%s, amount=%s", underlying, user, amount);
         address aToken = _getAToken(underlying);
         console.log("AaveGateway: aToken=%s", aToken);
@@ -125,7 +125,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         return (underlying, amountOut);
     }
 
-    function borrow(address token, address user, uint256 amount) public onlyRouterOrSelf(user) nonReentrant {
+    function borrow(address token, address user, uint256 amount) internal nonReentrant {
         address pool = poolAddressesProvider.getPool();
         require(pool != address(0), "Pool not set");
         (, , address vDebt) = _getReserveTokens(token);
@@ -140,7 +140,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address token,
         address user,
         uint256 amount
-    ) public onlyRouter nonReentrant returns (uint256 refund) {
+    ) internal nonReentrant returns (uint256 refund) {
         address pool = poolAddressesProvider.getPool();
         require(pool != address(0), "Pool not set");
         uint256 pre = IERC20(token).balanceOf(address(this));

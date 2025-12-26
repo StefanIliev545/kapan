@@ -189,17 +189,16 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
   console.log(`✓ Morpho Blue setup complete with ${markets.length} markets`);
 
   // ============ Verification ============
-  if (!["hardhat", "localhost"].includes(hre.network.name)) {
-    await verifyContract(hre, morphoGatewayWrite.address, [
-      kapanRouter.address,
-      deployer,
-      MORPHO_ADDRESS,
-    ]);
-    await verifyContract(hre, morphoGatewayView.address, [
-      MORPHO_ADDRESS,
-      deployer,
-    ]);
-  }
+  // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
+  await verifyContract(hre, morphoGatewayWrite.address, [
+    kapanRouter.address,
+    deployer,
+    MORPHO_ADDRESS,
+  ]);
+  await verifyContract(hre, morphoGatewayView.address, [
+    MORPHO_ADDRESS,
+    deployer,
+  ]);
 };
 
 export default deployMorphoBlueGateway;

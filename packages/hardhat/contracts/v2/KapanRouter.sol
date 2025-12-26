@@ -64,7 +64,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function setUniswapV3Enabled(address factoryOrSentinel) external onlyOwner {
-        _setUniswapV3Enabled(factoryOrSentinel);
+        _setUniswapV3Factory(factoryOrSentinel);
     }
 
     enum RouterInstructionType {
@@ -207,12 +207,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     instruction.data,
                     (ProtocolTypes.LendingInstruction)
                 );
-                if (
-                    lendingInstr.op == ProtocolTypes.LendingOp.Borrow ||
-                    lendingInstr.op == ProtocolTypes.LendingOp.WithdrawCollateral
-                ) {
-                    if (lendingInstr.user != msg.sender) revert NotAuthorized();
-                }
+                // Verify msg.sender matches the user in the instruction for ALL operations
+                // This prevents attackers from executing operations on behalf of other users
+                if (lendingInstr.user != msg.sender) revert NotAuthorized();
             }
         }
     }

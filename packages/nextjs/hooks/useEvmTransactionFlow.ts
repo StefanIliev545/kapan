@@ -19,6 +19,7 @@ interface UseEvmTransactionFlowParams {
   emptyFlowErrorMessage?: string;
   chainSwitchErrorMessage?: string;
   simulateWhenBatching?: boolean;
+  revokePermissions?: boolean; // Enable deauthorization after transaction
 }
 
 export const useEvmTransactionFlow = ({
@@ -30,6 +31,7 @@ export const useEvmTransactionFlow = ({
   emptyFlowErrorMessage = "Failed to build transaction instructions",
   chainSwitchErrorMessage = "Please switch to the selected network to proceed",
   simulateWhenBatching = false,
+  revokePermissions = false,
 }: UseEvmTransactionFlowParams) => {
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
@@ -77,10 +79,12 @@ export const useEvmTransactionFlow = ({
         }
       }
 
-      await executeFlowBatchedIfPossible(instructions, batchingPreference.enabled);
+      // Auto-enable revokePermissions when batching is enabled (for security - clean up permissions atomically)
+      const shouldRevoke = revokePermissions || batchingPreference.enabled;
+      await executeFlowBatchedIfPossible(instructions, batchingPreference.enabled, { revokePermissions: shouldRevoke });
       // Transaction toast notifications are handled by executeFlowBatchedIfPossible
     },
-    [ensureCorrectChain, buildFlow, executeFlowBatchedIfPossible, batchingPreference.enabled, simulateInstructions, chainSwitchErrorMessage, emptyFlowErrorMessage, simulateWhenBatching],
+    [ensureCorrectChain, buildFlow, executeFlowBatchedIfPossible, batchingPreference.enabled, simulateInstructions, chainSwitchErrorMessage, emptyFlowErrorMessage, simulateWhenBatching, revokePermissions],
   );
 
   useEffect(() => {

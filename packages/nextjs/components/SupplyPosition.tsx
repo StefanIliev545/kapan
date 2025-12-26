@@ -71,6 +71,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   position,
   disableMove = false,
   vesuContext,
+  protocolContext,
   actionsDisabled = false,
   actionsDisabledReason,
   containerClassName,
@@ -546,6 +547,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             protocolName={protocolName}
             position={position}
             chainId={chainId}
+            context={protocolContext}
           />
           <WithdrawModal
             isOpen={withdrawModal.isOpen}
@@ -562,6 +564,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
             position={position}
             chainId={chainId}
+            context={protocolContext}
           />
         </>
       )}

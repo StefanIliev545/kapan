@@ -11,6 +11,7 @@ import {
 import { MorphoPositionsSection } from "./MorphoPositionsSection";
 import { MorphoMarketsSection } from "./MorphoMarketsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
+import { getEffectiveChainId } from "~~/utils/forkChain";
 
 // Health status indicator component matching ProtocolView
 const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
@@ -50,6 +51,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 }) => {
   const { address: connectedAddress, chainId: walletChainId } = useAccount();
   const chainId = propChainId || walletChainId || 42161; // Default to Arbitrum
+  const effectiveChainId = getEffectiveChainId(chainId);
 
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -61,9 +63,9 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     isLoadingPositions,
     hasLoadedOnce,
     isUpdating,
-  } = useMorphoLendingPositions(chainId, connectedAddress);
+  } = useMorphoLendingPositions(effectiveChainId, connectedAddress);
 
-  const { marketPairs } = useMorphoMarkets(chainId);
+  const { marketPairs } = useMorphoMarkets(effectiveChainId);
 
   // Compute totals and metrics
   const metrics = useMemo(() => {
@@ -217,7 +219,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               markets={markets}
               marketPairs={marketPairs}
               isLoading={isLoadingMarkets}
-              chainId={chainId}
+              chainId={effectiveChainId}
             />
           </div>
         </div>

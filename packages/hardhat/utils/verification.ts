@@ -11,6 +11,18 @@ export const verifyContract = async (
   contractAddress: string,
   constructorArguments: any[]
 ): Promise<void> => {
+  // Skip verification if DISABLE_VERIFICATION is set (for development security)
+  if (process.env.DISABLE_VERIFICATION === "true") {
+    console.log(`⚠️  Verification disabled (DISABLE_VERIFICATION=true). Skipping verification for ${contractAddress}`);
+    return;
+  }
+
+  // Skip verification for local networks
+  if (["hardhat", "localhost"].includes(hre.network.name)) {
+    console.log(`⚠️  Skipping verification for local network: ${hre.network.name}`);
+    return;
+  }
+
   console.log(`Verifying contract at ${contractAddress}...`);
   
   try {

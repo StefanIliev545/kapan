@@ -25,7 +25,7 @@ contract PendleGateway is IGateway, ProtocolGateway, Ownable, ReentrancyGuard {
     function processLendingInstruction(
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
-    ) external override returns (ProtocolTypes.Output[] memory outputs) {
+    ) external onlyRouter override returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
 
         // Both Swap and SwapExactOut use the same logic - Pendle's router handles both

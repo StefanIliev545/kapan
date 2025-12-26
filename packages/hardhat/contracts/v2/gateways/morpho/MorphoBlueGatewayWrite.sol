@@ -90,7 +90,7 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
     function processLendingInstruction(
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
-    ) external returns (ProtocolTypes.Output[] memory) {
+    ) external onlyRouter returns (ProtocolTypes.Output[] memory) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
         MarketParams memory params = _decodeMarketParams(ins.context);
 

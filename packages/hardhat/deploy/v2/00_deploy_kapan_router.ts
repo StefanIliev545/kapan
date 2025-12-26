@@ -121,10 +121,8 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     console.warn(`No Aave for chainId=${chainId}. Skipping setAavePool.`);
   }
 
-  // Temporarily disable Etherscan verification for v2 deploys
-  if (!["hardhat", "localhost"].includes(hre.network.name)) {
-    await verifyContract(hre, kapanRouter.address, [deployer]);
-  }
+  // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
+  await verifyContract(hre, kapanRouter.address, [deployer]);
 };
 
 export default deployKapanRouter;

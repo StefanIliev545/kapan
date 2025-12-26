@@ -24,7 +24,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     function processLendingInstruction(
         ProtocolTypes.Output[] calldata inputs,
         bytes calldata data
-    ) external returns (ProtocolTypes.Output[] memory outputs) {
+    ) external onlyRouter returns (ProtocolTypes.Output[] memory outputs) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
         address token = ins.token;
         uint256 amount = ins.amount;
@@ -67,7 +67,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         }
     }
 
-    function deposit(address token, address user, uint256 amount) public onlyRouter nonReentrant {
+    function deposit(address token, address user, uint256 amount) internal nonReentrant {
         address vToken = _getVTokenForUnderlying(token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).approve(vToken, 0);
@@ -83,7 +83,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address collateral,
         address user,
         uint256 underlyingAmount
-    ) public onlyRouterOrSelf(user) nonReentrant returns (address, uint256) {
+    ) internal nonReentrant returns (address, uint256) {
         address vToken = _getVTokenForUnderlying(collateral);
 
         uint256 borrowBalance = VTokenInterface(vToken).borrowBalanceCurrent(user);
@@ -112,7 +112,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         return (collateral, actualRedeemed);
     }
 
-    function borrow(address token, address user, uint256 amount) public onlyRouterOrSelf(user) nonReentrant {
+    function borrow(address token, address user, uint256 amount) internal nonReentrant {
         address vToken = _getVTokenForUnderlying(token);
         uint err = VTokenInterface(vToken).borrowBehalf(user, amount);
         require(err == 0, "Venus: borrow failed");
@@ -123,7 +123,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address token,
         address user,
         uint256 amount
-    ) public onlyRouter nonReentrant returns (uint256 refund) {
+    ) internal nonReentrant returns (uint256 refund) {
         address vToken = _getVTokenForUnderlying(token);
         uint256 pre = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);

@@ -66,7 +66,7 @@ const networkOptions: NetworkOption[] = [
 ];
 
 const protocolCountByNetwork: Record<string, number> = {
-  base: 4,
+  base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
   arbitrum: 4, // Aave, Compound, Venus, Morpho
   optimism: 2,
   linea: 3,
@@ -204,6 +204,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={base.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
