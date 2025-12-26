@@ -54,7 +54,7 @@ const ROUTER_INSTRUCTION_TYPE = "tuple(uint256 amount,address token,address user
 export function encodeFlashLoan(
   provider: FlashLoanProvider,
   inputIndex: number,
-  pool: string = "0x0000000000000000000000000000000000000000"
+  pool = "0x0000000000000000000000000000000000000000"
 ): string {
   // instruction.data encodes: (RouterInstruction, FlashLoanProvider, InputPtr, address pool)
   // pool is only used for UniswapV3

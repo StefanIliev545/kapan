@@ -1379,8 +1379,10 @@ export const useKapanRouterV2 = () => {
       const txHash = await executeInstructions(instructions);
 
       // 4. Post-Execution Deauthorization (Sequential)
+      // Disabled for Linea and Plasma due to batching issues
       try {
-        const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
+        const shouldRevoke = options?.revokePermissions && chainId !== 59144 && chainId !== 9745; // Skip Linea and Plasma
+        const deauthCalls = shouldRevoke ? await getDeauthorizations(instructions) : [];
         if (deauthCalls.length > 0) {
           for (let i = 0; i < deauthCalls.length; i++) {
             const call = deauthCalls[i];
@@ -1452,8 +1454,9 @@ export const useKapanRouterV2 = () => {
       return true;
     });
 
-    // Prepare deauthorizations
-    const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
+    // Prepare deauthorizations (disabled for Linea and Plasma due to batching issues)
+    const shouldRevoke = options?.revokePermissions && chainId !== 59144 && chainId !== 9745; // Skip Linea and Plasma
+    const deauthCalls = shouldRevoke ? await getDeauthorizations(instructions) : [];
     const filteredDeauthCalls = deauthCalls.filter(({ target, data }) => {
       return target && data && data.length > 0;
     });
@@ -1480,8 +1483,8 @@ export const useKapanRouterV2 = () => {
     }
 
     const hash = await executeFlowWithApprovals(instructions, options);
-    return hash ? { kind: "tx", hash } : undefined;
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals, getDeauthorizations]);
+      return hash ? { kind: "tx", hash } : undefined;
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals, getDeauthorizations, chainId]);
 
   // --- Move Flow Builder ---
 
