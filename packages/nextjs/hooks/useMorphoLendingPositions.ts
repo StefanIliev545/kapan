@@ -19,7 +19,11 @@ export interface MorphoMarketState {
   utilization: number;
   supplyApy: number;
   borrowApy: number;
+  // Prefer these if the API returns them
   liquidityAssets?: number;
+  liquidityAssetsUsd?: number;
+  supplyAssetsUsd?: number;
+  borrowAssetsUsd?: number;
 }
 
 export interface MorphoMarket {
@@ -99,17 +103,76 @@ export interface MorphoPositionRow {
   hasDebt: boolean;
 }
 
+// ============ Liquidity Sorting ============
+
+/**
+ * Get USD-normalized liquidity for a market (preferred sort key)
+ */
+function getLiquidityUsd(m: MorphoMarket): number {
+  // Best: direct USD metric from the API
+  const apiUsd = m.state.liquidityAssetsUsd;
+  if (typeof apiUsd === "number" && Number.isFinite(apiUsd)) return apiUsd;
+
+  // Fallback #1: compute liquidityAssets * priceUsd (loan token)
+  const liquidityAssets =
+    (typeof m.state.liquidityAssets === "number" && Number.isFinite(m.state.liquidityAssets))
+      ? m.state.liquidityAssets
+      : Math.max(0, (m.state.supplyAssets || 0) - (m.state.borrowAssets || 0));
+
+  const loanPrice = m.loanAsset.priceUsd ?? 0;
+  return liquidityAssets * loanPrice;
+}
+
+/**
+ * Sort markets by liquidity (USD-first, asset fallback)
+ * Stable sort (preserves original order on ties)
+ */
+export function sortMarketsByLiquidityDesc(markets: MorphoMarket[]): MorphoMarket[] {
+  return markets
+    .map((m, i) => ({ m, i, liqUsd: getLiquidityUsd(m) }))
+    .sort((a, b) => {
+      if (b.liqUsd !== a.liqUsd) return b.liqUsd - a.liqUsd;
+
+      // Secondary tie-breakers (nice-to-have):
+      const bSupplyUsd = b.m.state.supplyAssetsUsd ?? 0;
+      const aSupplyUsd = a.m.state.supplyAssetsUsd ?? 0;
+      if (bSupplyUsd !== aSupplyUsd) return bSupplyUsd - aSupplyUsd;
+
+      return a.i - b.i;
+    })
+    .map(x => x.m);
+}
+
 // ============ API Fetchers ============
 
-async function fetchMorphoMarkets(chainId: number): Promise<MorphoMarket[]> {
+async function fetchMorphoMarkets(chainId: number, search?: string): Promise<MorphoMarket[]> {
   try {
-    const response = await fetch(`/api/morpho/${chainId}/markets?first=100`);
+    const params = new URLSearchParams({
+      first: "2000",
+      // Use curated mode (default): includes whitelisted markets + markets listed via vaults, excludes HIGH warnings
+      curation: "curated",
+      // Optional safety rails (opt-in to avoid filtering everything)
+      minLiquidityUsd: "10000",
+      hideSaturated: "true",
+    });
+
+    // Forward search parameter to API if provided
+    if (search && search.trim().length > 0) {
+      params.set("search", search.trim());
+    }
+
+    const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);
     if (!response.ok) {
       console.error(`[useMorphoLendingPositions] Markets API error: ${response.status}`);
       return [];
     }
     const data = await response.json();
-    return data?.markets?.items || [];
+    const items: MorphoMarket[] = data?.markets?.items || [];
+
+    console.log(`[useMorphoLendingPositions] Fetched ${items.length} markets`);
+
+    // Client-side safety net (ensures liquidity-first ordering even if server-side ordering was unavailable)
+    return sortMarketsByLiquidityDesc(items);
   } catch (error) {
     console.error("[useMorphoLendingPositions] Failed to fetch markets:", error);
     return [];
@@ -178,7 +241,7 @@ export function useMorphoLendingPositions(
   } = useQuery({
     queryKey: ["morpho-markets", chainId],
     queryFn: () => fetchMorphoMarkets(chainId),
-    staleTime: 60_000, // 1 minute
+    staleTime: 10_000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: chainId > 0,
   });
@@ -327,21 +390,30 @@ export function useMorphoLendingPositions(
 
 // ============ Markets-only Hook (for market selection UI) ============
 
-export function useMorphoMarkets(chainId: number) {
+export function useMorphoMarkets(chainId: number, search?: string) {
+  // Normalize search: empty string or undefined both mean no search
+  const normalizedSearch = search?.trim() || undefined;
+  
   const {
     data: markets = [],
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ["morpho-markets", chainId],
-    queryFn: () => fetchMorphoMarkets(chainId),
-    staleTime: 60_000,
+    queryKey: ["morpho-markets", chainId, normalizedSearch],
+    queryFn: () => {
+      console.log("[useMorphoMarkets] Fetching markets with search:", normalizedSearch || "(none)");
+      return fetchMorphoMarkets(chainId, normalizedSearch);
+    },
+    staleTime: 30_000, // Reduced from 60s to 30s for search responsiveness
     refetchOnWindowFocus: false,
     enabled: chainId > 0,
+    // Use select so sorting does not rerun unnecessarily
+    select: (ms) => sortMarketsByLiquidityDesc(ms),
   });
 
   // Filter to only markets with both collateral and loan assets
+  // Keep original conditions, but preserve the sorted order
   const validMarkets = useMemo(() => {
     return markets.filter(
       (m) => m.collateralAsset && m.loanAsset && m.state.supplyAssets > 0

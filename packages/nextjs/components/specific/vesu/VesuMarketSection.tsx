@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { FC } from "react";
+import React, { type FC } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
@@ -23,7 +23,7 @@ interface VesuMarketSectionProps {
   canDeposit: boolean;
   formatCurrency: (value: number) => string;
   protocolName?: string;
-  headerExtra?: JSX.Element;
+  headerExtra?: React.ReactElement;
   title?: string;
   iconSrc?: string;
 }

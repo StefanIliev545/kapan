@@ -20,6 +20,7 @@ const commonConfig = {
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },
+  turbopack: {},
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "identicon.starknet.id", pathname: "/**" },

@@ -1,8 +1,8 @@
 import { BoltIcon, ScaleIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
-import { FC } from "react";
+import React, { FC } from "react";
 
 interface Feature {
-  icon: JSX.Element;
+  icon: React.ReactElement;
   title: string;
   description: string;
 }

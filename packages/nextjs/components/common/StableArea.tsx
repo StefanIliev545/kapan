@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect, useRef, useState } from "react";
+import React, { PropsWithChildren, useEffect, useRef, useState } from "react";
 
 type StableAreaProps = PropsWithChildren<{
   /**
@@ -14,7 +14,7 @@ type StableAreaProps = PropsWithChildren<{
    * Element to render as the wrapper. Defaults to a div so that the component can be used inside flex/grid layouts
    * without introducing semantic issues.
    */
-  as?: keyof JSX.IntrinsicElements;
+  as?: React.ElementType;
 }>;
 
 /**

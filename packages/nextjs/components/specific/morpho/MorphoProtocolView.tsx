@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useMemo } from "react";
+import { FC, useState, useMemo, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useAccount } from "wagmi";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
@@ -8,6 +8,7 @@ import {
   useMorphoLendingPositions,
   useMorphoMarkets,
 } from "~~/hooks/useMorphoLendingPositions";
+import { useMorphoPositionsRefresh } from "~~/hooks/useMorphoPositionsRefresh";
 import { MorphoPositionsSection } from "./MorphoPositionsSection";
 import { MorphoMarketsSection } from "./MorphoMarketsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
@@ -58,14 +59,53 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
   const {
     markets,
-    rows,
+    rows: apiRows,
     isLoadingMarkets,
     isLoadingPositions,
     hasLoadedOnce,
     isUpdating,
   } = useMorphoLendingPositions(effectiveChainId, connectedAddress);
 
-  const { marketPairs } = useMorphoMarkets(effectiveChainId);
+  const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
+
+  // Extract markets where user has positions for fast refresh
+  const marketsWithPositions = useMemo(() => {
+    if (!apiRows.length) return [];
+    return apiRows.map(row => row.market);
+  }, [apiRows]);
+
+  // Use refresh hook for fast updates after transactions
+  const { rows: refreshedRows, isFetching: isRefreshing, refetch: refetchPositions } = useMorphoPositionsRefresh(
+    marketsWithPositions,
+    effectiveChainId,
+    hasLoadedOnce && marketsWithPositions.length > 0 // Only enable after initial load
+  );
+
+  // Listen for transaction completion to trigger fast refresh
+  useEffect(() => {
+    if (!hasLoadedOnce || marketsWithPositions.length === 0) return;
+
+    const handleTxCompleted = () => {
+      // Small delay to ensure transaction is mined
+      setTimeout(() => {
+        refetchPositions();
+      }, 2000);
+    };
+
+    window.addEventListener("txCompleted", handleTxCompleted);
+    return () => {
+      window.removeEventListener("txCompleted", handleTxCompleted);
+    };
+  }, [hasLoadedOnce, marketsWithPositions.length, refetchPositions]);
+
+  // Prioritize refreshed data when available, fallback to API data
+  const rows = useMemo(() => {
+    // Use refreshed data if available and not stale, otherwise use API data
+    if (refreshedRows.length > 0 && !isRefreshing) {
+      return refreshedRows;
+    }
+    return apiRows;
+  }, [refreshedRows, apiRows, isRefreshing]);
 
   // Compute totals and metrics
   const metrics = useMemo(() => {
@@ -80,9 +120,11 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     }
 
     // Build position arrays for the yield calculation utility
+    // Note: Collateral in Morpho doesn't earn yield (0% APY)
+    // The supplyApy is for lending the loan asset, not for collateral
     const suppliedPositions = rows.map((row) => ({
       balance: row.collateralBalanceUsd,
-      currentRate: row.supplyApy,
+      currentRate: 0, // Collateral doesn't earn yield in Morpho
     }));
 
     const borrowedPositions = rows
