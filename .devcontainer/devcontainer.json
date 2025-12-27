@@ -23,7 +23,9 @@
 		// Persist VS Code server extensions between rebuilds
 		"source=vscode-extensions,target=/home/node/.vscode-server/extensions,type=volume",
 		// Persist VS Code server user data (includes globalStorage/secret storage used by extensions)
-		"source=vscode-userdata,target=/home/node/.vscode-server/data/User,type=volume"
+		"source=vscode-userdata,target=/home/node/.vscode-server/data/User,type=volume",
+		"source=next-cache,target=${containerWorkspaceFolder}/.next/cache,type=volume",
+		"source=pnpm-store,target=/home/node/.local/share/pnpm/store,type=volume",
 	],
 	"customizations": {
 		"vscode": {
