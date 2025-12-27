@@ -61,7 +61,7 @@ export type RefinanceModalContentProps = {
   debtMaxRaw?: string;
   debtConfirmed: boolean;
   setDebtConfirmed: (value: boolean) => void;
-  debtInputRef: React.RefObject<HTMLInputElement>;
+  debtInputRef: React.RefObject<HTMLInputElement | null>;
   sourceProtocol: Protocol;
   setIsDebtMaxClicked: (value: boolean) => void;
 

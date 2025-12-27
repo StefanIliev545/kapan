@@ -253,10 +253,13 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
-    ? React.cloneElement(collateralView as React.ReactElement, {
-      isVisible: isExpanded,
-      initialShowAll: false,
-    })
+    ? React.cloneElement(
+        collateralView as React.ReactElement<{ isVisible?: boolean; initialShowAll?: boolean }>,
+        {
+          isVisible: isExpanded,
+          initialShowAll: false,
+        },
+      )
     : null;
 
   const defaultInfoButton = (
