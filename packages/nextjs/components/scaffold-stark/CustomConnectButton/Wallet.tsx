@@ -6,10 +6,8 @@ import { useTheme } from "next-themes";
 const Wallet = ({
   handleConnectWallet,
   connector,
-  loader,
 }: {
   connector: Connector;
-  loader: ({ src }: { src: string }) => string;
   handleConnectWallet: (
     e: React.MouseEvent<HTMLButtonElement>,
     connector: Connector,
@@ -47,11 +45,11 @@ const Wallet = ({
       <div className="h-[1.5rem] w-[1.5rem] rounded-[5px]">
         <Image
           alt={connector.name}
-          loader={loader}
           src={icon}
           width={70}
           height={70}
           className="h-full w-full object-cover rounded-[5px]"
+          unoptimized={icon.startsWith("data:")}
         />
       </div>
       <span className=" text-start m-0">{connector.name}</span>
