@@ -606,7 +606,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                 <div className="divide-y divide-base-200/30">
                   {sortedMarkets.map((m, idx) => (
                     <div
-                      key={m.protocol + m.address}
+                      key={`${m.protocol}-${m.network}-${m.address}${m.poolName ? `-${m.poolName}` : ""}`}
                       className={`grid grid-cols-5 items-center gap-4 px-4 py-3 hover:bg-base-200/30 transition-colors ${
                         idx === 0 ? "bg-base-100/50" : ""
                       }`}

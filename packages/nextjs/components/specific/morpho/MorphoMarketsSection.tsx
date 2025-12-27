@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { FC } from "react";
+import { createPortal } from "react-dom";
 import {
   Avatar,
   Badge,
@@ -20,7 +21,7 @@ import {
   TextField,
   Tooltip,
 } from "@radix-ui/themes";
-import { Search, X, ArrowDown, ArrowUp } from "lucide-react";
+import { Search, X, ArrowDown, ArrowUp, ChevronDown } from "lucide-react";
 
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -122,6 +123,197 @@ function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string
   );
 }
 
+// Searchable Select Component
+interface SearchableSelectProps {
+  options: string[];
+  value: string;
+  onValueChange: (value: string) => void;
+  placeholder: string;
+  allLabel: string;
+  style?: React.CSSProperties;
+}
+
+function SearchableSelect({ options, value, onValueChange, placeholder, allLabel, style }: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Filter options based on search term
+  const filteredOptions = React.useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    const term = searchTerm.toLowerCase();
+    return options.filter(opt => opt.toLowerCase().includes(term));
+  }, [options, searchTerm]);
+
+  // Get display value
+  const displayValue = value === "all" ? allLabel : value;
+
+  // Calculate position for dropdown
+  const [position, setPosition] = React.useState<{ top: number; left: number; width: number } | null>(null);
+
+  const updatePosition = React.useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      
+      // Update position on scroll/resize
+      window.addEventListener("scroll", updatePosition, true);
+      window.addEventListener("resize", updatePosition);
+      
+      return () => {
+        window.removeEventListener("scroll", updatePosition, true);
+        window.removeEventListener("resize", updatePosition);
+      };
+    } else {
+      setPosition(null);
+    }
+  }, [isOpen, updatePosition]);
+
+  // Handle outside click
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Focus input when opened
+  React.useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        const input = dropdownRef.current?.querySelector('input[type="text"]') as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleSelect = (option: string) => {
+    onValueChange(option);
+    setIsOpen(false);
+    setSearchTerm("");
+  };
+
+  return (
+    <Box style={{ position: "relative", ...style }} ref={containerRef}>
+      <Button
+        size="2"
+        variant="surface"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        style={{ minWidth: 140, justifyContent: "space-between" }}
+      >
+        <Text size="2" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {displayValue}
+        </Text>
+        <ChevronDown width="16" height="16" style={{ flexShrink: 0, marginLeft: 8 }} />
+      </Button>
+
+      {isOpen && position && typeof document !== "undefined" && createPortal(
+        <div
+          ref={dropdownRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: position.top,
+            left: position.left,
+            width: position.width,
+            zIndex: 9999,
+            maxWidth: "90vw",
+          }}
+          className="bg-base-100 border border-base-300 rounded-xl shadow-2xl overflow-hidden"
+        >
+          <Box style={{ padding: 8, borderBottom: "1px solid var(--gray-6)" }}>
+            <TextField.Root
+              size="2"
+              variant="surface"
+              placeholder={`Search ${placeholder.toLowerCase()}...`}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.currentTarget.value)}
+            >
+              <TextField.Slot>
+                <Search width="14" height="14" />
+              </TextField.Slot>
+              {searchTerm ? (
+                <TextField.Slot side="right">
+                  <IconButton
+                    size="1"
+                    variant="ghost"
+                    aria-label="Clear search"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    <X width="12" height="12" />
+                  </IconButton>
+                </TextField.Slot>
+              ) : null}
+            </TextField.Root>
+          </Box>
+
+          <ScrollArea style={{ maxHeight: 300 }}>
+            <Box style={{ padding: 4 }}>
+              <Button
+                size="2"
+                variant={value === "all" ? "solid" : "ghost"}
+                style={{ width: "100%", justifyContent: "flex-start" }}
+                onClick={() => handleSelect("all")}
+              >
+                {allLabel}
+              </Button>
+              {filteredOptions.length === 0 ? (
+                <Box style={{ padding: 12, textAlign: "center" }}>
+                  <Text size="2" color="gray">
+                    No matches found
+                  </Text>
+                </Box>
+              ) : (
+                filteredOptions.map(option => (
+                  <Button
+                    key={option}
+                    size="2"
+                    variant={value === option ? "solid" : "ghost"}
+                    style={{ width: "100%", justifyContent: "flex-start", marginTop: 2 }}
+                    onClick={() => handleSelect(option)}
+                  >
+                    {option}
+                  </Button>
+                ))
+              )}
+            </Box>
+          </ScrollArea>
+        </div>,
+        document.body
+      )}
+    </Box>
+  );
+}
+
 export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   markets,
   marketPairs,
@@ -135,6 +327,8 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const [search, setSearch] = React.useState("");
   const deferredSearch = React.useDeferredValue(search);
   const [visibleCount, setVisibleCount] = React.useState(pageSize);
+  const [selectedCollateral, setSelectedCollateral] = React.useState<string>("all");
+  const [selectedDebtAsset, setSelectedDebtAsset] = React.useState<string>("all");
 
   const usd = React.useMemo(() => makeUsdFormatter(), []);
 
@@ -142,17 +336,48 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const [selectedMarket, setSelectedMarket] = React.useState<MorphoMarket | null>(null);
   const { address: walletAddress, chainId: walletChainId } = useAccount();
 
+  // Extract unique collateral and debt assets from markets
+  const { collateralAssets, debtAssets } = React.useMemo(() => {
+    const collateralSet = new Set<string>();
+    const debtSet = new Set<string>();
+
+    markets.forEach(m => {
+      if (m.collateralAsset?.symbol) {
+        collateralSet.add(m.collateralAsset.symbol);
+      }
+      if (m.loanAsset?.symbol) {
+        debtSet.add(m.loanAsset.symbol);
+      }
+    });
+
+    return {
+      collateralAssets: Array.from(collateralSet).sort(),
+      debtAssets: Array.from(debtSet).sort(),
+    };
+  }, [markets]);
+
   const resetPaging = React.useCallback(() => setVisibleCount(pageSize), [pageSize]);
 
   React.useEffect(() => {
     resetPaging();
-  }, [deferredSearch, sortKey, sortDirection, resetPaging]);
+  }, [deferredSearch, sortKey, sortDirection, selectedCollateral, selectedDebtAsset, resetPaging]);
 
   const rows = React.useMemo(() => {
     const searchValue = deferredSearch.trim().toLowerCase();
 
     const candidates = markets
       .filter(m => Boolean(m.collateralAsset)) // only pairs (as in your original)
+      .filter(m => {
+        // Filter by selected collateral asset
+        if (selectedCollateral !== "all") {
+          if (m.collateralAsset?.symbol !== selectedCollateral) return false;
+        }
+        // Filter by selected debt asset
+        if (selectedDebtAsset !== "all") {
+          if (m.loanAsset?.symbol !== selectedDebtAsset) return false;
+        }
+        return true;
+      })
       .map(m => {
         const loanDecimals = toNumberSafe(m.loanAsset?.decimals);
         const loanPriceUsd = toNumberSafe(m.loanAsset?.priceUsd);
@@ -227,7 +452,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     });
 
     return sorted;
-  }, [markets, deferredSearch, sortKey, sortDirection]);
+  }, [markets, deferredSearch, sortKey, sortDirection, selectedCollateral, selectedDebtAsset]);
 
   const totalPairs = marketPairs?.size ?? 0;
 
@@ -330,6 +555,26 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
               </TextField.Root>
             </Box>
 
+            {/* Collateral Asset Filter */}
+            <SearchableSelect
+              options={collateralAssets}
+              value={selectedCollateral}
+              onValueChange={setSelectedCollateral}
+              placeholder="Collateral"
+              allLabel="All Collaterals"
+              style={{ minWidth: 140 }}
+            />
+
+            {/* Debt Asset Filter */}
+            <SearchableSelect
+              options={debtAssets}
+              value={selectedDebtAsset}
+              onValueChange={setSelectedDebtAsset}
+              placeholder="Debt Asset"
+              allLabel="All Debt Assets"
+              style={{ minWidth: 140 }}
+            />
+
             <Flex align="center" gap="2" wrap="wrap">
               <Text size="2" color="gray">
                 Sort
@@ -382,6 +627,8 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                           setSearch("");
                           setSortKey("liquidity");
                           setSortDirection("desc");
+                          setSelectedCollateral("all");
+                          setSelectedDebtAsset("all");
                         }}
                       >
                         Reset all
