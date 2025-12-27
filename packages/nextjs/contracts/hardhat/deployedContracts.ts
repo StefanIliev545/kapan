@@ -16796,7 +16796,7 @@ const contracts = {
   },
   31337: {
     AaveGatewayView: {
-      address: "0xF17fb297193046783E2e3CA41F749F0974Aa3f2C",
+      address: "0x70331B1D99689E49cAC22EA0bce43E1319fFC57d",
       abi: [
         {
           inputs: [
@@ -17533,7 +17533,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x2964A314Fcd2F559513e300FC8A46088192a15f7",
+      address: "0x4C36276b2B1CF92eA340C291699113d9c335Dd3f",
       abi: [
         {
           inputs: [
@@ -17730,29 +17730,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "borrow",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               components: [
                 {
                   internalType: "enum ProtocolTypes.LendingOp",
@@ -17833,29 +17810,6 @@ const contracts = {
             },
           ],
           stateMutability: "view",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "onBehalfOf",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "deposit",
-          outputs: [],
-          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -17956,69 +17910,6 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "repay",
-          outputs: [
-            {
-              internalType: "uint256",
-              name: "refund",
-              type: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "underlying",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "withdraw",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "",
-              type: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
       ],
       inheritedFunctions: {
         authorize: "contracts/v2/interfaces/IGateway.sol",
@@ -18028,7 +17919,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x79342c78b5C35D8860d89295fE7Db0C190508C2d",
+      address: "0xeE4D1A2457130BF0f65Ae367dFbdA307D5793472",
       abi: [
         {
           inputs: [
@@ -18923,7 +18814,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x1891E9c5917c5CAB12608299d7A56facb92C54AD",
+      address: "0x8a354606cEc0E73f06d5d10f22695CCd178e1e07",
       abi: [
         {
           inputs: [
@@ -19213,29 +19104,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "borrow",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               components: [
                 {
                   internalType: "enum ProtocolTypes.LendingOp",
@@ -19319,57 +19187,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "onBehalfOf",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "deposit",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "market",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "collateral",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-            {
-              internalType: "address",
-              name: "receiver",
-              type: "address",
-            },
-          ],
-          name: "depositCollateral",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
           inputs: [],
           name: "owner",
           outputs: [
@@ -19441,29 +19258,6 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "repay",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
               name: "baseToken",
               type: "address",
             },
@@ -19510,45 +19304,6 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "market",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "collateral",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "withdrawCollateral",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "",
-              type: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
       ],
       inheritedFunctions: {
         authorize: "contracts/v2/interfaces/IGateway.sol",
@@ -19561,7 +19316,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x9aCFc97151e39c7929497174F1393B02424ff7Ce",
+      address: "0x0854b0cD0c11b84De66D94411c5E9C3DABD639Dc",
       abi: [
         {
           inputs: [
@@ -20284,7 +20039,7 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "uniswapV3FactoryOrSentinel",
+          name: "uniswapV3Factory",
           outputs: [
             {
               internalType: "address",
@@ -20344,7 +20099,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayView: {
-      address: "0x148D9c36755CB0FB55182376bc69931F63F02D8a",
+      address: "0xFA9a6C971e59c002F0528CD79C30eCDd1efF0764",
       abi: [
         {
           inputs: [
@@ -21727,7 +21482,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0x7087c6D4B5de0C764af4Ac7120CB184d93D1165F",
+      address: "0x95ee32AA492118d0eEECe80801Ef0dCD737BF81F",
       abi: [
         {
           inputs: [
@@ -22362,7 +22117,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0xA24F9479679dA66B2D18c93A82cA467DD8c99d57",
+      address: "0xE31A7B7331a988ab0A7e75a5F4aF38C41D9fD543",
       abi: [
         {
           inputs: [
@@ -22583,7 +22338,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0xDd13899aED7E5ca7fBaaE15b6C30095DaA25f3aa",
+      address: "0xCb55BA05eb61c70081aCD6664cd9c8c0AE3495b8",
       abi: [
         {
           inputs: [
@@ -23004,7 +22759,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0x225f9F47a887b75Cb79FB9B668FF39508d42c64e",
+      address: "0x3b1ABF01B16EF4a859752552eD095aD088dDc943",
       abi: [
         {
           inputs: [
@@ -23225,7 +22980,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x2e4a782B8530854F886AC3764637cD5795dB5025",
+      address: "0x10e7e0184720563BEA0eF492AED76D592600013D",
       abi: [
         {
           inputs: [
@@ -23646,7 +23401,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xE7d27B363FcDdBc2ECB5ac2344Cb9B82D42Bd74F",
+      address: "0x5Be161b66e1D3484f12574223c467108CB9D8E75",
       abi: [
         {
           inputs: [
@@ -23671,7 +23426,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x9a5d83dED59db24Cd786F1f4bc97195d9B87d8D3",
+      address: "0x7a4b07ae68f01Ca54C687D47e7E4C468985Bed6a",
       abi: [
         {
           inputs: [
@@ -24375,7 +24130,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x0cE98289c6cDCAf5D086B0C7ACBd7377ff943a8C",
+      address: "0x8b6b290a0A7a5D7ED5e7818B37261Cc1Be3B9c6c",
       abi: [
         {
           inputs: [
@@ -24552,29 +24307,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "borrow",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
           inputs: [],
           name: "comptroller",
           outputs: [
@@ -24675,29 +24407,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "deposit",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               components: [
                 {
                   internalType: "address",
@@ -24738,69 +24447,6 @@ const contracts = {
               internalType: "struct ProtocolTypes.Output[]",
               name: "outputs",
               type: "tuple[]",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "repay",
-          outputs: [
-            {
-              internalType: "uint256",
-              name: "refund",
-              type: "uint256",
-            },
-          ],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "collateral",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "user",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "underlyingAmount",
-              type: "uint256",
-            },
-          ],
-          name: "withdrawCollateral",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "",
-              type: "uint256",
             },
           ],
           stateMutability: "nonpayable",

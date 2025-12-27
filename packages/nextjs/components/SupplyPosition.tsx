@@ -304,7 +304,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           {/* Token icon + name */}
           <div className="flex items-center gap-1.5 flex-shrink-0" title={name}>
             <div className="w-7 h-7 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-0.5 ring-1 ring-base-300/50 flex-shrink-0">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded object-contain" />
+              <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
             <span className="font-bold text-sm tracking-tight leading-none">
               {renderName ? renderName(name) : name}
@@ -379,7 +379,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           {/* Token */}
           <div className="lg:col-span-3 flex items-center min-w-0">
             <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 ring-1 ring-base-300/50">
-              <Image src={icon} alt={`${name} icon`} layout="fill" className="rounded-lg object-contain" />
+              <Image src={icon} alt={`${name} icon`} fill className="rounded-lg object-contain" />
             </div>
             <div className="ml-3 flex items-center gap-1.5 min-w-0">
               <div className="flex flex-col min-w-0">

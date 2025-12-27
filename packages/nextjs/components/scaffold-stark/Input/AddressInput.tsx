@@ -47,14 +47,14 @@ export const AddressInput = ({
       disabled={disabled}
       prefix={null}
       suffix={
-        // eslint-disable-next-line @next/next/no-img-element
         value && (
           <Image
             alt=""
             className="!rounded-full"
             src={blo(value as `0x${string}`)}
-            width="35"
-            height="35"
+            width={35}
+            height={35}
+            unoptimized
           />
         )
       }
