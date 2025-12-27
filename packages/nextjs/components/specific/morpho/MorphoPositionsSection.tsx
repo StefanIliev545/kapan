@@ -69,12 +69,14 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       const protocolContext = encodeMorphoContext(row.context);
 
       // Create supply position with encoded context
+      // Note: Collateral in Morpho doesn't earn yield (0% APY)
+      // The supplyApy is for lending the loan asset, not for collateral
       const supplyPosition = {
         icon: tokenNameToLogo(row.collateralSymbol.toLowerCase()),
         name: row.collateralSymbol,
         balance: row.collateralBalanceUsd,
         tokenBalance: row.collateralBalance,
-        currentRate: row.supplyApy,
+        currentRate: 0, // Collateral doesn't earn yield in Morpho
         tokenAddress: row.market.collateralAsset?.address || "",
         tokenDecimals: row.collateralDecimals,
         tokenPrice: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
@@ -83,7 +85,8 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       };
 
       // Create borrow position with encoded context
-      const borrowPosition = row.hasDebt
+      // Always create borrow position if there's collateral, even with no debt (allows borrowing)
+      const borrowPosition = row.hasCollateral
         ? {
             icon: tokenNameToLogo(row.loanSymbol.toLowerCase()),
             name: row.loanSymbol,
@@ -141,20 +144,15 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
               <span className="text-sm font-medium">
                 {row.collateralSymbol}/{row.loanSymbol}
               </span>
-              <span className="text-xs text-base-content/50">
-                Max LTV: {row.lltv.toFixed(0)}%
-              </span>
             </div>
             <div className="flex items-center gap-3 text-xs">
               {row.hasDebt && (
-                <>
-                  <span className="text-base-content/60">
-                    LTV: <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? "text-error" : "text-success"}>{ltvDisplayValue}</span>
+                <span className="text-base-content/60">
+                  LTV: <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? "text-error" : "text-success"}>{ltvDisplayValue}</span>
+                  <span className="text-base-content/50 ml-2">
+                    / {row.lltv.toFixed(0)}%
                   </span>
-                  <span className={`badge badge-sm ${row.isHealthy ? "badge-success" : "badge-error"}`}>
-                    HF: {row.healthFactor?.toFixed(2) || "∞"}
-                  </span>
-                </>
+                </span>
               )}
             </div>
           </div>
@@ -188,7 +186,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                 containerClassName="rounded-none"
                 availableActions={{
                   borrow: true,
-                  repay: true,
+                  repay: row.hasDebt, // Only show repay if there's actual debt
                   move: false,
                   close: false,
                   swap: false,
@@ -197,23 +195,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                 controlledExpanded={!!expandedRows[row.key]}
                 onToggleExpanded={() => toggleRowExpanded(row.key)}
               />
-            ) : (
-              <div className="flex h-full items-center justify-between gap-3 border border-dashed border-base-300 bg-base-200/60 p-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-base-content/70">No debt</span>
-                  <span className="text-xs text-base-content/50">
-                    You can borrow {row.loanSymbol} against this collateral.
-                  </span>
-                </div>
-                <button
-                  className="btn btn-sm btn-outline"
-                  disabled
-                  title="Borrow functionality coming soon"
-                >
-                  Borrow
-                </button>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       );

@@ -27,6 +27,8 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
 import { useModal } from "~~/hooks/useModal";
 import { DepositModal } from "~~/components/modals/DepositModal";
+import { useAccount } from "wagmi";
+import { notification } from "~~/utils/scaffold-eth/notification";
 
 type SortKey = "liquidity" | "apy" | "utilization";
 type SortDirection = "desc" | "asc";
@@ -138,6 +140,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
 
   const depositModal = useModal();
   const [selectedMarket, setSelectedMarket] = React.useState<MorphoMarket | null>(null);
+  const { address: walletAddress, chainId: walletChainId } = useAccount();
 
   const resetPaging = React.useCallback(() => setVisibleCount(pageSize), [pageSize]);
 
@@ -154,15 +157,27 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         const loanDecimals = toNumberSafe(m.loanAsset?.decimals);
         const loanPriceUsd = toNumberSafe(m.loanAsset?.priceUsd);
 
+        // Prefer USD values directly from API if available (more accurate)
+        const supplyAssetsUsd = toNumberSafe(m.state?.supplyAssetsUsd);
+        const borrowAssetsUsd = toNumberSafe(m.state?.borrowAssetsUsd);
+        const liquidityAssetsUsd = toNumberSafe(m.state?.liquidityAssetsUsd);
+
+        // Fallback to calculating from raw assets if USD values not available
         const supplyAssetsRaw = toNumberSafe(m.state?.supplyAssets);
         const borrowAssetsRaw = toNumberSafe(m.state?.borrowAssets);
         const liquidityAssetsRaw = toNumberSafe(m.state?.liquidityAssets ?? m.state?.supplyAssets);
-
         const denom = pow10(loanDecimals);
 
-        const supplyUsd = denom > 0 ? (supplyAssetsRaw / denom) * loanPriceUsd : 0;
-        const borrowUsd = denom > 0 ? (borrowAssetsRaw / denom) * loanPriceUsd : 0;
-        const liquidityUsd = denom > 0 ? (liquidityAssetsRaw / denom) * loanPriceUsd : 0;
+        // Use API USD values if available, otherwise calculate
+        const supplyUsd = supplyAssetsUsd > 0 
+          ? supplyAssetsUsd 
+          : (denom > 0 ? (supplyAssetsRaw / denom) * loanPriceUsd : 0);
+        const borrowUsd = borrowAssetsUsd > 0
+          ? borrowAssetsUsd
+          : (denom > 0 ? (borrowAssetsRaw / denom) * loanPriceUsd : 0);
+        const liquidityUsd = liquidityAssetsUsd > 0
+          ? liquidityAssetsUsd
+          : (denom > 0 ? (liquidityAssetsRaw / denom) * loanPriceUsd : 0);
 
         const utilization01 = toNumberSafe(m.state?.utilization);
         const supplyApy01 = toNumberSafe(m.state?.supplyApy);
@@ -222,10 +237,23 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         onSupply(m);
         return;
       }
+      
+      // Check if wallet is connected
+      if (!walletAddress) {
+        notification.error("Please connect your wallet to deposit");
+        return;
+      }
+      
+      // Check if wallet is on the correct chain
+      if (walletChainId !== chainId) {
+        notification.error(`Please switch to chain ID ${chainId} to deposit`);
+        return;
+      }
+      
       setSelectedMarket(m);
       depositModal.open();
     },
-    [onSupply, depositModal]
+    [onSupply, depositModal, walletAddress, walletChainId, chainId]
   );
 
   if (isLoading) {
@@ -474,17 +502,17 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
             setSelectedMarket(null);
           }}
           token={{
-            name: selectedMarket.loanAsset.symbol,
-            icon: tokenNameToLogo(selectedMarket.loanAsset.symbol),
-            address: selectedMarket.loanAsset.address,
-            currentRate: selectedMarket.state.supplyApy * 100, // Convert from decimal (0.05) to percentage (5)
-            usdPrice: selectedMarket.loanAsset.priceUsd ?? undefined,
-            decimals: selectedMarket.loanAsset.decimals,
+            name: selectedMarket.collateralAsset?.symbol ?? "",
+            icon: tokenNameToLogo(selectedMarket.collateralAsset?.symbol ?? ""),
+            address: selectedMarket.collateralAsset?.address ?? "",
+            currentRate: 0, // Collateral doesn't earn yield in Morpho (supplyApy is for lending loan asset)
+            usdPrice: selectedMarket.collateralAsset?.priceUsd ?? undefined,
+            decimals: selectedMarket.collateralAsset?.decimals,
           }}
-          protocolName="morpho"
+          protocolName="morpho-blue"
           chainId={chainId}
           context={encodeMorphoContext({
-            marketId: selectedMarket.id,
+            marketId: selectedMarket.uniqueKey,
             loanToken: selectedMarket.loanAsset.address,
             collateralToken: selectedMarket.collateralAsset?.address || "",
             oracle: selectedMarket.oracle?.address || "",
