@@ -1589,8 +1589,12 @@ export const useKapanRouterV2 = () => {
 
         // Approve (creates UTXO for sync)
         addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true);
-        // Deposit (NO UTXO created)
-        addProto(to, encodeLendingInstruction(LendingOp.Deposit, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
+        
+        // Deposit collateral to destination protocol
+        // For Morpho Blue, use DepositCollateral (supplies collateral for borrowing)
+        // For other protocols, use Deposit (which handles collateral deposits)
+        const depositOp = to === "morpho-blue" ? LendingOp.DepositCollateral : LendingOp.Deposit;
+        addProto(to, encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
       },
 
       buildBorrow: (p) => {

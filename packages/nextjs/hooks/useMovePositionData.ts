@@ -123,8 +123,8 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   const destinationProtocols: DestinationProtocolOption[] = useMemo(() => {
     if (networkType === "evm") {
       // Linea (59144): ZeroLend replaces Venus
-      // Base (8453): Show both ZeroLend and Venus
-      // Other chains: Show Venus only
+      // Base (8453): Show both ZeroLend, Venus, and Morpho Blue
+      // Other chains: Show Venus only (no Morpho)
       const isLinea = chainId === 59144;
       const isBase = chainId === 8453;
       const protocols = [
@@ -133,7 +133,11 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
         ...(isLinea
           ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }]
           : isBase
-            ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }, { name: "Venus", logo: getProtocolLogo("Venus") }]
+            ? [
+                { name: "Morpho Blue", logo: getProtocolLogo("Morpho Blue") },
+                { name: "ZeroLend", logo: getProtocolLogo("ZeroLend") },
+                { name: "Venus", logo: getProtocolLogo("Venus") },
+              ]
             : [{ name: "Venus", logo: getProtocolLogo("Venus") }]
         ),
       ];

@@ -18,6 +18,8 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { RefinanceModalContent } from "./RefinanceModalContent";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
+import { useMorphoMarketSupport } from "~~/hooks/useMorphoMarketSupport";
+import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
 
 /* ------------------------------ Helpers ------------------------------ */
 type PriceMap = Record<string, bigint>;
@@ -102,6 +104,8 @@ type RefinanceModalEvmProps = {
     inputValue?: string;
   }>;
   disableCollateralSelection?: boolean;
+  /** Pre-encoded context for the source protocol (e.g., Morpho MarketParams) */
+  fromContext?: string;
 };
 
 export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
@@ -109,6 +113,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   onClose,
   fromProtocol,
   position,
+  fromContext,
   chainId,
   preSelectedCollaterals,
   disableCollateralSelection,
@@ -139,6 +144,23 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Merge preselected collaterals with collaterals from hook
   const collaterals = useMemo(() => {
+    // If collateral selection is disabled and we have preselected collaterals,
+    // ONLY use the preselected collaterals (don't merge with hook data)
+    // This is important for protocols like Morpho where the collateral is fixed per market
+    if (disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0) {
+      return preSelectedCollaterals.map(pc => {
+        const rawBalance = pc.maxAmount || pc.amount || 0n;
+        return {
+          address: pc.token,
+          symbol: pc.symbol,
+          icon: tokenNameToLogo(pc.symbol.toLowerCase()),
+          decimals: pc.decimals,
+          rawBalance: rawBalance,
+          balance: rawBalance ? Number(formatUnits(rawBalance, pc.decimals)) : 0,
+        };
+      });
+    }
+
     if (!preSelectedCollaterals || preSelectedCollaterals.length === 0) {
       return collateralsFromHook;
     }
@@ -177,7 +199,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     });
 
     return merged;
-  }, [collateralsFromHook, preSelectedCollaterals]);
+  }, [collateralsFromHook, preSelectedCollaterals, disableCollateralSelection]);
 
   /* ----------------------- Stable prices (merged) ------------------------ */
   const [mergedPrices, setMergedPrices] = useState<PriceMap>({});
@@ -239,6 +261,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     resetState,
     onCollateralTileClick,
     onAddCollateral,
+    // Morpho-specific state
+    selectedMorphoMarket,
+    morphoContext,
+    onMorphoMarketSelect,
   } = state;
 
   const wasOpenRef = useRef(false);
@@ -298,6 +324,28 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     collateralAddresses.map(a => a.toLowerCase()),
     isOpen && collateralAddresses.length > 0 && Boolean(selectedProtocol || filteredDestinationProtocols[0]?.name),
   );
+
+  /* ---------------------- Morpho market support ---------------------- */
+  const isMorphoSelected = selectedProtocol === "Morpho Blue";
+  
+  const {
+    supportedCollaterals: morphoSupportedCollaterals,
+    marketsByCollateral: morphoMarketsByCollateral,
+    isLoading: isLoadingMorphoMarkets,
+  } = useMorphoMarketSupport({
+    chainId: chainId || 8453, // Default to Base
+    loanTokenAddress: position.tokenAddress,
+    collateralAddresses: collateralAddresses.map(a => a.toLowerCase()),
+    enabled: isOpen && isMorphoSelected && collateralAddresses.length > 0,
+  });
+
+  // Get markets for the currently selected collateral (for Morpho)
+  const morphoMarketsForSelectedCollateral = useMemo(() => {
+    if (!isMorphoSelected) return [];
+    const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
+    if (!selectedCollateralAddr) return [];
+    return morphoMarketsByCollateral[selectedCollateralAddr] || [];
+  }, [isMorphoSelected, addedCollaterals, morphoMarketsByCollateral]);
 
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
@@ -560,7 +608,19 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [isOpen, needDebtProbe, position.tokenAddress, position.name, collaterals, mergedPrices, reportPrice]);
 
   /* --------------------------- Action Handlers --------------------------- */
-  const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0 || Object.keys(addedCollaterals).some(addr => effectiveSupportedMap?.[addrKey(addr)] === false);
+  const isActionDisabled = useMemo(() => {
+    if (!debtConfirmed || !selectedProtocol) return true;
+    if (Object.keys(addedCollaterals).length === 0) return true;
+    
+    // For Morpho, must have a market selected
+    if (isMorphoSelected && !selectedMorphoMarket) return true;
+    
+    // Check collateral support based on protocol
+    const supportMap = isMorphoSelected ? morphoSupportedCollaterals : effectiveSupportedMap;
+    if (Object.keys(addedCollaterals).some(addr => supportMap?.[addrKey(addr)] === false)) return true;
+    
+    return false;
+  }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, effectiveSupportedMap]);
 
   const handleExecuteMove = async () => {
     if (!debtConfirmed || !selectedProtocol) return;
@@ -604,17 +664,29 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         builder.setCompoundMarket(position.tokenAddress as Address);
       }
 
+      // Check if source is Morpho Blue (need to pass fromContext)
+      const isFromMorpho = normalizedFromProtocol === "morphoblue" || fromProtocol.toLowerCase().includes("morpho");
+      const sourceContext: `0x${string}` = (isFromMorpho && fromContext) 
+        ? fromContext as `0x${string}` 
+        : "0x";
+
       builder.buildUnlockDebt({
         fromProtocol,
         debtToken: position.tokenAddress as Address,
         expectedDebt: debtAmount,
         debtDecimals: position.decimals,
+        fromContext: sourceContext,
         flash: {
           version: providerVersion as any,
           premiumBps: 9,
           bufferBps: 10,
         },
       });
+
+      // Prepare Morpho context if destination is Morpho Blue
+      const morphoEncodedContext: `0x${string}` | undefined = isMorphoSelected && morphoContext 
+        ? encodeMorphoContext(morphoContext as MorphoMarketContextForEncoding) as `0x${string}`
+        : undefined;
 
       Object.entries(addedCollaterals).forEach(([addr, amt]) => {
         const meta = collaterals.find(c => addrKey(c.address) === addrKey(addr));
@@ -626,6 +698,11 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
           collateralToken: addr as Address,
           withdraw: isMax ? { max: true } : { amount: amt },
           collateralDecimals: meta.decimals,
+          // Pass source context when moving FROM Morpho Blue
+          fromContext: sourceContext,
+          // Pass Morpho context when destination is Morpho Blue
+          // Note: For Morpho, we use DepositCollateral (not Deposit) which is handled by the gateway
+          toContext: morphoEncodedContext || "0x",
         });
       });
 
@@ -636,6 +713,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         decimals: position.decimals,
         extraBps: 5,
         approveToRouter: true,
+        // Pass Morpho context for borrow when destination is Morpho Blue
+        toContext: morphoEncodedContext || "0x",
       });
 
       const flow = builder.build();
@@ -754,6 +833,14 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       revokePermissions={revokePermissions}
       setRevokePermissions={setRevokePermissions}
       apiProbes={apiProbes}
+      // Morpho-specific props
+      isMorphoSelected={isMorphoSelected}
+      morphoMarkets={morphoMarketsForSelectedCollateral}
+      selectedMorphoMarket={selectedMorphoMarket}
+      onMorphoMarketSelect={onMorphoMarketSelect}
+      morphoSupportedCollaterals={morphoSupportedCollaterals}
+      isLoadingMorphoMarkets={isLoadingMorphoMarkets}
+      chainId={chainId}
     />
   );
 };

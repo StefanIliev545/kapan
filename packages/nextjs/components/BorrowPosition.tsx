@@ -708,6 +708,9 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               position={refiPosition}
               chainId={chainId}
               networkType="evm"
+              fromContext={protocolContext}
+              preSelectedCollaterals={moveSupport?.preselectedCollaterals}
+              disableCollateralSelection={moveSupport?.disableCollateralSelection}
             />
           )}
           <CloseWithCollateralEvmModal
