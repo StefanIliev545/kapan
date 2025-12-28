@@ -13,6 +13,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { BasicCollateral, useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
+import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo } from "react-icons/fi";
@@ -111,7 +112,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     const [selectedFrom, setSelectedFrom] = useState<SwapAsset | null>(null);
     const [selectedTo, setSelectedTo] = useState<SwapAsset | null>(null);
-    const [slippage, setSlippage] = useState<number>(3);
+    const [slippage, setSlippage] = useState<number>(0.1); // Start with minimum, will auto-adjust
     const [amountIn, setAmountIn] = useState("");
     const [isMax, setIsMax] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -205,6 +206,16 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
         return "0";
     }, [swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals]);
+
+    // Auto-slippage and price impact calculation
+    const { priceImpact } = useAutoSlippage({
+        slippage,
+        setSlippage,
+        oneInchQuote,
+        pendleQuote,
+        swapRouter,
+        resetDep: `${selectedFrom?.address}-${selectedTo?.address}`,
+    });
 
     const buildFlow = () => {
         if (!selectedFrom || !selectedTo) return [];
@@ -421,6 +432,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             toLabel="Swap To"
             swapRouter={swapRouter}
             setSwapRouter={oneInchAvailable && pendleAvailable ? setSwapRouter : undefined}
+            priceImpact={priceImpact}
         />
     );
 };

@@ -31,34 +31,39 @@ export const AaveProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?:
     setRefreshKey(k => k + 1);
   }, []);
 
+  // E-Mode header element - compact display for the protocol header
+  const eModeHeaderElement = useMemo(() => {
+    if (!address) return null;
+    return (
+      <div className="flex items-center gap-2">
+        <EModeToggle chainId={chainId} onEModeChanged={handleEModeChanged} />
+        {userEModeId > 0 && userEMode && (
+          <span className="hidden sm:inline text-xs text-primary whitespace-nowrap">
+            {userEMode.label} (LTV {(userEMode.ltv / 100).toFixed(0)}%)
+          </span>
+        )}
+      </div>
+    );
+  }, [address, chainId, handleEModeChanged, userEModeId, userEMode]);
+
   return (
     <AaveLike chainId={chainId} contractName="AaveGatewayView" key={refreshKey}>
-      {({ suppliedPositions, borrowedPositions, forceShowAll }) => (
-        <div>
-          <ProtocolView
-            protocolName="Aave V3"
-            protocolIcon="/logos/aave.svg"
-            enabledFeatures={enabledFeatures}
-            ltvBps={ltvBps}
-            lltvBps={lltvValue}
-            suppliedPositions={suppliedPositions}
-            borrowedPositions={borrowedPositions}
-            forceShowAll={forceShowAll}
-            networkType="evm"
-            chainId={chainId}
-          />
-          {/* E-Mode controls - below the protocol view */}
-          {address && (
-            <div className="mt-2 flex items-center gap-2">
-              <EModeToggle chainId={chainId} onEModeChanged={handleEModeChanged} />
-              {userEModeId > 0 && userEMode && (
-                <span className="text-xs text-primary">
-                  E-Mode: {userEMode.label} (LTV {(userEMode.ltv / 100).toFixed(0)}%)
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+      {({ suppliedPositions, borrowedPositions, forceShowAll, hasLoadedOnce }) => (
+        <ProtocolView
+          protocolName="Aave V3"
+          protocolIcon="/logos/aave.svg"
+          enabledFeatures={enabledFeatures}
+          ltvBps={ltvBps}
+          lltvBps={lltvValue}
+          suppliedPositions={suppliedPositions}
+          borrowedPositions={borrowedPositions}
+          forceShowAll={forceShowAll}
+          networkType="evm"
+          chainId={chainId}
+          autoExpandOnPositions
+          hasLoadedOnce={hasLoadedOnce}
+          headerElement={eModeHeaderElement}
+        />
       )}
     </AaveLike>
   );

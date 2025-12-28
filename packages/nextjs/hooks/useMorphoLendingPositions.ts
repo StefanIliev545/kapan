@@ -268,10 +268,10 @@ export function useMorphoLendingPositions(
     }
   }, [isLoadingPositions, hasLoadedOnce, userAddress]);
 
-  // Reset on address change
+  // Reset on address or chainId change
   useEffect(() => {
     setHasLoadedOnce(false);
-  }, [userAddress]);
+  }, [userAddress, chainId]);
 
   // Build position rows
   const rows = useMemo<MorphoPositionRow[]>(() => {

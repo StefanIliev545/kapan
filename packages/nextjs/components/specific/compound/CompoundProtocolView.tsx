@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { Address, formatUnits } from "viem";
@@ -93,7 +93,21 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     if (!gatewayAddress || !gateway || baseTokens.length === 0) return [] as any[];
     return baseTokens.map(t => ({ address: gatewayAddress, abi: gateway.abi as Abi, functionName: "getCompoundData" as const, args: [t, queryAddress], chainId }));
   }, [gatewayAddress, gateway, baseTokens, queryAddress, chainId]);
-  const { data: compoundResults } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
+  const { data: compoundResults, isFetched: compoundFetched } = useReadContracts({ allowFailure: true, contracts: compoundCalls, query: { enabled: compoundCalls.length > 0 } });
+
+  // Track whether we've loaded data at least once
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  
+  // Reset hasLoadedOnce when chainId changes
+  useEffect(() => {
+    setHasLoadedOnce(false);
+  }, [chainId]);
+
+  useEffect(() => {
+    if (compoundFetched && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [compoundFetched, hasLoadedOnce]);
 
   // Only fetch collateral details for markets where the user has a position.
   const activeMarketsForCollateral = useMemo(() => {
@@ -399,7 +413,7 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     );
 
     setProtocolTotals("Compound", totalSupplied, totalBorrowed);
-  }, [filteredBorrowedPositions, filteredSuppliedPositions, noMarkets, setProtocolTotals]);
+  }, [filteredBorrowedPositions, filteredSuppliedPositions, noMarkets, setProtocolTotals, chainId]);
 
   const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
 
@@ -418,6 +432,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
           enabledFeatures={enabledFeatures}
           inlineMarkets={true}
           hideUtilization={true}
+          autoExpandOnPositions
+          hasLoadedOnce={hasLoadedOnce}
       />
     </div>
   );

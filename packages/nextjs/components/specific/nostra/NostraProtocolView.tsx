@@ -7,7 +7,7 @@ import { useGlobalState } from "~~/services/store/store";
 
 export const NostraProtocolView: FC = () => {
   const { viewingAddress, isViewingOtherAddress } = useAccount();
-  const { suppliedPositions, borrowedPositions, isLoading } = useNostraLendingPositions();
+  const { suppliedPositions, borrowedPositions, isLoading, hasLoadedOnce } = useNostraLendingPositions();
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
@@ -33,6 +33,8 @@ export const NostraProtocolView: FC = () => {
       disableMoveSupply
       disableLoop
       readOnly={isViewingOtherAddress}
+      autoExpandOnPositions
+      hasLoadedOnce={hasLoadedOnce}
     />
   );
 };

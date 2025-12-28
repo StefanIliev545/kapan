@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useMemo, useRef, useState, useEffect } from "react";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
 
@@ -9,6 +9,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
+import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo, FiSettings } from "react-icons/fi";
@@ -113,7 +114,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     const [selectedFrom, setSelectedFrom] = useState<SwapAsset | null>(fromAsset);
     const [selectedTo, setSelectedTo] = useState<SwapAsset | null>(null); // Collateral to sell
-    const [slippage, setSlippage] = useState<number>(3);
+    const [slippage, setSlippage] = useState<number>(0.1); // Managed by useAutoSlippage after quotes
     const [amountIn, setAmountIn] = useState(""); // Amount of debt to repay
     const [isMax, setIsMax] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -371,15 +372,20 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const srcUSD = swapQuote?.srcUSD ? parseFloat(swapQuote.srcUSD) : null;
     const dstUSD = swapQuote?.dstUSD ? parseFloat(swapQuote.dstUSD) : null;
     
-    // Price impact from 1inch USD values
-    const priceImpact = srcUSD && dstUSD && srcUSD > 0 
-        ? ((srcUSD - dstUSD) / srcUSD) * 100 
-        : null;
+    // Auto-slippage and price impact calculation
+    const { priceImpact, priceImpactColorClass, formattedPriceImpact } = useAutoSlippage({
+        slippage,
+        setSlippage,
+        oneInchQuote: oneInchSwapQuote,
+        pendleQuote: pendleQuoteData,
+        swapRouter,
+        resetDep: selectedTo?.address,
+    });
 
     // Custom stats for close with collateral
     const customStats = (
         <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-3 text-center bg-base-200/50 p-3 rounded text-xs">
+            <div className="grid grid-cols-4 gap-3 text-center bg-base-200/50 p-3 rounded text-xs">
                 <div>
                     <div className="text-base-content/70 flex items-center justify-center gap-1">
                         Slippage
@@ -388,7 +394,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                                 <FiSettings className="w-3 h-3" />
                             </label>
                             <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                {[0.1, 0.5, 1, 3, 5].map((s) => (
+                                {SLIPPAGE_OPTIONS.map((s) => (
                                     <li key={s}>
                                         <a
                                             className={slippage === s ? "active" : ""}
@@ -404,6 +410,12 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                     <div className="font-medium">{slippage}%</div>
                 </div>
                 <div>
+                    <div className="text-base-content/70">Price Impact</div>
+                    <div className={`font-medium ${priceImpactColorClass}`}>
+                        {formattedPriceImpact}
+                    </div>
+                </div>
+                <div>
                     <div className="text-base-content/70">Swap Rate</div>
                     <div className="font-medium">
                         1 {selectedTo?.symbol || "?"} ≈ {parseFloat(exchangeRate).toFixed(2)} {debtName}
@@ -416,16 +428,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                     </div>
                 </div>
             </div>
-            {/* Show USD values from 1inch if available */}
+            {/* Show USD values if available */}
             {srcUSD !== null && dstUSD !== null && (
                 <div className="flex justify-between text-xs text-base-content/60 px-1">
                     <span>Selling: ~${srcUSD.toFixed(2)}</span>
                     <span>Receiving: ~${dstUSD.toFixed(2)}</span>
-                    {priceImpact !== null && Math.abs(priceImpact) > 0.1 && (
-                        <span className={priceImpact > 1 ? "text-warning" : ""}>
-                            Impact: {priceImpact > 0 ? "-" : "+"}{Math.abs(priceImpact).toFixed(2)}%
-                        </span>
-                    )}
                 </div>
             )}
         </div>
@@ -510,6 +517,9 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         </>
     );
 
+    // Hide dropdown when there's only one collateral option (e.g., Morpho isolated pairs)
+    const singleCollateral = toAssets.length === 1;
+
     return (
         <SwapModalShell
             isOpen={isOpen}
@@ -548,6 +558,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             fromLabel="Debt to Repay"
             toLabel="Collateral to Sell"
             fromReadOnly={true}
+            toReadOnly={singleCollateral}
             customStats={customStats}
         />
     );
