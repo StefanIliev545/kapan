@@ -236,13 +236,25 @@ export const tokenNameToLogo = (tokenName: string) => {
   const lower = tokenName.toLowerCase();
 
   // Handle Pendle PT tokens (e.g., "PT-USDe-15JAN2026" -> "ptusde")
-  // Strip dates like "-15JAN2026" and normalize to ptXXX format
+  // Strip dates like "-15JAN2026" or Unix timestamps like "-1750896023"
   if (lower.startsWith("pt-")) {
     // Extract base token: "pt-usde-15jan2026" -> "usde"
     const withoutPrefix = lower.slice(3); // Remove "pt-"
-    // Remove date suffix (pattern: -DDMMMYYYY like -15jan2026)
-    const baseToken = withoutPrefix.replace(/-\d{1,2}[a-z]{3}\d{4}$/i, "");
+    // Remove date suffix (pattern: -DDMMMYYYY like -15jan2026) or Unix timestamp (-1xxxxxxxxx)
+    const baseToken = withoutPrefix
+      .replace(/-\d{1,2}[a-z]{3}\d{4}$/i, "") // -15JAN2026
+      .replace(/-1\d{9}$/, ""); // -1750896023 (Unix timestamp)
     return `/logos/pt${baseToken}.svg`;
+  }
+
+  // Handle GMX GLV tokens (e.g., "GLV [WETH-USDC]" -> use GMX logo)
+  if (lower.startsWith("glv")) {
+    return "/logos/gmx.svg";
+  }
+
+  // Handle GMX GM tokens (e.g., "GM:ETH/USD[WETH-USDC]" -> use GM logo)
+  if (lower.startsWith("gm:") || lower.startsWith("gm ") || lower === "gm") {
+    return "/logos/gm.svg";
   }
 
   // Central PNG logo overrides for tokens that don't have svgs
@@ -257,7 +269,7 @@ export const tokenNameToLogo = (tokenName: string) => {
     mre7yield: "/logos/mre7yield.png",
     solvbtc: "/logos/solvbtc.png",
     dog: "/logos/dog.png",
-    tbtc: "/logos/threshold-btc.png", // threshold’s tBTC
+    tbtc: "/logos/threshold-btc.png", // threshold's tBTC
     unibtc: "/logos/unibtc.png",
     xsbtc: "/logos/xsolvbtc.png",
     lyu: "/logos/lyu.png",
