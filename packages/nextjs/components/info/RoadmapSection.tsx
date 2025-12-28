@@ -4,14 +4,14 @@ import React, { useRef } from "react";
 import Image from "next/image";
 import { motion, useInView } from "framer-motion";
 import {
-  FiCheck,
-  FiClock,
-  FiZap,
-  FiGlobe,
-  FiLayers,
-  FiTrendingUp,
-  FiActivity,
-} from "react-icons/fi";
+  CheckIcon,
+  ClockIcon,
+  BoltIcon,
+  GlobeAltIcon,
+  CircleStackIcon,
+  ArrowTrendingUpIcon,
+  ChartBarIcon,
+} from "@heroicons/react/24/outline";
 
 interface RoadmapPhase {
   phase: number;
@@ -98,9 +98,9 @@ const PhaseCard = ({ phase, index }: { phase: RoadmapPhase; index: number }) => 
               ? "bg-success/20 text-success"
               : "bg-base-300/50 text-base-content/50"
           }`}>
-            {isCompleted && <FiCheck className="w-3 h-3" />}
-            {isCurrent && <FiZap className="w-3 h-3" />}
-            {!isCompleted && !isCurrent && <FiClock className="w-3 h-3" />}
+            {isCompleted && <CheckIcon className="w-3 h-3" />}
+            {isCurrent && <BoltIcon className="w-3 h-3" />}
+            {!isCompleted && !isCurrent && <ClockIcon className="w-3 h-3" />}
             <span>{isCompleted ? "Done" : isCurrent ? "Active" : "Soon"}</span>
           </div>
         </div>
@@ -172,7 +172,7 @@ const RoadmapSection = () => {
         "Cross-protocol rate comparison",
       ],
       status: "completed",
-      icon: <FiZap className="w-5 h-5" />,
+      icon: <BoltIcon className="w-5 h-5" />,
       protocols: ["Aave V3", "Compound V3", "Venus"],
     },
     {
@@ -186,7 +186,7 @@ const RoadmapSection = () => {
         "Paymaster support",
       ],
       status: "completed",
-      icon: <FiGlobe className="w-5 h-5" />,
+      icon: <GlobeAltIcon className="w-5 h-5" />,
       protocols: ["Vesu", "Nostra", "Starknet"],
     },
     {
@@ -200,7 +200,7 @@ const RoadmapSection = () => {
         "Position health monitoring",
       ],
       status: "current",
-      icon: <FiLayers className="w-5 h-5" />,
+      icon: <CircleStackIcon className="w-5 h-5" />,
     },
     {
       phase: 4,
@@ -213,7 +213,7 @@ const RoadmapSection = () => {
         "Additional L2 networks",
       ],
       status: "upcoming",
-      icon: <FiGlobe className="w-5 h-5" />,
+      icon: <GlobeAltIcon className="w-5 h-5" />,
       protocols: ["Euler", "Morpho"],
     },
     {
@@ -228,7 +228,7 @@ const RoadmapSection = () => {
         "Yield optimization",
       ],
       status: "upcoming",
-      icon: <FiTrendingUp className="w-5 h-5" />,
+      icon: <ArrowTrendingUpIcon className="w-5 h-5" />,
     },
     {
       phase: 6,
@@ -242,7 +242,7 @@ const RoadmapSection = () => {
         "Rate change alerts",
       ],
       status: "upcoming",
-      icon: <FiActivity className="w-5 h-5" />,
+      icon: <ChartBarIcon className="w-5 h-5" />,
       protocols: ["Arbitrum", "Optimism", "Base"],
     },
   ];

@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { FiDollarSign, FiPercent, FiTrendingDown } from "react-icons/fi";
+import { ArrowTrendingDownIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
+import { Percent } from "lucide-react";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useTokenData } from "~~/hooks/useTokenData";
 import { formatNumber } from "~~/utils/formatNumber";
@@ -117,7 +118,7 @@ const DebtComparison = () => {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold flex items-center gap-2">
-          <FiDollarSign className="w-6 h-6" />
+          <CurrencyDollarIcon className="w-6 h-6" />
           Protocol Interest Rate Comparison
         </h2>
       </div>
@@ -221,7 +222,7 @@ const DebtComparison = () => {
           </div>
           <div className="mt-2">
             <div className="text-base-content/70 flex items-center gap-1">
-              <FiPercent className="w-4 h-4" />
+              <Percent className="w-4 h-4" />
               Annual Interest
             </div>
             <AnimatedValue className="text-2xl font-bold text-base-content">{higherRate.toFixed(2)}%</AnimatedValue>
@@ -278,7 +279,7 @@ const DebtComparison = () => {
       <div className="card bg-base-200 dark:bg-base-300/30 p-4 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-8 h-8 rounded-lg bg-success/10 dark:bg-success/20 flex items-center justify-center">
-            <FiTrendingDown className="w-5 h-5 text-success" />
+            <ArrowTrendingDownIcon className="w-5 h-5 text-success" />
           </div>
           <div className="font-semibold text-base-content">Your Potential Savings</div>
         </div>

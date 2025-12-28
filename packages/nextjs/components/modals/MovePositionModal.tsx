@@ -1,7 +1,7 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { FaGasPump } from "react-icons/fa";
-import { FiAlertTriangle, FiLock } from "react-icons/fi";
+import { ExclamationTriangleIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { Fuel } from "lucide-react";
 import { formatUnits } from "viem";
 import { useAccount, useReadContract, useSwitchChain } from "wagmi";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
@@ -480,7 +480,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               <div className="text-center mb-2">
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
                   Debt
-                  {position.type === "supply" && <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
+                  {position.type === "supply" && <LockClosedIcon className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
                 </label>
                 <div className="text-xs text-base-content/60">
                   Available: {formatDisplayNumber(formattedTokenBalance)} {position.name}
@@ -525,7 +525,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
             {error && (
               <div className="alert alert-error shadow-lg">
-                <FiAlertTriangle className="w-6 h-6" />
+                <ExclamationTriangleIcon className="w-6 h-6" />
                 <div className="text-sm flex-1">{error}</div>
               </div>
             )}
@@ -698,7 +698,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               {getActionButtonText()}
             </span>
             <span className="flex items-center gap-1 text-xs">
-              <FaGasPump className="text-gray-400" />
+              <Fuel className="w-4 h-4 text-gray-400" />
             </span>
           </button>
         </div>

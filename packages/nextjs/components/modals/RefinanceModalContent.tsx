@@ -1,7 +1,7 @@
 import React, { FC, ReactNode } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { FiCheck, FiAlertTriangle } from "react-icons/fi";
+import { CheckIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { formatUnits } from "viem";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import { MorphoMarketSelector } from "../common/MorphoMarketSelector";
@@ -688,7 +688,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
           {/* Error display */}
           {errorMessage && (
             <div className="alert alert-error">
-              <FiAlertTriangle className="w-4 h-4" />
+              <ExclamationTriangleIcon className="w-4 h-4" />
               <span>{errorMessage}</span>
             </div>
           )}
@@ -703,7 +703,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"
                     }`}
                 >
-                  <FiCheck className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                  <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
                   Batch transactions
                 </button>
                 {setRevokePermissions && (
@@ -713,7 +713,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                     className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${revokePermissions ? "text-success" : "text-base-content/60"
                       }`}
                   >
-                    <FiCheck className={`w-4 h-4 ${revokePermissions ? "" : "opacity-40"}`} />
+                    <CheckIcon className={`w-4 h-4 ${revokePermissions ? "" : "opacity-40"}`} />
                     Revoke permissions
                   </button>
                 )}

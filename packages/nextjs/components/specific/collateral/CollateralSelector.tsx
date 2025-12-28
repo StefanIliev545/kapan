@@ -1,6 +1,6 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
 import Image from "next/image";
-import { FiX } from "react-icons/fi";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 
@@ -387,7 +387,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                       onClick={() => handleRemoveCollateral(collateral.token)}
                       title="Remove collateral"
                     >
-                      <FiX className="w-4 h-4" />
+                      <XMarkIcon className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

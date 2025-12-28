@@ -8,7 +8,7 @@ import { BorrowModal } from "./modals/BorrowModal";
 import { TokenSelectModal } from "./modals/TokenSelectModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
 import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
-import { FiAlertTriangle, FiPlus, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { ExclamationTriangleIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import type { SwapAsset } from "./modals/SwapModalShell";
 import formatPercentage from "~~/utils/formatPercentage";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
@@ -608,13 +608,13 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
                 >
                   <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                  {isMarketsOpen ? <FiChevronUp className="h-3.5 w-3.5" /> : <FiChevronDown className="h-3.5 w-3.5" />}
+                  {isMarketsOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
                 </button>
               )}
               {forceShowAll && !readOnly && (
                 <span className="text-[11px] text-primary/80 font-medium">Connect wallet</span>
               )}
-              <FiChevronDown
+              <ChevronDownIcon
                 className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
               />
             </div>
@@ -760,7 +760,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                             className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary transition-all duration-200"
                             onClick={handleAddSupply}
                           >
-                            <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                             <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
                           </button>
 
@@ -776,7 +776,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                                   : "Build a flash-loan loop"
                               }
                             >
-                              <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                              <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                               <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
                             </button>
                           )}
@@ -786,7 +786,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
-                    <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
+                    <ExclamationTriangleIcon className="w-8 h-8 mb-3 opacity-40" />
                     <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                     {!readOnly && (
                       <div className="mt-4 flex items-center gap-2">
@@ -794,7 +794,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                           className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
                           onClick={handleAddSupply}
                         >
-                          <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                           <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
                         </button>
                         
@@ -810,7 +810,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                                 : "Build a flash-loan loop"
                             }
                           >
-                            <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                             <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
                           </button>
                         )}
@@ -870,7 +870,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                           disabled={filteredSuppliedPositions.length === 0}
                           title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                         >
-                          <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                           <span className="text-xs font-medium uppercase tracking-wider">Borrow</span>
                         </button>
                       </div>
@@ -878,7 +878,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
-                    <FiAlertTriangle className="w-8 h-8 mb-3 opacity-40" />
+                    <ExclamationTriangleIcon className="w-8 h-8 mb-3 opacity-40" />
                     <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                     {!readOnly && (
                       <button
@@ -890,7 +890,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         disabled={filteredSuppliedPositions.length === 0}
                         title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                       >
-                        <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                        <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
                         <span className="text-xs font-medium uppercase tracking-wider">Borrow Assets</span>
                       </button>
                     )}

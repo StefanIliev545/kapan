@@ -12,7 +12,7 @@ import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { is1inchSupported, isPendleSupported, getBestSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken } from "~~/utils/chainFeatures";
-import { FiAlertTriangle, FiInfo, FiSettings } from "react-icons/fi";
+import { ExclamationTriangleIcon, InformationCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
 // Aave flash loan fee: 5 bps (0.05%)
@@ -397,7 +397,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                         Slippage
                         <div className="dropdown dropdown-top dropdown-hover">
                             <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                <FiSettings className="w-3 h-3" />
+                                <Cog6ToothIcon className="w-3 h-3" />
                             </label>
                             <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
                                 {SLIPPAGE_OPTIONS.map((s) => (
@@ -448,7 +448,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const infoContent = (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <FiInfo className="w-5 h-5 flex-shrink-0" />
+                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
                 <span>
                     <strong>How Close with Collateral Works</strong>
                     <br />
@@ -501,7 +501,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         <>
             {!hasEnoughCollateral && requiredCollateral > 0n && selectedTo && (
                 <div className="alert alert-warning text-xs py-2">
-                    <FiAlertTriangle className="w-4 h-4" />
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span>
                         Insufficient collateral. Need ~{requiredCollateralFormatted} {selectedTo.symbol}, 
                         but you only have {formatUnits(selectedTo.rawBalance, selectedTo.decimals)} {selectedTo.symbol}.
@@ -510,13 +510,13 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             )}
             {swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                 <div className="alert alert-warning text-xs py-2">
-                    <FiAlertTriangle className="w-4 h-4" />
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
                 </div>
             )}
             {!hasAdapter && isOpen && (
                 <div className="alert alert-warning text-xs py-2">
-                    <FiAlertTriangle className="w-4 h-4" />
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span>{swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.</span>
                 </div>
             )}

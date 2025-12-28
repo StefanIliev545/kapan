@@ -9,7 +9,7 @@ import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
-import { FiRepeat } from "react-icons/fi";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { formatBps } from "~~/utils/risk";
 import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 import type { Address } from "viem";
@@ -470,7 +470,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                         title="Swap"
                       >
                         <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
-                          <FiRepeat className="w-3 h-3" />
+                          <ArrowPathIcon className="w-3 h-3" />
                         </div>
                         <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
                           Swap

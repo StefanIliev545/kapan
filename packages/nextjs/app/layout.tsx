@@ -30,6 +30,7 @@ export const viewport = {
 const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
@@ -38,6 +39,33 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
 
   return (
     <html suppressHydrationWarning>
+      <head>
+        {/* Preconnect to external APIs - saves 100-300ms per connection */}
+        <link rel="preconnect" href="https://blue-api.morpho.org" />
+        <link rel="preconnect" href="https://api.coingecko.com" />
+        <link rel="preconnect" href="https://api.1inch.io" />
+        <link rel="preconnect" href="https://api-v2.pendle.finance" />
+        <link rel="preconnect" href="https://yields.llama.fi" />
+        <link rel="dns-prefetch" href="https://blue-api.morpho.org" />
+        <link rel="dns-prefetch" href="https://api.coingecko.com" />
+        <link rel="dns-prefetch" href="https://api.1inch.io" />
+        
+        {/* Inline script to prevent theme flash - runs before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var stored = localStorage.getItem('theme');
+                  var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                  document.documentElement.classList.add(theme);
+                  document.documentElement.setAttribute('data-theme', theme);
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.className}`}>
         <ThemeProvider>
           <QueryProvider>

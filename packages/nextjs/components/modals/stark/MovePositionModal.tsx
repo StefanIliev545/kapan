@@ -3,8 +3,8 @@ import { useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
-import { FiAlertTriangle, FiCheck, FiLock } from "react-icons/fi";
-import { FaGasPump } from "react-icons/fa";
+import { ExclamationTriangleIcon, CheckIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { Fuel } from "lucide-react";
 import { CairoCustomEnum, CairoOption, CairoOptionVariant, CallData, num, uint256 } from "starknet";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { formatUnits, parseUnits } from "viem";
@@ -1065,7 +1065,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 <label className="block text-lg font-semibold flex items-center justify-center gap-1">
                   Debt
                   {position.type === "supply" && (
-                    <FiLock className="text-emerald-500 w-4 h-4" title="Supplied asset" />
+                    <LockClosedIcon className="text-emerald-500 w-4 h-4" title="Supplied asset" />
                   )}
                 </label>
                 <div className="text-xs text-base-content/60">
@@ -1120,7 +1120,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
               )}
               {error && (
                 <div className="alert alert-error shadow-lg">
-                  <FiAlertTriangle className="w-6 h-6" />
+                  <ExclamationTriangleIcon className="w-6 h-6" />
                   <div className="text-sm flex-1">{error}</div>
                 </div>
               )}

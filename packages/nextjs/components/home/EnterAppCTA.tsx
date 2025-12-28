@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { track } from "@vercel/analytics";
-import { FiArrowRight, FiZap, FiShield, FiTrendingUp } from "react-icons/fi";
+import { ArrowRightIcon, BoltIcon, ShieldCheckIcon, ArrowTrendingUpIcon } from "@heroicons/react/24/outline";
 
 const EnterAppCTA = () => {
   const appUrl = useMemo(() => {
@@ -20,9 +20,9 @@ const EnterAppCTA = () => {
   }, []);
 
   const features = [
-    { icon: <FiZap className="w-4 h-4" />, label: "Atomic Transactions" },
-    { icon: <FiShield className="w-4 h-4" />, label: "Non-Custodial" },
-    { icon: <FiTrendingUp className="w-4 h-4" />, label: "Best Rates" },
+    { icon: <BoltIcon className="w-4 h-4" />, label: "Atomic Transactions" },
+    { icon: <ShieldCheckIcon className="w-4 h-4" />, label: "Non-Custodial" },
+    { icon: <ArrowTrendingUpIcon className="w-4 h-4" />, label: "Best Rates" },
   ];
 
   const protocols = [
@@ -140,7 +140,7 @@ const EnterAppCTA = () => {
             {/* Button */}
             <div className="relative flex items-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-accent text-white font-bold text-lg shadow-xl">
               <span>Launch App</span>
-              <FiArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </div>
           </motion.a>
 

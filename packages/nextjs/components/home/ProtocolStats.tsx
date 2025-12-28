@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { FiDollarSign, FiLayers, FiUsers } from "react-icons/fi";
+import { CurrencyDollarIcon, CircleStackIcon, UsersIcon } from "@heroicons/react/24/outline";
 
 const ProtocolStats = () => {
   return (
@@ -10,7 +10,7 @@ const ProtocolStats = () => {
             <div className="stat">
               <div className="stat-figure text-primary dark:text-accent">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 dark:bg-accent/10 flex items-center justify-center">
-                  <FiDollarSign className="w-5 h-5 text-primary dark:text-accent" />
+                  <CurrencyDollarIcon className="w-5 h-5 text-primary dark:text-accent" />
                 </div>
               </div>
               <div className="stat-title text-base-content/70">Total Debt Moved</div>
@@ -20,7 +20,7 @@ const ProtocolStats = () => {
             <div className="stat">
               <div className="stat-figure text-secondary dark:text-accent">
                 <div className="w-10 h-10 rounded-lg bg-secondary/10 dark:bg-accent/10 flex items-center justify-center">
-                  <FiUsers className="w-5 h-5 text-secondary dark:text-accent" />
+                  <UsersIcon className="w-5 h-5 text-secondary dark:text-accent" />
                 </div>
               </div>
               <div className="stat-title text-base-content/70">Total Users</div>
@@ -30,7 +30,7 @@ const ProtocolStats = () => {
             <div className="stat">
               <div className="stat-figure text-accent">
                 <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <FiLayers className="w-5 h-5 text-accent" />
+                  <CircleStackIcon className="w-5 h-5 text-accent" />
                 </div>
               </div>
               <div className="stat-title text-base-content/70">Debt Positions</div>

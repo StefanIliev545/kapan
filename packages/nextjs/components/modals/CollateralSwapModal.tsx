@@ -16,7 +16,7 @@ import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken } from "~~/utils/chainFeatures";
-import { FiAlertTriangle, FiInfo } from "react-icons/fi";
+import { ExclamationTriangleIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
 // Extended type to include price info passed from parent
@@ -316,7 +316,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const infoContent = (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <FiInfo className="w-5 h-5 flex-shrink-0" />
+                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
                 <span>
                     <strong>How Collateral Swap Works</strong>
                     <br />
@@ -384,19 +384,19 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         <>
             {swapRouter === "1inch" && oneInchQuote && oneInchAdapter && oneInchQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                 <div className="alert alert-warning text-xs py-2">
-                    <FiAlertTriangle className="w-4 h-4" />
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
                 </div>
             )}
             {swapRouter === "1inch" && !oneInchAdapter && isOpen && (
                 <div className="alert alert-warning text-xs py-2">
-                    <FiAlertTriangle className="w-4 h-4" />
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span>1inch Adapter not found on this network. Try Pendle for PT swaps.</span>
                 </div>
             )}
             {swapRouter === "pendle" && !pendleAdapter && isOpen && (
                 <div className="alert alert-warning text-xs py-2">
-                    <FiAlertTriangle className="w-4 h-4" />
+                    <ExclamationTriangleIcon className="w-4 h-4" />
                     <span>Pendle Adapter not found on this network.</span>
                 </div>
             )}

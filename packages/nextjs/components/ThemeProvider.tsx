@@ -5,20 +5,16 @@ import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
 import { type ThemeProviderProps } from "next-themes/dist/types";
 import { Theme } from "@radix-ui/themes";
 
-// Add the force prop to ensure proper client-side rendering
+/**
+ * ThemeProvider that does NOT block rendering.
+ * 
+ * Previous implementation hid the entire page until hydration completed,
+ * which blocked FCP/LCP for 2-3 seconds. This version renders immediately.
+ * 
+ * Flash prevention is handled by an inline script in layout.tsx that sets
+ * the theme class before React hydrates.
+ */
 export const ThemeProvider = ({ children, ...props }: ThemeProviderProps) => {
-  const [mounted, setMounted] = React.useState(false);
-
-  // When mounted on client, now we can render
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // To avoid hydration mismatch, render a simple div until client-side
-  if (!mounted) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>;
-  }
-
   return (
     <NextThemesProvider
       attribute="class"

@@ -1,6 +1,6 @@
 import type { FC, MouseEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { FiPlus } from "react-icons/fi";
+import { PlusIcon } from "@heroicons/react/24/outline";
 
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
@@ -386,7 +386,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                     <span className="text-xs text-base-content/50">Supply assets to start or grow your borrowing power.</span>
                   </div>
                   <button className="btn btn-sm btn-outline" onClick={onDepositRequest} disabled={assetsWithRates.length === 0}>
-                    <FiPlus className="h-4 w-4" />
+                    <PlusIcon className="h-4 w-4" />
                     <span>Deposit</span>
                   </button>
                 </div>
