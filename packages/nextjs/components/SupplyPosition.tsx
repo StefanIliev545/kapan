@@ -1,5 +1,6 @@
 import { FC, ReactNode } from "react";
 import Image from "next/image";
+import clsx from "clsx";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
@@ -295,8 +296,14 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     <>
       {/* Container */}
       <div
-        className={`w-full ${isExpanded && hasAnyActions ? "px-4 sm:px-5 pt-4 pb-0" : "p-4 sm:p-5"} rounded-xl bg-base-200/30 border border-base-300/40 ${hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default"
-          } transition-colors duration-200 ${containerClassName ?? ""}`}
+        className={clsx(
+          "w-full bg-base-200/30 border border-base-300/40 transition-colors duration-200",
+          isExpanded && hasAnyActions ? "px-4 sm:px-5 pt-4 pb-0" : "p-4 sm:p-5",
+          hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default",
+          // Only apply rounded-xl if containerClassName doesn't override it
+          !containerClassName?.includes("rounded") && "rounded-xl",
+          containerClassName
+        )}
         onClick={toggleExpanded}
       >
         {/* Mobile Layout (< lg) - single row, spread out */}

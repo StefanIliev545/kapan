@@ -184,8 +184,11 @@ async function fetchMorphoPositions(
   userAddress: string
 ): Promise<MorphoPosition[]> {
   try {
+    // Use the hybrid endpoint that combines on-chain and GraphQL data
+    // On-chain data ensures positions created through our UI are visible
+    // even if Morpho's indexer hasn't picked them up yet
     const response = await fetch(
-      `/api/morpho/${chainId}/positions?user=${userAddress}`
+      `/api/morpho/${chainId}/positions-onchain?user=${userAddress}`
     );
     if (!response.ok) {
       console.error(`[useMorphoLendingPositions] Positions API error: ${response.status}`);
@@ -416,7 +419,9 @@ export function useMorphoMarkets(chainId: number, search?: string) {
   // Keep original conditions, but preserve the sorted order
   const validMarkets = useMemo(() => {
     return markets.filter(
-      (m) => m.collateralAsset && m.loanAsset && m.state.supplyAssets > 0
+      (m) => m.collateralAsset && m.loanAsset && 
+        // Check either supplyAssets or supplyAssetsUsd (API may return one or both)
+        ((m.state.supplyAssets ?? 0) > 0 || (m.state.supplyAssetsUsd ?? 0) > 0)
     );
   }, [markets]);
 

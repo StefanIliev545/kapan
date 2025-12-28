@@ -163,7 +163,8 @@ export async function GET(
   const SERVER_MAX_UTILIZATION = hideSaturated ? 0.995 : 0.9999; // Filter saturated at API
   
   // Client-side filter thresholds (for additional quality filtering)
-  const minLiquidity = safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || (isSearching ? "1000" : "5000"));
+  // Lowered from 5000 to 1000 to include smaller but legitimate markets (e.g., AERO/USDC)
+  const minLiquidity = safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || "1000");
 
   const allMarkets = new Map<string, MarketItem>();
 
