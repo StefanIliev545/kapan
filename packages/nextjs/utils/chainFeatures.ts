@@ -68,6 +68,38 @@ export function getDefaultSwapRouter(chainId: number | undefined): "1inch" | "pe
   return undefined;
 }
 
+/**
+ * Check if a token symbol indicates a Pendle PT (Principal Token)
+ * PT tokens should use Pendle router as 1inch typically has no liquidity
+ */
+export function isPendleToken(symbol: string | undefined): boolean {
+  if (!symbol) return false;
+  const sym = symbol.toLowerCase();
+  // PT tokens: pt-xxx, PT-xxx
+  // Could also match SY tokens: sy-xxx but those are less common in user flows
+  return sym.startsWith("pt-") || sym.startsWith("pt ");
+}
+
+/**
+ * Get the best swap router based on token symbols and chain support
+ * Prefers Pendle for PT tokens, otherwise uses default logic
+ */
+export function getBestSwapRouter(
+  chainId: number | undefined,
+  fromSymbol?: string,
+  toSymbol?: string
+): "1inch" | "pendle" | undefined {
+  if (chainId === undefined) return undefined;
+  
+  // If either token is a PT token and Pendle is available, use Pendle
+  if (isPendleSupported(chainId) && (isPendleToken(fromSymbol) || isPendleToken(toSymbol))) {
+    return "pendle";
+  }
+  
+  // Otherwise use default logic
+  return getDefaultSwapRouter(chainId);
+}
+
 export function getAvailableSwapRouters(chainId: number | undefined): Array<"1inch" | "pendle"> {
   const routers: Array<"1inch" | "pendle"> = [];
   if (is1inchSupported(chainId)) routers.push("1inch");

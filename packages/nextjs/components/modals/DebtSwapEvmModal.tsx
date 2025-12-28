@@ -11,7 +11,7 @@ import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo, FiSettings } from "react-icons/fi";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
@@ -128,6 +128,15 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         [availableAssets, debtFromToken]
     );
 
+    // Auto-switch to Pendle when a PT token is involved in the swap
+    useEffect(() => {
+        const fromIsPT = isPendleToken(debtFromName);
+        const toIsPT = selectedTo && isPendleToken(selectedTo.symbol);
+        if ((fromIsPT || toIsPT) && pendleAvailable) {
+            setSwapRouter("pendle");
+        }
+    }, [debtFromName, selectedTo, pendleAvailable]);
+
     // Amount to repay in raw
     const repayAmountRaw = useMemo(() => {
         try {
@@ -144,16 +153,16 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         return parseUnits("1", selectedTo.decimals).toString();
     }, [selectedTo]);
 
-    // 1inch unit quote (for chains that support it)
+    // 1inch unit quote (only fetch when 1inch router is selected)
     const { data: oneInchUnitQuote, isLoading: isOneInchUnitQuoteLoading } = use1inchQuoteOnly({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtFromToken,
         amount: unitQuoteAmount,
-        enabled: oneInchAvailable && !!selectedTo && isOpen,
+        enabled: oneInchAvailable && swapRouter === "1inch" && !!selectedTo && isOpen,
     });
 
-    // Pendle unit quote (for Pendle-only chains like Plasma)
+    // Pendle unit quote (only fetch when Pendle router is selected)
     const { data: pendleUnitQuote, isLoading: isPendleUnitQuoteLoading } = usePendleConvert({
         chainId,
         receiver: pendleAdapter?.address as Address,
@@ -161,10 +170,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         tokensOut: debtFromToken,
         amountsIn: unitQuoteAmount,
         slippage: 0.03, // 3% for unit quote
-        enabled: !oneInchAvailable && pendleAvailable && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
+        enabled: pendleAvailable && swapRouter === "pendle" && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
     });
 
-    const isUnitQuoteLoading = oneInchAvailable ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
+    const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required newDebt input based on unit quote
     // We want to borrow just enough newDebt to swap and get repayAmountRaw of currentDebt
