@@ -6,23 +6,19 @@ import type { FC } from "react";
 import Image from "next/image";
 import {
   Avatar,
-  Badge,
   Box,
   Button,
   Card,
-  DataList,
   Flex,
   IconButton,
   Inset,
   ScrollArea,
-  SegmentedControl,
   Spinner,
-  Table,
   Text,
   TextField,
   Tooltip,
 } from "@radix-ui/themes";
-import { Search, X, ArrowDown, ArrowUp, ChevronDown, ExternalLink } from "lucide-react";
+import { Search, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -37,8 +33,10 @@ import { notification } from "~~/utils/scaffold-eth/notification";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { parseUnits } from "viem";
 
-type SortKey = "liquidity" | "apy" | "utilization";
+type SortKey = "tvl" | "supplyApy" | "borrowApy" | "utilization";
 type SortDirection = "desc" | "asc";
+
+
 
 interface MorphoMarketsSectionProps {
   markets: MorphoMarket[];
@@ -74,16 +72,27 @@ function pow10(decimals: number): number {
   return 10 ** Math.max(0, Math.min(36, decimals));
 }
 
-function truncateMiddle(value: string, left = 6, right = 4): string {
-  if (!value) return "";
-  if (value.length <= left + right + 3) return value;
-  return `${value.slice(0, left)}…${value.slice(-right)}`;
+function utilizationColor(utilization: number): string {
+  if (utilization >= 0.95) return "text-error";
+  if (utilization >= 0.85) return "text-warning";
+  return "text-base-content/70";
 }
 
-function utilizationBadgeColor(utilization: number): "red" | "amber" | "green" {
-  if (utilization >= 0.9) return "red";
-  if (utilization >= 0.7) return "amber";
-  return "green";
+// Minimal utilization indicator - just bar, no text
+function UtilizationBar({ value }: { value: number }) {
+  const percent = Math.min(100, Math.max(0, value * 100));
+  const color = value >= 0.95 ? "bg-error" : value >= 0.85 ? "bg-warning" : "bg-primary/70";
+  
+  return (
+    <Tooltip content={`${percent.toFixed(1)}% utilized`}>
+      <div className="w-14 h-1.5 bg-base-content/10 rounded-full overflow-hidden mx-auto">
+        <div 
+          className={`h-full ${color} rounded-full`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </Tooltip>
+  );
 }
 
 function makeUsdFormatter() {
@@ -112,20 +121,22 @@ function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string
   const loanSrc = tokenNameToLogo(loanSymbol);
 
   return (
-    <Flex align="center" style={{ position: "relative" }}>
-      <Box style={{ position: "relative", zIndex: 2 }}>
-        <Avatar
-          size="2"
-          radius="full"
-          src={collateralSrc}
-          fallback={(props.collateralSymbol ?? "?").slice(0, 2).toUpperCase()}
-        />
-      </Box>
-
-      <Box style={{ position: "relative", marginLeft: "-10px", zIndex: 1 }}>
-        <Avatar size="2" radius="full" src={loanSrc} fallback={props.loanSymbol.slice(0, 2).toUpperCase()} />
-      </Box>
-    </Flex>
+    <div className="flex items-center -space-x-1.5">
+      <Avatar
+        size="1"
+        radius="full"
+        src={collateralSrc}
+        fallback={(props.collateralSymbol ?? "?").slice(0, 2).toUpperCase()}
+        className="ring-2 ring-base-100"
+      />
+      <Avatar 
+        size="1" 
+        radius="full" 
+        src={loanSrc} 
+        fallback={props.loanSymbol.slice(0, 2).toUpperCase()} 
+        className="ring-2 ring-base-100"
+      />
+    </div>
   );
 }
 
@@ -426,8 +437,17 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   onSupply,
   pageSize = DEFAULT_PAGE_SIZE,
 }) => {
-  const [sortKey, setSortKey] = React.useState<SortKey>("liquidity");
+  const [sortKey, setSortKey] = React.useState<SortKey>("tvl");
   const [sortDirection, setSortDirection] = React.useState<SortDirection>("desc");
+  
+  const handleSort = React.useCallback((key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(d => d === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(key);
+      setSortDirection("desc");
+    }
+  }, [sortKey]);
   const [search, setSearch] = React.useState("");
   const deferredSearch = React.useDeferredValue(search);
   const [visibleCount, setVisibleCount] = React.useState(pageSize);
@@ -541,11 +561,14 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       let delta = 0;
 
       switch (sortKey) {
-        case "liquidity":
-          delta = a.liquidityUsd - b.liquidityUsd;
+        case "tvl":
+          delta = a.supplyUsd - b.supplyUsd;
           break;
-        case "apy":
+        case "supplyApy":
           delta = a.supplyApy01 - b.supplyApy01;
+          break;
+        case "borrowApy":
+          delta = a.borrowApy01 - b.borrowApy01;
           break;
         case "utilization":
           delta = a.utilization01 - b.utilization01;
@@ -629,106 +652,58 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   }
 
   return (
-    <Flex direction="column" gap="4">
-      <Card size="2">
-        <Flex direction="column" gap="3">
-          <Flex align="center" justify="between" wrap="wrap" gap="3">
-            <Flex direction="column" gap="1">
-              <Text weight="bold">Morpho Markets</Text>
-              <Text size="2" color="gray">
-                Chain ID: {chainId}
-                {totalPairs > 0 ? ` • Pairs: ${totalPairs}` : ""}
-              </Text>
-            </Flex>
+    <Flex direction="column" gap="3">
+      {/* Compact filter bar */}
+      <Flex align="center" gap="2" className="px-1">
+        <Box style={{ minWidth: 200, maxWidth: 280 }}>
+          <TextField.Root
+            size="1"
+            variant="surface"
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.currentTarget.value)}
+          >
+            <TextField.Slot>
+              <Search width="12" height="12" />
+            </TextField.Slot>
 
-            <DataList.Root orientation={{ initial: "vertical", sm: "horizontal" }} size="1">
-              <DataList.Item>
-                <DataList.Label>Results</DataList.Label>
-                <DataList.Value>{rows.length}</DataList.Value>
-              </DataList.Item>
-              <DataList.Item>
-                <DataList.Label>Showing</DataList.Label>
-                <DataList.Value>{Math.min(visibleCount, rows.length)}</DataList.Value>
-              </DataList.Item>
-            </DataList.Root>
-          </Flex>
-
-          <Flex align="center" wrap="wrap" gap="3">
-            <Box style={{ minWidth: 260, flex: 1 }}>
-              <TextField.Root
-                size="2"
-                variant="surface"
-                placeholder="Search markets (e.g., ETH, USDC, WBTC/USDC)…"
-                value={search}
-                onChange={e => setSearch(e.currentTarget.value)}
-              >
-                <TextField.Slot>
-                  <Search width="16" height="16" />
-                </TextField.Slot>
-
-                {search ? (
-                  <TextField.Slot side="right">
-                    <IconButton
-                      size="1"
-                      variant="ghost"
-                      aria-label="Clear search"
-                      onClick={() => setSearch("")}
-                    >
-                      <X width="16" height="16" />
-                    </IconButton>
-                  </TextField.Slot>
-                ) : null}
-              </TextField.Root>
-            </Box>
-
-            {/* Collateral Asset Filter */}
-            <SearchableSelect
-              options={collateralAssets}
-              value={selectedCollateral}
-              onValueChange={setSelectedCollateral}
-              placeholder="Collateral"
-              allLabel="All Collaterals"
-            />
-
-            {/* Debt Asset Filter */}
-            <SearchableSelect
-              options={debtAssets}
-              value={selectedDebtAsset}
-              onValueChange={setSelectedDebtAsset}
-              placeholder="Debt Asset"
-              allLabel="All Debt Assets"
-            />
-
-            <Flex align="center" gap="2" wrap="wrap">
-              <Text size="2" color="gray">
-                Sort
-              </Text>
-
-              <SegmentedControl.Root
-                size="2"
-                value={sortKey}
-                onValueChange={v => setSortKey(v as SortKey)}
-                aria-label="Sort markets"
-              >
-                <SegmentedControl.Item value="liquidity">Liquidity</SegmentedControl.Item>
-                <SegmentedControl.Item value="apy">Supply APY</SegmentedControl.Item>
-                <SegmentedControl.Item value="utilization">Utilization</SegmentedControl.Item>
-              </SegmentedControl.Root>
-
-              <Tooltip content={sortDirection === "desc" ? "Descending" : "Ascending"}>
+            {search ? (
+              <TextField.Slot side="right">
                 <IconButton
-                  size="2"
-                  variant="surface"
-                  aria-label="Toggle sort direction"
-                  onClick={() => setSortDirection(d => (d === "desc" ? "asc" : "desc"))}
+                  size="1"
+                  variant="ghost"
+                  aria-label="Clear search"
+                  onClick={() => setSearch("")}
                 >
-                  {sortDirection === "desc" ? <ArrowDown width="16" height="16" /> : <ArrowUp width="16" height="16" />}
+                  <X width="12" height="12" />
                 </IconButton>
-              </Tooltip>
-            </Flex>
-          </Flex>
-        </Flex>
-      </Card>
+              </TextField.Slot>
+            ) : null}
+          </TextField.Root>
+        </Box>
+
+        <SearchableSelect
+          options={collateralAssets}
+          value={selectedCollateral}
+          onValueChange={setSelectedCollateral}
+          placeholder="Collateral"
+          allLabel="All Collaterals"
+        />
+
+        <SearchableSelect
+          options={debtAssets}
+          value={selectedDebtAsset}
+          onValueChange={setSelectedDebtAsset}
+          placeholder="Debt"
+          allLabel="All Debt"
+        />
+
+        <div className="flex-1" />
+
+        <Text size="1" color="gray" className="tabular-nums">
+          {rows.length} markets
+        </Text>
+      </Flex>
 
       <Card size="2">
         <Inset side="x" my="3">
@@ -749,7 +724,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         variant="outline"
                         onClick={() => {
                           setSearch("");
-                          setSortKey("liquidity");
+                          setSortKey("tvl");
                           setSortDirection("desc");
                           setSelectedCollateral("all");
                           setSelectedDebtAsset("all");
@@ -761,131 +736,86 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                   </Flex>
                 </Card>
               ) : (
-                <Table.Root variant="ghost" layout="fixed" size="2">
-                  <Table.Header>
-                    <Table.Row align="center">
-                      <Table.ColumnHeaderCell minWidth="260px">Market</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="140px">
-                        Supply
-                      </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="140px">
-                        Borrow
-                      </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="140px">
-                        Utilization
-                      </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="130px">
-                        Supply APY
-                      </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="130px">
-                        Borrow APY
-                      </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="110px">
-                        Max LTV
-                      </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="180px" />
-                    </Table.Row>
-                  </Table.Header>
-
-                  <Table.Body>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-base-content/70 border-b border-base-300">
+                      <th className="text-left font-medium py-2.5 pl-3">Market</th>
+                      <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("tvl")}>
+                        <span className={`inline-flex items-center gap-0.5 ${sortKey === "tvl" ? "text-primary" : ""}`}>
+                          TVL {sortKey === "tvl" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                        </span>
+                      </th>
+                      <th className="text-center font-medium py-2.5 w-16">Util</th>
+                      <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("supplyApy")}>
+                        <span className={`inline-flex items-center gap-0.5 ${sortKey === "supplyApy" ? "text-primary" : ""}`}>
+                          Earn {sortKey === "supplyApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                        </span>
+                      </th>
+                      <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("borrowApy")}>
+                        <span className={`inline-flex items-center gap-0.5 ${sortKey === "borrowApy" ? "text-primary" : ""}`}>
+                          Borrow {sortKey === "borrowApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                        </span>
+                      </th>
+                      <th className="w-28"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {rows.slice(0, visibleCount).map(r => {
                       const { market } = r;
+                      const morphoUrl = getMorphoMarketUrl(
+                        chainId,
+                        market.uniqueKey,
+                        r.collateralSymbol,
+                        r.loanSymbol
+                      );
 
                       return (
-                        <Table.Row key={market.uniqueKey} align="center">
-                          <Table.RowHeaderCell>
-                            <Flex align="center" gap="3">
+                        <tr key={market.uniqueKey} className="border-b border-base-300/50 hover:bg-base-200/30 transition-colors">
+                          <td className="py-2.5 pl-3">
+                            <div className="flex items-center gap-2">
                               <TokenPairAvatars collateralSymbol={r.collateralSymbol} loanSymbol={r.loanSymbol} />
-
-                              <Flex direction="column" gap="1" style={{ minWidth: 0 }}>
-                                <Flex align="center" gap="2">
-                                  <Text weight="medium" style={{ lineHeight: 1.1 }}>
-                                    {r.collateralSymbol}/{r.loanSymbol}
-                                  </Text>
-                                  {(() => {
-                                    const morphoUrl = getMorphoMarketUrl(
-                                      chainId,
-                                      market.uniqueKey,
-                                      r.collateralSymbol,
-                                      r.loanSymbol
-                                    );
-                                    return morphoUrl ? (
-                                      <Tooltip content="View on Morpho">
-                                        <a
-                                          href={morphoUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="inline-flex items-center gap-0.5 opacity-50 hover:opacity-100 transition-opacity"
-                                        >
-                                          <Image
-                                            src="/logos/morpho.svg"
-                                            alt="Morpho"
-                                            width={14}
-                                            height={14}
-                                            className="rounded-sm"
-                                          />
-                                          <ExternalLink width={10} height={10} />
-                                        </a>
-                                      </Tooltip>
-                                    ) : null;
-                                  })()}
-                                </Flex>
-
-                                <Flex align="center" gap="2" wrap="wrap">
-                                  <Text size="1" color="gray">
-                                    {truncateMiddle(market.uniqueKey, 10, 6)}
-                                  </Text>
-                                </Flex>
-                              </Flex>
-                            </Flex>
-                          </Table.RowHeaderCell>
-
-                          <Table.Cell justify="end">
-                            <Text>{usd.format(r.supplyUsd)}</Text>
-                          </Table.Cell>
-
-                          <Table.Cell justify="end">
-                            <Text>{usd.format(r.borrowUsd)}</Text>
-                          </Table.Cell>
-
-                          <Table.Cell justify="end">
-                            <Badge
-                              variant="soft"
-                              color={utilizationBadgeColor(r.utilization01)}
-                              radius="large"
-                            >
-                              {formatPercent(r.utilization01, 1)}
-                            </Badge>
-                          </Table.Cell>
-
-                          <Table.Cell justify="end">
-                            <Text color="green">{formatPercent(r.supplyApy01, 2)}</Text>
-                          </Table.Cell>
-
-                          <Table.Cell justify="end">
-                            <Text color="red">{formatPercent(r.borrowApy01, 2)}</Text>
-                          </Table.Cell>
-
-                          <Table.Cell justify="end">
-                            <Text>{formatPercent(r.lltv01, 0)}</Text>
-                          </Table.Cell>
-
-                          <Table.Cell justify="end">
-                            <Flex gap="2">
-                              <Button size="2" variant="solid" onClick={() => handleSupply(market)}>
+                              {morphoUrl ? (
+                                <a
+                                  href={morphoUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium hover:text-primary transition-colors group/link flex items-center gap-1"
+                                >
+                                  {r.collateralSymbol}/{r.loanSymbol}
+                                  <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-60 transition-opacity" />
+                                </a>
+                              ) : (
+                                <span className="font-medium">{r.collateralSymbol}/{r.loanSymbol}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 pr-4 text-right tabular-nums">
+                            {usd.format(r.supplyUsd)}
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <UtilizationBar value={r.utilization01} />
+                          </td>
+                          <td className="py-2.5 pr-4 text-right tabular-nums text-success">
+                            {formatPercent(r.supplyApy01, 2)}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right tabular-nums">
+                            {formatPercent(r.borrowApy01, 2)}
+                          </td>
+                          <td className="py-2.5 pr-3 text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <Button size="1" variant="soft" onClick={() => handleSupply(market)}>
                                 Supply
                               </Button>
-                              <Button size="2" variant="soft" onClick={() => handleLoop(market)}>
+                              <Button size="1" variant="outline" onClick={() => handleLoop(market)}>
                                 Loop
                               </Button>
-                            </Flex>
-                          </Table.Cell>
-                        </Table.Row>
+                            </div>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </Table.Body>
-                </Table.Root>
+                  </tbody>
+                </table>
               )}
             </Box>
           </ScrollArea>
