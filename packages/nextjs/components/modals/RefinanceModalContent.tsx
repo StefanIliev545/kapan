@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { FiCheck, FiAlertTriangle } from "react-icons/fi";
 import { formatUnits } from "viem";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
+import { MorphoMarketSelector } from "../common/MorphoMarketSelector";
+import type { MorphoMarket, MorphoMarketContext } from "~~/hooks/useMorphoLendingPositions";
 
 /* ------------------------------ Helpers ------------------------------ */
 const clampAmount = (value: string, max?: string) => {
@@ -140,6 +142,15 @@ export type RefinanceModalContentProps = {
 
   // Price probes (invisible)
   apiProbes?: ReactNode;
+
+  // Morpho-specific props (EVM only)
+  isMorphoSelected?: boolean;
+  morphoMarkets?: MorphoMarket[];
+  selectedMorphoMarket?: MorphoMarket | null;
+  onMorphoMarketSelect?: (market: MorphoMarket, context: MorphoMarketContext) => void;
+  morphoSupportedCollaterals?: Record<string, boolean>;
+  isLoadingMorphoMarkets?: boolean;
+  chainId?: number;
 };
 
 export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
@@ -203,8 +214,22 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   setRevokePermissions,
   errorMessage,
   apiProbes,
+  // Morpho-specific props
+  isMorphoSelected,
+  morphoMarkets,
+  selectedMorphoMarket,
+  onMorphoMarketSelect,
+  morphoSupportedCollaterals,
+  isLoadingMorphoMarkets,
+  chainId,
 }) => {
   const addrKey = (a?: string) => (a ?? "").toLowerCase();
+
+  // Determine effective supported collateral map
+  // When Morpho is selected, use morphoSupportedCollaterals instead
+  const effectiveCollateralSupport = isMorphoSelected && morphoSupportedCollaterals
+    ? morphoSupportedCollaterals
+    : effectiveSupportedMap;
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -470,11 +495,18 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
             <div className="text-sm text-base-content/80">
               {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0
                 ? "Collateral to Move"
-                : "Select Collaterals to Move"}
+                : isMorphoSelected
+                  ? "Select Collateral to Move"
+                  : "Select Collaterals to Move"}
             </div>
             {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
               <div className="text-xs text-base-content/60 mb-2 p-2 bg-info/10 rounded">
                 <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this collateral cannot be changed.
+              </div>
+            )}
+            {isMorphoSelected && !disableCollateralSelection && (
+              <div className="text-xs text-base-content/60 mb-2 p-2 bg-info/10 rounded">
+                <strong>Note:</strong> Morpho markets are isolated by collateral type. Select one collateral to see available markets.
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -491,19 +523,24 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                 ).map(c => {
                   const key = addrKey(c.address);
                   const supported =
-                    Object.keys(effectiveSupportedMap || {}).length === 0
+                    Object.keys(effectiveCollateralSupport || {}).length === 0
                       ? true
-                      : effectiveSupportedMap?.[key] ?? false;
+                      : effectiveCollateralSupport?.[key] ?? false;
                   const isAdded = Boolean(addedCollaterals[key]);
                   const isExpanded = expandedCollateral === key;
+                  
+                  // For Morpho, only allow one collateral to be selected
+                  const morphoHasOtherSelected = isMorphoSelected && 
+                    Object.keys(addedCollaterals).length > 0 && 
+                    !isAdded;
 
                   return (
                     <div
                       key={c.address}
-                      className={`p-2 border rounded ${isExpanded ? "col-span-2" : ""} ${isAdded ? "border-success bg-success/10" : supported ? "border-base-300" : "border-error/50 opacity-60"
-                        } ${c.balance <= 0 ? "opacity-50 cursor-not-allowed" : disableCollateralSelection ? "cursor-default" : "cursor-pointer"}`}
+                      className={`p-2 border rounded ${isExpanded ? "col-span-2" : ""} ${isAdded ? "border-success bg-success/10" : supported && !morphoHasOtherSelected ? "border-base-300" : "border-error/50 opacity-60"
+                        } ${c.balance <= 0 || morphoHasOtherSelected ? "opacity-50 cursor-not-allowed" : disableCollateralSelection ? "cursor-default" : "cursor-pointer"}`}
                       onClick={() => {
-                        if (c.balance <= 0 || disableCollateralSelection) return;
+                        if (c.balance <= 0 || disableCollateralSelection || morphoHasOtherSelected) return;
                         onCollateralTileClick(c.address);
                       }}
                     >
@@ -515,7 +552,11 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                           {c.symbol}
                           {isAdded && <span className="text-success">✓</span>}
                         </span>
-                        {!supported && <span className="badge badge-error badge-outline badge-xs ml-1">Not supported</span>}
+                        {!supported && (
+                          <span className="badge badge-error badge-outline badge-xs ml-1">
+                            {isMorphoSelected ? "No market" : "Not supported"}
+                          </span>
+                        )}
                         <span className="ml-auto text-sm text-base-content/70">
                           {addedCollaterals[key]
                             ? `$${getUsdValue(c.address, addedCollaterals[key]).toLocaleString(undefined, {
@@ -601,6 +642,20 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
               )}
             </div>
           </div>
+
+          {/* Morpho Market Selector - shown when Morpho is selected and a collateral is chosen */}
+          {isMorphoSelected && Object.keys(addedCollaterals).length > 0 && onMorphoMarketSelect && chainId && (
+            <>
+              <div className="divider my-2" />
+              <MorphoMarketSelector
+                markets={morphoMarkets || []}
+                selectedMarket={selectedMorphoMarket || null}
+                onSelectMarket={onMorphoMarketSelect}
+                chainId={chainId}
+                isLoading={isLoadingMorphoMarkets}
+              />
+            </>
+          )}
 
           <div className="divider my-2" />
 

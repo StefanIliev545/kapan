@@ -17,6 +17,8 @@ export const getProtocolLogo = (protocolName: string): string => {
     "Venus": "/logos/venus.svg",
     "ZeroLend": "/logos/zerolend.svg",
     "zerolend": "/logos/zerolend.svg",
+    "Morpho Blue": "/logos/morpho.svg",
+    "morpho-blue": "/logos/morpho.svg",
     "Vesu": "/logos/vesu.svg",
     "VesuV2": "/logos/vesu.svg",
     "vesu_v2": "/logos/vesu.svg",

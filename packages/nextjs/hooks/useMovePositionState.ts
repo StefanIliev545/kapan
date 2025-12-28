@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import type { MorphoMarket, MorphoMarketContext } from "./useMorphoLendingPositions";
 
 const addrKey = (a?: string) => (a ?? "").toLowerCase();
 
@@ -19,6 +20,31 @@ export const useMovePositionState = (isOpen: boolean) => {
   const [preferBatching, setPreferBatching] = useState<boolean>(false);
   const [autoSelectedDest, setAutoSelectedDest] = useState<boolean>(false);
 
+  // Morpho-specific state
+  const [selectedMorphoMarket, setSelectedMorphoMarket] = useState<MorphoMarket | null>(null);
+  const [morphoContext, setMorphoContext] = useState<MorphoMarketContext | null>(null);
+
+  // Reset Morpho selection when protocol changes away from Morpho
+  useEffect(() => {
+    if (selectedProtocol !== "Morpho Blue") {
+      setSelectedMorphoMarket(null);
+      setMorphoContext(null);
+    }
+  }, [selectedProtocol]);
+
+  // Reset Morpho selection when collaterals change (user deselected/changed collateral)
+  useEffect(() => {
+    if (selectedProtocol === "Morpho Blue" && selectedMorphoMarket) {
+      // Check if the selected market's collateral is still in addedCollaterals
+      const marketCollateral = selectedMorphoMarket.collateralAsset?.address?.toLowerCase();
+      const addedKeys = Object.keys(addedCollaterals).map(k => k.toLowerCase());
+      if (marketCollateral && !addedKeys.includes(marketCollateral)) {
+        setSelectedMorphoMarket(null);
+        setMorphoContext(null);
+      }
+    }
+  }, [selectedProtocol, selectedMorphoMarket, addedCollaterals]);
+
   // Reset all state when modal closes
   const resetState = useCallback(() => {
     if (isOpen) return;
@@ -33,7 +59,16 @@ export const useMovePositionState = (isOpen: boolean) => {
     setCollateralIsMaxMap({});
     setAutoSelectedDest(false);
     setIsSubmitting(false);
+    // Reset Morpho state
+    setSelectedMorphoMarket(null);
+    setMorphoContext(null);
   }, [isOpen]);
+
+  // Handler for Morpho market selection
+  const onMorphoMarketSelect = useCallback((market: MorphoMarket, context: MorphoMarketContext) => {
+    setSelectedMorphoMarket(market);
+    setMorphoContext(context);
+  }, []);
 
   return {
     // State
@@ -74,6 +109,13 @@ export const useMovePositionState = (isOpen: boolean) => {
     setPreferBatching,
     autoSelectedDest,
     setAutoSelectedDest,
+
+    // Morpho-specific state
+    selectedMorphoMarket,
+    setSelectedMorphoMarket,
+    morphoContext,
+    setMorphoContext,
+    onMorphoMarketSelect,
 
     // Actions
     resetState,

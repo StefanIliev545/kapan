@@ -244,9 +244,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
               networkType="evm"
               chainId={chainId}
               position={positionManager}
-              disableMove
+              disableMove={!row.hasCollateral} // Enable move when there's collateral
               containerClassName="rounded-none"
-              availableActions={{ deposit: true, withdraw: true, move: false, swap: false }}
+              availableActions={{ deposit: true, withdraw: true, move: row.hasCollateral, swap: false }}
               controlledExpanded={!!expandedRows[row.key]}
               onToggleExpanded={() => toggleRowExpanded(row.key)}
               extraStats={[{ label: "LTV", value: ltvDisplayValue }]}
@@ -275,9 +275,21 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                 availableActions={{
                   borrow: true,
                   repay: row.hasDebt, // Only show repay if there's actual debt
-                  move: false,
+                  move: row.hasDebt, // Enable move when there's debt to refinance
                   close: row.hasDebt && row.hasCollateral, // Enable close when has both debt and collateral
                   swap: false,
+                }}
+                // For Morpho, preselect the collateral from the isolated market
+                moveSupport={{
+                  preselectedCollaterals: row.hasCollateral ? [{
+                    token: row.market.collateralAsset?.address || "",
+                    symbol: row.collateralSymbol,
+                    decimals: row.collateralDecimals,
+                    amount: row.collateralBalance,
+                    maxAmount: row.collateralBalance,
+                    supported: true, // Morpho collateral is always supported for moving out
+                  }] : [],
+                  disableCollateralSelection: true, // Morpho positions have fixed collateral
                 }}
                 showNoDebtLabel={!row.hasDebt}
                 controlledExpanded={!!expandedRows[row.key]}

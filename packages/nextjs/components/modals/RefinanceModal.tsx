@@ -28,6 +28,8 @@ import { RefinanceModalStark } from "./RefinanceModalStark";
       inputValue?: string;
     }>;
     disableCollateralSelection?: boolean;
+    /** Pre-encoded context for the source protocol (e.g., Morpho MarketParams) */
+    fromContext?: string;
   };
   
   export const RefinanceModal: FC<RefinanceModalProps> = ({
@@ -39,6 +41,7 @@ import { RefinanceModalStark } from "./RefinanceModalStark";
     networkType,
     preSelectedCollaterals,
     disableCollateralSelection,
+    fromContext,
   }) => {
   if (networkType === "evm") {
     return (
@@ -50,6 +53,7 @@ import { RefinanceModalStark } from "./RefinanceModalStark";
         chainId={chainId}
         preSelectedCollaterals={preSelectedCollaterals}
         disableCollateralSelection={disableCollateralSelection}
+        fromContext={fromContext}
           />
         );
       }
