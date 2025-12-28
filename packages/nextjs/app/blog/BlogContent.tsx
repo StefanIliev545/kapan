@@ -4,7 +4,13 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FiArrowRight, FiCalendar, FiClock, FiSearch, FiTag } from "react-icons/fi";
+import {
+  ArrowRightIcon,
+  CalendarIcon,
+  ClockIcon,
+  MagnifyingGlassIcon,
+  TagIcon,
+} from "@heroicons/react/24/outline";
 import { BlogPost } from "~~/utils/blog";
 
 // Categories list
@@ -52,12 +58,12 @@ const FeaturedPost = ({ post }: { post: BlogPost }) => (
               <span className="badge badge-primary dark:badge-accent">{post.category}</span>
               <div className="flex items-center text-xs text-base-content/70 gap-2">
                 <span className="flex items-center gap-1">
-                  <FiCalendar className="h-3 w-3" />
+                  <CalendarIcon className="h-3 w-3" />
                   {post.date}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <FiClock className="h-3 w-3" />
+                  <ClockIcon className="h-3 w-3" />
                   {post.readTime}
                 </span>
               </div>
@@ -69,7 +75,7 @@ const FeaturedPost = ({ post }: { post: BlogPost }) => (
           </div>
           <div className="flex items-center gap-2 text-primary dark:text-accent font-medium">
             <span>Read Article</span>
-            <FiArrowRight className="transition-transform group-hover:translate-x-1" />
+            <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </div>
         </div>
       </div>
@@ -101,12 +107,12 @@ const BlogPostCard = ({ post, index }: { post: BlogPost; index: number }) => (
             <span className="badge badge-sm badge-primary dark:badge-accent">{post.category}</span>
             <div className="flex items-center text-xs text-base-content/70 gap-2">
               <span className="flex items-center gap-1">
-                <FiCalendar className="h-3 w-3" />
+                <CalendarIcon className="h-3 w-3" />
                 {post.date}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
-                <FiClock className="h-3 w-3" />
+                <ClockIcon className="h-3 w-3" />
                 {post.readTime}
               </span>
             </div>
@@ -118,7 +124,7 @@ const BlogPostCard = ({ post, index }: { post: BlogPost; index: number }) => (
         </div>
         <div className="mt-3 flex items-center gap-2 text-primary dark:text-accent text-sm font-medium">
           <span>Read More</span>
-          <FiArrowRight className="transition-transform group-hover:translate-x-1" />
+          <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
         </div>
       </div>
     </motion.div>
@@ -173,7 +179,7 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
             >
               <div className="relative flex w-full max-w-2xl mx-auto">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <FiSearch className="w-5 h-5 text-base-content/50" />
+                  <MagnifyingGlassIcon className="w-5 h-5 text-base-content/50" />
                 </div>
                 <input
                   type="text"
@@ -199,7 +205,7 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
                 className={`btn btn-sm ${selectedCategory === category ? "btn-primary dark:btn-accent" : "btn-ghost"}`}
                 onClick={() => setSelectedCategory(category)}
               >
-                <FiTag className="mr-1" />
+                <TagIcon className="h-4 w-4 mr-1" />
                 {category}
               </button>
             ))}

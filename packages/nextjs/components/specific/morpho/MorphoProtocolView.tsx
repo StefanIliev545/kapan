@@ -3,7 +3,7 @@
 import { FC, useState, useMemo, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useAccount } from "wagmi";
-import { FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import {
   useMorphoLendingPositions,
   useMorphoMarkets,
@@ -289,9 +289,9 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
                 onClick={(e) => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
               >
                 <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                {isMarketsOpen ? <FiChevronUp className="h-3.5 w-3.5" /> : <FiChevronDown className="h-3.5 w-3.5" />}
+                {isMarketsOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
               </button>
-              <FiChevronDown
+              <ChevronDownIcon
                 className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
               />
             </div>

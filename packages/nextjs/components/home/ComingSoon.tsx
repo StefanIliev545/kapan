@@ -1,4 +1,4 @@
-import { FiLink, FiDatabase } from "react-icons/fi";
+import { LinkIcon, CircleStackIcon } from "@heroicons/react/24/outline";
 
 const ComingSoon = () => {
   return (
@@ -11,7 +11,7 @@ const ComingSoon = () => {
             <div className="card bg-base-200 dark:bg-base-300/30 shadow-lg border-2 border-accent rounded-lg">
               <div className="card-body">
                 <h3 className="card-title text-accent flex items-center">
-                  <FiLink className="w-6 h-6 mr-2 text-accent" />
+                  <LinkIcon className="w-6 h-6 mr-2 text-accent" />
                   Multi-Chain Support
                 </h3>
                 <p className="text-base-content/80">
@@ -27,7 +27,7 @@ const ComingSoon = () => {
             <div className="card bg-base-200 dark:bg-base-300/30 shadow-lg border-2 border-primary dark:border-accent rounded-lg">
               <div className="card-body">
                 <h3 className="card-title text-primary dark:text-accent flex items-center">
-                  <FiDatabase className="w-6 h-6 mr-2 text-primary dark:text-accent" />
+                  <CircleStackIcon className="w-6 h-6 mr-2 text-primary dark:text-accent" />
                   Additional Protocols
                 </h3>
                 <p className="text-base-content/80">

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FiZap, FiCreditCard, FiRefreshCw, FiShield, FiDollarSign } from "react-icons/fi";
+import { BoltIcon, CreditCardIcon, ArrowPathIcon, ShieldCheckIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline";
 
 interface FeatureItem {
   icon: React.ReactNode;
@@ -11,27 +11,27 @@ interface FeatureItem {
 
 const features: FeatureItem[] = [
   {
-    icon: <FiCreditCard className="w-5 h-5" />,
+    icon: <CreditCardIcon className="w-5 h-5" />,
     title: "Pay with Any Gas Token",
     description: "AVNU Paymaster integration lets you pay gas fees in the token of your choice — no need to hold native tokens.",
   },
   {
-    icon: <FiZap className="w-5 h-5" />,
+    icon: <BoltIcon className="w-5 h-5" />,
     title: "Cartridge Controller",
     description: "Web2-like experience with Cartridge Controller integration — smooth onboarding without wallet complexity.",
   },
   {
-    icon: <FiRefreshCw className="w-5 h-5" />,
+    icon: <ArrowPathIcon className="w-5 h-5" />,
     title: "Smart Refinancing",
     description: "Refinance incompatible positions with mid-process swaps. Automatically split isolated collateral when migrating between protocols.",
   },
   {
-    icon: <FiShield className="w-5 h-5" />,
+    icon: <ShieldCheckIcon className="w-5 h-5" />,
     title: "Non-Custodial",
     description: "Your assets always stay yours. Kapan routes instructions but never takes ownership — verify on any protocol's frontend.",
   },
   {
-    icon: <FiDollarSign className="w-5 h-5" />,
+    icon: <CurrencyDollarIcon className="w-5 h-5" />,
     title: "Zero Protocol Fees",
     description: "No protocol liquidity needed thanks to flash loans. You only pay network gas and any swap fees in the route.",
   },

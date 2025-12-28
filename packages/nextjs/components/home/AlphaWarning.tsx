@@ -1,4 +1,4 @@
-import { FiInfo, FiShield, FiZap } from "react-icons/fi";
+import { InformationCircleIcon, ShieldCheckIcon, BoltIcon } from "@heroicons/react/24/outline";
 
 const AlphaWarning = () => {
   return (
@@ -9,7 +9,7 @@ const AlphaWarning = () => {
             {/* Main message */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <FiZap className="w-5 h-5 text-warning" />
+                <BoltIcon className="w-5 h-5 text-warning" />
                 <h3 className="text-lg font-bold">Early Access Alpha</h3>
               </div>
               <p className="text-base-content/80">
@@ -21,7 +21,7 @@ const AlphaWarning = () => {
             {/* Feature status */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <FiInfo className="w-5 h-5 text-info" />
+                <InformationCircleIcon className="w-5 h-5 text-info" />
                 <h3 className="text-lg font-bold">What to Expect</h3>
               </div>
               <p className="text-base-content/80">
@@ -33,7 +33,7 @@ const AlphaWarning = () => {
             {/* Security note */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <FiShield className="w-5 h-5 text-warning" />
+                <ShieldCheckIcon className="w-5 h-5 text-warning" />
                 <h3 className="text-lg font-bold">Active Development</h3>
               </div>
               <p className="text-base-content/80">

@@ -1,5 +1,5 @@
 import React, { FC, ReactNode } from "react";
-import { FiChevronDown, FiChevronUp, FiInfo } from "react-icons/fi";
+import { ChevronDownIcon, ChevronUpIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 
 type PositionCardProps = {
   isExpanded: boolean;
@@ -86,7 +86,7 @@ export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
 }) => (
   <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
     <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-      <FiInfo className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true" />
+      <InformationCircleIcon className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true" />
     </div>
     <div
       tabIndex={0}
@@ -129,9 +129,9 @@ export const PositionToggleIndicator: FC<PositionToggleIndicatorProps> = ({ isEx
     } transition-colors duration-200`}
   >
     {isExpanded ? (
-      <FiChevronUp className="w-4 h-4 text-primary" />
+      <ChevronUpIcon className="w-4 h-4 text-primary" />
     ) : (
-      <FiChevronDown className="w-4 h-4 text-base-content/70" />
+      <ChevronDownIcon className="w-4 h-4 text-base-content/70" />
     )}
   </div>
 );

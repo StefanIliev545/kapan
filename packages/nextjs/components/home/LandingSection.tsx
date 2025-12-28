@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ProtocolView } from "../ProtocolView";
 import { motion } from "framer-motion";
-import { FiArrowRight } from "react-icons/fi";
+import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 
@@ -164,7 +164,7 @@ const LandingSection = () => {
                 className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary to-accent text-white font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200 flex-shrink-0"
               >
                 <span>Launch App</span>
-                <FiArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </motion.a>
             </div>
           </div>

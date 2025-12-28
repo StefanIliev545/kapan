@@ -8,7 +8,7 @@ import { WithdrawModal } from "./modals/WithdrawModal";
 import { MoveSupplyModal } from "./modals/MoveSupplyModal";
 import { DepositModalStark } from "./modals/stark/DepositModalStark";
 import { WithdrawModalStark } from "./modals/stark/WithdrawModalStark";
-import { FiChevronDown, FiChevronUp, FiInfo, FiPlus, FiMinus, FiRepeat, FiArrowRight } from "react-icons/fi";
+import { ChevronDownIcon, ChevronUpIcon, InformationCircleIcon, PlusIcon, MinusIcon, ArrowPathIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useModal, useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
@@ -178,7 +178,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const defaultInfoButton = (
     <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0">
       <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-        <FiInfo className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true" />
+        <InformationCircleIcon className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true" />
       </div>
       <div
         tabIndex={0}
@@ -373,9 +373,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 } transition-all duration-200`}
             >
               {isExpanded ? (
-                <FiChevronUp className="w-3 h-3 text-primary" />
+                <ChevronUpIcon className="w-3 h-3 text-primary" />
               ) : (
-                <FiChevronDown className="w-3 h-3 text-base-content/50" />
+                <ChevronDownIcon className="w-3 h-3 text-base-content/50" />
               )}
             </div>
           )}
@@ -433,9 +433,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   } transition-all duration-200`}
               >
                 {isExpanded ? (
-                  <FiChevronUp className="w-3.5 h-3.5 text-primary" />
+                  <ChevronUpIcon className="w-3.5 h-3.5 text-primary" />
                 ) : (
-                  <FiChevronDown className="w-3.5 h-3.5 text-base-content/50" />
+                  <ChevronDownIcon className="w-3.5 h-3.5 text-base-content/50" />
                 )}
               </div>
             )}
@@ -452,16 +452,16 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                 className="w-full"
                 actions={[
                   ...(showDepositButton
-                    ? [{ key: "deposit", label: "Deposit", icon: <FiPlus className="w-4 h-4" />, onClick: handleDepositClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to deposit" : actionsDisabled ? disabledMessage : "Deposit tokens", variant: "ghost" as const }]
+                    ? [{ key: "deposit", label: "Deposit", icon: <PlusIcon className="w-4 h-4" />, onClick: handleDepositClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to deposit" : actionsDisabled ? disabledMessage : "Deposit tokens", variant: "ghost" as const }]
                     : []),
                   ...(showWithdrawButton
-                    ? [{ key: "withdraw", label: "Withdraw", icon: <FiMinus className="w-4 h-4" />, onClick: handleWithdrawClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to withdraw" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to withdraw" : "Withdraw tokens", variant: "ghost" as const }]
+                    ? [{ key: "withdraw", label: "Withdraw", icon: <MinusIcon className="w-4 h-4" />, onClick: handleWithdrawClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to withdraw" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to withdraw" : "Withdraw tokens", variant: "ghost" as const }]
                     : []),
                   ...(showMoveButton
-                    ? [{ key: "move", label: "Move", icon: <FiArrowRight className="w-4 h-4" />, onClick: handleMoveClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move supply" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to move" : "Move supply to another protocol", variant: "ghost" as const, compactOnHover: true }]
+                    ? [{ key: "move", label: "Move", icon: <ArrowRightIcon className="w-4 h-4" />, onClick: handleMoveClick, disabled: !isWalletConnected || !hasBalance || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move supply" : actionsDisabled ? disabledMessage : !hasBalance ? "No balance to move" : "Move supply to another protocol", variant: "ghost" as const, compactOnHover: true }]
                     : []),
                   ...(showSwapButton
-                    ? [{ key: "swap", label: "Swap", icon: <FiRepeat className="w-4 h-4" />, onClick: handleSwapClick ?? (() => { return; }), disabled: !isWalletConnected || actionsDisabled || !hasBalance, title: !isWalletConnected ? "Connect wallet to swap collateral" : actionsDisabled ? disabledMessage : !hasBalance ? "No collateral to swap" : "Switch collateral token", variant: "ghost" as const, compactOnHover: true }]
+                    ? [{ key: "swap", label: "Swap", icon: <ArrowPathIcon className="w-4 h-4" />, onClick: handleSwapClick ?? (() => { return; }), disabled: !isWalletConnected || actionsDisabled || !hasBalance, title: !isWalletConnected ? "Connect wallet to swap collateral" : actionsDisabled ? disabledMessage : !hasBalance ? "No collateral to swap" : "Switch collateral token", variant: "ghost" as const, compactOnHover: true }]
                     : []),
                 ]}
               />
@@ -497,7 +497,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   : "Deposit more collateral"
             }
           >
-            <FiPlus className="w-4 h-4" />
+            <PlusIcon className="w-4 h-4" />
             <span>Deposit</span>
           </button>
         </div>

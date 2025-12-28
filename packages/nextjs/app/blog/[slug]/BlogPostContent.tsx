@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FiArrowLeft, FiCalendar, FiClock, FiShare2 } from "react-icons/fi";
+import { ArrowLeftIcon, CalendarIcon, ClockIcon, ShareIcon } from "@heroicons/react/24/outline";
 import { BlogPost } from "~~/utils/blog";
 
 // Helper function to get image src from coverImage field
@@ -56,7 +56,7 @@ const RelatedPosts = ({ relatedPosts }: { relatedPosts: BlogPost[] }) => {
                   {post.title}
                 </h3>
                 <div className="flex items-center text-xs text-base-content/70 gap-2 mt-2">
-                  <FiCalendar className="h-3 w-3" />
+                  <CalendarIcon className="h-3 w-3" />
                   <span>{post.date}</span>
                 </div>
               </div>
@@ -106,7 +106,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
                 href="/blog"
                 className="inline-flex items-center gap-2 text-sm text-primary dark:text-accent mb-4 hover:underline"
               >
-                <FiArrowLeft className="h-4 w-4" />
+                <ArrowLeftIcon className="h-4 w-4" />
                 Back to all articles
               </Link>
 
@@ -116,12 +116,12 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
                   <span className="badge badge-primary dark:badge-accent">{post.category}</span>
                   <div className="flex items-center text-sm text-base-content/70 gap-2">
                     <span className="flex items-center gap-1">
-                      <FiCalendar className="h-4 w-4" />
+                      <CalendarIcon className="h-4 w-4" />
                       {post.date}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
-                      <FiClock className="h-4 w-4" />
+                      <ClockIcon className="h-4 w-4" />
                       {post.readTime}
                     </span>
                   </div>
@@ -135,7 +135,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
               <div className="flex justify-end mb-8">
                 <div className="flex gap-2">
                   <button className="btn btn-circle btn-sm btn-ghost" aria-label="Share this post">
-                    <FiShare2 className="h-4 w-4" />
+                    <ShareIcon className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -151,7 +151,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
                   </div>
                   <div className="flex gap-2">
                     <button className="btn btn-sm btn-primary dark:btn-accent" aria-label="Share this post">
-                      <FiShare2 className="mr-2 h-4 w-4" />
+                      <ShareIcon className="mr-2 h-4 w-4" />
                       Share
                     </button>
                   </div>

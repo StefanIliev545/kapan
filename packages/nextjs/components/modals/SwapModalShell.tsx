@@ -1,7 +1,7 @@
 import { FC, useState, useMemo, useEffect, ReactNode } from "react";
 import Image from "next/image";
 import { formatUnits, parseUnits, Address } from "viem";
-import { FiCheck, FiAlertTriangle, FiArrowDown, FiInfo, FiSettings } from "react-icons/fi";
+import { CheckIcon, ExclamationTriangleIcon, ArrowDownIcon, InformationCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import { FlashLoanProviderOption } from "~~/hooks/useMovePositionData";
 import { SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
@@ -228,7 +228,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     <div className="space-y-4 py-2">
                         {infoContent || (
                             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                                <FiInfo className="w-5 h-5 flex-shrink-0" />
+                                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
                                 <span>
                                     <strong>How {title} Works</strong>
                                     <br />
@@ -353,7 +353,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                         {/* Arrow Divider */}
                         <div className="flex justify-center -my-2 relative z-10">
                             <div className="bg-base-100 p-2 rounded-full border border-base-300">
-                                <FiArrowDown className="w-4 h-4 text-base-content/60" />
+                                <ArrowDownIcon className="w-4 h-4 text-base-content/60" />
                             </div>
                         </div>
 
@@ -415,7 +415,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                         Slippage
                                         <div className="dropdown dropdown-top dropdown-hover">
                                             <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                                <FiSettings className="w-3 h-3" />
+                                                <Cog6ToothIcon className="w-3 h-3" />
                                             </label>
                                             <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
                                                 {SLIPPAGE_OPTIONS.map((s) => (
@@ -460,7 +460,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                         {/* Warnings/Errors */}
                         {quoteError && (
                             <div className="alert alert-error text-xs py-2">
-                                <FiAlertTriangle className="w-4 h-4" />
+                                <ExclamationTriangleIcon className="w-4 h-4" />
                                 <span className="break-all">Error fetching quote: {quoteError.message}</span>
                             </div>
                         )}
@@ -475,7 +475,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                         onClick={() => setPreferBatching(prev => !prev)}
                                         className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
                                     >
-                                        <FiCheck className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                                        <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
                                         Batch transactions
                                     </button>
                                 )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { FiArrowDownLeft, FiArrowUpRight } from "react-icons/fi";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
 // Type definition for Transaction
 type Transaction = {
@@ -73,13 +73,13 @@ const TransactionFeed = () => {
   const getTransactionIcon = (type: string) => {
     switch(type) {
       case 'borrow':
-        return <FiArrowDownLeft className="text-error" />;
+        return <ArrowDownLeft className="text-error" />;
       case 'repay':
-        return <FiArrowUpRight className="text-primary" />;
+        return <ArrowUpRight className="text-primary" />;
       case 'supply':
-        return <FiArrowDownLeft className="text-primary" />;
+        return <ArrowDownLeft className="text-primary" />;
       case 'withdraw':
-        return <FiArrowUpRight className="text-warning" />;
+        return <ArrowUpRight className="text-warning" />;
       default:
         return null;
     }

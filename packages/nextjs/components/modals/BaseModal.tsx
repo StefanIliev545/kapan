@@ -1,5 +1,5 @@
 import { FC, ReactNode } from "react";
-import { FiX } from "react-icons/fi";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -38,7 +38,7 @@ export const BaseModal: FC<BaseModalProps> = ({
               onClick={onClose}
               className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
             >
-              <FiX className="w-5 h-5" />
+              <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
         )}
@@ -49,7 +49,7 @@ export const BaseModal: FC<BaseModalProps> = ({
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
           >
-            <FiX className="w-5 h-5" />
+            <XMarkIcon className="w-5 h-5" />
           </button>
         )}
 

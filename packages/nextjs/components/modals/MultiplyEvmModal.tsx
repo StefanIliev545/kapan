@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import Image from "next/image";
 import { Address, formatUnits, parseUnits } from "viem";
-import { FiCheck } from "react-icons/fi";
+import { CheckIcon } from "@heroicons/react/24/outline";
 
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
@@ -860,7 +860,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               onClick={() => setPreferBatching(!preferBatching)}
               className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
             >
-              <FiCheck className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+              <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
               Batch transactions
             </button>
 

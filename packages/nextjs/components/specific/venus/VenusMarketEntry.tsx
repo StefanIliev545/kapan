@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from "react";
-import { FiCheck, FiX } from "react-icons/fi";
+import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useAccount, useWriteContract } from "wagmi";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -142,7 +142,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
           {isExiting || isPending ? (
             <span className="loading loading-spinner loading-xs"></span>
           ) : (
-            <FiCheck size={14} />
+            <CheckIcon className="w-3.5 h-3.5" />
           )}
         </div>
       </div>
@@ -161,7 +161,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
         {isEntering || isPending ? (
           <span className="loading loading-spinner loading-xs"></span>
         ) : (
-          <FiX size={14} />
+          <XMarkIcon className="w-3.5 h-3.5" />
         )}
       </div>
     </div>

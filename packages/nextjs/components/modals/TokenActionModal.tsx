@@ -2,7 +2,7 @@ import { track } from "@vercel/analytics";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { FaGasPump } from "react-icons/fa";
+import { Fuel } from "lucide-react";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import type { Call } from "starknet";
 import { formatUnits, parseUnits } from "viem";
@@ -452,7 +452,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                       txState === "pending" ? (
                         <span className="loading loading-spinner loading-xs" />
                       ) : network === "stark" ? (
-                        <FaGasPump className="text-gray-400" />
+                        <Fuel className="w-4 h-4 text-gray-400" />
                       ) : undefined,
                     onClick: handleConfirm,
                     disabled: isConfirmDisabled,

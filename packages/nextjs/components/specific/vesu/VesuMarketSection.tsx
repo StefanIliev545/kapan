@@ -1,6 +1,6 @@
 import Image from "next/image";
 import React, { type FC } from "react";
-import { FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { BorrowPosition } from "~~/components/BorrowPosition";
@@ -189,7 +189,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
             <div className="flex items-center gap-2 pl-2 border-l border-base-300/50">
               <button className="btn btn-sm btn-ghost gap-1.5" type="button" onClick={onToggle}>
                 <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                {isOpen ? <FiChevronUp className="h-3.5 w-3.5" /> : <FiChevronDown className="h-3.5 w-3.5" />}
+                {isOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
               </button>
               {headerExtra}
             </div>
