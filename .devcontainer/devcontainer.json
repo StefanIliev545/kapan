@@ -20,6 +20,12 @@
 	"forwardPorts": [
 		3000
 	],
+	"portsAttributes": {
+		"3000": {
+			"label": "Next.js Dev Server",
+			"onAutoForward": "openBrowser"
+		}
+	},
 	"mounts": [
 		// 1. Keep OpenCode Config (Settings/API keys)
 		"source=opencode-config,target=/home/node/.config/opencode,type=volume",

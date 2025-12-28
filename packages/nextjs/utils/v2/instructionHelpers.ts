@@ -19,6 +19,7 @@ export enum FlashLoanProvider {
   Aave = 2,
   ZeroLend = 3,
   UniswapV3 = 4,
+  Morpho = 5,
 }
 
 // Lending operation types enum (matches Solidity)
@@ -47,7 +48,7 @@ const ROUTER_INSTRUCTION_TYPE = "tuple(uint256 amount,address token,address user
 
 /**
  * Encode a FlashLoan router instruction
- * @param provider - Flash loan provider (BalancerV2, BalancerV3, Aave, ZeroLend, UniswapV3)
+ * @param provider - Flash loan provider (BalancerV2, BalancerV3, Aave, ZeroLend, UniswapV3, Morpho)
  * @param inputIndex - Index of the UTXO to use as input (amount and token come from here)
  * @param pool - Pool address (only used for UniswapV3, otherwise address(0))
  */

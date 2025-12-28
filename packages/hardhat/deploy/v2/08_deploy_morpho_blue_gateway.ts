@@ -106,6 +106,11 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
         },
       ],
     },
+    // Optimism
+    10: {
+      MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      MARKETS: [],
+    },
   };
 
   const config = CONFIG[effectiveChainId];

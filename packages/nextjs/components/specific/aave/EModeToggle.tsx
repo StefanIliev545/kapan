@@ -1,7 +1,7 @@
 import { FC, useState } from "react";
 import { Address } from "viem";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { useAaveEMode } from "~~/hooks/useAaveEMode";
+import { useAaveLikeEMode, AaveLikeViewContractName, AaveLikeWriteContractName } from "~~/hooks/useAaveEMode";
 import { CheckCircleIcon, ExclamationTriangleIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 
 // Aave V3 Pool ABI for setUserEMode
@@ -18,11 +18,18 @@ const POOL_ABI = [
 interface EModeToggleProps {
   chainId?: number;
   onEModeChanged?: () => void;
+  viewContractName?: AaveLikeViewContractName;
+  writeContractName?: AaveLikeWriteContractName;
 }
 
-export const EModeToggle: FC<EModeToggleProps> = ({ chainId, onEModeChanged }) => {
+export const EModeToggle: FC<EModeToggleProps> = ({ 
+  chainId, 
+  onEModeChanged,
+  viewContractName = "AaveGatewayView",
+  writeContractName = "AaveGatewayWrite"
+}) => {
   const { address: userAddress } = useAccount();
-  const { userEModeId, userEMode, emodes, poolAddress, isLoading, refetchUserEMode } = useAaveEMode(chainId);
+  const { userEModeId, userEMode, emodes, poolAddress, isLoading, refetchUserEMode } = useAaveLikeEMode(chainId, viewContractName, writeContractName);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 

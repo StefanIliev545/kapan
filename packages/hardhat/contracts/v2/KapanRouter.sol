@@ -67,6 +67,11 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         _setUniswapV3Factory(factoryOrSentinel);
     }
 
+    /// @notice Set the Morpho Blue address for flash loans.
+    function setMorphoBluePool(address morpho) external onlyOwner {
+        _setMorphoBlue(morpho);
+    }
+
     enum RouterInstructionType {
         FlashLoan,
         PullToken,
@@ -82,7 +87,8 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         BalancerV3,
         Aave,
         ZeroLend,
-        UniswapV3
+        UniswapV3,
+        Morpho
     }
     struct RouterInstruction {
         uint256 amount;
@@ -491,6 +497,8 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         } else if (provider == FlashLoanProvider.UniswapV3) {
             if (pool == address(0)) revert UniswapV3RequiresPoolAddress();
             _requestUniswapV3(pool, input.token, input.amount, bytes(""));
+        } else if (provider == FlashLoanProvider.Morpho) {
+            _requestMorpho(input.token, input.amount, bytes(""));
         } else {
             revert UnsupportedFlashLoanProvider();
         }

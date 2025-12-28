@@ -152,6 +152,23 @@ interface IMorphoBlue {
 
     /// @notice Accrue interest for a market
     function accrueInterest(MarketParams memory marketParams) external;
+
+    /// @notice Executes a flash loan.
+    /// @dev Flash loans have access to the whole balance of the contract (all markets combined).
+    /// @dev Zero fees - flashFee is always zero.
+    /// @param token The token to flash loan.
+    /// @param assets The amount of assets to flash loan.
+    /// @param data Arbitrary data to pass to the `onMorphoFlashLoan` callback.
+    function flashLoan(address token, uint256 assets, bytes calldata data) external;
+}
+
+/// @title IMorphoFlashLoanCallback
+/// @notice Interface that users willing to use `flashLoan`'s callback must implement.
+interface IMorphoFlashLoanCallback {
+    /// @notice Callback called when a flash loan occurs.
+    /// @param assets The amount of assets that was flash loaned.
+    /// @param data Arbitrary data passed to the `flashLoan` function.
+    function onMorphoFlashLoan(uint256 assets, bytes calldata data) external;
 }
 
 /// @notice Library for computing Morpho Blue market IDs

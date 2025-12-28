@@ -209,6 +209,13 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
               })()}
             </div>
             <div className="flex items-center gap-4 text-xs">
+              {/* Net Value */}
+              <span className="text-base-content/60">
+                Net:{" "}
+                <span className={positionYieldMetrics.netBalance >= 0 ? "text-success" : "text-error"}>
+                  {formatCurrency(positionYieldMetrics.netBalance)}
+                </span>
+              </span>
               {/* Net APY */}
               <span className="text-base-content/60">
                 Net APY:{" "}
@@ -216,11 +223,14 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                   {positionYieldMetrics.netApyPercent != null ? formatSignedPercentage(positionYieldMetrics.netApyPercent) : "—"}
                 </span>
               </span>
-              {/* 30D Yield */}
-              <span className="hidden sm:inline text-base-content/60">
+              {/* 30D Yield with tooltip for annual yield */}
+              <span className="hidden sm:inline text-base-content/60 group relative cursor-help">
                 30D:{" "}
                 <span className={positionYieldMetrics.netYield30d >= 0 ? "text-success" : "text-error"}>
                   {formatCurrency(positionYieldMetrics.netYield30d)}
+                </span>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[10px] bg-base-300 text-base-content rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? "text-success" : "text-error"}>{formatCurrency(positionYieldMetrics.netAnnualYield)}</span>
                 </span>
               </span>
               {/* LTV */}
