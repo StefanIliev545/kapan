@@ -15,7 +15,7 @@ import { BasicCollateral, useMovePositionData } from "~~/hooks/useMovePositionDa
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo } from "react-icons/fi";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
@@ -122,6 +122,15 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         availableAssets.filter(a => a.address.toLowerCase() !== selectedFrom?.address.toLowerCase()) as SwapAsset[],
         [availableAssets, selectedFrom]
     );
+
+    // Auto-switch to Pendle when a PT token is involved in the swap
+    useEffect(() => {
+        const fromIsPT = selectedFrom && isPendleToken(selectedFrom.symbol);
+        const toIsPT = selectedTo && isPendleToken(selectedTo.symbol);
+        if ((fromIsPT || toIsPT) && pendleAvailable) {
+            setSwapRouter("pendle");
+        }
+    }, [selectedFrom, selectedTo, pendleAvailable]);
 
     // Flash Loan Liquidity Check & Auto-Selection
     const amountInBigInt = useMemo(() => {

@@ -11,7 +11,7 @@ import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getBestSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken } from "~~/utils/chainFeatures";
 import { FiAlertTriangle, FiInfo, FiSettings } from "react-icons/fi";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 
@@ -58,12 +58,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const pendleAvailable = isPendleSupported(chainId);
     const oneInchAdapter = getOneInchAdapterInfo(chainId);
     const pendleAdapter = getPendleAdapterInfo(chainId);
-    const defaultRouter = getDefaultSwapRouter(chainId);
 
-    // Swap router selection - default based on chain availability
-    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+    // Swap router selection - default based on chain and token availability
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>("1inch");
 
-    // Update swap router if chain changes and current router is not available
+    // Update swap router based on chain and token availability
     useEffect(() => {
         if (swapRouter === "1inch" && !oneInchAvailable) {
             setSwapRouter(pendleAvailable ? "pendle" : "1inch");
@@ -132,6 +131,13 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         [availableCollaterals, debtToken]
     );
 
+    // Auto-switch to Pendle when a PT token is selected as collateral
+    useEffect(() => {
+        if (selectedTo && isPendleToken(selectedTo.symbol) && pendleAvailable) {
+            setSwapRouter("pendle");
+        }
+    }, [selectedTo, pendleAvailable]);
+
     // Amount of debt to repay in raw
     const repayAmountRaw = useMemo(() => {
         try {
@@ -158,16 +164,16 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         return parseUnits("1", selectedTo.decimals).toString();
     }, [selectedTo]);
 
-    // 1inch unit quote (for chains that support it)
+    // 1inch unit quote (only fetch when 1inch router is selected)
     const { data: oneInchUnitQuote, isLoading: isOneInchUnitQuoteLoading } = use1inchQuoteOnly({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtToken,
         amount: unitQuoteAmount,
-        enabled: oneInchAvailable && !!selectedTo && isOpen,
+        enabled: oneInchAvailable && swapRouter === "1inch" && !!selectedTo && isOpen,
     });
 
-    // Pendle unit quote (for Pendle-only chains like Plasma)
+    // Pendle unit quote (only fetch when Pendle router is selected)
     const { data: pendleUnitQuote, isLoading: isPendleUnitQuoteLoading } = usePendleConvert({
         chainId,
         receiver: pendleAdapter?.address as Address,
@@ -175,10 +181,10 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         tokensOut: debtToken,
         amountsIn: unitQuoteAmount,
         slippage: 0.03, // 3% for unit quote
-        enabled: !oneInchAvailable && pendleAvailable && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
+        enabled: pendleAvailable && swapRouter === "pendle" && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
     });
 
-    const isUnitQuoteLoading = oneInchAvailable ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
+    const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required collateral based on debt to repay
     // We want to sell just enough collateral to get repayAmountRaw of debt token

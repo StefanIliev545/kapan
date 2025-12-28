@@ -15,7 +15,7 @@ import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveL
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { FlashLoanProvider, MorphoMarketContextForEncoding, encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken } from "~~/utils/chainFeatures";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -98,6 +98,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
     }
   }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+
+  // Auto-switch to Pendle when a PT token is involved
+  useEffect(() => {
+    const collateralIsPT = collateral && isPendleToken(collateral.symbol);
+    const debtIsPT = debt && isPendleToken(debt.symbol);
+    if ((collateralIsPT || debtIsPT) && pendleAvailable) {
+      setSwapRouter("pendle");
+    }
+  }, [collateral, debt, pendleAvailable]);
   
   // Zap mode: deposit debt token instead of collateral (e.g., USDe → PT-USDe)
   const [zapMode, setZapMode] = useState(false);
