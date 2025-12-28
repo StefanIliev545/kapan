@@ -757,7 +757,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       <div className="mt-auto pt-4 flex flex-col gap-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <button
-                            className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary transition-all duration-200"
+                            className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary transition-all duration-200"
                             onClick={handleAddSupply}
                           >
                             <FiPlus className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
@@ -767,7 +767,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                           {/* Disable looping for Compound - needs fix for market context */}
                           {!loopingDisabled && (
                             <button
-                              className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200"
+                              className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                               onClick={handleOpenMultiply}
                               disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
                               title={
@@ -801,7 +801,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         {/* Disable looping for Compound - needs fix for market context */}
                         {!protocolName.toLowerCase().includes("compound") && (
                           <button
-                            className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
+                            className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={handleOpenMultiply}
                             disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
                             title={
@@ -863,7 +863,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                       <div className="mt-auto pt-4">
                         <button
                           className={`group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed transition-all duration-200 ${filteredSuppliedPositions.length > 0
-                            ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/50 hover:text-primary"
+                            ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary"
                             : "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed"
                             }`}
                           onClick={handleAddBorrow}
