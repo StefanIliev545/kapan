@@ -556,6 +556,7 @@ export const useKapanRouterV2 = () => {
     debtDecimals?: number;
     flashLoanProvider?: FlashLoanProvider;
     market?: Address;
+    morphoContext?: string;  // Pre-encoded Morpho market context (from encodeMorphoContext)
     includeRefundPush?: boolean;
     swapRouter?: "oneinch" | "pendle";
     // Zap mode: deposit debt token and swap everything (deposit + flash loan) to collateral
@@ -586,6 +587,7 @@ export const useKapanRouterV2 = () => {
       debtDecimals = 18,
       flashLoanProvider = FlashLoanProvider.BalancerV2,
       market,
+      morphoContext,
       includeRefundPush = true,
       swapRouter = "oneinch",
       zapMode = false,
@@ -594,8 +596,11 @@ export const useKapanRouterV2 = () => {
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const isCompound = normalizedProtocol === "compound";
-    const context = isCompound && market ? encodeCompoundMarket(market) : "0x";
-    const depositOp = isCompound ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const isMorpho = normalizedProtocol === "morpho-blue";
+    // Use pre-encoded Morpho context if provided, otherwise Compound market encoding, otherwise empty
+    const context = isMorpho && morphoContext ? morphoContext : (isCompound && market ? encodeCompoundMarket(market) : "0x");
+    // Morpho and Compound use DepositCollateral, others use Deposit
+    const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     const initialCollateralAmount = parseUnits(initialCollateral, collateralDecimals);
     const flashAmount = parseUnits(flashLoanAmount, debtDecimals);

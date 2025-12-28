@@ -13,7 +13,7 @@ import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveLtv";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
-import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import { FlashLoanProvider, MorphoMarketContextForEncoding, encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported } from "~~/utils/chainFeatures";
 
@@ -25,11 +25,13 @@ interface MultiplyEvmModalProps {
   collaterals: SwapAsset[];  // Should be pre-filtered by caller if needed (e.g., E-Mode compatible)
   debtOptions: SwapAsset[];  // Should be pre-filtered by caller if needed
   market?: Address;
+  morphoContext?: MorphoMarketContextForEncoding;  // Optional Morpho market context for preselected markets
   maxLtvBps?: bigint;
   lltvBps?: bigint;
   supplyApyMap?: Record<string, number>; // address -> APY %
   borrowApyMap?: Record<string, number>; // address -> APY %
   eMode?: EModeCategory | null;  // Optional E-Mode for LTV/liquidation threshold override
+  disableAssetSelection?: boolean;  // If true, disable collateral/debt dropdowns (e.g., for Morpho preselected markets)
 }
 
 // No additional safety buffer - the protocol's LTV vs liquidation threshold gap is sufficient
@@ -68,8 +70,8 @@ const calculateFlashLoanAmount = (
 };
 
 export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
-  isOpen, onClose, protocolName, chainId, collaterals, debtOptions, market,
-  maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = {}, borrowApyMap = {}, eMode,
+  isOpen, onClose, protocolName, chainId, collaterals, debtOptions, market, morphoContext,
+  maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = {}, borrowApyMap = {}, eMode, disableAssetSelection = false,
 }) => {
   const wasOpenRef = useRef(false);
   const [collateral, setCollateral] = useState<SwapAsset | undefined>(collaterals[0]);
@@ -399,6 +401,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       minCollateralOut: minOut, swapData,
       collateralDecimals: collateral.decimals, debtDecimals: debt.decimals,
       flashLoanProvider: selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2, market,
+      morphoContext: morphoContext ? encodeMorphoContext(morphoContext) : undefined,
       swapRouter: (swapRouter === "1inch" ? "oneinch" : "pendle") as "oneinch" | "pendle",
       zapMode,
       depositAmount: zapMode ? marginAmount : undefined, // In zap mode, margin is the deposit amount
@@ -514,8 +517,139 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 />
                 {/* In zap mode, show debt token selector (deposit = debt); otherwise show collateral selector */}
                 {zapMode ? (
+                  disableAssetSelection ? (
+                    <div className="flex items-center gap-1.5 bg-primary/10 rounded-lg px-2 py-1">
+                      {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
+                      <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                    </div>
+                  ) : (
+                    <div className="dropdown dropdown-end">
+                      <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                        {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
+                        <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                        <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </label>
+                      <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                        {debtWithWalletBalance.map(d => {
+                          const bal = Number(formatUnits(d.walletBalance, d.decimals));
+                          return (
+                            <li key={d.address}>
+                              <a onClick={() => setDebt(d)} className={`flex items-center justify-between text-sm ${debt?.address === d.address ? "active" : ""}`}>
+                                <div className="flex items-center gap-2">
+                                  <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
+                                  {d.symbol}
+                                </div>
+                                <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )
+                ) : (
+                  disableAssetSelection ? (
+                    <div className="flex items-center gap-1.5 bg-primary/10 rounded-lg px-2 py-1">
+                      {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
+                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                    </div>
+                  ) : (
+                    <div className="dropdown dropdown-end">
+                      <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                        {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
+                        <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                        <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </label>
+                      <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                        {collateralsWithWalletBalance.map(c => {
+                          const bal = Number(formatUnits(c.walletBalance, c.decimals));
+                          return (
+                            <li key={c.address}>
+                              <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
+                                <div className="flex items-center gap-2">
+                                  <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
+                                  {c.symbol}
+                                </div>
+                                <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )
+                )}
+              </div>
+              {/* In zap mode, show collateral selector and swap arrow */}
+              {zapMode && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                  <div className="flex items-center gap-1.5 text-xs text-base-content/60">
+                    <span>↓ swap to</span>
+                  </div>
+                  {disableAssetSelection ? (
+                    <div className="flex items-center gap-1.5 bg-success/10 rounded-lg px-2 py-1">
+                      {collateral && <Image src={collateral.icon} alt="" width={14} height={14} className="rounded-full" />}
+                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                    </div>
+                  ) : (
+                    <div className="dropdown dropdown-end">
+                      <label tabIndex={0} className="btn btn-xs gap-1.5 bg-success/10 border-0 hover:bg-success/20 rounded-lg px-2">
+                        {collateral && <Image src={collateral.icon} alt="" width={14} height={14} className="rounded-full" />}
+                        <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                        <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </label>
+                      <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                        {collateralsWithWalletBalance.map(c => {
+                          const bal = Number(formatUnits(c.walletBalance, c.decimals));
+                          return (
+                            <li key={c.address}>
+                              <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
+                                <div className="flex items-center gap-2">
+                                  <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
+                                  {c.symbol}
+                                </div>
+                                <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Show total after leverage inline */}
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                <span className="text-xs text-base-content/50">≈ ${marginUsd.toFixed(2)}</span>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-base-content/40">→</span>
+                  <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)} {collateral?.symbol}</span>
+                  <span className="text-base-content/50">(${metrics.totalCollateralUsd.toFixed(2)})</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Borrow */}
+            <div className="bg-base-200/40 rounded-xl p-4 border border-base-300/20">
+              <div className="text-sm text-base-content/60 mb-2">Borrow</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 text-xl font-medium text-error truncate">
+                  {shortAmount > 0 ? shortAmount.toFixed(4) : "0"}
+                </div>
+                {disableAssetSelection ? (
+                  <div className="flex items-center gap-1.5 bg-base-300/30 rounded-lg px-2 py-1">
+                    {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
+                    <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                  </div>
+                ) : (
                   <div className="dropdown dropdown-end">
-                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-base-300/30 border-0 hover:bg-base-300/50 rounded-lg px-2 cursor-pointer">
                       {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
                       <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
                       <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -539,110 +673,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                       })}
                     </ul>
                   </div>
-                ) : (
-                  <div className="dropdown dropdown-end">
-                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
-                      {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
-                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
-                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </label>
-                    <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
-                      {collateralsWithWalletBalance.map(c => {
-                        const bal = Number(formatUnits(c.walletBalance, c.decimals));
-                        return (
-                          <li key={c.address}>
-                            <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
-                              <div className="flex items-center gap-2">
-                                <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
-                                {c.symbol}
-                              </div>
-                              <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
                 )}
-              </div>
-              {/* In zap mode, show collateral selector and swap arrow */}
-              {zapMode && (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
-                  <div className="flex items-center gap-1.5 text-xs text-base-content/60">
-                    <span>↓ swap to</span>
-                  </div>
-                  <div className="dropdown dropdown-end">
-                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-success/10 border-0 hover:bg-success/20 rounded-lg px-2">
-                      {collateral && <Image src={collateral.icon} alt="" width={14} height={14} className="rounded-full" />}
-                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
-                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </label>
-                    <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
-                      {collateralsWithWalletBalance.map(c => {
-                        const bal = Number(formatUnits(c.walletBalance, c.decimals));
-                        return (
-                          <li key={c.address}>
-                            <a onClick={() => setCollateral(c)} className={`flex items-center justify-between text-sm ${collateral?.address === c.address ? "active" : ""}`}>
-                              <div className="flex items-center gap-2">
-                                <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
-                                {c.symbol}
-                              </div>
-                              <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </div>
-              )}
-              {/* Show total after leverage inline */}
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
-                <span className="text-xs text-base-content/50">≈ ${marginUsd.toFixed(2)}</span>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-base-content/40">→</span>
-                  <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)} {collateral?.symbol}</span>
-                  <span className="text-base-content/50">(${metrics.totalCollateralUsd.toFixed(2)})</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Borrow */}
-            <div className="bg-base-200/40 rounded-xl p-4 border border-base-300/20">
-              <div className="text-sm text-base-content/60 mb-2">Borrow</div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 text-xl font-medium text-error truncate">
-                  {shortAmount > 0 ? shortAmount.toFixed(4) : "0"}
-                </div>
-                <div className="dropdown dropdown-end">
-                  <label tabIndex={0} className="btn btn-xs gap-1.5 bg-base-300/30 border-0 hover:bg-base-300/50 rounded-lg px-2 cursor-pointer">
-                    {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
-                    <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
-                    <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </label>
-                  <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
-                    {debtWithWalletBalance.map(d => {
-                      const bal = Number(formatUnits(d.walletBalance, d.decimals));
-                      return (
-                        <li key={d.address}>
-                          <a onClick={() => setDebt(d)} className={`flex items-center justify-between text-sm ${debt?.address === d.address ? "active" : ""}`}>
-                            <div className="flex items-center gap-2">
-                              <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
-                              {d.symbol}
-                            </div>
-                            <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
               </div>
               <div className="text-xs text-base-content/50 mt-2 pt-2 border-t border-base-300/30">≈ ${metrics.debtUsd.toFixed(2)}</div>
             </div>

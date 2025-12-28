@@ -9,6 +9,10 @@ import { PositionManager } from "~~/utils/position";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
 import { encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
+import { getMorphoMarketUrl } from "~~/utils/morpho";
+import { ExternalLink } from "lucide-react";
+import { isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
+import { calculateNetYieldMetrics } from "~~/utils/netYield";
 
 interface MorphoPositionsSectionProps {
   title: string;
@@ -20,6 +24,10 @@ interface MorphoPositionsSectionProps {
   chainId: number;
   onBorrowRequest?: (params: { market: MorphoMarket; collateralAddress: string }) => void;
   onDepositRequest?: () => void;
+  /** PT yield lookup by address (lowercase) */
+  yieldsByAddress?: Map<string, PTYield>;
+  /** PT yield lookup by symbol (lowercase) */
+  yieldsBySymbol?: Map<string, PTYield>;
 }
 
 export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
@@ -32,6 +40,8 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   chainId,
   onBorrowRequest: _onBorrowRequest,
   onDepositRequest: _onDepositRequest,
+  yieldsByAddress,
+  yieldsBySymbol,
 }) => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
@@ -69,14 +79,23 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       const protocolContext = encodeMorphoContext(row.context);
 
       // Create supply position with encoded context
-      // Note: Collateral in Morpho doesn't earn yield (0% APY)
-      // The supplyApy is for lending the loan asset, not for collateral
+      // Note: Collateral in Morpho doesn't earn yield (0% APY) UNLESS it's a PT token
+      // PT tokens have a fixed yield to maturity from Pendle
+      let collateralRate = 0;
+      if (isPTToken(row.collateralSymbol)) {
+        const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
+        const ptYield = yieldsByAddress?.get(collateralAddr) || yieldsBySymbol?.get(row.collateralSymbol.toLowerCase());
+        if (ptYield) {
+          collateralRate = ptYield.fixedApy;
+        }
+      }
+      
       const supplyPosition = {
         icon: tokenNameToLogo(row.collateralSymbol.toLowerCase()),
         name: row.collateralSymbol,
         balance: row.collateralBalanceUsd,
         tokenBalance: row.collateralBalance,
-        currentRate: 0, // Collateral doesn't earn yield in Morpho
+        currentRate: collateralRate,
         tokenAddress: row.market.collateralAsset?.address || "",
         tokenDecimals: row.collateralDecimals,
         tokenPrice: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
@@ -108,6 +127,23 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
       const ltvDisplayValue =
         row.currentLtv != null ? `${formatPercentage(row.currentLtv, 1)}%` : "--";
+
+      // Calculate per-position net APY and 30D yield
+      const positionYieldMetrics = calculateNetYieldMetrics(
+        [{ balance: row.collateralBalanceUsd, currentRate: collateralRate }],
+        row.hasDebt ? [{ balance: row.borrowBalanceUsd, currentRate: row.borrowApy }] : []
+      );
+
+      const formatSignedPercentage = (val: number) => {
+        const sign = val >= 0 ? "+" : "";
+        return `${sign}${val.toFixed(2)}%`;
+      };
+
+      const formatCurrency = (value: number) => {
+        if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+        if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
+        return `$${value.toFixed(2)}`;
+      };
 
       const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
@@ -144,12 +180,54 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
               <span className="text-sm font-medium">
                 {row.collateralSymbol}/{row.loanSymbol}
               </span>
+              {(() => {
+                const morphoUrl = getMorphoMarketUrl(
+                  chainId,
+                  row.market.uniqueKey,
+                  row.collateralSymbol,
+                  row.loanSymbol
+                );
+                return morphoUrl ? (
+                  <a
+                    href={morphoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-0.5 opacity-50 hover:opacity-100 transition-opacity ml-1"
+                    title="View on Morpho"
+                  >
+                    <Image
+                      src="/logos/morpho.svg"
+                      alt="Morpho"
+                      width={14}
+                      height={14}
+                      className="rounded-sm"
+                    />
+                    <ExternalLink width={10} height={10} />
+                  </a>
+                ) : null;
+              })()}
             </div>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-4 text-xs">
+              {/* Net APY */}
+              <span className="text-base-content/60">
+                Net APY:{" "}
+                <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? "text-success" : "text-error"}>
+                  {positionYieldMetrics.netApyPercent != null ? formatSignedPercentage(positionYieldMetrics.netApyPercent) : "—"}
+                </span>
+              </span>
+              {/* 30D Yield */}
+              <span className="hidden sm:inline text-base-content/60">
+                30D:{" "}
+                <span className={positionYieldMetrics.netYield30d >= 0 ? "text-success" : "text-error"}>
+                  {formatCurrency(positionYieldMetrics.netYield30d)}
+                </span>
+              </span>
+              {/* LTV */}
               {row.hasDebt && (
                 <span className="text-base-content/60">
                   LTV: <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? "text-error" : "text-success"}>{ltvDisplayValue}</span>
-                  <span className="text-base-content/50 ml-2">
+                  <span className="text-base-content/50 ml-1">
                     / {row.lltv.toFixed(0)}%
                   </span>
                 </span>
@@ -184,11 +262,21 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                 chainId={chainId}
                 position={positionManager}
                 containerClassName="rounded-none"
+                availableAssets={[{
+                  // Morpho markets are pair-isolated: single collateral per market
+                  symbol: row.collateralSymbol,
+                  address: row.market.collateralAsset?.address || "",
+                  decimals: row.collateralDecimals,
+                  rawBalance: row.collateralBalance,
+                  balance: row.collateralBalanceUsd,
+                  icon: tokenNameToLogo(row.collateralSymbol.toLowerCase()),
+                  price: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
+                }]}
                 availableActions={{
                   borrow: true,
                   repay: row.hasDebt, // Only show repay if there's actual debt
                   move: false,
-                  close: false,
+                  close: row.hasDebt && row.hasCollateral, // Enable close when has both debt and collateral
                   swap: false,
                 }}
                 showNoDebtLabel={!row.hasDebt}

@@ -24,7 +24,7 @@
  * 4. Allow users to supply, borrow, repay, and migrate debt between protocols
  */
 
-import { FC, useEffect, useMemo } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { SupplyPositionProps } from "../../SupplyPosition";
 import { VenusMarketEntry } from "./VenusMarketEntry";
@@ -138,6 +138,23 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     args: [vTokenAddresses, connectedAddress],
     chainId: chainId as any,
   });
+
+  // Track whether we've loaded data at least once
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  
+  // Reset hasLoadedOnce when chainId changes
+  useEffect(() => {
+    setHasLoadedOnce(false);
+  }, [chainId]);
+
+  useEffect(() => {
+    const isLoading = isLoadingVTokens || isLoadingMarketDetails || isLoadingRates || 
+                     (connectedAddress && (isLoadingBalances || isLoadingCollateral));
+    if (!isLoading && !hasLoadedOnce && vTokenAddresses && marketDetails && ratesData) {
+      setHasLoadedOnce(true);
+    }
+  }, [isLoadingVTokens, isLoadingMarketDetails, isLoadingRates, isLoadingBalances, isLoadingCollateral, 
+      connectedAddress, hasLoadedOnce, vTokenAddresses, marketDetails, ratesData]);
 
   // Combine all the data to create supply and borrow positions
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
@@ -288,6 +305,7 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     ratesData,
     setProtocolTotals,
     vTokenAddresses,
+    chainId,
   ]);
 
   const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
@@ -304,6 +322,8 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
       networkType="evm"
       chainId={chainId}
       enabledFeatures={enabledFeatures}
+      autoExpandOnPositions
+      hasLoadedOnce={hasLoadedOnce}
     />
   );
 };

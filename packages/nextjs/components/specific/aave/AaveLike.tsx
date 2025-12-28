@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { ProtocolPosition } from "../../ProtocolView";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
@@ -15,6 +15,7 @@ interface AaveLikeProps {
     suppliedPositions: ProtocolPosition[];
     borrowedPositions: ProtocolPosition[];
     forceShowAll: boolean;
+    hasLoadedOnce: boolean;
   }) => React.ReactNode;
 }
 
@@ -45,6 +46,14 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
   // Helper: Convert Aave RAY (1e27) rates to APY percentage.
   const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 
+  // Track whether we've loaded data at least once
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  // Reset hasLoadedOnce when chainId changes
+  useEffect(() => {
+    setHasLoadedOnce(false);
+  }, [chainId]);
+
   // Get all token info, including supply and borrow balances, using query address
   const { data: allTokensInfo } = useNetworkAwareReadContract({
     networkType: "evm",
@@ -53,6 +62,13 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
     args: [queryAddress],
     chainId,
   });
+
+  // Track first successful load (when data becomes available)
+  useEffect(() => {
+    if (allTokensInfo && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [allTokensInfo, hasLoadedOnce]);
 
   // Aggregate positions by iterating over the returned tokens.
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
@@ -133,8 +149,8 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
 
     const protoName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : "Aave";
     setProtocolTotals(protoName, totalSupplied, totalBorrowed);
-  }, [allTokensInfo, contractName, filteredBorrowedPositions, filteredSuppliedPositions, setProtocolTotals]);
+  }, [allTokensInfo, contractName, filteredBorrowedPositions, filteredSuppliedPositions, setProtocolTotals, chainId]);
 
-  return <>{children({ suppliedPositions: filteredSuppliedPositions, borrowedPositions: filteredBorrowedPositions, forceShowAll })}</>;
+  return <>{children({ suppliedPositions: filteredSuppliedPositions, borrowedPositions: filteredBorrowedPositions, forceShowAll, hasLoadedOnce })}</>;
 };
 

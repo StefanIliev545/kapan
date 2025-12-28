@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { formatUnits } from "viem";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
@@ -134,11 +134,26 @@ export const useNostraLendingPositions = () => {
   }, [assets, positionMap, rateMap, priceMap, decimalsMap]);
 
   const isLoading = isLoadingAssets || userPositionsQuery.isLoading;
+  
+  // Track whether we've loaded data at least once
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  
+  // Reset on address change
+  useEffect(() => {
+    setHasLoadedOnce(false);
+  }, [viewingAddress]);
+
+  useEffect(() => {
+    if (!isLoading && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [isLoading, hasLoadedOnce]);
 
   return {
     suppliedPositions,
     borrowedPositions,
     isLoading,
+    hasLoadedOnce,
   };
 };
 

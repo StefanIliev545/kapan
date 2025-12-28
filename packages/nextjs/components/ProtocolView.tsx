@@ -75,6 +75,12 @@ interface ProtocolViewProps {
   disableMarkets?: boolean;
   inlineMarkets?: boolean;
   disableLoop?: boolean;
+  /** If true, start collapsed and auto-expand when positions are found */
+  autoExpandOnPositions?: boolean;
+  /** Whether initial data load has completed */
+  hasLoadedOnce?: boolean;
+  /** Optional element to render in the header (e.g., E-Mode toggle) */
+  headerElement?: React.ReactNode;
 }
 
 // Health status indicator component that shows utilization percentage
@@ -127,6 +133,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   disableMarkets = false,
   inlineMarkets = false,
   disableLoop = false,
+  autoExpandOnPositions = false,
+  hasLoadedOnce = true,
+  headerElement,
 }) => {
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -140,7 +149,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [selectedClosePosition, setSelectedClosePosition] = useState<ProtocolPosition | null>(null);
   const [isDebtSwapModalOpen, setIsDebtSwapModalOpen] = useState(false);
   const [selectedDebtSwapPosition, setSelectedDebtSwapPosition] = useState<ProtocolPosition | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Start collapsed if autoExpandOnPositions is enabled
+  const [isCollapsed, setIsCollapsed] = useState(autoExpandOnPositions);
+
+  // Reset collapsed state when chainId changes (network switch)
+  useEffect(() => {
+    if (autoExpandOnPositions) {
+      setIsCollapsed(true); // Reset to collapsed, will expand when positions load
+    }
+  }, [chainId, autoExpandOnPositions]);
 
   const handleSwap = (position: ProtocolPosition) => {
     if (readOnly) return;
@@ -164,6 +181,25 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
   // Fetch PT token yields from Pendle
   const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(chainId);
+
+  // Determine if user has any positions with balance
+  const hasPositions = useMemo(() => {
+    const hasSupply = suppliedPositions.some(p => p.balance > 0);
+    const hasBorrow = borrowedPositions.some(p => p.balance < 0 || (p.collateralValue ?? 0) > 0);
+    return hasSupply || hasBorrow;
+  }, [suppliedPositions, borrowedPositions]);
+
+  // Auto-expand when positions are found (Option B: start collapsed, expand on positions)
+  useEffect(() => {
+    if (!autoExpandOnPositions) return;
+    if (!hasLoadedOnce) return; // Wait for initial load to complete
+    
+    if (hasPositions) {
+      setIsCollapsed(false); // Expand when positions exist
+    } else {
+      setIsCollapsed(true); // Stay/become collapsed when no positions
+    }
+  }, [autoExpandOnPositions, hasLoadedOnce, hasPositions]);
   
 
   // Helper to filter assets by E-Mode compatibility (heuristic based on label)
@@ -553,6 +589,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               )}
             </div>
 
+            {/* Header Element (e.g., E-Mode toggle) - hidden on mobile, shown in separate row */}
+            {headerElement && (
+              <div 
+                className="hidden md:flex items-center"
+                onClick={e => e.stopPropagation()}
+              >
+                {headerElement}
+              </div>
+            )}
+
             {/* Markets Toggle + Collapse */}
             <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
               {!forceShowAll && !disableMarkets && (
@@ -573,6 +619,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               />
             </div>
           </div>
+
+          {/* Header Element - Mobile row (shown below stats on small screens) */}
+          {headerElement && (
+            <div 
+              className="md:hidden flex items-center justify-start pt-2 mt-2 border-t border-base-300/30"
+              onClick={e => e.stopPropagation()}
+            >
+              {headerElement}
+            </div>
+          )}
         </div>
       </div>
 

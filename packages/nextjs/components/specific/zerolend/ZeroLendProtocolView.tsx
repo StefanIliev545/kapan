@@ -25,7 +25,7 @@ export const ZeroLendProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
 
   return (
     <AaveLike chainId={chainId} contractName="ZeroLendGatewayView">
-      {({ suppliedPositions, borrowedPositions, forceShowAll }) => (
+      {({ suppliedPositions, borrowedPositions, forceShowAll, hasLoadedOnce }) => (
         <ProtocolView
           protocolName="ZeroLend"
           protocolIcon="/logos/zerolend.svg"
@@ -37,6 +37,8 @@ export const ZeroLendProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
           forceShowAll={forceShowAll}
           networkType="evm"
           chainId={chainId}
+          autoExpandOnPositions
+          hasLoadedOnce={hasLoadedOnce}
         />
       )}
     </AaveLike>

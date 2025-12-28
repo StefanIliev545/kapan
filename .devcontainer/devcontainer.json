@@ -7,6 +7,7 @@
 		"dockerfile": "Dockerfile"
 	},
 	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/node:1": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installWget": true,
@@ -20,6 +21,10 @@
 		3000
 	],
 	"mounts": [
+		// 1. Keep OpenCode Config (Settings/API keys)
+		"source=opencode-config,target=/home/node/.config/opencode,type=volume",
+		// 2. Keep OpenCode History (Past chats/sessions)
+		"source=opencode-data,target=/home/node/.local/share/opencode,type=volume",
 		// Persist VS Code server extensions between rebuilds
 		"source=vscode-extensions,target=/home/node/.vscode-server/extensions,type=volume",
 		// Persist VS Code server user data (includes globalStorage/secret storage used by extensions)
@@ -38,9 +43,7 @@
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc"
-	// Configure tool-specific properties.
-	// "customizations": {},
+	"postCreateCommand": "sudo chown -R node:node /home/node/.local/share/opencode /home/node/.config/opencode && curl -fsSL https://opencode.ai/install | bash && echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc && echo 'OpenCode Installed ✅'"
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }

@@ -200,13 +200,13 @@ const App: NextPage = () => {
           {selectedNetwork === "base" && (
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={base.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={base.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />

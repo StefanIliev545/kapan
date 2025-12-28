@@ -13,6 +13,8 @@ import { MorphoPositionsSection } from "./MorphoPositionsSection";
 import { MorphoMarketsSection } from "./MorphoMarketsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
+import { useGlobalState } from "~~/services/store/store";
+import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
 
 // Health status indicator component matching ProtocolView
 const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
@@ -55,7 +57,14 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const effectiveChainId = getEffectiveChainId(chainId);
 
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Start collapsed, will auto-expand when positions are found
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  // Reset collapsed state when chainId changes (network switch)
+  useEffect(() => {
+    setIsCollapsed(true);
+    setIsMarketsOpen(false);
+  }, [effectiveChainId]);
 
   const {
     markets,
@@ -67,6 +76,9 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   } = useMorphoLendingPositions(effectiveChainId, connectedAddress);
 
   const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
+
+  // Fetch PT yields from Pendle for fixed APY display
+  const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(effectiveChainId);
 
   // Extract markets where user has positions for fast refresh
   const marketsWithPositions = useMemo(() => {
@@ -120,12 +132,23 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     }
 
     // Build position arrays for the yield calculation utility
-    // Note: Collateral in Morpho doesn't earn yield (0% APY)
-    // The supplyApy is for lending the loan asset, not for collateral
-    const suppliedPositions = rows.map((row) => ({
-      balance: row.collateralBalanceUsd,
-      currentRate: 0, // Collateral doesn't earn yield in Morpho
-    }));
+    // Note: Collateral in Morpho doesn't earn yield (0% APY) UNLESS it's a PT token
+    // PT tokens have a fixed yield to maturity from Pendle
+    const suppliedPositions = rows.map((row) => {
+      // Check if collateral is a PT token and get its fixed yield
+      let currentRate = 0;
+      if (isPTToken(row.collateralSymbol)) {
+        const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
+        const ptYield = yieldsByAddress.get(collateralAddr) || yieldsBySymbol.get(row.collateralSymbol.toLowerCase());
+        if (ptYield) {
+          currentRate = ptYield.fixedApy;
+        }
+      }
+      return {
+        balance: row.collateralBalanceUsd,
+        currentRate,
+      };
+    });
 
     const borrowedPositions = rows
       .filter((row) => row.hasDebt)
@@ -148,7 +171,19 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
       netApyPercent: yieldMetrics.netApyPercent,
       avgUtilization,
     };
-  }, [rows]);
+  }, [rows, yieldsByAddress, yieldsBySymbol]);
+
+  // Report totals to global state for dashboard metrics
+  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  useEffect(() => {
+    if (!hasLoadedOnce) return;
+
+    const totalSupplied = rows.reduce((sum, row) => sum + row.collateralBalanceUsd, 0);
+    const totalBorrowed = rows.reduce((sum, row) => sum + row.borrowBalanceUsd, 0);
+
+    setProtocolTotals("Morpho", totalSupplied, totalBorrowed);
+  }, [hasLoadedOnce, rows, setProtocolTotals, effectiveChainId]);
 
   const formatCurrency = (value: number) => {
     if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
@@ -162,6 +197,17 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   };
 
   const hasPositions = rows.length > 0;
+
+  // Auto-expand when positions are found, stay collapsed when empty
+  useEffect(() => {
+    if (!hasLoadedOnce) return; // Wait for initial load to complete
+    
+    if (hasPositions) {
+      setIsCollapsed(false); // Expand when positions exist
+    } else {
+      setIsCollapsed(true); // Stay collapsed when no positions
+    }
+  }, [hasLoadedOnce, hasPositions]);
 
   return (
     <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
@@ -279,6 +325,8 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
               isUpdating={isUpdating}
               chainId={chainId}
+              yieldsByAddress={yieldsByAddress}
+              yieldsBySymbol={yieldsBySymbol}
             />
           </div>
         </div>

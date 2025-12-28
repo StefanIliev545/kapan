@@ -4,6 +4,8 @@ import { formatUnits, parseUnits, Address } from "viem";
 import { FiCheck, FiAlertTriangle, FiArrowDown, FiInfo, FiSettings } from "react-icons/fi";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import { FlashLoanProviderOption } from "~~/hooks/useMovePositionData";
+import { SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
+import { getPriceImpactSeverity, getPriceImpactColorClass, formatPriceImpact } from "~~/utils/slippage";
 
 // Shared asset type
 export interface SwapAsset {
@@ -95,6 +97,9 @@ export interface SwapModalShellProps {
     // Swap router selection (optional - for choosing between 1inch/Pendle)
     swapRouter?: SwapRouter;
     setSwapRouter?: (router: SwapRouter) => void;
+
+    // Price impact (optional - for display in default stats)
+    priceImpact?: number | null;
 }
 
 export const SwapModalShell: FC<SwapModalShellProps> = ({
@@ -138,6 +143,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     hideDefaultStats = false,
     swapRouter,
     setSwapRouter,
+    priceImpact,
 }) => {
     const [activeTab, setActiveTab] = useState<"swap" | "info">("swap");
 
@@ -403,7 +409,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
                         {/* Stats Grid */}
                         {customStats ? customStats : !hideDefaultStats && (
-                            <div className="grid grid-cols-2 gap-4 text-center bg-base-200/50 p-3 rounded">
+                            <div className={`grid ${priceImpact !== undefined ? "grid-cols-3" : "grid-cols-2"} gap-4 text-center bg-base-200/50 p-3 rounded`}>
                                 <div className="flex flex-col items-center">
                                     <div className="text-xs text-base-content/70 flex items-center gap-1">
                                         Slippage
@@ -412,7 +418,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                                 <FiSettings className="w-3 h-3" />
                                             </label>
                                             <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                                {[0.1, 0.5, 1, 3].map((s) => (
+                                                {SLIPPAGE_OPTIONS.map((s) => (
                                                     <li key={s}>
                                                         <a
                                                             className={slippage === s ? "active" : ""}
@@ -427,6 +433,14 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                     </div>
                                     <div className="font-medium text-sm">{slippage}%</div>
                                 </div>
+                                {priceImpact !== undefined && (
+                                    <div>
+                                        <div className="text-xs text-base-content/70">Price Impact</div>
+                                        <div className={`font-medium text-sm ${getPriceImpactColorClass(getPriceImpactSeverity(priceImpact))}`}>
+                                            {formatPriceImpact(priceImpact)}
+                                        </div>
+                                    </div>
+                                )}
                                 <div>
                                     <div className="text-xs text-base-content/70">Min Output</div>
                                     <div className="font-medium text-sm">

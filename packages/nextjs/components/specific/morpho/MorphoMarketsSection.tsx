@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import type { FC } from "react";
-import { createPortal } from "react-dom";
+import Image from "next/image";
 import {
   Avatar,
   Badge,
@@ -21,15 +22,20 @@ import {
   TextField,
   Tooltip,
 } from "@radix-ui/themes";
-import { Search, X, ArrowDown, ArrowUp, ChevronDown } from "lucide-react";
+import { Search, X, ArrowDown, ArrowUp, ChevronDown, ExternalLink } from "lucide-react";
 
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
+import { encodeMorphoContext, MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
+import { getMorphoMarketUrl } from "~~/utils/morpho";
 import { useModal } from "~~/hooks/useModal";
 import { DepositModal } from "~~/components/modals/DepositModal";
+import { MultiplyEvmModal } from "~~/components/modals/MultiplyEvmModal";
+import { SwapAsset } from "~~/components/modals/SwapModalShell";
 import { useAccount } from "wagmi";
 import { notification } from "~~/utils/scaffold-eth/notification";
+import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { parseUnits } from "viem";
 
 type SortKey = "liquidity" | "apy" | "utilization";
 type SortDirection = "desc" | "asc";
@@ -123,93 +129,137 @@ function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string
   );
 }
 
-// Searchable Select Component
+// Token category definitions for filter tabs
+type TokenCategory = "all" | "eth" | "btc" | "stables" | "pt";
+
+const TOKEN_CATEGORIES: Record<TokenCategory, { label: string; patterns: string[] }> = {
+  all: { label: "All", patterns: [] },
+  eth: { label: "Eth", patterns: ["eth", "weth", "steth", "wsteth", "cbeth", "reth", "weeth", "ezeth", "rseth", "meth", "oeth", "sweth", "sfrxeth", "frxeth", "eeth", "lseth", "bsdeth"] },
+  btc: { label: "Btc", patterns: ["btc", "wbtc", "cbbtc", "lbtc", "tbtc", "sbtc", "renbtc", "hbtc"] },
+  stables: { label: "Stables", patterns: ["usdc", "usdt", "dai", "usde", "frax", "lusd", "gusd", "tusd", "usdp", "susd", "mim", "eurc", "eur", "cusd", "pyusd", "gho", "dola", "usd", "aprusr", "cusdo"] },
+  pt: { label: "PT", patterns: ["pt-"] },
+};
+
+function matchesCategory(symbol: string, category: TokenCategory): boolean {
+  if (category === "all") return true;
+  const lowerSymbol = symbol.toLowerCase();
+  return TOKEN_CATEGORIES[category].patterns.some(pattern => lowerSymbol.includes(pattern));
+}
+
+// Token Icon component with fixed sizing
+function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
+  const src = tokenNameToLogo(symbol.toLowerCase());
+  return (
+    <div 
+      className="relative rounded-full overflow-hidden bg-base-300 flex-shrink-0"
+      style={{ width: size, height: size, minWidth: size, minHeight: size }}
+    >
+      <Image
+        src={src}
+        alt={symbol}
+        width={size}
+        height={size}
+        className="object-cover"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.style.display = 'none';
+        }}
+      />
+      <span 
+        className="absolute inset-0 flex items-center justify-center text-xs font-medium text-base-content/70"
+        style={{ fontSize: size * 0.4 }}
+      >
+        {symbol.slice(0, 2).toUpperCase()}
+      </span>
+    </div>
+  );
+}
+
+// Searchable Select Component with token icons and category tabs (uses portal to avoid clipping)
 interface SearchableSelectProps {
   options: string[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder: string;
   allLabel: string;
-  style?: React.CSSProperties;
 }
 
-function SearchableSelect({ options, value, onValueChange, placeholder, allLabel, style }: SearchableSelectProps) {
+function SearchableSelect({ options, value, onValueChange, placeholder, allLabel }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState("");
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [activeCategory, setActiveCategory] = React.useState<TokenCategory>("all");
+  const [position, setPosition] = React.useState<{ top: number; left: number } | null>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Filter options based on search term
-  const filteredOptions = React.useMemo(() => {
-    if (!searchTerm.trim()) return options;
-    const term = searchTerm.toLowerCase();
-    return options.filter(opt => opt.toLowerCase().includes(term));
-  }, [options, searchTerm]);
-
-  // Get display value
-  const displayValue = value === "all" ? allLabel : value;
-
-  // Calculate position for dropdown
-  const [position, setPosition] = React.useState<{ top: number; left: number; width: number } | null>(null);
-
+  // Calculate dropdown position
   const updatePosition = React.useCallback(() => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 4,
         left: rect.left,
-        width: rect.width,
       });
     }
   }, []);
 
+  // Update position when opening and on scroll/resize
   React.useEffect(() => {
     if (isOpen) {
       updatePosition();
-      
-      // Update position on scroll/resize
       window.addEventListener("scroll", updatePosition, true);
       window.addEventListener("resize", updatePosition);
-      
       return () => {
         window.removeEventListener("scroll", updatePosition, true);
         window.removeEventListener("resize", updatePosition);
       };
-    } else {
-      setPosition(null);
     }
   }, [isOpen, updatePosition]);
 
-  // Handle outside click
+  // Close dropdown on outside click
   React.useEffect(() => {
+    if (!isOpen) return;
+    
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
       if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
         setSearchTerm("");
+        setActiveCategory("all");
       }
     };
 
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
+
+  // Filter options based on search term and category
+  const filteredOptions = React.useMemo(() => {
+    let filtered = options;
+    
+    if (activeCategory !== "all") {
+      filtered = filtered.filter(opt => matchesCategory(opt, activeCategory));
+    }
+    
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(opt => opt.toLowerCase().includes(term));
+    }
+    
+    return filtered;
+  }, [options, searchTerm, activeCategory]);
+
+  // Get display value
+  const displayValue = value === "all" ? allLabel : value;
 
   // Focus input when opened
   React.useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => {
-        const input = dropdownRef.current?.querySelector('input[type="text"]') as HTMLInputElement;
-        if (input) {
-          input.focus();
-        }
-      }, 0);
-      return () => clearTimeout(timer);
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [isOpen]);
 
@@ -217,100 +267,154 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
     onValueChange(option);
     setIsOpen(false);
     setSearchTerm("");
+    setActiveCategory("all");
   };
 
-  return (
-    <Box style={{ position: "relative", ...style }} ref={containerRef}>
-      <Button
-        size="2"
-        variant="surface"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        style={{ minWidth: 140, justifyContent: "space-between" }}
-      >
-        <Text size="2" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {displayValue}
-        </Text>
-        <ChevronDown width="16" height="16" style={{ flexShrink: 0, marginLeft: 8 }} />
-      </Button>
+  const handleClear = () => {
+    onValueChange("all");
+    setSearchTerm("");
+    setActiveCategory("all");
+  };
 
-      {isOpen && position && typeof document !== "undefined" && createPortal(
-        <div
-          ref={dropdownRef}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "fixed",
-            top: position.top,
-            left: position.left,
-            width: position.width,
-            zIndex: 9999,
-            maxWidth: "90vw",
-          }}
-          className="bg-base-100 border border-base-300 rounded-xl shadow-2xl overflow-hidden"
-        >
-          <Box style={{ padding: 8, borderBottom: "1px solid var(--gray-6)" }}>
-            <TextField.Root
-              size="2"
-              variant="surface"
-              placeholder={`Search ${placeholder.toLowerCase()}...`}
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.currentTarget.value)}
+  // Dropdown content (rendered via portal)
+  const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
+    <div
+      ref={dropdownRef}
+      className="fixed z-[9999] bg-base-100 border border-base-300 rounded-xl shadow-2xl w-80"
+      style={{ top: position.top, left: position.left }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Search Input */}
+      <div className="p-3 border-b border-base-300">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={`Search for ${placeholder.toLowerCase()} asset`}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="input input-sm input-bordered w-full pl-9 pr-8 bg-base-200/50"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
             >
-              <TextField.Slot>
-                <Search width="14" height="14" />
-              </TextField.Slot>
-              {searchTerm ? (
-                <TextField.Slot side="right">
-                  <IconButton
-                    size="1"
-                    variant="ghost"
-                    aria-label="Clear search"
-                    onClick={() => setSearchTerm("")}
-                  >
-                    <X width="12" height="12" />
-                  </IconButton>
-                </TextField.Slot>
-              ) : null}
-            </TextField.Root>
-          </Box>
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
 
-          <ScrollArea style={{ maxHeight: 300 }}>
-            <Box style={{ padding: 4 }}>
-              <Button
-                size="2"
-                variant={value === "all" ? "solid" : "ghost"}
-                style={{ width: "100%", justifyContent: "flex-start" }}
-                onClick={() => handleSelect("all")}
-              >
-                {allLabel}
-              </Button>
-              {filteredOptions.length === 0 ? (
-                <Box style={{ padding: 12, textAlign: "center" }}>
-                  <Text size="2" color="gray">
-                    No matches found
-                  </Text>
-                </Box>
-              ) : (
-                filteredOptions.map(option => (
-                  <Button
-                    key={option}
-                    size="2"
-                    variant={value === option ? "solid" : "ghost"}
-                    style={{ width: "100%", justifyContent: "flex-start", marginTop: 2 }}
-                    onClick={() => handleSelect(option)}
-                  >
-                    {option}
-                  </Button>
-                ))
-              )}
-            </Box>
-          </ScrollArea>
-        </div>,
-        document.body
-      )}
-    </Box>
+      {/* Category Tabs */}
+      <div className="px-3 py-2 border-b border-base-300">
+        <div className="flex items-center gap-1 flex-wrap">
+          {(Object.keys(TOKEN_CATEGORIES) as TokenCategory[]).map(category => (
+            <button
+              key={category}
+              onClick={() => setActiveCategory(category)}
+              className={`btn btn-xs ${
+                activeCategory === category 
+                  ? 'btn-primary' 
+                  : 'btn-ghost'
+              }`}
+            >
+              {TOKEN_CATEGORIES[category].label}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <button
+            onClick={handleClear}
+            className="btn btn-xs btn-ghost text-base-content/60"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
+      {/* Options List */}
+      <div className="max-h-72 overflow-y-auto p-2">
+        {/* All Option */}
+        <button
+          onClick={() => handleSelect("all")}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+            value === "all" ? 'bg-primary/10' : 'hover:bg-base-200'
+          }`}
+        >
+          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+            value === "all" 
+              ? 'bg-primary border-primary' 
+              : 'border-base-content/30'
+          }`}>
+            {value === "all" && (
+              <svg className="w-2.5 h-2.5 text-primary-content" fill="none" viewBox="0 0 10 10">
+                <path d="M2 5L4 7L8 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </div>
+          <span className={`text-sm ${value === "all" ? 'font-medium' : ''}`}>
+            {allLabel}
+          </span>
+        </button>
+
+        {/* Token Options */}
+        {filteredOptions.length === 0 ? (
+          <div className="py-8 text-center text-sm text-base-content/50">
+            No matches found
+          </div>
+        ) : (
+          filteredOptions.map(option => (
+            <button
+              key={option}
+              onClick={() => handleSelect(option)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                value === option ? 'bg-primary/10' : 'hover:bg-base-200'
+              }`}
+            >
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                value === option 
+                  ? 'bg-primary border-primary' 
+                  : 'border-base-content/30'
+              }`}>
+                {value === option && (
+                  <svg className="w-2.5 h-2.5 text-primary-content" fill="none" viewBox="0 0 10 10">
+                    <path d="M2 5L4 7L8 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+              <TokenIcon symbol={option} size={24} />
+              <span className={`text-sm ${value === option ? 'font-medium' : ''}`}>
+                {option}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <>
+      {/* Trigger Button */}
+      <button
+        ref={triggerRef}
+        type="button"
+        className="btn btn-sm btn-ghost border border-base-300 hover:border-base-content/30 gap-2 min-w-[140px] justify-between font-normal"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-2 overflow-hidden">
+          {value !== "all" && <TokenIcon symbol={value} size={18} />}
+          <span className="truncate text-sm">{displayValue}</span>
+        </div>
+        <ChevronDown 
+          className={`w-4 h-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+        />
+      </button>
+
+      {/* Portal dropdown to body to avoid clipping */}
+      {typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
+    </>
   );
 }
 
@@ -333,7 +437,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const usd = React.useMemo(() => makeUsdFormatter(), []);
 
   const depositModal = useModal();
+  const loopModal = useModal();
   const [selectedMarket, setSelectedMarket] = React.useState<MorphoMarket | null>(null);
+  const [loopMarket, setLoopMarket] = React.useState<MorphoMarket | null>(null);
   const { address: walletAddress, chainId: walletChainId } = useAccount();
 
   // Extract unique collateral and debt assets from markets
@@ -481,6 +587,26 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     [onSupply, depositModal, walletAddress, walletChainId, chainId]
   );
 
+  const handleLoop = React.useCallback(
+    (m: MorphoMarket) => {
+      // Check if wallet is connected
+      if (!walletAddress) {
+        notification.error("Please connect your wallet to create a loop");
+        return;
+      }
+      
+      // Check if wallet is on the correct chain
+      if (walletChainId !== chainId) {
+        notification.error(`Please switch to chain ID ${chainId} to create a loop`);
+        return;
+      }
+      
+      setLoopMarket(m);
+      loopModal.open();
+    },
+    [loopModal, walletAddress, walletChainId, chainId]
+  );
+
   if (isLoading) {
     return (
       <Card size="2">
@@ -562,7 +688,6 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
               onValueChange={setSelectedCollateral}
               placeholder="Collateral"
               allLabel="All Collaterals"
-              style={{ minWidth: 140 }}
             />
 
             {/* Debt Asset Filter */}
@@ -572,7 +697,6 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
               onValueChange={setSelectedDebtAsset}
               placeholder="Debt Asset"
               allLabel="All Debt Assets"
-              style={{ minWidth: 140 }}
             />
 
             <Flex align="center" gap="2" wrap="wrap">
@@ -659,7 +783,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                       <Table.ColumnHeaderCell justify="end" width="110px">
                         Max LTV
                       </Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell justify="end" width="130px" />
+                      <Table.ColumnHeaderCell justify="end" width="180px" />
                     </Table.Row>
                   </Table.Header>
 
@@ -674,9 +798,39 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                               <TokenPairAvatars collateralSymbol={r.collateralSymbol} loanSymbol={r.loanSymbol} />
 
                               <Flex direction="column" gap="1" style={{ minWidth: 0 }}>
-                                <Text weight="medium" style={{ lineHeight: 1.1 }}>
-                                  {r.collateralSymbol}/{r.loanSymbol}
-                                </Text>
+                                <Flex align="center" gap="2">
+                                  <Text weight="medium" style={{ lineHeight: 1.1 }}>
+                                    {r.collateralSymbol}/{r.loanSymbol}
+                                  </Text>
+                                  {(() => {
+                                    const morphoUrl = getMorphoMarketUrl(
+                                      chainId,
+                                      market.uniqueKey,
+                                      r.collateralSymbol,
+                                      r.loanSymbol
+                                    );
+                                    return morphoUrl ? (
+                                      <Tooltip content="View on Morpho">
+                                        <a
+                                          href={morphoUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="inline-flex items-center gap-0.5 opacity-50 hover:opacity-100 transition-opacity"
+                                        >
+                                          <Image
+                                            src="/logos/morpho.svg"
+                                            alt="Morpho"
+                                            width={14}
+                                            height={14}
+                                            className="rounded-sm"
+                                          />
+                                          <ExternalLink width={10} height={10} />
+                                        </a>
+                                      </Tooltip>
+                                    ) : null;
+                                  })()}
+                                </Flex>
 
                                 <Flex align="center" gap="2" wrap="wrap">
                                   <Text size="1" color="gray">
@@ -718,9 +872,14 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                           </Table.Cell>
 
                           <Table.Cell justify="end">
-                            <Button size="2" variant="solid" onClick={() => handleSupply(market)}>
-                              Supply
-                            </Button>
+                            <Flex gap="2">
+                              <Button size="2" variant="solid" onClick={() => handleSupply(market)}>
+                                Supply
+                              </Button>
+                              <Button size="2" variant="soft" onClick={() => handleLoop(market)}>
+                                Loop
+                              </Button>
+                            </Flex>
                           </Table.Cell>
                         </Table.Row>
                       );
@@ -766,6 +925,53 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
             irm: selectedMarket.irmAddress,
             lltv: BigInt(selectedMarket.lltv),
           })}
+        />
+      )}
+
+      {loopMarket && loopMarket.collateralAsset && (
+        <MultiplyEvmModal
+          isOpen={loopModal.isOpen}
+          onClose={() => {
+            loopModal.close();
+            setLoopMarket(null);
+          }}
+          protocolName="morpho-blue"
+          chainId={chainId}
+          collaterals={[{
+            symbol: loopMarket.collateralAsset.symbol,
+            address: loopMarket.collateralAsset.address as `0x${string}`,
+            decimals: loopMarket.collateralAsset.decimals,
+            icon: tokenNameToLogo(loopMarket.collateralAsset.symbol),
+            rawBalance: 0n,
+            balance: 0,
+            price: loopMarket.collateralAsset.priceUsd 
+              ? parseUnits(loopMarket.collateralAsset.priceUsd.toFixed(8), 8) 
+              : 0n,
+          }]}
+          debtOptions={[{
+            symbol: loopMarket.loanAsset.symbol,
+            address: loopMarket.loanAsset.address as `0x${string}`,
+            decimals: loopMarket.loanAsset.decimals,
+            icon: tokenNameToLogo(loopMarket.loanAsset.symbol),
+            rawBalance: 0n,
+            balance: 0,
+            price: loopMarket.loanAsset.priceUsd 
+              ? parseUnits(loopMarket.loanAsset.priceUsd.toFixed(8), 8) 
+              : 0n,
+          }]}
+          morphoContext={{
+            marketId: loopMarket.uniqueKey,
+            loanToken: loopMarket.loanAsset.address,
+            collateralToken: loopMarket.collateralAsset.address,
+            oracle: loopMarket.oracle?.address || "",
+            irm: loopMarket.irmAddress,
+            lltv: BigInt(loopMarket.lltv),
+          }}
+          maxLtvBps={BigInt(Math.floor(toNumberSafe(loopMarket.lltv) / 1e14))} // Convert from 1e18 to bps
+          lltvBps={BigInt(Math.floor(toNumberSafe(loopMarket.lltv) / 1e14))}
+          supplyApyMap={{ [loopMarket.collateralAsset.address.toLowerCase()]: 0 }} // Morpho collateral doesn't earn yield
+          borrowApyMap={{ [loopMarket.loanAsset.address.toLowerCase()]: toNumberSafe(loopMarket.state?.borrowApy) * 100 }}
+          disableAssetSelection={true}
         />
       )}
     </Flex>

@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 
 const MORPHO_GRAPHQL_API = "https://blue-api.morpho.org/graphql";
 
+// Optimized query with server-side filtering support
+// Key filters: utilization_lte, supplyAssetsUsd_gte reduce junk at API level
 const QUERY_MARKETS = `
-  query Markets($first: Int, $skip: Int, $chainId: Int!, $whitelisted: Boolean) {
+  query Markets(
+    $first: Int, 
+    $skip: Int, 
+    $chainId: Int!, 
+    $whitelisted: Boolean,
+    $utilizationMax: Float,
+    $minSupplyUsd: Float,
+    $search: String
+  ) {
     markets(
       first: $first
       skip: $skip
@@ -11,7 +21,10 @@ const QUERY_MARKETS = `
       orderDirection: Desc
       where: { 
         chainId_in: [$chainId]
-        whitelisted: $whitelisted 
+        whitelisted: $whitelisted
+        utilization_lte: $utilizationMax
+        supplyAssetsUsd_gte: $minSupplyUsd
+        search: $search
       }
     ) {
       items {
@@ -134,218 +147,195 @@ export async function GET(
   }
 
   const sp = request.nextUrl.searchParams;
-  const search = (sp.get("search") || "").toLowerCase().trim();
+  const search = (sp.get("search") || "").trim();
+  const searchLower = search.toLowerCase();
   const isSearching = search.length > 0;
   const curationMode = (sp.get("curation") || "curated").toLowerCase();
   const hideSaturated = sp.get("hideSaturated") === "true";
   const debug = sp.get("debug") === "true";
   
-  // If searching, we dig deeper (scan 1000 items). If browsing, scan more to get more markets
-  const SCAN_DEPTH = isSearching ? 5000 : 5000; // Increased to 5000 to find more markets
-  const TARGET_COUNT = isSearching ? 100 : Math.min(parseInt(sp.get("first") || "1000", 10), 1000); // Increased default to 1000
+  // Target number of markets to return
+  const TARGET_COUNT = isSearching ? 100 : Math.min(parseInt(sp.get("first") || "500", 10), 500);
   
-  // Lower minimum liquidity when searching to find small pools
+  // Server-side filter thresholds (pushed to GraphQL API for efficiency)
+  // Use lower thresholds to cast a wider net, then filter client-side
+  const SERVER_MIN_SUPPLY_USD = isSearching ? 100 : 1000; // Minimum TVL at API level
+  const SERVER_MAX_UTILIZATION = hideSaturated ? 0.995 : 0.9999; // Filter saturated at API
+  
+  // Client-side filter thresholds (for additional quality filtering)
   const minLiquidity = safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || (isSearching ? "1000" : "5000"));
 
   const allMarkets = new Map<string, MarketItem>();
 
   try {
-    // --- STEP 1: Whitelisted (Fast Path) ---
-    // Always fetch these first as they are the "Gold Standard"
-    // Fetch ALL whitelisted markets (up to 500) before moving to discovery
-    if (!isSearching && curationMode === "curated") {
-      // Fetch whitelisted markets in batches to get all of them
-      let whitelistedSkip = 0;
-      const whitelistedPageSize = 100;
-      let hasMoreWhitelisted = true;
+    // Helper function to fetch markets with server-side filtering
+    const fetchMarketsBatch = async (
+      skip: number, 
+      first: number, 
+      whitelisted?: boolean,
+      searchTerm?: string
+    ) => {
+      const variables: Record<string, any> = { 
+        first, 
+        skip, 
+        chainId: chainIdInt,
+        utilizationMax: SERVER_MAX_UTILIZATION,
+        minSupplyUsd: SERVER_MIN_SUPPLY_USD,
+      };
       
-      while (hasMoreWhitelisted && whitelistedSkip < 5000) { // Fetch up to 1000 whitelisted markets
-        const safeRes = await fetch(MORPHO_GRAPHQL_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: QUERY_MARKETS,
-            variables: { 
-              first: whitelistedPageSize, 
-              skip: whitelistedSkip, 
-              chainId: chainIdInt, 
-              whitelisted: true 
-            },
-          }),
-          next: { revalidate: 120 },
-        });
-        
-        const safeData = await safeRes.json();
-        
-        if (safeData.errors) {
-          const msg = safeData.errors[0]?.message || "";
-          if (msg.includes("No results matching") || msg.includes("No results")) {
-            hasMoreWhitelisted = false;
-            break;
-          }
-          console.error("[Morpho] Whitelisted fetch error:", safeData.errors);
-          break;
-        }
-        
-        const whitelistedItems = safeData.data?.markets?.items || [];
-        
-        if (whitelistedItems.length === 0) {
-          hasMoreWhitelisted = false;
-          break;
-        }
-        
-        // Add these immediately - they are "Tier 1" quality
-        whitelistedItems.forEach((m: any) => {
-          // Apply basic sanity checks even to whitelisted markets
-          const util = normalizeUtilization(m.state?.utilization);
-          const supplyApy = safeFloat(m.state?.supplyApy);
-          
-          // Still filter out saturated or broken markets
-          if (util > 0.99) return; // Allow up to 99% for whitelisted
-          if (supplyApy > 20.0) return; // Block absurd APYs even for whitelisted
-          
-          allMarkets.set(m.uniqueKey, m);
-        });
-        
-        whitelistedSkip += whitelistedItems.length;
-        
-        // If we got fewer than requested, we've reached the end
-        if (whitelistedItems.length < whitelistedPageSize) {
-          hasMoreWhitelisted = false;
-        }
+      // Only add whitelisted filter if explicitly set
+      if (whitelisted !== undefined) {
+        variables.whitelisted = whitelisted;
       }
       
-      if (debug) console.log(`[Morpho] Found ${allMarkets.size} whitelisted markets after filtering`);
-    }
+      // Use GraphQL search for server-side text matching (more efficient)
+      if (searchTerm) {
+        variables.search = searchTerm;
+      }
+      
+      const res = await fetch(MORPHO_GRAPHQL_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: QUERY_MARKETS, variables }),
+        next: { revalidate: whitelisted ? 120 : 60 },
+      });
+      
+      const data = await res.json();
+      
+      if (data.errors) {
+        const msg = data.errors[0]?.message || "";
+        // "No results" is not an error - just empty results
+        if (msg.includes("No results")) {
+          return { items: [], hasMore: false };
+        }
+        if (debug) console.warn("[Morpho] GraphQL error:", data.errors);
+        return { items: [], hasMore: false, error: msg };
+      }
+      
+      const items = data.data?.markets?.items || [];
+      return { items, hasMore: items.length === first };
+    };
 
-    // --- STEP 2: Discovery / Search Loop ---
-    // If we are searching OR we need more markets, we scan the public list
-    // Only apply trust filter if curation mode is "curated"
-    if (isSearching || (curationMode === "curated" && allMarkets.size < TARGET_COUNT)) {
+    // Client-side filter function
+    const passesClientFilters = (m: MarketItem): boolean => {
+      const liq = safeFloat(m.state?.liquidityAssetsUsd);
+      const supplyApy = safeFloat(m.state?.supplyApy);
+      const borrowApy = safeFloat(m.state?.borrowApy);
+      const util = normalizeUtilization(m.state?.utilization);
+      
+      // Liquidity check - ensure market has usable liquidity
+      if (liq < minLiquidity) return false;
+      
+      // APY sanity check (50.0 = 5000% for search, 10.0 = 1000% for browse)
+      const maxApy = isSearching ? 50.0 : 10.0;
+      if (supplyApy > maxApy || borrowApy > maxApy) return false;
+      
+      // Utilization check (already filtered server-side, but double-check)
+      if (util > 0.99 || (hideSaturated && util >= 0.995)) return false;
+      
+      // Suspicious "G" tokens (e.g., GMORPHO spam) - skip when not searching
+      if (!isSearching && isSuspiciousGToken(m)) return false;
+      
+      // Critical warnings (RED/HIGH level)
+      const hasRedWarning = Array.isArray(m.warnings) && m.warnings.some(
+        (w: any) => ["RED", "HIGH"].includes(String(w?.level || "").toUpperCase())
+      );
+      if (hasRedWarning) return false;
+      
+      return true;
+    };
+
+    // --- UNIFIED FETCHING APPROACH ---
+    // Fetch both whitelisted and vault-trusted markets in fewer API calls
+    // by leveraging server-side filters
+    
+    const PAGE_SIZE = 200; // Larger batches since server filters out junk
+    const MAX_PAGES = 10; // Max 2000 items total per category
+    
+    // 1. Fetch whitelisted markets (highest quality)
+    if (curationMode === "curated" || curationMode === "all") {
       let skip = 0;
-      let shouldContinue = true;
-      const maxPages = Math.ceil(SCAN_DEPTH / 100); // Calculate max pages
-
-      while (shouldContinue && skip < SCAN_DEPTH && allMarkets.size < TARGET_COUNT) {
+      let hasMore = true;
+      
+      while (hasMore && skip < PAGE_SIZE * MAX_PAGES && allMarkets.size < TARGET_COUNT) {
+        const { items, hasMore: more } = await fetchMarketsBatch(
+          skip, 
+          PAGE_SIZE, 
+          true, // whitelisted only
+          isSearching ? search : undefined
+        );
         
-        // Fetch batch
-        const res = await fetch(MORPHO_GRAPHQL_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: QUERY_MARKETS,
-            variables: { 
-              first: 100, 
-              skip: skip, 
-              chainId: chainIdInt, 
-              whitelisted: false // Scan non-whitelisted
-            },
-          }),
-          next: { revalidate: 60 },
-        });
-
-        const data = await res.json();
-        
-        if (data.errors) {
-          const msg = data.errors[0]?.message || "";
-          if (msg.includes("No results matching") || msg.includes("No results")) {
-            shouldContinue = false;
-            break;
-          }
-          console.warn(`[Morpho] Discovery page ${skip / 100} error:`, data.errors);
-          skip += 100;
-          continue;
-        }
-        
-        const items = data.data?.markets?.items || [];
-        
-        if (items.length === 0) {
-          shouldContinue = false;
-          break;
-        }
-
         for (const m of items) {
           if (allMarkets.has(m.uniqueKey)) continue;
-          if (allMarkets.size >= TARGET_COUNT) break;
-
-          // --- SEARCH FILTER ---
-          if (isSearching) {
-            const loan = (m.loanAsset?.symbol || "").toLowerCase();
-            const coll = (m.collateralAsset?.symbol || "").toLowerCase();
-            // If search term is NOT found, skip this market
-            if (!loan.includes(search) && !coll.includes(search)) {
-              continue;
-            }
-          }
-
-          // --- STATS FILTER ---
-          const liq = safeFloat(m.state?.liquidityAssetsUsd);
-          const supplyApy = safeFloat(m.state?.supplyApy);
-          const borrowApy = safeFloat(m.state?.borrowApy);
-          const util = normalizeUtilization(m.state?.utilization);
-
-          // Basic Junk Check
-          if (liq < minLiquidity) continue;
-          // More lenient APY check when searching (50.0 = 5000% vs 10.0 = 1000%)
-          const maxApy = isSearching ? 50.0 : 10.0;
-          if (supplyApy > maxApy || borrowApy > maxApy) continue;
-          if (util > 0.99 || (hideSaturated && util >= 0.999)) continue; // Saturated
-
-          // Suspicious "G" tokens (only block when not searching)
-          if (!isSearching && isSuspiciousGToken(m)) continue;
-
-          // Critical Warning Check (Always Block RED/HIGH)
-          const hasRedWarning = Array.isArray(m.warnings) && m.warnings.some(
-            (w: any) => {
-              const level = String(w?.level || "").toUpperCase();
-              return level === "RED" || level === "HIGH";
-            }
-          );
-          if (hasRedWarning) continue;
-
-          // --- TRUST CHECK ---
-          // If searching, we are lenient. If browsing, we are strict.
-          // Skip trust check entirely if curation mode is "all"
-          if (curationMode === "all" || isMarketTrusted(m, isSearching)) {
+          if (passesClientFilters(m)) {
             allMarkets.set(m.uniqueKey, m);
           }
         }
-
-        skip += 100;
         
-        // Log progress every 5 pages
-        if (skip % 500 === 0 && debug) {
-          console.log(`[Morpho] Discovery progress: scanned ${skip}, found ${allMarkets.size} markets`);
-        }
+        hasMore = more && allMarkets.size < TARGET_COUNT;
+        skip += PAGE_SIZE;
       }
       
-      if (debug) {
-        console.log(`[Morpho] Discovery complete: scanned ${skip}, found ${allMarkets.size} total markets`);
+      if (debug) console.log(`[Morpho] Whitelisted: ${allMarkets.size} markets`);
+    }
+
+    // 2. Fetch additional markets (vault-trusted, Pendle, etc.) if needed
+    // Only for curated mode when we haven't hit target yet
+    if ((curationMode === "curated" && allMarkets.size < TARGET_COUNT) || curationMode === "all") {
+      let skip = 0;
+      let hasMore = true;
+      
+      while (hasMore && skip < PAGE_SIZE * MAX_PAGES && allMarkets.size < TARGET_COUNT) {
+        const { items, hasMore: more } = await fetchMarketsBatch(
+          skip, 
+          PAGE_SIZE, 
+          false, // non-whitelisted
+          isSearching ? search : undefined
+        );
+        
+        for (const m of items) {
+          if (allMarkets.has(m.uniqueKey)) continue;
+          if (!passesClientFilters(m)) continue;
+          
+          // Trust check for non-whitelisted markets (skip if mode is "all")
+          if (curationMode !== "all" && !isMarketTrusted(m, isSearching)) continue;
+          
+          allMarkets.set(m.uniqueKey, m);
+        }
+        
+        hasMore = more && allMarkets.size < TARGET_COUNT;
+        skip += PAGE_SIZE;
       }
+      
+      if (debug) console.log(`[Morpho] Total after discovery: ${allMarkets.size} markets`);
     }
     
-    // Sort: If searching, exact matches first. Otherwise, by TVL (SupplyAssetsUsd).
+    // Sort results
     const sorted = Array.from(allMarkets.values()).sort((a, b) => {
+      // Whitelisted markets first
+      if (a.whitelisted && !b.whitelisted) return -1;
+      if (!a.whitelisted && b.whitelisted) return 1;
+      
       if (isSearching) {
-        // Prioritize exact symbol match
+        // For search: exact matches first, then starts with, then by TVL
         const aLoan = (a.loanAsset?.symbol || "").toLowerCase();
         const aColl = (a.collateralAsset?.symbol || "").toLowerCase();
         const bLoan = (b.loanAsset?.symbol || "").toLowerCase();
         const bColl = (b.collateralAsset?.symbol || "").toLowerCase();
         
-        const aExact = aLoan === search || aColl === search;
-        const bExact = bLoan === search || bColl === search;
+        const aExact = aLoan === searchLower || aColl === searchLower;
+        const bExact = bLoan === searchLower || bColl === searchLower;
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         
-        // Then prioritize starts with
-        const aStarts = aLoan.startsWith(search) || aColl.startsWith(search);
-        const bStarts = bLoan.startsWith(search) || bColl.startsWith(search);
+        const aStarts = aLoan.startsWith(searchLower) || aColl.startsWith(searchLower);
+        const bStarts = bLoan.startsWith(searchLower) || bColl.startsWith(searchLower);
         if (aStarts && !bStarts) return -1;
         if (!aStarts && bStarts) return 1;
       }
-      // Secondary sort by Supply TVL (shows biggest markets first)
-      return safeFloat(b.state?.supplyAssetsUsd) - safeFloat(a.state?.supplyAssetsUsd);
+      
+      // Sort by liquidity (available to borrow) - more useful than total supply
+      return safeFloat(b.state?.liquidityAssetsUsd) - safeFloat(a.state?.liquidityAssetsUsd);
     });
 
     if (debug) {
