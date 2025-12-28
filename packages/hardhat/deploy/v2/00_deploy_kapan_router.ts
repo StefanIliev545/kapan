@@ -10,6 +10,9 @@ import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
  * Router is chain-agnostic; we deploy it always.
  * Balancer vaults and Aave pools are set only if the chain is recognized in the map.
  * For Hardhat (31337), uses FORK_CHAIN env to determine which addresses to use.
+ * 
+ * IMPORTANT: When adding/removing chains for flash loan providers, also update:
+ * - packages/nextjs/utils/chainFeatures.ts (static flash loan provider availability)
  */
 const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = Number(await hre.getChainId());
@@ -68,6 +71,26 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     },
   };
 
+  // Morpho Blue singleton addresses (for flash loans)
+  const MORPHO: Record<number, { MORPHO: string }> = {
+    // Ethereum mainnet
+    1: {
+      MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    },
+    // Base
+    8453: {
+      MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    },
+    // Arbitrum
+    42161: {
+      MORPHO: "0x6c247b1F6182318877311737BaC0844bAa518F5e",
+    },
+    // Optimism
+    10: {
+      MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    },
+  };
+
   const kapanRouter = await deploy("KapanRouter", {
     from: deployer,
     args: [deployer], // owner
@@ -119,6 +142,20 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     }
   } else {
     console.warn(`No Aave for chainId=${chainId}. Skipping setAavePool.`);
+  }
+
+  // Set Morpho Blue for flash loans if available
+  const morphoEntry = MORPHO[effectiveChainId];
+  if (morphoEntry) {
+    const morphoAddress = process.env.MORPHO_BLUE_ADDRESS || morphoEntry.MORPHO;
+    try {
+      await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setMorphoBluePool", morphoAddress);
+      console.log(`Morpho Blue pool set: ${morphoAddress}`);
+    } catch (error) {
+      console.warn(`Failed to set Morpho Blue pool for chainId=${chainId}:`, error);
+    }
+  } else {
+    console.warn(`No Morpho Blue for chainId=${chainId}. Skipping setMorphoBluePool.`);
   }
 
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)

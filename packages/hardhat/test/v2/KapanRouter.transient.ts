@@ -17,9 +17,10 @@ describe("KapanRouter transient instruction stack", function () {
     await (await router.addGateway("mock", await mock.getAddress())).wait();
 
     const coder = ethers.AbiCoder.defaultAbiCoder();
-    // Use dummy values for token/user, but vary amount to track order
+    const userAddress = await deployer.getAddress();
+    // Use dummy token but real user address for authorization, vary amount to track order
     const payloads = [1n, 2n, 3n].map((n) =>
-      encodeLendingInstruction(LendingOp.Deposit, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", n, "0x", 999)
+      encodeLendingInstruction(LendingOp.Deposit, "0x0000000000000000000000000000000000000000", userAddress, n, "0x", 999)
     );
     const instructions = payloads.map((data) => ({ protocolName: "mock", data }));
 

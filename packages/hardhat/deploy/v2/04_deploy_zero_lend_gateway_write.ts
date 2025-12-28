@@ -46,6 +46,7 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
   const REFERRAL_CODE = Number(process.env.ZEROLEND_REFERRAL_CODE ?? entry.REFERRAL);
 
   const kapanRouter = await get("KapanRouter");
+  const { ethers } = hre;
   const WAIT = 3;
 
   // Reusing AaveGatewayWrite contract for now, but naming the deployment ZeroLendGatewayWrite
@@ -76,6 +77,24 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
 
   await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "zerolend", zeroLendGatewayWrite.address);
   console.log(`ZeroLendGatewayWrite registered with KapanRouter as "zerolend"`);
+
+  // Set ZeroLend pool for flash loans (same pattern as Aave in 00_deploy_kapan_router.ts)
+  try {
+    const provider = await ethers.getContractAt(
+      "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
+      POOL_ADDRESSES_PROVIDER
+    );
+    const poolAddress = await provider.getPool();
+
+    if (poolAddress && poolAddress !== ethers.ZeroAddress) {
+      await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setZeroLendPool", poolAddress);
+      console.log(`ZeroLend pool set for flash loans: ${poolAddress}`);
+    } else {
+      console.warn(`ZeroLend pool address is zero. Skipping setZeroLendPool.`);
+    }
+  } catch (error) {
+    console.warn(`Failed to set ZeroLend pool for flash loans:`, error);
+  }
 
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
   await verifyContract(hre, zeroLendGatewayWrite.address, [

@@ -22,6 +22,8 @@ const ROUTER_ABI = parseAbi([
     "function balancerV2Vault() view returns (address)",
     "function balancerV3Vault() view returns (address)",
     "function aaveV3Pool() view returns (address)",
+    "function zeroLendPool() view returns (address)",
+    "function morphoBlue() view returns (address)",
 ]);
 
 export const useFlashLoanLiquidity = (
@@ -46,22 +48,32 @@ export const useFlashLoanLiquidity = (
         setIsLoading(true);
         try {
             // 1. Get Provider Addresses from Router
-            const [balancerV2Addr, balancerV3Addr, aaveV3PoolAddr] = await Promise.all([
+            const [balancerV2Addr, balancerV3Addr, aaveV3PoolAddr, zeroLendPoolAddr, morphoBlueAddr] = await Promise.all([
                 publicClient.readContract({
                     address: routerInfo.address,
                     abi: ROUTER_ABI,
                     functionName: "balancerV2Vault",
-                }),
+                }).catch(() => "0x0000000000000000000000000000000000000000"),
                 publicClient.readContract({
                     address: routerInfo.address,
                     abi: ROUTER_ABI,
                     functionName: "balancerV3Vault",
-                }),
+                }).catch(() => "0x0000000000000000000000000000000000000000"),
                 publicClient.readContract({
                     address: routerInfo.address,
                     abi: ROUTER_ABI,
                     functionName: "aaveV3Pool",
-                }),
+                }).catch(() => "0x0000000000000000000000000000000000000000"),
+                publicClient.readContract({
+                    address: routerInfo.address,
+                    abi: ROUTER_ABI,
+                    functionName: "zeroLendPool",
+                }).catch(() => "0x0000000000000000000000000000000000000000"),
+                publicClient.readContract({
+                    address: routerInfo.address,
+                    abi: ROUTER_ABI,
+                    functionName: "morphoBlue",
+                }).catch(() => "0x0000000000000000000000000000000000000000"),
             ]);
 
             const results: FlashLoanLiquidity[] = [];
@@ -129,7 +141,7 @@ export const useFlashLoanLiquidity = (
             if (aaveV3PoolAddr && aaveV3PoolAddr !== "0x0000000000000000000000000000000000000000") {
                 try {
                     // ReserveData layout (Aave v3):
-                    // index 7 is the aTokenAddress
+                    // index 8 is the aTokenAddress
                     const reserveData = await publicClient.readContract({
                         address: aaveV3PoolAddr as Address,
                         abi: AAVE_POOL_ABI,
@@ -139,7 +151,6 @@ export const useFlashLoanLiquidity = (
 
                     const aTokenAddr = reserveData[8] as Address;
 
-                    console.log(`Atoken address: ${aTokenAddr}`);
                     // Aave stores the underlying asset on the aToken contract,
                     // not on the Pool itself. The aToken's underlying balance
                     // is the available liquidity for flash loans.
@@ -160,6 +171,64 @@ export const useFlashLoanLiquidity = (
                     // Likely token not supported on Aave or no reserve data
                     results.push({
                         provider: FlashLoanProvider.Aave,
+                        liquidity: 0n,
+                        hasLiquidity: false,
+                    });
+                }
+            }
+
+            // 5. Check ZeroLend (Aave fork - same pattern as Aave)
+            if (zeroLendPoolAddr && zeroLendPoolAddr !== "0x0000000000000000000000000000000000000000") {
+                try {
+                    const reserveData = await publicClient.readContract({
+                        address: zeroLendPoolAddr as Address,
+                        abi: AAVE_POOL_ABI,
+                        functionName: "getReserveData",
+                        args: [tokenAddress as Address],
+                    }) as readonly unknown[];
+
+                    const aTokenAddr = reserveData[8] as Address;
+
+                    const balance = await publicClient.readContract({
+                        address: tokenAddress as Address,
+                        abi: ERC20_ABI,
+                        functionName: "balanceOf",
+                        args: [aTokenAddr],
+                    }) as bigint;
+
+                    results.push({
+                        provider: FlashLoanProvider.ZeroLend,
+                        liquidity: balance,
+                        hasLiquidity: balance >= amount,
+                    });
+                } catch (err) {
+                    console.error("ZeroLend liquidity check failed", err);
+                    results.push({
+                        provider: FlashLoanProvider.ZeroLend,
+                        liquidity: 0n,
+                        hasLiquidity: false,
+                    });
+                }
+            }
+
+            // 6. Check Morpho Blue - token balance at singleton address
+            if (morphoBlueAddr && morphoBlueAddr !== "0x0000000000000000000000000000000000000000") {
+                try {
+                    const balance = await publicClient.readContract({
+                        address: tokenAddress as Address,
+                        abi: ERC20_ABI,
+                        functionName: "balanceOf",
+                        args: [morphoBlueAddr],
+                    }) as bigint;
+
+                    results.push({
+                        provider: FlashLoanProvider.Morpho,
+                        liquidity: balance,
+                        hasLiquidity: balance >= amount,
+                    });
+                } catch {
+                    results.push({
+                        provider: FlashLoanProvider.Morpho,
                         liquidity: 0n,
                         hasLiquidity: false,
                     });

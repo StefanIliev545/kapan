@@ -200,6 +200,9 @@ export const useKapanRouterV2 = () => {
       queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
+      // Morpho-specific queries
+      queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
     ]).catch(e => console.warn("Post-tx refetch err:", e));
 
     if (typeof window !== "undefined") {
@@ -1493,7 +1496,7 @@ export const useKapanRouterV2 = () => {
 
   // --- Move Flow Builder ---
 
-  type FlashConfig = { version: "v3" | "v2" | "aave" | "zerolend"; premiumBps?: number; bufferBps?: number; };
+  type FlashConfig = { version: "v3" | "v2" | "aave" | "zerolend" | "morpho"; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
   };
@@ -1555,6 +1558,7 @@ export const useKapanRouterV2 = () => {
         // Map version string to FlashLoanProvider enum
         const provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.Aave 
           : version === "zerolend" ? FlashLoanProvider.ZeroLend
+          : version === "morpho" ? FlashLoanProvider.Morpho
           : version === "v3" ? FlashLoanProvider.BalancerV3 
           : FlashLoanProvider.BalancerV2;
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);

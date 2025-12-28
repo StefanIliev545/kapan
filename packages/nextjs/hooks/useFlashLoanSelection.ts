@@ -65,11 +65,14 @@ export const useFlashLoanSelection = ({
         if (userHasSelected.current) return;
         if (!liquidityData.length || amount === 0n) return;
 
-        // Priority: Balancer V2 > Aave V3 > Balancer V3
+        // Priority: Zero-fee providers first, then by reliability
+        // Fees: BalancerV2=0%, Morpho=0%, BalancerV3=0%, Aave=0.05%, ZeroLend=0.05%
         const priority = [
-            FlashLoanProvider.BalancerV2,
-            FlashLoanProvider.Aave,
-            FlashLoanProvider.BalancerV3
+            FlashLoanProvider.BalancerV2,  // 0% fee, most liquid
+            FlashLoanProvider.Morpho,      // 0% fee
+            FlashLoanProvider.BalancerV3,  // 0% fee
+            FlashLoanProvider.Aave,        // 0.05% fee
+            FlashLoanProvider.ZeroLend,    // 0.05% fee (Aave fork)
         ];
 
         // Find the best provider with sufficient liquidity

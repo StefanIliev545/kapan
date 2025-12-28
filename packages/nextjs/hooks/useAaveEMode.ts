@@ -23,19 +23,27 @@ export interface EModeCategory {
   borrowableBitmap: bigint;
 }
 
+export type AaveLikeViewContractName = "AaveGatewayView" | "ZeroLendGatewayView";
+export type AaveLikeWriteContractName = "AaveGatewayWrite" | "ZeroLendGatewayWrite";
+
 /**
- * Hook for Aave V3 E-Mode functionality
+ * Generic hook for Aave-like protocol E-Mode functionality
  * - Fetches available E-Mode categories
  * - Fetches user's current E-Mode category
  * - Provides function to switch E-Mode
+ * - Works with any Aave-fork protocol (Aave, ZeroLend, etc.)
  */
-export function useAaveEMode(chainId?: number) {
+export function useAaveLikeEMode(
+  chainId?: number,
+  viewContractName: AaveLikeViewContractName = "AaveGatewayView",
+  writeContractName: AaveLikeWriteContractName = "AaveGatewayWrite"
+) {
   const { address: userAddress } = useAccount();
 
   // Fetch user's current E-Mode category
-  // Note: Type cast needed until AaveGatewayView is redeployed to all chains with getUserEMode
+  // Note: Type cast needed until GatewayView is redeployed to all chains with getUserEMode
   const { data: userEModeRaw, isLoading: isLoadingUserEMode, refetch: refetchUserEMode } = useScaffoldReadContract({
-    contractName: "AaveGatewayView",
+    contractName: viewContractName,
     functionName: "getUserEMode",
     args: [userAddress as Address],
     chainId,
@@ -46,7 +54,7 @@ export function useAaveEMode(chainId?: number) {
 
   // Fetch all available E-Mode categories
   const { data: eModesRaw, isLoading: isLoadingEModes } = useScaffoldReadContract({
-    contractName: "AaveGatewayView",
+    contractName: viewContractName,
     functionName: "getEModes",
     args: [],
     chainId,
@@ -55,9 +63,9 @@ export function useAaveEMode(chainId?: number) {
     },
   } as any);
 
-  // Get the Aave Pool address for direct setUserEMode calls
+  // Get the Pool address for direct setUserEMode calls
   const { data: poolAddress } = useScaffoldReadContract({
-    contractName: "AaveGatewayWrite",
+    contractName: writeContractName,
     functionName: "getPool",
     args: [],
     chainId,
@@ -130,6 +138,22 @@ export function useAaveEMode(chainId?: number) {
     canSwitchToEMode,
     encodeSetEModeCall,
   };
+}
+
+/**
+ * Hook for Aave V3 E-Mode functionality (convenience wrapper)
+ * Uses the generic useAaveLikeEMode with Aave contract names
+ */
+export function useAaveEMode(chainId?: number) {
+  return useAaveLikeEMode(chainId, "AaveGatewayView", "AaveGatewayWrite");
+}
+
+/**
+ * Hook for ZeroLend E-Mode functionality (convenience wrapper)
+ * Uses the generic useAaveLikeEMode with ZeroLend contract names
+ */
+export function useZeroLendEMode(chainId?: number) {
+  return useAaveLikeEMode(chainId, "ZeroLendGatewayView", "ZeroLendGatewayWrite");
 }
 
 /**

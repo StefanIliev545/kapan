@@ -10,12 +10,12 @@ import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
+
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { getProtocolLogo } from "~~/utils/protocol";
-import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported } from "~~/utils/chainFeatures";
+import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported } from "~~/utils/chainFeatures";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -35,37 +35,43 @@ interface MovePositionModalProps {
 }
 
 type FlashLoanProvider = {
-  name: "Balancer V2" | "Balancer V3" | "Aave V3";
+  name: "Balancer V2" | "Balancer V3" | "Aave V3" | "ZeroLend" | "Morpho";
   icon: string;
-  version: "v2" | "v3" | "aave";
-  providerEnum: 0 | 1 | 2; // FlashLoanProvider enum: BalancerV2=0, BalancerV3=1, AaveV3=2
+  version: "v2" | "v3" | "aave" | "zerolend" | "morpho";
+  providerEnum: 0 | 1 | 2 | 3 | 5; // FlashLoanProvider enum: BalancerV2=0, BalancerV3=1, Aave=2, ZeroLend=3, Morpho=5
 };
 
 const ALL_FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
   { name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 },
   { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 },
   { name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 },
+  { name: "ZeroLend", icon: "/logos/zerolend.svg", version: "zerolend", providerEnum: 3 },
+  { name: "Morpho", icon: "/logos/morpho.svg", version: "morpho", providerEnum: 5 },
 ] as const;
 
 // Extend the collateral type with rawBalance
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position, chainId }) => {
   const { address: userAddress, chain } = useAccount();
   const { switchChain } = useSwitchChain();
-  // Linea (59144): ZeroLend replaces Venus
-  // Base (8453): Show both ZeroLend and Venus
-  // Other chains: Show Venus only
-  const isLinea = chainId === 59144;
-  const isBase = chainId === 8453;
-  const protocols = [
-    { name: "Aave V3" },
-    { name: "Compound V3" },
-    ...(isLinea
-      ? [{ name: "ZeroLend" }]
-      : isBase
-        ? [{ name: "ZeroLend" }, { name: "Venus" }]
-        : [{ name: "Venus" }]
-    ),
-  ];
+  
+  // Build destination protocols from static chain config
+  // IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/ gateway deploy scripts
+  const protocols = useMemo(() => {
+    const result = [
+      { name: "Aave V3" },
+      { name: "Compound V3" },
+    ];
+    if (isMorphoBlueSupported(chainId)) {
+      result.push({ name: "Morpho Blue" });
+    }
+    if (isZeroLendSupported(chainId)) {
+      result.push({ name: "ZeroLend" });
+    }
+    if (isVenusSupported(chainId)) {
+      result.push({ name: "Venus" });
+    }
+    return result;
+  }, [chainId]);
 
   const [selectedProtocol, setSelectedProtocol] = useState(protocols.find(p => p.name !== fromProtocol)?.name || "");
   const [amount, setAmount] = useState("");
@@ -75,51 +81,30 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  // Check which flash loan providers are available on the router using enabled functions
-  // These are view functions in FlashLoanConsumerBase that check if addresses are non-zero
-  const { data: routerContract } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as any });
-
-  const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useReadContract({
-    address: routerContract?.address as `0x${string}` | undefined,
-    abi: routerContract?.abi,
-    functionName: "balancerV2Enabled",
-    query: { enabled: isOpen && !!chainId && !!routerContract?.address },
-  });
-
-  const { data: balancerV3Enabled, isLoading: isLoadingBalancerV3 } = useReadContract({
-    address: routerContract?.address as `0x${string}` | undefined,
-    abi: routerContract?.abi,
-    functionName: "balancerV3Enabled",
-    query: { enabled: isOpen && !!chainId && !!routerContract?.address },
-  });
-
-  const { data: aaveEnabled, isLoading: isLoadingAave } = useReadContract({
-    address: routerContract?.address as `0x${string}` | undefined,
-    abi: routerContract?.abi,
-    functionName: "aaveEnabled",
-    query: { enabled: isOpen && !!chainId && !!routerContract?.address },
-  });
-
-  // Filter available flash loan providers based on what's enabled AND chain support
-  // Chain support is defined in chainFeatures.ts
+  // Flash loan providers - built from static chain config (no contract reads needed)
+  // Chain support is defined in chainFeatures.ts, synced with deployment scripts
   const availableFlashLoanProviders = useMemo(() => {
     const providers: FlashLoanProvider[] = [];
 
-    // Only check if we're not loading (to avoid showing providers that will be filtered out)
-    if (!isLoadingBalancerV2 && balancerV2Enabled === true && isBalancerV2Supported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[0]);
+    // Order by preference: zero-fee providers first
+    if (isBalancerV2Supported(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[0]); // Balancer V2
     }
-
-    if (!isLoadingBalancerV3 && balancerV3Enabled === true && isBalancerV3Supported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[1]);
+    if (isMorphoSupported(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[4]); // Morpho
     }
-
-    if (!isLoadingAave && aaveEnabled === true && isAaveV3Supported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[2]);
+    if (isBalancerV3Supported(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[1]); // Balancer V3
+    }
+    if (isAaveV3Supported(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[2]); // Aave V3
+    }
+    if (isZeroLendSupported(chainId)) {
+      providers.push(ALL_FLASH_LOAN_PROVIDERS[3]); // ZeroLend
     }
 
     return providers;
-  }, [balancerV2Enabled, balancerV3Enabled, aaveEnabled, isLoadingBalancerV2, isLoadingBalancerV3, isLoadingAave, chainId]);
+  }, [chainId]);
 
   // Set default selected provider (first available)
   const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider | null>(null);

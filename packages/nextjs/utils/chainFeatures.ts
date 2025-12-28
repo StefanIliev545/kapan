@@ -23,7 +23,10 @@ const PENDLE_AVAILABLE = new Set([
   31337, // Hardhat (for local dev)
 ]);
 
-// Flash loan provider availability
+// ==================== FLASH LOAN PROVIDER AVAILABILITY ====================
+// IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/00_deploy_kapan_router.ts
+// and packages/hardhat/deploy/v2/04_deploy_zero_lend_gateway_write.ts
+
 const AAVE_V3_AVAILABLE = new Set([
   1,     // Mainnet
   10,    // Optimism
@@ -35,6 +38,7 @@ const AAVE_V3_AVAILABLE = new Set([
 ]);
 
 const BALANCER_V2_AVAILABLE = new Set([
+  1,     // Mainnet
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
@@ -42,11 +46,47 @@ const BALANCER_V2_AVAILABLE = new Set([
 ]);
 
 const BALANCER_V3_AVAILABLE = new Set([
+  1,     // Mainnet
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
   31337, // Hardhat
 ]);
+
+// Morpho Blue singleton addresses (from 00_deploy_kapan_router.ts MORPHO map)
+const MORPHO_AVAILABLE = new Set([
+  1,     // Mainnet
+  42161, // Arbitrum
+  8453,  // Base
+  10,    // Optimism
+]);
+
+// ZeroLend (from 04_deploy_zero_lend_gateway_write.ts MAP)
+const ZEROLEND_AVAILABLE = new Set([
+  59144, // Linea
+  8453,  // Base
+]);
+
+// ==================== DESTINATION PROTOCOL AVAILABILITY ====================
+// IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/ gateway deploy scripts
+
+// Venus (from 03_deploy_venus_gateway_write.ts VENUS map)
+const VENUS_AVAILABLE = new Set([
+  1,     // Mainnet
+  42161, // Arbitrum
+  8453,  // Base
+  130,   // Unichain
+]);
+
+// Flash loan fees in basis points (1 bps = 0.01%)
+export const FLASH_LOAN_FEES_BPS = {
+  BalancerV2: 0,
+  BalancerV3: 0,
+  Morpho: 0,
+  Aave: 5,       // 0.05%
+  ZeroLend: 5,   // 0.05% (Aave fork)
+  UniswapV3: 30, // ~0.3% varies by pool
+} as const;
 
 // ==================== SWAP ROUTERS ====================
 
@@ -123,6 +163,26 @@ export function isBalancerV3Supported(chainId: number | undefined): boolean {
   if (chainId === undefined) return false;
   return BALANCER_V3_AVAILABLE.has(chainId);
 }
+
+export function isMorphoSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return MORPHO_AVAILABLE.has(chainId);
+}
+
+export function isZeroLendSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return ZEROLEND_AVAILABLE.has(chainId);
+}
+
+// ==================== DESTINATION PROTOCOLS ====================
+
+export function isVenusSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return VENUS_AVAILABLE.has(chainId);
+}
+
+// Morpho Blue as destination uses the same availability as flash loan
+export { isMorphoSupported as isMorphoBlueSupported };
 
 // Legacy exports for backwards compatibility
 export const CHAIN_IDS = {

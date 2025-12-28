@@ -82,7 +82,7 @@ export type UseMovePositionDataResult = {
   vesuPools?: VesuPoolsData;
 };
 
-import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported } from "~~/utils/chainFeatures";
+import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported } from "~~/utils/chainFeatures";
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
   const { isOpen, networkType, fromProtocol, chainId, position } = params;
@@ -119,28 +119,27 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     return { debtMaxRaw: undefined, debtMaxLabel: undefined };
   }, [position.balance, position.decimals]);
 
-  // Destination protocol options (simple baseline; caller can refine)
+  // Destination protocol options - built from static chain config
+  // IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/ gateway deploy scripts
   const destinationProtocols: DestinationProtocolOption[] = useMemo(() => {
     if (networkType === "evm") {
-      // Linea (59144): ZeroLend replaces Venus
-      // Base (8453): Show both ZeroLend, Venus, and Morpho Blue
-      // Other chains: Show Venus only (no Morpho)
-      const isLinea = chainId === 59144;
-      const isBase = chainId === 8453;
-      const protocols = [
+      const protocols: DestinationProtocolOption[] = [
+        // Always available on all EVM chains
         { name: "Aave V3", logo: getProtocolLogo("Aave V3") },
         { name: "Compound V3", logo: getProtocolLogo("Compound V3") },
-        ...(isLinea
-          ? [{ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") }]
-          : isBase
-            ? [
-                { name: "Morpho Blue", logo: getProtocolLogo("Morpho Blue") },
-                { name: "ZeroLend", logo: getProtocolLogo("ZeroLend") },
-                { name: "Venus", logo: getProtocolLogo("Venus") },
-              ]
-            : [{ name: "Venus", logo: getProtocolLogo("Venus") }]
-        ),
       ];
+      
+      // Add chain-specific protocols
+      if (isMorphoBlueSupported(chainId)) {
+        protocols.push({ name: "Morpho Blue", logo: getProtocolLogo("Morpho Blue") });
+      }
+      if (isZeroLendSupported(chainId)) {
+        protocols.push({ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") });
+      }
+      if (isVenusSupported(chainId)) {
+        protocols.push({ name: "Venus", logo: getProtocolLogo("Venus") });
+      }
+      
       return protocols.filter(
         p => p.name.toLowerCase() !== fromProtocol.toLowerCase(),
       );
@@ -296,74 +295,34 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     prevStarkDataRef.current.starkCollaterals = currentStarkCollaterals;
   }, [starkCollaterals, starkIsLoading, networkType]);
 
-  // Flash loan providers
-  const [flashLoanProviders, setFlashLoanProviders] = useState<FlashLoanProviderOption[]>([]);
-  const [defaultFlashLoanProvider, setDefaultFlashLoanProvider] = useState<FlashLoanProviderOption | undefined>(undefined);
-
-  // EVM router flags - pass chainId to ensure we read from the correct network
-  const { data: balancerV2Enabled, isLoading: isLoadingBalancerV2 } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "KapanRouter",
-    functionName: "balancerV2Enabled",
-    chainId,
-    query: { enabled: isOpen && networkType === "evm" },
-  });
-  const { data: balancerV3Enabled, isLoading: isLoadingBalancerV3 } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "KapanRouter",
-    functionName: "balancerV3Enabled",
-    chainId,
-    query: { enabled: isOpen && networkType === "evm" },
-  });
-  const { data: aaveEnabled, isLoading: isLoadingAave } = useNetworkAwareReadContract({
-    networkType: "evm",
-    contractName: "KapanRouter",
-    functionName: "aaveEnabled",
-    chainId,
-    query: { enabled: isOpen && networkType === "evm" },
-  });
-
-  // Use ref for flash loan providers too
-  const prevFlashLoanRef = useRef<string>('');
-
-  useEffect(() => {
+  // Flash loan providers - built from static chain config (no contract reads needed)
+  const flashLoanProviders = useMemo<FlashLoanProviderOption[]>(() => {
     if (networkType !== "evm") {
       // Stark: show placeholder Vesu flash loan provider
-      const starkProvider: FlashLoanProviderOption = { name: "Vesu", version: "v1", icon: "/logos/vesu.svg" };
-      setFlashLoanProviders([starkProvider]);
-      setDefaultFlashLoanProvider(starkProvider);
-      return;
+      return [{ name: "Vesu", version: "v1", icon: "/logos/vesu.svg" }];
     }
-
-    if (isLoadingBalancerV2 || isLoadingBalancerV3 || isLoadingAave) return;
 
     const providers: FlashLoanProviderOption[] = [];
-    if (balancerV2Enabled === true && isBalancerV2Supported(chainId)) {
+    // Order by preference: zero-fee providers first
+    if (isBalancerV2Supported(chainId)) {
       providers.push({ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 });
     }
-    if (balancerV3Enabled === true && isBalancerV3Supported(chainId)) {
+    if (isMorphoSupported(chainId)) {
+      providers.push({ name: "Morpho", icon: "/logos/morpho.svg", version: "morpho", providerEnum: 5 });
+    }
+    if (isBalancerV3Supported(chainId)) {
       providers.push({ name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 });
     }
-    if (aaveEnabled === true && isAaveV3Supported(chainId)) {
+    if (isAaveV3Supported(chainId)) {
       providers.push({ name: "Aave", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 });
     }
+    if (isZeroLendSupported(chainId)) {
+      providers.push({ name: "ZeroLend", icon: "/logos/zerolend.svg", version: "zerolend", providerEnum: 3 });
+    }
+    return providers;
+  }, [networkType, chainId]);
 
-    const currentProviders = stringifyWithBigInt(providers);
-    if (prevFlashLoanRef.current === currentProviders) return;
-
-    setFlashLoanProviders(providers);
-    setDefaultFlashLoanProvider(providers[0]);
-    prevFlashLoanRef.current = currentProviders;
-  }, [
-    networkType,
-    isLoadingBalancerV2,
-    isLoadingBalancerV3,
-    isLoadingAave,
-    balancerV2Enabled,
-    balancerV3Enabled,
-    aaveEnabled,
-    chainId,
-  ]);
+  const defaultFlashLoanProvider = useMemo(() => flashLoanProviders[0], [flashLoanProviders]);
 
   // Vesu pools (for Stark UI that requires versions/pools)
   const vesuPools: VesuPoolsData | undefined = useMemo(() => {
