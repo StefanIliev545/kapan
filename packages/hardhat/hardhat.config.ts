@@ -83,8 +83,12 @@ const config: HardhatUserConfig = {
           evmVersion: "cancun",
           optimizer: {
             enabled: true,
-            // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
-            runs: 200,
+            runs: 50,
+            details: {
+              yulDetails: {
+                optimizerSteps: "u",
+              },
+            },
           },
           viaIR: true,
         },
