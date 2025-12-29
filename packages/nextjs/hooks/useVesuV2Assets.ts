@@ -1,7 +1,6 @@
 import { useMemo, useEffect, useState } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
-// import { toAnnualRates } from "~~/utils/protocols";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 

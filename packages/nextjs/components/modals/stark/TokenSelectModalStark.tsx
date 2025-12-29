@@ -146,7 +146,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                 return (
                   <button
                     key={address}
-                    className="w-full flex items-center justify-between p-3 hover:bg-base-200/50 transition-colors"
+                    className="w-full flex items-center justify-between p-3 hover:bg-base-200/60 transition-colors cursor-pointer"
                     onClick={() => handleSelectToken(token)}
                   >
                     <div className="flex items-center gap-3">

@@ -19,6 +19,7 @@ import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { useGlobalState } from "~~/services/store/store";
+import { formatCurrency } from "~~/utils/formatNumber";
 
 type VesuVersionKey = "v1" | "v2";
 
@@ -156,17 +157,6 @@ export const VesuProtocolView: FC = () => {
     v2All.Re7USDCPrime.rows,
     v2All.Re7USDCStableCore.rows,
   ]);
-
-  const formatCurrency = (amount: number) => {
-    const formatter = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-
-    return formatter.format(amount);
-  };
 
   useEffect(() => {
     if (!userAddress) {

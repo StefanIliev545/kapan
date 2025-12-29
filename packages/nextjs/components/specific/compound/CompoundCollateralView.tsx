@@ -458,7 +458,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                   key={position.address}
                   className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border
                     ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"}
-                    hover:bg-base-200/50 flex items-center overflow-hidden`}
+                    hover:bg-base-200/60 hover:border-base-content/15 flex items-center overflow-hidden`}
                 >
                   <div className="flex gap-1">
                     <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">

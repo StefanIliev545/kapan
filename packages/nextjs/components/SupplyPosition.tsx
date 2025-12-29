@@ -228,7 +228,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       content: (
         <>
           <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Balance</div>
-          <div className="text-sm font-mono font-semibold tabular-nums">
+          <div className="text-xs font-mono font-semibold tabular-nums">
             <FiatBalance
               tokenAddress={tokenAddress}
               rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
@@ -249,7 +249,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     content: (
       <>
         <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">APY</div>
-        <div className="text-sm font-mono font-semibold tabular-nums text-base-content">
+        <div className="text-xs font-mono font-semibold tabular-nums text-base-content">
           {formatPercentage(currentRate)}%
         </div>
       </>
@@ -262,7 +262,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       <>
         <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Best APY</div>
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-mono font-semibold tabular-nums text-success">
+          <span className="text-xs font-mono font-semibold tabular-nums text-success">
             {formatPercentage(displayedOptimalRate)}%
           </span>
           <div className="w-4 h-4 relative flex-shrink-0">
@@ -286,7 +286,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       content: (
         <>
           <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">{stat.label}</div>
-          <div className="text-sm font-mono font-semibold tabular-nums">{stat.value}</div>
+          <div className="text-xs font-mono font-semibold tabular-nums">{stat.value}</div>
         </>
       ),
     });
@@ -297,23 +297,23 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       {/* Container */}
       <div
         className={clsx(
-          "w-full bg-base-200/30 border border-base-300/40 transition-colors duration-200",
+          "w-full bg-base-200/30 border border-base-300/40 transition-all duration-200",
           isExpanded && hasAnyActions ? "px-4 sm:px-5 pt-4 pb-0" : "p-4 sm:p-5",
-          hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default",
+          hasAnyActions ? "cursor-pointer hover:bg-base-200/60 hover:border-base-content/15" : "cursor-default",
           // Only apply rounded-xl if containerClassName doesn't override it
           !containerClassName?.includes("rounded") && "rounded-xl",
           containerClassName
         )}
         onClick={toggleExpanded}
       >
-        {/* Mobile Layout (< lg) - single row, spread out */}
-        <div className="lg:hidden flex items-center gap-2 sm:gap-3">
+        {/* Mobile Layout (< md) - single row, spread out */}
+        <div className="md:hidden flex items-center gap-2 sm:gap-3">
           {/* Token icon + name */}
           <div className="flex items-center gap-1.5 flex-shrink-0" title={name}>
             <div className="w-7 h-7 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-0.5 ring-1 ring-base-300/50 flex-shrink-0">
               <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
-            <span className="font-bold text-sm tracking-tight leading-none">
+            <span className="font-bold text-sm tracking-tight leading-none truncate max-w-[100px]" title={name}>
               {renderName ? renderName(name) : name}
             </span>
             {infoButtonNode && (
@@ -381,10 +381,10 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           )}
         </div>
 
-        {/* Desktop Layout (>= lg) */}
-        <div className="hidden lg:grid lg:grid-cols-12 relative gap-0">
+        {/* Desktop Layout (>= md) */}
+        <div className="hidden md:grid md:grid-cols-12 relative gap-0">
           {/* Token */}
-          <div className="lg:col-span-3 flex items-center min-w-0">
+          <div className="md:col-span-3 flex items-center min-w-0">
             <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 ring-1 ring-base-300/50">
               <Image src={icon} alt={`${name} icon`} fill className="rounded-lg object-contain" />
             </div>
@@ -394,7 +394,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
                   <>{renderName(name)}</>
                 ) : (
                   <>
-                    <span className="font-bold text-base tracking-tight truncate leading-tight">{name}</span>
+                    <span className="font-bold text-base tracking-tight truncate leading-tight" title={name}>{name}</span>
                     {subtitle ? (
                       <span className="text-[10px] uppercase tracking-wider text-base-content/40 truncate leading-tight">{subtitle}</span>
                     ) : null}
@@ -412,7 +412,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`lg:col-span-8 grid gap-0 items-center min-w-[200px] ${statGridClass}`}
+            className={`md:col-span-8 grid gap-0 items-center ${statGridClass}`}
           >
             {statColumns.map((column, index) => {
               const isLast = index === statColumns.length - 1;
@@ -426,7 +426,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           </div>
 
           {/* Expand Indicator */}
-          <div className="lg:col-span-1 flex items-center justify-end">
+          <div className="md:col-span-1 flex items-center justify-end">
             {hasAnyActions && showExpandIndicator && (
               <div
                 className={`flex items-center justify-center w-6 h-6 rounded-lg ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"

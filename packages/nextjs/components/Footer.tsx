@@ -6,13 +6,16 @@ import Link from "next/link";
  */
 export const Footer = () => {
   return (
-    <footer className="w-full py-4 text-center text-xs text-base-content/70">
-      <div className="flex justify-center gap-4">
-        <Link href="/blog" className="hover:underline">
+    <footer className="w-full py-6 text-center">
+      <div className="flex justify-center gap-6 text-[10px] uppercase tracking-wider text-base-content/30">
+        <Link href="/blog" className="hover:text-base-content/50 transition-colors">
           Blog
         </Link>
-        <Link href="/license" className="hover:underline">
+        <Link href="/license" className="hover:text-base-content/50 transition-colors">
           License
+        </Link>
+        <Link href="/privacy" className="hover:text-base-content/50 transition-colors">
+          Privacy
         </Link>
       </div>
     </footer>

@@ -429,6 +429,96 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   );
 }
 
+// Mobile market row with expandable details
+interface MobileMarketRowProps {
+  row: {
+    market: MorphoMarket;
+    collateralSymbol: string;
+    loanSymbol: string;
+    supplyUsd: number;
+    borrowUsd: number;
+    utilization01: number;
+    supplyApy01: number;
+    borrowApy01: number;
+    lltv01: number;
+  };
+  pairName: string;
+  usd: Intl.NumberFormat;
+  chainId: number;
+  onSupply: () => void;
+  onLoop: () => void;
+}
+
+function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: MobileMarketRowProps) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const morphoUrl = getMorphoMarketUrl(chainId, row.market.uniqueKey, row.collateralSymbol, row.loanSymbol);
+
+  return (
+    <div 
+      className={`rounded-lg border transition-colors cursor-pointer ${
+        isExpanded 
+          ? 'border-primary/30 bg-base-200/40' 
+          : 'border-base-300/50 bg-base-200/20 hover:bg-base-200/40'
+      }`}
+      onClick={() => setIsExpanded(!isExpanded)}
+    >
+      {/* Main row */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        {/* Token pair icons + name */}
+        <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1">
+            <span className="font-medium text-sm truncate" title={pairName}>{pairName}</span>
+            {morphoUrl && (
+              <a
+                href={morphoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="opacity-40 hover:opacity-80 transition-opacity"
+              >
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Stats - always visible */}
+        <div className="flex items-center gap-3 text-[11px]">
+          <span className="font-mono tabular-nums text-base-content/70">{usd.format(row.supplyUsd)}</span>
+          <span className="font-mono tabular-nums text-success">{formatPercent(row.supplyApy01, 2)}</span>
+          <span className="font-mono tabular-nums">{formatPercent(row.borrowApy01, 2)}</span>
+        </div>
+
+        {/* Chevron */}
+        <ChevronDown className={`w-4 h-4 text-base-content/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </div>
+
+      {/* Expanded: action bar */}
+      {isExpanded && (
+        <div className="flex items-center gap-2 px-3 pb-2 pt-0">
+          <div className="flex-1 flex items-center gap-3 text-[10px] text-base-content/50">
+            <span>Util: <span className="text-base-content/70">{formatPercent(row.utilization01, 0)}</span></span>
+            <span>LTV: <span className="text-base-content/70">{formatPercent(row.lltv01, 0)}</span></span>
+          </div>
+          <button
+            className="btn btn-xs btn-primary"
+            onClick={e => { e.stopPropagation(); onSupply(); }}
+          >
+            Supply
+          </button>
+          <button
+            className="btn btn-xs btn-ghost"
+            onClick={e => { e.stopPropagation(); onLoop(); }}
+          >
+            Loop
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   markets,
   marketPairs,
@@ -653,9 +743,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
 
   return (
     <Flex direction="column" gap="3">
-      {/* Compact filter bar */}
-      <Flex align="center" gap="2" className="px-1">
-        <Box style={{ minWidth: 200, maxWidth: 280 }}>
+      {/* Filter bar - responsive */}
+      <Flex align="center" gap="2" wrap="wrap" className="px-1">
+        <Box className="w-full sm:w-auto sm:min-w-[200px] sm:max-w-[280px]">
           <TextField.Root
             size="1"
             variant="surface"
@@ -705,130 +795,155 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         </Text>
       </Flex>
 
-      <Card size="2">
-        <Inset side="x" my="3">
-          <ScrollArea scrollbars="horizontal" type="auto">
-            <Box px="3" pb="3">
-              {rows.length === 0 ? (
-                <Card variant="surface" size="2">
-                  <Flex direction="column" gap="2">
-                    <Text weight="bold">No matches</Text>
-                    <Text color="gray" size="2">
-                      Try a different symbol or clear the search filter.
-                    </Text>
-                    <Flex gap="2">
-                      <Button variant="soft" onClick={() => setSearch("")} disabled={!search}>
-                        Clear search
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSearch("");
-                          setSortKey("tvl");
-                          setSortDirection("desc");
-                          setSelectedCollateral("all");
-                          setSelectedDebtAsset("all");
-                        }}
-                      >
-                        Reset all
-                      </Button>
-                    </Flex>
-                  </Flex>
-                </Card>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs text-base-content/70 border-b border-base-300">
-                      <th className="text-left font-medium py-2.5 pl-3">Market</th>
-                      <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("tvl")}>
-                        <span className={`inline-flex items-center gap-0.5 ${sortKey === "tvl" ? "text-primary" : ""}`}>
-                          TVL {sortKey === "tvl" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
-                        </span>
-                      </th>
-                      <th className="text-center font-medium py-2.5 w-16">Util</th>
-                      <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("supplyApy")}>
-                        <span className={`inline-flex items-center gap-0.5 ${sortKey === "supplyApy" ? "text-primary" : ""}`}>
-                          Earn {sortKey === "supplyApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
-                        </span>
-                      </th>
-                      <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("borrowApy")}>
-                        <span className={`inline-flex items-center gap-0.5 ${sortKey === "borrowApy" ? "text-primary" : ""}`}>
-                          Borrow {sortKey === "borrowApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
-                        </span>
-                      </th>
-                      <th className="w-28"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, visibleCount).map(r => {
-                      const { market } = r;
-                      const morphoUrl = getMorphoMarketUrl(
-                        chainId,
-                        market.uniqueKey,
-                        r.collateralSymbol,
-                        r.loanSymbol
-                      );
-
-                      return (
-                        <tr key={market.uniqueKey} className="border-b border-base-300/50 hover:bg-base-200/30 transition-colors">
-                          <td className="py-2.5 pl-3">
-                            <div className="flex items-center gap-2">
-                              <TokenPairAvatars collateralSymbol={r.collateralSymbol} loanSymbol={r.loanSymbol} />
-                              {morphoUrl ? (
-                                <a
-                                  href={morphoUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="font-medium hover:text-primary transition-colors group/link flex items-center gap-1"
-                                >
-                                  {r.collateralSymbol}/{r.loanSymbol}
-                                  <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-60 transition-opacity" />
-                                </a>
-                              ) : (
-                                <span className="font-medium">{r.collateralSymbol}/{r.loanSymbol}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-2.5 pr-4 text-right tabular-nums">
-                            {usd.format(r.supplyUsd)}
-                          </td>
-                          <td className="py-2.5 text-center">
-                            <UtilizationBar value={r.utilization01} />
-                          </td>
-                          <td className="py-2.5 pr-4 text-right tabular-nums text-success">
-                            {formatPercent(r.supplyApy01, 2)}
-                          </td>
-                          <td className="py-2.5 pr-4 text-right tabular-nums">
-                            {formatPercent(r.borrowApy01, 2)}
-                          </td>
-                          <td className="py-2.5 pr-3 text-right">
-                            <div className="inline-flex items-center gap-1.5">
-                              <Button size="1" variant="soft" onClick={() => handleSupply(market)}>
-                                Supply
-                              </Button>
-                              <Button size="1" variant="outline" onClick={() => handleLoop(market)}>
-                                Loop
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </Box>
-          </ScrollArea>
-        </Inset>
-
-        {rows.length > visibleCount ? (
-          <Flex align="center" justify="center" pb="4">
-            <Button variant="soft" onClick={() => setVisibleCount(v => Math.min(v + pageSize, rows.length))}>
-              Show more
-            </Button>
+      {rows.length === 0 ? (
+        <Card size="2">
+          <Flex direction="column" gap="2" p="4">
+            <Text weight="bold">No matches</Text>
+            <Text color="gray" size="2">
+              Try a different symbol or clear the search filter.
+            </Text>
+            <Flex gap="2">
+              <Button variant="soft" onClick={() => setSearch("")} disabled={!search}>
+                Clear search
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearch("");
+                  setSortKey("tvl");
+                  setSortDirection("desc");
+                  setSelectedCollateral("all");
+                  setSelectedDebtAsset("all");
+                }}
+              >
+                Reset all
+              </Button>
+            </Flex>
           </Flex>
-        ) : null}
-      </Card>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile: Card-based layout */}
+          <div className="block md:hidden space-y-2">
+            {rows.slice(0, visibleCount).map(r => {
+              const { market } = r;
+              const pairName = `${r.collateralSymbol}/${r.loanSymbol}`;
+              
+              return (
+                <MobileMarketRow
+                  key={market.uniqueKey}
+                  row={r}
+                  pairName={pairName}
+                  usd={usd}
+                  chainId={chainId}
+                  onSupply={() => handleSupply(market)}
+                  onLoop={() => handleLoop(market)}
+                />
+              );
+            })}
+          </div>
+
+          {/* Desktop: Table layout */}
+          <div className="hidden md:block">
+          <Card size="2">
+            <Inset side="x" my="3">
+              <ScrollArea scrollbars="horizontal" type="auto">
+                <Box px="3" pb="3">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-base-content/70 border-b border-base-300">
+                        <th className="text-left font-medium py-2.5 pl-3">Market</th>
+                        <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("tvl")}>
+                          <span className={`inline-flex items-center gap-0.5 ${sortKey === "tvl" ? "text-primary" : ""}`}>
+                            TVL {sortKey === "tvl" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                          </span>
+                        </th>
+                        <th className="text-center font-medium py-2.5 w-16">Util</th>
+                        <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("supplyApy")}>
+                          <span className={`inline-flex items-center gap-0.5 ${sortKey === "supplyApy" ? "text-primary" : ""}`}>
+                            Earn {sortKey === "supplyApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                          </span>
+                        </th>
+                        <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("borrowApy")}>
+                          <span className={`inline-flex items-center gap-0.5 ${sortKey === "borrowApy" ? "text-primary" : ""}`}>
+                            Borrow {sortKey === "borrowApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                          </span>
+                        </th>
+                        <th className="w-28"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.slice(0, visibleCount).map(r => {
+                        const { market } = r;
+                        const morphoUrl = getMorphoMarketUrl(
+                          chainId,
+                          market.uniqueKey,
+                          r.collateralSymbol,
+                          r.loanSymbol
+                        );
+
+                        return (
+                          <tr key={market.uniqueKey} className="border-b border-base-300/50 hover:bg-base-200/30 transition-colors">
+                            <td className="py-2.5 pl-3">
+                              <div className="flex items-center gap-2">
+                                <TokenPairAvatars collateralSymbol={r.collateralSymbol} loanSymbol={r.loanSymbol} />
+                                {morphoUrl ? (
+                                  <a
+                                    href={morphoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-medium hover:text-primary transition-colors group/link flex items-center gap-1"
+                                  >
+                                    {r.collateralSymbol}/{r.loanSymbol}
+                                    <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-60 transition-opacity" />
+                                  </a>
+                                ) : (
+                                  <span className="font-medium">{r.collateralSymbol}/{r.loanSymbol}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 pr-4 text-right tabular-nums">
+                              {usd.format(r.supplyUsd)}
+                            </td>
+                            <td className="py-2.5 text-center">
+                              <UtilizationBar value={r.utilization01} />
+                            </td>
+                            <td className="py-2.5 pr-4 text-right tabular-nums text-success">
+                              {formatPercent(r.supplyApy01, 2)}
+                            </td>
+                            <td className="py-2.5 pr-4 text-right tabular-nums">
+                              {formatPercent(r.borrowApy01, 2)}
+                            </td>
+                            <td className="py-2.5 pr-3 text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                <Button size="1" variant="soft" onClick={() => handleSupply(market)}>
+                                  Supply
+                                </Button>
+                                <Button size="1" variant="outline" onClick={() => handleLoop(market)}>
+                                  Loop
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Box>
+              </ScrollArea>
+            </Inset>
+          </Card>
+          </div>
+        </>
+      )}
+
+      {rows.length > visibleCount && (
+        <Flex align="center" justify="center" py="2">
+          <Button variant="soft" onClick={() => setVisibleCount(v => Math.min(v + pageSize, rows.length))}>
+            Show more
+          </Button>
+        </Flex>
+      )}
 
       {selectedMarket && (
         <DepositModal

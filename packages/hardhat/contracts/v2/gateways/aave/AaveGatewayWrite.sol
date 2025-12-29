@@ -8,7 +8,6 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { IGateway } from "../../interfaces/IGateway.sol";
 import { ProtocolTypes } from "../../interfaces/ProtocolTypes.sol";
-import "hardhat/console.sol";
 
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
@@ -36,23 +35,17 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         ProtocolTypes.LendingInstruction memory instr = abi.decode(data, (ProtocolTypes.LendingInstruction));
         address token = instr.token;
         uint256 amount = instr.amount;
-        console.log("AaveGateway: op=%s, token=%s, inputIdx=%s", uint256(instr.op), token, instr.input.index);
-        console.log("AaveGateway: amount=%s, user=%s", amount, instr.user);
         if (instr.input.index < inputs.length) {
             token = inputs[instr.input.index].token;
             amount = inputs[instr.input.index].amount;
-            console.log("AaveGateway: resolved token=%s, amount=%s", token, amount);
         }
         if (instr.op == ProtocolTypes.LendingOp.Deposit || instr.op == ProtocolTypes.LendingOp.DepositCollateral) {
             deposit(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](0);
         } else if (instr.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-            console.log("AaveGateway: calling withdraw for WithdrawCollateral");
             (address u, uint256 amt) = withdraw(token, instr.user, amount);
-            console.log("AaveGateway: withdraw returned token=%s, amount=%s", u, amt);
             outputs = new ProtocolTypes.Output[](1);
             outputs[0] = ProtocolTypes.Output({ token: u, amount: amt });
-            console.log("AaveGateway: WithdrawCollateral complete, returning output");
         } else if (instr.op == ProtocolTypes.LendingOp.Borrow) {
             borrow(token, instr.user, amount);
             outputs = new ProtocolTypes.Output[](1);
@@ -78,7 +71,6 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         } else {
             revert("Unknown op");
         }
-        console.log("AaveGateway: processLendingInstruction complete, returning %s outputs", outputs.length);
     }
 
     function deposit(address token, address onBehalfOf, uint256 amount) internal nonReentrant {
@@ -96,32 +88,22 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address user,
         uint256 amount
     ) internal nonReentrant returns (address, uint256) {
-        console.log("AaveGateway: withdraw called, underlying=%s, user=%s, amount=%s", underlying, user, amount);
         address aToken = _getAToken(underlying);
-        console.log("AaveGateway: aToken=%s", aToken);
         require(aToken != address(0), "aToken not found");
         IERC20 a = IERC20(aToken);
         uint256 balance = a.balanceOf(user);
-        console.log("AaveGateway: user aToken balance=%s", balance);
         // Clamp amount to balance if requested amount > balance
         // This handles rounding errors (e.g. 1 wei less) and type(uint256).max
         if (amount > balance) {
             amount = balance;
         }
-        console.log("AaveGateway: final withdraw amount=%s", amount);
         uint256 allowance = a.allowance(user, address(this));
-        console.log("AaveGateway: aToken allowance=%s", allowance);
         require(allowance >= amount, "aToken: allowance");
         a.safeTransferFrom(user, address(this), amount);
-        console.log("AaveGateway: transferred aToken to gateway");
         address pool = poolAddressesProvider.getPool();
-        console.log("AaveGateway: pool=%s", pool);
         require(pool != address(0), "Pool not set");
-        console.log("AaveGateway: calling pool.withdraw(underlying=%s, amount=%s, to=%s)", underlying, amount, address(this));
         uint256 amountOut = IPool(pool).withdraw(underlying, amount, address(this));
-        console.log("AaveGateway: pool.withdraw returned amountOut=%s", amountOut);
         IERC20(underlying).safeTransfer(msg.sender, amountOut);
-        console.log("AaveGateway: withdraw complete, returning underlying=%s, amountOut=%s", underlying, amountOut);
         return (underlying, amountOut);
     }
 

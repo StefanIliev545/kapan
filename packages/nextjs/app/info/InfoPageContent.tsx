@@ -4,7 +4,7 @@ import React from "react";
 import BenefitsSection from "~~/components/info/BenefitsSection";
 import ContractsSection from "~~/components/info/ContractsSection";
 import FeaturesSection from "~~/components/info/FeaturesSection";
-import Footer from "~~/components/info/Footer";
+import InfoCTAFooter from "~~/components/info/InfoCTAFooter";
 import Header from "~~/components/info/Header";
 import HowItWorksSection from "~~/components/info/HowItWorksSection";
 import RevolutionSection from "~~/components/info/RevolutionSection";
@@ -48,7 +48,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
       <ContractsSection />
       <AuditSection />
       <RevolutionSection />
-      <Footer />
+      <InfoCTAFooter />
     </div>
   );
 };

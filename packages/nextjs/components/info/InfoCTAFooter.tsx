@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowTopRightOnSquareIcon, DocumentTextIcon, CodeBracketIcon } from "@heroicons/react/24/outline";
 import Button from "~~/components/common/Button";
 
-const Footer = () => {
+const InfoCTAFooter = () => {
   return (
     <section className="py-16 relative">
       <div className="absolute inset-0 bg-base-200/50 -z-10 rounded-t-3xl"></div>
@@ -76,4 +76,4 @@ const Footer = () => {
   );
 };
 
-export default Footer; 
+export default InfoCTAFooter; 
