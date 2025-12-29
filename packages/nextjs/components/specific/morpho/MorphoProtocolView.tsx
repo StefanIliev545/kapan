@@ -211,8 +211,73 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
         className="card bg-base-200/40 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-300/50 cursor-pointer select-none"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <div className="card-body px-5 py-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="card-body px-3 sm:px-5 py-3">
+          {/* Mobile Layout (< sm) */}
+          <div className="sm:hidden space-y-3">
+            {/* Row 1: Protocol name + Markets + Collapse */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+                  <Image
+                    src="/logos/morpho.svg"
+                    alt="Morpho Blue icon"
+                    width={20}
+                    height={20}
+                    className="object-contain drop-shadow-sm"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/logos/default.svg";
+                    }}
+                  />
+                </div>
+                <span className="text-sm font-bold tracking-tight">Morpho Blue</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-xs btn-ghost gap-1"
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
+                >
+                  <span className="text-[9px] uppercase tracking-wider font-semibold">Markets</span>
+                  {isMarketsOpen ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
+                </button>
+                <ChevronDownIcon
+                  className={`w-4 h-4 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                />
+              </div>
+            </div>
+            {/* Row 2: Stats in a 2x2 grid */}
+            <div className="grid grid-cols-4 gap-1">
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Balance</span>
+                <span className={`text-xs font-mono font-bold tabular-nums ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
+                  {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">30D</span>
+                <span className={`text-xs font-mono font-bold tabular-nums ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
+                  {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Net APY</span>
+                <span className={`text-xs font-mono font-bold tabular-nums ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercentage(metrics.netApyPercent) : "—"}
+                </span>
+              </div>
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">LTV</span>
+                {hasPositions ? (
+                  <HealthStatus utilizationPercentage={metrics.avgUtilization} />
+                ) : (
+                  <span className="text-xs font-mono font-bold tabular-nums text-base-content/40">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Layout (>= sm) */}
+          <div className="hidden sm:flex flex-wrap items-center gap-x-6 gap-y-4">
             {/* Protocol name + icon */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
@@ -234,7 +299,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
             </div>
 
             {/* Divider */}
-            <div className="hidden sm:block w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+            <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
 
             {/* Stats - spread evenly across available space */}
             <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
@@ -247,7 +312,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               </div>
 
               {/* 30D Yield */}
-              <div className="hidden min-[480px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                 <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
@@ -255,7 +320,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               </div>
 
               {/* Net APY */}
-              <div className="hidden min-[400px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                 <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {hasPositions && metrics.netApyPercent != null ? formatSignedPercentage(metrics.netApyPercent) : "—"}
@@ -264,10 +329,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
               {/* Utilization */}
               <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">
-                  <span className="hidden sm:inline">Utilization</span>
-                  <span className="sm:hidden">LTV</span>
-                </span>
+                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
                 {hasPositions ? (
                   <HealthStatus utilizationPercentage={metrics.avgUtilization} />
                 ) : (

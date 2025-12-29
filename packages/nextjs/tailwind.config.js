@@ -71,6 +71,31 @@ module.exports = {
           ".link:hover": { opacity: "0.8" },
         },
       },
+      // Kapan landing page theme - minimal dark aesthetic
+      {
+        kapan: {
+          "base-100": "#0a0a0a",      // Near-black main bg
+          "base-200": "#101010",      // Slightly lighter surfaces
+          "base-300": "#1a1a1a",      // Borders/accents
+          "base-content": "#e5e5e5",  // Light text
+          primary: "#ffffff",         // White as primary (clean CTAs)
+          "primary-content": "#0a0a0a",
+          secondary: "#71717a",       // Zinc-500 muted
+          "secondary-content": "#e5e5e5",
+          accent: "#3b82f6",          // Blue accent for highlights
+          "accent-content": "#ffffff",
+          neutral: "#27272a",
+          "neutral-content": "#e5e5e5",
+          info: "#38bdf8",
+          success: "#4ade80",
+          warning: "#fbbf24",
+          error: "#f87171",
+          "--rounded-btn": "0px",
+          ".tooltip": { "--tooltip-tail": "6px" },
+          ".link": { textUnderlineOffset: "2px" },
+          ".link:hover": { opacity: "0.8" },
+        },
+      },
       // Additional DaisyUI themes for more choices
       "emerald",
       "dark",

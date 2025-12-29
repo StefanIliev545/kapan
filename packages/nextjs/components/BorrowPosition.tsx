@@ -327,14 +327,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
         )}
         onClick={toggleExpanded}
       >
-        {/* Mobile Layout (< lg) - single row, spread out */}
-        <div className="lg:hidden flex items-center gap-2 sm:gap-3">
+        {/* Mobile Layout (< md) - single row, spread out */}
+        <div className="md:hidden flex items-center gap-2 sm:gap-3">
           {/* Token icon + name */}
           <div className="flex items-center gap-1.5 flex-shrink-0" title={name}>
             <div className="w-7 h-7 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-0.5 ring-1 ring-base-300/50 flex-shrink-0">
               <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
-            <span className="font-bold text-sm tracking-tight leading-none">
+            <span className="font-bold text-sm tracking-tight leading-none truncate max-w-[100px]" title={name}>
               {renderName ? renderName(name) : name}
             </span>
             {infoButtonNode && (
@@ -396,10 +396,16 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <div className="flex items-center gap-1 flex-shrink-0">
             {hasBetterRate && showMoveButton && (
               <button
-                className="px-1.5 py-0.5 text-[7px] uppercase tracking-wider font-semibold rounded bg-secondary/20 text-secondary hover:bg-secondary/30 transition-colors animate-pulse"
+                className={`px-1.5 py-0.5 text-[7px] uppercase tracking-wider font-semibold rounded transition-colors ${
+                  !isWalletConnected || actionsDisabled
+                    ? "bg-base-300 text-base-content/50 cursor-not-allowed"
+                    : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
+                }`}
                 onClick={e => {
                   e.stopPropagation();
-                  moveModal.open();
+                  if (isWalletConnected && !actionsDisabled) {
+                    moveModal.open();
+                  }
                 }}
                 disabled={!isWalletConnected || actionsDisabled}
                 aria-label="Move"
@@ -429,18 +435,18 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </div>
         </div>
 
-        {/* Desktop Layout (>= lg) */}
-        <div className="hidden lg:grid lg:grid-cols-12 relative gap-0">
+        {/* Desktop Layout (>= md) */}
+        <div className="hidden md:grid md:grid-cols-12 relative gap-0">
           {/* Token */}
-          <div className="lg:col-span-3 flex items-center">
+          <div className="md:col-span-3 flex items-center">
             <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 ring-1 ring-base-300/50">
               <Image src={icon} alt={`${name} icon`} fill className="rounded-lg object-contain" />
             </div>
-            <div className="ml-3 flex items-center gap-1.5">
+            <div className="ml-3 flex items-center gap-1.5 min-w-0">
               {renderName ? (
                 <>{renderName(name)}</>
               ) : (
-                <span className="font-bold text-base text-base-content">{name}</span>
+                <span className="font-bold text-base text-base-content truncate" title={name}>{name}</span>
               )}
             </div>
             {infoButtonNode && (
@@ -453,7 +459,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
           {/* Stats: Rates */}
           <div
-            className={`lg:col-span-8 grid gap-0 items-center min-w-[200px] ${hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
+            className={`md:col-span-8 grid gap-0 items-center ${hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
               }`}
           >
             {!hideBalanceColumn && (
@@ -503,13 +509,19 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           </div>
 
           {/* Expand Indicator and quick Move action */}
-          <div className="lg:col-span-1 flex items-center justify-end gap-2">
+          <div className="md:col-span-1 flex items-center justify-end gap-2">
             {hasBetterRate && showMoveButton && (
               <button
-                className="px-2 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md bg-secondary/20 text-secondary hover:bg-secondary/30 transition-colors animate-pulse"
+                className={`px-2 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
+                  !isWalletConnected || actionsDisabled
+                    ? "bg-base-300 text-base-content/50 cursor-not-allowed"
+                    : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
+                }`}
                 onClick={e => {
                   e.stopPropagation();
-                  moveModal.open();
+                  if (isWalletConnected && !actionsDisabled) {
+                    moveModal.open();
+                  }
                 }}
                 disabled={!isWalletConnected || actionsDisabled}
                 aria-label="Move"
@@ -526,7 +538,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             )}
             {hasAnyActions && (
               <div
-                className={`flex items-center justify-center w-6 h-6 rounded-lg ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
+                className={`flex items-center justify-center w-6 h-6 rounded-lg flex-shrink-0 ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
                   } transition-all duration-200`}
               >
                 {isExpanded ? (

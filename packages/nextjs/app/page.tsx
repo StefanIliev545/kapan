@@ -1,9 +1,5 @@
 import type { Metadata, NextPage } from "next";
-import LandingSection from "../components/home/LandingSection";
-import EnterAppCTA from "../components/home/EnterAppCTA";
-import ExplainerSection from "../components/home/ExplainerSection";
-import BuiltForConvenience from "../components/home/BuiltForConvenience";
-import RoadmapSection from "../components/info/RoadmapSection";
+import StickyLanding from "../components/home/StickyLanding";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Home Page Component
+ * Home Page Component - Full-screen sticky scroll landing
  */
 const Home: NextPage = () => {
   const organizationSchema = {
@@ -26,20 +22,13 @@ const Home: NextPage = () => {
   };
 
   return (
-    <div className="flex-grow">
-      {/* Main content */}
-      <main className="relative z-10">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") }}
-        />
-        <LandingSection />
-        <EnterAppCTA />
-        <ExplainerSection />
-        <BuiltForConvenience />
-        <RoadmapSection />
-      </main>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") }}
+      />
+      <StickyLanding />
+    </>
   );
 };
 

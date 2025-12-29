@@ -121,8 +121,8 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
       return isNegative ? `-${result}` : result;
     }
     
-    // For values >= $10K, use K notation to keep display compact
-    if (absValue >= 10_000) {
+    // For values >= $1K, use K notation to keep display compact
+    if (absValue >= 1_000) {
       const thousands = absValue / 1_000;
       const formatted = new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 2,
