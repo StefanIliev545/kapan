@@ -2,76 +2,11 @@
 module.exports = {
   content: ["./app/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}", "./utils/**/*.{js,ts,jsx,tsx}"],
   plugins: [require("daisyui")],
-  darkTheme: "dark",
-  darkMode: ["selector", "[data-theme='dark']"],
+  darkTheme: "kapan",
+  darkMode: ["selector", "[data-theme='kapan']"],
   daisyui: {
     themes: [
-      // Light theme remains unchanged
-      {
-        light: {
-          primary: "#3B82F6",
-          "primary-content": "#ffffff",
-          secondary: "#E5E7EB",
-          "secondary-content": "#1F2937",
-          accent: "#10B981",
-          "accent-content": "#ffffff",
-          neutral: "#1F2937",
-          "neutral-content": "#ffffff",
-          "base-100": "#ffffff",
-          "base-200": "#F1F5F9",
-          "base-300": "#E2E8F0",
-          "base-content": "#1F2937",
-          info: "#3ABFF8",
-          success: "#3B82F6",
-          warning: "#FBBF24",
-          error: "#F97316",
-          "--rounded-btn": "0.375rem",
-          ".tooltip": { "--tooltip-tail": "6px" },
-          ".link": { textUnderlineOffset: "2px" },
-          ".link:hover": { opacity: "0.8" },
-        },
-      },
-      // Custom synthwave theme derived from the refreshed dark palette
-      {
-        synthwave: {
-          // Muted indigo backdrop tones
-          "base-100": "#1E1E2E", // main background
-          "base-200": "#2A2A3C", // slightly lighter for surfaces
-          "base-300": "#3A3A4F", // even lighter accents
-          "base-content": "#E6E6EF", // light text for contrast
-
-          // Cool blue primary elements
-          primary: "#7AA2F7",
-          "primary-content": "#1E1E2E",
-
-          // Subtle purple secondary highlights
-          secondary: "#AD8EE6",
-          "secondary-content": "#1E1E2E",
-
-          // Pastel pink accents for focus
-          accent: "#F4B8E4",
-          "accent-content": "#1E1E2E",
-
-          // Slate neutrals for borders and UI chrome
-          neutral: "#414558",
-          "neutral-content": "#E6E6EF",
-
-          // Supporting status colors
-          info: "#89DDFF",
-          success: "#A6E3A1",
-          warning: "#F9E2AF",
-          error: "#F28FAD",
-
-          "--rounded-btn": "0.375rem",
-          ".tooltip": {
-            "--tooltip-tail": "6px",
-            "--tooltip-color": "oklch(var(--p))",
-          },
-          ".link": { textUnderlineOffset: "2px" },
-          ".link:hover": { opacity: "0.8" },
-        },
-      },
-      // Kapan landing page theme - minimal dark aesthetic
+      // Kapan theme - minimal dark aesthetic (the only theme)
       {
         kapan: {
           "base-100": "#0a0a0a",      // Near-black main bg
@@ -96,13 +31,9 @@ module.exports = {
           ".link:hover": { opacity: "0.8" },
         },
       },
-      // Additional DaisyUI themes for more choices
-      "emerald",
-      "dark",
-      "retro",
-      "forest",
-      "valentine",
     ],
+    // Force kapan as the default
+    darkTheme: "kapan",
   },
   theme: {
     container: {

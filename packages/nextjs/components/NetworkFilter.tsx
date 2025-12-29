@@ -4,7 +4,7 @@ import { track } from "@vercel/analytics";
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
-import { useTheme } from "next-themes";
+
 import Image from "next/image";
 
 // Helper to get the correct logo based on theme
@@ -54,8 +54,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const pathname = usePathname();
   const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
-  const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === "dark";
+  // Always dark mode with kapan theme
+  const isDarkMode = true;
 
   const [selectedNetwork, setSelectedNetwork] = useState<string>(defaultNetwork);
   const selectedRef = useRef(selectedNetwork);
@@ -255,12 +255,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex items-center gap-1 p-1 bg-base-200/30 rounded-lg border border-base-300/40"
+      className="relative inline-flex items-center gap-0.5 p-1 bg-base-200/50 rounded-lg border border-base-content/10"
     >
       {/* Animated sliding indicator */}
       {indicatorStyle && (
         <div
-          className="absolute top-1 bottom-1 bg-base-100 rounded-md shadow-sm transition-all duration-300 ease-out"
+          className="absolute top-1 bottom-1 bg-base-content/10 rounded-md transition-all duration-300 ease-out"
           style={{
             left: indicatorStyle.left,
             width: indicatorStyle.width,
@@ -279,10 +279,10 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
             type="button"
             aria-pressed={isActive}
             className={`
-              relative z-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 min-w-[100px]
+              relative z-10 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-md transition-colors duration-200 min-w-[90px]
               ${isActive
                 ? "text-base-content"
-                : "text-base-content/40 hover:text-base-content/70"
+                : "text-base-content/35 hover:text-base-content/60"
               }
             `}
             onClick={() => handleNetworkChange(network.id)}

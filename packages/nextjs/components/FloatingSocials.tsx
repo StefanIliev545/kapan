@@ -1,7 +1,6 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { SwitchTheme } from "~~/components/SwitchTheme";
 
 /**
  * Floating social links banner
@@ -59,10 +58,8 @@ export const FloatingSocials = () => {
         </Link>
       </div>
 
-      {/* Theme toggle - right side */}
-      <div className="pointer-events-auto">
-        <SwitchTheme className="btn-circle bg-base-100 dark:bg-base-200 shadow-md hover:shadow-lg border-0" />
-      </div>
+      {/* Empty div to maintain layout */}
+      <div />
     </div>
   );
 };

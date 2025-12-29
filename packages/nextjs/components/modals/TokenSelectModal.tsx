@@ -103,7 +103,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               sortedTokens.map(token => (
                 <button
                   key={token.tokenAddress}
-                  className="w-full flex items-center justify-between p-3 hover:bg-base-200/50 transition-colors"
+                  className="w-full flex items-center justify-between p-3 hover:bg-base-200/60 transition-colors cursor-pointer"
                   onClick={() => handleSelectToken(token)}
                 >
                   <div className="flex items-center gap-3 text-left">

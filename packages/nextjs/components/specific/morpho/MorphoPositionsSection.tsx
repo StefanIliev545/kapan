@@ -142,13 +142,16 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
       const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
-      return (
+        return (
         <div
           key={row.key}
-          className="relative rounded-md border border-base-300"
+          className="relative rounded-md border border-base-300 transition-all duration-200 hover:border-base-content/15"
         >
           {/* Market pair header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-base-200/50 px-3 py-2 border-b border-base-300">
+          <div 
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-base-200/50 px-3 py-2 border-b border-base-300 cursor-pointer transition-colors hover:bg-base-200/70"
+            onClick={() => toggleRowExpanded(row.key)}
+          >
             {/* Market name row */}
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex -space-x-2 flex-shrink-0">

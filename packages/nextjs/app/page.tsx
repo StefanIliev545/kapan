@@ -1,5 +1,5 @@
 import type { Metadata, NextPage } from "next";
-import StickyLanding from "../components/home/StickyLanding";
+import { StickyLanding } from "../components/home/StickyLanding";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Home Page Component - Full-screen sticky scroll landing
+ * Home Page Component - Sticky scroll landing
  */
 const Home: NextPage = () => {
   const organizationSchema = {

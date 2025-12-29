@@ -33,8 +33,8 @@ export const PositionCard: FC<PositionCardProps> = ({
   const containerClasses = `w-full p-3 rounded-md ${
     isExpanded ? "bg-base-300" : "bg-base-200"
   } ${
-    canToggle ? "cursor-pointer hover:bg-primary/10 hover:shadow-md" : "cursor-default"
-  } transition-all duration-200 ${containerClassName ?? ""}`;
+    canToggle ? "cursor-pointer hover:bg-base-200/80 hover:border-base-content/15" : "cursor-default"
+  } transition-all duration-200 border border-transparent ${containerClassName ?? ""}`;
 
   return (
     <>

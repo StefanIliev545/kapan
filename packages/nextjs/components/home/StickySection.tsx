@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { motion, MotionValue, useTransform } from "framer-motion";
+import { TextScramble } from "./TextScramble";
 
 export interface SectionData {
   tag: string;
@@ -10,6 +11,8 @@ export interface SectionData {
   content?: ReactNode;
   /** If true, use smaller text and tighter spacing to make room for larger content */
   compactHeader?: boolean;
+  /** If provided, cycles through these titles with scramble effect */
+  titlePhrases?: string[];
 }
 
 interface StickySectionProps {
@@ -75,7 +78,15 @@ export const StickySection = ({
           
           {/* Main title */}
           <h2 className={`landing-title text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-5xl sm:text-6xl md:text-7xl lg:text-8xl"}`}>
-            {section.title}
+            {section.titlePhrases ? (
+              <TextScramble 
+                phrases={section.titlePhrases} 
+                displayDuration={3000}
+                revealDuration={750}
+              />
+            ) : (
+              section.title
+            )}
           </h2>
         </div>
 

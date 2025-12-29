@@ -297,9 +297,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       {/* Container */}
       <div
         className={clsx(
-          "w-full bg-base-200/30 border border-base-300/40 transition-colors duration-200",
+          "w-full bg-base-200/30 border border-base-300/40 transition-all duration-200",
           isExpanded && hasAnyActions ? "px-4 sm:px-5 pt-4 pb-0" : "p-4 sm:p-5",
-          hasAnyActions ? "cursor-pointer hover:bg-base-200/50" : "cursor-default",
+          hasAnyActions ? "cursor-pointer hover:bg-base-200/60 hover:border-base-content/15" : "cursor-default",
           // Only apply rounded-xl if containerClassName doesn't override it
           !containerClassName?.includes("rounded") && "rounded-xl",
           containerClassName

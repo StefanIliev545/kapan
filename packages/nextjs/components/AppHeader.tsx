@@ -73,12 +73,12 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
                 href={href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                   isActive 
-                    ? "bg-primary/10 dark:bg-accent/10 text-primary dark:text-accent" 
-                    : "text-base-content/70 hover:bg-base-200/50 hover:text-base-content"
+                    ? "bg-base-content/10 text-base-content" 
+                    : "text-base-content/50 hover:bg-base-content/5 hover:text-base-content/70"
                 }`}
               >
-                <span className={isActive ? "text-primary dark:text-accent" : ""}>{icon}</span>
-                <span className="font-medium">{label}</span>
+                <span>{icon}</span>
+                <span className="font-medium uppercase tracking-wider text-sm">{label}</span>
               </Link>
             </li>
           );
@@ -91,12 +91,12 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center p-1 bg-base-200/50 rounded-xl border border-base-300/30"
+      className="relative flex items-center p-1 bg-base-200/60 rounded-lg border border-base-300/40"
     >
       {/* Sliding indicator */}
       {indicatorStyle && (
         <motion.div
-          className="absolute top-1 bottom-1 bg-gradient-to-r from-primary/20 to-accent/20 dark:from-primary/30 dark:to-accent/30 rounded-lg"
+          className="absolute top-1 bottom-1 bg-base-content/10 rounded-md"
           initial={false}
           animate={{
             left: indicatorStyle.left,
@@ -115,10 +115,10 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
             ref={(el) => {
               if (el) buttonRefs.current.set(href, el);
             }}
-            className={`relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+            className={`relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
               isActive 
-                ? "text-primary dark:text-accent" 
-                : "text-base-content/50 hover:text-base-content/80"
+                ? "text-base-content" 
+                : "text-base-content/40 hover:text-base-content/70"
             }`}
           >
             <span className={`transition-transform duration-200 ${isActive ? "scale-110" : ""}`}>
@@ -200,14 +200,14 @@ const SmartConnectButton = () => {
             transition={{ duration: 0.2 }}
             className="flex items-center gap-2"
           >
-            {/* Starknet glow effect */}
+            {/* Starknet glow effect - subtle */}
             <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 rounded-2xl blur-sm opacity-40 animate-pulse" />
-              <div className="relative flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-2xl shadow-md">
+              <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-orange-400/30 rounded-lg blur-sm opacity-60" />
+              <div className="relative flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10">
                 <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
                   <CustomConnectButton />
                 </div>
-                <div className="h-7 w-[1px] bg-base-300/50"></div>
+                <div className="h-7 w-[1px] bg-base-content/10"></div>
                 <div className="px-3 py-1.5">
                   <GasTokenSelector />
                 </div>
@@ -221,7 +221,7 @@ const SmartConnectButton = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className="flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-2xl shadow-md"
+            className="flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10"
           >
             <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
               <RainbowKitCustomConnectButton />
@@ -291,7 +291,7 @@ const AddressSearchBar = () => {
 
   return (
     <form onSubmit={handleSubmit} className="relative w-full max-w-xl">
-      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base-content/60">
+      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base-content/40">
         <MagnifyingGlassIcon className="h-5 w-5" />
       </span>
       <input
@@ -303,15 +303,15 @@ const AddressSearchBar = () => {
           }
         }}
         placeholder="Search address"
-        className={`input input-bordered w-full bg-base-200 pl-10 pr-12 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 dark:focus:ring-accent/40 ${
-          isInvalid ? "input-error" : ""
+        className={`w-full bg-base-200/60 border border-base-content/10 rounded-lg pl-10 pr-12 py-2.5 text-sm transition-colors focus:outline-none focus:ring-1 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/30 ${
+          isInvalid ? "border-error focus:ring-error/40" : ""
         }`}
       />
       {hasOverride && (
         <button
           type="button"
           onClick={handleClear}
-          className="absolute inset-y-0 right-2 flex items-center rounded-full p-1 text-base-content/60 transition-colors hover:text-error"
+          className="absolute inset-y-0 right-2 flex items-center rounded-full p-1 text-base-content/40 transition-colors hover:text-error"
           aria-label="Clear address override"
         >
           <XMarkIcon className="h-5 w-5" />
@@ -353,15 +353,15 @@ export const AppHeader = () => {
   return (
     <>
       <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
-        {/* Background with gradient border */}
+        {/* Background - simple dark with subtle border */}
         <div
-          className={`absolute inset-0 bg-gradient-to-r from-base-300/80 via-base-100/95 to-base-300/80 dark:from-base-300/60 dark:via-base-100/75 dark:to-base-300/60 backdrop-blur-md transition-all duration-300 ${
-            scrolled ? "shadow-md" : ""
+          className={`absolute inset-0 bg-base-100/95 backdrop-blur-md transition-all duration-300 ${
+            scrolled ? "shadow-[0_1px_3px_rgba(0,0,0,0.3)]" : ""
           }`}
           style={{ zIndex: -1 }}
         >
-          {/* Accent line */}
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 dark:via-accent/30 to-transparent"></div>
+          {/* Subtle bottom border */}
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-base-content/5"></div>
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
@@ -416,27 +416,25 @@ export const AppHeader = () => {
                         className="fixed top-16 left-4 z-50 w-72 rounded-lg shadow-2xl"
                         onClick={e => e.stopPropagation()}
                       >
-                        <div className="bg-base-200/95 dark:bg-base-300/95 backdrop-blur-md p-6 rounded-box border border-base-300/50 dark:border-base-content/10 shadow-lg">
-                          <div className="mb-6 pb-3 border-b border-base-300/50 dark:border-base-content/10">
-                            <div className="flex items-center gap-4">
-                              <div className="relative w-12 h-12">
+                        <div className="bg-base-200/95 backdrop-blur-md p-6 rounded-xl border border-base-content/10 shadow-lg">
+                          <div className="mb-6 pb-3 border-b border-base-content/10">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-10 h-10">
                                 <Image
                                   alt="Kapan logo"
-                                  className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
+                                  className="object-contain opacity-60"
                                   fill
                                   src="/seal-logo.png"
                                 />
                               </div>
-                              <div>
-                                <div className="font-bold text-xl font-inter text-base-content">Kapan</div>
-                              </div>
+                              <span className="text-base font-bold text-base-content/60 uppercase tracking-wider">Kapan</span>
                             </div>
                           </div>
                           {/* Mobile nav links */}
                           <ul className="space-y-2">
                             <AppHeaderMenuLinks isMobile />
                           </ul>
-                          <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
+                          <div className="mt-6 pt-4 border-t border-base-content/10">
                             <div className="flex flex-col space-y-3 items-stretch relative z-50">
                               <SmartConnectButton />
                             </div>
@@ -449,13 +447,13 @@ export const AppHeader = () => {
               </div>
 
               {/* Logo */}
-              <Link href="/" className="flex items-center">
+              <Link href="/" className="flex items-center group">
                 <div className="relative flex items-center">
                   <div className="relative">
-                    <div className={`relative w-11 h-11 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                    <div className={`relative w-9 h-9 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
                       <Image
                         alt="Kapan logo"
-                        className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
+                        className="object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-300"
                         fill
                         src="/seal-logo.png"
                         priority
@@ -463,7 +461,7 @@ export const AppHeader = () => {
                     </div>
                   </div>
                   <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                    <div className="font-bold text-lg font-inter text-base-content">Kapan</div>
+                    <span className="text-sm font-bold text-base-content/60 group-hover:text-base-content transition-colors duration-300 uppercase tracking-wider">Kapan</span>
                   </div>
                 </div>
               </Link>
@@ -498,16 +496,6 @@ export const AppHeader = () => {
           <AddressSearchBar />
         </div>
       )}
-      <div className="w-full bg-primary/5 dark:bg-accent/5 text-base-content/70 text-center text-xs py-1">
-        <Link
-          href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-primary dark:hover:text-accent"
-        >
-          Starknet Audit by Codespect
-        </Link>
-      </div>
     </>
   );
 };

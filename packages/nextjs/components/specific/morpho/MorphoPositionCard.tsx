@@ -48,7 +48,7 @@ export const MorphoPositionCard: FC<MorphoPositionCardProps> = ({
           : "text-success";
 
   return (
-    <div className="card bg-base-100 shadow-lg border border-base-300 hover:border-primary/30 transition-all">
+    <div className="card bg-base-100 shadow-lg border border-base-300 hover:border-base-content/20 hover:bg-base-200/30 transition-all cursor-pointer">
       <div className="card-body p-4">
         {/* Header: Market Pair */}
         <div className="flex items-center justify-between mb-3">

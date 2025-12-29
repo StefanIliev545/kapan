@@ -2,6 +2,7 @@
 
 import { FC, useState, useMemo, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import {
@@ -208,7 +209,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
       {/* Protocol Header Card - matching ProtocolView exactly */}
       <div
-        className="card bg-base-200/40 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-300/50 cursor-pointer select-none"
+        className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50 cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="card-body px-3 sm:px-5 py-3">
@@ -357,37 +358,57 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
       </div>
 
       {/* Markets Section - expandable */}
-      {isMarketsOpen && !isCollapsed && (
-        <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
-          <div className="card-body p-4">
-            <MorphoMarketsSection
-              markets={markets}
-              marketPairs={marketPairs}
-              isLoading={isLoadingMarkets}
-              chainId={effectiveChainId}
-            />
-          </div>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {isMarketsOpen && !isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
+              <div className="card-body p-4">
+                <MorphoMarketsSection
+                  markets={markets}
+                  marketPairs={marketPairs}
+                  isLoading={isLoadingMarkets}
+                  chainId={effectiveChainId}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Positions Container - collapsible */}
-      {!isCollapsed && (
-        <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 rounded-xl border border-base-300/50">
-          <div className="card-body p-4">
-            <MorphoPositionsSection
-              title="Your Positions"
-              rows={rows}
-              markets={markets}
-              userAddress={connectedAddress}
-              hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
-              isUpdating={isUpdating}
-              chainId={chainId}
-              yieldsByAddress={yieldsByAddress}
-              yieldsBySymbol={yieldsBySymbol}
-            />
-          </div>
-        </div>
-      )}
+      {/* Positions Container - collapsible with animation */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
+              <div className="card-body p-4">
+                <MorphoPositionsSection
+                  title="Your Positions"
+                  rows={rows}
+                  markets={markets}
+                  userAddress={connectedAddress}
+                  hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
+                  isUpdating={isUpdating}
+                  chainId={chainId}
+                  yieldsByAddress={yieldsByAddress}
+                  yieldsBySymbol={yieldsBySymbol}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -38,7 +38,7 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
   const initialHost = headersList.get("host");
 
   return (
-    <html suppressHydrationWarning>
+    <html suppressHydrationWarning data-theme="kapan" className="dark">
       <head>
         {/* Preconnect to external APIs - saves 100-300ms per connection */}
         <link rel="preconnect" href="https://blue-api.morpho.org" />
@@ -50,17 +50,13 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
         <link rel="dns-prefetch" href="https://api.coingecko.com" />
         <link rel="dns-prefetch" href="https://api.1inch.io" />
         
-        {/* Inline script to prevent theme flash - runs before React hydrates */}
+        {/* Inline script to ensure kapan theme is always applied */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                try {
-                  var stored = localStorage.getItem('theme');
-                  var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-                  document.documentElement.classList.add(theme);
-                  document.documentElement.setAttribute('data-theme', theme);
-                } catch (e) {}
+                document.documentElement.classList.add('dark');
+                document.documentElement.setAttribute('data-theme', 'kapan');
               })();
             `,
           }}

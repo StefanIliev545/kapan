@@ -1,6 +1,7 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import { Address, encodeAbiParameters } from "viem";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
 import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
@@ -491,7 +492,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
       {/* Protocol Header Card */}
       <div
-        className="card bg-base-200/40 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-300/50 cursor-pointer select-none"
+        className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50 cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="card-body px-3 sm:px-5 py-3">
@@ -777,9 +778,17 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
       )}
 
-      {/* Positions Container - collapsible */}
-      {!isCollapsed && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Positions Container - collapsible with animation */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
           {/* Supplied Assets */}
           <div className="h-full">
             <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
@@ -962,8 +971,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modals - Conditional based on network type */}
       {!readOnly && networkType === "starknet" ? (
