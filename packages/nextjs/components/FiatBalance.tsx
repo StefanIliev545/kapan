@@ -109,6 +109,29 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
   // Format the USD value for display.
   const formattedUsd = useMemo(() => {
     const absValue = Math.abs(usdValue);
+    
+    // Use compact notation for large values to prevent overflow
+    if (absValue >= 1_000_000) {
+      const millions = absValue / 1_000_000;
+      const formatted = new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(millions);
+      const result = showCurrencySymbol ? `$${formatted}M` : `${formatted}M`;
+      return isNegative ? `-${result}` : result;
+    }
+    
+    // For values >= $10K, use K notation to keep display compact
+    if (absValue >= 10_000) {
+      const thousands = absValue / 1_000;
+      const formatted = new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(thousands);
+      const result = showCurrencySymbol ? `$${formatted}K` : `${formatted}K`;
+      return isNegative ? `-${result}` : result;
+    }
+    
     const formatter = new Intl.NumberFormat("en-US", {
       style: showCurrencySymbol ? "currency" : "decimal",
       currency: "USD",

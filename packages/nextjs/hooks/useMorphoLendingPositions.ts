@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { logger } from "~~/utils/logger";
 
 // ============ Types ============
 
@@ -405,7 +406,7 @@ export function useMorphoMarkets(chainId: number, search?: string) {
   } = useQuery({
     queryKey: ["morpho-markets", chainId, normalizedSearch],
     queryFn: () => {
-      console.log("[useMorphoMarkets] Fetching markets with search:", normalizedSearch || "(none)");
+      logger.debug("[useMorphoMarkets] Fetching markets with search:", normalizedSearch || "(none)");
       return fetchMorphoMarkets(chainId, normalizedSearch);
     },
     staleTime: 30_000, // Reduced from 60s to 30s for search responsiveness

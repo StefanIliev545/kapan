@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { useOutsideClick } from "../useOutsideClick";
+import { useOutsideClick } from "../../common/useOutsideClick";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("useOutsideClick", () => {

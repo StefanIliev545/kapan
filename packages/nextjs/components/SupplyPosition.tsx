@@ -228,7 +228,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       content: (
         <>
           <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Balance</div>
-          <div className="text-sm font-mono font-semibold tabular-nums">
+          <div className="text-xs font-mono font-semibold tabular-nums">
             <FiatBalance
               tokenAddress={tokenAddress}
               rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
@@ -249,7 +249,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     content: (
       <>
         <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">APY</div>
-        <div className="text-sm font-mono font-semibold tabular-nums text-base-content">
+        <div className="text-xs font-mono font-semibold tabular-nums text-base-content">
           {formatPercentage(currentRate)}%
         </div>
       </>
@@ -262,7 +262,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       <>
         <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Best APY</div>
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-mono font-semibold tabular-nums text-success">
+          <span className="text-xs font-mono font-semibold tabular-nums text-success">
             {formatPercentage(displayedOptimalRate)}%
           </span>
           <div className="w-4 h-4 relative flex-shrink-0">
@@ -286,7 +286,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       content: (
         <>
           <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">{stat.label}</div>
-          <div className="text-sm font-mono font-semibold tabular-nums">{stat.value}</div>
+          <div className="text-xs font-mono font-semibold tabular-nums">{stat.value}</div>
         </>
       ),
     });

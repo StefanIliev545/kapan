@@ -58,7 +58,8 @@
   "devDependencies": {
     "cursor-tools": "latest",
     "husky": "~8.0.3",
-    "lint-staged": "~13.2.2"
+    "lint-staged": "~13.2.2",
+    "zod": "^4.2.1"
   },
   "packageManager": "yarn@3.2.3",
   "engines": {

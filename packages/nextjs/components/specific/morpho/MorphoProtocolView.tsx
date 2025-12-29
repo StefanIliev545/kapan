@@ -15,6 +15,7 @@ import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
 import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { formatCurrencyCompact } from "~~/utils/formatNumber";
 
 // Health status indicator component matching ProtocolView
 const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
@@ -185,12 +186,6 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     setProtocolTotals("Morpho", totalSupplied, totalBorrowed);
   }, [hasLoadedOnce, rows, setProtocolTotals, effectiveChainId]);
 
-  const formatCurrency = (value: number) => {
-    if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-    if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
-    return `$${value.toFixed(2)}`;
-  };
-
   const formatSignedPercentage = (val: number) => {
     const sign = val >= 0 ? "+" : "";
     return `${sign}${val.toFixed(2)}%`;
@@ -247,7 +242,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                 <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
-                  {hasPositions ? formatCurrency(metrics.netBalance) : "—"}
+                  {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
                 </span>
               </div>
 
@@ -255,7 +250,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               <div className="hidden min-[480px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
                 <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
-                  {hasPositions ? formatCurrency(metrics.netYield30d) : "—"}
+                  {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
                 </span>
               </div>
 

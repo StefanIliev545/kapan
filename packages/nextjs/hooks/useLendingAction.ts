@@ -9,6 +9,7 @@ import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import { feltToString } from "~~/utils/protocols";
 import { notification } from "~~/utils/scaffold-stark";
+import { logger } from "~~/utils/logger";
 
 export type Action = "Borrow" | "Deposit" | "Withdraw" | "Repay";
 
@@ -211,9 +212,9 @@ export const useLendingAction = (
     }
     
     if (shouldUseDirectVault) {
-      console.log("Using direct ERC4626 vault interaction for", action);
+      logger.debug("Using direct ERC4626 vault interaction for", action);
       if (!vtokenAddress) {
-        console.log("vtokenAddress not available");
+        logger.debug("vtokenAddress not available");
         return null;
       }
       
@@ -296,8 +297,8 @@ export const useLendingAction = (
         user: starkAddress,
       };
       const context = buildVesuContextOption(vesuContext);
-      console.log("token.address", tokenAddress);
-      console.log("parsedAmount", parsedAmount);
+      logger.debug("token.address", tokenAddress);
+      logger.debug("parsedAmount", parsedAmount);
       let lendingInstruction;
       switch (action) {
         case "Deposit":

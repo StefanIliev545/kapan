@@ -11,8 +11,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title MorphoBlueGatewayWrite
  * @notice Gateway for Morpho Blue lending protocol
@@ -96,8 +94,6 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
 
         // Resolve amount from input if referenced
         uint256 amount = ins.input.index < inputs.length ? inputs[ins.input.index].amount : ins.amount;
-
-        console.log("MorphoBlue: op=%s, amount=%s, user=%s", uint256(ins.op), amount, ins.user);
 
         return _dispatch(ins.op, params, amount, ins.user);
     }

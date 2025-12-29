@@ -1,4 +1,5 @@
 import React from "react";
+import { formatCurrency } from "~~/utils/formatNumber";
 
 interface DashboardMetricsProps {
     netWorth: number;
@@ -13,14 +14,6 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({
     totalDebt,
     isLoading = false,
 }) => {
-    const formatCurrency = (val: number) =>
-        new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(val);
-
     if (isLoading) {
         return (
             <div className="flex items-center space-x-8">

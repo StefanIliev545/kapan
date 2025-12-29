@@ -11,6 +11,7 @@ import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { ExclamationTriangleIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import type { SwapAsset } from "./modals/SwapModalShell";
 import formatPercentage from "~~/utils/formatPercentage";
+import { formatCurrency } from "~~/utils/formatNumber";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
@@ -366,17 +367,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       }),
     [suppliedPositionsWithPTYields, borrowedPositions, netBalance],
   );
-
-  // Format currency with sign.
-  const formatCurrency = (amount: number) => {
-    const formatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(amount));
-    return amount >= 0 ? formatted : `-${formatted}`;
-  };
 
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));

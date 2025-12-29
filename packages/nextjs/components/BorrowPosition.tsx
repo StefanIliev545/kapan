@@ -459,7 +459,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             {!hideBalanceColumn && (
               <div className="px-3 border-r border-base-300/50">
                 <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Balance</div>
-                <div className="text-sm font-mono font-semibold tabular-nums">
+                <div className="text-xs font-mono font-semibold tabular-nums">
                   {showNoDebtLabel ? (
                     <span className="text-base-content/50">No debt</span>
                   ) : (
@@ -480,14 +480,14 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             )}
             <div className="px-3 border-r border-base-300/50">
               <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">APR</div>
-              <div className="text-sm font-mono font-semibold tabular-nums text-base-content">
+              <div className="text-xs font-mono font-semibold tabular-nums text-base-content">
                 {formatPercentage(currentRate)}%
               </div>
             </div>
             <div className="px-3">
               <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Best APR</div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-mono font-semibold tabular-nums text-success">
+                <span className="text-xs font-mono font-semibold tabular-nums text-success">
                   {formatPercentage(displayedOptimalRate)}%
                 </span>
                 <div className="w-4 h-4 relative flex-shrink-0">
