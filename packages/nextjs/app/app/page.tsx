@@ -144,33 +144,41 @@ const App: NextPage = () => {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-4">
-        {/* Header with metrics */}
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-base-content tracking-tight">Positions</h1>
-            </div>
-
-            {/* Network Switcher */}
-            <NetworkFilter
-              networks={networkOptions}
-              defaultNetwork={initialNetwork}
-              onNetworkChange={handleNetworkChange}
+        {/* Compact header: title + metrics + network filter on one line (desktop) */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Left: Title + Metrics */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+            <h1 className="text-lg font-bold text-base-content tracking-tight uppercase">Positions</h1>
+            <div className="hidden sm:block w-px h-6 bg-base-content/10" />
+            <DashboardMetrics
+              netWorth={totalNet}
+              totalSupply={totalSupplied}
+              totalDebt={totalBorrowed}
+              isLoading={!allLoaded}
             />
           </div>
 
-          {/* Compact metrics row */}
-          <DashboardMetrics
-            netWorth={totalNet}
-            totalSupply={totalSupplied}
-            totalDebt={totalBorrowed}
-            isLoading={!allLoaded}
+          {/* Right: Network Switcher */}
+          <NetworkFilter
+            networks={networkOptions}
+            defaultNetwork={initialNetwork}
+            onNetworkChange={handleNetworkChange}
           />
+          
+          {/* Mobile metrics (below network filter) */}
+          <div className="sm:hidden">
+            <DashboardMetrics
+              netWorth={totalNet}
+              totalSupply={totalSupplied}
+              totalDebt={totalBorrowed}
+              isLoading={!allLoaded}
+            />
+          </div>
         </div>
 
         {/* Subtle warning */}
         {warnings[selectedNetwork as keyof typeof warnings] && (
-          <p className="text-xs text-base-content/40 border-l-2 border-base-300 pl-3">
+          <p className="text-[10px] uppercase tracking-wider text-base-content/30 border-l border-base-content/10 pl-3">
             {warnings[selectedNetwork as keyof typeof warnings]}
           </p>
         )}

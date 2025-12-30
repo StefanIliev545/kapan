@@ -13,6 +13,7 @@ import { getMorphoMarketUrl } from "~~/utils/morpho";
 import { ExternalLink } from "lucide-react";
 import { isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
+import { formatCurrencyCompact } from "~~/utils/formatNumber";
 
 interface MorphoPositionsSectionProps {
   title: string;
@@ -139,23 +140,21 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         return `${sign}${val.toFixed(2)}%`;
       };
 
-      const formatCurrency = (value: number) => {
-        if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-        if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(2)}K`;
-        return `$${value.toFixed(2)}`;
-      };
-
       const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
-      return (
+        return (
         <div
           key={row.key}
-          className="relative overflow-hidden rounded-md border border-base-300"
+          className="relative rounded-md border border-base-300 transition-all duration-200 hover:border-base-content/15"
         >
           {/* Market pair header */}
-          <div className="flex items-center justify-between bg-base-200/50 px-3 py-2 border-b border-base-300">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
+          <div 
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-base-200/50 px-3 py-2 border-b border-base-300 cursor-pointer transition-colors hover:bg-base-200/70"
+            onClick={() => toggleRowExpanded(row.key)}
+          >
+            {/* Market name row */}
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex -space-x-2 flex-shrink-0">
                 <Image
                   src={tokenNameToLogo(row.collateralSymbol.toLowerCase())}
                   alt={row.collateralSymbol}
@@ -177,7 +176,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                   }}
                 />
               </div>
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium truncate" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
                 {row.collateralSymbol}/{row.loanSymbol}
               </span>
               {(() => {
@@ -193,7 +192,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-0.5 opacity-50 hover:opacity-100 transition-opacity ml-1"
+                    className="inline-flex items-center gap-0.5 opacity-50 hover:opacity-100 transition-opacity flex-shrink-0"
                     title="View on Morpho"
                   >
                     <Image
@@ -208,40 +207,40 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                 ) : null;
               })()}
             </div>
-            <div className="flex items-center gap-4 text-xs">
+            {/* Stats row - wraps on mobile */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
               {/* Net Value */}
               <span className="text-base-content/60">
                 Net:{" "}
                 <span className={positionYieldMetrics.netBalance >= 0 ? "text-success" : "text-error"}>
-                  {formatCurrency(positionYieldMetrics.netBalance)}
+                  {formatCurrencyCompact(positionYieldMetrics.netBalance)}
                 </span>
               </span>
               {/* Net APY */}
               <span className="text-base-content/60">
-                Net APY:{" "}
+                APY:{" "}
                 <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? "text-success" : "text-error"}>
                   {positionYieldMetrics.netApyPercent != null ? formatSignedPercentage(positionYieldMetrics.netApyPercent) : "—"}
                 </span>
               </span>
-              {/* 30D Yield with tooltip for annual yield */}
-              <span className="hidden sm:inline text-base-content/60 group relative cursor-help">
-                30D:{" "}
-                <span className={positionYieldMetrics.netYield30d >= 0 ? "text-success" : "text-error"}>
-                  {formatCurrency(positionYieldMetrics.netYield30d)}
-                </span>
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[10px] bg-base-300 text-base-content rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? "text-success" : "text-error"}>{formatCurrency(positionYieldMetrics.netAnnualYield)}</span>
-                </span>
-              </span>
-              {/* LTV */}
+              {/* LTV - show first on mobile since it's important */}
               {row.hasDebt && (
                 <span className="text-base-content/60">
-                  LTV: <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? "text-error" : "text-success"}>{ltvDisplayValue}</span>
-                  <span className="text-base-content/50 ml-1">
-                    / {row.lltv.toFixed(0)}%
-                  </span>
+                  LTV:{" "}
+                  <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? "text-error" : "text-success"}>{ltvDisplayValue}</span>
+                  <span className="text-base-content/50">/{row.lltv.toFixed(0)}%</span>
                 </span>
               )}
+              {/* 30D Yield - hidden on very small screens */}
+              <span className="hidden min-[400px]:inline text-base-content/60 group relative cursor-help">
+                30D:{" "}
+                <span className={positionYieldMetrics.netYield30d >= 0 ? "text-success" : "text-error"}>
+                  {formatCurrencyCompact(positionYieldMetrics.netYield30d)}
+                </span>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[10px] bg-base-300 text-base-content rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? "text-success" : "text-error"}>{formatCurrencyCompact(positionYieldMetrics.netAnnualYield)}</span>
+                </span>
+              </span>
             </div>
           </div>
 

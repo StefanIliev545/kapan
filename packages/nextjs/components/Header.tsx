@@ -13,8 +13,6 @@ import {
   SparklesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { SwitchTheme } from "~~/components/SwitchTheme";
-import { ThemeSettings } from "~~/components/ThemeSettings";
 import { GasTokenSelector } from "~~/components/GasTokenSelector";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
@@ -216,20 +214,18 @@ export const Header = () => {
                       className="fixed top-16 left-4 z-50 w-72 rounded-lg shadow-2xl"
                       onClick={e => e.stopPropagation()}
                     >
-                      <div className="bg-base-200/95 dark:bg-base-300/95 backdrop-blur-md p-6 rounded-box border border-base-300/50 dark:border-base-content/10 shadow-lg">
-                        <div className="mb-6 pb-3 border-b border-base-300/50 dark:border-base-content/10">
-                          <div className="flex items-center gap-4">
-                            <div className="relative w-12 h-12">
+                      <div className="bg-base-200/95 backdrop-blur-md p-6 rounded-xl border border-base-content/10 shadow-lg">
+                        <div className="mb-6 pb-3 border-b border-base-content/10">
+                          <div className="flex items-center gap-3">
+                            <div className="relative w-10 h-10">
                               <Image
                                 alt="Kapan logo"
-                                className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
+                                className="object-contain opacity-60"
                                 fill
                                 src="/seal-logo.png"
                               />
                             </div>
-                            <div>
-                              <div className="font-bold text-xl font-inter text-base-content">Kapan</div>
-                            </div>
+                            <span className="text-base font-bold text-base-content/60 uppercase tracking-wider">Kapan</span>
                           </div>
                         </div>
                         <ul className="space-y-2">
@@ -262,13 +258,13 @@ export const Header = () => {
             </div>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center">
+            <Link href="/" className="flex items-center group">
               <div className="relative flex items-center">
                 <div className="relative">
-                  <div className={`relative w-11 h-11 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
+                  <div className={`relative w-9 h-9 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
                     <Image
                       alt="Kapan logo"
-                      className="object-contain dark:opacity-90 dark:[filter:drop-shadow(0_0_11px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.9))]"
+                      className="object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-300"
                       fill
                       src="/seal-logo.png"
                       priority
@@ -276,10 +272,10 @@ export const Header = () => {
                   </div>
                 </div>
                 <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                  <div className="font-bold text-lg font-inter text-base-content">Kapan</div>
+                  <span className="text-sm font-bold text-base-content/60 group-hover:text-base-content transition-colors duration-300 uppercase tracking-wider">Kapan</span>
                 </div>
-                </div>
-              </Link>
+              </div>
+            </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex ml-10">
@@ -336,23 +332,10 @@ export const Header = () => {
               </div>
               {/* Removed Stark faucet and FaucetButton from desktop header */}
             </motion.div>
-            <div className="flex items-center gap-2">
-              <SwitchTheme />
-              <ThemeSettings />
-            </div>
+
           </div>
         </div>
       </div>
-    </div>
-    <div className="w-full bg-primary/5 dark:bg-accent/5 text-base-content/70 text-center text-xs py-1">
-      <Link
-        href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="hover:text-primary dark:hover:text-accent"
-      >
-        Starknet Audit by Codespect
-      </Link>
     </div>
     </>
   );

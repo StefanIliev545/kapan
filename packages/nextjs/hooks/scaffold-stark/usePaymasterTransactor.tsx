@@ -7,6 +7,7 @@ import { usePaymasterSendTransaction, usePaymasterGasTokens } from "@starknet-re
 import { universalStrkAddress } from "~~/utils/Constants";
 import providerFactory from "~~/services/web3/provider";
 import { TransactionToast } from "~~/components/TransactionToast";
+import { logger } from "~~/utils/logger";
 
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
@@ -91,11 +92,11 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
             const calls = Array.isArray(result) ? result : [result];
             
             if (shouldUsePaymaster && selectedToken?.address) {
-              console.log(`Using paymaster with ${selectedToken.symbol} for gas payment`);
+              logger.debug(`Using paymaster with ${selectedToken.symbol} for gas payment`);
               const paymasterResult = await sendPaymasterTransaction(calls);
               transactionHash = paymasterResult.transaction_hash;
             } else {
-              console.log("Using regular transaction with STRK for gas payment");
+              logger.debug("Using regular transaction with STRK for gas payment");
               // Fallback to regular transaction
               const regularResult = await walletClient.execute(calls);
               transactionHash = regularResult.transaction_hash;
@@ -106,11 +107,11 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
           const calls = Array.isArray(tx) ? tx : [tx];
           
           if (shouldUsePaymaster && selectedToken?.address) {
-            console.log(`Using paymaster with ${selectedToken.symbol} for gas payment`);
+            logger.debug(`Using paymaster with ${selectedToken.symbol} for gas payment`);
             const paymasterResult = await sendPaymasterTransaction(calls);
             transactionHash = paymasterResult.transaction_hash;
           } else {
-            console.log("Using regular transaction with STRK for gas payment");
+            logger.debug("Using regular transaction with STRK for gas payment");
             const regularResult = await walletClient.execute(calls);
             transactionHash = regularResult.transaction_hash;
           }
@@ -143,7 +144,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
       // Wait for transaction receipt
       try {
         await provider?.waitForTransaction(transactionHash);
-        console.log("Transaction confirmed:", transactionHash);
+        logger.debug("Transaction confirmed:", transactionHash);
       } catch (waitError) {
         console.warn("Error waiting for transaction:", waitError);
         // Continue anyway - transaction might be included but receipt fetch failed

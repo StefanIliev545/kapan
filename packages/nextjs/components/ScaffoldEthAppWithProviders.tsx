@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
   argent,
@@ -11,7 +11,6 @@ import {
   type Connector,
 } from "@starknet-react/core";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
-import { useTheme } from "next-themes";
 import { Toaster } from "sonner";
 import { Fordefi } from "starknetkit/fordefi";
 import { Keplr } from "starknetkit/keplr";
@@ -98,13 +97,7 @@ export const ScaffoldEthAppWithProviders = ({
   children: React.ReactNode;
   initialHost?: string | null;
 }) => {
-  const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === "dark";
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Always dark mode with kapan theme
 
   const injected = useInjectedConnectors({
     recommended: [argent(), braavos(), new MetaMask(), new Keplr(), new Fordefi()],
@@ -141,7 +134,7 @@ export const ScaffoldEthAppWithProviders = ({
                 <ProgressBar height="3px" color="#2299dd" />
                 <RainbowKitProvider
                   avatar={BlockieAvatar}
-                  theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+                  theme={darkTheme()}
                 >
                   <StarknetWalletAnalytics />
                   <WalletAnalytics />

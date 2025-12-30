@@ -1,4 +1,5 @@
 import { Address } from "viem";
+import { logger } from "./logger";
 
 export const ONE_INCH_API_BASE = "/api/1inch";
 
@@ -81,7 +82,7 @@ export const fetch1inchQuote = async (
     });
 
     const json = await response.json();
-    console.log(`1inch quote response: ${JSON.stringify(json)}`);
+    logger.debug(`1inch quote response: ${JSON.stringify(json)}`);
     if (json.error) {
         throw new Error(json.description || json.error);
     }
@@ -110,7 +111,7 @@ export const fetch1inchSwap = async (
     });
 
     const json = await response.json();
-    console.log(`1inch response: ${JSON.stringify(json)}`);
+    logger.debug(`1inch response: ${JSON.stringify(json)}`);
     if (json.error) {
         throw new Error(json.description || json.error);
     }

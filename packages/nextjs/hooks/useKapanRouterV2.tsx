@@ -42,6 +42,7 @@ import {
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { simulateTransaction, formatErrorForDisplay, decodeRevertReason } from "~~/utils/errorDecoder";
+import { logger } from "~~/utils/logger";
 
 // --- ABI FIXES ---
 // Local definition of deauthorizeInstructions/authorizeInstructions signatures 
@@ -203,7 +204,7 @@ export const useKapanRouterV2 = () => {
       // Morpho-specific queries
       queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
-    ]).catch(e => console.warn("Post-tx refetch err:", e));
+    ]).catch(e => logger.warn("Post-tx refetch err:", e));
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("txCompleted"));
@@ -275,7 +276,7 @@ export const useKapanRouterV2 = () => {
     const normalizedProtocol = normalizeProtocolName(protocolName);
 
     if (isMax || amount.toLowerCase() === "max") {
-      console.warn("buildRepayFlow: isMax=true is deprecated for sync calls. Use buildRepayFlowAsync instead.");
+      logger.warn("buildRepayFlow: isMax=true is deprecated for sync calls. Use buildRepayFlowAsync instead.");
       return [];
     }
 
@@ -615,11 +616,11 @@ export const useKapanRouterV2 = () => {
       [collateralToken as Address, minCollateralOutBigInt, swapData as Hex]
     );
 
-    console.log("[buildMultiplyFlow] zapMode:", zapMode, "depositAmountRaw:", depositAmountRaw.toString(), "flashAmount:", flashAmount.toString());
+    logger.debug("[buildMultiplyFlow] zapMode:", zapMode, "depositAmountRaw:", depositAmountRaw.toString(), "flashAmount:", flashAmount.toString());
 
     // ZAP MODE: deposit debt token, combine with flash loan, swap everything to collateral
     if (zapMode && depositAmountRaw > 0n) {
-      console.log("[buildMultiplyFlow] Using ZAP MODE flow");
+      logger.debug("[buildMultiplyFlow] Using ZAP MODE flow");
       // Output tracking for zap mode:
       // 0. Pull deposit (debt token) -> Output[0]
       // 1. ToOutput flash-loan amount -> Output[1]
@@ -1069,7 +1070,7 @@ export const useKapanRouterV2 = () => {
       // skip entirely since simulation can't accurately predict atomic batch behavior.
       // The approvals would be bundled atomically with the main tx, so simulating separately gives false negatives.
       if (options?.skipWhenAuthCallsExist && authCalls.length > 0) {
-        console.info("Skipping simulation for batched flow with authorization calls");
+        logger.info("Skipping simulation for batched flow with authorization calls");
         return;
       }
 
@@ -1119,7 +1120,7 @@ export const useKapanRouterV2 = () => {
             // Approvals will be bundled with execution, so skip failing on errors that might be
             // caused by missing approvals. Common false negatives include ERC20 transfer failures,
             // "unknown error" from protocols, etc.
-            console.info("Skipping simulation error because authorization calls will be bundled:", formatted);
+            logger.info("Skipping simulation error because authorization calls will be bundled:", formatted);
             return;
           }
         }
@@ -1418,12 +1419,12 @@ export const useKapanRouterV2 = () => {
               notification.success(<TransactionToast step="confirmed" txHash={hash} message="Permissions revoked" />);
             } catch (e) {
               if (deauthNotifId) notification.remove(deauthNotifId);
-              console.warn("Deauth step failed", e);
+              logger.warn("Deauth step failed", e);
             }
           }
         }
       } catch (e) {
-        console.warn("Deauthorization check failed", e);
+        logger.warn("Deauthorization check failed", e);
       }
 
       return txHash;

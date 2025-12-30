@@ -4,7 +4,6 @@ pragma solidity ^0.8.30;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 
 contract OneInchAdapter is Ownable {
     using SafeERC20 for IERC20;
@@ -67,13 +66,7 @@ contract OneInchAdapter is Ownable {
         uint256 balanceOutAfter = IERC20(tokenOut).balanceOf(address(this));
         uint256 balanceInAfter = IERC20(tokenIn).balanceOf(address(this));
 
-        console.log("OneInchAdapter: tokenIn=%s, tokenOut=%s", tokenIn, tokenOut);
-        console.log("OneInchAdapter: amountIn=%s, minAmountOut=%s", amountIn, minAmountOut);
-        console.log("OneInchAdapter: balanceOutBefore=%s, balanceOutAfter=%s", balanceOutBefore, balanceOutAfter);
-        console.log("OneInchAdapter: balanceInAfter=%s", balanceInAfter);
-
         amountReceived = balanceOutAfter - balanceOutBefore;
-        console.log("OneInchAdapter: amountReceived=%s", amountReceived);
         require(amountReceived >= minAmountOut, "Adapter: High Slippage");
 
         // Calculate refund (remaining tokenIn)

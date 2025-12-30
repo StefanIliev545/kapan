@@ -1,6 +1,7 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import { Address, encodeAbiParameters } from "viem";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import { BorrowPosition } from "./BorrowPosition";
 import { SupplyPosition } from "./SupplyPosition";
 import type { CollateralWithAmount } from "./specific/collateral/CollateralSelector";
@@ -11,6 +12,7 @@ import { TokenSelectModalStark } from "./modals/stark/TokenSelectModalStark";
 import { ExclamationTriangleIcon, PlusIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import type { SwapAsset } from "./modals/SwapModalShell";
 import formatPercentage from "~~/utils/formatPercentage";
+import { formatCurrency } from "~~/utils/formatNumber";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { PositionManager } from "~~/utils/position";
 import type { VesuContext } from "~~/utils/vesu";
@@ -367,17 +369,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     [suppliedPositionsWithPTYields, borrowedPositions, netBalance],
   );
 
-  // Format currency with sign.
-  const formatCurrency = (amount: number) => {
-    const formatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(amount));
-    return amount >= 0 ? formatted : `-${formatted}`;
-  };
-
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
     return `${value >= 0 ? "" : "-"}${formatted}%`;
@@ -501,134 +492,207 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
       {/* Protocol Header Card */}
       <div
-        className="card bg-base-200/40 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-300/50 cursor-pointer select-none"
+        className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50 cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <div className="card-body px-5 py-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-            {/* Protocol name + icon */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
-                <Image
-                  src={protocolIcon}
-                  alt={`${protocolName} icon`}
-                  width={24}
-                  height={24}
-                  className="object-contain drop-shadow-sm"
+        <div className="card-body px-3 sm:px-5 py-3">
+          {/* Mobile Layout (< sm) */}
+          <div className="sm:hidden space-y-3">
+            {/* Row 1: Protocol name + Markets + Collapse */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+                  <Image
+                    src={protocolIcon}
+                    alt={`${protocolName} icon`}
+                    width={20}
+                    height={20}
+                    className="object-contain drop-shadow-sm"
+                  />
+                </div>
+                <span className="text-sm font-bold tracking-tight">{protocolName}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!forceShowAll && !disableMarkets && (
+                  <button
+                    className="btn btn-xs btn-ghost gap-1"
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
+                  >
+                    <span className="text-[9px] uppercase tracking-wider font-semibold">Markets</span>
+                    {isMarketsOpen ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
+                  </button>
+                )}
+                {forceShowAll && !readOnly && (
+                  <span className="text-[10px] text-primary/80 font-medium">Connect</span>
+                )}
+                <ChevronDownIcon
+                  className={`w-4 h-4 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
                 />
               </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
-                <span className="text-base font-bold tracking-tight">{protocolName}</span>
-              </div>
             </div>
-
-            {/* Divider */}
-            <div className="hidden sm:block w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
-
-            {/* Stats - spread evenly across available space */}
-            <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
-              {/* Net Balance */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+            {/* Row 2: Stats in a grid */}
+            <div className={`grid gap-1 ${hideUtilization ? 'grid-cols-3' : 'grid-cols-4'}`}>
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Balance</span>
+                <span className={`text-xs font-mono font-bold tabular-nums ${netBalance >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netBalance)}
                 </span>
               </div>
-
-              {/* 30D Yield - hidden on very narrow screens */}
-              <div className="hidden min-[480px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">30D</span>
+                <span className={`text-xs font-mono font-bold tabular-nums ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netYield30d)}
                 </span>
               </div>
-
-              {/* Net APY - hidden on very narrow screens */}
-              <div className="hidden min-[400px]:flex group flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+              <div className="flex flex-col items-center py-1">
+                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Net APY</span>
+                <span className={`text-xs font-mono font-bold tabular-nums ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                 </span>
               </div>
-
-              {/* Utilization */}
               {!hideUtilization && (
-                <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">
-                    <span className="hidden sm:inline">Utilization</span>
-                    <span className="sm:hidden">LTV</span>
-                  </span>
-                  {/* Default: show bar */}
-                  <div className="group-hover/util:hidden">
-                    <HealthStatus utilizationPercentage={utilizationPercentage} />
-                  </div>
-                  {/* On hover: show Current and LLTV breakdown */}
-                  <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
-                    {currentLtvBps > 0n || lltvBps > 0n ? (
-                      <>
-                        <span className="text-base-content/70">
-                          <span className="text-[10px] text-base-content/50">Current </span>
-                          {currentLtvLabel || "0%"}
-                        </span>
-                        {lltvBps > 0n && (
-                          <>
-                            <span className="text-base-content/30">•</span>
-                            <span className="text-base-content/70">
-                              <span className="text-[10px] text-base-content/50">LLTV </span>
-                              {formatBps(lltvBps)}%
-                            </span>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-base-content/50">—</span>
-                    )}
-                  </div>
+                <div className="flex flex-col items-center py-1">
+                  <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">LTV</span>
+                  <HealthStatus utilizationPercentage={utilizationPercentage} />
                 </div>
               )}
             </div>
-
-            {/* Header Element (e.g., E-Mode toggle) - hidden on mobile, shown in separate row */}
+            {/* Header Element - Mobile row */}
             {headerElement && (
               <div 
-                className="hidden md:flex items-center"
+                className="flex items-center justify-start pt-2 border-t border-base-300/30"
                 onClick={e => e.stopPropagation()}
               >
                 {headerElement}
               </div>
             )}
-
-            {/* Markets Toggle + Collapse */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
-              {!forceShowAll && !disableMarkets && (
-                <button
-                  className="btn btn-sm btn-ghost gap-1.5"
-                  type="button"
-                  onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
-                >
-                  <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                  {isMarketsOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
-                </button>
-              )}
-              {forceShowAll && !readOnly && (
-                <span className="text-[11px] text-primary/80 font-medium">Connect wallet</span>
-              )}
-              <ChevronDownIcon
-                className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
-              />
-            </div>
           </div>
 
-          {/* Header Element - Mobile row (shown below stats on small screens) */}
-          {headerElement && (
-            <div 
-              className="md:hidden flex items-center justify-start pt-2 mt-2 border-t border-base-300/30"
-              onClick={e => e.stopPropagation()}
-            >
-              {headerElement}
+          {/* Desktop Layout (>= sm) */}
+          <div className="hidden sm:block">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+              {/* Protocol name + icon */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+                  <Image
+                    src={protocolIcon}
+                    alt={`${protocolName} icon`}
+                    width={24}
+                    height={24}
+                    className="object-contain drop-shadow-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+                  <span className="text-base font-bold tracking-tight">{protocolName}</span>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+
+              {/* Stats - spread evenly across available space */}
+              <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+                {/* Net Balance */}
+                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                  <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+                    {formatCurrency(netBalance)}
+                  </span>
+                </div>
+
+                {/* 30D Yield */}
+                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                  <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                    {formatCurrency(netYield30d)}
+                  </span>
+                </div>
+
+                {/* Net APY */}
+                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                  <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                    {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
+                  </span>
+                </div>
+
+                {/* Utilization */}
+                {!hideUtilization && (
+                  <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                    <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+                    {/* Default: show bar */}
+                    <div className="group-hover/util:hidden">
+                      <HealthStatus utilizationPercentage={utilizationPercentage} />
+                    </div>
+                    {/* On hover: show Current and LLTV breakdown */}
+                    <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
+                      {currentLtvBps > 0n || lltvBps > 0n ? (
+                        <>
+                          <span className="text-base-content/70">
+                            <span className="text-[10px] text-base-content/50">Current </span>
+                            {currentLtvLabel || "0%"}
+                          </span>
+                          {lltvBps > 0n && (
+                            <>
+                              <span className="text-base-content/30">•</span>
+                              <span className="text-base-content/70">
+                                <span className="text-[10px] text-base-content/50">LLTV </span>
+                                {formatBps(lltvBps)}%
+                              </span>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-base-content/50">—</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Header Element (e.g., E-Mode toggle) - hidden on mobile, shown in separate row */}
+              {headerElement && (
+                <div 
+                  className="hidden md:flex items-center"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {headerElement}
+                </div>
+              )}
+
+              {/* Markets Toggle + Collapse */}
+              <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
+                {!forceShowAll && !disableMarkets && (
+                  <button
+                    className="btn btn-sm btn-ghost gap-1.5"
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
+                  >
+                    <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
+                    {isMarketsOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+                {forceShowAll && !readOnly && (
+                  <span className="text-[11px] text-primary/80 font-medium">Connect wallet</span>
+                )}
+                <ChevronDownIcon
+                  className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                />
+              </div>
             </div>
-          )}
+
+            {/* Header Element - Tablet row (shown below stats on md screens) */}
+            {headerElement && (
+              <div 
+                className="md:hidden flex items-center justify-start pt-2 mt-2 border-t border-base-300/30"
+                onClick={e => e.stopPropagation()}
+              >
+                {headerElement}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -714,9 +778,17 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
         </div>
       )}
 
-      {/* Positions Container - collapsible */}
-      {!isCollapsed && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Positions Container - collapsible with animation */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
           {/* Supplied Assets */}
           <div className="h-full">
             <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
@@ -899,8 +971,10 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modals - Conditional based on network type */}
       {!readOnly && networkType === "starknet" ? (

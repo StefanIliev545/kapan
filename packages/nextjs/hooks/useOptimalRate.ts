@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNetworkAwareReadContract } from "./useNetworkAwareReadContract";
 import { feltToString } from "~~/utils/protocols";
-import { NetworkType } from "./useNetworkType";
+import { NetworkType } from "./useMovePositionData";
 import { useLocalRateProvider } from "./useLocalRateProvider";
 import { Address } from "viem";
 
