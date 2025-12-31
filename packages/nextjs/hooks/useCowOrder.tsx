@@ -30,6 +30,45 @@ import {
 import { ProtocolInstruction } from "~~/utils/v2/instructionHelpers";
 import { logger } from "~~/utils/logger";
 
+/**
+ * Flatten per-iteration instructions to a single array (for authorization)
+ * Deduplicates by combining all unique instructions across iterations
+ */
+function flattenInstructions(
+  instructions: ProtocolInstruction[] | ProtocolInstruction[][] | undefined
+): ProtocolInstruction[] {
+  if (!instructions || instructions.length === 0) return [];
+  
+  // Check if it's per-iteration (array of arrays)
+  if (Array.isArray(instructions[0]) && Array.isArray((instructions[0] as ProtocolInstruction[])[0]?.protocolName ? [] : instructions[0])) {
+    // It's ProtocolInstruction[][] - flatten all iterations
+    const perIteration = instructions as ProtocolInstruction[][];
+    const flattened: ProtocolInstruction[] = [];
+    const seen = new Set<string>();
+    
+    for (const iteration of perIteration) {
+      for (const inst of iteration) {
+        // Deduplicate by protocolName + data hash
+        const key = `${inst.protocolName}:${inst.data}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          flattened.push(inst);
+        }
+      }
+    }
+    return flattened;
+  }
+  
+  // It's a single ProtocolInstruction[] - check if elements are ProtocolInstruction or arrays
+  if (instructions.length > 0 && typeof (instructions[0] as any).protocolName === 'string') {
+    return instructions as ProtocolInstruction[];
+  }
+  
+  // Fallback: assume per-iteration
+  const perIteration = instructions as ProtocolInstruction[][];
+  return perIteration.flat();
+}
+
 // Minimal ABI for functions not in deployed contract (fallback)
 const ORDER_MANAGER_ABI = [
   {
@@ -37,13 +76,13 @@ const ORDER_MANAGER_ABI = [
       {
         components: [
           { name: "user", type: "address" },
-          { name: "preInstructionsData", type: "bytes" },
+          { name: "preInstructionsPerIteration", type: "bytes[]" },
           { name: "preTotalAmount", type: "uint256" },
           { name: "sellToken", type: "address" },
           { name: "buyToken", type: "address" },
           { name: "chunkSize", type: "uint256" },
           { name: "minBuyPerChunk", type: "uint256" },
-          { name: "postInstructionsData", type: "bytes" },
+          { name: "postInstructionsPerIteration", type: "bytes[]" },
           { name: "completion", type: "uint8" },
           { name: "targetValue", type: "uint256" },
           { name: "minHealthFactor", type: "uint256" },
@@ -76,13 +115,13 @@ const ORDER_MANAGER_ABI = [
           {
             components: [
               { name: "user", type: "address" },
-              { name: "preInstructionsData", type: "bytes" },
+              { name: "preInstructionsPerIteration", type: "bytes[]" },
               { name: "preTotalAmount", type: "uint256" },
               { name: "sellToken", type: "address" },
               { name: "buyToken", type: "address" },
               { name: "chunkSize", type: "uint256" },
               { name: "minBuyPerChunk", type: "uint256" },
-              { name: "postInstructionsData", type: "bytes" },
+              { name: "postInstructionsPerIteration", type: "bytes[]" },
               { name: "completion", type: "uint8" },
               { name: "targetValue", type: "uint256" },
               { name: "minHealthFactor", type: "uint256" },
@@ -122,9 +161,12 @@ const ORDER_MANAGER_ABI = [
  * Extended order input with optional pre-built instructions
  */
 export interface CreateOrderInput extends KapanOrderInput {
-  /** Optional: Pre-built instructions (alternative to building them here) */
-  preInstructions?: ProtocolInstruction[];
-  postInstructions?: ProtocolInstruction[];
+  /** 
+   * Pre-built instructions per iteration (alternative to building them here)
+   * Can be single array (same for all) or array of arrays (per-iteration)
+   */
+  preInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
+  postInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
   /** Amount of sell tokens to seed OrderManager for first chunk (pulled from user) */
   seedAmount?: bigint;
 }
@@ -317,9 +359,10 @@ export function useCowOrder() {
     }
 
     // 5. Get authorization calls for pre/post instructions
+    // Flatten per-iteration instructions for authorization check
     const allInstructions = [
-      ...(input.preInstructions || []),
-      ...(input.postInstructions || []),
+      ...flattenInstructions(input.preInstructions),
+      ...flattenInstructions(input.postInstructions),
     ];
     
     let authCalls: { to: Address; data: Hex }[] = [];
@@ -453,9 +496,10 @@ export function useCowOrder() {
       }
 
       // 5. Get authorizations for pre/post instructions
+      // Flatten per-iteration instructions for authorization check
       const allInstructions = [
-        ...(input.preInstructions || []),
-        ...(input.postInstructions || []),
+        ...flattenInstructions(input.preInstructions),
+        ...flattenInstructions(input.postInstructions),
       ];
       
       let authCalls: { target: Address; data: `0x${string}` }[] = [];
@@ -585,8 +629,10 @@ export function useCowOrder() {
 
       notification.remove(notificationId);
       
-      // Build CoW Explorer link for user's orders
-      const cowExplorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
+      // Build CoW Explorer link - use orderManagerAddress since orders are created by the contract
+      const cowExplorerUrl = orderManagerAddress 
+        ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
+        : undefined;
       const shortOrderHash = orderHash ? `${orderHash.slice(0, 10)}...${orderHash.slice(-8)}` : "";
       
       notification.success(

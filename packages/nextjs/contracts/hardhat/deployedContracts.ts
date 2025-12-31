@@ -9803,7 +9803,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0x4852B109Df2eD3DA856241a5748FD4C5b3b22c17",
+      address: "0xF0792EA477Dd8aFbb9907e7076a624Ee9D0E7Df3",
       abi: [
         {
           inputs: [
@@ -10169,7 +10169,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x00F3E48C5FEd4c38D81E1E038aEFFa07Ed148134",
+      address: "0x9F0E89B9BF2eAa5390fF06970573f9bed5F01865",
       abi: [
         {
           inputs: [
@@ -10613,9 +10613,9 @@ const contracts = {
                   type: "address",
                 },
                 {
-                  internalType: "bytes",
-                  name: "preInstructionsData",
-                  type: "bytes",
+                  internalType: "bytes[]",
+                  name: "preInstructionsPerIteration",
+                  type: "bytes[]",
                 },
                 {
                   internalType: "uint256",
@@ -10643,9 +10643,9 @@ const contracts = {
                   type: "uint256",
                 },
                 {
-                  internalType: "bytes",
-                  name: "postInstructionsData",
-                  type: "bytes",
+                  internalType: "bytes[]",
+                  name: "postInstructionsPerIteration",
+                  type: "bytes[]",
                 },
                 {
                   internalType: "enum KapanOrderManager.CompletionType",
@@ -10776,9 +10776,9 @@ const contracts = {
                       type: "address",
                     },
                     {
-                      internalType: "bytes",
-                      name: "preInstructionsData",
-                      type: "bytes",
+                      internalType: "bytes[]",
+                      name: "preInstructionsPerIteration",
+                      type: "bytes[]",
                     },
                     {
                       internalType: "uint256",
@@ -10806,9 +10806,9 @@ const contracts = {
                       type: "uint256",
                     },
                     {
-                      internalType: "bytes",
-                      name: "postInstructionsData",
-                      type: "bytes",
+                      internalType: "bytes[]",
+                      name: "postInstructionsPerIteration",
+                      type: "bytes[]",
                     },
                     {
                       internalType: "enum KapanOrderManager.CompletionType",
@@ -10989,9 +10989,9 @@ const contracts = {
                   type: "address",
                 },
                 {
-                  internalType: "bytes",
-                  name: "preInstructionsData",
-                  type: "bytes",
+                  internalType: "bytes[]",
+                  name: "preInstructionsPerIteration",
+                  type: "bytes[]",
                 },
                 {
                   internalType: "uint256",
@@ -11019,9 +11019,9 @@ const contracts = {
                   type: "uint256",
                 },
                 {
-                  internalType: "bytes",
-                  name: "postInstructionsData",
-                  type: "bytes",
+                  internalType: "bytes[]",
+                  name: "postInstructionsPerIteration",
+                  type: "bytes[]",
                 },
                 {
                   internalType: "enum KapanOrderManager.CompletionType",

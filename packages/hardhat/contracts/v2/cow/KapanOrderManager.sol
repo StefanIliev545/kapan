@@ -56,8 +56,10 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     struct KapanOrderParams {
         address user;
         
-        // Pre-swap instructions (executed in pre-hook)
-        bytes preInstructionsData;      // ABI-encoded ProtocolInstruction[]
+        // Pre-swap instructions (executed in pre-hook) - per iteration
+        // Array of ABI-encoded ProtocolInstruction[] for each iteration
+        // If fewer entries than iterations, last entry is reused
+        bytes[] preInstructionsPerIteration;
         uint256 preTotalAmount;         // Total amount to process across all chunks
         
         // Swap configuration
@@ -66,8 +68,11 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         uint256 chunkSize;              // Max sell amount per chunk
         uint256 minBuyPerChunk;         // Minimum buy amount per chunk (slippage protection)
         
-        // Post-swap instructions (executed in post-hook)
-        bytes postInstructionsData;     // ABI-encoded ProtocolInstruction[]
+        // Post-swap instructions (executed in post-hook) - per iteration
+        // Array of ABI-encoded ProtocolInstruction[] for each iteration
+        // If fewer entries than iterations, last entry is reused
+        // Typically: [0..N-2] = deposit+borrow+push, [N-1] = deposit only
+        bytes[] postInstructionsPerIteration;
         
         // Completion
         CompletionType completion;
@@ -356,9 +361,16 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
         
+        // Get pre-instructions for current iteration
+        // If fewer entries than iterations, reuse the last entry
+        bytes memory preInstructionsData = _getInstructionsForIteration(
+            ctx.params.preInstructionsPerIteration,
+            ctx.iterationCount
+        );
+        
         // Decode stored pre-instructions
         ProtocolTypes.ProtocolInstruction[] memory storedInstructions = 
-            abi.decode(ctx.params.preInstructionsData, (ProtocolTypes.ProtocolInstruction[]));
+            abi.decode(preInstructionsData, (ProtocolTypes.ProtocolInstruction[]));
         
         // Create new array with ToOutput prepended
         ProtocolTypes.ProtocolInstruction[] memory instructions = 
@@ -396,9 +408,16 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // Transfer tokens to router for processing
         IERC20(ctx.params.buyToken).safeTransfer(address(router), receivedAmount);
         
+        // Get post-instructions for current iteration
+        // If fewer entries than iterations, reuse the last entry
+        bytes memory postInstructionsData = _getInstructionsForIteration(
+            ctx.params.postInstructionsPerIteration,
+            ctx.iterationCount
+        );
+        
         // Decode stored post-instructions
         ProtocolTypes.ProtocolInstruction[] memory storedInstructions = 
-            abi.decode(ctx.params.postInstructionsData, (ProtocolTypes.ProtocolInstruction[]));
+            abi.decode(postInstructionsData, (ProtocolTypes.ProtocolInstruction[]));
         
         // Create new array with ToOutput prepended
         ProtocolTypes.ProtocolInstruction[] memory instructions = 
@@ -532,6 +551,30 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // ABI encode as tuple matching RouterInstruction struct layout
         // Note: RouterInstructionType enum is uint8, but in ABI encoding it's padded to 32 bytes
         return abi.encode(amount, token, address(0), uint8(3));
+    }
+    
+    /// @notice Get instructions for a specific iteration
+    /// @dev If the array has fewer entries than the iteration index, returns the last entry
+    ///      This allows specifying different instructions for early iterations vs later ones
+    ///      e.g., [depositAndBorrow, depositAndBorrow, depositOnly] for 3 iterations
+    /// @param instructionsArray Array of encoded instructions per iteration
+    /// @param iteration Current iteration index (0-based)
+    /// @return The encoded instructions for this iteration
+    function _getInstructionsForIteration(
+        bytes[] storage instructionsArray,
+        uint256 iteration
+    ) internal view returns (bytes memory) {
+        if (instructionsArray.length == 0) {
+            // Return empty instructions if none provided
+            return abi.encode(new ProtocolTypes.ProtocolInstruction[](0));
+        }
+        
+        // If iteration index exceeds array length, use the last entry
+        uint256 index = iteration < instructionsArray.length 
+            ? iteration 
+            : instructionsArray.length - 1;
+            
+        return instructionsArray[index];
     }
     
     function _ensureVaultRelayerApproval(address token) internal {

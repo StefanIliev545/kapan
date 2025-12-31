@@ -33,8 +33,14 @@ export interface KapanOrderInput {
   /** User address (order owner) */
   user: string;
   
-  /** Pre-swap instructions (e.g., withdraw collateral for leverage down) */
-  preInstructions?: ProtocolInstruction[];
+  /** 
+   * Pre-swap instructions per iteration (e.g., borrow + push to OrderManager)
+   * Array where each element is the instructions for that iteration.
+   * If fewer entries than iterations, the last entry is reused.
+   * 
+   * For convenience, can also pass a single ProtocolInstruction[] which will be used for all iterations.
+   */
+  preInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
   
   /** Total amount to process across all chunks */
   preTotalAmount: string;
@@ -54,8 +60,18 @@ export interface KapanOrderInput {
   minBuyPerChunk: string;
   minBuyPerChunkDecimals?: number;
   
-  /** Post-swap instructions (e.g., deposit collateral, repay debt) */
-  postInstructions?: ProtocolInstruction[];
+  /** 
+   * Post-swap instructions per iteration (e.g., deposit + borrow for most, deposit-only for last)
+   * Array where each element is the instructions for that iteration.
+   * If fewer entries than iterations, the last entry is reused.
+   * 
+   * For convenience, can also pass a single ProtocolInstruction[] which will be used for all iterations.
+   * 
+   * Typical pattern for multiply:
+   * - Iterations 0 to N-2: [deposit, borrow, push] 
+   * - Iteration N-1 (last): [deposit only]
+   */
+  postInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
   
   /** How to determine when order is complete */
   completion?: CompletionType;
@@ -75,13 +91,13 @@ export interface KapanOrderInput {
  */
 export interface KapanOrderParams {
   user: string;
-  preInstructionsData: string;
+  preInstructionsPerIteration: string[];  // Array of encoded instructions per iteration
   preTotalAmount: bigint;
   sellToken: string;
   buyToken: string;
   chunkSize: bigint;
   minBuyPerChunk: bigint;
-  postInstructionsData: string;
+  postInstructionsPerIteration: string[]; // Array of encoded instructions per iteration
   completion: number;
   targetValue: bigint;
   minHealthFactor: bigint;
@@ -107,7 +123,11 @@ const coder = AbiCoder.defaultAbiCoder();
  */
 export function encodeInstructions(instructions: ProtocolInstruction[] | undefined): string {
   if (!instructions || instructions.length === 0) {
-    return "0x";
+    // Encode empty array properly so contract can decode it
+    return coder.encode(
+      ["tuple(string protocolName, bytes data)[]"],
+      [[]]
+    );
   }
   
   return coder.encode(
@@ -117,6 +137,46 @@ export function encodeInstructions(instructions: ProtocolInstruction[] | undefin
       data: i.data,
     }))]
   );
+}
+
+/**
+ * Check if input is per-iteration instructions (array of arrays)
+ */
+function isPerIterationInstructions(
+  instructions: ProtocolInstruction[] | ProtocolInstruction[][] | undefined
+): instructions is ProtocolInstruction[][] {
+  if (!instructions || instructions.length === 0) return false;
+  // Check if first element is an array (per-iteration) or an object (single set)
+  return Array.isArray(instructions[0]);
+}
+
+/**
+ * Normalize instructions to per-iteration format
+ * If single array provided, wraps it in an array (same instructions for all iterations)
+ */
+function normalizeToPerIteration(
+  instructions: ProtocolInstruction[] | ProtocolInstruction[][] | undefined
+): ProtocolInstruction[][] {
+  if (!instructions || instructions.length === 0) {
+    return [[]]; // Single iteration with no instructions
+  }
+  
+  if (isPerIterationInstructions(instructions)) {
+    return instructions;
+  }
+  
+  // Single set of instructions - use for all iterations
+  return [instructions];
+}
+
+/**
+ * Encode per-iteration instructions to array of encoded bytes
+ */
+export function encodePerIterationInstructions(
+  instructions: ProtocolInstruction[] | ProtocolInstruction[][] | undefined
+): string[] {
+  const perIteration = normalizeToPerIteration(instructions);
+  return perIteration.map(iter => encodeInstructions(iter));
 }
 
 /**
@@ -154,13 +214,13 @@ export function buildOrderParams(input: KapanOrderInput): KapanOrderParams {
   
   return {
     user: input.user,
-    preInstructionsData: encodeInstructions(input.preInstructions),
+    preInstructionsPerIteration: encodePerIterationInstructions(input.preInstructions),
     preTotalAmount: parseUnits(input.preTotalAmount, preTotalAmountDecimals),
     sellToken: input.sellToken,
     buyToken: input.buyToken,
     chunkSize: parseUnits(input.chunkSize, chunkSizeDecimals),
     minBuyPerChunk: parseUnits(input.minBuyPerChunk, minBuyDecimals),
-    postInstructionsData: encodeInstructions(input.postInstructions),
+    postInstructionsPerIteration: encodePerIterationInstructions(input.postInstructions),
     completion: input.completion ?? CompletionType.Iterations,
     targetValue: BigInt(input.targetValue ?? 1),
     minHealthFactor: parseUnits(input.minHealthFactor ?? "1.1", 18),
@@ -189,7 +249,7 @@ export function computeOrderHashPreview(
   return keccak256(
     coder.encode(
       [
-        "tuple(address user, bytes preInstructionsData, uint256 preTotalAmount, address sellToken, address buyToken, uint256 chunkSize, uint256 minBuyPerChunk, bytes postInstructionsData, uint8 completion, uint256 targetValue, uint256 minHealthFactor, bytes32 appDataHash)",
+        "tuple(address user, bytes[] preInstructionsPerIteration, uint256 preTotalAmount, address sellToken, address buyToken, uint256 chunkSize, uint256 minBuyPerChunk, bytes[] postInstructionsPerIteration, uint8 completion, uint256 targetValue, uint256 minHealthFactor, bytes32 appDataHash)",
         "bytes32",
         "uint256"
       ],
@@ -209,13 +269,13 @@ export function parseOrderContext(rawContext: any): OrderContext {
   return {
     params: {
       user: rawContext.params.user,
-      preInstructionsData: rawContext.params.preInstructionsData,
+      preInstructionsPerIteration: rawContext.params.preInstructionsPerIteration || [],
       preTotalAmount: BigInt(rawContext.params.preTotalAmount),
       sellToken: rawContext.params.sellToken,
       buyToken: rawContext.params.buyToken,
       chunkSize: BigInt(rawContext.params.chunkSize),
       minBuyPerChunk: BigInt(rawContext.params.minBuyPerChunk),
-      postInstructionsData: rawContext.params.postInstructionsData,
+      postInstructionsPerIteration: rawContext.params.postInstructionsPerIteration || [],
       completion: Number(rawContext.params.completion),
       targetValue: BigInt(rawContext.params.targetValue),
       minHealthFactor: BigInt(rawContext.params.minHealthFactor),

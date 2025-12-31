@@ -105,13 +105,15 @@ export async function isSolver(address: string): Promise<boolean> {
 // ============ Order Params Builder ============
 export interface KapanOrderParamsInput {
   user: string;
-  preInstructions?: any[];
+  /** Pre-instructions: single array (same for all) or array of arrays (per-iteration) */
+  preInstructions?: any[] | any[][];
   preTotalAmount: bigint;
   sellToken: string;
   buyToken: string;
   chunkSize: bigint;
   minBuyPerChunk: bigint;
-  postInstructions?: any[];
+  /** Post-instructions: single array (same for all) or array of arrays (per-iteration) */
+  postInstructions?: any[] | any[][];
   completion?: number; // 0=TargetLTV, 1=TargetBalance, 2=Iterations, 3=UntilCancelled
   targetValue?: number;
   minHealthFactor?: bigint;
@@ -120,24 +122,61 @@ export interface KapanOrderParamsInput {
 
 const coder = AbiCoder.defaultAbiCoder();
 
-export function buildOrderParams(input: KapanOrderParamsInput) {
-  const encodeInstructions = (instructions: any[] | undefined) => {
-    if (!instructions || instructions.length === 0) return "0x";
+/**
+ * Check if instructions are per-iteration (array of arrays)
+ */
+function isPerIteration(instructions: any[] | any[][] | undefined): instructions is any[][] {
+  if (!instructions || instructions.length === 0) return false;
+  // Check if first element is an array with protocolName property (single set)
+  // or an array of arrays (per-iteration)
+  return Array.isArray(instructions[0]) && 
+    (instructions[0].length === 0 || !instructions[0].protocolName);
+}
+
+/**
+ * Encode a single set of instructions to bytes
+ */
+function encodeInstructions(instructions: any[] | undefined): string {
+  if (!instructions || instructions.length === 0) {
+    // Encode empty array properly
     return coder.encode(
       ["tuple(string protocolName, bytes data)[]"],
-      [instructions.map(i => ({ protocolName: i.protocolName, data: i.data }))]
+      [[]]
     );
-  };
+  }
+  return coder.encode(
+    ["tuple(string protocolName, bytes data)[]"],
+    [instructions.map(i => ({ protocolName: i.protocolName, data: i.data }))]
+  );
+}
 
+/**
+ * Convert instructions to per-iteration format (array of encoded bytes)
+ */
+function encodePerIterationInstructions(instructions: any[] | any[][] | undefined): string[] {
+  if (!instructions || instructions.length === 0) {
+    return [encodeInstructions([])];
+  }
+  
+  if (isPerIteration(instructions)) {
+    // Already per-iteration
+    return instructions.map(iter => encodeInstructions(iter));
+  }
+  
+  // Single set - wrap in array
+  return [encodeInstructions(instructions)];
+}
+
+export function buildOrderParams(input: KapanOrderParamsInput) {
   return {
     user: input.user,
-    preInstructionsData: encodeInstructions(input.preInstructions),
+    preInstructionsPerIteration: encodePerIterationInstructions(input.preInstructions),
     preTotalAmount: input.preTotalAmount,
     sellToken: input.sellToken,
     buyToken: input.buyToken,
     chunkSize: input.chunkSize,
     minBuyPerChunk: input.minBuyPerChunk,
-    postInstructionsData: encodeInstructions(input.postInstructions),
+    postInstructionsPerIteration: encodePerIterationInstructions(input.postInstructions),
     completion: input.completion ?? 2, // Default: Iterations
     targetValue: input.targetValue ?? 1,
     minHealthFactor: input.minHealthFactor ?? ethers.parseEther("1.1"),
@@ -229,45 +268,81 @@ export function computeOrderUid(orderDigest: string, owner: string, validTo: num
 // ============ ERC-1271 Signature Helpers ============
 
 /**
- * Build ERC-1271 signature for ComposableCoW verification (used by KapanOrderManager.isValidSignature)
+ * Build the PayloadStruct for ComposableCoW verification
+ */
+export function buildPayloadStruct(
+  handlerAddress: string,
+  salt: string,
+  orderHash: string
+) {
+  const staticInput = coder.encode(["bytes32"], [orderHash]);
+  
+  return {
+    proof: [],
+    params: {
+      handler: handlerAddress,
+      salt: salt,
+      staticData: staticInput,
+    },
+    offchainInput: "0x",
+  };
+}
+
+/**
+ * Build ERC-1271 signature for KapanOrderManager.isValidSignature
+ * Format: abi.encode(GPv2Order.Data, PayloadStruct)
+ * 
+ * The settlement contract extracts owner from the first 20 bytes of the trade signature,
+ * then calls owner.isValidSignature(orderDigest, remainingBytes)
+ * Our isValidSignature expects: abi.encode(order, payload)
  */
 export function buildERC1271Signature(
+  order: GPv2OrderData,
   handlerAddress: string,
   salt: string,
   orderHash: string
 ): string {
-  const staticInput = coder.encode(["bytes32"], [orderHash]);
-  
-  const conditionalOrderParams = {
-    handler: handlerAddress,
-    salt: salt,
-    staticData: staticInput,
-  };
+  const payload = buildPayloadStruct(handlerAddress, salt, orderHash);
 
-  const payload = {
-    proof: [],
-    params: conditionalOrderParams,
-    offchainInput: "0x",
-  };
-
+  // Encode order and payload together as expected by isValidSignature
   return coder.encode(
-    ["tuple(bytes32[] proof, tuple(address handler, bytes32 salt, bytes staticData) params, bytes offchainInput)"],
-    [payload]
+    [
+      "tuple(address sellToken, address buyToken, address receiver, uint256 sellAmount, uint256 buyAmount, uint32 validTo, bytes32 appData, uint256 feeAmount, bytes32 kind, bool partiallyFillable, bytes32 sellTokenBalance, bytes32 buyTokenBalance)",
+      "tuple(bytes32[] proof, tuple(address handler, bytes32 salt, bytes staticData) params, bytes offchainInput)"
+    ],
+    [
+      {
+        sellToken: order.sellToken,
+        buyToken: order.buyToken,
+        receiver: order.receiver,
+        sellAmount: order.sellAmount,
+        buyAmount: order.buyAmount,
+        validTo: order.validTo,
+        appData: order.appData,
+        feeAmount: order.feeAmount,
+        kind: order.kind,
+        partiallyFillable: order.partiallyFillable,
+        sellTokenBalance: order.sellTokenBalance,
+        buyTokenBalance: order.buyTokenBalance,
+      },
+      payload
+    ]
   );
 }
 
 /**
  * Build the signature bytes for a GPv2Trade with ERC-1271 signing scheme
- * Format: abi.encodePacked(address owner, bytes signature)
- * The settlement contract will call owner.isValidSignature(orderDigest, signature)
+ * Format: abi.encodePacked(address owner, bytes innerSignature)
+ * The settlement contract will call owner.isValidSignature(orderDigest, innerSignature)
  */
 export function buildTradeSignature(
   ownerAddress: string,
+  order: GPv2OrderData,
   handlerAddress: string,
   salt: string,
   kapanOrderHash: string
 ): string {
-  const innerSignature = buildERC1271Signature(handlerAddress, salt, kapanOrderHash);
+  const innerSignature = buildERC1271Signature(order, handlerAddress, salt, kapanOrderHash);
   // Pack owner address (20 bytes) + inner signature
   return ethers.concat([ownerAddress, innerSignature]);
 }
@@ -311,7 +386,23 @@ export async function buildSettlementParams(params: SettlementParams) {
   // We set prices such that the trade executes at our desired rate
   const clearingPrices = [params.buyAmount, params.sellAmount];
   
-  // 3. Build the trade
+  // 3. Build the GPv2Order for signature verification
+  const gpv2Order: GPv2OrderData = {
+    sellToken: params.sellToken,
+    buyToken: params.buyToken,
+    receiver: orderManagerAddr,
+    sellAmount: params.sellAmount,
+    buyAmount: params.buyAmount,
+    validTo: params.validTo,
+    appData: params.appDataHash,
+    feeAmount: 0n,
+    kind: GPV2_ORDER.KIND_SELL,
+    partiallyFillable: false,
+    sellTokenBalance: GPV2_ORDER.BALANCE_ERC20,
+    buyTokenBalance: GPV2_ORDER.BALANCE_ERC20,
+  };
+  
+  // 4. Build the trade
   const trade = {
     sellTokenIndex: 0,
     buyTokenIndex: 1,
@@ -323,7 +414,7 @@ export async function buildSettlementParams(params: SettlementParams) {
     feeAmount: 0n, // No fee for simplicity
     flags: TRADE_FLAGS.EIP1271 | TRADE_FLAGS.SELL_ORDER | TRADE_FLAGS.FILL_OR_KILL,
     executedAmount: params.sellAmount, // For fill-or-kill, this equals sellAmount
-    signature: buildTradeSignature(orderManagerAddr, orderHandlerAddr, params.salt, params.kapanOrderHash),
+    signature: buildTradeSignature(orderManagerAddr, gpv2Order, orderHandlerAddr, params.salt, params.kapanOrderHash),
   };
   
   // 4. Build interactions
