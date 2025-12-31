@@ -39,8 +39,10 @@ export interface AppDataDocument {
 
 // ABI for KapanOrderManager hook functions
 // Using (user, salt) variant allows pre-computing appData before order creation
+// Note: chunkIndex is NOT passed - the contract reads it from iterationCount
+// This allows the same appData to work for ALL chunks
 const ORDER_MANAGER_HOOK_ABI = [
-  "function executePreHookBySalt(address user, bytes32 salt, uint256 chunkIndex) external",
+  "function executePreHookBySalt(address user, bytes32 salt) external",
   "function executePostHookBySalt(address user, bytes32 salt) external",
 ];
 
@@ -50,17 +52,17 @@ const orderManagerIface = new Interface(ORDER_MANAGER_HOOK_ABI);
  * Encode a pre-hook call for KapanOrderManager using (user, salt) lookup
  * This allows pre-computing appData before order creation
  * The pre-hook withdraws collateral and prepares tokens for the swap
+ * Note: Chunk index is determined by the contract from iterationCount,
+ * so the same calldata works for all chunks.
  */
 export function encodePreHookCall(
   orderManagerAddress: string,
   user: string,
-  salt: string,
-  chunkIndex: number = 0
+  salt: string
 ): string {
   return orderManagerIface.encodeFunctionData("executePreHookBySalt", [
     user,
     salt,
-    chunkIndex,
   ]);
 }
 
@@ -91,10 +93,12 @@ export function encodePostHookCall(
  * 2. appData (with hooks) must be registered with CoW API
  * 3. Both must reference the same (user, salt) that will be used in createOrder()
  * 
+ * The same appData works for ALL chunks because the contract determines
+ * the current chunk index from its own iterationCount state.
+ * 
  * @param orderManagerAddress - Address of the KapanOrderManager contract
  * @param user - User address (order creator)
  * @param salt - Order salt (generated before order creation)
- * @param chunkIndex - Current chunk index (default 0 for first chunk)
  * @param options - Additional options
  * @returns The AppData document ready for hashing/registration
  */
@@ -102,7 +106,6 @@ export function buildKapanAppData(
   orderManagerAddress: string,
   user: string,
   salt: string,
-  chunkIndex: number = 0,
   options?: {
     /** Gas limit for pre-hook (default: 1000000) */
     preHookGasLimit?: string;
@@ -120,7 +123,8 @@ export function buildKapanAppData(
   const postHookGasLimit = options?.postHookGasLimit ?? "1000000";
 
   // Encode the hook calls to OrderManager using (user, salt) lookup
-  const preHookCalldata = encodePreHookCall(orderManagerAddress, user, salt, chunkIndex);
+  // Note: chunkIndex is NOT passed - contract reads from iterationCount
+  const preHookCalldata = encodePreHookCall(orderManagerAddress, user, salt);
   const postHookCalldata = encodePostHookCall(orderManagerAddress, user, salt);
 
   // Hooks are executed by Settlement → HooksTrampoline → target
@@ -223,11 +227,13 @@ export async function registerAppData(
 /**
  * Helper to build and register AppData in one call
  * 
+ * The same appData works for ALL chunks because the contract determines
+ * the current chunk index from its own iterationCount state.
+ * 
  * @param chainId - Chain ID for CoW API
  * @param orderManagerAddress - KapanOrderManager contract address
  * @param user - User address (order creator)
  * @param salt - Order salt (must match what will be used in createOrder)
- * @param chunkIndex - Current chunk index (default 0)
  * @param options - Additional options
  * @returns Object with appDataDoc, appDataHash, and registration result
  */
@@ -236,15 +242,14 @@ export async function buildAndRegisterAppData(
   orderManagerAddress: string,
   user: string,
   salt: string,
-  chunkIndex: number = 0,
-  options?: Parameters<typeof buildKapanAppData>[4]
+  options?: Parameters<typeof buildKapanAppData>[3]
 ): Promise<{
   appDataDoc: AppDataDocument;
   appDataHash: string;
   registered: boolean;
   error?: string;
 }> {
-  const appDataDoc = buildKapanAppData(orderManagerAddress, user, salt, chunkIndex, options);
+  const appDataDoc = buildKapanAppData(orderManagerAddress, user, salt, options);
   const appDataHash = computeAppDataHash(appDataDoc);
   
   const result = await registerAppData(chainId, appDataHash, appDataDoc);

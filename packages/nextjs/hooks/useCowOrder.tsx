@@ -281,12 +281,13 @@ export function useCowOrder() {
     const salt = generateOrderSalt();
 
     // 2. Build and register appData with CoW API
+    // Note: chunkIndex is NOT needed - the contract reads it from iterationCount
+    // This allows the same appData to work for ALL chunks
     const appDataResult = await buildAndRegisterAppData(
       chainId,
       orderManagerAddress,
       userAddress,
       salt,
-      0, // First chunk
     );
 
     if (!appDataResult.registered) {
@@ -410,13 +411,14 @@ export function useCowOrder() {
       // 2. Build and register appData with CoW API BEFORE order creation
       // This is critical: appData uses (user, salt) to reference the order
       // which gets mapped to orderHash when createOrder is called
+      // Note: chunkIndex is NOT needed - the contract reads it from iterationCount
+      // This allows the same appData to work for ALL chunks
       logger.debug("[useCowOrder] Registering AppData for (user, salt):", userAddress, salt);
       const appDataResult = await buildAndRegisterAppData(
         chainId,
         orderManagerAddress,
         userAddress,
         salt,
-        0, // First chunk
       );
 
       if (!appDataResult.registered) {

@@ -36,7 +36,7 @@ describe("v2 Router Deauthorization Flow", function () {
 
         // Deploy authorization helper
         const AuthHelper = await ethers.getContractFactory("KapanAuthorizationHelper");
-        const authHelper = await AuthHelper.deploy(await router.getAddress());
+        const authHelper = await AuthHelper.deploy(await router.getAddress(), await deployer.getAddress());
         await authHelper.waitForDeployment();
 
         // Sync gateway with auth helper

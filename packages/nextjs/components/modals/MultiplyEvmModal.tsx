@@ -29,7 +29,8 @@ import {
   normalizeProtocolName,
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl } from "~~/utils/cow";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate } from "~~/utils/cow";
+import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { useAccount } from "wagmi";
@@ -110,7 +111,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   
   // CoW limit order specific state
   // Limit order slippage: how much worse than market price we accept (allows filling when price moves)
-  const [limitSlippage, setLimitSlippage] = useState<number>(1); // % worse than market (1% = accept 99% of quoted)
+  // Default 0.1% - will be auto-adjusted based on price impact on first quote
+  const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
+  const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
   const [customMinPrice, setCustomMinPrice] = useState<string>(""); // User override for min price
   const [showAdvancedPricing, setShowAdvancedPricing] = useState(false);
   const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null); // Store salt for CoW Explorer link
@@ -406,6 +409,39 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     return buyAmountFloat / sellAmountFloat;
   }, [bestQuote, debt, collateral, swapQuoteAmount]);
 
+  // Calculate price impact from available quote data (for limit order slippage estimation)
+  const quotesPriceImpact = useMemo(() => {
+    // Pendle provides priceImpact directly
+    if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
+      return Math.abs(pendleQuote.data.priceImpact * 100);
+    }
+    // 1inch: calculate from USD values
+    if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
+      const srcUSD = parseFloat(oneInchQuote.srcUSD);
+      const dstUSD = parseFloat(oneInchQuote.dstUSD);
+      if (srcUSD > 0) {
+        return Math.max(0, ((srcUSD - dstUSD) / srcUSD) * 100);
+      }
+    }
+    return null;
+  }, [swapRouter, pendleQuote, oneInchQuote]);
+
+  // Auto-estimate limit order slippage based on price impact (only on first quote)
+  useEffect(() => {
+    if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
+    if (quotesPriceImpact === null) return;
+    
+    const suggested = calculateSuggestedSlippage(quotesPriceImpact);
+    setLimitSlippage(suggested);
+    setHasAutoSetLimitSlippage(true);
+  }, [executionType, quotesPriceImpact, hasAutoSetLimitSlippage]);
+
+  // Reset limit slippage auto-set flag when switching execution type or tokens
+  useEffect(() => {
+    setHasAutoSetLimitSlippage(false);
+    setLimitSlippage(0.1); // Reset to default
+  }, [collateral?.address, debt?.address]);
+
   const minCollateralOut = useMemo(() => {
     if (!collateral) return { raw: 0n, formatted: "0" };
     
@@ -564,15 +600,72 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   };
 
   /**
+   * Calculate chunk parameters for limit orders
+   * Based on initial collateral deposit and LTV, determine how many chunks needed
+   */
+  const chunkParams = useMemo(() => {
+    if (executionType !== "limit" || !collateral || !debt || flashLoanAmountRaw === 0n || marginAmountRaw === 0n) {
+      return { numChunks: 1, chunkSize: flashLoanAmountRaw, needsChunking: false, explanation: "" };
+    }
+
+    // Get LTV - prefer from reserve config, fall back to prop, then default
+    const ltvBps = collateralConfig?.ltv 
+      ? Number(collateralConfig.ltv) 
+      : (isEModeActive && eMode ? eMode.ltv : Number(maxLtvBps));
+
+    // Get prices (8 decimals like Aave oracle)
+    const collateralPrice = collateral.price ?? 0n;
+    const debtPrice = debt.price ?? 0n;
+
+    if (collateralPrice === 0n || debtPrice === 0n) {
+      return { numChunks: 1, chunkSize: flashLoanAmountRaw, needsChunking: false, explanation: "Missing price data" };
+    }
+
+    // Calculate swap rate from best quote
+    const swapRate = bestQuote && swapQuoteAmount > 0n
+      ? calculateSwapRate(swapQuoteAmount, debt.decimals, bestQuote.amount, collateral.decimals)
+      : 0n;
+
+    const result = calculateChunkParams({
+      initialCollateralAmount: marginAmountRaw,
+      collateralPrice,
+      collateralDecimals: collateral.decimals,
+      debtPrice,
+      debtDecimals: debt.decimals,
+      totalDebtAmount: flashLoanAmountRaw,
+      ltvBps,
+      swapRate,
+      safetyBuffer: 0.90, // 90% of max capacity per chunk
+    });
+
+    console.log("[Limit Order] Chunk calculation:", {
+      initialCollateral: formatUnits(marginAmountRaw, collateral.decimals),
+      totalDebt: formatUnits(flashLoanAmountRaw, debt.decimals),
+      ltvBps,
+      result,
+    });
+
+    return result;
+  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount]);
+
+  /**
    * Build pre/post instructions for CoW limit order loop
    * 
-   * Pre-hook (before swap): Borrow debt token from lending protocol
-   * Post-hook (after swap): Deposit received collateral to lending protocol
+   * Pre-hook (before swap): Currently empty - tokens already at OrderManager from previous post-hook or seed
+   * Post-hook (after swap): 
+   *   1. Deposit received collateral to lending protocol
+   *   2. Borrow next chunk's debt from lending protocol  
+   *   3. Push borrowed debt to OrderManager for next swap
+   * 
+   * Note: The first chunk is funded by seedAmount at order creation.
+   * Subsequent chunks are funded by the previous post-hook's borrow+push.
+   * The last chunk's post-hook will borrow but those tokens stay in OrderManager
+   * and get returned to user when order completes/cancels.
    * 
    * The CoW order sells debt token (borrowed) and buys collateral token
    */
   const buildCowInstructions = useMemo(() => {
-    if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n) {
+    if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n || !orderManagerAddress) {
       return { preInstructions: [], postInstructions: [] };
     }
 
@@ -585,32 +678,53 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       ? encodeMorphoContext(morphoContext) 
       : (isCompound && market ? market : "0x");
 
-    // Pre-hook instructions: Borrow debt token
-    // The borrowed tokens will be sold via CoW swap
-    // Note: We use inputIndex=999 (no UTXO reference) since amount comes from chunkSize
-    const preInstructions: ProtocolInstruction[] = [
-      // Borrow debt token - amount comes from order's chunkSize (set by OrderManager as Output[0])
-      createProtocolInstruction(
-        normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, 0n, context, 0) // Reference Output[0] from ToOutput
-      ),
-    ];
+    // Pre-hook instructions: Empty for now
+    // Tokens are already at OrderManager from:
+    // - Chunk 0: seedAmount transferred during createOrder
+    // - Chunk 1+: borrowed and pushed during previous post-hook
+    // 
+    // TODO: When CoW removes balance check, we can borrow JIT here instead
+    const preInstructions: ProtocolInstruction[] = [];
 
-    // Post-hook instructions: Deposit collateral received from swap
-    // The swap output (collateral) is sent to OrderManager, then to Router via post-hook
+    // Post-hook instructions:
+    // 1. Deposit collateral received from swap
+    // 2. Borrow next chunk's debt (chunkSize)
+    // 3. Push borrowed debt to OrderManager for next swap
+    //
+    // Note: The last chunk will also borrow+push, but those tokens will be
+    // returned to user when order completes (via refund logic)
     const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
     const postInstructions: ProtocolInstruction[] = [
-      // Approve collateral for lending protocol - amount comes from swap output (set as Output[0])
+      // 1. Approve collateral for lending protocol - amount comes from swap output (set as Output[0])
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-      // Deposit collateral received from swap
+      // 2. Deposit collateral received from swap
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 0)
       ),
+      // 3. Borrow next chunk's debt - amount comes from chunkSize (set by OrderManager as Output[0] via ToOutput)
+      // The OrderManager prepends ToOutput(chunkSize, sellToken) before executing post-instructions
+      // Wait - that's for the SWAP output. We need to borrow chunkSize.
+      // Actually the post-hook ToOutput is (receivedAmount, buyToken) for the swap output.
+      // We need a separate ToOutput for chunkSize to reference.
+      // For now, let's encode chunkSize directly (will be set when building order params)
+      // Using inputIndex=999 means "use the amount field directly"
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkParams.chunkSize, context, 999)
+      ),
+      // 4. Push borrowed debt to OrderManager
+      // UTXO trace after OrderManager prepends ToOutput(swapAmount, buyToken):
+      //   [0]: swapAmount (collateral received from swap)
+      //   After Approve(0): [0, 1] where [1] is empty {token:0, amount:0} (Approve always appends empty output)
+      //   After Deposit(0): [0, 1] unchanged (Deposit produces no new output)
+      //   After Borrow: [0, 1, 2] where [2] is the borrowed debt tokens
+      // So PushToken should reference index 2.
+      createRouterInstruction(encodePushToken(2, orderManagerAddress)),
     ];
 
     return { preInstructions, postInstructions };
-  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market]);
+  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams.chunkSize]);
 
   /**
    * Build instructions to deposit initial collateral (executed before creating CoW order)
@@ -661,8 +775,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         }
 
         const { preInstructions, postInstructions } = buildCowInstructions;
-        const minBuyAmount = minCollateralOut.raw > 0n 
-          ? formatUnits(minCollateralOut.raw, collateral.decimals)
+        
+        // Calculate minBuyPerChunk - the minimum collateral expected per chunk
+        // minCollateralOut is the TOTAL expected collateral, so we divide by numChunks
+        // to get the proportional amount per chunk
+        const minBuyPerChunkRaw = minCollateralOut.raw > 0n && chunkParams.numChunks > 0
+          ? minCollateralOut.raw / BigInt(chunkParams.numChunks)
+          : 0n;
+        const minBuyAmount = minBuyPerChunkRaw > 0n
+          ? formatUnits(minBuyPerChunkRaw, collateral.decimals)
           : "0";
 
         console.log("[Limit Order] Building batched transaction with:", {
@@ -670,7 +791,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           sellToken: debt.address,
           buyToken: collateral.address,
           preTotalAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-          minBuyAmount,
+          totalMinBuy: formatUnits(minCollateralOut.raw, collateral.decimals),
+          minBuyPerChunk: minBuyAmount,
+          numChunks: chunkParams.numChunks,
           preInstructionsCount: preInstructions.length,
           postInstructionsCount: postInstructions.length,
         });
@@ -686,7 +809,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           : (isCompound && market ? market : "0x");
 
         // Build SEED BORROW instruction (borrow 1 chunk of debt token to user's wallet)
-        const seedAmount = flashLoanAmountRaw;
+        // Only borrow the first chunk's worth - subsequent chunks will be borrowed by the pre-hook
+        const seedAmount = chunkParams.chunkSize;
+        console.log("[Limit Order] Using chunk params:", {
+          numChunks: chunkParams.numChunks,
+          chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
+          needsChunking: chunkParams.needsChunking,
+          explanation: chunkParams.explanation,
+        });
+        
         const seedBorrowInstruction = createProtocolInstruction(
           normalizedProtocol,
           encodeLendingInstruction(
@@ -755,6 +886,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
         // 4. Build CoW order calls (delegation + order creation)
         // Pass seedAmount so OrderManager pulls tokens from user during createOrder
+        // Use calculated chunk params for proper multi-chunk execution
         const cowCalls = await buildOrderCalls({
           user: userAddress,
           preInstructions,
@@ -763,12 +895,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           preTotalAmountDecimals: debt.decimals,
           sellToken: debt.address,
           buyToken: collateral.address,
-          chunkSize: formatUnits(flashLoanAmountRaw, debt.decimals),
+          chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
           chunkSizeDecimals: debt.decimals,
           minBuyPerChunk: minBuyAmount,
           minBuyPerChunkDecimals: collateral.decimals,
           completion: CompletionType.Iterations,
-          targetValue: 1,
+          targetValue: chunkParams.numChunks,
           minHealthFactor: "1.1",
           seedAmount: seedAmount, // Seeds OrderManager for CoW API balance check
         });
@@ -1181,24 +1313,34 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 <div className="mb-2">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-base-content/60">Max Slippage</span>
-                    <span className="font-medium text-warning">{limitSlippage.toFixed(1)}%</span>
+                    <span className="font-medium text-warning">
+                      {limitSlippage < 0.1 ? limitSlippage.toFixed(2) : limitSlippage.toFixed(1)}%
+                    </span>
                   </div>
                   <input
                     type="range"
-                    min="0.1"
+                    min="0"
                     max="5"
-                    step="0.1"
+                    step="0.01"
                     value={limitSlippage}
                     onChange={e => {
                       setLimitSlippage(parseFloat(e.target.value));
                       setCustomMinPrice(""); // Reset custom price when using slider
+                      setHasAutoSetLimitSlippage(true); // Mark as manually adjusted
                     }}
                     className="range range-warning range-xs w-full"
                   />
                   <div className="flex justify-between text-[10px] text-base-content/40 mt-0.5">
+                    <span>0%</span>
                     <span>0.1%</span>
+                    <span>1%</span>
                     <span>5%</span>
                   </div>
+                  {limitSlippage === 0 && (
+                    <div className="text-warning text-[10px] mt-1">
+                      0% slippage - order may not fill if price moves
+                    </div>
+                  )}
                 </div>
 
                 {/* Computed Min Output */}
@@ -1249,12 +1391,30 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   </div>
                 )}
 
+                {/* Chunk Info - shown when multi-chunk execution needed */}
+                {chunkParams.needsChunking && (
+                  <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px]">
+                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <span className="text-info font-medium">Multi-chunk execution: {chunkParams.numChunks} iterations</span>
+                      <p className="text-base-content/50 mt-0.5">
+                        {chunkParams.explanation}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Info note */}
                 <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50">
                   <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
                   <span>
-                    Order executes only when solvers find a price at or above your minimum. 
-                    No flash loan fees. MEV protected.
+                    {chunkParams.needsChunking 
+                      ? `Each chunk executes when solvers find a good price. Est. ${chunkParams.numChunks * 2}-${chunkParams.numChunks * 5} min total.`
+                      : "Order executes only when solvers find a price at or above your minimum."
+                    }
+                    {" "}No flash loan fees. MEV protected.
                   </span>
                 </div>
               </div>

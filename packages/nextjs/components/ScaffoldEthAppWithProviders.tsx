@@ -17,6 +17,7 @@ import { Keplr } from "starknetkit/keplr";
 import { MetaMask } from "starknetkit/metamask";
 import { WagmiProvider } from "wagmi";
 import FloatingSocials from "~~/components/FloatingSocials";
+import { PendingOrdersDrawer } from "~~/components/common/PendingOrdersDrawer";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
 import { LandingHeader } from "~~/components/LandingHeader";
@@ -87,6 +88,7 @@ const ScaffoldEthApp = ({
           <Footer />
         </div>
         {!isLandingRoute && <FloatingSocials />}
+        {isAppExperience && <PendingOrdersDrawer />}
         <Toaster position="bottom-right" />
       </LandingSectionProvider>
     </SelectedGasTokenProvider>

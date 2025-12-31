@@ -964,6 +964,7 @@ export const useKapanRouterV2 = () => {
     instructions: ProtocolInstruction[]
   ): Promise<AuthorizationCall[]> => {
     if (!routerContract || !userAddress || !publicClient) {
+      logger.warn("[getAuthorizations] Missing context", { routerContract: !!routerContract, userAddress, publicClient: !!publicClient });
       return [];
     }
 
@@ -973,21 +974,32 @@ export const useKapanRouterV2 = () => {
         data: inst.data as `0x${string}`,
       }));
 
+      logger.info("[getAuthorizations] Calling authorizeInstructions with", protocolInstructions.length, "instructions");
+      logger.debug("[getAuthorizations] Instructions:", protocolInstructions.map(p => p.protocolName));
+
       // We send the FULL set of instructions to authorizeInstructions.
       // The Router calculates the simulated state (UTXOs) internally.
+      // Use blockTag: 'pending' to avoid RPC caching issues that can cause stale allowance reads
       const result = await publicClient.readContract({
         address: routerContract.address as Address,
         abi: routerContract.abi,
         functionName: "authorizeInstructions",
         args: [protocolInstructions, userAddress as Address],
+        blockTag: 'pending',
       });
       const [targets, data] = result as unknown as [Address[], `0x${string}`[]];
+
+      logger.info("[getAuthorizations] Raw result:", { 
+        targetsCount: targets.length, 
+        targets: targets.map((t, i) => ({ index: i, target: t, hasData: data[i]?.length > 2 }))
+      });
 
       const authCalls: AuthorizationCall[] = [];
       for (let i = 0; i < targets.length; i++) {
         const target = targets[i];
         const dataItem = data[i];
         const isValid = target && target !== "0x0000000000000000000000000000000000000000" && dataItem && dataItem.length > 0;
+        logger.debug(`[getAuthorizations] Index ${i}: target=${target}, dataLen=${dataItem?.length}, isValid=${isValid}`);
         if (isValid) {
           authCalls.push({
             target: target,
@@ -995,9 +1007,12 @@ export const useKapanRouterV2 = () => {
           });
         }
       }
+      
+      logger.info("[getAuthorizations] Filtered auth calls:", authCalls.length);
       return authCalls;
     } catch (error) {
       console.error("Error calling authorizeInstructions:", error);
+      logger.error("[getAuthorizations] Error:", error);
       return [];
     }
   }, [routerContract, userAddress, publicClient]);
@@ -1015,11 +1030,13 @@ export const useKapanRouterV2 = () => {
         data: inst.data as `0x${string}`,
       }));
 
+      // Use blockTag: 'pending' to avoid RPC caching issues
       const result = await publicClient.readContract({
         address: routerContract.address as Address,
         abi: DEAUTH_ABI,
         functionName: "deauthorizeInstructions",
         args: [protocolInstructions, userAddress as Address],
+        blockTag: 'pending',
       });
       const [targets, data] = result as unknown as [Address[], `0x${string}`[]];
 
@@ -1542,6 +1559,15 @@ export const useKapanRouterV2 = () => {
       { to: routerContract.address as Address, data: routerCalldata as Hex },
       ...filteredDeauthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
     ];
+
+    logger.info("[executeFlowBatchedIfPossible] Call order:", {
+      authCallsCount: filteredAuthCalls.length,
+      authCalls: filteredAuthCalls.map(c => ({ to: c.target, dataPrefix: c.data?.slice(0, 10) })),
+      mainCall: { to: routerContract.address, dataPrefix: routerCalldata.slice(0, 10) },
+      deauthCallsCount: filteredDeauthCalls.length,
+      totalCalls: calls.length,
+      callOrder: calls.map((c, i) => ({ index: i, to: c.to, dataPrefix: c.data?.slice(0, 10) })),
+    });
 
     if (preferBatching) {
       const { id } = await sendCallsAsync({

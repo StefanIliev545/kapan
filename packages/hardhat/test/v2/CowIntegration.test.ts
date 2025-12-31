@@ -126,7 +126,7 @@ describe("CoW Protocol Integration", function () {
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
       
-      await expect(orderManager.connect(user).createOrder(params, salt))
+      await expect(orderManager.connect(user).createOrder(params, salt, 0))
         .to.emit(orderManager, "OrderCreated");
       
       // Verify order was registered with ComposableCoW
@@ -152,7 +152,7 @@ describe("CoW Protocol Integration", function () {
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
       
       // Owner tries to create order for user - should fail
-      await expect(orderManager.connect(owner).createOrder(params, salt))
+      await expect(orderManager.connect(owner).createOrder(params, salt, 0))
         .to.be.revertedWithCustomError(orderManager, "Unauthorized");
     });
   });
@@ -178,7 +178,7 @@ describe("CoW Protocol Integration", function () {
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
       
-      const tx = await orderManager.connect(user).createOrder(params, salt);
+      const tx = await orderManager.connect(user).createOrder(params, salt, 0);
       const receipt = await tx.wait();
       
       // Extract orderHash from event
@@ -228,6 +228,73 @@ describe("CoW Protocol Integration", function () {
       expect(executed).to.equal(0);
       expect(total).to.equal(ethers.parseUnits("10000", 6));
       expect(iterations).to.equal(0);
+    });
+
+    it("should return deterministic validTo (same order hash on multiple polls)", async function () {
+      const staticInput = coder.encode(["bytes32"], [orderHash]);
+      
+      // First poll
+      const order1 = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // Simulate time passing (5 minutes) - still within same chunk window
+      await ethers.provider.send("evm_increaseTime", [5 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      
+      // Second poll - should return SAME validTo
+      const order2 = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // validTo should be identical (deterministic)
+      expect(order1.validTo).to.equal(order2.validTo);
+      
+      // All other fields should also match
+      expect(order1.sellAmount).to.equal(order2.sellAmount);
+      expect(order1.buyAmount).to.equal(order2.buyAmount);
+      expect(order1.sellToken).to.equal(order2.sellToken);
+      expect(order1.buyToken).to.equal(order2.buyToken);
+    });
+
+    it("should extend validTo to current window if chunk window expires", async function () {
+      const staticInput = coder.encode(["bytes32"], [orderHash]);
+      
+      // Get initial order
+      const order1 = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // Simulate time passing beyond first chunk window (35 minutes)
+      await ethers.provider.send("evm_increaseTime", [35 * 60]);
+      await ethers.provider.send("evm_mine", []);
+      
+      // Poll again - validTo should extend to current window (not be expired)
+      const order2 = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // validTo should be different (extended to new window)
+      expect(order2.validTo).to.be.greaterThan(order1.validTo);
+      
+      // But sell/buy amounts should still be the same (same chunk)
+      expect(order1.sellAmount).to.equal(order2.sellAmount);
     });
   });
 });

@@ -9,6 +9,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IGateway } from "../../interfaces/IGateway.sol";
 import { ProtocolTypes } from "../../interfaces/ProtocolTypes.sol";
 
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IPoolAddressesProvider } from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
@@ -321,5 +322,18 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     function _getSupplyBalance(address token, address user) internal view returns (uint256) {
         (address aToken, , ) = _getReserveTokens(token);
         return aToken == address(0) ? 0 : IERC20(aToken).balanceOf(user);
+    }
+
+    // ============ Emergency Recovery ============
+
+    /// @notice Recover stuck tokens (only callable by router's owner)
+    function recoverTokens(address token, address to, uint256 amount) external {
+        require(msg.sender == Ownable(ROUTER).owner(), "Only router owner");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toRecover = amount == type(uint256).max ? balance : amount;
+        if (toRecover > balance) toRecover = balance;
+        if (toRecover > 0) {
+            IERC20(token).safeTransfer(to, toRecover);
+        }
     }
 }

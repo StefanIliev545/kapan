@@ -68,3 +68,11 @@ export {
   getOrderStatusText,
   getCompletionTypeText,
 } from "./orderParams";
+
+// Chunk calculation utilities
+export {
+  type ChunkCalculationInput,
+  type ChunkCalculationResult,
+  calculateChunkParams,
+  calculateSwapRate,
+} from "./chunkCalculator";

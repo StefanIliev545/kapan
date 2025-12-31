@@ -11,6 +11,7 @@ import { VTokenInterface } from "../../../interfaces/venus/VTokenInterface.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -342,5 +343,18 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             } catch {}
         }
         revert("Venus: vToken not found");
+    }
+
+    // ============ Emergency Recovery ============
+
+    /// @notice Recover stuck tokens (only callable by router's owner)
+    function recoverTokens(address token, address to, uint256 amount) external {
+        require(msg.sender == Ownable(ROUTER).owner(), "Only router owner");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toRecover = amount == type(uint256).max ? balance : amount;
+        if (toRecover > balance) toRecover = balance;
+        if (toRecover > 0) {
+            IERC20(token).safeTransfer(to, toRecover);
+        }
     }
 }

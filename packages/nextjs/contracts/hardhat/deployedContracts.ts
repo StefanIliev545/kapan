@@ -7013,7 +7013,7 @@ const contracts = {
   },
   8453: {
     AaveGatewayView: {
-      address: "0x0a2Bed49F2601Afd7b066c9Ac8842f3eF01AC673",
+      address: "0xCF5b0eab59cf79F8DEf5fBE5C44291460c9C08D2",
       abi: [
         {
           inputs: [
@@ -7737,7 +7737,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x2e9b0e0F5d41109fEe68a3766bf4f131c28135FB",
+      address: "0x82fB028FC78acedF7809AD25Ac932D732b85b511",
       abi: [
         {
           inputs: [
@@ -8114,6 +8114,29 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         authorize: "contracts/v2/interfaces/IGateway.sol",
@@ -8123,7 +8146,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0xa92E5685CE845A1Db59C51d8FbA918758a26ec14",
+      address: "0x12e625e4204c6B56eEa64B305eC14CB91A0097BD",
       abi: [
         {
           inputs: [
@@ -9018,7 +9041,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x88EbCc0c4633a949Cd1e5bDa0e842B9082E2Ac27",
+      address: "0x9b99E41b395Ee98449bb7df070b88b476FEA8e45",
       abi: [
         {
           inputs: [
@@ -9452,6 +9475,29 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "renounceOwnership",
           outputs: [],
@@ -9520,7 +9566,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0x4be975D2fba6489A081bDbbe88Fea30F5A3Dc6F7",
+      address: "0x8693aaeb73F250e886f2Dd748CC5Ef88b7C979cD",
       abi: [
         {
           inputs: [
@@ -9757,7 +9803,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0x63bFEF44220Cc53EF25cc1ECEaA80B57b1207c0f",
+      address: "0x4852B109Df2eD3DA856241a5748FD4C5b3b22c17",
       abi: [
         {
           inputs: [
@@ -9804,12 +9850,12 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "DEFAULT_VALIDITY",
+          name: "CHUNK_WINDOW",
           outputs: [
             {
-              internalType: "uint32",
+              internalType: "uint256",
               name: "",
-              type: "uint32",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -10123,7 +10169,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x1afB2579d820bE93fd70994f2bD5c6183579AABd",
+      address: "0x00F3E48C5FEd4c38D81E1E038aEFFa07Ed148134",
       abi: [
         {
           inputs: [
@@ -10686,11 +10732,6 @@ const contracts = {
               name: "orderHash",
               type: "bytes32",
             },
-            {
-              internalType: "uint256",
-              name: "chunkIndex",
-              type: "uint256",
-            },
           ],
           name: "executePreHook",
           outputs: [],
@@ -10708,11 +10749,6 @@ const contracts = {
               internalType: "bytes32",
               name: "salt",
               type: "bytes32",
-            },
-            {
-              internalType: "uint256",
-              name: "chunkIndex",
-              type: "uint256",
             },
           ],
           name: "executePreHookBySalt",
@@ -11227,7 +11263,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xC444698c4a6f18B4e86FDE6b4e27d08B0192C85a",
+      address: "0x2302643bf7ceea3F7180547F90d5eA5a917e2b99",
       abi: [
         {
           inputs: [
@@ -11903,6 +11939,47 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address payable",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverNative",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "renounceOwnership",
           outputs: [],
@@ -12131,7 +12208,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayView: {
-      address: "0xD6fEC3901d930d7b51AdBdF9B7d2aC6D10A45702",
+      address: "0xD8A99f82c8014a2377236d3062410887c33B6a00",
       abi: [
         {
           inputs: [
@@ -13514,7 +13591,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0xc435c8FD8bcDfdD670f5A5e1fA78FeD5011d55b0",
+      address: "0x8af3Bf8e54173D9B7A0C4CD3425350dA653f3dc8",
       abi: [
         {
           inputs: [
@@ -14041,6 +14118,29 @@ const contracts = {
         {
           inputs: [
             {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               components: [
                 {
                   internalType: "address",
@@ -14149,7 +14249,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0xbaD13cf58858e8D4c8d3EdBD50e08DBD2DB4540E",
+      address: "0xf1A7365da12A12dda4dB92271274B26B6A29310D",
       abi: [
         {
           inputs: [
@@ -14330,6 +14430,29 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "renounceOwnership",
           outputs: [],
@@ -14370,7 +14493,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0xE6b3e71e75e4f8F212466F8321c322218cfB2001",
+      address: "0x8bcdA0C99b34014e6be21C673114D5150C0Bf2dB",
       abi: [
         {
           inputs: [
@@ -15211,7 +15334,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xCE0B72e0d939484de0a10Eb475Af5556a5Cd397d",
+      address: "0x9CD2C7e69a1965ea8BB107C059e73Dc23006585e",
       abi: [
         {
           inputs: [
@@ -15392,6 +15515,29 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "renounceOwnership",
           outputs: [],
@@ -15432,7 +15578,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0xeb936BD402cf26511199c546259c24f2D8C3aF8A",
+      address: "0x924d5c33A83a45DDb95191b4e607C888A39F4535",
       abi: [
         {
           inputs: [
@@ -15853,7 +15999,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x7D02A146d30310c2AE7aF77E3AdD1bbB6034b703",
+      address: "0x871C033B58DB92752b8fFe5AE65f9C6d8bA31B5b",
       abi: [
         {
           inputs: [
@@ -15878,7 +16024,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x714292EFb5273f4308988031d533709cA4F16d15",
+      address: "0x49e2d7ba35E872e44f25b4958c572C21Ea51Ea05",
       abi: [
         {
           inputs: [
@@ -16582,7 +16728,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x17F491e3aA94AAbb5Ee622ec8190d95ED595aa5E",
+      address: "0x6549e2a7D8447D5dfF19d309113b6acaa6d1511C",
       abi: [
         {
           inputs: [
@@ -16904,6 +17050,29 @@ const contracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         authorize: "contracts/v2/interfaces/IGateway.sol",
@@ -16913,7 +17082,7 @@ const contracts = {
       },
     },
     ZeroLendGatewayView: {
-      address: "0x41fdd378089377213A5C5eCD86D4a83f7DEd0579",
+      address: "0xdA15c61A268B42D7a7d24D6acE2e12812371a25C",
       abi: [
         {
           inputs: [
@@ -17637,7 +17806,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0xb504Dd1343673929a42A40B55403966b19076201",
+      address: "0x97aBDaE5Ad8e9aEaC13A7c8857CB42CC1C73a64B",
       abi: [
         {
           inputs: [
@@ -18011,6 +18180,29 @@ const contracts = {
               type: "tuple[]",
             },
           ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
           stateMutability: "nonpayable",
           type: "function",
         },

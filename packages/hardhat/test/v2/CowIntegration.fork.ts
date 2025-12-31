@@ -131,14 +131,15 @@ describe("CoW Protocol Integration (Fork)", function () {
     await debtToken.connect(user).approveDelegation(spender, ethers.MaxUint256);
   }
 
-  function buildHookCalldata(orderManagerAddr: string, kapanOrderHash: string, isPreHook: boolean, chunkIndex: number = 0): string {
+  function buildHookCalldata(orderManagerAddr: string, kapanOrderHash: string, isPreHook: boolean): string {
     const orderManagerIface = new ethers.Interface([
-      "function executePreHook(bytes32 orderHash, uint256 chunkIndex) external",
+      "function executePreHook(bytes32 orderHash) external",
       "function executePostHook(bytes32 orderHash) external"
     ]);
     
+    // Note: chunkIndex is NOT needed - the contract reads it from iterationCount
     const innerCalldata = isPreHook 
-      ? orderManagerIface.encodeFunctionData("executePreHook", [kapanOrderHash, chunkIndex])
+      ? orderManagerIface.encodeFunctionData("executePreHook", [kapanOrderHash])
       : orderManagerIface.encodeFunctionData("executePostHook", [kapanOrderHash]);
     
     return HOOKS_TRAMPOLINE_IFACE.encodeFunctionData("execute", [[{
@@ -181,7 +182,7 @@ describe("CoW Protocol Integration (Fork)", function () {
       });
 
       const salt = ethers.keccak256(ethers.toUtf8Bytes("test-salt"));
-      const tx = await orderManager.connect(user).createOrder(params, salt);
+      const tx = await orderManager.connect(user).createOrder(params, salt, 0);
       const receipt = await tx.wait();
       const orderHash = extractOrderHash(receipt, orderManager);
 
@@ -219,7 +220,7 @@ describe("CoW Protocol Integration (Fork)", function () {
       });
 
       const salt = ethers.keccak256(ethers.toUtf8Bytes("handler-test"));
-      const tx = await orderManager.connect(user).createOrder(params, salt);
+      const tx = await orderManager.connect(user).createOrder(params, salt, 0);
       orderHash = extractOrderHash(await tx.wait(), orderManager);
     });
 
@@ -304,7 +305,7 @@ describe("CoW Protocol Integration (Fork)", function () {
       });
 
       salt = ethers.keccak256(ethers.toUtf8Bytes("settlement-test-" + Date.now()));
-      const tx = await orderManager.connect(user).createOrder(params, salt);
+      const tx = await orderManager.connect(user).createOrder(params, salt, 0);
       kapanOrderHash = extractOrderHash(await tx.wait(), orderManager);
 
       // Get domain separator
@@ -495,7 +496,7 @@ describe("CoW Protocol Integration (Fork)", function () {
       });
 
       const salt = ethers.keccak256(ethers.toUtf8Bytes("sig-test"));
-      const tx = await orderManager.connect(user).createOrder(params, salt);
+      const tx = await orderManager.connect(user).createOrder(params, salt, 0);
       const orderHash = extractOrderHash(await tx.wait(), orderManager);
 
       const signature = buildERC1271Signature(await orderHandler.getAddress(), salt, orderHash);

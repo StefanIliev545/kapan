@@ -289,11 +289,20 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         );
         composableCoW.remove(cowOrderHash);
         
-        // Refund any remaining sell tokens to user
-        // This handles the case where seed tokens were provided but order never filled
-        uint256 remainingBalance = IERC20(ctx.params.sellToken).balanceOf(address(this));
-        if (remainingBalance > 0) {
-            IERC20(ctx.params.sellToken).safeTransfer(ctx.params.user, remainingBalance);
+        // Refund any remaining tokens to user
+        // This handles cases where:
+        // 1. Seed tokens were provided but order never filled
+        // 2. Partial execution left some sell tokens
+        // 3. A chunk was in-flight and buy tokens arrived but couldn't be processed
+        uint256 sellRemaining = IERC20(ctx.params.sellToken).balanceOf(address(this));
+        if (sellRemaining > 0) {
+            IERC20(ctx.params.sellToken).safeTransfer(ctx.params.user, sellRemaining);
+        }
+        
+        // Also refund any buy tokens that might be stuck (from partial chunk execution)
+        uint256 buyRemaining = IERC20(ctx.params.buyToken).balanceOf(address(this));
+        if (buyRemaining > 0) {
+            IERC20(ctx.params.buyToken).safeTransfer(ctx.params.user, buyRemaining);
         }
         
         emit OrderCancelled(orderHash, msg.sender);
@@ -303,11 +312,10 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     
     /// @notice Execute pre-hook (called by HooksTrampoline during CoW settlement)
     /// @dev Prepends a ToOutput instruction with chunkSize, so all stored instructions
-    ///      can reference index 0 for the chunk amount
+    ///      can reference index 0 for the chunk amount. Chunk index is read from iterationCount.
     /// @param orderHash The order being settled
-    /// @param chunkIndex The current chunk index
-    function executePreHook(bytes32 orderHash, uint256 chunkIndex) external nonReentrant {
-        _executePreHook(orderHash, chunkIndex);
+    function executePreHook(bytes32 orderHash) external nonReentrant {
+        _executePreHook(orderHash);
     }
     
     /// @notice Execute post-hook (called by HooksTrampoline during CoW settlement)
@@ -319,14 +327,14 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     }
     
     /// @notice Execute pre-hook using (user, salt) lookup
-    /// @dev Allows pre-computing appData before order creation
+    /// @dev Allows pre-computing appData before order creation. Chunk index is determined
+    ///      from the order's iterationCount, so the same appData works for all chunks.
     /// @param user The order owner
     /// @param salt The order salt (known before tx)
-    /// @param chunkIndex The current chunk index
-    function executePreHookBySalt(address user, bytes32 salt, uint256 chunkIndex) external nonReentrant {
+    function executePreHookBySalt(address user, bytes32 salt) external nonReentrant {
         bytes32 orderHash = userSaltToOrderHash[user][salt];
         if (orderHash == bytes32(0)) revert OrderNotFound();
-        _executePreHook(orderHash, chunkIndex);
+        _executePreHook(orderHash);
     }
     
     /// @notice Execute post-hook using (user, salt) lookup
@@ -340,7 +348,8 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     }
     
     /// @notice Internal pre-hook execution
-    function _executePreHook(bytes32 orderHash, uint256 chunkIndex) internal {
+    /// @dev Chunk index is read from ctx.iterationCount so the same appData works for all chunks
+    function _executePreHook(bytes32 orderHash) internal {
         // Only HooksTrampoline can call this
         if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
         
@@ -369,7 +378,8 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // Execute via router (router will check delegation)
         router.processProtocolInstructions(instructions);
         
-        emit PreHookExecuted(orderHash, chunkIndex);
+        // Emit with current iteration count (chunk index is self-determined from state)
+        emit PreHookExecuted(orderHash, ctx.iterationCount);
     }
     
     /// @notice Internal post-hook execution
@@ -409,8 +419,12 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         router.processProtocolInstructions(instructions);
         
         // Update progress
-        ctx.executedAmount += ctx.params.chunkSize;
+        uint256 chunkSellAmount = ctx.params.chunkSize;
+        ctx.executedAmount += chunkSellAmount;
         ctx.iterationCount++;
+        
+        // Emit chunk execution event with sell/buy amounts for frontend tracking
+        emit ChunkExecuted(orderHash, ctx.iterationCount, chunkSellAmount, receivedAmount);
         
         // Check completion
         if (_isOrderComplete(ctx)) {

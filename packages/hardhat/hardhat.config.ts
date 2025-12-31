@@ -81,12 +81,11 @@ const config: HardhatUserConfig = {
         version: "0.8.30",
         settings: {
           evmVersion: "cancun",
+          viaIR: true,
           optimizer: {
             enabled: true,
             runs: 10,  // Minimal runs for smallest bytecode (KapanRouter at limit)
           },
-          // Note: viaIR disabled due to stack-too-deep issues with complex ABI decoding
-          // The contracts use transient storage (tload/tstore) requiring 0.8.24+
         },
       },
       {

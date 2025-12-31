@@ -669,4 +669,23 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         for (uint j = 0; j < items.length; j++) next[current.length + j] = items[j];
         return next;
     }
+
+    // ============ Emergency Recovery ============
+
+    /// @notice Recover ERC20 tokens stuck in the router (owner only)
+    function recoverTokens(address token, address to, uint256 amount) external onlyOwner {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toRecover = amount > balance ? balance : amount;
+        if (toRecover > 0) IERC20(token).safeTransfer(to, toRecover);
+    }
+
+    /// @notice Recover native ETH stuck in the router (owner only)
+    function recoverNative(address payable to, uint256 amount) external onlyOwner {
+        uint256 balance = address(this).balance;
+        uint256 toRecover = amount > balance ? balance : amount;
+        if (toRecover > 0) {
+            (bool ok, ) = to.call{value: toRecover}("");
+            require(ok);
+        }
+    }
 }

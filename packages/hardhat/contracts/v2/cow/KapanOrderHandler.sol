@@ -22,8 +22,9 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
     /// @notice The KapanOrderManager that stores order contexts
     KapanOrderManager public immutable orderManager;
     
-    /// @notice Default order validity duration (30 minutes)
-    uint32 public constant DEFAULT_VALIDITY = 30 minutes;
+    /// @notice Chunk window duration - each chunk is valid for this period
+    /// @dev Using fixed windows ensures deterministic validTo = same order hash during window
+    uint256 public constant CHUNK_WINDOW = 30 minutes;
 
     // ============ Constructor ============
     
@@ -78,14 +79,19 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
             ? remaining 
             : orderCtx.params.chunkSize;
         
-        // Build the order
+        // Calculate deterministic validTo based on chunk windows (TWAP-style)
+        // This ensures the same order hash is returned during a window period,
+        // preventing order spam where each poll creates a new CoW order.
+        uint256 validTo = _calculateValidTo(orderCtx.createdAt, orderCtx.iterationCount);
+        
+        // Build the order with deterministic validTo
         order = GPv2Order.Data({
             sellToken: IERC20(orderCtx.params.sellToken),
             buyToken: IERC20(orderCtx.params.buyToken),
             receiver: address(orderManager),  // Receive tokens at manager for post-hook
             sellAmount: sellAmount,
             buyAmount: orderCtx.params.minBuyPerChunk,
-            validTo: uint32(block.timestamp + DEFAULT_VALIDITY),
+            validTo: uint32(validTo),
             appData: orderCtx.params.appDataHash,
             feeAmount: 0,  // Fee is taken from sellAmount in CoW Protocol
             kind: GPv2Order.KIND_SELL,
@@ -93,6 +99,29 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
             sellTokenBalance: GPv2Order.BALANCE_ERC20,
             buyTokenBalance: GPv2Order.BALANCE_ERC20
         });
+    }
+    
+    /// @notice Calculate deterministic validTo timestamp for a chunk
+    /// @dev Uses fixed time windows so multiple polls return the same validTo.
+    ///      If chunk doesn't fill within its window, we extend to the current window.
+    /// @param createdAt Order creation timestamp
+    /// @param iterationCount Current chunk index (0-based)
+    /// @return validTo The validTo timestamp for this chunk's order
+    function _calculateValidTo(uint256 createdAt, uint256 iterationCount) internal view returns (uint256) {
+        // Calculate the ideal window for this chunk
+        uint256 chunkWindowStart = createdAt + (iterationCount * CHUNK_WINDOW);
+        uint256 chunkWindowEnd = chunkWindowStart + CHUNK_WINDOW - 1;
+        
+        // If we're still within the chunk's ideal window, use it
+        if (block.timestamp <= chunkWindowEnd) {
+            return chunkWindowEnd;
+        }
+        
+        // Chunk didn't fill in time - extend to current window
+        // This allows the order to remain valid and retry
+        uint256 elapsedSinceCreate = block.timestamp - createdAt;
+        uint256 currentWindowIndex = elapsedSinceCreate / CHUNK_WINDOW;
+        return createdAt + ((currentWindowIndex + 1) * CHUNK_WINDOW) - 1;
     }
     
     /// @notice Verify that a proposed order matches the conditional order

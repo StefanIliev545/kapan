@@ -315,4 +315,16 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
             }
         }
     }
+
+    // ============ Emergency Recovery ============
+
+    /// @notice Recover stuck tokens (owner only)
+    function recoverTokens(address token, address to, uint256 amount) external onlyOwner {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toRecover = amount == type(uint256).max ? balance : amount;
+        if (toRecover > balance) toRecover = balance;
+        if (toRecover > 0) {
+            IERC20(token).safeTransfer(to, toRecover);
+        }
+    }
 }
