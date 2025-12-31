@@ -3,10 +3,11 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { ethers } from "hardhat";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
+import { safeExecute } from "../../utils/safeExecute";
 
 const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre;
-    const { deploy, execute } = deployments;
+    const { deploy } = deployments;
     const { deployer } = await getNamedAccounts();
 
     const router = await deployments.get("KapanRouter");
@@ -54,25 +55,14 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
     const gatewayContract = await ethers.getContractAt("PendleGateway", gateway.address);
     if ((await gatewayContract.adapter()) !== adapter.address) {
         console.log("Setting adapter in PendleGateway...");
-        await execute(
-            "PendleGateway",
-            { from: deployer, log: true, waitConfirmations: 3 },
-            "setAdapter",
-            adapter.address
-        );
+        await safeExecute(hre, deployer, "PendleGateway", "setAdapter", [adapter.address], { waitConfirmations: 3, log: true });
     }
 
     const routerContract = await ethers.getContractAt("KapanRouter", router.address);
     const existingGateway = await routerContract.gateways("pendle");
     if (existingGateway !== gateway.address) {
         console.log("Registering PendleGateway in KapanRouter...");
-        await execute(
-            "KapanRouter",
-            { from: deployer, log: true, waitConfirmations: 3 },
-            "addGateway",
-            "pendle",
-            gateway.address
-        );
+        await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["pendle", gateway.address], { waitConfirmations: 3, log: true });
     }
 
     console.log("Pendle integration deployed!");

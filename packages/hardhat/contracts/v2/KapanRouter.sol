@@ -10,6 +10,11 @@ import { IGateway } from "./interfaces/IGateway.sol";
 import { ProtocolTypes } from "./interfaces/ProtocolTypes.sol";
 import { FlashLoanConsumerBase } from "./flashloans/FlashLoanConsumerBase.sol";
 
+interface IAuthorizationHelper {
+    function authorizeInstructions(ProtocolTypes.ProtocolInstruction[] calldata, address) external view returns (address[] memory, bytes[] memory);
+    function deauthorizeInstructions(ProtocolTypes.ProtocolInstruction[] calldata, address) external view returns (address[] memory, bytes[] memory);
+}
+
 // Custom errors
 error GatewayAlreadyExists();
 error GatewayNotFound();
@@ -35,7 +40,44 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     bytes32 constant ROUTER_KEY = keccak256(abi.encode("router"));
     mapping(string => IGateway) public gateways;
 
+    // ============ Authorization Helper ============
+    /// @notice Address of the KapanAuthorizationHelper contract for auth encoding
+    address public authorizationHelper;
+
+    // ============ Delegation ============
+    /// @notice Approved managers that can act on behalf of users who delegate to them
+    mapping(address => bool) public approvedManagers;
+    
+    /// @notice User => delegate => canActOnBehalf
+    mapping(address => mapping(address => bool)) public userDelegates;
+
+    event ManagerApprovalChanged(address indexed manager, bool approved);
+    event DelegateApprovalChanged(address indexed user, address indexed delegate, bool approved);
+
     constructor(address owner) Ownable(owner) {}
+
+    // ============ Delegation Functions ============
+    
+    /// @notice Owner approves/revokes a manager address that users can delegate to
+    function setApprovedManager(address manager, bool approved) external onlyOwner {
+        approvedManagers[manager] = approved;
+        emit ManagerApprovalChanged(manager, approved);
+    }
+
+    /// @notice User grants/revokes delegation to a manager
+    /// @dev Manager must be approved by owner first
+    function setDelegate(address delegate, bool approved) external {
+        userDelegates[msg.sender][delegate] = approved;
+        emit DelegateApprovalChanged(msg.sender, delegate, approved);
+    }
+
+    /// @notice Check if caller is authorized to act for a user
+    /// @param user The user to check authorization for
+    /// @return True if msg.sender can act on behalf of user
+    function isAuthorizedFor(address user) public view returns (bool) {
+        if (msg.sender == user) return true;
+        return approvedManagers[msg.sender] && userDelegates[user][msg.sender];
+    }
 
     function addGateway(string calldata protocolName, address gateway) external onlyOwner {
         if (address(gateways[protocolName]) == gateway) {
@@ -213,9 +255,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
                     instruction.data,
                     (ProtocolTypes.LendingInstruction)
                 );
-                // Verify msg.sender matches the user in the instruction for ALL operations
-                // This prevents attackers from executing operations on behalf of other users
-                if (lendingInstr.user != msg.sender) revert NotAuthorized();
+                // Verify msg.sender is authorized for the user in the instruction
+                // Either msg.sender == user, or msg.sender is an approved manager with delegation
+                if (!isAuthorizedFor(lendingInstr.user)) revert NotAuthorized();
             }
         }
     }
@@ -257,8 +299,8 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         if (routerInstruction.instructionType == RouterInstructionType.FlashLoan) {
             revert FlashLoanRequiresTransientStack();
         } else if (routerInstruction.instructionType == RouterInstructionType.PullToken) {
-            if (routerInstruction.user != msg.sender) revert NotAuthorized();
-            IERC20(routerInstruction.token).safeTransferFrom(msg.sender, address(this), routerInstruction.amount);
+            if (!isAuthorizedFor(routerInstruction.user)) revert NotAuthorized();
+            IERC20(routerInstruction.token).safeTransferFrom(routerInstruction.user, address(this), routerInstruction.amount);
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount }));
         } else if (routerInstruction.instructionType == RouterInstructionType.PushToken) {
             (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
@@ -505,7 +547,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function processPullToken(RouterInstruction memory routerInstruction) internal authorize(routerInstruction) {
-        IERC20(routerInstruction.token).safeTransferFrom(msg.sender, address(this), routerInstruction.amount);
+        IERC20(routerInstruction.token).safeTransferFrom(routerInstruction.user, address(this), routerInstruction.amount);
         ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
         out[0] = ProtocolTypes.Output({ token: routerInstruction.token, amount: routerInstruction.amount });
         _appendOutputs(out);
@@ -533,7 +575,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     modifier authorize(RouterInstruction memory routerInstruction) {
-        if (routerInstruction.user != msg.sender) revert NotAuthorized();
+        if (!isAuthorizedFor(routerInstruction.user)) revert NotAuthorized();
         _;
     }
 
@@ -567,344 +609,27 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
         }
     }
 
-    // --------- Aggregate authorization for ProtocolInstructions ---------
+    // --------- Authorization Helper Setup ---------
+    
+    /// @notice Set the authorization helper contract address
+    function setAuthorizationHelper(address helper) external onlyOwner {
+        authorizationHelper = helper;
+    }
+
+    /// @notice Generate authorization calls for instructions (delegates to helper)
     function authorizeInstructions(
         ProtocolTypes.ProtocolInstruction[] calldata instructions,
         address caller
-    ) external view returns (address[] memory targets, bytes[] memory data) {
-        // Simulation state (outputs)
-        ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
-
-        // Results - allocate extra space since gateways can return multiple auths per instruction
-        // Each instruction could need: approval + enterMarkets + delegate approval = 3 max
-        address[] memory tmpTargets = new address[](instructions.length * 3);
-        bytes[] memory tmpData = new bytes[](instructions.length * 3);
-        uint256 k;
-
-        for (uint256 i = 0; i < instructions.length; i++) {
-            ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
-
-            // Router step
-            if (keccak256(abi.encode(pi.protocolName)) == ROUTER_KEY) {
-                RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
-
-                // Default no auth
-                tmpTargets[k] = address(0);
-                tmpData[k] = bytes("");
-
-                if (r.instructionType == RouterInstructionType.PullToken) {
-                    if (r.user == caller) {
-                        uint256 current = IERC20(r.token).allowance(caller, address(this));
-                        if (current < r.amount) {
-                            tmpTargets[k] = r.token;
-                            tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), r.amount);
-                        }
-                    }
-                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: r.token, amount: r.amount }));
-                } else if (r.instructionType == RouterInstructionType.PushToken) {
-                    (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr)
-                    );
-                    if (inputPtr.index < outputs.length) {
-                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                    }
-                } else if (r.instructionType == RouterInstructionType.ToOutput) {
-                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: r.token, amount: r.amount }));
-                } else if (r.instructionType == RouterInstructionType.Approve) {
-                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                } else if (r.instructionType == RouterInstructionType.FlashLoan) {
-                    // Simulate flashloan output WITH BUFFER for fees
-                    (, , ProtocolTypes.InputPtr memory inputPtr, ) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address)
-                    );
-                    if (inputPtr.index < outputs.length) {
-                        ProtocolTypes.Output memory loanOut = outputs[inputPtr.index];
-                        // 0.1% Buffer for Flash Loan Fee simulation
-                        // This ensures Repay instructions downstream request enough allowance
-                        loanOut.amount = (loanOut.amount * 1001) / 1000;
-                        outputs = _appendOutputMemory(outputs, loanOut);
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                } else if (r.instructionType == RouterInstructionType.Split) {
-                    // Simulate Split: takes one output and produces two (fee + remainder)
-                    (, ProtocolTypes.InputPtr memory inputPtr, uint256 bp) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr, uint256)
-                    );
-                    if (inputPtr.index < outputs.length) {
-                        ProtocolTypes.Output memory orig = outputs[inputPtr.index];
-                        uint256 feeAmount = (orig.amount * bp + 10000 - 1) / 10000;
-                        if (feeAmount > orig.amount) feeAmount = orig.amount;
-                        uint256 remainder = orig.amount - feeAmount;
-                        // Clear the original
-                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        // Append fee and remainder
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: feeAmount }));
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: remainder }));
-                    } else {
-                        // Bad index, append two empty outputs for consistent indexing
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                } else if (r.instructionType == RouterInstructionType.Add) {
-                    // Simulate Add: takes two outputs and produces one (sum)
-                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
-                    );
-                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
-                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
-                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
-                        uint256 total = outA.amount + outB.amount;
-                        // Clear the originals
-                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        // Append sum
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: total }));
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                } else if (r.instructionType == RouterInstructionType.Subtract) {
-                    // Simulate Subtract: takes two outputs and produces one (difference)
-                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
-                    );
-                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
-                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
-                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
-                        uint256 diff = outA.amount >= outB.amount ? outA.amount - outB.amount : 0;
-                        // Clear the originals
-                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        // Append difference
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: diff }));
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                }
-
-                k++;
-                continue;
-            }
-
-            // Protocol step
-            IGateway gw = gateways[pi.protocolName];
-
-            if (address(gw) == address(0)) {
-                tmpTargets[k] = address(0);
-                tmpData[k] = bytes("");
-                k++;
-                continue;
-            }
-
-            ProtocolTypes.LendingInstruction memory li = abi.decode(pi.data, (ProtocolTypes.LendingInstruction));
-
-            ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
-            one[0] = li;
-
-            // Call authorize with simulation inputs
-            (address[] memory t, bytes[] memory d, ProtocolTypes.Output[] memory produced) = gw.authorize(
-                one,
-                caller,
-                outputs
-            );
-
-            // Handle ALL authorization calls from the gateway (not just the first)
-            for (uint256 j = 0; j < t.length; j++) {
-                if (t[j] != address(0) && d[j].length > 0) {
-                    tmpTargets[k] = t[j];
-                    tmpData[k] = d[j];
-                    k++;
-                }
-            }
-
-            // Update simulation state
-            if (produced.length > 0) {
-                outputs = _concatOutputsMemory(outputs, produced);
-            }
-        }
-
-        // Compact
-        targets = new address[](k);
-        data = new bytes[](k);
-        for (uint256 i = 0; i < k; i++) {
-            targets[i] = tmpTargets[i];
-            data[i] = tmpData[i];
-        }
+    ) external view returns (address[] memory, bytes[] memory) {
+        return IAuthorizationHelper(authorizationHelper).authorizeInstructions(instructions, caller);
     }
 
+    /// @notice Generate deauthorization calls for instructions (delegates to helper)
     function deauthorizeInstructions(
         ProtocolTypes.ProtocolInstruction[] calldata instructions,
         address caller
-    ) external view returns (address[] memory targets, bytes[] memory data) {
-        // We must track outputs even in deauth to resolve token addresses from indices
-        ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
-
-        // Estimate max size (Gateways might return multiple revokes per instruction)
-        address[] memory tmpTargets = new address[](instructions.length * 3);
-        bytes[] memory tmpData = new bytes[](instructions.length * 3);
-        uint256 k;
-
-        for (uint256 i = 0; i < instructions.length; i++) {
-            ProtocolTypes.ProtocolInstruction calldata pi = instructions[i];
-
-            // --- ROUTER INSTRUCTIONS ---
-            if (keccak256(abi.encode(pi.protocolName)) == ROUTER_KEY) {
-                RouterInstruction memory r = abi.decode(pi.data, (RouterInstruction));
-
-                if (r.instructionType == RouterInstructionType.PullToken) {
-                    if (r.user == caller) {
-                        // Revoke: Approve 0 to Router
-                        tmpTargets[k] = r.token;
-                        tmpData[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), 0);
-                    } else {
-                        tmpTargets[k] = address(0);
-                        tmpData[k] = bytes("");
-                    }
-                    // Update state for downstream instructions
-                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: r.token, amount: r.amount }));
-                } else if (r.instructionType == RouterInstructionType.PushToken) {
-                    (, ProtocolTypes.InputPtr memory inputPtr) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr)
-                    );
-                    if (inputPtr.index < outputs.length)
-                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                } else if (r.instructionType == RouterInstructionType.ToOutput) {
-                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: r.token, amount: r.amount }));
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                } else if (r.instructionType == RouterInstructionType.Approve) {
-                    outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                } else if (r.instructionType == RouterInstructionType.FlashLoan) {
-                    // Simulate flashloan output for indexing consistency
-                    (, , ProtocolTypes.InputPtr memory inputPtr, ) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, FlashLoanProvider, ProtocolTypes.InputPtr, address)
-                    );
-                    if (inputPtr.index < outputs.length) {
-                        outputs = _appendOutputMemory(outputs, outputs[inputPtr.index]);
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                } else if (r.instructionType == RouterInstructionType.Split) {
-                    // Simulate Split output for indexing consistency (no revocation needed)
-                    (, ProtocolTypes.InputPtr memory inputPtr, uint256 bp) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr, uint256)
-                    );
-                    if (inputPtr.index < outputs.length) {
-                        ProtocolTypes.Output memory orig = outputs[inputPtr.index];
-                        uint256 feeAmount = (orig.amount * bp + 10000 - 1) / 10000;
-                        if (feeAmount > orig.amount) feeAmount = orig.amount;
-                        uint256 remainder = orig.amount - feeAmount;
-                        outputs[inputPtr.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: feeAmount }));
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: remainder }));
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                } else if (r.instructionType == RouterInstructionType.Add) {
-                    // Simulate Add output for indexing consistency (no revocation needed)
-                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
-                    );
-                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
-                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
-                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
-                        uint256 total = outA.amount + outB.amount;
-                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: total }));
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                } else if (r.instructionType == RouterInstructionType.Subtract) {
-                    // Simulate Subtract output for indexing consistency (no revocation needed)
-                    (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
-                        pi.data,
-                        (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
-                    );
-                    if (ptrA.index < outputs.length && ptrB.index < outputs.length) {
-                        ProtocolTypes.Output memory outA = outputs[ptrA.index];
-                        ProtocolTypes.Output memory outB = outputs[ptrB.index];
-                        uint256 diff = outA.amount >= outB.amount ? outA.amount - outB.amount : 0;
-                        outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: diff }));
-                    } else {
-                        outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
-                    }
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                }
-                k++;
-                continue;
-            }
-
-            // --- GATEWAY INSTRUCTIONS ---
-            IGateway gw = gateways[pi.protocolName];
-            if (address(gw) == address(0)) {
-                tmpTargets[k] = address(0);
-                tmpData[k] = bytes("");
-                k++;
-                continue;
-            }
-
-            ProtocolTypes.LendingInstruction[] memory one = new ProtocolTypes.LendingInstruction[](1);
-            one[0] = abi.decode(pi.data, (ProtocolTypes.LendingInstruction));
-
-            // 1. Get Revocation Call(s)
-            (address[] memory t, bytes[] memory d) = gw.deauthorize(one, caller, outputs);
-
-            for (uint j = 0; j < t.length; j++) {
-                if (t[j] != address(0)) {
-                    tmpTargets[k] = t[j];
-                    tmpData[k] = d[j];
-                } else {
-                    tmpTargets[k] = address(0);
-                    tmpData[k] = bytes("");
-                }
-                k++;
-            }
-
-            // 2. Update Simulation State (using authorize view)
-            // We ignore the targets returned here, we only want 'produced' outputs
-            (, , ProtocolTypes.Output[] memory produced) = gw.authorize(one, caller, outputs);
-            if (produced.length > 0) outputs = _concatOutputsMemory(outputs, produced);
-        }
-
-        // Compact results to remove empty slots
-        uint256 actualCount = 0;
-        for (uint i = 0; i < k; i++) {
-            if (tmpTargets[i] != address(0)) actualCount++;
-        }
-        targets = new address[](actualCount);
-        data = new bytes[](actualCount);
-        uint256 idx = 0;
-        for (uint i = 0; i < k; i++) {
-            if (tmpTargets[i] != address(0)) {
-                targets[idx] = tmpTargets[i];
-                data[idx] = tmpData[i];
-                idx++;
-            }
-        }
+    ) external view returns (address[] memory, bytes[] memory) {
+        return IAuthorizationHelper(authorizationHelper).deauthorizeInstructions(instructions, caller);
     }
 
     function _getOutputs() internal view returns (ProtocolTypes.Output[] memory out) {

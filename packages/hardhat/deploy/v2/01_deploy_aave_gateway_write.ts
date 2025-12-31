@@ -5,6 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
+import { safeExecute } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -97,8 +98,10 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
 
   console.log(`AaveGatewayView deployed to: ${aaveGatewayView.address}`);
 
-  await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "aave", aaveGatewayWrite.address);
+  await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["aave", aaveGatewayWrite.address], { waitConfirmations: 5 });
   console.log(`AaveGatewayWrite registered with KapanRouter as "aave"`);
+
+  // Gateway sync is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
 
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
   await verifyContract(hre, aaveGatewayWrite.address, [

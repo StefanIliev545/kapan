@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, cloneElement, isValidElement, useState, useEffect } from "react";
 import { motion, MotionValue, useTransform } from "framer-motion";
 import { TextScramble } from "./TextScramble";
 
@@ -13,6 +13,11 @@ export interface SectionData {
   compactHeader?: boolean;
   /** If provided, cycles through these titles with scramble effect */
   titlePhrases?: string[];
+}
+
+// Props that can be injected into content components
+export interface SectionContentProps {
+  isActive?: boolean;
 }
 
 interface StickySectionProps {
@@ -47,8 +52,28 @@ export const StickySection = ({
 
   // Pointer events: only interactive when visible
   const pointerEvents = useTransform(opacity, (v) => (v > 0.5 ? "auto" : "none"));
+  
+  // Track if this section is active (opacity > 0.8)
+  const [isActive, setIsActive] = useState(false);
+  const [hasBeenActive, setHasBeenActive] = useState(false);
+  
+  useEffect(() => {
+    const unsubscribe = opacity.on("change", (v) => {
+      const active = v > 0.8;
+      setIsActive(active);
+      if (active && !hasBeenActive) {
+        setHasBeenActive(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [opacity, hasBeenActive]);
 
   const isCompact = section.compactHeader;
+  
+  // Clone content element and inject isActive prop if it accepts it
+  const contentWithProps = section.content && isValidElement(section.content)
+    ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive })
+    : section.content;
 
   return (
     <motion.div
@@ -98,7 +123,7 @@ export const StickySection = ({
         {/* Optional content (mock components, CTA, etc.) */}
         {section.content && (
           <div className="w-full flex justify-center">
-            {section.content}
+            {contentWithProps}
           </div>
         )}
       </div>

@@ -33,6 +33,7 @@ import provider, { paymasterProvider } from "~~/services/web3/provider";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
+import { LandingSectionProvider } from "~~/contexts/LandingSectionContext";
 import { ControllerConnector } from "@cartridge/connector";
 import { constants } from "starknet";
 
@@ -63,7 +64,7 @@ const ScaffoldEthApp = ({
 
   const isAppSubdomain = hostname?.startsWith("app.") ?? false;
   const isAppExperience = pathname.startsWith("/app") || pathname.startsWith("/markets") || isAppSubdomain;
-  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/automate");
+  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/about") || pathname.startsWith("/automate");
 
   const renderHeader = () => {
     if (isAppExperience) {
@@ -79,13 +80,15 @@ const ScaffoldEthApp = ({
 
   return (
     <SelectedGasTokenProvider>
-      <div className={`flex flex-col min-h-screen `}>
-        {renderHeader()}
-        <main className="relative flex flex-col flex-1">{children}</main>
-        <Footer />
-      </div>
-      <FloatingSocials />
-      <Toaster position="bottom-right" />
+      <LandingSectionProvider>
+        <div className={`flex flex-col min-h-screen `}>
+          {renderHeader()}
+          <main className="relative flex flex-col flex-1">{children}</main>
+          <Footer />
+        </div>
+        {!isLandingRoute && <FloatingSocials />}
+        <Toaster position="bottom-right" />
+      </LandingSectionProvider>
     </SelectedGasTokenProvider>
   );
 };

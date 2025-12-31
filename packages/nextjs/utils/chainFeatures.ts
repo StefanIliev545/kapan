@@ -13,6 +13,20 @@ const ONEINCH_UNAVAILABLE = new Set([
   9745, // Plasma - 1inch not supported
 ]);
 
+// Chains where CoW Protocol IS available (deterministic addresses on all these)
+const COW_PROTOCOL_AVAILABLE = new Set([
+  1,     // Mainnet
+  42161, // Arbitrum
+  8453,  // Base
+  10,    // Optimism
+  100,   // Gnosis
+  137,   // Polygon
+  43114, // Avalanche
+  56,    // BNB Chain
+  59144, // Linea
+  31337, // Hardhat (for local dev with fork)
+]);
+
 // Chains where Pendle IS available (from deploy script PENDLE_ROUTERS)
 const PENDLE_AVAILABLE = new Set([
   1,     // Mainnet
@@ -145,6 +159,13 @@ export function getAvailableSwapRouters(chainId: number | undefined): Array<"1in
   if (is1inchSupported(chainId)) routers.push("1inch");
   if (isPendleSupported(chainId)) routers.push("pendle");
   return routers;
+}
+
+// ==================== COW PROTOCOL ====================
+
+export function isCowProtocolSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return COW_PROTOCOL_AVAILABLE.has(chainId);
 }
 
 // ==================== FLASH LOANS ====================

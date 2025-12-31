@@ -5,6 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
+import { safeExecute } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -75,8 +76,10 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
 
   console.log(`ZeroLendGatewayView deployed to: ${zeroLendGatewayView.address}`);
 
-  await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "zerolend", zeroLendGatewayWrite.address);
+  await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["zerolend", zeroLendGatewayWrite.address], { waitConfirmations: 5 });
   console.log(`ZeroLendGatewayWrite registered with KapanRouter as "zerolend"`);
+
+  // Gateway sync is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
 
   // Set ZeroLend pool for flash loans (same pattern as Aave in 00_deploy_kapan_router.ts)
   try {
@@ -87,7 +90,7 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
     const poolAddress = await provider.getPool();
 
     if (poolAddress && poolAddress !== ethers.ZeroAddress) {
-      await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setZeroLendPool", poolAddress);
+      await safeExecute(hre, deployer, "KapanRouter", "setZeroLendPool", [poolAddress], { waitConfirmations: 5 });
       console.log(`ZeroLend pool set for flash loans: ${poolAddress}`);
     } else {
       console.warn(`ZeroLend pool address is zero. Skipping setZeroLendPool.`);

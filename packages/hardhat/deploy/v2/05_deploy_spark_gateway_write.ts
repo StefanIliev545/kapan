@@ -5,6 +5,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { safeExecute } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -67,7 +68,7 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   console.log(`SparkGatewayView (using AaveGatewayView contract) deployed to: ${sparkGatewayView.address}`);
 
-  await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "spark", sparkGatewayWrite.address);
+  await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["spark", sparkGatewayWrite.address], { waitConfirmations: 5 });
   console.log(`SparkGatewayWrite registered with KapanRouter as "spark"`);
 
   // Temporarily disable Etherscan verification for v2 deploys
@@ -86,6 +87,6 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
 export default deploySparkGatewayWrite;
 
-deploySparkGatewayWrite.tags = ["SparkGatewayWrite", "v2"];
+deploySparkGatewayWrite.tags = ["SparkGatewayWrite"];
 deploySparkGatewayWrite.dependencies = ["KapanRouter"];
 

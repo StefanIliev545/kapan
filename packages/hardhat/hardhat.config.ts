@@ -83,14 +83,10 @@ const config: HardhatUserConfig = {
           evmVersion: "cancun",
           optimizer: {
             enabled: true,
-            runs: 50,
-            details: {
-              yulDetails: {
-                optimizerSteps: "u",
-              },
-            },
+            runs: 10,  // Minimal runs for smallest bytecode (KapanRouter at limit)
           },
-          viaIR: true,
+          // Note: viaIR disabled due to stack-too-deep issues with complex ABI decoding
+          // The contracts use transient storage (tload/tstore) requiring 0.8.24+
         },
       },
       {

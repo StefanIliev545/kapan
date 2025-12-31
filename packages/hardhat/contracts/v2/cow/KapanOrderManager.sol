@@ -33,6 +33,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     error HookExecutionFailed();
     error Unauthorized();
     error InvalidOrderState();
+    error ZeroAddress();
 
     // ============ Enums ============
     enum CompletionType {
@@ -111,6 +112,9 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     
     /// @notice User's active orders
     mapping(address => bytes32[]) public userOrders;
+    
+    /// @notice Lookup order hash by (user, salt) - enables pre-computing appData
+    mapping(address => mapping(bytes32 => bytes32)) public userSaltToOrderHash;
 
     // ============ Events ============
     
@@ -128,6 +132,12 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     event ChunkExecuted(bytes32 indexed orderHash, uint256 chunkIndex, uint256 sellAmount, uint256 buyAmount);
     event PreHookExecuted(bytes32 indexed orderHash, uint256 chunkIndex);
     event PostHookExecuted(bytes32 indexed orderHash, uint256 chunkIndex, uint256 receivedAmount);
+    
+    // Admin events
+    event RouterUpdated(address indexed oldRouter, address indexed newRouter);
+    event ComposableCoWUpdated(address indexed oldComposableCoW, address indexed newComposableCoW);
+    event HooksTrampolineUpdated(address indexed oldTrampoline, address indexed newTrampoline);
+    event OrderHandlerUpdated(address indexed oldHandler, address indexed newHandler);
 
     // ============ Constructor ============
     
@@ -138,47 +148,66 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         address _settlement,
         address _hooksTrampoline
     ) Ownable(_owner) {
+        if (_router == address(0)) revert ZeroAddress();
+        if (_composableCoW == address(0)) revert ZeroAddress();
+        if (_settlement == address(0)) revert ZeroAddress();
+        if (_hooksTrampoline == address(0)) revert ZeroAddress();
+        
         router = IKapanRouter(_router);
         composableCoW = IComposableCoW(_composableCoW);
         settlement = IGPv2Settlement(_settlement);
         hooksTrampoline = _hooksTrampoline;
-        
-        // Approve vault relayer to spend all tokens (will be set per-token as needed)
     }
 
     // ============ Admin Functions ============
     
     function setRouter(address _router) external onlyOwner {
+        if (_router == address(0)) revert ZeroAddress();
+        address oldRouter = address(router);
         router = IKapanRouter(_router);
+        emit RouterUpdated(oldRouter, _router);
     }
     
     function setComposableCoW(address _composableCoW) external onlyOwner {
+        if (_composableCoW == address(0)) revert ZeroAddress();
+        address oldComposableCoW = address(composableCoW);
         composableCoW = IComposableCoW(_composableCoW);
+        emit ComposableCoWUpdated(oldComposableCoW, _composableCoW);
     }
     
     function setHooksTrampoline(address _hooksTrampoline) external onlyOwner {
+        if (_hooksTrampoline == address(0)) revert ZeroAddress();
+        address oldTrampoline = hooksTrampoline;
         hooksTrampoline = _hooksTrampoline;
+        emit HooksTrampolineUpdated(oldTrampoline, _hooksTrampoline);
     }
     
     function setOrderHandler(address _handler) external onlyOwner {
+        if (_handler == address(0)) revert ZeroAddress();
+        address oldHandler = orderHandler;
         orderHandler = _handler;
+        emit OrderHandlerUpdated(oldHandler, _handler);
     }
     
     /// @notice Approve vault relayer to spend a token
     function approveVaultRelayer(address token) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
         address vaultRelayer = settlement.vaultRelayer();
         IERC20(token).approve(vaultRelayer, type(uint256).max);
     }
 
     // ============ Order Creation ============
     
-    /// @notice Create a new CoW order
+    /// @notice Create a new CoW order with seed tokens for first chunk
+    /// @dev User must approve this contract to pull seedAmount of sellToken before calling
     /// @param params The order parameters
     /// @param salt Unique salt for the order
+    /// @param seedAmount Amount of sell tokens to pull from user for first chunk (0 to skip)
     /// @return orderHash The hash identifying this order
     function createOrder(
         KapanOrderParams calldata params,
-        bytes32 salt
+        bytes32 salt,
+        uint256 seedAmount
     ) external nonReentrant returns (bytes32 orderHash) {
         // Validate
         if (params.user != msg.sender) revert Unauthorized();
@@ -189,6 +218,12 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         
         // Check order doesn't exist
         if (orders[orderHash].status != OrderStatus.None) revert OrderAlreadyExists();
+        
+        // Pull seed tokens from user if provided
+        // This ensures OrderManager has balance for CoW API's balance check
+        if (seedAmount > 0) {
+            IERC20(params.sellToken).safeTransferFrom(msg.sender, address(this), seedAmount);
+        }
         
         // Store order context
         orders[orderHash] = OrderContext({
@@ -204,6 +239,9 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         
         // Track user's orders
         userOrders[params.user].push(orderHash);
+        
+        // Enable lookup by (user, salt) for hook resolution
+        userSaltToOrderHash[params.user][salt] = orderHash;
         
         // Register with ComposableCoW
         IConditionalOrder.ConditionalOrderParams memory cowParams = IConditionalOrder.ConditionalOrderParams({
@@ -229,7 +267,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
 
     // ============ Order Cancellation ============
     
-    /// @notice Cancel an active order
+    /// @notice Cancel an active order and refund any remaining seed tokens
     /// @param orderHash The order to cancel
     function cancelOrder(bytes32 orderHash) external nonReentrant {
         OrderContext storage ctx = orders[orderHash];
@@ -251,6 +289,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         );
         composableCoW.remove(cowOrderHash);
         
+        // Refund any remaining sell tokens to user
+        // This handles the case where seed tokens were provided but order never filled
+        uint256 remainingBalance = IERC20(ctx.params.sellToken).balanceOf(address(this));
+        if (remainingBalance > 0) {
+            IERC20(ctx.params.sellToken).safeTransfer(ctx.params.user, remainingBalance);
+        }
+        
         emit OrderCancelled(orderHash, msg.sender);
     }
 
@@ -262,6 +307,40 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @param orderHash The order being settled
     /// @param chunkIndex The current chunk index
     function executePreHook(bytes32 orderHash, uint256 chunkIndex) external nonReentrant {
+        _executePreHook(orderHash, chunkIndex);
+    }
+    
+    /// @notice Execute post-hook (called by HooksTrampoline during CoW settlement)
+    /// @dev Prepends a ToOutput instruction with the actual received amount, so all
+    ///      stored instructions can reference index 0 for the swap output
+    /// @param orderHash The order being settled
+    function executePostHook(bytes32 orderHash) external nonReentrant {
+        _executePostHook(orderHash);
+    }
+    
+    /// @notice Execute pre-hook using (user, salt) lookup
+    /// @dev Allows pre-computing appData before order creation
+    /// @param user The order owner
+    /// @param salt The order salt (known before tx)
+    /// @param chunkIndex The current chunk index
+    function executePreHookBySalt(address user, bytes32 salt, uint256 chunkIndex) external nonReentrant {
+        bytes32 orderHash = userSaltToOrderHash[user][salt];
+        if (orderHash == bytes32(0)) revert OrderNotFound();
+        _executePreHook(orderHash, chunkIndex);
+    }
+    
+    /// @notice Execute post-hook using (user, salt) lookup
+    /// @dev Allows pre-computing appData before order creation
+    /// @param user The order owner
+    /// @param salt The order salt (known before tx)
+    function executePostHookBySalt(address user, bytes32 salt) external nonReentrant {
+        bytes32 orderHash = userSaltToOrderHash[user][salt];
+        if (orderHash == bytes32(0)) revert OrderNotFound();
+        _executePostHook(orderHash);
+    }
+    
+    /// @notice Internal pre-hook execution
+    function _executePreHook(bytes32 orderHash, uint256 chunkIndex) internal {
         // Only HooksTrampoline can call this
         if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
         
@@ -293,11 +372,8 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         emit PreHookExecuted(orderHash, chunkIndex);
     }
     
-    /// @notice Execute post-hook (called by HooksTrampoline during CoW settlement)
-    /// @dev Prepends a ToOutput instruction with the actual received amount, so all
-    ///      stored instructions can reference index 0 for the swap output
-    /// @param orderHash The order being settled
-    function executePostHook(bytes32 orderHash) external nonReentrant {
+    /// @notice Internal post-hook execution
+    function _executePostHook(bytes32 orderHash) internal {
         // Only HooksTrampoline can call this
         if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
         
@@ -348,26 +424,50 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     // ============ ERC-1271 Signature Verification ============
     
     /// @notice Verify signature for CoW Protocol orders
-    /// @dev Delegates to ComposableCoW for conditional order verification
+    /// @dev For non-Safe ERC-1271 contracts, ComposableCoW returns signature as:
+    ///      abi.encode(GPv2Order.Data, PayloadStruct)
+    ///      We decode this and verify the order matches what the handler generates.
     function isValidSignature(
         bytes32 _hash,
         bytes calldata _signature
     ) external view override returns (bytes4) {
-        // Decode the payload
-        IComposableCoW.PayloadStruct memory payload = abi.decode(_signature, (IComposableCoW.PayloadStruct));
+        // For ERC-1271 forwarder pattern (non-Safe), signature = abi.encode(order, payload)
+        // We need to decode both parts
+        (GPv2Order.Data memory order, IComposableCoW.PayloadStruct memory payload) = 
+            abi.decode(_signature, (GPv2Order.Data, IComposableCoW.PayloadStruct));
         
-        // Verify via ComposableCoW
+        // Verify via ComposableCoW - this checks authorization and generates the expected order
         // ComposableCoW will call the handler's verify() function
         try composableCoW.getTradeableOrderWithSignature(
             address(this),
             payload.params,
             payload.offchainInput,
             payload.proof
-        ) returns (GPv2Order.Data memory, bytes memory) {
-            return ERC1271_MAGIC_VALUE;
+        ) returns (GPv2Order.Data memory expectedOrder, bytes memory) {
+            // Verify the provided order matches the expected order
+            // The hash should match what we expect for this order
+            if (_orderMatches(order, expectedOrder)) {
+                return ERC1271_MAGIC_VALUE;
+            }
+            return bytes4(0xffffffff);
         } catch {
             return bytes4(0xffffffff);
         }
+    }
+    
+    /// @dev Check if two GPv2Orders match (excluding validTo which changes)
+    function _orderMatches(GPv2Order.Data memory a, GPv2Order.Data memory b) internal pure returns (bool) {
+        return address(a.sellToken) == address(b.sellToken) &&
+               address(a.buyToken) == address(b.buyToken) &&
+               a.receiver == b.receiver &&
+               a.sellAmount == b.sellAmount &&
+               a.buyAmount == b.buyAmount &&
+               a.appData == b.appData &&
+               a.feeAmount == b.feeAmount &&
+               a.kind == b.kind &&
+               a.partiallyFillable == b.partiallyFillable &&
+               a.sellTokenBalance == b.sellTokenBalance &&
+               a.buyTokenBalance == b.buyTokenBalance;
     }
 
     // ============ View Functions ============

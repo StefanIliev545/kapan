@@ -148,6 +148,8 @@ export const useKapanRouterV2 = () => {
 
   const [isApproving, setIsApproving] = useState(false);
   const [batchId, setBatchId] = useState<string | undefined>(undefined);
+  // When true, the hook won't show notifications - caller handles them
+  const [suppressBatchNotifications, setSuppressBatchNotifications] = useState(false);
 
   // EIP-5792 capability detection (Atomic Batching)
   const { data: capabilities } = useCapabilities({ account: userAddress });
@@ -165,10 +167,30 @@ export const useKapanRouterV2 = () => {
 
   const [batchNotificationId, setBatchNotificationId] = useState<string | number | null>(null);
 
-  // Batch Status Effects
+  // Show loading notification when batch is submitted (unless suppressed)
   useEffect(() => {
-    if (!batchId || !batchStatus) return;
+    if (!batchId || suppressBatchNotifications) return;
+    
+    // Show "waiting for confirmation" notification
+    const id = notification.loading(
+      <TransactionToast
+        step="sent"
+        message="Transaction submitted — waiting for confirmation..."
+      />
+    );
+    setBatchNotificationId(id);
+    
+    return () => {
+      // Cleanup on unmount or when batchId changes
+      if (id) notification.remove(id);
+    };
+  }, [batchId, suppressBatchNotifications]);
 
+  // Batch Status Effects - update notification when status changes (unless suppressed)
+  useEffect(() => {
+    if (!batchId || !batchStatus || suppressBatchNotifications) return;
+
+    // Remove the loading notification
     if (batchNotificationId) {
       notification.remove(batchNotificationId);
       setBatchNotificationId(null);
@@ -178,18 +200,18 @@ export const useKapanRouterV2 = () => {
       notification.success(
         <TransactionToast
           step="confirmed"
-          message="Batch transaction completed successfully!"
+          message="Transaction confirmed!"
         />
       );
     } else if (isBatchError) {
       notification.error(
         <TransactionToast
           step="failed"
-          message="Batch transaction failed"
+          message="Transaction failed"
         />
       );
     }
-  }, [batchId, batchStatus, isBatchConfirmed, isBatchError, batchNotificationId]);
+  }, [batchId, batchStatus, isBatchConfirmed, isBatchError, batchNotificationId, suppressBatchNotifications]);
 
   // Refetch Data on Success
   useEffect(() => {
@@ -1433,7 +1455,52 @@ export const useKapanRouterV2 = () => {
       console.error("Error in executeFlowWithApprovals:", error);
       throw error;
     }
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations, canDoAtomicBatch, sendCallsAsync, capabilities, getDeauthorizations]);
+  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations, canDoAtomicBatch, sendCallsAsync, capabilities, getDeauthorizations, chainId]);
+
+  /**
+   * Build all calls for a flow (for batching with other calls)
+   * Returns array of { to, data } ready for sendCallsAsync
+   */
+  const buildFlowCalls = useCallback(async (
+    instructions: ProtocolInstruction[],
+    options?: { revokePermissions?: boolean }
+  ): Promise<{ to: Address; data: Hex }[]> => {
+    if (!routerContract || !userAddress) {
+      throw new Error("Missing context");
+    }
+
+    // Prepare main calldata
+    const protocolInstructions = instructions.map(inst => ({
+      protocolName: inst.protocolName,
+      data: inst.data as `0x${string}`,
+    }));
+    const routerCalldata = encodeFunctionData({
+      abi: routerContract.abi,
+      functionName: "processProtocolInstructions",
+      args: [protocolInstructions],
+    });
+
+    // Prepare approvals
+    const authCalls = await getAuthorizations(instructions);
+    const filteredAuthCalls = authCalls.filter(({ target, data }) => {
+      if (!target || !data || data.length === 0) return false;
+      if (isZeroAmountApproval(data)) return false;
+      return true;
+    });
+
+    // Prepare deauthorizations
+    const shouldRevoke = options?.revokePermissions && chainId !== 59144 && chainId !== 9745;
+    const deauthCalls = shouldRevoke ? await getDeauthorizations(instructions) : [];
+    const filteredDeauthCalls = deauthCalls.filter(({ target, data }) => {
+      return target && data && data.length > 0;
+    });
+
+    return [
+      ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
+      { to: routerContract.address as Address, data: routerCalldata as Hex },
+      ...filteredDeauthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
+    ];
+  }, [routerContract, userAddress, getAuthorizations, getDeauthorizations, chainId]);
 
   const executeFlowBatchedIfPossible = useCallback(async (
     instructions: ProtocolInstruction[],
@@ -1648,8 +1715,13 @@ export const useKapanRouterV2 = () => {
     executeInstructions,
     executeFlowWithApprovals,
     executeFlowBatchedIfPossible,
+    buildFlowCalls,
     getAuthorizations,
     getDeauthorizations,
+    sendCallsAsync,
+    setBatchId,
+    setSuppressBatchNotifications,
+    routerContract,
     hash,
     isPending,
     isConfirming,

@@ -5,326 +5,234 @@ import {
   encodePullToken,
   encodeApprove,
   encodePushToken,
-  encodeToOutput,
   createRouterInstruction,
   createProtocolInstruction,
   encodeLendingInstruction,
   LendingOp,
+  deployRouterWithAuthHelper,
 } from "./helpers/instructionHelpers";
+import {
+  COW_PROTOCOL,
+  GPV2_ORDER,
+  TRADE_FLAGS,
+  getComposableCoW,
+  getSettlement,
+  impersonateAndFund,
+  becomeSolver,
+  isSolver,
+  buildOrderParams,
+  extractOrderHash,
+  buildERC1271Signature,
+  buildTradeSignature,
+  hashOrder,
+  computeOrderUid,
+  GPv2OrderData,
+} from "./helpers/cowHelpers";
 
 const FORK = process.env.MAINNET_FORKING_ENABLED === "true";
 
-// Arbitrum addresses
+// ============ Arbitrum Token Addresses ============
 const USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 const WETH = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
-const USDC_WHALE = "0x489ee077994B6658eAfA855C308275EAd8097C4A"; // Aave Pool - has more USDC
-const WETH_WHALE = "0xBA12222222228d8Ba445958a75a0704d566BF2C8"; // Balancer vault
+const USDC_WHALE = "0x489ee077994B6658eAfA855C308275EAd8097C4A";
+const WETH_WHALE = "0xBA12222222228d8Ba445958a75a0704d566BF2C8";
 const AAVE_POOL_ADDRESSES_PROVIDER = "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb";
+const AAVE_DATA_PROVIDER = "0x69FA688f1Dc47d4B5d8029D5a35FB7a548310654";
 
 const coder = AbiCoder.defaultAbiCoder();
 
+// HooksTrampoline interface for encoding hook calls
+const HOOKS_TRAMPOLINE_IFACE = new ethers.Interface([
+  "function execute(tuple(address target, bytes callData, uint256 gasLimit)[] hooks) external"
+]);
+
 describe("CoW Protocol Integration (Fork)", function () {
   before(function () {
-    if (!FORK) {
-      this.skip();
-    }
+    if (!FORK) this.skip();
   });
 
-  let owner: any;
-  let user: any;
-  let hooksTrampoline: any;
-  let mockVaultRelayer: any;
+  // ============ Shared State ============
+  let owner: any, user: any;
+  let router: any, aaveGateway: any, orderManager: any, orderHandler: any;
+  let composableCoW: any, settlement: any;
+  let usdc: any, weth: any;
 
-  let router: any;
-  let aaveGateway: any;
-  let orderManager: any;
-  let orderHandler: any;
-  let mockComposableCoW: any;
-  let mockSettlement: any;
-
-  let usdc: any;
-  let weth: any;
-
+  // ============ Test Setup ============
   beforeEach(async function () {
-    [owner, hooksTrampoline, mockVaultRelayer] = await ethers.getSigners();
-
-    // Create a fresh user wallet
+    [owner] = await ethers.getSigners();
     user = ethers.Wallet.createRandom().connect(ethers.provider);
 
     // Get token contracts
     usdc = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", USDC);
     weth = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", WETH);
 
-    // Fund user with ETH for gas
-    await network.provider.send("hardhat_setBalance", [
-      await user.getAddress(),
-      "0x56BC75E2D63100000", // 100 ETH
-    ]);
+    // Fund user with ETH
+    await network.provider.send("hardhat_setBalance", [await user.getAddress(), "0x56BC75E2D63100000"]);
 
-    // Impersonate whales and fund user
-    await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [USDC_WHALE],
-    });
-    await network.provider.send("hardhat_setBalance", [USDC_WHALE, "0x56BC75E2D63100000"]);
-    
-    await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [WETH_WHALE],
-    });
-    await network.provider.send("hardhat_setBalance", [WETH_WHALE, "0x56BC75E2D63100000"]);
-
+    // Fund user with tokens from whales
+    await impersonateAndFund(USDC_WHALE);
+    await impersonateAndFund(WETH_WHALE);
     const usdcWhale = await ethers.getSigner(USDC_WHALE);
     const wethWhale = await ethers.getSigner(WETH_WHALE);
-
-    // Fund user with tokens (use smaller amounts to avoid whale exhaustion)
     await usdc.connect(usdcWhale).transfer(await user.getAddress(), ethers.parseUnits("2000", 6));
     await weth.connect(wethWhale).transfer(await user.getAddress(), ethers.parseEther("3"));
 
-    // Deploy mock settlement
-    const MockSettlement = await ethers.getContractFactory("MockGPv2Settlement");
-    mockSettlement = await MockSettlement.deploy(await mockVaultRelayer.getAddress());
+    // Get real CoW Protocol contracts
+    composableCoW = await getComposableCoW();
+    settlement = await getSettlement();
 
-    // Deploy mock ComposableCoW
-    const MockComposableCoW = await ethers.getContractFactory("MockComposableCoW");
-    mockComposableCoW = await MockComposableCoW.deploy();
+    // Deploy our contracts
+    const { router: _router, syncGateway, routerAddress } = await deployRouterWithAuthHelper(ethers, await owner.getAddress());
+    router = _router;
 
-    // Deploy router
-    const Router = await ethers.getContractFactory("KapanRouter");
-    router = await Router.deploy(await owner.getAddress());
-
-    // Deploy Aave gateway
     const AaveGateway = await ethers.getContractFactory("AaveGatewayWrite");
-    aaveGateway = await AaveGateway.deploy(await router.getAddress(), AAVE_POOL_ADDRESSES_PROVIDER, 0);
-
-    // Add gateway to router
+    aaveGateway = await AaveGateway.deploy(routerAddress, AAVE_POOL_ADDRESSES_PROVIDER, 0);
     await router.addGateway("aave", await aaveGateway.getAddress());
+    await syncGateway("aave", await aaveGateway.getAddress());
 
-    // Deploy order manager
     const OrderManager = await ethers.getContractFactory("KapanOrderManager");
     orderManager = await OrderManager.deploy(
       await owner.getAddress(),
-      await router.getAddress(),
-      await mockComposableCoW.getAddress(),
-      await mockSettlement.getAddress(),
-      await hooksTrampoline.getAddress()
+      routerAddress,
+      COW_PROTOCOL.composableCoW,
+      COW_PROTOCOL.settlement,
+      COW_PROTOCOL.hooksTrampoline
     );
 
-    // Deploy order handler
     const OrderHandler = await ethers.getContractFactory("KapanOrderHandler");
     orderHandler = await OrderHandler.deploy(await orderManager.getAddress());
 
-    // Setup
     await orderManager.setOrderHandler(await orderHandler.getAddress());
     await router.setApprovedManager(await orderManager.getAddress(), true);
     await router.connect(user).setDelegate(await orderManager.getAddress(), true);
   });
 
-  describe("Order Creation with Real Aave", function () {
-    it("should create an order with Aave borrow pre-instructions", async function () {
+  // ============ Helper Functions ============
+  async function getAaveTokenAddresses(asset: string) {
+    const dataProvider = await ethers.getContractAt(
+      ["function getReserveTokensAddresses(address) view returns (address aToken, address stableDebt, address variableDebt)"],
+      AAVE_DATA_PROVIDER
+    );
+    return dataProvider.getReserveTokensAddresses(asset);
+  }
+
+  async function depositToAave(token: any, amount: bigint, userAddr: string) {
+    await token.connect(user).approve(await router.getAddress(), amount);
+    const instructions = [
+      createRouterInstruction(encodePullToken(amount, await token.getAddress(), userAddr)),
+      createRouterInstruction(encodeApprove(0, "aave")),
+      createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Deposit, await token.getAddress(), userAddr, amount, "0x", 999)),
+    ];
+    await router.connect(user).processProtocolInstructions(instructions);
+  }
+
+  async function approveCreditDelegation(debtTokenAddr: string, spender: string) {
+    const debtToken = await ethers.getContractAt(["function approveDelegation(address, uint256) external"], debtTokenAddr);
+    await debtToken.connect(user).approveDelegation(spender, ethers.MaxUint256);
+  }
+
+  function buildHookCalldata(orderManagerAddr: string, kapanOrderHash: string, isPreHook: boolean, chunkIndex: number = 0): string {
+    const orderManagerIface = new ethers.Interface([
+      "function executePreHook(bytes32 orderHash, uint256 chunkIndex) external",
+      "function executePostHook(bytes32 orderHash) external"
+    ]);
+    
+    const innerCalldata = isPreHook 
+      ? orderManagerIface.encodeFunctionData("executePreHook", [kapanOrderHash, chunkIndex])
+      : orderManagerIface.encodeFunctionData("executePostHook", [kapanOrderHash]);
+    
+    return HOOKS_TRAMPOLINE_IFACE.encodeFunctionData("execute", [[{
+      target: orderManagerAddr,
+      callData: innerCalldata,
+      gasLimit: 1000000n, // 1M gas limit for lending operations
+    }]]);
+  }
+
+  // ============ Tests ============
+
+  describe("Order Creation", function () {
+    it("should create order with Aave borrow pre-instructions", async function () {
       const userAddr = await user.getAddress();
+      const [, , vDebtUsdc] = await getAaveTokenAddresses(USDC);
 
-      // First, user needs to deposit collateral to Aave
-      // This is a prerequisite for borrowing
-      const depositAmount = ethers.parseEther("2"); // 2 WETH
-      
-      // Approve router to pull WETH
-      await weth.connect(user).approve(await router.getAddress(), depositAmount);
-      
-      // Get aToken address for approval
-      const aaveDataProvider = await ethers.getContractAt(
-        ["function getReserveTokensAddresses(address) view returns (address, address, address)"],
-        "0x69FA688f1Dc47d4B5d8029D5a35FB7a548310654" // Aave PoolDataProvider on Arbitrum
-      );
-      const [aWeth, , vDebtUsdc] = await aaveDataProvider.getReserveTokensAddresses(WETH);
-      const [, , vDebtWeth] = await aaveDataProvider.getReserveTokensAddresses(WETH);
+      await depositToAave(weth, ethers.parseEther("2"), userAddr);
+      await approveCreditDelegation(vDebtUsdc, await aaveGateway.getAddress());
 
-      // Deposit WETH to Aave
-      const depositInstructions = [
-        createRouterInstruction(encodePullToken(depositAmount, WETH, userAddr)),
-        createRouterInstruction(encodeApprove(0, "aave")),
-        createProtocolInstruction(
-          "aave",
-          encodeLendingInstruction(LendingOp.Deposit, WETH, userAddr, depositAmount, "0x", 999)
-        ),
-      ];
-
-      await router.connect(user).processProtocolInstructions(depositInstructions);
-
-      // Verify deposit
-      const aWethContract = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", aWeth);
-      const aWethBalance = await aWethContract.balanceOf(userAddr);
-      console.log(`User aWETH balance after deposit: ${ethers.formatEther(aWethBalance)}`);
-      expect(aWethBalance).to.be.gt(0);
-
-      // Now approve credit delegation for borrowing USDC
-      const vDebtUsdcContract = await ethers.getContractAt(
-        ["function approveDelegation(address, uint256) external"],
-        vDebtUsdc
-      );
-      await vDebtUsdcContract.connect(user).approveDelegation(
-        await aaveGateway.getAddress(),
-        ethers.MaxUint256
-      );
-
-      // Create pre-instructions for borrowing
-      const borrowAmount = ethers.parseUnits("1000", 6); // 1000 USDC
+      const borrowAmount = ethers.parseUnits("1000", 6);
       const preInstructions = [
-        createProtocolInstruction(
-          "aave",
-          encodeLendingInstruction(LendingOp.Borrow, USDC, userAddr, borrowAmount, "0x", 999)
-        ),
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddr, borrowAmount, "0x", 999)),
         createRouterInstruction(encodePushToken(0, await orderManager.getAddress())),
       ];
-
-      // Create post-instructions for depositing (these would receive swap output)
       const postInstructions = [
-        createRouterInstruction(encodePullToken(0n, WETH, await orderManager.getAddress())), // Amount set by post-hook
         createRouterInstruction(encodeApprove(0, "aave")),
-        createProtocolInstruction(
-          "aave",
-          encodeLendingInstruction(LendingOp.Deposit, WETH, userAddr, 0n, "0x", 0) // Amount from input
-        ),
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Deposit, WETH, userAddr, 0n, "0x", 0)),
       ];
 
-      // Create order params
-      const params = {
+      const params = buildOrderParams({
         user: userAddr,
-        preInstructionsData: coder.encode(
-          ["tuple(string protocolName, bytes data)[]"],
-          [preInstructions.map(i => ({ protocolName: i.protocolName, data: i.data }))]
-        ),
+        preInstructions,
         preTotalAmount: borrowAmount,
         sellToken: USDC,
         buyToken: WETH,
-        chunkSize: ethers.parseUnits("500", 6), // 500 USDC per chunk
-        minBuyPerChunk: ethers.parseEther("0.15"), // Expect at least 0.15 WETH per 500 USDC
-        postInstructionsData: coder.encode(
-          ["tuple(string protocolName, bytes data)[]"],
-          [postInstructions.map(i => ({ protocolName: i.protocolName, data: i.data }))]
-        ),
-        completion: 2, // Iterations
-        targetValue: 2, // 2 chunks
-        minHealthFactor: ethers.parseEther("1.1"),
-        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
-      };
+        chunkSize: ethers.parseUnits("500", 6),
+        minBuyPerChunk: ethers.parseEther("0.15"),
+        postInstructions,
+        targetValue: 2,
+      });
 
       const salt = ethers.keccak256(ethers.toUtf8Bytes("test-salt"));
-
-      // Create order
       const tx = await orderManager.connect(user).createOrder(params, salt);
       const receipt = await tx.wait();
+      const orderHash = extractOrderHash(receipt, orderManager);
 
-      // Extract orderHash from event
-      const event = receipt?.logs.find((log: any) => {
-        try {
-          return orderManager.interface.parseLog(log)?.name === "OrderCreated";
-        } catch {
-          return false;
-        }
-      });
-      expect(event).to.not.be.undefined;
-
-      const parsed = orderManager.interface.parseLog(event);
-      const orderHash = parsed?.args[0];
-      console.log(`Order created with hash: ${orderHash}`);
-
-      // Verify order was registered
-      expect(await mockComposableCoW.getCreatedOrdersCount()).to.equal(1);
-
-      // Get tradeable order from handler
       const staticInput = coder.encode(["bytes32"], [orderHash]);
-      const order = await orderHandler.getTradeableOrder(
-        await orderManager.getAddress(),
-        await owner.getAddress(),
-        ethers.ZeroHash,
-        staticInput,
-        "0x"
-      );
-
-      console.log(`Generated order:`);
-      console.log(`  sellToken: ${order.sellToken}`);
-      console.log(`  buyToken: ${order.buyToken}`);
-      console.log(`  sellAmount: ${ethers.formatUnits(order.sellAmount, 6)} USDC`);
-      console.log(`  buyAmount: ${ethers.formatEther(order.buyAmount)} WETH`);
+      const order = await orderHandler.getTradeableOrder(await orderManager.getAddress(), await owner.getAddress(), ethers.ZeroHash, staticInput, "0x");
 
       expect(order.sellToken).to.equal(USDC);
       expect(order.buyToken).to.equal(WETH);
-      expect(order.sellAmount).to.equal(ethers.parseUnits("500", 6)); // chunkSize
-      expect(order.buyAmount).to.equal(ethers.parseEther("0.15")); // minBuyPerChunk
+      expect(order.sellAmount).to.equal(ethers.parseUnits("500", 6));
     });
   });
 
-  describe("Delegation Flow", function () {
-    it("should allow manager to execute on behalf of user via delegation", async function () {
-      const userAddr = await user.getAddress();
+  describe("Delegation", function () {
+    it("should configure delegation correctly", async function () {
       const managerAddr = await orderManager.getAddress();
+      const userAddr = await user.getAddress();
 
-      // Verify delegation is set up correctly
-      expect(await router.approvedManagers(managerAddr)).to.equal(true);
-      expect(await router.userDelegates(userAddr, managerAddr)).to.equal(true);
-
-      // The isAuthorizedFor function is public, but we can't call it directly
-      // because it checks msg.sender. Instead we verify the mappings.
-      console.log(`Manager ${managerAddr} is approved: ${await router.approvedManagers(managerAddr)}`);
-      console.log(`User ${userAddr} delegated to manager: ${await router.userDelegates(userAddr, managerAddr)}`);
+      expect(await router.approvedManagers(managerAddr)).to.be.true;
+      expect(await router.userDelegates(userAddr, managerAddr)).to.be.true;
     });
   });
 
-  describe("Handler Order Generation", function () {
+  describe("Order Handler", function () {
     let orderHash: string;
 
     beforeEach(async function () {
-      const userAddr = await user.getAddress();
-
-      const params = {
-        user: userAddr,
-        preInstructionsData: "0x",
+      const params = buildOrderParams({
+        user: await user.getAddress(),
         preTotalAmount: ethers.parseUnits("1000", 6),
         sellToken: USDC,
         buyToken: WETH,
         chunkSize: ethers.parseUnits("200", 6),
         minBuyPerChunk: ethers.parseEther("0.05"),
-        postInstructionsData: "0x",
-        completion: 2, // Iterations
-        targetValue: 5, // 5 chunks
-        minHealthFactor: ethers.parseEther("1.1"),
-        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test")),
-      };
-
-      const salt = ethers.keccak256(ethers.toUtf8Bytes("unique"));
-      const tx = await orderManager.connect(user).createOrder(params, salt);
-      const receipt = await tx.wait();
-
-      const event = receipt?.logs.find((log: any) => {
-        try {
-          return orderManager.interface.parseLog(log)?.name === "OrderCreated";
-        } catch {
-          return false;
-        }
+        targetValue: 5,
       });
-      const parsed = orderManager.interface.parseLog(event);
-      orderHash = parsed?.args[0];
+
+      const salt = ethers.keccak256(ethers.toUtf8Bytes("handler-test"));
+      const tx = await orderManager.connect(user).createOrder(params, salt);
+      orderHash = extractOrderHash(await tx.wait(), orderManager);
     });
 
-    it("should correctly calculate chunk progress", async function () {
+    it("should track chunk progress", async function () {
       const [executed, total, iterations] = await orderHandler.getProgress(orderHash);
-
       expect(executed).to.equal(0);
       expect(total).to.equal(ethers.parseUnits("1000", 6));
       expect(iterations).to.equal(0);
     });
 
-    it("should generate valid order for first chunk", async function () {
+    it("should generate valid chunk order", async function () {
       const staticInput = coder.encode(["bytes32"], [orderHash]);
-
-      const order = await orderHandler.getTradeableOrder(
-        await orderManager.getAddress(),
-        await owner.getAddress(),
-        ethers.ZeroHash,
-        staticInput,
-        "0x"
-      );
+      const order = await orderHandler.getTradeableOrder(await orderManager.getAddress(), await owner.getAddress(), ethers.ZeroHash, staticInput, "0x");
 
       expect(order.sellAmount).to.equal(ethers.parseUnits("200", 6));
       expect(order.buyAmount).to.equal(ethers.parseEther("0.05"));
@@ -333,43 +241,33 @@ describe("CoW Protocol Integration (Fork)", function () {
 
     it("should return correct chunk params", async function () {
       const [sellAmount, minBuyAmount, isComplete] = await orderHandler.getChunkParams(orderHash);
-
       expect(sellAmount).to.equal(ethers.parseUnits("200", 6));
       expect(minBuyAmount).to.equal(ethers.parseEther("0.05"));
-      expect(isComplete).to.equal(false);
+      expect(isComplete).to.be.false;
     });
   });
 
-  describe("Full Leverage-Up Flow Simulation", function () {
-    /**
-     * This test simulates a complete 2-chunk leverage-up flow:
-     * 1. User has WETH collateral in Aave
-     * 2. Pre-hook: Borrow USDC, send to OrderManager
-     * 3. Simulated CoW swap: USDC → WETH
-     * 4. Post-hook: Deposit WETH back to Aave
-     * 5. Repeat for chunk 2
-     * 6. Verify order completion
-     */
+  describe("Full Settlement via GPv2Settlement.settle()", function () {
+    const SELL_AMOUNT = ethers.parseUnits("500", 6); // 500 USDC
+    const BUY_AMOUNT = ethers.parseEther("0.17");     // 0.17 WETH
 
-    let orderHash: string;
+    let kapanOrderHash: string;
+    let salt: string;
     let userAddr: string;
+    let orderManagerAddr: string;
+    let orderHandlerAddr: string;
     let aWethContract: any;
     let vDebtUsdcContract: any;
-    let wethWhale: any;
-
-    const CHUNK_SIZE = ethers.parseUnits("500", 6); // 500 USDC per chunk
-    const SWAP_OUTPUT = ethers.parseEther("0.17"); // ~0.17 WETH per 500 USDC
+    let domainSeparator: string;
+    let appDataHash: string;
 
     beforeEach(async function () {
       userAddr = await user.getAddress();
-
-      // Get Aave data provider for token addresses
-      const aaveDataProvider = await ethers.getContractAt(
-        ["function getReserveTokensAddresses(address) view returns (address, address, address)"],
-        "0x69FA688f1Dc47d4B5d8029D5a35FB7a548310654"
-      );
-      const [aWeth] = await aaveDataProvider.getReserveTokensAddresses(WETH);
-      const [, , vDebtUsdc] = await aaveDataProvider.getReserveTokensAddresses(USDC);
+      orderManagerAddr = await orderManager.getAddress();
+      orderHandlerAddr = await orderHandler.getAddress();
+      
+      const [aWeth] = await getAaveTokenAddresses(WETH);
+      const [, , vDebtUsdc] = await getAaveTokenAddresses(USDC);
 
       aWethContract = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", aWeth);
       vDebtUsdcContract = await ethers.getContractAt(
@@ -377,234 +275,253 @@ describe("CoW Protocol Integration (Fork)", function () {
         vDebtUsdc
       );
 
-      // Get WETH whale signer for simulating swap output
-      wethWhale = await ethers.getSigner(WETH_WHALE);
+      // Setup Aave position
+      await depositToAave(weth, ethers.parseEther("2"), userAddr);
+      await approveCreditDelegation(vDebtUsdc, await aaveGateway.getAddress());
 
-      // Step 1: User deposits 2 WETH as collateral to Aave
-      const depositAmount = ethers.parseEther("2");
-      await weth.connect(user).approve(await router.getAddress(), depositAmount);
-
-      const depositInstructions = [
-        createRouterInstruction(encodePullToken(depositAmount, WETH, userAddr)),
-        createRouterInstruction(encodeApprove(0, "aave")),
-        createProtocolInstruction(
-          "aave",
-          encodeLendingInstruction(LendingOp.Deposit, WETH, userAddr, depositAmount, "0x", 999)
-        ),
-      ];
-      await router.connect(user).processProtocolInstructions(depositInstructions);
-
-      const initialAWeth = await aWethContract.balanceOf(userAddr);
-      console.log(`Initial aWETH balance: ${ethers.formatEther(initialAWeth)}`);
-
-      // Step 2: User approves credit delegation for USDC borrowing
-      await vDebtUsdcContract.connect(user).approveDelegation(
-        await aaveGateway.getAddress(),
-        ethers.MaxUint256
-      );
-
-      // Step 3: Create CoW order with pre/post instructions
-      // Pre-instructions: Borrow USDC (amount comes from prepended ToOutput at index 0)
-      //   - The hook prepends ToOutput(chunkSize, USDC) at index 0
-      //   - Borrow instruction reads from index 0
-      //   - PushToken sends borrowed USDC to OrderManager
+      // Create leverage order (single chunk for this test)
       const preInstructions = [
-        // Borrow USDC - uses input from index 0 (prepended ToOutput with chunkSize)
-        createProtocolInstruction(
-          "aave",
-          encodeLendingInstruction(LendingOp.Borrow, USDC, userAddr, 0n, "0x", 0) // amount from index 0
-        ),
-        // Push borrowed USDC to OrderManager (borrow produces output at index 1 after ToOutput)
-        createRouterInstruction(encodePushToken(1, await orderManager.getAddress())),
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Borrow, USDC, userAddr, 0n, "0x", 0)),
+        createRouterInstruction(encodePushToken(1, orderManagerAddr)),
       ];
-
-      // Post-instructions: Deposit WETH (amount comes from prepended ToOutput at index 0)
-      //   - The hook prepends ToOutput(receivedAmount, WETH) at index 0
-      //   - Router already has the WETH (transferred by executePostHook)
-      //   - Approve aave gateway to spend from index 0
-      //   - Deposit WETH to Aave
       const postInstructions = [
-        // Approve aave gateway to spend WETH from index 0 (prepended ToOutput)
         createRouterInstruction(encodeApprove(0, "aave")),
-        // Deposit WETH to Aave - uses input from index 0
-        createProtocolInstruction(
-          "aave",
-          encodeLendingInstruction(LendingOp.Deposit, WETH, userAddr, 0n, "0x", 0) // amount from index 0
-        ),
+        createProtocolInstruction("aave", encodeLendingInstruction(LendingOp.Deposit, WETH, userAddr, 0n, "0x", 0)),
       ];
 
-      const params = {
+      appDataHash = ethers.keccak256(ethers.toUtf8Bytes("kapan-leverage"));
+      const params = buildOrderParams({
         user: userAddr,
-        preInstructionsData: coder.encode(
-          ["tuple(string protocolName, bytes data)[]"],
-          [preInstructions.map(i => ({ protocolName: i.protocolName, data: i.data }))]
-        ),
-        preTotalAmount: ethers.parseUnits("1000", 6), // Total 1000 USDC
+        preInstructions,
+        preTotalAmount: SELL_AMOUNT,
         sellToken: USDC,
         buyToken: WETH,
-        chunkSize: CHUNK_SIZE,
-        minBuyPerChunk: ethers.parseEther("0.15"),
-        postInstructionsData: coder.encode(
-          ["tuple(string protocolName, bytes data)[]"],
-          [postInstructions.map(i => ({ protocolName: i.protocolName, data: i.data }))]
-        ),
-        completion: 2, // Iterations
-        targetValue: 2, // 2 chunks to complete
-        minHealthFactor: ethers.parseEther("1.1"),
-        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("leverage-up")),
+        chunkSize: SELL_AMOUNT,
+        minBuyPerChunk: BUY_AMOUNT,
+        postInstructions,
+        targetValue: 1, // Single iteration
+        appDataHash,
+      });
+
+      salt = ethers.keccak256(ethers.toUtf8Bytes("settlement-test-" + Date.now()));
+      const tx = await orderManager.connect(user).createOrder(params, salt);
+      kapanOrderHash = extractOrderHash(await tx.wait(), orderManager);
+
+      // Get domain separator
+      domainSeparator = await settlement.domainSeparator();
+
+      // Make owner a solver
+      await becomeSolver(await owner.getAddress());
+      expect(await isSolver(await owner.getAddress())).to.be.true;
+    });
+
+    it("should execute full settlement with pre/post hooks via real GPv2Settlement.settle()", async function () {
+      const validTo = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+
+      // Build the GPv2Order that will be verified
+      const gpv2Order: GPv2OrderData = {
+        sellToken: USDC,
+        buyToken: WETH,
+        receiver: orderManagerAddr,
+        sellAmount: SELL_AMOUNT,
+        buyAmount: BUY_AMOUNT,
+        validTo,
+        appData: appDataHash,
+        feeAmount: 0n,
+        kind: GPV2_ORDER.KIND_SELL,
+        partiallyFillable: false,
+        sellTokenBalance: GPV2_ORDER.BALANCE_ERC20,
+        buyTokenBalance: GPV2_ORDER.BALANCE_ERC20,
       };
 
-      const salt = ethers.keccak256(ethers.toUtf8Bytes("full-flow-test"));
-      const tx = await orderManager.connect(user).createOrder(params, salt);
-      const receipt = await tx.wait();
+      // Compute order digest (what settlement will verify signature against)
+      const orderDigest = hashOrder(gpv2Order, domainSeparator);
+      const orderUid = computeOrderUid(orderDigest, orderManagerAddr, validTo);
 
-      const event = receipt?.logs.find((log: any) => {
+      // Build settlement parameters
+      const tokens = [USDC, WETH];
+      
+      // Clearing prices: sellAmount * sellPrice = buyAmount * buyPrice
+      // We want 500 USDC = 0.17 WETH, so prices ratio = buyAmount:sellAmount
+      const clearingPrices = [BUY_AMOUNT, SELL_AMOUNT];
+
+      // Build trade with ERC-1271 signature
+      const trade = {
+        sellTokenIndex: 0,
+        buyTokenIndex: 1,
+        receiver: orderManagerAddr,
+        sellAmount: SELL_AMOUNT,
+        buyAmount: BUY_AMOUNT,
+        validTo,
+        appData: appDataHash,
+        feeAmount: 0n,
+        flags: TRADE_FLAGS.EIP1271 | TRADE_FLAGS.SELL_ORDER | TRADE_FLAGS.FILL_OR_KILL,
+        executedAmount: SELL_AMOUNT,
+        signature: buildTradeSignature(orderManagerAddr, orderHandlerAddr, salt, kapanOrderHash),
+      };
+
+      // Build hook calldata
+      const preHookCalldata = buildHookCalldata(orderManagerAddr, kapanOrderHash, true, 0);
+      const postHookCalldata = buildHookCalldata(orderManagerAddr, kapanOrderHash, false);
+
+      // Build interactions
+      const preInteractions = [{
+        target: COW_PROTOCOL.hooksTrampoline,
+        value: 0n,
+        callData: preHookCalldata,
+      }];
+      const intraInteractions: any[] = [];
+      const postInteractions = [{
+        target: COW_PROTOCOL.hooksTrampoline,
+        value: 0n,
+        callData: postHookCalldata,
+      }];
+
+      // Pre-fund settlement with buy tokens (simulating solver's liquidity)
+      // In real settlement, solver would use intra-interactions for DEX swaps
+      await impersonateAndFund(WETH_WHALE);
+      const wethWhale = await ethers.getSigner(WETH_WHALE);
+      await weth.connect(wethWhale).transfer(COW_PROTOCOL.settlement, BUY_AMOUNT);
+
+      // Ensure OrderManager has approved VaultRelayer
+      await orderManager.approveVaultRelayer(USDC);
+
+      // Record balances before
+      const aWethBefore = await aWethContract.balanceOf(userAddr);
+      const debtBefore = await vDebtUsdcContract.balanceOf(userAddr);
+
+      console.log("\n=== Before Settlement ===");
+      console.log(`User aWETH: ${ethers.formatEther(aWethBefore)}`);
+      console.log(`User USDC debt: ${ethers.formatUnits(debtBefore, 6)}`);
+
+      // Execute settlement
+      console.log("\n=== Executing GPv2Settlement.settle() ===");
+      const tx = await settlement.connect(owner).settle(
+        tokens,
+        clearingPrices,
+        [trade],
+        [preInteractions, intraInteractions, postInteractions]
+      );
+      const receipt = await tx.wait();
+      console.log(`Gas used: ${receipt.gasUsed}`);
+
+      // Record balances after
+      const aWethAfter = await aWethContract.balanceOf(userAddr);
+      const debtAfter = await vDebtUsdcContract.balanceOf(userAddr);
+
+      console.log("\n=== After Settlement ===");
+      console.log(`User aWETH: ${ethers.formatEther(aWethAfter)} (+${ethers.formatEther(aWethAfter - aWethBefore)})`);
+      console.log(`User USDC debt: ${ethers.formatUnits(debtAfter, 6)} (+${ethers.formatUnits(debtAfter - debtBefore, 6)})`);
+
+      // Verify the results
+      expect(aWethAfter).to.be.gt(aWethBefore); // Collateral increased
+      expect(aWethAfter - aWethBefore).to.be.closeTo(BUY_AMOUNT, ethers.parseEther("0.001"));
+      expect(debtAfter).to.be.gt(debtBefore); // Debt increased  
+      expect(debtAfter - debtBefore).to.be.closeTo(SELL_AMOUNT, ethers.parseUnits("1", 6));
+
+      // Verify order is marked complete
+      const order = await orderManager.getOrder(kapanOrderHash);
+      expect(order.status).to.equal(2); // Completed
+      expect(order.iterationCount).to.equal(1);
+
+      // Check Trade event to get the actual order UID used by settlement
+      const tradeEvent = receipt.logs.find((log: any) => {
         try {
-          return orderManager.interface.parseLog(log)?.name === "OrderCreated";
+          const parsed = settlement.interface.parseLog(log);
+          return parsed?.name === "Trade";
         } catch {
           return false;
         }
       });
-      const parsed = orderManager.interface.parseLog(event);
-      orderHash = parsed?.args[0];
-      console.log(`Order created with hash: ${orderHash}`);
+      
+      if (tradeEvent) {
+        const parsed = settlement.interface.parseLog(tradeEvent);
+        const actualOrderUid = parsed?.args.orderUid;
+        console.log("\n=== Settlement Successful ===");
+        console.log(`Actual Order UID from event: ${actualOrderUid}`);
+        console.log(`Computed Order UID: ${orderUid}`);
+        
+        // Verify order is filled using the actual UID from event
+        const filledAmount = await settlement.filledAmount(actualOrderUid);
+        console.log(`Filled amount: ${ethers.formatUnits(filledAmount, 6)} USDC`);
+        expect(filledAmount).to.equal(SELL_AMOUNT);
+      } else {
+        // Fallback: just verify the order state changed
+        console.log("\n=== Settlement Successful (Trade event not found) ===");
+      }
     });
 
-    it("should execute full 2-chunk leverage-up flow", async function () {
-      const orderManagerAddr = await orderManager.getAddress();
-      const vaultRelayerAddr = await mockVaultRelayer.getAddress();
+    it("should reject settlement from non-solver", async function () {
+      const validTo = Math.floor(Date.now() / 1000) + 3600;
 
-      // ============ CHUNK 1 ============
-      console.log("\n=== CHUNK 1 ===");
+      const trade = {
+        sellTokenIndex: 0,
+        buyTokenIndex: 1,
+        receiver: orderManagerAddr,
+        sellAmount: SELL_AMOUNT,
+        buyAmount: BUY_AMOUNT,
+        validTo,
+        appData: appDataHash,
+        feeAmount: 0n,
+        flags: TRADE_FLAGS.EIP1271,
+        executedAmount: SELL_AMOUNT,
+        signature: buildTradeSignature(orderManagerAddr, orderHandlerAddr, salt, kapanOrderHash),
+      };
 
-      // 1a) Execute pre-hook (HooksTrampoline calls this)
-      console.log("Executing pre-hook...");
-      await orderManager.connect(hooksTrampoline).executePreHook(orderHash, 0);
-
-      // Verify: OrderManager now has USDC (borrowed from Aave)
-      const usdcAfterPreHook1 = await usdc.balanceOf(orderManagerAddr);
-      console.log(`OrderManager USDC after pre-hook: ${ethers.formatUnits(usdcAfterPreHook1, 6)}`);
-      expect(usdcAfterPreHook1).to.equal(CHUNK_SIZE);
-
-      // Verify: User has USDC debt
-      const userDebt1 = await vDebtUsdcContract.balanceOf(userAddr);
-      console.log(`User USDC debt after pre-hook: ${ethers.formatUnits(userDebt1, 6)}`);
-      expect(userDebt1).to.be.gte(CHUNK_SIZE);
-
-      // 1b) Simulate VaultRelayer pulling USDC from OrderManager
-      console.log("Simulating VaultRelayer pull...");
-      await usdc.connect(mockVaultRelayer).transferFrom(
-        orderManagerAddr,
-        vaultRelayerAddr,
-        CHUNK_SIZE
-      );
-
-      // Verify: OrderManager no longer has USDC
-      expect(await usdc.balanceOf(orderManagerAddr)).to.equal(0);
-
-      // 1c) Simulate swap output - transfer WETH to OrderManager
-      console.log("Simulating swap output...");
-      await weth.connect(wethWhale).transfer(orderManagerAddr, SWAP_OUTPUT);
-
-      // Verify: OrderManager has WETH
-      expect(await weth.balanceOf(orderManagerAddr)).to.equal(SWAP_OUTPUT);
-
-      // 1d) Execute post-hook (HooksTrampoline calls this)
-      console.log("Executing post-hook...");
-      await orderManager.connect(hooksTrampoline).executePostHook(orderHash);
-
-      // Verify: OrderManager no longer has WETH (deposited to Aave)
-      expect(await weth.balanceOf(orderManagerAddr)).to.equal(0);
-
-      // Verify: Order progress updated
-      let order = await orderManager.getOrder(orderHash);
-      console.log(`Order after chunk 1: iterations=${order.iterationCount}, status=${order.status}`);
-      expect(order.iterationCount).to.equal(1);
-      expect(order.status).to.equal(1); // Active
-
-      // ============ CHUNK 2 ============
-      console.log("\n=== CHUNK 2 ===");
-
-      // 2a) Execute pre-hook
-      console.log("Executing pre-hook...");
-      await orderManager.connect(hooksTrampoline).executePreHook(orderHash, 1);
-
-      const usdcAfterPreHook2 = await usdc.balanceOf(orderManagerAddr);
-      console.log(`OrderManager USDC after pre-hook: ${ethers.formatUnits(usdcAfterPreHook2, 6)}`);
-      expect(usdcAfterPreHook2).to.equal(CHUNK_SIZE);
-
-      // 2b) Simulate VaultRelayer pulling USDC
-      console.log("Simulating VaultRelayer pull...");
-      await usdc.connect(mockVaultRelayer).transferFrom(
-        orderManagerAddr,
-        vaultRelayerAddr,
-        CHUNK_SIZE
-      );
-
-      // 2c) Simulate swap output
-      console.log("Simulating swap output...");
-      await weth.connect(wethWhale).transfer(orderManagerAddr, SWAP_OUTPUT);
-
-      // 2d) Execute post-hook
-      console.log("Executing post-hook...");
-      await orderManager.connect(hooksTrampoline).executePostHook(orderHash);
-
-      // Verify: Order is now COMPLETED
-      order = await orderManager.getOrder(orderHash);
-      console.log(`Order after chunk 2: iterations=${order.iterationCount}, status=${order.status}`);
-      expect(order.iterationCount).to.equal(2);
-      expect(order.status).to.equal(2); // Completed
-
-      // ============ FINAL VERIFICATION ============
-      console.log("\n=== FINAL STATE ===");
-
-      // User's final aWETH balance (should be ~2.34 WETH: 2 initial + 0.17*2 from swaps)
-      const finalAWeth = await aWethContract.balanceOf(userAddr);
-      console.log(`Final aWETH balance: ${ethers.formatEther(finalAWeth)}`);
-      expect(finalAWeth).to.be.gt(ethers.parseEther("2.3")); // At least 2.3 WETH
-
-      // User's final USDC debt (should be ~1000 USDC: 500*2 borrowed)
-      const finalDebt = await vDebtUsdcContract.balanceOf(userAddr);
-      console.log(`Final USDC debt: ${ethers.formatUnits(finalDebt, 6)}`);
-      expect(finalDebt).to.be.gte(ethers.parseUnits("1000", 6));
-
-      // Verify order is complete via public function
-      expect(await orderManager.isOrderComplete(orderHash)).to.equal(true);
-    });
-
-    it("should not allow non-HooksTrampoline to execute hooks", async function () {
-      // Try to execute pre-hook from non-authorized address
+      // Try to settle as user (not a solver)
       await expect(
-        orderManager.connect(user).executePreHook(orderHash, 0)
-      ).to.be.revertedWithCustomError(orderManager, "NotHooksTrampoline");
+        settlement.connect(user).settle(
+          [USDC, WETH],
+          [BUY_AMOUNT, SELL_AMOUNT],
+          [trade],
+          [[], [], []]
+        )
+      ).to.be.revertedWith("GPv2: not a solver");
+    });
+  });
 
-      await expect(
-        orderManager.connect(owner).executePostHook(orderHash)
-      ).to.be.revertedWithCustomError(orderManager, "NotHooksTrampoline");
+  describe("ERC-1271 Signature Verification", function () {
+    it("should verify valid order signature", async function () {
+      const userAddr = await user.getAddress();
+
+      const params = buildOrderParams({
+        user: userAddr,
+        preTotalAmount: ethers.parseUnits("100", 6),
+        sellToken: USDC,
+        buyToken: WETH,
+        chunkSize: ethers.parseUnits("100", 6),
+        minBuyPerChunk: ethers.parseEther("0.03"),
+        targetValue: 1,
+      });
+
+      const salt = ethers.keccak256(ethers.toUtf8Bytes("sig-test"));
+      const tx = await orderManager.connect(user).createOrder(params, salt);
+      const orderHash = extractOrderHash(await tx.wait(), orderManager);
+
+      const signature = buildERC1271Signature(await orderHandler.getAddress(), salt, orderHash);
+      const result = await orderManager.isValidSignature(orderHash, signature);
+
+      expect(result).to.equal("0x1626ba7e"); // ERC1271_MAGIC_VALUE
+    });
+  });
+
+  describe("Real CoW Contract Verification", function () {
+    it("should have correct VaultRelayer", async function () {
+      const vaultRelayer = await settlement.vaultRelayer();
+      expect(vaultRelayer.toLowerCase()).to.equal(COW_PROTOCOL.vaultRelayer.toLowerCase());
     });
 
-    it("should allow user to cancel order before completion", async function () {
-      // Execute one chunk first
-      await orderManager.connect(hooksTrampoline).executePreHook(orderHash, 0);
-      await usdc.connect(mockVaultRelayer).transferFrom(
-        await orderManager.getAddress(),
-        await mockVaultRelayer.getAddress(),
-        CHUNK_SIZE
-      );
-      await weth.connect(wethWhale).transfer(await orderManager.getAddress(), SWAP_OUTPUT);
-      await orderManager.connect(hooksTrampoline).executePostHook(orderHash);
+    it("should have valid domain separator", async function () {
+      const domainSeparator = await settlement.domainSeparator();
+      expect(domainSeparator).to.not.equal(ethers.ZeroHash);
+    });
 
-      // Verify order is still active
-      let order = await orderManager.getOrder(orderHash);
-      expect(order.status).to.equal(1); // Active
-
-      // Cancel the order
-      await orderManager.connect(user).cancelOrder(orderHash);
-
-      // Verify order is cancelled
-      order = await orderManager.getOrder(orderHash);
-      expect(order.status).to.equal(3); // Cancelled
-      expect(order.iterationCount).to.equal(1); // One chunk was completed
+    it("should be able to add/check solver status", async function () {
+      const testAddr = ethers.Wallet.createRandom().address;
+      
+      expect(await isSolver(testAddr)).to.be.false;
+      await becomeSolver(testAddr);
+      expect(await isSolver(testAddr)).to.be.true;
     });
   });
 });

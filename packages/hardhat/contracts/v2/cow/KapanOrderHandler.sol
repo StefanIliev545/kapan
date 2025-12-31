@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import { IConditionalOrderGenerator, PollTryNextBlock, PollNever, OrderNotValid } from "../interfaces/cow/IConditionalOrder.sol";
+import { IConditionalOrder, IConditionalOrderGenerator, PollTryNextBlock, PollNever, OrderNotValid } from "../interfaces/cow/IConditionalOrder.sol";
 import { GPv2Order } from "../interfaces/cow/GPv2Order.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { KapanOrderManager } from "./KapanOrderManager.sol";
 
 /// @title KapanOrderHandler
 /// @notice Generates CoW Protocol orders for Kapan leveraged positions
 /// @dev Implements IConditionalOrderGenerator for ComposableCoW integration
-contract KapanOrderHandler is IConditionalOrderGenerator {
+contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
     
     // ============ Errors ============
     error InvalidOrderManager();
@@ -193,5 +194,15 @@ contract KapanOrderHandler is IConditionalOrderGenerator {
         executed = orderCtx.executedAmount;
         total = orderCtx.params.preTotalAmount;
         iterations = orderCtx.iterationCount;
+    }
+
+    // ============ ERC-165 Implementation ============
+
+    /// @notice Check if contract supports an interface
+    /// @dev Required for ComposableCoW to verify handler compatibility
+    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+        return interfaceId == type(IConditionalOrderGenerator).interfaceId ||
+               interfaceId == type(IConditionalOrder).interfaceId ||
+               interfaceId == type(IERC165).interfaceId;
     }
 }

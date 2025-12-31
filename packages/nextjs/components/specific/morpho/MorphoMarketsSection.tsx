@@ -32,6 +32,7 @@ import { useAccount } from "wagmi";
 import { notification } from "~~/utils/scaffold-eth/notification";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { parseUnits } from "viem";
+import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
 
 type SortKey = "tvl" | "supplyApy" | "borrowApy" | "utilization";
 type SortDirection = "desc" | "asc";
@@ -552,6 +553,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const [loopMarket, setLoopMarket] = React.useState<MorphoMarket | null>(null);
   const { address: walletAddress, chainId: walletChainId } = useAccount();
 
+  // Fetch Pendle PT yields for PT tokens
+  const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(chainId);
+
   // Extract unique collateral and debt assets from markets
   const { collateralAssets, debtAssets } = React.useMemo(() => {
     const collateralSet = new Set<string>();
@@ -1014,7 +1018,17 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           }}
           maxLtvBps={BigInt(Math.floor(toNumberSafe(loopMarket.lltv) / 1e14))} // Convert from 1e18 to bps
           lltvBps={BigInt(Math.floor(toNumberSafe(loopMarket.lltv) / 1e14))}
-          supplyApyMap={{ [loopMarket.collateralAsset.address.toLowerCase()]: 0 }} // Morpho collateral doesn't earn yield
+          supplyApyMap={{
+            [loopMarket.collateralAsset.address.toLowerCase()]: (() => {
+              // PT tokens have a fixed yield to maturity from Pendle
+              if (isPTToken(loopMarket.collateralAsset.symbol)) {
+                const collateralAddr = loopMarket.collateralAsset.address.toLowerCase();
+                const ptYield = yieldsByAddress.get(collateralAddr) || yieldsBySymbol.get(loopMarket.collateralAsset.symbol.toLowerCase());
+                if (ptYield) return ptYield.fixedApy;
+              }
+              return 0; // Morpho collateral doesn't earn yield unless it's a PT token
+            })(),
+          }}
           borrowApyMap={{ [loopMarket.loanAsset.address.toLowerCase()]: toNumberSafe(loopMarket.state?.borrowApy) * 100 }}
           disableAssetSelection={true}
         />

@@ -5,6 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
+import { safeExecute } from "../../utils/safeExecute";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -144,7 +145,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
     for (const cometAddress of COMET_ADDRESSES) {
       try {
         {
-          await execute(contractName, { from: deployer, waitConfirmations: 5 }, "addComet", cometAddress);
+          await safeExecute(hre, deployer, contractName, "addComet", [cometAddress], { waitConfirmations: 5 });
         }
         console.log(`[${contractName}] addComet OK: ${cometAddress}`);
       } catch (err) {
@@ -155,7 +156,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
             cometAddress
           );
           const baseToken: string = await cometContract.baseToken();
-          await execute(contractName, { from: deployer, waitConfirmations: 5 }, "setCometForBase", baseToken, cometAddress);
+          await safeExecute(hre, deployer, contractName, "setCometForBase", [baseToken, cometAddress], { waitConfirmations: 5 });
           console.log(`[${contractName}] setCometForBase OK: ${cometAddress} (base=${baseToken})`);
         } catch (fallbackErr) {
           console.error(`[${contractName}] Failed to register ${cometAddress} via both methods:`, fallbackErr);
@@ -177,7 +178,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   console.log(`CompoundGatewayView deployed to: ${compoundGatewayView.address}`);
 
   {
-    await execute("CompoundGatewayView", { from: deployer, waitConfirmations: 5 }, "setWriteGateway", compoundGatewayWrite.address);
+    await safeExecute(hre, deployer, "CompoundGatewayView", "setWriteGateway", [compoundGatewayWrite.address], { waitConfirmations: 5 });
   }
   console.log(`Write gateway set in view: ${compoundGatewayWrite.address}`);
 
@@ -189,7 +190,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   const WETH_PRICE_FEED = process.env.WETH_PRICE_FEED ?? ZERO;
   if (isAddr(WETH_ADDRESS) && isAddr(WETH_PRICE_FEED)) {
     try {
-      await execute("CompoundGatewayView", { from: deployer, waitConfirmations: 5 }, "overrideFeed", WETH_ADDRESS, WETH_PRICE_FEED);
+      await safeExecute(hre, deployer, "CompoundGatewayView", "overrideFeed", [WETH_ADDRESS, WETH_PRICE_FEED], { waitConfirmations: 5 });
       console.log(`Set override feed: WETH ${WETH_ADDRESS} -> ${WETH_PRICE_FEED}`);
     } catch (error) {
       console.warn(`Failed to set WETH override feed:`, error);
@@ -197,9 +198,11 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   }
 
   {
-    await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "compound", compoundGatewayWrite.address);
+    await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["compound", compoundGatewayWrite.address], { waitConfirmations: 5 });
   }
   console.log(`CompoundGatewayWrite registered with KapanRouter as "compound"`);
+
+  // Gateway sync is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
 
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
   await verifyContract(hre, compoundGatewayWrite.address, [kapanRouter.address, deployer]);
