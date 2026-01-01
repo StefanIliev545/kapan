@@ -14,6 +14,24 @@ export interface CowHook {
 }
 
 /**
+ * Flash loan metadata for CoW Protocol (schema v0.2.0)
+ * When included in appData, solvers will take a flash loan on behalf of the user
+ * @see https://docs.cow.fi/cow-protocol/concepts/flash-loans/integrators
+ */
+export interface FlashLoanMetadata {
+  /** Flash loan liquidity provider address (e.g., Aave Pool, Balancer Vault) */
+  liquidityProvider: string;
+  /** Protocol adapter address - the CoW flash loan router */
+  protocolAdapter: string;
+  /** Receiver address - who receives the flash loaned tokens */
+  receiver: string;
+  /** Token to borrow */
+  token: string;
+  /** Amount to borrow (in wei/atoms as string) */
+  amount: string;
+}
+
+/**
  * AppData document structure for CoW Protocol
  * @see https://docs.cow.fi/cow-protocol/reference/sdks/app-data
  */
@@ -25,6 +43,8 @@ export interface AppDataDocument {
       pre?: CowHook[];
       post?: CowHook[];
     };
+    /** Optional: Flash loan configuration for single-tx leverage */
+    flashloan?: FlashLoanMetadata;
     /** Optional: Partner fee configuration */
     partnerFee?: {
       bps: number;
@@ -117,6 +137,17 @@ export function buildKapanAppData(
     partnerFeeRecipient?: string;
     /** Slippage tolerance in basis points */
     slippageBps?: number;
+    /** Flash loan configuration for single-tx leverage (schema v0.2.0) */
+    flashLoan?: {
+      /** Flash loan liquidity provider (Aave pool, Balancer vault, etc.) */
+      lender: string;
+      /** CoW protocol adapter address (AaveBorrower or ERC3156Borrower) */
+      protocolAdapter: string;
+      /** Token to borrow */
+      token: string;
+      /** Amount to borrow */
+      amount: bigint;
+    };
   }
 ): AppDataDocument {
   const preHookGasLimit = options?.preHookGasLimit ?? "1000000";
@@ -142,7 +173,7 @@ export function buildKapanAppData(
   }];
 
   const appData: AppDataDocument = {
-    version: "1.6.0",
+    version: "1.12.0",
     appCode: "KapanFinance",
     metadata: {
       hooks: {
@@ -151,6 +182,21 @@ export function buildKapanAppData(
       },
     },
   };
+
+  // Add flash loan metadata if provided (schema v0.2.0)
+  // This hints to CoW solvers to take a flash loan for single-tx execution
+  // - liquidityProvider: The flash loan lender (Aave pool, Balancer vault, etc.)
+  // - protocolAdapter: The CoW flash loan router's borrower contract
+  // - receiver: Who receives the flash loaned tokens (the orderManager)
+  if (options?.flashLoan) {
+    appData.metadata.flashloan = {
+      liquidityProvider: options.flashLoan.lender,
+      protocolAdapter: options.flashLoan.protocolAdapter,
+      receiver: orderManagerAddress,
+      token: options.flashLoan.token,
+      amount: options.flashLoan.amount.toString(),
+    };
+  }
 
   // Add optional metadata
   if (options?.partnerFeeBps && options?.partnerFeeRecipient) {
@@ -198,13 +244,24 @@ export async function registerAppData(
   }
 
   try {
+    const fullAppDataJson = JSON.stringify(appDataDoc);
+    console.log("[registerAppData] Registering appData:");
+    console.log("[registerAppData] Full JSON:", fullAppDataJson);
+    if (appDataDoc.metadata.flashloan) {
+      console.log("[registerAppData] Flash loan config:", JSON.stringify(appDataDoc.metadata.flashloan, null, 2));
+    }
+    if (appDataDoc.metadata.hooks) {
+      console.log("[registerAppData] Pre-hooks:", appDataDoc.metadata.hooks.pre?.length || 0);
+      console.log("[registerAppData] Post-hooks:", appDataDoc.metadata.hooks.post?.length || 0);
+    }
+    
     const response = await fetch(`${apiUrl}/api/v1/app_data/${appDataHash}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        fullAppData: JSON.stringify(appDataDoc),
+        fullAppData: fullAppDataJson,
       }),
     });
 
@@ -218,6 +275,8 @@ export async function registerAppData(
     }
 
     const errorText = await response.text();
+    console.error("[registerAppData] API error response:", errorText);
+    console.error("[registerAppData] Request body was:", fullAppDataJson);
     return { success: false, error: `API error ${response.status}: ${errorText}` };
   } catch (error) {
     return { success: false, error: `Network error: ${error}` };

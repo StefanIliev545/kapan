@@ -471,7 +471,7 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => (
       <a href="https://x.com/KapanFinance" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">
         <ScrambleText text="Twitter" isActive={isActive} duration={300} />
       </a>
-      <a href="https://github.com/kapan-finance" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">
+      <a href="https://github.com/StefanIliev545/kapan" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">
         <ScrambleText text="GitHub" isActive={isActive} duration={300} />
       </a>
     </div>

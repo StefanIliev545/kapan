@@ -24,12 +24,13 @@ import {
   encodePullToken,
   encodePushToken,
   encodeApprove,
+  encodeAdd,
   encodeLendingInstruction,
   LendingOp,
   normalizeProtocolName,
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult } from "~~/utils/cow";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, COW_FLASH_LOAN_ROUTER } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
@@ -119,6 +120,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null); // Store salt for CoW Explorer link
   const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null); // Track loading notification
   const cowAvailable = isCowProtocolSupported(chainId);
+  
+  // Check if we're in a dev environment
+  const isDevEnvironment = process.env.NODE_ENV === 'development';
+  
+  // Flash loan toggle for limit orders - enables single-tx execution via CoW Protocol flash loans
+  const [useFlashLoan, setUseFlashLoan] = useState<boolean>(true); // Default ON
   
   // Get user address for CoW order creation
   const { address: userAddress } = useAccount();
@@ -603,11 +610,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   /**
    * Calculate chunk parameters for limit orders
-   * Based on initial collateral deposit and LTV, determine how many chunks needed
+   * With flash loan enabled: single chunk, full amount
+   * Without flash loan: calculate based on capacity constraints
    */
-  const chunkParams = useMemo((): ChunkCalculationResult => {
+  const chunkParams = useMemo((): ChunkCalculationResult & { useFlashLoan?: boolean; flashLoanFee?: bigint; flashLoanLender?: string; protocolAdapter?: string } => {
     if (executionType !== "limit" || !collateral || !debt || flashLoanAmountRaw === 0n || marginAmountRaw === 0n) {
-      return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, explanation: "" };
+      return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "" };
     }
 
     // Get LTV - prefer from reserve config, fall back to prop, then default
@@ -620,7 +628,48 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     const debtPrice = debt.price ?? 0n;
 
     if (collateralPrice === 0n || debtPrice === 0n) {
-      return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, explanation: "Missing price data" };
+      return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "Missing price data" };
+    }
+
+    // If flash loan is enabled, use single chunk with flash loan
+    // Prefer Balancer V2 (0 fee) over Aave V3 (0.05% fee)
+    if (useFlashLoan) {
+      const balancerLender = getFlashLoanLender(chainId, "balancerV2");
+      const aaveLender = getFlashLoanLender(chainId, "aaveV3");
+      // Prefer Balancer (0 fee), fall back to Aave
+      const flashLoanLender = balancerLender || aaveLender;
+      const lenderType = balancerLender ? "balancerV2" : "aaveV3";
+      // Balancer V2 has 0 fee, Aave V3 has 0.05% fee
+      const flashLoanFee = lenderType === "balancerV2" ? 0n : calculateFlashLoanFee(flashLoanAmountRaw, "aaveV3");
+      // Protocol adapter: ERC3156Borrower for Balancer, AaveBorrower for Aave
+      const protocolAdapter = lenderType === "balancerV2" 
+        ? COW_FLASH_LOAN_ROUTER.erc3156Borrower 
+        : COW_FLASH_LOAN_ROUTER.aaveBorrower;
+      
+      console.log("[Limit Order] Flash loan mode:", {
+        totalDebt: formatUnits(flashLoanAmountRaw, debt.decimals),
+        flashLoanFee: formatUnits(flashLoanFee, debt.decimals),
+        lender: flashLoanLender,
+        lenderType,
+        protocolAdapter,
+      });
+      
+      return {
+        numChunks: 1,
+        chunkSize: flashLoanAmountRaw,
+        chunkSizes: [flashLoanAmountRaw],
+        needsChunking: false,
+        initialBorrowCapacityUsd: 0n,
+        geometricRatio: 0,
+        recommendFlashLoan: true,
+        useFlashLoan: true,
+        flashLoanFee,
+        flashLoanLender,
+        protocolAdapter,
+        explanation: flashLoanFee > 0n 
+          ? `Flash loan: single tx execution (fee: ${formatUnits(flashLoanFee, debt.decimals)} ${debt.symbol})`
+          : `Flash loan: single tx execution (no fee)`,
+      };
     }
 
     // Calculate swap rate from best quote
@@ -648,20 +697,22 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     });
 
     return result;
-  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount]);
+  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, chainId]);
 
   /**
    * Build per-iteration pre/post instructions for CoW limit order loop
    * 
-   * Pre-hook (before swap): Currently empty - tokens already at OrderManager from previous post-hook or seed
-   * Post-hook (after swap): 
+   * FLASH LOAN MODE (useFlashLoan=true):
+   * - Single iteration
+   * - Pre-hook: Deposit initial collateral (if any)
+   * - Post-hook: Deposit all swapped collateral, then borrow to repay flash loan
+   * - The borrowed funds go to the settlement contract which repays the flash loan
+   * 
+   * MULTI-CHUNK MODE (useFlashLoan=false):
+   * - Pre-hook (before swap): Empty - tokens already at OrderManager
+   * - Post-hook (after swap): 
    *   - Non-final chunks: Deposit + Borrow + Push (fund next chunk)
    *   - Final chunk: Deposit only (no more borrowing needed)
-   * 
-   * Note: The first chunk is funded by seedAmount at order creation.
-   * Subsequent chunks are funded by the previous post-hook's borrow+push.
-   * 
-   * The CoW order sells debt token (borrowed) and buys collateral token
    */
   const buildCowInstructions = useMemo(() => {
     if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n || !orderManagerAddress) {
@@ -677,15 +728,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       ? encodeMorphoContext(morphoContext) 
       : (isCompound && market ? market : "0x");
 
-    // Pre-hook instructions: Empty for all iterations
-    // Tokens are already at OrderManager from:
-    // - Chunk 0: seedAmount transferred during createOrder
-    // - Chunk 1+: borrowed and pushed during previous post-hook
-    const preInstructionsPerIteration: ProtocolInstruction[][] = [[]];
-
     const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
     
-    // Common deposit instructions (used by all iterations)
+    // Common deposit instructions (used by all modes)
     const depositInstructions: ProtocolInstruction[] = [
       // 1. Approve collateral for lending protocol - amount comes from swap output (set as Output[0])
       createRouterInstruction(encodeApprove(0, normalizedProtocol)),
@@ -695,52 +740,105 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 0)
       ),
     ];
+
+    // ========== FLASH LOAN MODE ==========
+    // Flow: Solver takes flash loan → swap (debt → collateral) → post-hook deposits all & borrows to repay
+    //
+    // Post-hook receives swap output as Output[0] (prepended by OrderManager)
+    // We then:
+    // 1. Pull user's initial collateral → Output[1]
+    // 2. Add Output[0] + Output[1] → Output[2] (total collateral)
+    // 3. Approve & Deposit total collateral
+    // 4. Borrow flash loan amount to settlement contract (repays the flash loan)
+    //
+    // Using Balancer V2 initially (0 fee), will add Aave support later
+    if (chunkParams.useFlashLoan) {
+      // For Balancer V2, no fee. For Aave, fee would be flashLoanAmount * 0.0005
+      const flashLoanRepayAmount = flashLoanAmountRaw; // Balancer has 0 fee
+      
+      // Pre-hook: Empty (solver provides flash loan funds for the swap)
+      const preInstructionsPerIteration: ProtocolInstruction[][] = [[]];
+      
+      // Post-hook: Combine collaterals, deposit all, borrow to repay flash loan
+      // OrderManager prepends: Output[0] = swap output (collateral from swap)
+      const postInstructionsFlashLoan: ProtocolInstruction[] = [
+        // 1. Pull user's initial collateral → Output[1]
+        createRouterInstruction(encodePullToken(marginAmountRaw, collateral.address, userAddress)),
+        
+        // 2. Add swap output + initial collateral → Output[2] (total collateral)
+        createRouterInstruction(encodeAdd(0, 1)),
+        
+        // 3. Approve total collateral for lending protocol
+        createRouterInstruction(encodeApprove(2, normalizedProtocol)),
+        
+        // 4. Deposit all collateral (single deposit)
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 2)
+        ),
+        
+        // 5. Borrow to repay flash loan - sends debt tokens to settlement contract
+        // Settlement contract uses these to repay the flash loan provider
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.Borrow, debt.address, COW_PROTOCOL.settlement, flashLoanRepayAmount, context, 999)
+        ),
+      ];
+      
+      console.log("[buildCowInstructions] Flash loan mode:", {
+        flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
+        initialCollateral: formatUnits(marginAmountRaw, collateral.decimals),
+        repayAmount: formatUnits(flashLoanRepayAmount, debt.decimals),
+        flow: "swap output[0] + pull[1] → add[2] → deposit[2] → borrow to settlement",
+      });
+
+      return { 
+        preInstructionsPerIteration, 
+        postInstructionsPerIteration: [postInstructionsFlashLoan] 
+      };
+    }
+
+    // ========== MULTI-CHUNK MODE (no flash loan) ==========
+    // Pre-hook instructions: Empty for all iterations
+    // Tokens are already at OrderManager from:
+    // - Chunk 0: seedAmount transferred during createOrder
+    // - Chunk 1+: borrowed and pushed during previous post-hook
+    const preInstructionsPerIteration: ProtocolInstruction[][] = [[]];
     
     // Post-hook for final chunk: Deposit only (no borrow needed)
     const postInstructionsFinal: ProtocolInstruction[] = [...depositInstructions];
     
     // Build per-iteration post instructions
-    // IMPORTANT: CoW contract sells EQUAL chunks (min(remaining, chunkSize))
-    // So post-hook borrows must also be EQUAL to match the sell amounts
     const numChunks = chunkParams.numChunks;
-    const chunkSize = chunkParams.chunkSize; // Equal chunk size for all iterations
+    const chunkSize = chunkParams.chunkSize;
     const postInstructionsPerIteration: ProtocolInstruction[][] = [];
     
     for (let i = 0; i < numChunks; i++) {
       if (i === numChunks - 1) {
-        // Last chunk - deposit only (no more borrowing needed)
+        // Last chunk - deposit only
         postInstructionsPerIteration.push(postInstructionsFinal);
       } else {
-        // Non-final chunk - deposit + borrow NEXT chunk (equal size) + push
-        // UTXO trace after OrderManager prepends ToOutput(swapAmount, buyToken):
-        //   [0]: swapAmount (collateral received from swap)
-        //   After Approve(0): [0, 1] where [1] is empty {token:0, amount:0}
-        //   After Deposit(0): [0, 1] unchanged (Deposit produces no new output)
-        //   After Borrow: [0, 1, 2] where [2] is the borrowed debt tokens
-        // So PushToken should reference index 2.
+        // Non-final chunk - deposit + borrow + push
         const postInstructionsWithBorrow: ProtocolInstruction[] = [
           ...depositInstructions,
-          // 3. Borrow next chunk's debt (EQUAL chunks to match CoW sell amounts)
           createProtocolInstruction(
             normalizedProtocol,
             encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkSize, context, 999)
           ),
-          // 4. Push borrowed debt to OrderManager for next swap
           createRouterInstruction(encodePushToken(2, orderManagerAddress)),
         ];
         postInstructionsPerIteration.push(postInstructionsWithBorrow);
       }
     }
     
-    // Fallback: if somehow numChunks is 0, provide at least deposit-only
     if (postInstructionsPerIteration.length === 0) {
       postInstructionsPerIteration.push(postInstructionsFinal);
     }
 
-    console.log("[buildCowInstructions] Equal chunks:", numChunks, "x", formatUnits(chunkSize, debt.decimals), debt.symbol);
+    console.log("[buildCowInstructions] Multi-chunk mode:", numChunks, "chunks");
 
     return { preInstructionsPerIteration, postInstructionsPerIteration };
-  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams.chunkSize, chunkParams.numChunks]);
+  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams]);
 
   /**
    * Build instructions to deposit initial collateral (executed before creating CoW order)
@@ -824,50 +922,91 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           ? encodeMorphoContext(morphoContext) 
           : (isCompound && market ? market : "0x");
 
-        // Build SEED BORROW instruction (borrow first chunk of debt token to user's wallet)
-        // All chunks are EQUAL size (CoW contract sells equal amounts)
-        const seedAmount = chunkParams.chunkSize;
-        console.log("[Limit Order] Using equal chunk params:", {
+        // Flash loan mode vs multi-chunk mode
+        const isFlashLoanMode = chunkParams.useFlashLoan === true;
+        
+        console.log("[Limit Order] Execution mode:", isFlashLoanMode ? "FLASH_LOAN" : "MULTI_CHUNK");
+        console.log("[Limit Order] Using chunk params:", {
           numChunks: chunkParams.numChunks,
           chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
           geometricRatio: chunkParams.geometricRatio,
           needsChunking: chunkParams.needsChunking,
+          useFlashLoan: chunkParams.useFlashLoan,
+          flashLoanFee: chunkParams.flashLoanFee ? formatUnits(chunkParams.flashLoanFee, debt.decimals) : "N/A",
           explanation: chunkParams.explanation,
         });
         
-        const seedBorrowInstruction = createProtocolInstruction(
-          normalizedProtocol,
-          encodeLendingInstruction(
-            LendingOp.Borrow,
-            debt.address,
-            userAddress,
-            seedAmount,
-            context,
-            999 // No UTXO reference - fixed amount
-          )
-        );
+        // For multi-chunk mode: Build SEED BORROW instruction
+        // For flash loan mode: No seed borrow needed - solver provides funds via flash loan
+        const seedAmount = isFlashLoanMode ? 0n : chunkParams.chunkSize;
+        
+        let seedBorrowInstruction: ProtocolInstruction | undefined;
+        if (!isFlashLoanMode) {
+          seedBorrowInstruction = createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(
+              LendingOp.Borrow,
+              debt.address,
+              userAddress,
+              seedAmount,
+              context,
+              999 // No UTXO reference - fixed amount
+            )
+          );
+        }
 
         // 1. Build authorization instructions explicitly
         // Only include instructions that actually need user authorization:
-        // - PullToken needs ERC20 approve for router (first instruction in buildInitialDepositFlow)
-        // - Borrow needs credit delegation (seedBorrow covers post-hook borrow too - same delegation)
+        // - PullToken needs ERC20 approve for router
+        // - Borrow needs credit delegation
         // 
-        // We DON'T include postInstructions because:
-        // - Router instructions (Approve, PushToken) don't need user auth
-        // - Deposit doesn't need user auth
-        // - Post-hook Borrow uses same credit delegation as seedBorrow (already covered)
-        // 
-        // Including postInstructions creates "ghost approvals" that make Metamask flag the tx as suspicious
+        // FLASH LOAN MODE:
+        // - PullToken happens in post-hook (user's initial collateral pulled during hook execution)
+        // - Borrow to settlement contract for flash loan repayment
+        // - No initial deposit before order (everything happens in post-hook)
+        //
+        // MULTI-CHUNK MODE:
+        // - PullToken for initial deposit (before order creation)
+        // - Seed borrow (covers post-hook borrows too via same delegation)
         const instructionsNeedingAuth: ProtocolInstruction[] = [];
         
-        // Add PullToken from initial deposit (if any margin is being deposited)
-        if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
-          // First instruction is PullToken which needs ERC20 approve
-          instructionsNeedingAuth.push(buildInitialDepositFlow[0]);
+        if (isFlashLoanMode) {
+          // Flash loan mode: collateral is pulled in post-hook, so we need approval for that
+          if (marginAmountRaw > 0n && collateral) {
+            // Create PullToken instruction for auth (same as what's in post-hook)
+            const pullForAuth = createRouterInstruction(
+              encodePullToken(marginAmountRaw, collateral.address, userAddress)
+            );
+            instructionsNeedingAuth.push(pullForAuth);
+          }
+          
+          // Credit delegation for flash loan repayment borrow
+          // Using Balancer V2 (0 fee) initially
+          const flashLoanRepayAmount = flashLoanAmountRaw; // Balancer has 0 fee
+          const borrowForAuth = createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(
+              LendingOp.Borrow,
+              debt.address,
+              COW_PROTOCOL.settlement, // Borrow goes to settlement for flash loan repayment
+              flashLoanRepayAmount,
+              context,
+              999
+            )
+          );
+          instructionsNeedingAuth.push(borrowForAuth);
+        } else {
+          // Multi-chunk mode: initial deposit before order creation
+          if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
+            // First instruction is PullToken which needs ERC20 approve
+            instructionsNeedingAuth.push(buildInitialDepositFlow[0]);
+          }
+          
+          // Seed borrow (covers post-hook borrows too)
+          if (seedBorrowInstruction) {
+            instructionsNeedingAuth.push(seedBorrowInstruction);
+          }
         }
-        
-        // Add seed borrow (needs credit delegation - covers both seed and post-hook borrows)
-        instructionsNeedingAuth.push(seedBorrowInstruction);
 
         // Get authorizations only for instructions that need them
         const allAuthCalls = await getAuthorizations(instructionsNeedingAuth);
@@ -880,8 +1019,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           console.log("[Limit Order] Added authorization calls:", filteredAuthCalls.length);
         }
 
-        // 2. Build initial deposit router call (without separate auth since we did it above)
-        if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
+        // 2. Build initial deposit router call (ONLY for multi-chunk mode)
+        // Flash loan mode does the deposit in the post-hook after the swap
+        if (!isFlashLoanMode && marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
           const depositCalldata = encodeFunctionData({
             abi: routerContract.abi,
             functionName: "processProtocolInstructions",
@@ -894,29 +1034,31 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           console.log("[Limit Order] Added deposit router call");
         }
 
-        // 3. Build seed borrow router call (borrow + push to user wallet)
-        // The borrow puts tokens in router's output slot, PushToken sends them to user
-        const pushTokenInstruction = createRouterInstruction(encodePushToken(0, userAddress));
-        const seedBorrowCalldata = encodeFunctionData({
-          abi: routerContract.abi,
-          functionName: "processProtocolInstructions",
-          args: [[
-            {
-              protocolName: seedBorrowInstruction.protocolName,
-              data: seedBorrowInstruction.data as `0x${string}`,
-            },
-            {
-              protocolName: pushTokenInstruction.protocolName,
-              data: pushTokenInstruction.data as `0x${string}`,
-            },
-          ]],
-        });
-        allCalls.push({ to: routerContract.address as Address, data: seedBorrowCalldata as Hex });
-        console.log("[Limit Order] Added seed borrow + push router call");
+        // 3. Build seed borrow router call (ONLY for multi-chunk mode)
+        // Flash loan mode skips this - solver provides funds via flash loan
+        if (!isFlashLoanMode && seedBorrowInstruction) {
+          const pushTokenInstruction = createRouterInstruction(encodePushToken(0, userAddress));
+          const seedBorrowCalldata = encodeFunctionData({
+            abi: routerContract.abi,
+            functionName: "processProtocolInstructions",
+            args: [[
+              {
+                protocolName: seedBorrowInstruction.protocolName,
+                data: seedBorrowInstruction.data as `0x${string}`,
+              },
+              {
+                protocolName: pushTokenInstruction.protocolName,
+                data: pushTokenInstruction.data as `0x${string}`,
+              },
+            ]],
+          });
+          allCalls.push({ to: routerContract.address as Address, data: seedBorrowCalldata as Hex });
+          console.log("[Limit Order] Added seed borrow + push router call");
+        }
 
         // 4. Build CoW order calls (delegation + order creation)
-        // Pass seedAmount so OrderManager pulls tokens from user during createOrder
-        // Use calculated chunk params for proper multi-chunk execution
+        // For flash loan mode: pass flash loan config so appData includes flash loan hint
+        // For multi-chunk: pass seedAmount so OrderManager pulls tokens from user
         const cowCalls = await buildOrderCalls({
           user: userAddress,
           preInstructions: preInstructionsPerIteration,
@@ -932,7 +1074,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           completion: CompletionType.Iterations,
           targetValue: chunkParams.numChunks,
           minHealthFactor: "1.1",
-          seedAmount: seedAmount, // Seeds OrderManager for CoW API balance check
+          // Multi-chunk: seed with borrowed tokens; Flash loan: no seed needed
+          seedAmount: seedAmount,
+          // Flash loan config: tells CoW solvers to use flash loan for this order
+          flashLoan: isFlashLoanMode && chunkParams.flashLoanLender && chunkParams.protocolAdapter ? {
+            lender: chunkParams.flashLoanLender,
+            protocolAdapter: chunkParams.protocolAdapter,
+            token: debt.address,
+            amount: flashLoanAmountRaw,
+          } : undefined,
         });
 
         if (!cowCalls) {
@@ -1022,9 +1172,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
   
   // For market orders: need quote and adapter
-  // For limit orders: need CoW contract available (quote optional - just for preview)
+  // For limit orders: need CoW contract available (quote optional - just for preview) and dev environment
   const canSubmitMarket = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
-  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating;
+  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating && isDevEnvironment;
   const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
   
   const isSubmittingAny = isSubmitting || isCowCreating;
@@ -1311,8 +1461,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 <button
                   onClick={() => setExecutionType("limit")}
                   className={`flex-1 btn btn-xs ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
-                  disabled={!cowContractAvailable}
-                  title={!cowContractAvailable ? "CoW contracts not deployed on this chain" : "Execute via CoW Protocol limit order"}
+                  disabled={!cowContractAvailable || !isDevEnvironment}
+                  title={
+                    !isDevEnvironment 
+                      ? "Limit orders are only available in development environment" 
+                      : !cowContractAvailable 
+                        ? "CoW contracts not deployed on this chain" 
+                        : "Execute via CoW Protocol limit order"
+                  }
                 >
                   <ClockIcon className="w-3 h-3 mr-1" /> Limit
                 </button>
@@ -1421,8 +1577,45 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   </div>
                 )}
 
-                {/* Chunk Info - shown when multi-chunk execution needed */}
-                {chunkParams.needsChunking && (
+                {/* Flash Loan Toggle for Limit Orders */}
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base-content/60">Flash Loan</span>
+                    <span className="text-[10px] text-base-content/40">(single tx)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {chunkParams.useFlashLoan && chunkParams.flashLoanFee !== undefined && chunkParams.flashLoanFee > 0n && (
+                      <span className="text-[10px] text-warning">
+                        +{formatUnits(chunkParams.flashLoanFee, debt?.decimals ?? 18)} {debt?.symbol} fee
+                      </span>
+                    )}
+                    <input
+                      type="checkbox"
+                      checked={useFlashLoan}
+                      onChange={e => setUseFlashLoan(e.target.checked)}
+                      className="toggle toggle-primary toggle-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Flash Loan Info */}
+                {chunkParams.useFlashLoan && (
+                  <div className="flex items-start gap-1.5 mt-2 text-[10px]">
+                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <div>
+                      <span className="text-success font-medium">Single transaction execution</span>
+                      <p className="text-base-content/50 mt-0.5">
+                        Solver takes flash loan → swaps → you borrow to repay. All in one tx.
+                        {chunkParams.flashLoanFee === 0n && " No flash loan fee (Balancer V2)."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chunk Info - shown when multi-chunk execution needed (flash loan OFF) */}
+                {!chunkParams.useFlashLoan && chunkParams.needsChunking && (
                   <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px]">
                     <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1440,11 +1633,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50">
                   <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
                   <span>
-                    {chunkParams.needsChunking 
-                      ? `Each chunk executes when solvers find a good price. Est. ${chunkParams.numChunks * 2}-${chunkParams.numChunks * 5} min total.`
-                      : "Order executes only when solvers find a price at or above your minimum."
+                    {chunkParams.useFlashLoan
+                      ? "Single transaction via CoW flash loan. MEV protected."
+                      : chunkParams.needsChunking 
+                        ? `Each chunk executes when solvers find a good price. Est. ${chunkParams.numChunks * 2}-${chunkParams.numChunks * 5} min total.`
+                        : "Order executes only when solvers find a price at or above your minimum."
                     }
-                    {" "}No flash loan fees. MEV protected.
+                    {!chunkParams.useFlashLoan && " No flash loan fees."}
+                    {" "}MEV protected.
                   </span>
                 </div>
               </div>

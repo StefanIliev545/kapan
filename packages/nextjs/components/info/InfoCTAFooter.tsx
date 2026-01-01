@@ -32,7 +32,7 @@ const InfoCTAFooter = () => {
           className="w-full max-w-xs"
         >
           <Button
-            href="https://github.com/stefaniliev545/kapan"
+            href="https://github.com/StefanIliev545/kapan"
             target="_blank"
             className="w-full group flex items-center justify-center gap-2"
             variant="primary"

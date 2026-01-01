@@ -367,7 +367,7 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
     { name: "Twitter", icon: TwitterIcon, href: "https://x.com/KapanFinance" },
     { name: "Discord", icon: DiscordIcon, href: "https://discord.gg/Vjk6NhkxGv" },
     { name: "Telegram", icon: TelegramIcon, href: "https://t.me/+vYCKr2TrOXRiODg0" },
-    { name: "GitHub", icon: GitHubIcon, href: "https://github.com/kapan-finance" },
+    { name: "GitHub", icon: GitHubIcon, href: "https://github.com/StefanIliev545/kapan" },
   ];
 
   return (

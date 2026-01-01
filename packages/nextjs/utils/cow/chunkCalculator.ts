@@ -50,6 +50,8 @@ export interface ChunkCalculationResult {
   initialBorrowCapacityUsd: bigint;
   /** Capacity restoration ratio r = LTV * swapEfficiency */
   geometricRatio: number;
+  /** Whether flash loan mode is recommended */
+  recommendFlashLoan: boolean;
   /** Explanation for UI */
   explanation: string;
 }
@@ -139,13 +141,13 @@ export function calculateChunkParams(input: ChunkCalculationInput): ChunkCalcula
   }
 
   if (n >= maxChunks) {
-    // Can't achieve with reasonable chunks
-    // Calculate theoretical max leverage
-    const maxD = capacity0 / (1 - r) * 0.95; // Leave some buffer
+    // Can't achieve with reasonable chunks - recommend flash loan
+    const maxD = capacity0 / (1 - r) * 0.95;
     const maxLev = 1 + maxD / C0;
-    console.warn(`[chunkCalculator] Needs ${n}+ chunks, exceeds practical limit. Max leverage ~${maxLev.toFixed(1)}x`);
-    return makeResult(0, 0n, [], true, initialCapacityUsd, r,
-      `Too many chunks needed (>${maxChunks}). Try lower leverage or use Market order.`);
+    console.warn(`[chunkCalculator] Needs ${n}+ chunks. Recommending flash loan.`);
+    // Return single chunk with flash loan recommendation
+    return makeResult(1, totalDebtAmount, [totalDebtAmount], false, initialCapacityUsd, r,
+      `Flash loan recommended for ${maxLev.toFixed(1)}x+ leverage`, true);
   }
 
   // Calculate chunk size
@@ -160,10 +162,16 @@ export function calculateChunkParams(input: ChunkCalculationInput): ChunkCalcula
 
   const chunkUsd = Number(chunkSize * debtPrice / BigInt(10 ** debtDecimals)) / 1e8;
   
-  console.log(`[chunkCalculator] Result: ${n} chunks of ~$${chunkUsd.toFixed(2)}`);
+  // Recommend flash loan if more than 5 chunks needed (faster execution)
+  const recommendFlashLoan = n > 5;
+  
+  console.log(`[chunkCalculator] Result: ${n} chunks of ~$${chunkUsd.toFixed(2)}, recommendFlashLoan=${recommendFlashLoan}`);
 
   return makeResult(n, chunkSize, chunkSizes, n > 1, initialCapacityUsd, r,
-    `${n} chunks of ~$${chunkUsd.toFixed(2)} each`);
+    recommendFlashLoan 
+      ? `${n} chunks needed - flash loan recommended for faster execution`
+      : `${n} chunks of ~$${chunkUsd.toFixed(2)} each`,
+    recommendFlashLoan);
 }
 
 function makeResult(
@@ -173,7 +181,8 @@ function makeResult(
   needsChunking: boolean,
   initialBorrowCapacityUsd: bigint,
   geometricRatio: number,
-  explanation: string
+  explanation: string,
+  recommendFlashLoan: boolean = false
 ): ChunkCalculationResult {
   return {
     numChunks,
@@ -182,6 +191,7 @@ function makeResult(
     needsChunking,
     initialBorrowCapacityUsd,
     geometricRatio,
+    recommendFlashLoan,
     explanation,
   };
 }

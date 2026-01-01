@@ -158,6 +158,21 @@ const ORDER_MANAGER_ABI = [
 ] as const;
 
 /**
+ * Flash loan configuration for CoW Protocol single-tx execution (schema v0.2.0)
+ * When provided, solvers will take a flash loan and the post-hook borrows to repay it
+ */
+export interface FlashLoanConfig {
+  /** Flash loan liquidity provider address (Aave Pool or Balancer Vault) */
+  lender: string;
+  /** CoW protocol adapter address (AaveBorrower or ERC3156Borrower) */
+  protocolAdapter: string;
+  /** Token to borrow (should match sellToken) */
+  token: string;
+  /** Amount to borrow (flash loan amount) */
+  amount: bigint;
+}
+
+/**
  * Extended order input with optional pre-built instructions
  */
 export interface CreateOrderInput extends KapanOrderInput {
@@ -169,6 +184,8 @@ export interface CreateOrderInput extends KapanOrderInput {
   postInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
   /** Amount of sell tokens to seed OrderManager for first chunk (pulled from user) */
   seedAmount?: bigint;
+  /** Flash loan config for single-tx execution (bypasses seed requirement) */
+  flashLoan?: FlashLoanConfig;
 }
 
 /**
@@ -330,6 +347,15 @@ export function useCowOrder() {
       orderManagerAddress,
       userAddress,
       salt,
+      // Pass flash loan config if provided - this hints to solvers to use flash loan
+      input.flashLoan ? {
+        flashLoan: {
+          lender: input.flashLoan.lender,
+          protocolAdapter: input.flashLoan.protocolAdapter,
+          token: input.flashLoan.token,
+          amount: input.flashLoan.amount,
+        },
+      } : undefined,
     );
 
     if (!appDataResult.registered) {
@@ -373,9 +399,10 @@ export function useCowOrder() {
         .map(({ target, data }) => ({ to: target as Address, data: data as Hex }));
     }
 
-    // 6. Build seed token approve call if seedAmount provided
+    // 6. Build seed token approve call if seedAmount provided (not needed for flash loan mode)
     // This allows OrderManager to pull tokens during createOrder
-    const seedAmount = input.seedAmount ?? 0n;
+    // Skip for flash loan mode - solver provides funds via flash loan
+    const seedAmount = input.flashLoan ? 0n : (input.seedAmount ?? 0n);
     let seedApproveCall: { to: Address; data: Hex } | undefined;
     
     if (seedAmount > 0n) {

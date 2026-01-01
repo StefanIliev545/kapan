@@ -114,3 +114,95 @@ export const TRADE_FLAGS = {
   /** Partially fillable (bit 1 = 1) */
   PARTIALLY_FILLABLE: 0x02,
 } as const;
+
+/**
+ * CoW Protocol Flash Loan Router contracts (same address on all chains via CREATE2)
+ * @see https://github.com/cowprotocol/flash-loan-router
+ */
+export const COW_FLASH_LOAN_ROUTER = {
+  /** Main router contract */
+  router: "0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69",
+  /** Aave-compatible borrower adapter */
+  aaveBorrower: "0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A",
+  /** ERC-3156 compatible borrower adapter (for Balancer, Maker, etc.) */
+  erc3156Borrower: "0x47d71b4B3336AB2729436186C216955F3C27cD04",
+} as const;
+
+/**
+ * Flash loan lender addresses by chain ID
+ * These are used in CoW Protocol appData to hint solvers about flash loan sources
+ */
+export const FLASH_LOAN_LENDERS: Record<number, Record<string, string>> = {
+  // Ethereum Mainnet
+  1: {
+    aaveV3: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+    balancerV2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  },
+  // Arbitrum One
+  42161: {
+    aaveV3: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    balancerV2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  },
+  // Base
+  8453: {
+    aaveV3: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+    balancerV2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  },
+  // Optimism
+  10: {
+    aaveV3: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    balancerV2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  },
+  // Gnosis Chain
+  100: {
+    balancerV2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  },
+  // Polygon
+  137: {
+    aaveV3: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
+    balancerV2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  },
+  // Linea
+  59144: {
+    aaveV3: "0x3E5f750726cc1D0d4a9c62c507f890f984576507",
+  },
+};
+
+/**
+ * Flash loan fees by provider (in basis points)
+ */
+export const FLASH_LOAN_FEES: Record<string, number> = {
+  aaveV3: 5,      // 0.05%
+  balancerV2: 0,  // 0%
+  morpho: 0,      // 0%
+};
+
+/**
+ * Get flash loan lender address for a chain
+ * @param chainId - Chain ID
+ * @param provider - Flash loan provider name (aaveV3, balancerV2)
+ * @returns Lender address or undefined
+ */
+export function getFlashLoanLender(chainId: number, provider: string = "aaveV3"): string | undefined {
+  return FLASH_LOAN_LENDERS[chainId]?.[provider];
+}
+
+/**
+ * Get flash loan fee in basis points
+ * @param provider - Flash loan provider name
+ * @returns Fee in basis points
+ */
+export function getFlashLoanFeeBps(provider: string = "aaveV3"): number {
+  return FLASH_LOAN_FEES[provider] ?? 5; // Default to 5 bps
+}
+
+/**
+ * Calculate flash loan fee amount
+ * @param amount - Loan amount
+ * @param provider - Flash loan provider
+ * @returns Fee amount
+ */
+export function calculateFlashLoanFee(amount: bigint, provider: string = "aaveV3"): bigint {
+  const feeBps = getFlashLoanFeeBps(provider);
+  return (amount * BigInt(feeBps)) / 10000n;
+}

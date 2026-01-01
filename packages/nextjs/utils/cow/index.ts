@@ -26,23 +26,30 @@
  * ```
  */
 
-// Contract addresses
+// Contract addresses and flash loan utilities
 export {
   COW_PROTOCOL,
+  COW_FLASH_LOAN_ROUTER,
   COW_API_URLS,
   COW_EXPLORER_URLS,
   GPV2_ORDER,
   TRADE_FLAGS,
+  FLASH_LOAN_LENDERS,
+  FLASH_LOAN_FEES,
   isChainSupported,
   getCowApiUrl,
   getCowExplorerOrderUrl,
   getCowExplorerAddressUrl,
+  getFlashLoanLender,
+  getFlashLoanFeeBps,
+  calculateFlashLoanFee,
 } from "./addresses";
 
 // AppData utilities
 export {
   type CowHook,
   type AppDataDocument,
+  type FlashLoanMetadata,
   buildKapanAppData,
   computeAppDataHash,
   registerAppData,
