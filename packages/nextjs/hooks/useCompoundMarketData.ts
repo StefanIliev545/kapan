@@ -30,10 +30,10 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
   const resolvedChainId = chainId ?? selectedNetwork.id;
   const network = CHAIN_ID_TO_NETWORK[resolvedChainId] ?? "arbitrum";
 
-  const { data: weth } = useDeployedContractInfo({ contractName: "eth", chainId: resolvedChainId as any });
-  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC", chainId: resolvedChainId as any });
-  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT", chainId: resolvedChainId as any });
-  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe", chainId: resolvedChainId as any });
+  const { data: weth } = useDeployedContractInfo({ contractName: "eth" as any, chainId: resolvedChainId as any });
+  const { data: usdc } = useDeployedContractInfo({ contractName: "USDC" as any, chainId: resolvedChainId as any });
+  const { data: usdt } = useDeployedContractInfo({ contractName: "USDT" as any, chainId: resolvedChainId as any });
+  const { data: usdcE } = useDeployedContractInfo({ contractName: "USDCe" as any, chainId: resolvedChainId as any });
   const { data: compoundGateway } = useDeployedContractInfo({
     contractName: "CompoundGatewayView",
     chainId: resolvedChainId as any,

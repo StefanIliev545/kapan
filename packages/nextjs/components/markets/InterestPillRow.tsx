@@ -66,9 +66,9 @@ export const InterestPillRow: FC<{
     optimalSupplyProtocol = localSupplyRates.optimal.protocol;
     optimalSupplyRate = localSupplyRates.optimal.rate;
   } else if (optimalSupplyRateData) {
-    // Starknet path
-    const proto = feltToString(BigInt(optimalSupplyRateData?.[0]?.toString() || "0"));
-    const rate = Number(optimalSupplyRateData?.[1]?.toString() || "0");
+    // Starknet path - cast to any since tuple type parsing is inconsistent
+    const proto = feltToString(BigInt((optimalSupplyRateData as any)?.[0]?.toString() || "0"));
+    const rate = Number((optimalSupplyRateData as any)?.[1]?.toString() || "0");
     optimalSupplyProtocol = proto;
     optimalSupplyRate = rate / 1e16 / 100;
   }
@@ -80,9 +80,9 @@ export const InterestPillRow: FC<{
     optimalBorrowProtocol = localBorrowRates.optimal.protocol;
     optimalBorrowRate = localBorrowRates.optimal.rate;
   } else if (optimalBorrowRateData) {
-    // Starknet path
-    const proto = feltToString(BigInt(optimalBorrowRateData?.[0]?.toString() || "0"));
-    const rate = Number(optimalBorrowRateData?.[1]?.toString() || "0");
+    // Starknet path - cast to any since tuple type parsing is inconsistent
+    const proto = feltToString(BigInt((optimalBorrowRateData as any)?.[0]?.toString() || "0"));
+    const rate = Number((optimalBorrowRateData as any)?.[1]?.toString() || "0");
     optimalBorrowProtocol = proto;
     optimalBorrowRate = rate / 1e16 / 100;
   }
