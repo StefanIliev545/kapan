@@ -52,7 +52,7 @@ const FORK_BLOCK_NUMBERS: Record<string, number> = {
   mainnet: 21350000,
   arbitrum: 414729450, // ~Dec 2025
   arb: 414729450,
-  base: 23500000,      // ~Dec 2024
+  base: 40261400,      // ~Jan 2026 - after real CoW order created at 40261309
   optimism: 129000000, // ~Dec 2024
   op: 129000000,
   linea: 13000000,     // ~Dec 2024
@@ -121,7 +121,30 @@ const config: HardhatUserConfig = {
       mining: {
         auto: true,
         interval: 1000
-      }
+      },
+      // Chain configurations for fork support
+      chains: {
+        8453: { // Base
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        42161: { // Arbitrum One
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        10: { // Optimism
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        59144: { // Linea
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+      },
     },
     localhost: {
       url: "http://127.0.0.1:8545",

@@ -84,11 +84,16 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
         // preventing order spam where each poll creates a new CoW order.
         uint256 validTo = _calculateValidTo(orderCtx.createdAt, orderCtx.iterationCount);
         
+        // Receiver is always OrderManager - it needs the bought tokens for post-hook execution
+        // (Previously had flash loan special case for Settlement, but that was incorrect -
+        // Aave's working implementation shows receiver should be where post-hook runs)
+        address receiver = address(orderManager);
+        
         // Build the order with deterministic validTo
         order = GPv2Order.Data({
             sellToken: IERC20(orderCtx.params.sellToken),
             buyToken: IERC20(orderCtx.params.buyToken),
-            receiver: address(orderManager),  // Receive tokens at manager for post-hook
+            receiver: receiver,
             sellAmount: sellAmount,
             buyAmount: orderCtx.params.minBuyPerChunk,
             validTo: uint32(validTo),
@@ -158,7 +163,7 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
             revert OrderNotValid("buy_token_mismatch");
         }
         
-        // Validate receiver is the order manager
+        // Validate receiver - must always be OrderManager for post-hook token handling
         if (order.receiver != address(orderManager)) {
             revert OrderNotValid("invalid_receiver");
         }

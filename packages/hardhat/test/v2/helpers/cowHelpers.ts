@@ -1,7 +1,7 @@
 import { ethers, network } from "hardhat";
 import { AbiCoder } from "ethers";
 
-// ============ CoW Protocol Addresses (Arbitrum) ============
+// ============ CoW Protocol Addresses (same on all chains via CREATE2) ============
 export const COW_PROTOCOL = {
   settlement: "0x9008D19f58AAbD9eD0D60971565AA8510560ab41",
   composableCoW: "0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74",
@@ -9,7 +9,25 @@ export const COW_PROTOCOL = {
   hooksTrampoline: "0x60Bf78233f48eC42eE3F101b9a05eC7878728006",
   authenticator: "0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE",
   allowlistManager: "0x66331f0b9cb30d38779c786Bda5a3d57d12fbA50",
+  // Flash Loan Router contracts (deployed by CoW DAO)
+  // @see https://github.com/cowprotocol/flash-loan-router
+  flashLoanRouter: "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+  // ERC3156Borrower: for ERC-3156 compliant lenders (Maker, NOT Balancer!)
+  erc3156Borrower: "0x47d71b4b3336ab2729436186c216955f3c27cd04",
+  // AaveBorrower: default for Aave V3 (most chains)
+  aaveBorrower: "0x7d9C4DeE56933151Bc5C909cfe09DEf0d315CB4A",
 } as const;
+
+// Chain-specific Aave borrowers (some chains use factory-deployed adapters)
+export const COW_AAVE_BORROWERS: Record<number, string> = {
+  // Base uses AaveV3AdapterFactory-deployed adapter (standard AaveBorrower doesn't work)
+  8453: "0xdeCC46a4b09162F5369c5C80383AAa9159bCf192",
+};
+
+// Helper to get the correct Aave borrower for a chain
+export function getCowAaveBorrower(chainId: number): string {
+  return COW_AAVE_BORROWERS[chainId] ?? COW_PROTOCOL.aaveBorrower;
+}
 
 // ============ GPv2Order Constants ============
 export const GPV2_ORDER = {
@@ -118,6 +136,8 @@ export interface KapanOrderParamsInput {
   targetValue?: number;
   minHealthFactor?: bigint;
   appDataHash?: string;
+  /** Flash loan mode: when true, GPv2Order.receiver = Settlement (required by CoW solvers) */
+  isFlashLoanOrder?: boolean;
 }
 
 const coder = AbiCoder.defaultAbiCoder();
@@ -181,6 +201,7 @@ export function buildOrderParams(input: KapanOrderParamsInput) {
     targetValue: input.targetValue ?? 1,
     minHealthFactor: input.minHealthFactor ?? ethers.parseEther("1.1"),
     appDataHash: input.appDataHash ?? ethers.keccak256(ethers.toUtf8Bytes("kapan-order")),
+    isFlashLoanOrder: input.isFlashLoanOrder ?? false,
   };
 }
 

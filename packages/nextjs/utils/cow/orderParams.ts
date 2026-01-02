@@ -84,6 +84,9 @@ export interface KapanOrderInput {
   
   /** Pre-computed appData hash (includes hooks) */
   appDataHash?: string;
+  
+  /** Flash loan mode: when true, order.receiver = Settlement (required by CoW solvers) */
+  isFlashLoanOrder?: boolean;
 }
 
 /**
@@ -102,6 +105,7 @@ export interface KapanOrderParams {
   targetValue: bigint;
   minHealthFactor: bigint;
   appDataHash: string;
+  isFlashLoanOrder: boolean;  // When true, order.receiver = Settlement (required by CoW solvers)
 }
 
 /**
@@ -225,6 +229,7 @@ export function buildOrderParams(input: KapanOrderInput): KapanOrderParams {
     targetValue: BigInt(input.targetValue ?? 1),
     minHealthFactor: parseUnits(input.minHealthFactor ?? "1.1", 18),
     appDataHash: input.appDataHash ?? keccak256(toUtf8Bytes("kapan-order")),
+    isFlashLoanOrder: input.isFlashLoanOrder ?? false,
   };
 }
 
@@ -280,6 +285,7 @@ export function parseOrderContext(rawContext: any): OrderContext {
       targetValue: BigInt(rawContext.params.targetValue),
       minHealthFactor: BigInt(rawContext.params.minHealthFactor),
       appDataHash: rawContext.params.appDataHash,
+      isFlashLoanOrder: Boolean(rawContext.params.isFlashLoanOrder),
     },
     status: Number(rawContext.status) as OrderStatus,
     executedAmount: BigInt(rawContext.executedAmount),

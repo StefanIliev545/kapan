@@ -13,6 +13,8 @@ import { GPv2Order } from "../interfaces/cow/GPv2Order.sol";
 import { IGPv2Settlement } from "../interfaces/cow/IGPv2Settlement.sol";
 import { ProtocolTypes } from "../interfaces/ProtocolTypes.sol";
 
+import "hardhat/console.sol";
+
 // Forward declaration for KapanRouter interface
 interface IKapanRouter {
     function processProtocolInstructions(ProtocolTypes.ProtocolInstruction[] calldata instructions) external;
@@ -81,6 +83,10 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         
         // AppData (pre-computed by frontend, includes hooks)
         bytes32 appDataHash;
+        
+        // Flash loan mode: when true, order.receiver = Settlement (required by CoW solvers)
+        // When false (multi-chunk mode), order.receiver = OrderManager
+        bool isFlashLoanOrder;
     }
 
     /// @notice Order context stored on-chain
@@ -396,17 +402,23 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     
     /// @notice Internal post-hook execution
     function _executePostHook(bytes32 orderHash) internal {
+        console.log("_executePostHook: START");
+        
         // Only HooksTrampoline can call this
         if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
+        
+        console.log("_executePostHook: caller is HooksTrampoline");
         
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
         
         // Get actual received amount
         uint256 receivedAmount = IERC20(ctx.params.buyToken).balanceOf(address(this));
+        console.log("_executePostHook: receivedAmount =", receivedAmount);
         
         // Transfer tokens to router for processing
         IERC20(ctx.params.buyToken).safeTransfer(address(router), receivedAmount);
+        console.log("_executePostHook: transferred to router");
         
         // Get post-instructions for current iteration
         // If fewer entries than iterations, reuse the last entry
@@ -434,8 +446,20 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
             instructions[i + 1] = storedInstructions[i];
         }
         
+        console.log("_executePostHook: instruction count =", instructions.length);
+        console.log("_executePostHook: calling router.processProtocolInstructions");
+        
         // Execute via router
-        router.processProtocolInstructions(instructions);
+        try router.processProtocolInstructions(instructions) {
+            console.log("_executePostHook: router call SUCCESS");
+        } catch Error(string memory reason) {
+            console.log("_executePostHook: router call FAILED with reason:", reason);
+            revert(reason);
+        } catch (bytes memory lowLevelData) {
+            console.log("_executePostHook: router call FAILED with low-level error");
+            console.logBytes(lowLevelData);
+            revert("Router call failed");
+        }
         
         // Update progress
         uint256 chunkSellAmount = ctx.params.chunkSize;
@@ -452,6 +476,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         }
         
         emit PostHookExecuted(orderHash, ctx.iterationCount, receivedAmount);
+        console.log("_executePostHook: COMPLETE");
     }
 
     // ============ ERC-1271 Signature Verification ============

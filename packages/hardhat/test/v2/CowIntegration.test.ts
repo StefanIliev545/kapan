@@ -111,17 +111,18 @@ describe("CoW Protocol Integration", function () {
     it("should create an order", async function () {
       const params = {
         user: await user.getAddress(),
-        preInstructionsData: "0x",
+        preInstructionsPerIteration: [],  // Empty array - no pre-instructions
         preTotalAmount: ethers.parseUnits("10000", 6),
         sellToken: await mockToken.getAddress(),
         buyToken: await buyToken.getAddress(),
         chunkSize: ethers.parseUnits("2000", 6),
         minBuyPerChunk: ethers.parseEther("0.5"),
-        postInstructionsData: "0x",
+        postInstructionsPerIteration: [], // Empty array - no post-instructions
         completion: 2, // Iterations
         targetValue: 5, // 5 iterations
         minHealthFactor: ethers.parseEther("1.1"),
-        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data"))
+        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
+        isFlashLoanOrder: false,  // Non-flash loan order (receiver = OrderManager)
       };
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
@@ -136,17 +137,18 @@ describe("CoW Protocol Integration", function () {
     it("should reject order creation from non-user", async function () {
       const params = {
         user: await user.getAddress(),
-        preInstructionsData: "0x",
+        preInstructionsPerIteration: [],
         preTotalAmount: ethers.parseUnits("10000", 6),
         sellToken: await mockToken.getAddress(),
         buyToken: await buyToken.getAddress(),
         chunkSize: ethers.parseUnits("2000", 6),
         minBuyPerChunk: ethers.parseEther("0.5"),
-        postInstructionsData: "0x",
+        postInstructionsPerIteration: [],
         completion: 2,
         targetValue: 5,
         minHealthFactor: ethers.parseEther("1.1"),
-        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data"))
+        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
+        isFlashLoanOrder: false,
       };
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
@@ -163,17 +165,18 @@ describe("CoW Protocol Integration", function () {
     beforeEach(async function () {
       const params = {
         user: await user.getAddress(),
-        preInstructionsData: "0x",
+        preInstructionsPerIteration: [],
         preTotalAmount: ethers.parseUnits("10000", 6),
         sellToken: await mockToken.getAddress(),
         buyToken: await buyToken.getAddress(),
         chunkSize: ethers.parseUnits("2000", 6),
         minBuyPerChunk: ethers.parseEther("0.5"),
-        postInstructionsData: "0x",
+        postInstructionsPerIteration: [],
         completion: 2, // Iterations
         targetValue: 5,
         minHealthFactor: ethers.parseEther("1.1"),
-        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data"))
+        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
+        isFlashLoanOrder: false,
       };
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
@@ -228,6 +231,60 @@ describe("CoW Protocol Integration", function () {
       expect(executed).to.equal(0);
       expect(total).to.equal(ethers.parseUnits("10000", 6));
       expect(iterations).to.equal(0);
+    });
+
+    it("should set receiver to Settlement for flash loan orders", async function () {
+      // Create a flash loan order
+      const flashLoanParams = {
+        user: await user.getAddress(),
+        preInstructionsPerIteration: [],
+        preTotalAmount: ethers.parseUnits("10000", 6),
+        sellToken: await mockToken.getAddress(),
+        buyToken: await buyToken.getAddress(),
+        chunkSize: ethers.parseUnits("10000", 6), // Full amount in one chunk
+        minBuyPerChunk: ethers.parseEther("0.5"),
+        postInstructionsPerIteration: [],
+        completion: 2, // Iterations
+        targetValue: 1, // Single iteration
+        minHealthFactor: ethers.parseEther("1.1"),
+        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("flash-loan-app-data")),
+        isFlashLoanOrder: true,  // Flash loan order - receiver should be Settlement
+      };
+      
+      const flashLoanSalt = ethers.keccak256(ethers.toUtf8Bytes("flash-loan-salt"));
+      
+      const tx = await orderManager.connect(user).createOrder(flashLoanParams, flashLoanSalt, 0);
+      const receipt = await tx.wait();
+      
+      // Extract orderHash from event
+      const event = receipt?.logs.find((log: any) => {
+        try {
+          return orderManager.interface.parseLog(log)?.name === "OrderCreated";
+        } catch {
+          return false;
+        }
+      });
+      
+      let flashLoanOrderHash: string;
+      if (event) {
+        const parsed = orderManager.interface.parseLog(event);
+        flashLoanOrderHash = parsed?.args[0];
+      } else {
+        throw new Error("OrderCreated event not found");
+      }
+      
+      const staticInput = coder.encode(["bytes32"], [flashLoanOrderHash]);
+      
+      const order = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // Flash loan order should have receiver = Settlement (not OrderManager)
+      expect(order.receiver).to.equal(await mockSettlement.getAddress());
     });
 
     it("should return deterministic validTo (same order hash on multiple polls)", async function () {

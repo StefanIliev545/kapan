@@ -30,7 +30,7 @@ import {
   normalizeProtocolName,
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, COW_FLASH_LOAN_ROUTER } from "~~/utils/cow";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, getCowBorrower, getPreferredFlashLoanLender, getKapanCowAdapter } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
@@ -613,7 +613,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
    * With flash loan enabled: single chunk, full amount
    * Without flash loan: calculate based on capacity constraints
    */
-  const chunkParams = useMemo((): ChunkCalculationResult & { useFlashLoan?: boolean; flashLoanFee?: bigint; flashLoanLender?: string; protocolAdapter?: string } => {
+  const chunkParams = useMemo((): ChunkCalculationResult & { useFlashLoan?: boolean; flashLoanFee?: bigint; flashLoanLender?: string } => {
     if (executionType !== "limit" || !collateral || !debt || flashLoanAmountRaw === 0n || marginAmountRaw === 0n) {
       return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "" };
     }
@@ -632,26 +632,23 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     // If flash loan is enabled, use single chunk with flash loan
-    // Prefer Balancer V2 (0 fee) over Aave V3 (0.05% fee)
+    // KapanCowAdapter supports both Morpho (0% fee) and Aave V3 (0.05% fee)
     if (useFlashLoan) {
-      const balancerLender = getFlashLoanLender(chainId, "balancerV2");
-      const aaveLender = getFlashLoanLender(chainId, "aaveV3");
-      // Prefer Balancer (0 fee), fall back to Aave
-      const flashLoanLender = balancerLender || aaveLender;
-      const lenderType = balancerLender ? "balancerV2" : "aaveV3";
-      // Balancer V2 has 0 fee, Aave V3 has 0.05% fee
-      const flashLoanFee = lenderType === "balancerV2" ? 0n : calculateFlashLoanFee(flashLoanAmountRaw, "aaveV3");
-      // Protocol adapter: ERC3156Borrower for Balancer, AaveBorrower for Aave
-      const protocolAdapter = lenderType === "balancerV2" 
-        ? COW_FLASH_LOAN_ROUTER.erc3156Borrower 
-        : COW_FLASH_LOAN_ROUTER.aaveBorrower;
+      // Get preferred lender (Morpho if available, else Aave)
+      const lenderInfo = getPreferredFlashLoanLender(chainId);
+      const flashLoanLender = lenderInfo?.address;
+      if (!flashLoanLender || !lenderInfo) {
+        console.warn("[Limit Order] Flash loans not available on this chain for CoW orders");
+        return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "Flash loans not available for limit orders on this chain" };
+      }
+      // Calculate fee based on actual provider (Morpho = 0%, Aave = 0.05%)
+      const flashLoanFee = calculateFlashLoanFee(flashLoanAmountRaw, lenderInfo.provider);
       
-      console.log("[Limit Order] Flash loan mode:", {
+      console.log(`[Limit Order] Flash loan mode (CoW/${lenderInfo.provider}):`, {
         totalDebt: formatUnits(flashLoanAmountRaw, debt.decimals),
         flashLoanFee: formatUnits(flashLoanFee, debt.decimals),
         lender: flashLoanLender,
-        lenderType,
-        protocolAdapter,
+        lenderType: lenderInfo.provider,
       });
       
       return {
@@ -665,7 +662,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         useFlashLoan: true,
         flashLoanFee,
         flashLoanLender,
-        protocolAdapter,
         explanation: flashLoanFee > 0n 
           ? `Flash loan: single tx execution (fee: ${formatUnits(flashLoanFee, debt.decimals)} ${debt.symbol})`
           : `Flash loan: single tx execution (no fee)`,
@@ -744,52 +740,84 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     // ========== FLASH LOAN MODE ==========
     // Flow: Solver takes flash loan → swap (debt → collateral) → post-hook deposits all & borrows to repay
     //
+    // ========== FLASH LOAN MODE ==========
+    // CoW Protocol flash loan flow:
+    // 1. Solver takes flash loan via FlashLoanRouter → funds at ERC3156Borrower (or AaveBorrower)
+    // 2. Pre-hooks in appData: 
+    //    a. Borrower.approve(token, OrderManager, amount)
+    //    b. token.transferFrom(Borrower, OrderManager, amount)
+    //    c. OrderManager.executePreHookBySalt() - empty, just marks execution
+    // 3. Swap executes: OrderManager sells debt tokens for collateral
+    // 4. Post-hooks:
+    //    a. OrderManager.executePostHookBySalt() - runs instructions below
+    // 5. Flash loan repaid from Borrower contract
+    //
     // Post-hook receives swap output as Output[0] (prepended by OrderManager)
     // We then:
-    // 1. Pull user's initial collateral → Output[1]
-    // 2. Add Output[0] + Output[1] → Output[2] (total collateral)
+    // 1. Pull user's initial margin collateral → UTXO[1]
+    // 2. Add swap output + margin → UTXO[2] (total collateral)
     // 3. Approve & Deposit total collateral
-    // 4. Borrow flash loan amount to settlement contract (repays the flash loan)
-    //
-    // Using Balancer V2 initially (0 fee), will add Aave support later
-    if (chunkParams.useFlashLoan) {
-      // For Balancer V2, no fee. For Aave, fee would be flashLoanAmount * 0.0005
-      const flashLoanRepayAmount = flashLoanAmountRaw; // Balancer has 0 fee
+    // 4. Borrow debt tokens to repay flash loan
+    // 5. Push borrowed tokens to CoW Borrower (KapanCowAdapter or fallback to standard borrower)
+    if (chunkParams.useFlashLoan && chunkParams.flashLoanLender) {
+      // Get the borrower address - use KapanCowAdapter if deployed, otherwise fall back to CoW's standard borrower
+      // This MUST match the adapter used in appData.ts for flash loan execution
+      const cowBorrowerAddress = getKapanCowAdapter(chainId) || getCowBorrower(chunkParams.flashLoanLender, chainId);
       
-      // Pre-hook: Empty (solver provides flash loan funds for the swap)
+      // Calculate repay amount (Balancer V2 has 0 fee, Aave V3 has 0.05% fee)
+      const flashLoanRepayAmount = flashLoanAmountRaw + (chunkParams.flashLoanFee ?? 0n);
+      
+      // Pre-hook: Empty - the flash loan transfer hooks are added in appData.ts
+      // Those hooks run BEFORE this and move tokens from Borrower → OrderManager
       const preInstructionsPerIteration: ProtocolInstruction[][] = [[]];
       
-      // Post-hook: Combine collaterals, deposit all, borrow to repay flash loan
-      // OrderManager prepends: Output[0] = swap output (collateral from swap)
+      // Post-hook: Deposit collateral, borrow to repay flash loan, push to Borrower
+      // 
+      // UTXO Tracking:
+      // - OrderManager prepends: ToOutput(receivedAmount, collateralToken) → UTXO[0]
+      // - [0] PullToken(marginAmount) → UTXO[1]
+      // - [1] Add(0, 1) → UTXO[2] (total collateral)
+      // - [2] Approve(2) → UTXO[3] (empty, for index sync)
+      // - [3] Deposit(input=2) → (no UTXO, consumed)
+      // - [4] Borrow(flashLoanRepayAmount) → UTXO[4] (borrowed debt tokens)
+      // - [5] PushToken(4, cowBorrower) → sends borrowed tokens to CoW Borrower for flash loan repayment
       const postInstructionsFlashLoan: ProtocolInstruction[] = [
-        // 1. Pull user's initial collateral → Output[1]
+        // 1. Pull user's initial collateral → UTXO[1]
         createRouterInstruction(encodePullToken(marginAmountRaw, collateral.address, userAddress)),
         
-        // 2. Add swap output + initial collateral → Output[2] (total collateral)
+        // 2. Add swap output + initial collateral → UTXO[2] (total collateral)
         createRouterInstruction(encodeAdd(0, 1)),
         
-        // 3. Approve total collateral for lending protocol
+        // 3. Approve total collateral for lending protocol → UTXO[3] (empty)
         createRouterInstruction(encodeApprove(2, normalizedProtocol)),
         
-        // 4. Deposit all collateral (single deposit)
+        // 4. Deposit all collateral (single deposit) - no UTXO created
         createProtocolInstruction(
           normalizedProtocol,
           encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 2)
         ),
         
-        // 5. Borrow to repay flash loan - sends debt tokens to settlement contract
-        // Settlement contract uses these to repay the flash loan provider
+        // 5. Borrow to repay flash loan → UTXO[4] (borrowed tokens at Router)
+        // Borrow sends tokens to Router. userAddress param is for credit delegation.
         createProtocolInstruction(
           normalizedProtocol,
-          encodeLendingInstruction(LendingOp.Borrow, debt.address, COW_PROTOCOL.settlement, flashLoanRepayAmount, context, 999)
+          encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, flashLoanRepayAmount, context, 999)
         ),
+        
+        // 6. Push borrowed tokens to CoW Borrower for flash loan repayment
+        // The FlashLoanRouter will pull from Borrower to repay the lender
+        // UTXO[4] = Borrow output (after PullToken[1], Add[2], Approve[3])
+        createRouterInstruction(encodePushToken(4, cowBorrowerAddress)),
       ];
       
       console.log("[buildCowInstructions] Flash loan mode:", {
         flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-        initialCollateral: formatUnits(marginAmountRaw, collateral.decimals),
+        flashLoanFee: formatUnits(chunkParams.flashLoanFee ?? 0n, debt.decimals),
         repayAmount: formatUnits(flashLoanRepayAmount, debt.decimals),
-        flow: "swap output[0] + pull[1] → add[2] → deposit[2] → borrow to settlement",
+        initialCollateral: formatUnits(marginAmountRaw, collateral.decimals),
+        lender: chunkParams.flashLoanLender,
+        cowBorrower: cowBorrowerAddress,
+        flow: "swap[0] + pull[1] → add[2] → approve[3] → deposit → borrow[4] → push to Borrower",
       });
 
       return { 
@@ -981,14 +1009,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           }
           
           // Credit delegation for flash loan repayment borrow
-          // Using Balancer V2 (0 fee) initially
-          const flashLoanRepayAmount = flashLoanAmountRaw; // Balancer has 0 fee
+          // Must use userAddress - this is whose collateral backs the borrow and who delegates credit
+          const flashLoanRepayAmount = flashLoanAmountRaw + (chunkParams.flashLoanFee ?? 0n);
           const borrowForAuth = createProtocolInstruction(
             normalizedProtocol,
             encodeLendingInstruction(
               LendingOp.Borrow,
               debt.address,
-              COW_PROTOCOL.settlement, // Borrow goes to settlement for flash loan repayment
+              userAddress, // Borrow on behalf of user (uses their collateral and credit delegation)
               flashLoanRepayAmount,
               context,
               999
@@ -1009,14 +1037,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         }
 
         // Get authorizations only for instructions that need them
+        console.log("[Limit Order] instructionsNeedingAuth:", instructionsNeedingAuth.length, instructionsNeedingAuth.map(i => i.protocolName));
         const allAuthCalls = await getAuthorizations(instructionsNeedingAuth);
+        console.log("[Limit Order] allAuthCalls from getAuthorizations:", allAuthCalls.length);
         const filteredAuthCalls = allAuthCalls
-          .filter(({ target, data }) => target && data && data.length > 0)
+          .filter(({ target, data }) => target && target !== "0x0000000000000000000000000000000000000000" && data && data.length > 2)
           .map(({ target, data }) => ({ to: target as Address, data: data as Hex }));
         
         if (filteredAuthCalls.length > 0) {
           allCalls.push(...filteredAuthCalls);
           console.log("[Limit Order] Added authorization calls:", filteredAuthCalls.length);
+        } else {
+          console.log("[Limit Order] No new authorizations needed (user may already have delegation)");
         }
 
         // 2. Build initial deposit router call (ONLY for multi-chunk mode)
@@ -1077,9 +1109,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           // Multi-chunk: seed with borrowed tokens; Flash loan: no seed needed
           seedAmount: seedAmount,
           // Flash loan config: tells CoW solvers to use flash loan for this order
-          flashLoan: isFlashLoanMode && chunkParams.flashLoanLender && chunkParams.protocolAdapter ? {
+          flashLoan: isFlashLoanMode && chunkParams.flashLoanLender ? {
             lender: chunkParams.flashLoanLender,
-            protocolAdapter: chunkParams.protocolAdapter,
             token: debt.address,
             amount: flashLoanAmountRaw,
           } : undefined,

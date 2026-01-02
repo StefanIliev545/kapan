@@ -54,6 +54,12 @@ export interface ChunkCalculationResult {
   recommendFlashLoan: boolean;
   /** Explanation for UI */
   explanation: string;
+  /** Whether flash loan mode is enabled (set by caller) */
+  useFlashLoan?: boolean;
+  /** Flash loan fee in debt token units (0 for Balancer) */
+  flashLoanFee?: bigint;
+  /** Flash loan lender address */
+  flashLoanLender?: string;
 }
 
 export function calculateChunkParams(input: ChunkCalculationInput): ChunkCalculationResult {

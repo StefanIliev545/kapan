@@ -13,7 +13,7 @@ export async function safeExecute(
   contractName: string,
   methodName: string,
   args: any[],
-  options: { waitConfirmations?: number; log?: boolean } = {}
+  options: { waitConfirmations?: number; log?: boolean; gasLimit?: number } = {}
 ) {
   const { deployments, ethers } = hre;
   const { execute } = deployments;
@@ -23,20 +23,13 @@ export async function safeExecute(
   
   // Get pending nonce to avoid race conditions
   const nonce = await ethers.provider.getTransactionCount(deployer, "pending");
-  
-  // Get current gas price and bump it slightly to avoid replacement issues
-  const feeData = await ethers.provider.getFeeData();
-  const maxFeePerGas = feeData.maxFeePerGas ? (feeData.maxFeePerGas * 120n / 100n) : undefined;
-  const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas ? (feeData.maxPriorityFeePerGas * 120n / 100n) : undefined;
-  
+    
   return await execute(
     contractName,
     { 
       from: deployer, 
       nonce,
-      maxFeePerGas: maxFeePerGas?.toString(),
-      maxPriorityFeePerGas: maxPriorityFeePerGas?.toString(),
-      waitConfirmations: options.waitConfirmations ?? 1,
+      waitConfirmations: options.waitConfirmations ?? 2,
       log: options.log,
     },
     methodName,

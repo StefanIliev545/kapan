@@ -1,0 +1,807 @@
+{
+  "address": "0x2197f7f6369FeFDE4B461bF6CdE898fD730a3255",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_router",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "target",
+          "type": "address"
+        }
+      ],
+      "name": "AddressEmptyCode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "AddressInsufficientBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FailedInnerCall",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FlashLoanInProgress",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidLender",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlyRouter",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "OnlySettlement",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "SafeERC20FailedOperation",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UnauthorizedCaller",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum LenderType",
+          "name": "lenderType",
+          "type": "uint8"
+        }
+      ],
+      "name": "FlashLoanRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum LenderType",
+          "name": "lenderType",
+          "type": "uint8"
+        }
+      ],
+      "name": "LenderUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "OrderFunded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "allowedLenders",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "target",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "approve",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "premium",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "initiator",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "params",
+          "type": "bytes"
+        }
+      ],
+      "name": "executeOperation",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "callbackData",
+          "type": "bytes"
+        }
+      ],
+      "name": "flashLoanAndCallBack",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "fundOrder",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        }
+      ],
+      "name": "getLenderType",
+      "outputs": [
+        {
+          "internalType": "enum LenderType",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getRouter",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getSettlementContract",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isInFlashLoan",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "lenderTypes",
+      "outputs": [
+        {
+          "internalType": "enum LenderType",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "assets",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "onMorphoFlashLoan",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "rescueTokens",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "router",
+      "outputs": [
+        {
+          "internalType": "contract IFlashLoanRouter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "setAaveLender",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "setLender",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "lender",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "name": "setMorphoLender",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "settlementContract",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x49981b83e03110e96ff9bf7117ae1d3b3cfb9128b3795f5c963cfe0e3f15b732",
+  "receipt": {
+    "to": null,
+    "from": "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027",
+    "contractAddress": "0x2197f7f6369FeFDE4B461bF6CdE898fD730a3255",
+    "transactionIndex": 79,
+    "gasUsed": "969127",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000800000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000800000000000000020040000000004000000800000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000800000000040000000000000000000000",
+    "blockHash": "0xf7b0e8e5a884f8db1598a51d798b44a5a096c0717a258d27de2665017633fb91",
+    "transactionHash": "0x49981b83e03110e96ff9bf7117ae1d3b3cfb9128b3795f5c963cfe0e3f15b732",
+    "logs": [
+      {
+        "transactionIndex": 79,
+        "blockNumber": 40278386,
+        "transactionHash": "0x49981b83e03110e96ff9bf7117ae1d3b3cfb9128b3795f5c963cfe0e3f15b732",
+        "address": "0x2197f7f6369FeFDE4B461bF6CdE898fD730a3255",
+        "topics": [
+          "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x0000000000000000000000000be61223f99e57b8b8b7033a77b54adc7f7cf027"
+        ],
+        "data": "0x",
+        "logIndex": 584,
+        "blockHash": "0xf7b0e8e5a884f8db1598a51d798b44a5a096c0717a258d27de2665017633fb91"
+      }
+    ],
+    "blockNumber": 40278386,
+    "cumulativeGasUsed": "21182072",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x9da8B48441583a2b93e2eF8213aAD0EC0b392C69",
+    "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "ed074f71f735c71eb3dd1e5f8ee31e8e",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_router\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_owner\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"}],\"name\":\"AddressEmptyCode\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"AddressInsufficientBalance\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"FailedInnerCall\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"FlashLoanInProgress\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidLender\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"OnlyRouter\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"OnlySettlement\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"SafeERC20FailedOperation\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"UnauthorizedCaller\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"enum LenderType\",\"name\":\"lenderType\",\"type\":\"uint8\"}],\"name\":\"FlashLoanRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"},{\"indexed\":false,\"internalType\":\"enum LenderType\",\"name\":\"lenderType\",\"type\":\"uint8\"}],\"name\":\"LenderUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"OrderFunded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"allowedLenders\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"approve\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"asset\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"premium\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"initiator\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"params\",\"type\":\"bytes\"}],\"name\":\"executeOperation\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"},{\"internalType\":\"contract IERC20\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"callbackData\",\"type\":\"bytes\"}],\"name\":\"flashLoanAndCallBack\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"fundOrder\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"}],\"name\":\"getLenderType\",\"outputs\":[{\"internalType\":\"enum LenderType\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRouter\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSettlementContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isInFlashLoan\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"lenderTypes\",\"outputs\":[{\"internalType\":\"enum LenderType\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"assets\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"onMorphoFlashLoan\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"rescueTokens\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"router\",\"outputs\":[{\"internalType\":\"contract IFlashLoanRouter\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"name\":\"setAaveLender\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"name\":\"setLender\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"lender\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"name\":\"setMorphoLender\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"settlementContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Supports both Morpho Blue (0% fee) and Aave V3 (0.05% fee)\",\"errors\":{\"AddressEmptyCode(address)\":[{\"details\":\"There's no code at `target` (it is not a contract).\"}],\"AddressInsufficientBalance(address)\":[{\"details\":\"The ETH balance of the account is not enough to perform the operation.\"}],\"FailedInnerCall()\":[{\"details\":\"A call to an address target failed. The target may have reverted.\"}],\"OwnableInvalidOwner(address)\":[{\"details\":\"The owner is not a valid owner account. (eg. `address(0)`)\"}],\"OwnableUnauthorizedAccount(address)\":[{\"details\":\"The caller account is not authorized to perform an operation.\"}],\"SafeERC20FailedOperation(address)\":[{\"details\":\"An operation with an ERC20 token failed.\"}]},\"kind\":\"dev\",\"methods\":{\"approve(address,address,uint256)\":{\"details\":\"Only callable by Settlement contract\"},\"flashLoanAndCallBack(address,address,uint256,bytes)\":{\"params\":{\"amount\":\"The amount to borrow\",\"callbackData\":\"Data to pass back to router after receiving loan\",\"lender\":\"The flash loan provider (Morpho or Aave pool)\",\"token\":\"The token to borrow\"}},\"fundOrder(address,address,uint256)\":{\"details\":\"Called in pre-hook to fund the order. No access control to allow      balance simulation during order validation (adapter should be empty outside flash loans)\"},\"onMorphoFlashLoan(uint256,bytes)\":{\"params\":{\"assets\":\"The borrowed amount\",\"data\":\"Encoded callbackData for router\"}},\"owner()\":{\"details\":\"Returns the address of the current owner.\"},\"renounceOwnership()\":{\"details\":\"Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner.\"},\"transferOwnership(address)\":{\"details\":\"Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner.\"}},\"title\":\"KapanCowAdapter\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"allowedLenders(address)\":{\"notice\":\"Mapping of allowed lenders\"},\"approve(address,address,uint256)\":{\"notice\":\"Approve a target to spend tokens (standard IBorrower function)\"},\"executeOperation(address,uint256,uint256,address,bytes)\":{\"notice\":\"Called by Aave after flash loan tokens are sent\"},\"flashLoanAndCallBack(address,address,uint256,bytes)\":{\"notice\":\"Called by FlashLoanRouter to initiate flash loan\"},\"fundOrder(address,address,uint256)\":{\"notice\":\"Transfer flash-loaned tokens to the order recipient (OrderManager)\"},\"lenderTypes(address)\":{\"notice\":\"Mapping of lender address => LenderType\"},\"onMorphoFlashLoan(uint256,bytes)\":{\"notice\":\"Called by Morpho Blue after flash loan tokens are sent\"},\"rescueTokens(address,address,uint256)\":{\"notice\":\"Rescue tokens accidentally sent to this contract\"},\"router()\":{\"notice\":\"CoW Protocol's FlashLoanRouter\"},\"setAaveLender(address,bool)\":{\"notice\":\"Add or remove an allowed Aave lender\"},\"setLender(address,bool)\":{\"notice\":\"Legacy function for backwards compatibility (defaults to Aave)\"},\"setMorphoLender(address,bool)\":{\"notice\":\"Add or remove an allowed Morpho lender\"},\"settlementContract()\":{\"notice\":\"CoW Protocol's Settlement contract\"}},\"notice\":\"Bridges Kapan's OrderManager with CoW Protocol's flash loan system\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/cow/KapanCowAdapter.sol\":\"KapanCowAdapter\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/access/Ownable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (access/Ownable.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {Context} from \\\"../utils/Context.sol\\\";\\n\\n/**\\n * @dev Contract module which provides a basic access control mechanism, where\\n * there is an account (an owner) that can be granted exclusive access to\\n * specific functions.\\n *\\n * The initial owner is set to the address provided by the deployer. This can\\n * later be changed with {transferOwnership}.\\n *\\n * This module is used through inheritance. It will make available the modifier\\n * `onlyOwner`, which can be applied to your functions to restrict their use to\\n * the owner.\\n */\\nabstract contract Ownable is Context {\\n    address private _owner;\\n\\n    /**\\n     * @dev The caller account is not authorized to perform an operation.\\n     */\\n    error OwnableUnauthorizedAccount(address account);\\n\\n    /**\\n     * @dev The owner is not a valid owner account. (eg. `address(0)`)\\n     */\\n    error OwnableInvalidOwner(address owner);\\n\\n    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);\\n\\n    /**\\n     * @dev Initializes the contract setting the address provided by the deployer as the initial owner.\\n     */\\n    constructor(address initialOwner) {\\n        if (initialOwner == address(0)) {\\n            revert OwnableInvalidOwner(address(0));\\n        }\\n        _transferOwnership(initialOwner);\\n    }\\n\\n    /**\\n     * @dev Throws if called by any account other than the owner.\\n     */\\n    modifier onlyOwner() {\\n        _checkOwner();\\n        _;\\n    }\\n\\n    /**\\n     * @dev Returns the address of the current owner.\\n     */\\n    function owner() public view virtual returns (address) {\\n        return _owner;\\n    }\\n\\n    /**\\n     * @dev Throws if the sender is not the owner.\\n     */\\n    function _checkOwner() internal view virtual {\\n        if (owner() != _msgSender()) {\\n            revert OwnableUnauthorizedAccount(_msgSender());\\n        }\\n    }\\n\\n    /**\\n     * @dev Leaves the contract without owner. It will not be possible to call\\n     * `onlyOwner` functions. Can only be called by the current owner.\\n     *\\n     * NOTE: Renouncing ownership will leave the contract without an owner,\\n     * thereby disabling any functionality that is only available to the owner.\\n     */\\n    function renounceOwnership() public virtual onlyOwner {\\n        _transferOwnership(address(0));\\n    }\\n\\n    /**\\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\\n     * Can only be called by the current owner.\\n     */\\n    function transferOwnership(address newOwner) public virtual onlyOwner {\\n        if (newOwner == address(0)) {\\n            revert OwnableInvalidOwner(address(0));\\n        }\\n        _transferOwnership(newOwner);\\n    }\\n\\n    /**\\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\\n     * Internal function without access restriction.\\n     */\\n    function _transferOwnership(address newOwner) internal virtual {\\n        address oldOwner = _owner;\\n        _owner = newOwner;\\n        emit OwnershipTransferred(oldOwner, newOwner);\\n    }\\n}\\n\",\"keccak256\":\"0xff6d0bb2e285473e5311d9d3caacb525ae3538a80758c10649a4d61029b017bb\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0xc6a8ff0ea489379b61faa647490411b80102578440ab9d84e9a957cc12164e70\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Permit.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 Permit extension allowing approvals to be made via signatures, as defined in\\n * https://eips.ethereum.org/EIPS/eip-2612[EIP-2612].\\n *\\n * Adds the {permit} method, which can be used to change an account's ERC20 allowance (see {IERC20-allowance}) by\\n * presenting a message signed by the account. By not relying on {IERC20-approve}, the token holder account doesn't\\n * need to send a transaction, and thus is not required to hold Ether at all.\\n *\\n * ==== Security Considerations\\n *\\n * There are two important considerations concerning the use of `permit`. The first is that a valid permit signature\\n * expresses an allowance, and it should not be assumed to convey additional meaning. In particular, it should not be\\n * considered as an intention to spend the allowance in any specific way. The second is that because permits have\\n * built-in replay protection and can be submitted by anyone, they can be frontrun. A protocol that uses permits should\\n * take this into consideration and allow a `permit` call to fail. Combining these two aspects, a pattern that may be\\n * generally recommended is:\\n *\\n * ```solidity\\n * function doThingWithPermit(..., uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public {\\n *     try token.permit(msg.sender, address(this), value, deadline, v, r, s) {} catch {}\\n *     doThing(..., value);\\n * }\\n *\\n * function doThing(..., uint256 value) public {\\n *     token.safeTransferFrom(msg.sender, address(this), value);\\n *     ...\\n * }\\n * ```\\n *\\n * Observe that: 1) `msg.sender` is used as the owner, leaving no ambiguity as to the signer intent, and 2) the use of\\n * `try/catch` allows the permit to fail and makes the code tolerant to frontrunning. (See also\\n * {SafeERC20-safeTransferFrom}).\\n *\\n * Additionally, note that smart contract wallets (such as Argent or Safe) are not able to produce permit signatures, so\\n * contracts should have entry points that don't rely on permit.\\n */\\ninterface IERC20Permit {\\n    /**\\n     * @dev Sets `value` as the allowance of `spender` over ``owner``'s tokens,\\n     * given ``owner``'s signed approval.\\n     *\\n     * IMPORTANT: The same issues {IERC20-approve} has related to transaction\\n     * ordering also apply here.\\n     *\\n     * Emits an {Approval} event.\\n     *\\n     * Requirements:\\n     *\\n     * - `spender` cannot be the zero address.\\n     * - `deadline` must be a timestamp in the future.\\n     * - `v`, `r` and `s` must be a valid `secp256k1` signature from `owner`\\n     * over the EIP712-formatted function arguments.\\n     * - the signature must use ``owner``'s current nonce (see {nonces}).\\n     *\\n     * For more information on the signature format, see the\\n     * https://eips.ethereum.org/EIPS/eip-2612#specification[relevant EIP\\n     * section].\\n     *\\n     * CAUTION: See Security Considerations above.\\n     */\\n    function permit(\\n        address owner,\\n        address spender,\\n        uint256 value,\\n        uint256 deadline,\\n        uint8 v,\\n        bytes32 r,\\n        bytes32 s\\n    ) external;\\n\\n    /**\\n     * @dev Returns the current nonce for `owner`. This value must be\\n     * included whenever a signature is generated for {permit}.\\n     *\\n     * Every successful call to {permit} increases ``owner``'s nonce by one. This\\n     * prevents a signature from being used multiple times.\\n     */\\n    function nonces(address owner) external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the domain separator used in the encoding of the signature for {permit}, as defined by {EIP712}.\\n     */\\n    // solhint-disable-next-line func-name-mixedcase\\n    function DOMAIN_SEPARATOR() external view returns (bytes32);\\n}\\n\",\"keccak256\":\"0x6008dabfe393240d73d7dd7688033f72740d570aa422254d29a7dce8568f3aff\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/utils/SafeERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC20} from \\\"../IERC20.sol\\\";\\nimport {IERC20Permit} from \\\"../extensions/IERC20Permit.sol\\\";\\nimport {Address} from \\\"../../../utils/Address.sol\\\";\\n\\n/**\\n * @title SafeERC20\\n * @dev Wrappers around ERC20 operations that throw on failure (when the token\\n * contract returns false). Tokens that return no value (and instead revert or\\n * throw on failure) are also supported, non-reverting calls are assumed to be\\n * successful.\\n * To use this library you can add a `using SafeERC20 for IERC20;` statement to your contract,\\n * which allows you to call the safe operations as `token.safeTransfer(...)`, etc.\\n */\\nlibrary SafeERC20 {\\n    using Address for address;\\n\\n    /**\\n     * @dev An operation with an ERC20 token failed.\\n     */\\n    error SafeERC20FailedOperation(address token);\\n\\n    /**\\n     * @dev Indicates a failed `decreaseAllowance` request.\\n     */\\n    error SafeERC20FailedDecreaseAllowance(address spender, uint256 currentAllowance, uint256 requestedDecrease);\\n\\n    /**\\n     * @dev Transfer `value` amount of `token` from the calling contract to `to`. If `token` returns no value,\\n     * non-reverting calls are assumed to be successful.\\n     */\\n    function safeTransfer(IERC20 token, address to, uint256 value) internal {\\n        _callOptionalReturn(token, abi.encodeCall(token.transfer, (to, value)));\\n    }\\n\\n    /**\\n     * @dev Transfer `value` amount of `token` from `from` to `to`, spending the approval given by `from` to the\\n     * calling contract. If `token` returns no value, non-reverting calls are assumed to be successful.\\n     */\\n    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {\\n        _callOptionalReturn(token, abi.encodeCall(token.transferFrom, (from, to, value)));\\n    }\\n\\n    /**\\n     * @dev Increase the calling contract's allowance toward `spender` by `value`. If `token` returns no value,\\n     * non-reverting calls are assumed to be successful.\\n     */\\n    function safeIncreaseAllowance(IERC20 token, address spender, uint256 value) internal {\\n        uint256 oldAllowance = token.allowance(address(this), spender);\\n        forceApprove(token, spender, oldAllowance + value);\\n    }\\n\\n    /**\\n     * @dev Decrease the calling contract's allowance toward `spender` by `requestedDecrease`. If `token` returns no\\n     * value, non-reverting calls are assumed to be successful.\\n     */\\n    function safeDecreaseAllowance(IERC20 token, address spender, uint256 requestedDecrease) internal {\\n        unchecked {\\n            uint256 currentAllowance = token.allowance(address(this), spender);\\n            if (currentAllowance < requestedDecrease) {\\n                revert SafeERC20FailedDecreaseAllowance(spender, currentAllowance, requestedDecrease);\\n            }\\n            forceApprove(token, spender, currentAllowance - requestedDecrease);\\n        }\\n    }\\n\\n    /**\\n     * @dev Set the calling contract's allowance toward `spender` to `value`. If `token` returns no value,\\n     * non-reverting calls are assumed to be successful. Meant to be used with tokens that require the approval\\n     * to be set to zero before setting it to a non-zero value, such as USDT.\\n     */\\n    function forceApprove(IERC20 token, address spender, uint256 value) internal {\\n        bytes memory approvalCall = abi.encodeCall(token.approve, (spender, value));\\n\\n        if (!_callOptionalReturnBool(token, approvalCall)) {\\n            _callOptionalReturn(token, abi.encodeCall(token.approve, (spender, 0)));\\n            _callOptionalReturn(token, approvalCall);\\n        }\\n    }\\n\\n    /**\\n     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement\\n     * on the return value: the return value is optional (but if data is returned, it must not be false).\\n     * @param token The token targeted by the call.\\n     * @param data The call data (encoded using abi.encode or one of its variants).\\n     */\\n    function _callOptionalReturn(IERC20 token, bytes memory data) private {\\n        // We need to perform a low level call here, to bypass Solidity's return data size checking mechanism, since\\n        // we're implementing it ourselves. We use {Address-functionCall} to perform this call, which verifies that\\n        // the target address contains contract code and also asserts for success in the low-level call.\\n\\n        bytes memory returndata = address(token).functionCall(data);\\n        if (returndata.length != 0 && !abi.decode(returndata, (bool))) {\\n            revert SafeERC20FailedOperation(address(token));\\n        }\\n    }\\n\\n    /**\\n     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement\\n     * on the return value: the return value is optional (but if data is returned, it must not be false).\\n     * @param token The token targeted by the call.\\n     * @param data The call data (encoded using abi.encode or one of its variants).\\n     *\\n     * This is a variant of {_callOptionalReturn} that silents catches all reverts and returns a bool instead.\\n     */\\n    function _callOptionalReturnBool(IERC20 token, bytes memory data) private returns (bool) {\\n        // We need to perform a low level call here, to bypass Solidity's return data size checking mechanism, since\\n        // we're implementing it ourselves. We cannot use {Address-functionCall} here since this should return false\\n        // and not revert is the subcall reverts.\\n\\n        (bool success, bytes memory returndata) = address(token).call(data);\\n        return success && (returndata.length == 0 || abi.decode(returndata, (bool))) && address(token).code.length > 0;\\n    }\\n}\\n\",\"keccak256\":\"0x37bb49513c49c87c4642a891b13b63571bc87013dde806617aa1efb54605f386\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/Address.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (utils/Address.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Collection of functions related to the address type\\n */\\nlibrary Address {\\n    /**\\n     * @dev The ETH balance of the account is not enough to perform the operation.\\n     */\\n    error AddressInsufficientBalance(address account);\\n\\n    /**\\n     * @dev There's no code at `target` (it is not a contract).\\n     */\\n    error AddressEmptyCode(address target);\\n\\n    /**\\n     * @dev A call to an address target failed. The target may have reverted.\\n     */\\n    error FailedInnerCall();\\n\\n    /**\\n     * @dev Replacement for Solidity's `transfer`: sends `amount` wei to\\n     * `recipient`, forwarding all available gas and reverting on errors.\\n     *\\n     * https://eips.ethereum.org/EIPS/eip-1884[EIP1884] increases the gas cost\\n     * of certain opcodes, possibly making contracts go over the 2300 gas limit\\n     * imposed by `transfer`, making them unable to receive funds via\\n     * `transfer`. {sendValue} removes this limitation.\\n     *\\n     * https://consensys.net/diligence/blog/2019/09/stop-using-soliditys-transfer-now/[Learn more].\\n     *\\n     * IMPORTANT: because control is transferred to `recipient`, care must be\\n     * taken to not create reentrancy vulnerabilities. Consider using\\n     * {ReentrancyGuard} or the\\n     * https://solidity.readthedocs.io/en/v0.8.20/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].\\n     */\\n    function sendValue(address payable recipient, uint256 amount) internal {\\n        if (address(this).balance < amount) {\\n            revert AddressInsufficientBalance(address(this));\\n        }\\n\\n        (bool success, ) = recipient.call{value: amount}(\\\"\\\");\\n        if (!success) {\\n            revert FailedInnerCall();\\n        }\\n    }\\n\\n    /**\\n     * @dev Performs a Solidity function call using a low level `call`. A\\n     * plain `call` is an unsafe replacement for a function call: use this\\n     * function instead.\\n     *\\n     * If `target` reverts with a revert reason or custom error, it is bubbled\\n     * up by this function (like regular Solidity function calls). However, if\\n     * the call reverted with no returned reason, this function reverts with a\\n     * {FailedInnerCall} error.\\n     *\\n     * Returns the raw returned data. To convert to the expected return value,\\n     * use https://solidity.readthedocs.io/en/latest/units-and-global-variables.html?highlight=abi.decode#abi-encoding-and-decoding-functions[`abi.decode`].\\n     *\\n     * Requirements:\\n     *\\n     * - `target` must be a contract.\\n     * - calling `target` with `data` must not revert.\\n     */\\n    function functionCall(address target, bytes memory data) internal returns (bytes memory) {\\n        return functionCallWithValue(target, data, 0);\\n    }\\n\\n    /**\\n     * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`],\\n     * but also transferring `value` wei to `target`.\\n     *\\n     * Requirements:\\n     *\\n     * - the calling contract must have an ETH balance of at least `value`.\\n     * - the called Solidity function must be `payable`.\\n     */\\n    function functionCallWithValue(address target, bytes memory data, uint256 value) internal returns (bytes memory) {\\n        if (address(this).balance < value) {\\n            revert AddressInsufficientBalance(address(this));\\n        }\\n        (bool success, bytes memory returndata) = target.call{value: value}(data);\\n        return verifyCallResultFromTarget(target, success, returndata);\\n    }\\n\\n    /**\\n     * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`],\\n     * but performing a static call.\\n     */\\n    function functionStaticCall(address target, bytes memory data) internal view returns (bytes memory) {\\n        (bool success, bytes memory returndata) = target.staticcall(data);\\n        return verifyCallResultFromTarget(target, success, returndata);\\n    }\\n\\n    /**\\n     * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`],\\n     * but performing a delegate call.\\n     */\\n    function functionDelegateCall(address target, bytes memory data) internal returns (bytes memory) {\\n        (bool success, bytes memory returndata) = target.delegatecall(data);\\n        return verifyCallResultFromTarget(target, success, returndata);\\n    }\\n\\n    /**\\n     * @dev Tool to verify that a low level call to smart-contract was successful, and reverts if the target\\n     * was not a contract or bubbling up the revert reason (falling back to {FailedInnerCall}) in case of an\\n     * unsuccessful call.\\n     */\\n    function verifyCallResultFromTarget(\\n        address target,\\n        bool success,\\n        bytes memory returndata\\n    ) internal view returns (bytes memory) {\\n        if (!success) {\\n            _revert(returndata);\\n        } else {\\n            // only check if target is a contract if the call was successful and the return data is empty\\n            // otherwise we already know that it was a contract\\n            if (returndata.length == 0 && target.code.length == 0) {\\n                revert AddressEmptyCode(target);\\n            }\\n            return returndata;\\n        }\\n    }\\n\\n    /**\\n     * @dev Tool to verify that a low level call was successful, and reverts if it wasn't, either by bubbling the\\n     * revert reason or with a default {FailedInnerCall} error.\\n     */\\n    function verifyCallResult(bool success, bytes memory returndata) internal pure returns (bytes memory) {\\n        if (!success) {\\n            _revert(returndata);\\n        } else {\\n            return returndata;\\n        }\\n    }\\n\\n    /**\\n     * @dev Reverts with returndata if present. Otherwise reverts with {FailedInnerCall}.\\n     */\\n    function _revert(bytes memory returndata) private pure {\\n        // Look for revert reason and bubble it up if present\\n        if (returndata.length > 0) {\\n            // The easiest way to bubble the revert reason is using memory via assembly\\n            /// @solidity memory-safe-assembly\\n            assembly {\\n                let returndata_size := mload(returndata)\\n                revert(add(32, returndata), returndata_size)\\n            }\\n        } else {\\n            revert FailedInnerCall();\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0xaf28a975a78550e45f65e559a3ad6a5ad43b9b8a37366999abd1b7084eb70721\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/Context.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Provides information about the current execution context, including the\\n * sender of the transaction and its data. While these are generally available\\n * via msg.sender and msg.data, they should not be accessed in such a direct\\n * manner, since when dealing with meta-transactions the account sending and\\n * paying for execution may not be the actual sender (as far as an application\\n * is concerned).\\n *\\n * This contract is only required for intermediate, library-like contracts.\\n */\\nabstract contract Context {\\n    function _msgSender() internal view virtual returns (address) {\\n        return msg.sender;\\n    }\\n\\n    function _msgData() internal view virtual returns (bytes calldata) {\\n        return msg.data;\\n    }\\n\\n    function _contextSuffixLength() internal view virtual returns (uint256) {\\n        return 0;\\n    }\\n}\\n\",\"keccak256\":\"0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2\",\"license\":\"MIT\"},\"contracts/v2/cow/KapanCowAdapter.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IERC20 } from \\\"@openzeppelin/contracts/token/ERC20/IERC20.sol\\\";\\nimport { SafeERC20 } from \\\"@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol\\\";\\nimport { Ownable } from \\\"@openzeppelin/contracts/access/Ownable.sol\\\";\\nimport { IMorphoBlue, IMorphoFlashLoanCallback } from \\\"../interfaces/morpho/IMorphoBlue.sol\\\";\\n\\n/**\\n * @title KapanCowAdapter\\n * @notice Adapter contract that integrates Kapan with CoW Protocol's FlashLoanRouter\\n * @dev Implements IBorrower interface for CoW and handles flash loans from:\\n *      - Morpho Blue (0% fee - RECOMMENDED)\\n *      - Aave V3 (0.05% fee - fallback)\\n * \\n * Flow:\\n * 1. FlashLoanRouter calls flashLoanAndCallBack()\\n * 2. We request flash loan from Morpho or Aave\\n * 3. Lender sends tokens here and calls our callback\\n * 4. We call router.borrowerCallBack() to proceed with settlement\\n * 5. Settlement executes:\\n *    - Pre-hook: fundOrder() moves tokens to OrderManager\\n *    - Trade: VaultRelayer pulls from OrderManager\\n *    - Post-hook: OrderManager deposits/borrows, sends repayment here\\n * 6. Settlement returns, flash loan repays from this contract\\n */\\n\\n// CoW Protocol interfaces\\ninterface IFlashLoanRouter {\\n    function borrowerCallBack(bytes calldata callbackData) external;\\n    function settlementContract() external view returns (address);\\n}\\n\\n// Aave V3 interface\\ninterface IAaveV3Pool {\\n    function flashLoanSimple(\\n        address receiverAddress,\\n        address asset,\\n        uint256 amount,\\n        bytes calldata params,\\n        uint16 referralCode\\n    ) external;\\n}\\n\\n// Custom errors\\nerror OnlyRouter();\\nerror OnlySettlement();\\nerror OnlyDuringSettlement();\\nerror InvalidLender();\\nerror FlashLoanInProgress();\\nerror UnauthorizedCaller();\\n\\n/// @notice Lender type for routing flash loan requests\\nenum LenderType {\\n    Unknown,\\n    Aave,\\n    Morpho\\n}\\n\\n/**\\n * @title KapanCowAdapter\\n * @notice Bridges Kapan's OrderManager with CoW Protocol's flash loan system\\n * @dev Supports both Morpho Blue (0% fee) and Aave V3 (0.05% fee)\\n */\\ncontract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {\\n    using SafeERC20 for IERC20;\\n\\n    // ============ Immutables ============\\n    \\n    /// @notice CoW Protocol's FlashLoanRouter\\n    IFlashLoanRouter public immutable router;\\n    \\n    /// @notice CoW Protocol's Settlement contract\\n    address public immutable settlementContract;\\n\\n    // ============ State ============\\n    \\n    /// @notice Tracks if we're currently in a flash loan callback\\n    bool private _inFlashLoan;\\n    \\n    /// @notice The token being flash loaned\\n    address private _flashLoanToken;\\n    \\n    /// @notice The lender we're borrowing from (for callback validation)\\n    address private _currentLender;\\n\\n    /// @notice Mapping of lender address => LenderType\\n    mapping(address => LenderType) public lenderTypes;\\n    \\n    /// @notice Mapping of allowed lenders\\n    mapping(address => bool) public allowedLenders;\\n\\n    // ============ Events ============\\n    \\n    event FlashLoanRequested(address indexed lender, address indexed token, uint256 amount, LenderType lenderType);\\n    event OrderFunded(address indexed token, address indexed recipient, uint256 amount);\\n    event LenderUpdated(address indexed lender, bool allowed, LenderType lenderType);\\n\\n    // ============ Modifiers ============\\n\\n    modifier onlyRouter() {\\n        if (msg.sender != address(router)) revert OnlyRouter();\\n        _;\\n    }\\n\\n    modifier onlySettlement() {\\n        if (msg.sender != settlementContract) revert OnlySettlement();\\n        _;\\n    }\\n\\n    modifier duringSettlement() {\\n        if (!_inFlashLoan) revert OnlyDuringSettlement();\\n        _;\\n    }\\n\\n    // ============ Constructor ============\\n\\n    constructor(\\n        address _router,\\n        address _owner\\n    ) Ownable(_owner) {\\n        router = IFlashLoanRouter(_router);\\n        settlementContract = router.settlementContract();\\n    }\\n\\n    // ============ Admin Functions ============\\n\\n    /// @notice Add or remove an allowed Aave lender\\n    function setAaveLender(address lender, bool allowed) external onlyOwner {\\n        allowedLenders[lender] = allowed;\\n        lenderTypes[lender] = allowed ? LenderType.Aave : LenderType.Unknown;\\n        emit LenderUpdated(lender, allowed, LenderType.Aave);\\n    }\\n\\n    /// @notice Add or remove an allowed Morpho lender\\n    function setMorphoLender(address lender, bool allowed) external onlyOwner {\\n        allowedLenders[lender] = allowed;\\n        lenderTypes[lender] = allowed ? LenderType.Morpho : LenderType.Unknown;\\n        emit LenderUpdated(lender, allowed, LenderType.Morpho);\\n    }\\n\\n    /// @notice Legacy function for backwards compatibility (defaults to Aave)\\n    function setLender(address lender, bool allowed) external onlyOwner {\\n        allowedLenders[lender] = allowed;\\n        lenderTypes[lender] = allowed ? LenderType.Aave : LenderType.Unknown;\\n        emit LenderUpdated(lender, allowed, LenderType.Aave);\\n    }\\n\\n    // ============ IBorrower Interface ============\\n\\n    /// @notice Called by FlashLoanRouter to initiate flash loan\\n    /// @param lender The flash loan provider (Morpho or Aave pool)\\n    /// @param token The token to borrow\\n    /// @param amount The amount to borrow\\n    /// @param callbackData Data to pass back to router after receiving loan\\n    function flashLoanAndCallBack(\\n        address lender,\\n        IERC20 token,\\n        uint256 amount,\\n        bytes calldata callbackData\\n    ) external onlyRouter {\\n        if (!allowedLenders[lender]) revert InvalidLender();\\n        if (_inFlashLoan) revert FlashLoanInProgress();\\n\\n        _flashLoanToken = address(token);\\n        _currentLender = lender;\\n\\n        LenderType lenderType = lenderTypes[lender];\\n        emit FlashLoanRequested(lender, address(token), amount, lenderType);\\n\\n        if (lenderType == LenderType.Morpho) {\\n            // Request flash loan from Morpho Blue (0% fee!)\\n            IMorphoBlue(lender).flashLoan(\\n                address(token),\\n                amount,\\n                abi.encode(callbackData) // Pass router callback data\\n            );\\n        } else {\\n            // Request flash loan from Aave (0.05% fee)\\n            IAaveV3Pool(lender).flashLoanSimple(\\n                address(this),\\n                address(token),\\n                amount,\\n                callbackData,\\n                0\\n            );\\n        }\\n    }\\n\\n    // ============ Morpho Callback ============\\n\\n    /// @notice Called by Morpho Blue after flash loan tokens are sent\\n    /// @param assets The borrowed amount\\n    /// @param data Encoded callbackData for router\\n    function onMorphoFlashLoan(uint256 assets, bytes calldata data) external override {\\n        // Validate caller is the expected Morpho lender\\n        if (msg.sender != _currentLender) revert UnauthorizedCaller();\\n        if (lenderTypes[msg.sender] != LenderType.Morpho) revert InvalidLender();\\n\\n        // Decode the router callback data\\n        bytes memory callbackData = abi.decode(data, (bytes));\\n\\n        // Mark that we're in flash loan context\\n        _inFlashLoan = true;\\n\\n        // Pre-approve Morpho to pull repayment (0% fee, so repayment = assets)\\n        IERC20(_flashLoanToken).forceApprove(msg.sender, assets);\\n\\n        // Call back to FlashLoanRouter to proceed with settlement\\n        router.borrowerCallBack(callbackData);\\n\\n        // Settlement complete, clean up\\n        _inFlashLoan = false;\\n        _flashLoanToken = address(0);\\n        _currentLender = address(0);\\n    }\\n\\n    // ============ Aave Callback ============\\n\\n    /// @notice Called by Aave after flash loan tokens are sent\\n    function executeOperation(\\n        address asset,\\n        uint256 amount,\\n        uint256 premium,\\n        address initiator,\\n        bytes calldata params\\n    ) external returns (bool) {\\n        // Validate caller is the expected Aave lender\\n        if (msg.sender != _currentLender) revert UnauthorizedCaller();\\n        if (lenderTypes[msg.sender] != LenderType.Aave) revert InvalidLender();\\n        if (initiator != address(this)) revert UnauthorizedCaller();\\n\\n        // Mark that we're in flash loan context\\n        _inFlashLoan = true;\\n\\n        // Pre-approve Aave to pull repayment\\n        uint256 repayment = amount + premium;\\n        IERC20(asset).forceApprove(msg.sender, repayment);\\n\\n        // Call back to FlashLoanRouter to proceed with settlement\\n        router.borrowerCallBack(params);\\n\\n        // Settlement complete, clean up\\n        _inFlashLoan = false;\\n        _flashLoanToken = address(0);\\n        _currentLender = address(0);\\n\\n        return true;\\n    }\\n\\n    /// @notice Approve a target to spend tokens (standard IBorrower function)\\n    /// @dev Only callable by Settlement contract\\n    function approve(IERC20 token, address target, uint256 amount) external onlySettlement {\\n        token.forceApprove(target, amount);\\n    }\\n\\n    // ============ Hook Functions (called via HooksTrampoline) ============\\n\\n    /// @notice Transfer flash-loaned tokens to the order recipient (OrderManager)\\n    /// @dev Called in pre-hook to fund the order. No access control to allow\\n    ///      balance simulation during order validation (adapter should be empty outside flash loans)\\n    function fundOrder(\\n        address token,\\n        address recipient,\\n        uint256 amount\\n    ) external {\\n        IERC20(token).safeTransfer(recipient, amount);\\n        emit OrderFunded(token, recipient, amount);\\n    }\\n\\n    // ============ View Functions ============\\n\\n    function getRouter() external view returns (address) {\\n        return address(router);\\n    }\\n\\n    function getSettlementContract() external view returns (address) {\\n        return settlementContract;\\n    }\\n\\n    function isInFlashLoan() external view returns (bool) {\\n        return _inFlashLoan;\\n    }\\n\\n    function getLenderType(address lender) external view returns (LenderType) {\\n        return lenderTypes[lender];\\n    }\\n\\n    // ============ Emergency Functions ============\\n\\n    /// @notice Rescue tokens accidentally sent to this contract\\n    function rescueTokens(address token, address to, uint256 amount) external onlyOwner {\\n        if (_inFlashLoan) revert FlashLoanInProgress();\\n        IERC20(token).safeTransfer(to, amount);\\n    }\\n}\\n\",\"keccak256\":\"0xc04e268d882a41907cb65928fe7f1acc4ef18392b57d02f27c22919db1c8fe13\",\"license\":\"MIT\"},\"contracts/v2/interfaces/morpho/IMorphoBlue.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IMorphoBlue Interface\\n/// @notice Interface for Morpho Blue lending protocol\\n/// @dev See https://github.com/morpho-org/morpho-blue\\n\\nstruct MarketParams {\\n    address loanToken;\\n    address collateralToken;\\n    address oracle;\\n    address irm;\\n    uint256 lltv;\\n}\\n\\nstruct Market {\\n    uint128 totalSupplyAssets;\\n    uint128 totalSupplyShares;\\n    uint128 totalBorrowAssets;\\n    uint128 totalBorrowShares;\\n    uint128 lastUpdate;\\n    uint128 fee;\\n}\\n\\nstruct Position {\\n    uint256 supplyShares;\\n    uint128 borrowShares;\\n    uint128 collateral;\\n}\\n\\ninterface IMorphoBlue {\\n    /// @notice The state of a market (by id)\\n    function market(bytes32 id) external view returns (Market memory);\\n\\n    /// @notice The position of a user in a market\\n    function position(bytes32 id, address user) external view returns (Position memory);\\n\\n    /// @notice Whether an address is authorized to act on behalf of another\\n    function isAuthorized(address authorizer, address authorized) external view returns (bool);\\n\\n    /// @notice The nonce of an authorizer for EIP-712 signatures\\n    function nonce(address authorizer) external view returns (uint256);\\n\\n    /// @notice Compute market ID from market params\\n    function idToMarketParams(bytes32 id) external view returns (MarketParams memory);\\n\\n    // ============ Write Functions ============\\n\\n    /// @notice Supply assets to a market (lender side - earns yield)\\n    /// @param marketParams The market to supply to\\n    /// @param assets The amount of assets to supply (use 0 if using shares)\\n    /// @param shares The amount of shares to mint (use 0 if using assets)\\n    /// @param onBehalf The address to supply on behalf of\\n    /// @param data Callback data (empty for no callback)\\n    /// @return assetsSupplied The actual amount of assets supplied\\n    /// @return sharesSupplied The actual amount of shares minted\\n    function supply(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        bytes memory data\\n    ) external returns (uint256 assetsSupplied, uint256 sharesSupplied);\\n\\n    /// @notice Withdraw assets from a market (lender side)\\n    /// @param marketParams The market to withdraw from\\n    /// @param assets The amount of assets to withdraw (use 0 if using shares)\\n    /// @param shares The amount of shares to burn (use 0 if using assets)\\n    /// @param onBehalf The address to withdraw on behalf of\\n    /// @param receiver The address to receive the withdrawn assets\\n    /// @return assetsWithdrawn The actual amount of assets withdrawn\\n    /// @return sharesWithdrawn The actual amount of shares burned\\n    function withdraw(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        address receiver\\n    ) external returns (uint256 assetsWithdrawn, uint256 sharesWithdrawn);\\n\\n    /// @notice Borrow assets from a market\\n    /// @param marketParams The market to borrow from\\n    /// @param assets The amount of assets to borrow (use 0 if using shares)\\n    /// @param shares The amount of borrow shares to mint (use 0 if using assets)\\n    /// @param onBehalf The address to borrow on behalf of\\n    /// @param receiver The address to receive the borrowed assets\\n    /// @return assetsBorrowed The actual amount of assets borrowed\\n    /// @return sharesBorrowed The actual amount of borrow shares minted\\n    function borrow(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        address receiver\\n    ) external returns (uint256 assetsBorrowed, uint256 sharesBorrowed);\\n\\n    /// @notice Repay borrowed assets\\n    /// @param marketParams The market to repay to\\n    /// @param assets The amount of assets to repay (use 0 if using shares)\\n    /// @param shares The amount of borrow shares to burn (use 0 if using assets)\\n    /// @param onBehalf The address to repay on behalf of\\n    /// @param data Callback data (empty for no callback)\\n    /// @return assetsRepaid The actual amount of assets repaid\\n    /// @return sharesRepaid The actual amount of borrow shares burned\\n    function repay(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        bytes memory data\\n    ) external returns (uint256 assetsRepaid, uint256 sharesRepaid);\\n\\n    /// @notice Supply collateral to a market\\n    /// @param marketParams The market to supply collateral to\\n    /// @param assets The amount of collateral assets to supply\\n    /// @param onBehalf The address to supply on behalf of\\n    /// @param data Callback data (empty for no callback)\\n    function supplyCollateral(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        address onBehalf,\\n        bytes memory data\\n    ) external;\\n\\n    /// @notice Withdraw collateral from a market\\n    /// @param marketParams The market to withdraw collateral from\\n    /// @param assets The amount of collateral assets to withdraw\\n    /// @param onBehalf The address to withdraw on behalf of\\n    /// @param receiver The address to receive the withdrawn collateral\\n    function withdrawCollateral(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        address onBehalf,\\n        address receiver\\n    ) external;\\n\\n    /// @notice Set authorization for an address to act on behalf of the caller\\n    /// @param authorized The address to authorize/deauthorize\\n    /// @param newIsAuthorized Whether to authorize (true) or deauthorize (false)\\n    function setAuthorization(address authorized, bool newIsAuthorized) external;\\n\\n    /// @notice Set authorization with signature (EIP-712)\\n    function setAuthorizationWithSig(\\n        address authorizer,\\n        address authorized,\\n        bool newIsAuthorized,\\n        uint256 deadline,\\n        uint8 v,\\n        bytes32 r,\\n        bytes32 s\\n    ) external;\\n\\n    /// @notice Accrue interest for a market\\n    function accrueInterest(MarketParams memory marketParams) external;\\n\\n    /// @notice Executes a flash loan.\\n    /// @dev Flash loans have access to the whole balance of the contract (all markets combined).\\n    /// @dev Zero fees - flashFee is always zero.\\n    /// @param token The token to flash loan.\\n    /// @param assets The amount of assets to flash loan.\\n    /// @param data Arbitrary data to pass to the `onMorphoFlashLoan` callback.\\n    function flashLoan(address token, uint256 assets, bytes calldata data) external;\\n}\\n\\n/// @title IMorphoFlashLoanCallback\\n/// @notice Interface that users willing to use `flashLoan`'s callback must implement.\\ninterface IMorphoFlashLoanCallback {\\n    /// @notice Callback called when a flash loan occurs.\\n    /// @param assets The amount of assets that was flash loaned.\\n    /// @param data Arbitrary data passed to the `flashLoan` function.\\n    function onMorphoFlashLoan(uint256 assets, bytes calldata data) external;\\n}\\n\\n/// @notice Library for computing Morpho Blue market IDs\\nlibrary MorphoLib {\\n    /// @notice Compute the market ID from market params\\n    function id(MarketParams memory params) internal pure returns (bytes32) {\\n        return keccak256(abi.encode(params));\\n    }\\n}\\n\\n\",\"keccak256\":\"0x7f96e16bf077fee48200f7f68a77421daed157a7a36a1f2743c3a4892cf861b5\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60c08060405234610143576040816111af803803809161001f828561016d565b83398101031261014357610032816101a4565b906001600160a01b0390610048906020016101a4565b16801561015a575f80546001600160a01b0319811683178255604051936020938593600493859392916001600160a01b03909116907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09080a36001600160a01b0316608081905263ea42418b60e01b82525afa90811561014f575f91610111575b5060a052604051610ff690816101b9823960805181818161010b0152818161036a015281816104d90152818161083401526109e0015260a0518181816101d90152610bc70152f35b90506020813d602011610147575b8161012c6020938361016d565b810103126101435761013d906101a4565b5f6100c9565b5f80fd5b3d915061011f565b6040513d5f823e3d90fd5b631e4fbdf760e01b5f525f60045260245ffd5b601f909101601f19168101906001600160401b0382119082101761019057604052565b634e487b7160e01b5f52604160045260245ffd5b51906001600160a01b03821682036101435756fe60806040526004361015610011575f80fd5b5f5f3560e01c80631b11d0ff1461091d57806331f570721461073b578063366d8f3d146106fc5780633ff5af8f146104045780635678d2161461049057806360db1bc21461046b578063665bf3d0146103c0578063715018a6146104245780637cd223c9146104045780638382075a146103c05780638da5cb5b14610399578063b0f479a114610354578063ba4d4392146102f6578063cea9d26f146102ab578063dc127d09146101b0578063e1a3503b14610227578063e1f21c67146101b5578063ea42418b146101b0578063f2fde38b1461013d5763f887ea40146100f6575f80fd5b3461013a578060031936011261013a576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b80fd5b503461013a57602036600319011261013a57610157610ae3565b61015f610e23565b6001600160a01b0316801561019c5781546001600160a01b03198116821783556001600160a01b03165f516020610fa15f395f51905f528380a380f35b631e4fbdf760e01b82526004829052602482fd5b610bb2565b503461013a57606036600319011261013a576101cf610ae3565b6101d7610af9565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316330361021857906102159160443591610d2f565b80f35b630ad98cbb60e11b8352600483fd5b503461013a5760405f516020610f815f395f51905f5261024636610b3c565b9290610250610e23565b6001600160a01b03168085526004602052818520805460ff191660ff861515161790559280156102a25761029060025b8587526003602052838720610c8c565b8151901515815260026020820152a280f35b61029085610280565b503461013a576102ba36610b78565b906102c6939293610e23565b60ff835460a01c166102e757919261021592906001600160a01b0316610e49565b636d9b07e760e11b8352600483fd5b503461013a577e2359f304b8464c859c155522e44f8652d8e890288a45e8de86c3cab7961654602061032736610b78565b936001600160a01b039092169290610340858286610e49565b6040519485526001600160a01b031693a380f35b503461013a578060031936011261013a576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b503461013a578060031936011261013a57546040516001600160a01b039091168152602090f35b503461013a57602036600319011261013a5760209060ff906040906001600160a01b036103eb610ae3565b168152600384522054166104026040518092610b6b565bf35b503461013a5761021561041636610b3c565b9061041f610e23565b610ca4565b503461013a578060031936011261013a5761043d610e23565b80546001600160a01b03198116825581906001600160a01b03165f516020610fa15f395f51905f528280a380f35b503461013a578060031936011261013a5760ff6020915460a01c166040519015158152f35b503461013a57608036600319011261013a576104aa610ae3565b906104b3610af9565b604435906064356001600160401b0381116106f8576104d6903690600401610b0f565b947f00000000000000000000000000000000000000000000000000000000000000006001600160a01b031633036106e9576001600160a01b03168085526004602052604085205490929060ff16156106db5760ff855460a01c166106cc5760018060a01b0316918260018060a01b031960015416176001558060018060a01b03196002541617600255808552600360205260ff6040862054169583827fae1167dd988b206ad4318c5abda297dffa2222fafb9f16468d03d866a3431dd6604080518981526105a7602082018d610b6b565ba360038710156106b85760028697145f14610657576105e7906105d96040519485926020808501526040840191610c2d565b03601f198101845283610bf6565b803b1561065357610624938580946040519687958694859363701195a160e11b855260048501526024840152606060448401526064830190610c68565b03925af180156106485761063757505080f35b8161064191610bf6565b61013a5780f35b6040513d84823e3d90fd5b8480fd5b9193813b156106b45785809461069b604051978896879586946310ac2ddf60e21b86523060048701526024860152604485015260a0606485015260a4840191610c2d565b82608483015203925af180156106485761063757505080f35b8580fd5b634e487b7160e01b86526021600452602486fd5b636d9b07e760e11b8552600485fd5b6221eeab60e81b8552600485fd5b639e41bdd760e01b8552600485fd5b8380fd5b503461013a57602036600319011261013a5760209060ff906040906001600160a01b03610727610ae3565b168152600484522054166040519015158152f35b503461013a57604036600319011261013a576024356001600160401b0381116109195761076c903690600401610b0f565b600254909291906001600160a01b0316330361090a57338252600360205260ff60408320541660038110156108f6576002036108e85781928101906020818303126108df578035906001600160401b0382116108e3570181601f820112156108df578035906107da82610c4d565b926107e86040519485610bf6565b828452602083830101116108e35781849260208093018386013783010152815460ff60a01b1916600160a01b178255600154610832906004359033906001600160a01b0316610d2f565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316803b156108df576040516306d7234360e11b8152602060048201529183918391829084908290610890906024830190610c68565b03925af18015610648576108ca575b50805460ff60a01b19168155600180546001600160a01b031990811690915560028054909116905580f35b816108d491610bf6565b61013a57805f61089f565b5050fd5b505050fd5b6221eeab60e81b8252600482fd5b634e487b7160e01b83526021600452602483fd5b635c427cd960e01b8252600482fd5b5080fd5b5034610a9a5760a0366003190112610a9a57610937610ae3565b6064356001600160a01b0381169160243591839003610a9a576084356001600160401b038111610a9a5761096f903690600401610b0f565b60025491949093916001600160a01b03163303610ab257335f52600360205260ff60405f2054166003811015610acf57600103610ac1573003610ab2575f805460ff60a01b1916600160a01b1790556044358101908110610a9e576109de9133906001600160a01b0316610d2f565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b031691823b15610a9a57610a3b925f92836040518096819582946306d7234360e11b8452602060048501526024840191610c2d565b03925af18015610a8f57610a7c575b50805460ff60a01b19169055600180546001600160a01b03199081168255600280549091169055604051908152602090f35b610a8891505f90610bf6565b5f5f610a4a565b6040513d5f823e3d90fd5b5f80fd5b634e487b7160e01b5f52601160045260245ffd5b635c427cd960e01b5f5260045ffd5b6221eeab60e81b5f5260045ffd5b634e487b7160e01b5f52602160045260245ffd5b600435906001600160a01b0382168203610a9a57565b602435906001600160a01b0382168203610a9a57565b9181601f84011215610a9a578235916001600160401b038311610a9a5760208381860195010111610a9a57565b6040906003190112610a9a576004356001600160a01b0381168103610a9a57906024358015158103610a9a5790565b906003821015610acf5752565b6060906003190112610a9a576004356001600160a01b0381168103610a9a57906024356001600160a01b0381168103610a9a579060443590565b34610a9a575f366003190112610a9a576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b601f909101601f19168101906001600160401b03821190821017610c1957604052565b634e487b7160e01b5f52604160045260245ffd5b908060209392818452848401375f828201840152601f01601f1916010190565b6001600160401b038111610c1957601f01601f191660200190565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b906003811015610acf5760ff80198354169116179055565b60405f516020610f815f395f51905f529160018060a01b031692835f526004602052610cde81835f209060ff801983541691151516179055565b8015610d0b57610cfa60015b855f526003602052835f20610c8c565b8151901515815260016020820152a2565b610cfa5f610cea565b6001600160a01b039091168152602081019190915260400190565b91909160405191610d6483610d56602082019363095ea7b360e01b85528760248401610d14565b03601f198101855284610bf6565b82516001600160a01b038316915f91829182855af190610d82610e70565b82610df1575b5081610de6575b5015610d9a57505050565b60405163095ea7b360e01b60208201526001600160a01b0390931660248401525f6044808501919091528352610de492610ddf90610dd9606482610bf6565b82610eb7565b610eb7565b565b90503b15155f610d8f565b80519192508115918215610e09575b5050905f610d88565b610e1c9250602080918301019101610e9f565b5f80610e00565b5f546001600160a01b03163303610e3657565b63118cdaa760e01b5f523360045260245ffd5b610ddf610de493926105d960405194859263a9059cbb60e01b602085015260248401610d14565b3d15610e9a573d90610e8182610c4d565b91610e8f6040519384610bf6565b82523d5f602084013e565b606090565b90816020910312610a9a57518015158103610a9a5790565b5f80610edf9260018060a01b03169360208151910182865af1610ed8610e70565b9083610f22565b8051908115159182610f07575b5050610ef55750565b635274afe760e01b5f5260045260245ffd5b610f1a9250602080918301019101610e9f565b155f80610eec565b90610f465750805115610f3757805190602001fd5b630a12f52160e11b5f5260045ffd5b81511580610f77575b610f57575090565b639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b50803b15610f4f56fed4592927869c83c7edf7f0a74cd19a3839b0888757840d5ea3663c4542ca1d758be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0a26469706673582212202e6fd7d5779441a2547d9ee1154502961da389cae766dd20dccb65e3ccab276164736f6c634300081e0033",
+  "deployedBytecode": "0x60806040526004361015610011575f80fd5b5f5f3560e01c80631b11d0ff1461091d57806331f570721461073b578063366d8f3d146106fc5780633ff5af8f146104045780635678d2161461049057806360db1bc21461046b578063665bf3d0146103c0578063715018a6146104245780637cd223c9146104045780638382075a146103c05780638da5cb5b14610399578063b0f479a114610354578063ba4d4392146102f6578063cea9d26f146102ab578063dc127d09146101b0578063e1a3503b14610227578063e1f21c67146101b5578063ea42418b146101b0578063f2fde38b1461013d5763f887ea40146100f6575f80fd5b3461013a578060031936011261013a576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b80fd5b503461013a57602036600319011261013a57610157610ae3565b61015f610e23565b6001600160a01b0316801561019c5781546001600160a01b03198116821783556001600160a01b03165f516020610fa15f395f51905f528380a380f35b631e4fbdf760e01b82526004829052602482fd5b610bb2565b503461013a57606036600319011261013a576101cf610ae3565b6101d7610af9565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316330361021857906102159160443591610d2f565b80f35b630ad98cbb60e11b8352600483fd5b503461013a5760405f516020610f815f395f51905f5261024636610b3c565b9290610250610e23565b6001600160a01b03168085526004602052818520805460ff191660ff861515161790559280156102a25761029060025b8587526003602052838720610c8c565b8151901515815260026020820152a280f35b61029085610280565b503461013a576102ba36610b78565b906102c6939293610e23565b60ff835460a01c166102e757919261021592906001600160a01b0316610e49565b636d9b07e760e11b8352600483fd5b503461013a577e2359f304b8464c859c155522e44f8652d8e890288a45e8de86c3cab7961654602061032736610b78565b936001600160a01b039092169290610340858286610e49565b6040519485526001600160a01b031693a380f35b503461013a578060031936011261013a576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b503461013a578060031936011261013a57546040516001600160a01b039091168152602090f35b503461013a57602036600319011261013a5760209060ff906040906001600160a01b036103eb610ae3565b168152600384522054166104026040518092610b6b565bf35b503461013a5761021561041636610b3c565b9061041f610e23565b610ca4565b503461013a578060031936011261013a5761043d610e23565b80546001600160a01b03198116825581906001600160a01b03165f516020610fa15f395f51905f528280a380f35b503461013a578060031936011261013a5760ff6020915460a01c166040519015158152f35b503461013a57608036600319011261013a576104aa610ae3565b906104b3610af9565b604435906064356001600160401b0381116106f8576104d6903690600401610b0f565b947f00000000000000000000000000000000000000000000000000000000000000006001600160a01b031633036106e9576001600160a01b03168085526004602052604085205490929060ff16156106db5760ff855460a01c166106cc5760018060a01b0316918260018060a01b031960015416176001558060018060a01b03196002541617600255808552600360205260ff6040862054169583827fae1167dd988b206ad4318c5abda297dffa2222fafb9f16468d03d866a3431dd6604080518981526105a7602082018d610b6b565ba360038710156106b85760028697145f14610657576105e7906105d96040519485926020808501526040840191610c2d565b03601f198101845283610bf6565b803b1561065357610624938580946040519687958694859363701195a160e11b855260048501526024840152606060448401526064830190610c68565b03925af180156106485761063757505080f35b8161064191610bf6565b61013a5780f35b6040513d84823e3d90fd5b8480fd5b9193813b156106b45785809461069b604051978896879586946310ac2ddf60e21b86523060048701526024860152604485015260a0606485015260a4840191610c2d565b82608483015203925af180156106485761063757505080f35b8580fd5b634e487b7160e01b86526021600452602486fd5b636d9b07e760e11b8552600485fd5b6221eeab60e81b8552600485fd5b639e41bdd760e01b8552600485fd5b8380fd5b503461013a57602036600319011261013a5760209060ff906040906001600160a01b03610727610ae3565b168152600484522054166040519015158152f35b503461013a57604036600319011261013a576024356001600160401b0381116109195761076c903690600401610b0f565b600254909291906001600160a01b0316330361090a57338252600360205260ff60408320541660038110156108f6576002036108e85781928101906020818303126108df578035906001600160401b0382116108e3570181601f820112156108df578035906107da82610c4d565b926107e86040519485610bf6565b828452602083830101116108e35781849260208093018386013783010152815460ff60a01b1916600160a01b178255600154610832906004359033906001600160a01b0316610d2f565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316803b156108df576040516306d7234360e11b8152602060048201529183918391829084908290610890906024830190610c68565b03925af18015610648576108ca575b50805460ff60a01b19168155600180546001600160a01b031990811690915560028054909116905580f35b816108d491610bf6565b61013a57805f61089f565b5050fd5b505050fd5b6221eeab60e81b8252600482fd5b634e487b7160e01b83526021600452602483fd5b635c427cd960e01b8252600482fd5b5080fd5b5034610a9a5760a0366003190112610a9a57610937610ae3565b6064356001600160a01b0381169160243591839003610a9a576084356001600160401b038111610a9a5761096f903690600401610b0f565b60025491949093916001600160a01b03163303610ab257335f52600360205260ff60405f2054166003811015610acf57600103610ac1573003610ab2575f805460ff60a01b1916600160a01b1790556044358101908110610a9e576109de9133906001600160a01b0316610d2f565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b031691823b15610a9a57610a3b925f92836040518096819582946306d7234360e11b8452602060048501526024840191610c2d565b03925af18015610a8f57610a7c575b50805460ff60a01b19169055600180546001600160a01b03199081168255600280549091169055604051908152602090f35b610a8891505f90610bf6565b5f5f610a4a565b6040513d5f823e3d90fd5b5f80fd5b634e487b7160e01b5f52601160045260245ffd5b635c427cd960e01b5f5260045ffd5b6221eeab60e81b5f5260045ffd5b634e487b7160e01b5f52602160045260245ffd5b600435906001600160a01b0382168203610a9a57565b602435906001600160a01b0382168203610a9a57565b9181601f84011215610a9a578235916001600160401b038311610a9a5760208381860195010111610a9a57565b6040906003190112610a9a576004356001600160a01b0381168103610a9a57906024358015158103610a9a5790565b906003821015610acf5752565b6060906003190112610a9a576004356001600160a01b0381168103610a9a57906024356001600160a01b0381168103610a9a579060443590565b34610a9a575f366003190112610a9a576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b601f909101601f19168101906001600160401b03821190821017610c1957604052565b634e487b7160e01b5f52604160045260245ffd5b908060209392818452848401375f828201840152601f01601f1916010190565b6001600160401b038111610c1957601f01601f191660200190565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b906003811015610acf5760ff80198354169116179055565b60405f516020610f815f395f51905f529160018060a01b031692835f526004602052610cde81835f209060ff801983541691151516179055565b8015610d0b57610cfa60015b855f526003602052835f20610c8c565b8151901515815260016020820152a2565b610cfa5f610cea565b6001600160a01b039091168152602081019190915260400190565b91909160405191610d6483610d56602082019363095ea7b360e01b85528760248401610d14565b03601f198101855284610bf6565b82516001600160a01b038316915f91829182855af190610d82610e70565b82610df1575b5081610de6575b5015610d9a57505050565b60405163095ea7b360e01b60208201526001600160a01b0390931660248401525f6044808501919091528352610de492610ddf90610dd9606482610bf6565b82610eb7565b610eb7565b565b90503b15155f610d8f565b80519192508115918215610e09575b5050905f610d88565b610e1c9250602080918301019101610e9f565b5f80610e00565b5f546001600160a01b03163303610e3657565b63118cdaa760e01b5f523360045260245ffd5b610ddf610de493926105d960405194859263a9059cbb60e01b602085015260248401610d14565b3d15610e9a573d90610e8182610c4d565b91610e8f6040519384610bf6565b82523d5f602084013e565b606090565b90816020910312610a9a57518015158103610a9a5790565b5f80610edf9260018060a01b03169360208151910182865af1610ed8610e70565b9083610f22565b8051908115159182610f07575b5050610ef55750565b635274afe760e01b5f5260045260245ffd5b610f1a9250602080918301019101610e9f565b155f80610eec565b90610f465750805115610f3757805190602001fd5b630a12f52160e11b5f5260045ffd5b81511580610f77575b610f57575090565b639996b31560e01b5f9081526001600160a01b0391909116600452602490fd5b50803b15610f4f56fed4592927869c83c7edf7f0a74cd19a3839b0888757840d5ea3663c4542ca1d758be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0a26469706673582212202e6fd7d5779441a2547d9ee1154502961da389cae766dd20dccb65e3ccab276164736f6c634300081e0033",
+  "devdoc": {
+    "details": "Supports both Morpho Blue (0% fee) and Aave V3 (0.05% fee)",
+    "errors": {
+      "AddressEmptyCode(address)": [
+        {
+          "details": "There's no code at `target` (it is not a contract)."
+        }
+      ],
+      "AddressInsufficientBalance(address)": [
+        {
+          "details": "The ETH balance of the account is not enough to perform the operation."
+        }
+      ],
+      "FailedInnerCall()": [
+        {
+          "details": "A call to an address target failed. The target may have reverted."
+        }
+      ],
+      "OwnableInvalidOwner(address)": [
+        {
+          "details": "The owner is not a valid owner account. (eg. `address(0)`)"
+        }
+      ],
+      "OwnableUnauthorizedAccount(address)": [
+        {
+          "details": "The caller account is not authorized to perform an operation."
+        }
+      ],
+      "SafeERC20FailedOperation(address)": [
+        {
+          "details": "An operation with an ERC20 token failed."
+        }
+      ]
+    },
+    "kind": "dev",
+    "methods": {
+      "approve(address,address,uint256)": {
+        "details": "Only callable by Settlement contract"
+      },
+      "flashLoanAndCallBack(address,address,uint256,bytes)": {
+        "params": {
+          "amount": "The amount to borrow",
+          "callbackData": "Data to pass back to router after receiving loan",
+          "lender": "The flash loan provider (Morpho or Aave pool)",
+          "token": "The token to borrow"
+        }
+      },
+      "fundOrder(address,address,uint256)": {
+        "details": "Called in pre-hook to fund the order. No access control to allow      balance simulation during order validation (adapter should be empty outside flash loans)"
+      },
+      "onMorphoFlashLoan(uint256,bytes)": {
+        "params": {
+          "assets": "The borrowed amount",
+          "data": "Encoded callbackData for router"
+        }
+      },
+      "owner()": {
+        "details": "Returns the address of the current owner."
+      },
+      "renounceOwnership()": {
+        "details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
+      },
+      "transferOwnership(address)": {
+        "details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
+      }
+    },
+    "title": "KapanCowAdapter",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "allowedLenders(address)": {
+        "notice": "Mapping of allowed lenders"
+      },
+      "approve(address,address,uint256)": {
+        "notice": "Approve a target to spend tokens (standard IBorrower function)"
+      },
+      "executeOperation(address,uint256,uint256,address,bytes)": {
+        "notice": "Called by Aave after flash loan tokens are sent"
+      },
+      "flashLoanAndCallBack(address,address,uint256,bytes)": {
+        "notice": "Called by FlashLoanRouter to initiate flash loan"
+      },
+      "fundOrder(address,address,uint256)": {
+        "notice": "Transfer flash-loaned tokens to the order recipient (OrderManager)"
+      },
+      "lenderTypes(address)": {
+        "notice": "Mapping of lender address => LenderType"
+      },
+      "onMorphoFlashLoan(uint256,bytes)": {
+        "notice": "Called by Morpho Blue after flash loan tokens are sent"
+      },
+      "rescueTokens(address,address,uint256)": {
+        "notice": "Rescue tokens accidentally sent to this contract"
+      },
+      "router()": {
+        "notice": "CoW Protocol's FlashLoanRouter"
+      },
+      "setAaveLender(address,bool)": {
+        "notice": "Add or remove an allowed Aave lender"
+      },
+      "setLender(address,bool)": {
+        "notice": "Legacy function for backwards compatibility (defaults to Aave)"
+      },
+      "setMorphoLender(address,bool)": {
+        "notice": "Add or remove an allowed Morpho lender"
+      },
+      "settlementContract()": {
+        "notice": "CoW Protocol's Settlement contract"
+      }
+    },
+    "notice": "Bridges Kapan's OrderManager with CoW Protocol's flash loan system",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 8,
+        "contract": "contracts/v2/cow/KapanCowAdapter.sol:KapanCowAdapter",
+        "label": "_owner",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_address"
+      },
+      {
+        "astId": 907,
+        "contract": "contracts/v2/cow/KapanCowAdapter.sol:KapanCowAdapter",
+        "label": "_inFlashLoan",
+        "offset": 20,
+        "slot": "0",
+        "type": "t_bool"
+      },
+      {
+        "astId": 910,
+        "contract": "contracts/v2/cow/KapanCowAdapter.sol:KapanCowAdapter",
+        "label": "_flashLoanToken",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_address"
+      },
+      {
+        "astId": 913,
+        "contract": "contracts/v2/cow/KapanCowAdapter.sol:KapanCowAdapter",
+        "label": "_currentLender",
+        "offset": 0,
+        "slot": "2",
+        "type": "t_address"
+      },
+      {
+        "astId": 919,
+        "contract": "contracts/v2/cow/KapanCowAdapter.sol:KapanCowAdapter",
+        "label": "lenderTypes",
+        "offset": 0,
+        "slot": "3",
+        "type": "t_mapping(t_address,t_enum(LenderType)888)"
+      },
+      {
+        "astId": 924,
+        "contract": "contracts/v2/cow/KapanCowAdapter.sol:KapanCowAdapter",
+        "label": "allowedLenders",
+        "offset": 0,
+        "slot": "4",
+        "type": "t_mapping(t_address,t_bool)"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_bool": {
+        "encoding": "inplace",
+        "label": "bool",
+        "numberOfBytes": "1"
+      },
+      "t_enum(LenderType)888": {
+        "encoding": "inplace",
+        "label": "enum LenderType",
+        "numberOfBytes": "1"
+      },
+      "t_mapping(t_address,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_address,t_enum(LenderType)888)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => enum LenderType)",
+        "numberOfBytes": "32",
+        "value": "t_enum(LenderType)888"
+      }
+    }
+  }
+}

@@ -87,6 +87,7 @@ const ORDER_MANAGER_ABI = [
           { name: "targetValue", type: "uint256" },
           { name: "minHealthFactor", type: "uint256" },
           { name: "appDataHash", type: "bytes32" },
+          { name: "isFlashLoanOrder", type: "bool" },
         ],
         name: "params",
         type: "tuple",
@@ -126,6 +127,7 @@ const ORDER_MANAGER_ABI = [
               { name: "targetValue", type: "uint256" },
               { name: "minHealthFactor", type: "uint256" },
               { name: "appDataHash", type: "bytes32" },
+              { name: "isFlashLoanOrder", type: "bool" },
             ],
             name: "params",
             type: "tuple",
@@ -158,14 +160,15 @@ const ORDER_MANAGER_ABI = [
 ] as const;
 
 /**
- * Flash loan configuration for CoW Protocol single-tx execution (schema v0.2.0)
+ * Flash loan configuration for CoW Protocol single-tx execution
  * When provided, solvers will take a flash loan and the post-hook borrows to repay it
+ * 
+ * CoW Protocol schema: { lender, borrower (optional), token, amount }
+ * The borrower (who receives flash loaned tokens) is set to OrderManager automatically.
  */
 export interface FlashLoanConfig {
   /** Flash loan liquidity provider address (Aave Pool or Balancer Vault) */
   lender: string;
-  /** CoW protocol adapter address (AaveBorrower or ERC3156Borrower) */
-  protocolAdapter: string;
   /** Token to borrow (should match sellToken) */
   token: string;
   /** Amount to borrow (flash loan amount) */
@@ -351,7 +354,6 @@ export function useCowOrder() {
       input.flashLoan ? {
         flashLoan: {
           lender: input.flashLoan.lender,
-          protocolAdapter: input.flashLoan.protocolAdapter,
           token: input.flashLoan.token,
           amount: input.flashLoan.amount,
         },
@@ -364,9 +366,11 @@ export function useCowOrder() {
     }
 
     // 3. Build order parameters with appDataHash
+    // Set isFlashLoanOrder based on whether flash loan config is provided
     const orderParams = buildOrderParams({
       ...input,
       appDataHash: appDataResult.appDataHash,
+      isFlashLoanOrder: !!input.flashLoan,
     });
 
     // 4. Check delegation
@@ -498,9 +502,11 @@ export function useCowOrder() {
       logger.debug("[useCowOrder] AppData registered:", appDataResult.appDataHash);
 
       // 3. Build order parameters with the registered appDataHash
+      // Note: isFlashLoanOrder is set based on flashLoan config in CreateOrderInput
       const orderParams = buildOrderParams({
         ...input,
         appDataHash: appDataResult.appDataHash,
+        isFlashLoanOrder: !!input.flashLoan,
       });
       
       logger.debug("[useCowOrder] Order params:", {

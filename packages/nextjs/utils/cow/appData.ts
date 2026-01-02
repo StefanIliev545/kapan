@@ -1,5 +1,6 @@
 import { keccak256, toUtf8Bytes, Interface } from "ethers";
-import { getCowApiUrl } from "./addresses";
+import stringify from "json-stringify-deterministic";
+import { getCowApiUrl, COW_FLASH_LOAN_ROUTER, COW_AAVE_BORROWERS, COW_PROTOCOL, getKapanCowAdapter, getPreferredFlashLoanLender } from "./addresses";
 
 /**
  * Hook definition for CoW AppData
@@ -11,19 +12,37 @@ export interface CowHook {
   callData: string;
   /** Gas limit for hook execution */
   gasLimit: string;
+  /** Optional: dApp identifier for solver recognition (e.g., "cow-sdk://flashloans/aave/v3/collateral-swap") */
+  dappId?: string;
 }
 
 /**
- * Flash loan metadata for CoW Protocol (schema v0.2.0)
+ * Flash loan metadata for CoW Protocol (v1.10.0 schema - matching working Aave implementation)
  * When included in appData, solvers will take a flash loan on behalf of the user
  * @see https://docs.cow.fi/cow-protocol/concepts/flash-loans/integrators
+ * 
+ * CRITICAL: Based on analysis of working Aave collateral swap tx 0x9c69c319...:
+ * - receiver MUST be the protocolAdapter (AaveBorrower), NOT the final destination
+ * - The pre-hook on the borrower handles token routing
+ * 
+ * Schema:
+ * {
+ *   "liquidityProvider": "0x...",  // Flash loan provider (Aave Pool)
+ *   "protocolAdapter": "0x...",    // CoW Protocol borrower adapter (AaveBorrower)
+ *   "receiver": "0x...",           // SAME as protocolAdapter - flash loan lands here first
+ *   "token": "0x...",              // Token to borrow
+ *   "amount": "1000000"            // Amount in wei/atoms as string
+ * }
  */
 export interface FlashLoanMetadata {
-  /** Flash loan liquidity provider address (e.g., Aave Pool, Balancer Vault) */
+  /** Flash loan liquidity provider address (e.g., Aave Pool) */
   liquidityProvider: string;
-  /** Protocol adapter address - the CoW flash loan router */
+  /** CoW Protocol borrower adapter (AaveBorrower for Aave) */
   protocolAdapter: string;
-  /** Receiver address - who receives the flash loaned tokens */
+  /** 
+   * Who receives the borrowed tokens - MUST be same as protocolAdapter!
+   * The borrower contract receives flash loan, then pre-hook routes tokens.
+   */
   receiver: string;
   /** Token to borrow */
   token: string;
@@ -67,6 +86,117 @@ const ORDER_MANAGER_HOOK_ABI = [
 ];
 
 const orderManagerIface = new Interface(ORDER_MANAGER_HOOK_ABI);
+
+// ABI for CoW Protocol Borrower contracts (ERC3156Borrower, AaveBorrower)
+// Used to approve tokens for transfer from borrower to OrderManager
+const BORROWER_ABI = [
+  "function approve(address token, address target, uint256 amount) external",
+];
+
+// ABI for ERC20 token transfer
+const ERC20_ABI = [
+  "function transfer(address to, uint256 amount) external returns (bool)",
+  "function transferFrom(address from, address to, uint256 amount) external returns (bool)",
+];
+
+// ABI for KapanCowAdapter
+const KAPAN_ADAPTER_ABI = [
+  "function fundOrder(address token, address recipient, uint256 amount) external",
+];
+
+const borrowerIface = new Interface(BORROWER_ABI);
+const erc20Iface = new Interface(ERC20_ABI);
+const kapanAdapterIface = new Interface(KAPAN_ADAPTER_ABI);
+
+/**
+ * Get the appropriate CoW Protocol borrower address based on lender type
+ * 
+ * SUPPORTED LENDERS:
+ * - Aave V3: Use AaveBorrower (RECOMMENDED for CoW limit orders)
+ * - ERC-3156 compliant lenders (Maker): Use ERC3156Borrower
+ * 
+ * NOT SUPPORTED:
+ * - Balancer V2: Does NOT implement ERC-3156, will fail silently!
+ * 
+ * For limit orders, use getCowFlashLoanLender() which only returns Aave V3 addresses.
+ * 
+ * @see https://github.com/cowprotocol/flash-loan-router
+ */
+export function getCowBorrower(lenderAddress: string, chainId?: number): string {
+  // Aave V3 Pool addresses (mainnet and L2s)
+  const AAVE_POOLS = [
+    "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2", // Ethereum Mainnet
+    "0x794a61358D6845594F94dc1DB02A252b5b4814aD", // Arbitrum, Optimism, Polygon, Avalanche
+    "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5", // Base
+    "0x3E5f750726cc1D0d4a9c62c507f890f984576507", // Linea
+  ].map(a => a.toLowerCase());
+  
+  if (AAVE_POOLS.includes(lenderAddress.toLowerCase())) {
+    // Check for chain-specific borrower (e.g., Base uses a factory-deployed adapter)
+    if (chainId && COW_AAVE_BORROWERS[chainId]) {
+      return COW_AAVE_BORROWERS[chainId];
+    }
+    return COW_FLASH_LOAN_ROUTER.aaveBorrower;
+  }
+  
+  // Warn if using Balancer - it won't work with CoW FlashLoanRouter!
+  const BALANCER_VAULT = "0xBA12222222228d8Ba445958a75a0704d566BF2C8".toLowerCase();
+  if (lenderAddress.toLowerCase() === BALANCER_VAULT) {
+    console.error("[getCowBorrower] ERROR: Balancer V2 is NOT supported by CoW FlashLoanRouter!");
+    console.error("[getCowBorrower] Balancer V2 does not implement ERC-3156. Order will fail!");
+    console.error("[getCowBorrower] Use getCowFlashLoanLender() to get a supported lender (Aave V3).");
+  }
+  
+  // Default to ERC3156Borrower for Maker and other ERC-3156 compliant lenders
+  // NOTE: This will NOT work for Balancer V2!
+  return COW_FLASH_LOAN_ROUTER.erc3156Borrower;
+}
+
+/**
+ * Encode a call to Borrower.approve() to allow OrderManager to pull flash loan tokens
+ * This must be called as a pre-hook before the order executes
+ */
+export function encodeBorrowerApprove(
+  borrowerAddress: string,
+  token: string,
+  spender: string,
+  amount: bigint
+): string {
+  return borrowerIface.encodeFunctionData("approve", [token, spender, amount]);
+}
+
+/**
+ * Encode a token transfer call (for moving tokens from borrower to OrderManager)
+ */
+export function encodeTokenTransfer(
+  recipient: string,
+  amount: bigint
+): string {
+  return erc20Iface.encodeFunctionData("transfer", [recipient, amount]);
+}
+
+/**
+ * Encode a token transferFrom call
+ */
+export function encodeTokenTransferFrom(
+  from: string,
+  to: string,
+  amount: bigint
+): string {
+  return erc20Iface.encodeFunctionData("transferFrom", [from, to, amount]);
+}
+
+/**
+ * Encode a call to KapanCowAdapter.fundOrder()
+ * This is used in pre-hook to transfer flash-loaned tokens to OrderManager
+ */
+export function encodeAdapterFundOrder(
+  token: string,
+  recipient: string,
+  amount: bigint
+): string {
+  return kapanAdapterIface.encodeFunctionData("fundOrder", [token, recipient, amount]);
+}
 
 /**
  * Encode a pre-hook call for KapanOrderManager using (user, salt) lookup
@@ -126,10 +256,11 @@ export function buildKapanAppData(
   orderManagerAddress: string,
   user: string,
   salt: string,
+  chainId: number,
   options?: {
-    /** Gas limit for pre-hook (default: 1000000) */
+    /** Gas limit for pre-hook (default: 300000 for borrower, 800000 for post) */
     preHookGasLimit?: string;
-    /** Gas limit for post-hook (default: 1000000) */
+    /** Gas limit for post-hook (default: 800000) */
     postHookGasLimit?: string;
     /** Partner fee in basis points */
     partnerFeeBps?: number;
@@ -137,12 +268,10 @@ export function buildKapanAppData(
     partnerFeeRecipient?: string;
     /** Slippage tolerance in basis points */
     slippageBps?: number;
-    /** Flash loan configuration for single-tx leverage (schema v0.2.0) */
+    /** Flash loan configuration for single-tx leverage */
     flashLoan?: {
-      /** Flash loan liquidity provider (Aave pool, Balancer vault, etc.) */
+      /** Flash loan liquidity provider (Aave pool) */
       lender: string;
-      /** CoW protocol adapter address (AaveBorrower or ERC3156Borrower) */
-      protocolAdapter: string;
       /** Token to borrow */
       token: string;
       /** Amount to borrow */
@@ -150,30 +279,102 @@ export function buildKapanAppData(
     };
   }
 ): AppDataDocument {
-  const preHookGasLimit = options?.preHookGasLimit ?? "1000000";
-  const postHookGasLimit = options?.postHookGasLimit ?? "1000000";
+  // Gas limits based on working Aave tx: pre=300000, post=800000
+  const preHookGasLimit = options?.preHookGasLimit ?? "300000";
+  const postHookGasLimit = options?.postHookGasLimit ?? "800000";
 
   // Encode the hook calls to OrderManager using (user, salt) lookup
   // Note: chunkIndex is NOT passed - contract reads from iterationCount
   const preHookCalldata = encodePreHookCall(orderManagerAddress, user, salt);
   const postHookCalldata = encodePostHookCall(orderManagerAddress, user, salt);
 
-  // Hooks are executed by Settlement → HooksTrampoline → target
-  // So we specify OrderManager as the target directly (not wrapped in another trampoline call)
-  const preHooks: CowHook[] = [{
-    target: orderManagerAddress,
-    callData: preHookCalldata,
-    gasLimit: preHookGasLimit,
-  }];
+  // For flash loan orders with KapanCowAdapter:
+  // - Pre-hook 1: KapanCowAdapter.fundOrder() - transfers tokens to OrderManager
+  // - Pre-hook 2: OrderManager.executePreHookBySalt() - any pre-logic
+  // - Post-hook: OrderManager.executePostHookBySalt() - deposits/borrows for repayment
+  //
+  // For non-flash-loan orders:
+  // - Both hooks target OrderManager
+  let preHooks: CowHook[];
+  let postHooks: CowHook[];
+  
+  if (options?.flashLoan) {
+    const kapanAdapter = getKapanCowAdapter(chainId);
+    
+    if (kapanAdapter) {
+      // Use KapanCowAdapter - our custom borrower that works with HooksTrampoline
+      const fundOrderCalldata = encodeAdapterFundOrder(
+        options.flashLoan.token,
+        orderManagerAddress,
+        options.flashLoan.amount
+      );
+      
+      preHooks = [
+        // First: Transfer flash-loaned tokens from Adapter to OrderManager
+        {
+          target: kapanAdapter,
+          callData: fundOrderCalldata,
+          gasLimit: "100000",
+          dappId: "kapan://flashloans/adapter/fund",
+        },
+        // Second: Execute any pre-hook logic on OrderManager
+        {
+          target: orderManagerAddress,
+          callData: preHookCalldata,
+          gasLimit: preHookGasLimit,
+          dappId: "kapan://flashloans/pre-hook",
+        },
+      ];
+      
+      // Post-hook targets OrderManager (handles deposit collateral, borrow for repay)
+      postHooks = [{
+        target: orderManagerAddress,
+        callData: postHookCalldata,
+        gasLimit: postHookGasLimit,
+        dappId: "kapan://flashloans/post-hook",
+      }];
+    } else {
+      // Fallback: Use CoW's standard AaveBorrower
+      // Note: This requires the solver to understand token routing
+      const protocolAdapter = getCowBorrower(options.flashLoan.lender, chainId);
+      
+      console.warn(
+        `[buildKapanAppData] KapanCowAdapter not deployed on chain ${chainId}. ` +
+        `Using standard borrower ${protocolAdapter}. Flash loan may not work correctly.`
+      );
+      
+      preHooks = [{
+        target: protocolAdapter,
+        callData: preHookCalldata,
+        gasLimit: preHookGasLimit,
+        dappId: "kapan://flashloans/aave/v3/leverage",
+      }];
+      
+      postHooks = [{
+        target: orderManagerAddress,
+        callData: postHookCalldata,
+        gasLimit: postHookGasLimit,
+        dappId: "kapan://flashloans/aave/v3/leverage",
+      }];
+    }
+  } else {
+    // Non-flash-loan: both hooks target OrderManager
+    preHooks = [{
+      target: orderManagerAddress,
+      callData: preHookCalldata,
+      gasLimit: preHookGasLimit,
+    }];
+    
+    postHooks = [{
+      target: orderManagerAddress,
+      callData: postHookCalldata,
+      gasLimit: postHookGasLimit,
+    }];
+  }
 
-  const postHooks: CowHook[] = [{
-    target: orderManagerAddress,
-    callData: postHookCalldata,
-    gasLimit: postHookGasLimit,
-  }];
-
+  // Use version 1.10.0 to match working Aave implementation
   const appData: AppDataDocument = {
-    version: "1.12.0",
+    version: "1.10.0",
     appCode: "KapanFinance",
     metadata: {
       hooks: {
@@ -183,18 +384,43 @@ export function buildKapanAppData(
     },
   };
 
-  // Add flash loan metadata if provided (schema v0.2.0)
-  // This hints to CoW solvers to take a flash loan for single-tx execution
-  // - liquidityProvider: The flash loan lender (Aave pool, Balancer vault, etc.)
-  // - protocolAdapter: The CoW flash loan router's borrower contract
-  // - receiver: Who receives the flash loaned tokens (the orderManager)
+  // Flash loan metadata for CoW Protocol
+  // @see https://github.com/cowprotocol/flash-loan-router
+  //
+  // With KapanCowAdapter:
+  // 1. FlashLoanRouter.flashLoanAndSettle() is called
+  // 2. Flash loan goes to KapanCowAdapter (our borrower)
+  // 3. Pre-hook: Adapter.fundOrder() moves tokens to OrderManager
+  // 4. Settlement executes trade with OrderManager as owner
+  // 5. Post-hook: OrderManager deposits/borrows, sends repayment to Adapter
+  // 6. Adapter repays flash loan to Aave
   if (options?.flashLoan) {
+    const kapanAdapter = getKapanCowAdapter(chainId);
+    // Use KapanCowAdapter if deployed, otherwise fall back to standard borrower
+    const protocolAdapter = kapanAdapter || getCowBorrower(options.flashLoan.lender, chainId);
+    const flashLoanAmount = options.flashLoan.amount;
+    const flashLoanToken = options.flashLoan.token;
+    
+    console.log("[buildKapanAppData] Flash loan metadata:", {
+      liquidityProvider: options.flashLoan.lender,
+      protocolAdapter: protocolAdapter,
+      receiver: protocolAdapter, // Same as protocolAdapter (matches working Aave pattern)
+      token: flashLoanToken,
+      amount: flashLoanAmount.toString(),
+      usingKapanAdapter: !!kapanAdapter,
+    });
+    
+    // Flash loan metadata for CoW API:
+    // - protocolAdapter: The borrower contract that handles flash loan mechanics (KapanCowAdapter)
+    // - receiver: Same as protocolAdapter (balance override applies to adapter)
+    // - Pre-hook transfers tokens from adapter → OrderManager during simulation
+    // At settlement time, actual tokens flow: Lender → Adapter → (pre-hook) → OrderManager
     appData.metadata.flashloan = {
       liquidityProvider: options.flashLoan.lender,
-      protocolAdapter: options.flashLoan.protocolAdapter,
-      receiver: orderManagerAddress,
-      token: options.flashLoan.token,
-      amount: options.flashLoan.amount.toString(),
+      protocolAdapter: protocolAdapter,
+      receiver: protocolAdapter, // Same as protocolAdapter (matches working Aave pattern)
+      token: flashLoanToken,
+      amount: flashLoanAmount.toString(),
     };
   }
 
@@ -218,9 +444,11 @@ export function buildKapanAppData(
 /**
  * Compute the keccak256 hash of an AppData document
  * This hash is used as the appData field in GPv2Orders
+ * 
+ * Uses deterministic JSON stringification for consistent hashing.
  */
 export function computeAppDataHash(appDataDoc: AppDataDocument): string {
-  const json = JSON.stringify(appDataDoc);
+  const json = stringify(appDataDoc);
   return keccak256(toUtf8Bytes(json));
 }
 
@@ -228,23 +456,27 @@ export function computeAppDataHash(appDataDoc: AppDataDocument): string {
  * Register AppData with the CoW Protocol API
  * This is required so solvers can fetch the full AppData document during settlement
  * 
+ * Uses the simpler `/api/v1/app_data` endpoint that computes the hash server-side.
+ * This avoids hash mismatch issues from different JSON serialization methods.
+ * 
  * @param chainId - Chain ID
- * @param appDataHash - The keccak256 hash of the AppData document
+ * @param appDataHash - The expected keccak256 hash (for verification, not used in request)
  * @param appDataDoc - The full AppData document
- * @returns The API response
+ * @returns The API response with the computed hash
  */
 export async function registerAppData(
   chainId: number,
   appDataHash: string,
   appDataDoc: AppDataDocument
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; computedHash?: string }> {
   const apiUrl = getCowApiUrl(chainId);
   if (!apiUrl) {
     return { success: false, error: `Chain ${chainId} not supported by CoW Protocol` };
   }
 
   try {
-    const fullAppDataJson = JSON.stringify(appDataDoc);
+    // Use deterministic stringify for consistent serialization
+    const fullAppDataJson = stringify(appDataDoc);
     console.log("[registerAppData] Registering appData:");
     console.log("[registerAppData] Full JSON:", fullAppDataJson);
     if (appDataDoc.metadata.flashloan) {
@@ -255,18 +487,28 @@ export async function registerAppData(
       console.log("[registerAppData] Post-hooks:", appDataDoc.metadata.hooks.post?.length || 0);
     }
     
-    const response = await fetch(`${apiUrl}/api/v1/app_data/${appDataHash}`, {
+    // Build request body - fullAppData should be a JSON string
+    const requestBody = JSON.stringify({
+      fullAppData: fullAppDataJson,
+    });
+    console.log("[registerAppData] Request body:", requestBody);
+    
+    // Use the simpler endpoint that computes the hash server-side
+    // This avoids hash mismatch issues from JSON serialization differences
+    const response = await fetch(`${apiUrl}/api/v1/app_data`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        fullAppData: fullAppDataJson,
-      }),
+      body: requestBody,
     });
 
     if (response.ok || response.status === 200 || response.status === 201) {
-      return { success: true };
+      // The API returns the computed appDataHash
+      const result = await response.json();
+      const computedHash = result.appDataHash || result;
+      console.log("[registerAppData] Success! Computed hash:", computedHash);
+      return { success: true, computedHash: typeof computedHash === 'string' ? computedHash : undefined };
     }
 
     // 409 Conflict means it already exists - that's fine
@@ -301,22 +543,60 @@ export async function buildAndRegisterAppData(
   orderManagerAddress: string,
   user: string,
   salt: string,
-  options?: Parameters<typeof buildKapanAppData>[3]
+  options?: Parameters<typeof buildKapanAppData>[4]
 ): Promise<{
   appDataDoc: AppDataDocument;
   appDataHash: string;
   registered: boolean;
   error?: string;
 }> {
-  const appDataDoc = buildKapanAppData(orderManagerAddress, user, salt, options);
-  const appDataHash = computeAppDataHash(appDataDoc);
+  const appDataDoc = buildKapanAppData(orderManagerAddress, user, salt, chainId, options);
   
-  const result = await registerAppData(chainId, appDataHash, appDataDoc);
+  // Register with CoW API - it will compute the correct hash
+  const result = await registerAppData(chainId, "", appDataDoc);
+  
+  // Use the hash computed by the API if available, otherwise fall back to local computation
+  const appDataHash = result.computedHash || computeAppDataHash(appDataDoc);
+  
+  if (result.computedHash) {
+    console.log("[buildAndRegisterAppData] Using API-computed hash:", result.computedHash);
+  } else {
+    console.log("[buildAndRegisterAppData] Using locally-computed hash:", appDataHash);
+  }
   
   return {
     appDataDoc,
     appDataHash,
     registered: result.success,
     error: result.error,
+  };
+}
+
+/**
+ * Build flash loan options with the preferred lender for a chain
+ * Automatically selects Morpho (0% fee) when available, falls back to Aave (0.05% fee)
+ * 
+ * @param chainId - Chain ID
+ * @param token - Token to flash loan
+ * @param amount - Amount to flash loan
+ * @returns Flash loan options or undefined if no lender available
+ */
+export function buildFlashLoanOptions(
+  chainId: number,
+  token: string,
+  amount: bigint
+): { lender: string; token: string; amount: bigint } | undefined {
+  const lenderInfo = getPreferredFlashLoanLender(chainId);
+  if (!lenderInfo) {
+    console.warn(`[buildFlashLoanOptions] No flash loan lender available for chain ${chainId}`);
+    return undefined;
+  }
+  
+  console.log(`[buildFlashLoanOptions] Using ${lenderInfo.provider} (${lenderInfo.feeBps / 100}% fee) on chain ${chainId}`);
+  
+  return {
+    lender: lenderInfo.address,
+    token,
+    amount,
   };
 }

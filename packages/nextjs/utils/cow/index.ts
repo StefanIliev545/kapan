@@ -21,7 +21,7 @@
  * });
  * 
  * // Build and hash AppData (contains hooks)
- * const appData = buildKapanAppData(orderManagerAddress, kapanOrderHash);
+ * const appData = buildKapanAppData(orderManagerAddress, user, salt, chainId);
  * const appDataHash = computeAppDataHash(appData);
  * ```
  */
@@ -30,12 +30,16 @@
 export {
   COW_PROTOCOL,
   COW_FLASH_LOAN_ROUTER,
+  COW_AAVE_BORROWERS,
   COW_API_URLS,
   COW_EXPLORER_URLS,
   GPV2_ORDER,
   TRADE_FLAGS,
   FLASH_LOAN_LENDERS,
   FLASH_LOAN_FEES,
+  COW_FLASH_LOAN_LENDERS,
+  MORPHO_BLUE,
+  AAVE_V3_POOLS,
   isChainSupported,
   getCowApiUrl,
   getCowExplorerOrderUrl,
@@ -43,6 +47,10 @@ export {
   getFlashLoanLender,
   getFlashLoanFeeBps,
   calculateFlashLoanFee,
+  getCowFlashLoanLender,
+  getKapanCowAdapter,
+  getPreferredFlashLoanLender,
+  isMorphoLender,
 } from "./addresses";
 
 // AppData utilities
@@ -54,8 +62,14 @@ export {
   computeAppDataHash,
   registerAppData,
   buildAndRegisterAppData,
+  buildFlashLoanOptions,
   encodePreHookCall,
   encodePostHookCall,
+  encodeAdapterFundOrder,
+  getCowBorrower,
+  encodeBorrowerApprove,
+  encodeTokenTransfer,
+  encodeTokenTransferFrom,
 } from "./appData";
 
 // Order parameter utilities
