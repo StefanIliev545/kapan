@@ -323,6 +323,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     position.tokenAddress,
     collateralAddresses.map(a => a.toLowerCase()),
     isOpen && collateralAddresses.length > 0 && Boolean(selectedProtocol || filteredDestinationProtocols[0]?.name),
+    chainId,
   );
 
   /* ---------------------- Morpho market support ---------------------- */

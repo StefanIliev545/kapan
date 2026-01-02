@@ -72,7 +72,7 @@ const networkOptions: NetworkOption[] = [
 ];
 
 const protocolCountByNetwork: Record<string, number> = {
-  ethereum: 5, // Aave, Morpho, Spark, ZeroLend, Compound
+  ethereum: 4, // Aave, Morpho, Spark, Compound (ZeroLend frozen)
   base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
   arbitrum: 4, // Aave, Compound, Venus, Morpho
   optimism: 3, // Aave, Morpho, Compound
@@ -207,9 +207,7 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <SparkProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <ZeroLendProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
-              </StableArea>
+              {/* ZeroLend mainnet LRT market has frozen reserves - disabled until unfrozen */}
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
               </StableArea>

@@ -46,10 +46,11 @@ const FORK_CHAIN = matchForkChain(FORK_CHAIN_INPUT);
 const forkUrl = FORK_RPC_URLS[FORK_CHAIN];
 
 // Pin to specific block numbers for faster caching (update periodically)
-const FORK_BLOCK_NUMBERS: Record<string, number> = {
-  ethereum: 23988682,
-  eth: 21350000,
-  mainnet: 21350000,
+// Set to undefined to use latest block
+const FORK_BLOCK_NUMBERS: Record<string, number | undefined> = {
+  ethereum: undefined, // Use latest - contracts deployed recently
+  eth: undefined,
+  mainnet: undefined,
   arbitrum: 414729450, // ~Dec 2025
   arb: 414729450,
   base: 40261400,      // ~Jan 2026 - after real CoW order created at 40261309

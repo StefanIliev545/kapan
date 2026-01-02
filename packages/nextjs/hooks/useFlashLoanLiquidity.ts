@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Address, parseAbi } from "viem";
+import { Address, parseAbi, keccak256, toHex } from "viem";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
 import { usePublicClient } from "wagmi";
@@ -21,17 +21,21 @@ const AAVE_POOL_ABI = parseAbi([
 const ROUTER_ABI = parseAbi([
     "function balancerV2Vault() view returns (address)",
     "function balancerV3Vault() view returns (address)",
-    "function aaveV3Pool() view returns (address)",
-    "function zeroLendPool() view returns (address)",
+    "function aaveCompatiblePools(bytes32 key) view returns (address)",
     "function morphoBlue() view returns (address)",
 ]);
+
+// Keys used in KapanRouter for aaveCompatiblePools mapping
+const AAVE_POOL_KEY = keccak256(toHex("aave"));
+const ZEROLEND_POOL_KEY = keccak256(toHex("zerolend"));
 
 export const useFlashLoanLiquidity = (
     tokenAddress: string | undefined,
     amount: bigint,
     chainId: number
 ) => {
-    const { data: routerInfo } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as 31337 | 42161 | 10 | 8453 | 59144 | 9745 });
+    // Note: chainId cast includes all supported EVM chains
+    const { data: routerInfo } = useDeployedContractInfo({ contractName: "KapanRouter", chainId: chainId as 1 | 31337 | 42161 | 10 | 8453 | 59144 | 9745 });
     const publicClient = usePublicClient({ chainId });
 
     const [liquidityData, setLiquidityData] = useState<FlashLoanLiquidity[]>([]);
@@ -48,6 +52,7 @@ export const useFlashLoanLiquidity = (
         setIsLoading(true);
         try {
             // 1. Get Provider Addresses from Router
+            // Note: Aave/ZeroLend pools are stored in aaveCompatiblePools mapping with string keys
             const [balancerV2Addr, balancerV3Addr, aaveV3PoolAddr, zeroLendPoolAddr, morphoBlueAddr] = await Promise.all([
                 publicClient.readContract({
                     address: routerInfo.address,
@@ -62,12 +67,14 @@ export const useFlashLoanLiquidity = (
                 publicClient.readContract({
                     address: routerInfo.address,
                     abi: ROUTER_ABI,
-                    functionName: "aaveV3Pool",
+                    functionName: "aaveCompatiblePools",
+                    args: [AAVE_POOL_KEY],
                 }).catch(() => "0x0000000000000000000000000000000000000000"),
                 publicClient.readContract({
                     address: routerInfo.address,
                     abi: ROUTER_ABI,
-                    functionName: "zeroLendPool",
+                    functionName: "aaveCompatiblePools",
+                    args: [ZEROLEND_POOL_KEY],
                 }).catch(() => "0x0000000000000000000000000000000000000000"),
                 publicClient.readContract({
                     address: routerInfo.address,

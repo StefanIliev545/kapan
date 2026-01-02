@@ -8,11 +8,12 @@ interface CollateralSupportResult {
 }
 
 // Map protocol names to gateway view contract names
-const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView"> = {
+const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView" | "SparkGatewayView"> = {
   aave: "AaveGatewayView",
   compound: "CompoundGatewayView",
   venus: "VenusGatewayView",
   zerolend: "ZeroLendGatewayView",
+  spark: "SparkGatewayView",
 };
 
 /**
@@ -20,6 +21,8 @@ const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatew
  * @param protocolName The target protocol name
  * @param marketAddress The market token address
  * @param collateralAddresses List of collateral addresses to check
+ * @param enabled Whether the query should be enabled
+ * @param chainId Optional chain ID to query on (defaults to connected chain)
  * @returns Object containing loading state and map of collateral addresses to support status
  */
 export const useCollateralSupport = (
@@ -27,6 +30,7 @@ export const useCollateralSupport = (
   marketAddress: string,
   collateralAddresses: string[],
   enabled: boolean,
+  chainId?: number,
 ): CollateralSupportResult => {
   const [supportedCollaterals, setSupportedCollaterals] = useState<Record<string, boolean>>({});
 
@@ -39,6 +43,7 @@ export const useCollateralSupport = (
     contractName: gatewayContractName as ContractName,
     functionName: "getSupportedCollaterals",
     args: [marketAddress],
+    chainId: chainId as any,
     query: {
       enabled,
     },

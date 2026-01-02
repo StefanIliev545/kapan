@@ -38,11 +38,15 @@ const MAINNET = {
     WETH_WHALE: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", // Balancer V2 Vault
     USDC_WHALE: "0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341", // Circle
 
+    // ZeroLend (LRT market on mainnet)
+    ZEROLEND_POOL_PROVIDER: "0xFD856E1a33225B86f70D686f9280435E3fF75FCF",
+
     // DEPLOYED contracts on mainnet (from deployments/mainnet/)
     DEPLOYED: {
         KAPAN_ROUTER: "0xf415edf6F48e5744053Aae9D67317118c3E029d5",
         AAVE_GATEWAY_WRITE: "0x7a0dEE6d416293845c43298A136C7dd0054144b6",
         COMPOUND_GATEWAY_WRITE: "0x730ACC4dece77964321b8BEB861A3943D667033D",
+        ZEROLEND_GATEWAY_WRITE: "0x49A5ac50c8418b5D1A7dB2ec9f55C14F932c248F",
         AUTH_HELPER: "0xd4D36d109eAA0b0a49448Af58329Bb904329b228",
     },
 };
@@ -408,9 +412,117 @@ describe("Mainnet Refinance Debug (fork)", function () {
                 throw e;
             }
         });
+
+        it("Step 6: ZeroLend USDC deposit (mainnet LRT market)", async function () {
+            if (!USE_DEPLOYED) {
+                console.log("Skipping ZeroLend test - only works with deployed contracts");
+                this.skip();
+                return;
+            }
+
+            console.log("\n=== Step 6: ZeroLend USDC Deposit ===");
+            
+            const userAddr = user.address;
+
+            // First, get some USDC for the user by impersonating a whale
+            console.log("Funding user with USDC...");
+            await network.provider.send("hardhat_setBalance", [MAINNET.USDC_WHALE, "0x56BC75E2D63100000"]);
+            await network.provider.request({ method: "hardhat_impersonateAccount", params: [MAINNET.USDC_WHALE] });
+            const usdcWhaleSigner = await ethers.getSigner(MAINNET.USDC_WHALE);
+            
+            const depositAmount = 1000_000_000n; // 1000 USDC
+            await (usdc.connect(usdcWhaleSigner) as any).transfer(userAddr, depositAmount, { gasPrice: ethers.parseUnits("200", "gwei") });
+            console.log("Funded user with", ethers.formatUnits(depositAmount, 6), "USDC");
+
+            const userUsdcBefore = await usdc.balanceOf(userAddr);
+            console.log("User USDC balance before deposit:", ethers.formatUnits(userUsdcBefore, 6));
+
+            // Check if ZeroLend gateway is registered
+            const zerolendGateway = await router.gateways("zerolend");
+            console.log("ZeroLend gateway:", zerolendGateway);
+            
+            if (zerolendGateway === ethers.ZeroAddress) {
+                console.log("ZeroLend gateway not registered, skipping test");
+                this.skip();
+                return;
+            }
+
+            // Approve router to pull USDC
+            await usdc.connect(user).approve(await router.getAddress(), depositAmount);
+            console.log("Approved router for", ethers.formatUnits(depositAmount, 6), "USDC");
+
+            // Build deposit instructions for ZeroLend
+            const instructions = [
+                createRouterInstruction(encodePullToken(depositAmount, MAINNET.USDC, userAddr)),
+                createRouterInstruction(encodeApprove(0, "zerolend")),
+                createProtocolInstruction("zerolend", encodeLendingInstruction(LendingOp.Deposit, MAINNET.USDC, userAddr, 0n, "0x", 0)),
+            ];
+
+            console.log("Instructions built, count:", instructions.length);
+
+            // Get and execute authorizations
+            console.log("Getting authorizations...");
+            const [authTargets, authData] = await router.authorizeInstructions(instructions, userAddr);
+            console.log("Auth targets count:", authTargets.length);
+            
+            for (let i = 0; i < authTargets.length; i++) {
+                if (authTargets[i] === ethers.ZeroAddress || authData[i] === "0x") continue;
+                console.log(`Authorizing target ${i}:`, authTargets[i]);
+                await user.sendTransaction({ to: authTargets[i], data: authData[i] });
+            }
+
+            // Try to estimate gas first
+            console.log("Estimating gas...");
+            try {
+                const gasEstimate = await router.connect(user).processProtocolInstructions.estimateGas(instructions);
+                console.log("Gas estimate:", gasEstimate.toString());
+            } catch (e: any) {
+                console.log("!!! Gas estimation FAILED !!!");
+                console.log("Error:", e.message);
+                if (e.data) console.log("Error data:", e.data);
+                throw e;
+            }
+
+            // Execute deposit
+            console.log("Executing ZeroLend deposit...");
+            try {
+                const tx = await router.connect(user).processProtocolInstructions(instructions);
+                const receipt = await tx.wait();
+                console.log("Gas used:", receipt.gasUsed.toString());
+
+                // Verify - check ZeroLend aToken balance
+                const zeroLendSupply = await getZeroLendSupplyBalance(MAINNET.USDC, userAddr);
+                console.log("ZeroLend USDC supply after:", ethers.formatUnits(zeroLendSupply, 6));
+
+                const userUsdcAfter = await usdc.balanceOf(userAddr);
+                console.log("User USDC balance after:", ethers.formatUnits(userUsdcAfter, 6));
+
+                expect(zeroLendSupply).to.be.closeTo(depositAmount, 1_000_000n); // Allow 1 USDC tolerance
+                console.log("SUCCESS: ZeroLend USDC deposit works!");
+
+            } catch (e: any) {
+                console.log("\n!!! ZEROLEND DEPOSIT FAILED !!!");
+                console.log("Error:", e.message);
+                if (e.data) console.log("Error data:", e.data);
+                if (e.reason) console.log("Reason:", e.reason);
+                throw e;
+            }
+        });
     });
 
     // Helper functions to query balances
+    async function getZeroLendSupplyBalance(token: string, userAddr: string): Promise<bigint> {
+        const poolProvider = await ethers.getContractAt(
+            "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",
+            MAINNET.ZEROLEND_POOL_PROVIDER
+        );
+        const dataProviderAddr = await poolProvider.getPoolDataProvider();
+        const dataProvider = new ethers.Contract(dataProviderAddr, [
+            "function getUserReserveData(address asset, address user) external view returns (uint256 currentATokenBalance, uint256 currentStableDebt, uint256 currentVariableDebt, uint256 principalStableDebt, uint256 scaledVariableDebt, uint256 stableBorrowRate, uint256 liquidityRate, uint40 stableRateLastUpdated, bool usageAsCollateralEnabled)"
+        ], ethers.provider);
+        const data = await dataProvider.getUserReserveData(token, userAddr);
+        return data[0]; // currentATokenBalance
+    }
     async function getAaveSupplyBalance(token: string, userAddr: string): Promise<bigint> {
         const poolProvider = await ethers.getContractAt(
             "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol:IPoolAddressesProvider",

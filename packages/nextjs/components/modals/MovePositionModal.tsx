@@ -15,7 +15,7 @@ import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { getProtocolLogo } from "~~/utils/protocol";
-import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported } from "~~/utils/chainFeatures";
+import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -61,6 +61,9 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       { name: "Aave V3" },
       { name: "Compound V3" },
     ];
+    if (isSparkSupported(chainId)) {
+      result.push({ name: "Spark" });
+    }
     if (isMorphoBlueSupported(chainId)) {
       result.push({ name: "Morpho Blue" });
     }
@@ -126,6 +129,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     fromProtocol,
     userAddress || "0x0000000000000000000000000000000000000000",
     isOpen,
+    chainId,
   );
 
   // Memoize the collateral addresses to prevent recreation on every render.
@@ -141,6 +145,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     position.tokenAddress,
     collateralAddresses,
     isOpen,
+    chainId,
   );
 
   // Combine fetched collaterals with support status.

@@ -82,7 +82,7 @@ export type UseMovePositionDataResult = {
   vesuPools?: VesuPoolsData;
 };
 
-import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported } from "~~/utils/chainFeatures";
+import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
   const { isOpen, networkType, fromProtocol, chainId, position } = params;
@@ -130,6 +130,9 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       ];
       
       // Add chain-specific protocols
+      if (isSparkSupported(chainId)) {
+        protocols.push({ name: "Spark", logo: getProtocolLogo("Spark") });
+      }
       if (isMorphoBlueSupported(chainId)) {
         protocols.push({ name: "Morpho Blue", logo: getProtocolLogo("Morpho Blue") });
       }
@@ -169,6 +172,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     fromProtocol,
     (evmUserAddress as string) || zeroAddress,
     isOpen && networkType === "evm",
+    chainId,
   );
 
   // Use stringified version for stable comparison
@@ -182,6 +186,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     position.tokenAddress,
     useMemo(() => evmCollaterals.map(c => c.address), [evmCollaterals]),
     isOpen && networkType === "evm" && evmCollaterals.length > 0,
+    chainId,
   );
 
   const { data: tokenPrices } = useNetworkAwareReadContract({
