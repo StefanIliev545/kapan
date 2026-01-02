@@ -75,6 +75,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
       compound: "Compound V3",
       venus: "Venus",
       zerolend: "ZeroLend",
+      spark: "Spark",
     };
     return protocolNameMap[protocolId.toLowerCase()] || protocolId;
   };

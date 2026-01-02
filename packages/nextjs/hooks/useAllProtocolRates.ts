@@ -4,7 +4,7 @@ import { Address, Abi } from "viem";
 import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useAccount } from "wagmi";
 
-type ProtocolKey = "aave" | "compound" | "venus" | "zerolend";
+type ProtocolKey = "aave" | "compound" | "venus" | "zerolend" | "spark";
 
 interface TokenRate {
   token: Address;
@@ -56,6 +56,17 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     query: { enabled: enabled && !!zeroLendGateway?.address },
   };
   const { data: zerolendTokensInfo, isLoading: zerolendLoading } = useScaffoldReadContract(zeroLendReadConfig as any);
+
+  // Spark (mainnet only, Aave fork)
+  const sparkGatewayName = "SparkGatewayView" as any;
+  const { data: sparkGateway } = useDeployedContractInfo({ contractName: sparkGatewayName });
+  const sparkReadConfig = {
+    contractName: sparkGatewayName,
+    functionName: "getAllTokensInfo",
+    args: [queryAddress],
+    query: { enabled: enabled && !!sparkGateway?.address },
+  };
+  const { data: sparkTokensInfo, isLoading: sparkLoading } = useScaffoldReadContract(sparkReadConfig as any);
 
   // Venus: getAllVenusMarkets + getMarketRates (batched)
   const { data: venusMarkets, isLoading: venusMarketsLoading } = useScaffoldReadContract({
@@ -116,7 +127,7 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     }
     const map = new Map<Address, Map<ProtocolKey, TokenRate>>();
 
-    const addAaveLikeRates = (tokensInfo: any[] | undefined, protocol: Extract<ProtocolKey, "aave" | "zerolend">) => {
+    const addAaveLikeRates = (tokensInfo: any[] | undefined, protocol: Extract<ProtocolKey, "aave" | "zerolend" | "spark">) => {
       if (tokensInfo && Array.isArray(tokensInfo)) {
         tokensInfo.forEach((tokenInfo: any) => {
           if (tokenInfo?.token) {
@@ -136,9 +147,11 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     };
 
     const zerolendArray = Array.isArray(zerolendTokensInfo) ? [...zerolendTokensInfo] : [];
+    const sparkArray = Array.isArray(sparkTokensInfo) ? [...sparkTokensInfo] : [];
 
     addAaveLikeRates(aaveTokensInfo as any[], "aave");
     addAaveLikeRates(zerolendArray as any[], "zerolend");
+    addAaveLikeRates(sparkArray as any[], "spark");
 
     // Venus rates
     if (venusMarkets && venusRates && Array.isArray(venusMarkets) && Array.isArray(venusRates)) {
@@ -182,10 +195,10 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
     }
 
     return map;
-  }, [enabled, aaveTokensInfo, zerolendTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
+  }, [enabled, aaveTokensInfo, zerolendTokensInfo, sparkTokensInfo, venusMarkets, venusRates, compoundResults, compoundBaseTokens]);
 
   const isLoading = enabled
-    ? aaveLoading || zerolendLoading || venusMarketsLoading || venusRatesLoading || compoundBaseLoading || compoundDataLoading
+    ? aaveLoading || zerolendLoading || sparkLoading || venusMarketsLoading || venusRatesLoading || compoundBaseLoading || compoundDataLoading
     : false;
 
   return {
@@ -222,6 +235,14 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
         candidates.push({
           protocol: "zerolend",
           rate: type === "supply" ? zerolendRate.supplyRate : zerolendRate.borrowRate,
+        });
+      }
+      
+      const sparkRate = protocolRates.get("spark");
+      if (sparkRate) {
+        candidates.push({
+          protocol: "spark",
+          rate: type === "supply" ? sparkRate.supplyRate : sparkRate.borrowRate,
         });
       }
       
