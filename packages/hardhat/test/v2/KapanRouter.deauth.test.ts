@@ -23,14 +23,6 @@ describe("v2 Router Deauthorization Flow", function () {
         await router.waitForDeployment();
 
         // Deploy Aave gateway (using real one to test logic, but we need to mock dependencies)
-        // Actually, let's use a MockGateway that mimics the BAD behavior to prove the test works,
-        // OR use the real AaveGatewayWrite if we can deploy it easily.
-        // Given the complexity of deploying Aave dependencies, let's use a MockGateway that implements
-        // the "bad" logic (revoking on Deposit) and another that implements "good" logic.
-        // Wait, the goal is to test the CURRENT codebase.
-        // So I should use the REAL AaveGatewayWrite if possible, or at least a Mock that behaves EXACTLY like it.
-
-        // Let's try to deploy the real AaveGatewayWrite. It needs a PoolAddressesProvider.
         const MockProvider = await ethers.getContractFactory("MockPoolAddressesProvider");
         const provider = await MockProvider.deploy(await deployer.getAddress()); // Mock address for pool
         await provider.waitForDeployment();
@@ -39,8 +31,16 @@ describe("v2 Router Deauthorization Flow", function () {
         const gateway = await AaveGateway.deploy(await router.getAddress(), await provider.getAddress(), 0);
         await gateway.waitForDeployment();
 
-        // Register gateway
+        // Register gateway with router
         await router.addGateway("aave", await gateway.getAddress());
+
+        // Deploy authorization helper
+        const AuthHelper = await ethers.getContractFactory("KapanAuthorizationHelper");
+        const authHelper = await AuthHelper.deploy(await router.getAddress(), await deployer.getAddress());
+        await authHelper.waitForDeployment();
+
+        // Sync gateway with auth helper
+        await authHelper.syncGateway("aave", await gateway.getAddress());
 
         // Build instructions:
         // 1. PullToken (user -> router)
@@ -63,8 +63,8 @@ describe("v2 Router Deauthorization Flow", function () {
             createProtocolInstruction("aave", depositInstr),
         ];
 
-        // Call deauthorizeInstructions
-        const [targets, data] = await router.deauthorizeInstructions(instrs, await user.getAddress());
+        // Call deauthorizeInstructions via helper contract
+        const [targets, data] = await authHelper.deauthorizeInstructions(instrs, await user.getAddress());
 
         // Filter out empty targets
         const validOps = [];
@@ -87,22 +87,7 @@ describe("v2 Router Deauthorization Flow", function () {
         const routerRevoke = validOps.find(op => op.target === tokenAddress);
         expect(routerRevoke).to.not.be.undefined;
 
-        // Check count. If we have redundant approvals, we might have 2 identical revokes or 2 different ones.
-        // In the "bad" case:
-        // - Router emits: approve(router, 0)
-        // - Gateway emits: approve(gateway, 0) -> Wait, AaveGatewayWrite.deposit emits approve(pool, 0) inside execution, 
-        //   but deauthorize would emit approve(gateway, 0) if it was revoking user->gateway allowance?
-        //   Actually, let's look at the "bad" logic description again.
-        //   "AaveGatewayWrite.deauthorize emits: token.approve(aaveGateway, 0)"
-        //   So we look for an approval to the Gateway address? Or is it just a generic approve?
-        //   The target is the token. The spender is `address(this)` (the gateway).
-
-        // So we expect:
-        // Op 1: Target = Token, Data = approve(Router, 0)
-        // Op 2 (Bad): Target = Token, Data = approve(Gateway, 0)
-
-        // If fixed, Op 2 should be missing.
-
+        // Check count - should only have 1 revocation (Router), not 2
         expect(validOps.length).to.equal(1, "Should only have 1 revocation (Router)");
 
     });

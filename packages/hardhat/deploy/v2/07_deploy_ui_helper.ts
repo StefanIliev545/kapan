@@ -4,6 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 // import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Deploys the UiHelper contract
@@ -14,7 +15,8 @@ import { deterministicSalt } from "../../utils/deploySalt";
 const deployUiHelper: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
-  const WAIT = 3;
+  const chainId = Number(await hre.getChainId());
+  const WAIT = getWaitConfirmations(chainId);
 
   // Deploy UiHelper (no constructor arguments needed)
   const uiHelper = await deploy("UiHelper", {

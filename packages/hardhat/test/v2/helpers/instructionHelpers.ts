@@ -291,3 +291,128 @@ export function encodeSubtract(minuendIndex: number, subtrahendIndex: number): s
     ]
   );
 }
+
+/**
+ * Helper to get authorization helper contract and execute auth calls
+ * @param deployments - Hardhat deployments
+ * @param ethers - Hardhat ethers
+ * @param instructions - Protocol instructions to authorize
+ * @param caller - Address of the caller
+ * @param signer - Signer to execute auth txs
+ */
+export async function authorizeInstructions(
+  deployments: any,
+  ethers: any,
+  instructions: { protocolName: string; data: string }[],
+  caller: string,
+  signer: any
+): Promise<void> {
+  const authHelper = await ethers.getContractAt(
+    "KapanAuthorizationHelper",
+    (await deployments.get("KapanAuthorizationHelper")).address
+  );
+  
+  const [targets, data] = await authHelper.authorizeInstructions(instructions, caller);
+  
+  for (let i = 0; i < targets.length; i++) {
+    if (targets[i] !== ethers.ZeroAddress && data[i].length > 0) {
+      await signer.sendTransaction({
+        to: targets[i],
+        data: data[i]
+      });
+    }
+  }
+}
+
+/**
+ * Helper to get deauthorization calls
+ */
+export async function deauthorizeInstructions(
+  deployments: any,
+  ethers: any,
+  instructions: { protocolName: string; data: string }[],
+  caller: string,
+  signer: any
+): Promise<void> {
+  const authHelper = await ethers.getContractAt(
+    "KapanAuthorizationHelper",
+    (await deployments.get("KapanAuthorizationHelper")).address
+  );
+  
+  const [targets, data] = await authHelper.deauthorizeInstructions(instructions, caller);
+  
+  for (let i = 0; i < targets.length; i++) {
+    if (targets[i] !== ethers.ZeroAddress && data[i].length > 0) {
+      await signer.sendTransaction({
+        to: targets[i],
+        data: data[i]
+      });
+    }
+  }
+}
+
+/**
+ * Result type for deployRouterWithAuthHelper
+ */
+export interface RouterWithAuthHelper {
+  router: any;
+  authHelper: any;
+  routerAddress: string;
+  authHelperAddress: string;
+  /** Sync a gateway with the auth helper */
+  syncGateway: (protocolName: string, gatewayAddress: string) => Promise<void>;
+}
+
+/**
+ * Deploy KapanRouter with KapanAuthorizationHelper configured.
+ * Use this in tests that manually deploy the router and need authorizeInstructions().
+ * 
+ * @param ethers - Hardhat ethers instance
+ * @param owner - Owner address for the router
+ * @returns RouterWithAuthHelper object with router, authHelper, and syncGateway function
+ * 
+ * @example
+ * ```typescript
+ * const { router, authHelper, syncGateway } = await deployRouterWithAuthHelper(ethers, deployer.address);
+ * 
+ * // Deploy and register a gateway
+ * const gateway = await GatewayFactory.deploy(routerAddress, ...);
+ * await router.addGateway("aave", gateway.address);
+ * await syncGateway("aave", gateway.address);
+ * 
+ * // Now authorizeInstructions will work
+ * const [targets, data] = await router.authorizeInstructions(instrs, userAddress);
+ * ```
+ */
+export async function deployRouterWithAuthHelper(
+  ethers: any,
+  owner: string
+): Promise<RouterWithAuthHelper> {
+  // Deploy Router
+  const Router = await ethers.getContractFactory("KapanRouter");
+  const router = await Router.deploy(owner);
+  await router.waitForDeployment();
+  const routerAddress = await router.getAddress();
+
+  // Deploy AuthorizationHelper
+  const AuthHelper = await ethers.getContractFactory("KapanAuthorizationHelper");
+  const authHelper = await AuthHelper.deploy(routerAddress, owner);
+  await authHelper.waitForDeployment();
+  const authHelperAddress = await authHelper.getAddress();
+
+  // Configure router to use auth helper
+  await router.setAuthorizationHelper(authHelperAddress);
+
+  // Helper function to sync gateways
+  const syncGateway = async (protocolName: string, gatewayAddress: string) => {
+    await authHelper.syncGateway(protocolName, gatewayAddress);
+  };
+
+  return {
+    router,
+    authHelper,
+    routerAddress,
+    authHelperAddress,
+    syncGateway,
+  };
+}

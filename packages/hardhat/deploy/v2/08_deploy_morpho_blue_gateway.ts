@@ -5,6 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
+import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Morpho Blue deployment script.
@@ -123,7 +124,7 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
   const MORPHO_ADDRESS = process.env.MORPHO_BLUE_ADDRESS || config.MORPHO;
 
   const kapanRouter = await get("KapanRouter");
-  const WAIT = 3;
+  const WAIT = getWaitConfirmations(chainId);
 
   // ============ Deploy Write Gateway ============
   const morphoGatewayWrite = await deploy("MorphoBlueGatewayWrite", {
@@ -150,8 +151,9 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
   console.log(`MorphoBlueGatewayView deployed to: ${morphoGatewayView.address}`);
 
   // ============ Register Gateway with Router ============
-  await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "addGateway", "morpho-blue", morphoGatewayWrite.address);
+  await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["morpho-blue", morphoGatewayWrite.address], { waitConfirmations: 1 });
   console.log(`MorphoBlueGatewayWrite registered with KapanRouter as "morpho-blue"`);
+  // Gateway sync is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
 
   // ============ Register Markets ============
   const markets = config.MARKETS;
@@ -168,7 +170,7 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
 
     try {
       // Register on Write Gateway
-      await execute("MorphoBlueGatewayWrite", { from: deployer, waitConfirmations: 5 }, "registerMarket", marketParams);
+      await safeExecute(hre, deployer, "MorphoBlueGatewayWrite", "registerMarket", [marketParams], { waitConfirmations: 1 });
       console.log(`[Write] Registered market: ${market.collateralToken.slice(0, 10)}.../${market.loanToken.slice(0, 10)}...`);
     } catch (err: any) {
       if (err.message?.includes("already registered")) {
@@ -180,7 +182,7 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
 
     try {
       // Register on View Gateway
-      await execute("MorphoBlueGatewayView", { from: deployer, waitConfirmations: 5 }, "registerMarket", marketParams);
+      await safeExecute(hre, deployer, "MorphoBlueGatewayView", "registerMarket", [marketParams], { waitConfirmations: 1 });
       console.log(`[View] Registered market: ${market.collateralToken.slice(0, 10)}.../${market.loanToken.slice(0, 10)}...`);
     } catch (err: any) {
       if (err.message?.includes("already registered")) {

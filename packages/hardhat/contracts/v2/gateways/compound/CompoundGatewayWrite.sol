@@ -168,9 +168,21 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
     ) external view returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced) {
         targets = new address[](instrs.length);
         data = new bytes[](instrs.length);
+        produced = new ProtocolTypes.Output[](_countOutputs(instrs));
+        uint256 pIdx = 0;
 
-        // 1. Count outputs
-        uint256 outCount = 0;
+        for (uint256 i = 0; i < instrs.length; i++) {
+            (address target, bytes memory callData, ProtocolTypes.Output memory output, bool hasOutput) = 
+                _processAuthorizeOp(instrs[i], caller, inputs);
+            targets[i] = target;
+            data[i] = callData;
+            if (hasOutput) {
+                produced[pIdx++] = output;
+            }
+        }
+    }
+
+    function _countOutputs(ProtocolTypes.LendingInstruction[] calldata instrs) private pure returns (uint256 count) {
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingOp op = instrs[i].op;
             if (
@@ -180,92 +192,82 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
                 op == ProtocolTypes.LendingOp.GetBorrowBalance ||
                 op == ProtocolTypes.LendingOp.GetSupplyBalance
             ) {
-                outCount++;
+                count++;
             }
         }
-        produced = new ProtocolTypes.Output[](outCount);
-        uint256 pIdx = 0;
+    }
 
-        // k tracks targets index (shared with loop i actually)
-        // Just use i for targets/data as they are 1-to-1 with instrs
+    function _processAuthorizeOp(
+        ProtocolTypes.LendingInstruction calldata ins,
+        address caller,
+        ProtocolTypes.Output[] calldata inputs
+    ) private view returns (address target, bytes memory callData, ProtocolTypes.Output memory output, bool hasOutput) {
+        address market = _decodeMarket(ins.context);
+        address token = ins.token;
+        uint256 amount = ins.amount;
+        if (ins.input.index < inputs.length) {
+            token = inputs[ins.input.index].token;
+            amount = inputs[ins.input.index].amount;
+        }
 
-        for (uint256 i = 0; i < instrs.length; i++) {
-            ProtocolTypes.LendingInstruction calldata ins = instrs[i];
-            address market = _decodeMarket(ins.context);
-
-            address token = ins.token;
-            uint256 amount = ins.amount;
-            if (ins.input.index < inputs.length) {
-                token = inputs[ins.input.index].token;
-                amount = inputs[ins.input.index].amount;
+        if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
+            if (ins.op == ProtocolTypes.LendingOp.Repay) {
+                output = ProtocolTypes.Output({ token: token, amount: 0 });
+                hasOutput = true;
             }
+        } else if (
+            ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
+            (ins.op == ProtocolTypes.LendingOp.Deposit && market != address(0) && market != token)
+        ) {
+            // No output
+        } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+            (target, callData) = _getWithdrawAuth(market, token, caller);
+            output = ProtocolTypes.Output({ token: token, amount: amount });
+            hasOutput = true;
+        } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+            (target, callData) = _getBorrowAuth(token, caller);
+            output = ProtocolTypes.Output({ token: token, amount: amount });
+            hasOutput = true;
+        } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
+            uint256 bal = _getBorrowBalance(token, ins.user);
+            output = ProtocolTypes.Output({ token: token, amount: (bal * 1001) / 1000 });
+            hasOutput = true;
+        } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
+            uint256 bal = _getSupplyBalance(token, market, ins.user);
+            output = ProtocolTypes.Output({ token: token, amount: (bal * 1001) / 1000 });
+            hasOutput = true;
+        }
+    }
 
-            if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.Repay) {
-                targets[i] = address(0);
-                data[i] = bytes("");
-                // Repay produces output
-                if (ins.op == ProtocolTypes.LendingOp.Repay) {
-                    produced[pIdx] = ProtocolTypes.Output({ token: token, amount: 0 });
-                    pIdx++;
-                }
-                // Deposit produces NO output
-            } else if (
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral ||
-                (ins.op == ProtocolTypes.LendingOp.Deposit && market != address(0) && market != token)
-            ) {
-                targets[i] = address(0);
-                data[i] = bytes("");
-                // DepositCollateral produces NO output
-            } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                address base = market != address(0) ? market : token;
-                ICompoundComet comet = tokenToComet[base];
-                bool permitted = comet.isAllowed(caller, address(this));
-                if (permitted) {
-                    targets[i] = address(0);
-                    data[i] = bytes("");
-                } else {
-                    targets[i] = address(comet);
-                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
-                }
+    function _getWithdrawAuth(address market, address token, address caller) private view returns (address target, bytes memory callData) {
+        address base = market != address(0) ? market : token;
+        ICompoundComet comet = tokenToComet[base];
+        if (!comet.isAllowed(caller, address(this))) {
+            target = address(comet);
+            callData = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
+        }
+    }
 
-                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: amount });
-                pIdx++;
-            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                ICompoundComet comet = tokenToComet[token];
-                bool permitted = comet.isAllowed(caller, address(this));
-                if (permitted) {
-                    targets[i] = address(0);
-                    data[i] = bytes("");
-                } else {
-                    targets[i] = address(comet);
-                    data[i] = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
-                }
+    function _getBorrowAuth(address token, address caller) private view returns (address target, bytes memory callData) {
+        ICompoundComet comet = tokenToComet[token];
+        if (!comet.isAllowed(caller, address(this))) {
+            target = address(comet);
+            callData = abi.encodeWithSelector(ICompoundComet.allow.selector, address(this), true);
+        }
+    }
 
-                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: amount });
-                pIdx++;
-            } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
-                ICompoundComet comet = tokenToComet[token];
-                uint256 bal = address(comet) == address(0) ? 0 : comet.borrowBalanceOf(ins.user);
-                bal = (bal * 1001) / 1000;
-                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: bal });
-                pIdx++;
-                targets[i] = address(0);
-                data[i] = bytes("");
-            } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
-                uint256 bal;
-                if (market != address(0) && market != token) {
-                    ICompoundComet comet = tokenToComet[market];
-                    bal = address(comet) == address(0) ? 0 : uint256(comet.collateralBalanceOf(ins.user, token));
-                } else {
-                    ICompoundComet comet = tokenToComet[token];
-                    bal = address(comet) == address(0) ? 0 : comet.balanceOf(ins.user);
-                }
-                bal = (bal * 1001) / 1000;
-                produced[pIdx] = ProtocolTypes.Output({ token: token, amount: bal });
-                pIdx++;
-                targets[i] = address(0);
-                data[i] = bytes("");
-            }
+    function _getBorrowBalance(address token, address user) private view returns (uint256) {
+        ICompoundComet comet = tokenToComet[token];
+        return address(comet) == address(0) ? 0 : comet.borrowBalanceOf(user);
+    }
+
+    function _getSupplyBalance(address token, address market, address user) private view returns (uint256) {
+        if (market != address(0) && market != token) {
+            ICompoundComet comet = tokenToComet[market];
+            return address(comet) == address(0) ? 0 : uint256(comet.collateralBalanceOf(user, token));
+        } else {
+            ICompoundComet comet = tokenToComet[token];
+            return address(comet) == address(0) ? 0 : comet.balanceOf(user);
         }
     }
 
@@ -311,6 +313,18 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
             assembly {
                 market := mload(add(ctx, 32))
             }
+        }
+    }
+
+    // ============ Emergency Recovery ============
+
+    /// @notice Recover stuck tokens (owner only)
+    function recoverTokens(address token, address to, uint256 amount) external onlyOwner {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toRecover = amount == type(uint256).max ? balance : amount;
+        if (toRecover > balance) toRecover = balance;
+        if (toRecover > 0) {
+            IERC20(token).safeTransfer(to, toRecover);
         }
     }
 }

@@ -7,9 +7,12 @@ interface TransactionToastProps {
   txHash?: string;
   message?: string;
   blockExplorerLink?: string;
+  /** Optional secondary link (e.g., CoW Explorer for limit orders) */
+  secondaryLink?: string;
+  secondaryLinkText?: string;
 }
 
-export function TransactionToast({ step, txHash, message, blockExplorerLink }: TransactionToastProps) {
+export function TransactionToast({ step, txHash, message, blockExplorerLink, secondaryLink, secondaryLinkText }: TransactionToastProps) {
   const getStepConfig = () => {
     switch (step) {
       case "pending":
@@ -64,6 +67,16 @@ export function TransactionToast({ step, txHash, message, blockExplorerLink }: T
               className="block link text-md text-primary hover:text-primary-focus mt-1"
             >
               View on explorer
+            </a>
+          )}
+          {secondaryLink && secondaryLink.length > 0 && (
+            <a
+              href={secondaryLink}
+              target="_blank"
+              rel="noreferrer"
+              className="block link text-md text-primary hover:text-primary-focus mt-1"
+            >
+              {secondaryLinkText || "View order"}
             </a>
           )}
         </div>

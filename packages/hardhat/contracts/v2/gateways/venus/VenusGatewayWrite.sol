@@ -11,6 +11,7 @@ import { VTokenInterface } from "../../../interfaces/venus/VTokenInterface.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -86,13 +87,17 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     ) internal nonReentrant returns (address, uint256) {
         address vToken = _getVTokenForUnderlying(collateral);
 
-        uint256 borrowBalance = VTokenInterface(vToken).borrowBalanceCurrent(user);
-        if (underlyingAmount >= borrowBalance) {
-            underlyingAmount = borrowBalance;
-            uint256 balance = VTokenInterface(vToken).balanceOf(user);
-            VTokenInterface(vToken).transferFrom(user, address(this), balance);
+        // Get user's supply balance in vTokens and convert to underlying
+        uint256 vBalance = VTokenInterface(vToken).balanceOf(user);
+        uint256 exchangeRate = VTokenInterface(vToken).exchangeRateCurrent();
+        uint256 supplyBalance = (vBalance * exchangeRate) / 1e18;
+
+        // Clamp to supply balance if requesting more than available
+        if (underlyingAmount >= supplyBalance || underlyingAmount == 0) {
+            // Withdraw all - transfer all vTokens and redeem
+            VTokenInterface(vToken).transferFrom(user, address(this), vBalance);
             uint256 pre = IERC20(collateral).balanceOf(address(this));
-            uint err = VTokenInterface(vToken).redeem(balance);
+            uint err = VTokenInterface(vToken).redeem(vBalance);
             require(err == 0, "Venus: redeem failed");
             uint256 balanceAfter = IERC20(collateral).balanceOf(address(this));
             uint256 redeemed = balanceAfter - pre;
@@ -100,7 +105,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             return (collateral, redeemed);
         }
 
-        uint exchangeRate = VTokenInterface(vToken).exchangeRateCurrent();
+        // Partial withdraw - calculate required vTokens for desired underlying
         uint requiredV = (underlyingAmount * 1e18 + exchangeRate - 1) / exchangeRate;
         VTokenInterface(vToken).transferFrom(user, address(this), requiredV);
 
@@ -138,104 +143,127 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         }
     }
 
+    /// @dev Helper struct to reduce stack depth in authorize
+    struct AuthCounts {
+        uint256 outCount;
+        uint256 authCount;
+    }
+
     function authorize(
         ProtocolTypes.LendingInstruction[] calldata instrs,
         address caller,
         ProtocolTypes.Output[] calldata inputs
     ) external view returns (address[] memory targets, bytes[] memory data, ProtocolTypes.Output[] memory produced) {
-        // PASS 1: Count needed outputs and needed auth targets
-        // We MUST do this because 1 Venus instruction can generate 2 auth steps (Approve + EnterMarkets)
-        uint256 outCount = 0;
-        uint256 authCount = 0;
+        // PASS 1: Count needed outputs and auth targets
+        AuthCounts memory counts = _countAuthRequirements(instrs, caller, inputs);
 
+        // Allocate exact sizes
+        targets = new address[](counts.authCount);
+        data = new bytes[](counts.authCount);
+        produced = new ProtocolTypes.Output[](counts.outCount);
+
+        // PASS 2: Fill Arrays
+        _fillAuthArrays(instrs, caller, inputs, targets, data, produced);
+    }
+
+    function _countAuthRequirements(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address caller,
+        ProtocolTypes.Output[] calldata inputs
+    ) private view returns (AuthCounts memory counts) {
         for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
 
             // Output counting
-            if (
-                ins.op == ProtocolTypes.LendingOp.WithdrawCollateral ||
-                ins.op == ProtocolTypes.LendingOp.Borrow ||
-                ins.op == ProtocolTypes.LendingOp.Repay ||
-                ins.op == ProtocolTypes.LendingOp.GetBorrowBalance ||
-                ins.op == ProtocolTypes.LendingOp.GetSupplyBalance
-            ) {
-                outCount++;
+            if (_producesOutput(ins.op)) {
+                counts.outCount++;
             }
 
-            // Auth counting logic
-            address token = ins.token;
-            uint256 amount = ins.amount;
-            if (ins.input.index < inputs.length) {
-                token = inputs[ins.input.index].token;
-                amount = inputs[ins.input.index].amount;
-            }
-
-            if (
-                ins.op == ProtocolTypes.LendingOp.Deposit ||
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral
-            ) {
-                // Enter Markets - required for collateral to count
-                address vToken = _getVTokenForUnderlying(token);
-                bool member = false;
-                try comptroller.checkMembership(caller, vToken) returns (bool m) {
-                    member = m;
-                } catch {}
-                if (!member) {
-                    authCount++;
-                }
-            } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                address vToken = _getVTokenForUnderlying(token);
-                uint rate = VTokenInterface(vToken).exchangeRateStored();
-                uint requiredV = amount == 0 ? type(uint256).max : (amount * 1e18 + rate - 1) / rate;
-                uint256 curV = IERC20(vToken).allowance(caller, address(this));
-                if (amount == 0 || curV < requiredV) {
-                    authCount++;
-                }
-            } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                bool approved = false;
-                try comptroller.approvedDelegates(caller, address(this)) returns (bool a) {
-                    approved = a;
-                } catch {}
-                if (!approved) {
-                    authCount++;
-                }
-            }
-            // Get* ops require 0 auth
+            // Auth counting
+            counts.authCount += _countAuthForInstruction(ins, caller, inputs);
         }
+    }
 
-        // Allocate exact sizes
-        targets = new address[](authCount);
-        data = new bytes[](authCount);
-        produced = new ProtocolTypes.Output[](outCount);
+    function _producesOutput(ProtocolTypes.LendingOp op) private pure returns (bool) {
+        return op == ProtocolTypes.LendingOp.WithdrawCollateral ||
+               op == ProtocolTypes.LendingOp.Borrow ||
+               op == ProtocolTypes.LendingOp.Repay ||
+               op == ProtocolTypes.LendingOp.GetBorrowBalance ||
+               op == ProtocolTypes.LendingOp.GetSupplyBalance;
+    }
 
+    function _countAuthForInstruction(
+        ProtocolTypes.LendingInstruction calldata ins,
+        address caller,
+        ProtocolTypes.Output[] calldata inputs
+    ) private view returns (uint256) {
+        (address token, uint256 amount) = _resolveTokenAmount(ins, inputs);
+
+        if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
+            return _needsEnterMarkets(token, caller) ? 1 : 0;
+        } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
+            return _needsWithdrawApproval(token, amount, caller) ? 1 : 0;
+        } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
+            return _needsBorrowDelegation(caller) ? 1 : 0;
+        }
+        return 0;
+    }
+
+    function _resolveTokenAmount(
+        ProtocolTypes.LendingInstruction calldata ins,
+        ProtocolTypes.Output[] calldata inputs
+    ) private pure returns (address token, uint256 amount) {
+        token = ins.token;
+        amount = ins.amount;
+        if (ins.input.index < inputs.length) {
+            token = inputs[ins.input.index].token;
+            amount = inputs[ins.input.index].amount;
+        }
+    }
+
+    function _needsEnterMarkets(address token, address caller) private view returns (bool) {
+        address vToken = _getVTokenForUnderlying(token);
+        try comptroller.checkMembership(caller, vToken) returns (bool m) {
+            return !m;
+        } catch {
+            return true;
+        }
+    }
+
+    function _needsWithdrawApproval(address token, uint256 amount, address caller) private view returns (bool) {
+        address vToken = _getVTokenForUnderlying(token);
+        uint256 rate = VTokenInterface(vToken).exchangeRateStored();
+        uint256 requiredV = amount == 0 ? type(uint256).max : (amount * 1e18 + rate - 1) / rate;
+        uint256 curV = IERC20(vToken).allowance(caller, address(this));
+        return amount == 0 || curV < requiredV;
+    }
+
+    function _needsBorrowDelegation(address caller) private view returns (bool) {
+        try comptroller.approvedDelegates(caller, address(this)) returns (bool a) {
+            return !a;
+        } catch {
+            return true;
+        }
+    }
+
+    function _fillAuthArrays(
+        ProtocolTypes.LendingInstruction[] calldata instrs,
+        address caller,
+        ProtocolTypes.Output[] calldata inputs,
+        address[] memory targets,
+        bytes[] memory data,
+        ProtocolTypes.Output[] memory produced
+    ) private view {
         uint256 k = 0; // auth index
         uint256 p = 0; // output index
 
-        // PASS 2: Fill Arrays
-        for (uint256 i; i < instrs.length; i++) {
+        for (uint256 i = 0; i < instrs.length; i++) {
             ProtocolTypes.LendingInstruction calldata ins = instrs[i];
+            (address token, uint256 amount) = _resolveTokenAmount(ins, inputs);
 
-            address token = ins.token;
-            uint256 amount = ins.amount;
-            if (ins.input.index < inputs.length) {
-                token = inputs[ins.input.index].token;
-                amount = inputs[ins.input.index].amount;
-            }
-
-            if (
-                ins.op == ProtocolTypes.LendingOp.Deposit ||
-                ins.op == ProtocolTypes.LendingOp.DepositCollateral
-            ) {
-                // Enter Markets - required for collateral to count
-                address vToken = _getVTokenForUnderlying(token);
-                bool member = false;
-                try comptroller.checkMembership(caller, vToken) returns (bool m) {
-                    member = m;
-                } catch {
-                    // If checkMembership fails, assume not a member to be safe
-                    member = false;
-                }
-                if (!member) {
+            if (ins.op == ProtocolTypes.LendingOp.Deposit || ins.op == ProtocolTypes.LendingOp.DepositCollateral) {
+                if (_needsEnterMarkets(token, caller)) {
+                    address vToken = _getVTokenForUnderlying(token);
                     address[] memory markets = new address[](1);
                     markets[0] = vToken;
                     targets[k] = address(comptroller);
@@ -243,48 +271,34 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
                     k++;
                 }
             } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
-                produced[p] = ProtocolTypes.Output({ token: token, amount: 0 });
-                p++;
+                produced[p++] = ProtocolTypes.Output({ token: token, amount: 0 });
             } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
-                address vToken = _getVTokenForUnderlying(token);
-                uint rate = VTokenInterface(vToken).exchangeRateStored();
-                uint requiredV = amount == 0 ? type(uint256).max : (amount * 1e18 + rate - 1) / rate;
-                uint256 curV = IERC20(vToken).allowance(caller, address(this));
-
-                if (amount == 0 || curV < requiredV) {
+                if (_needsWithdrawApproval(token, amount, caller)) {
+                    address vToken = _getVTokenForUnderlying(token);
+                    uint256 rate = VTokenInterface(vToken).exchangeRateStored();
+                    uint256 requiredV = amount == 0 ? type(uint256).max : (amount * 1e18 + rate - 1) / rate;
                     targets[k] = vToken;
                     data[k] = abi.encodeWithSelector(IERC20.approve.selector, address(this), requiredV);
                     k++;
                 }
-
-                produced[p] = ProtocolTypes.Output({ token: token, amount: amount });
-                p++;
+                produced[p++] = ProtocolTypes.Output({ token: token, amount: amount });
             } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-                bool approved = false;
-                try comptroller.approvedDelegates(caller, address(this)) returns (bool a) {
-                    approved = a;
-                } catch {}
-                if (!approved) {
+                if (_needsBorrowDelegation(caller)) {
                     targets[k] = address(comptroller);
                     data[k] = abi.encodeWithSelector(ComptrollerInterface.updateDelegate.selector, address(this), true);
                     k++;
                 }
-                produced[p] = ProtocolTypes.Output({ token: token, amount: amount });
-                p++;
+                produced[p++] = ProtocolTypes.Output({ token: token, amount: amount });
             } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
                 address vToken = _getVTokenForUnderlying(token);
                 uint256 bal = VTokenInterface(vToken).borrowBalanceStored(ins.user);
-                bal = (bal * 1001) / 1000;
-                produced[p] = ProtocolTypes.Output({ token: token, amount: bal });
-                p++;
+                produced[p++] = ProtocolTypes.Output({ token: token, amount: (bal * 1001) / 1000 });
             } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
                 address vToken = _getVTokenForUnderlying(token);
                 uint256 vBal = VTokenInterface(vToken).balanceOf(ins.user);
                 uint256 rate = VTokenInterface(vToken).exchangeRateStored();
                 uint256 bal = (vBal * rate) / 1e18;
-                bal = (bal * 1001) / 1000;
-                produced[p] = ProtocolTypes.Output({ token: token, amount: bal });
-                p++;
+                produced[p++] = ProtocolTypes.Output({ token: token, amount: (bal * 1001) / 1000 });
             }
         }
     }
@@ -329,5 +343,18 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
             } catch {}
         }
         revert("Venus: vToken not found");
+    }
+
+    // ============ Emergency Recovery ============
+
+    /// @notice Recover stuck tokens (only callable by router's owner)
+    function recoverTokens(address token, address to, uint256 amount) external {
+        require(msg.sender == Ownable(ROUTER).owner(), "Only router owner");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 toRecover = amount == type(uint256).max ? balance : amount;
+        if (toRecover > balance) toRecover = balance;
+        if (toRecover > 0) {
+            IERC20(token).safeTransfer(to, toRecover);
+        }
     }
 }

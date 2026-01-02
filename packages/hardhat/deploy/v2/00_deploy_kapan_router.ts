@@ -5,6 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
+import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Router is chain-agnostic; we deploy it always.
@@ -20,9 +21,9 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
   logForkConfig(chainId);
 
   const { deployer } = await hre.getNamedAccounts();
-  const { deploy, execute } = hre.deployments;
+  const { deploy } = hre.deployments;
   const { ethers } = hre;
-  const WAIT = 3;
+  const WAIT = getWaitConfirmations(chainId);
 
   const BALANCER: Record<number, { VAULT_V2?: string; VAULT_V3?: string }> = {
     // Ethereum mainnet
@@ -106,14 +107,14 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
   const v3 = process.env.BALANCER_VAULT3 || BALANCER[effectiveChainId]?.VAULT_V3;
 
   if (v2) {
-    await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setBalancerV2", v2);
+    await safeExecute(hre, deployer, "KapanRouter", "setBalancerV2", [v2], { waitConfirmations: 1 });
     console.log(`Balancer V2 provider set: ${v2}`);
   } else {
     console.warn(`No Balancer V2 for chainId=${chainId}. Skipping setBalancerV2.`);
   }
 
   if (v3) {
-    await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setBalancerV3", v3);
+    await safeExecute(hre, deployer, "KapanRouter", "setBalancerV3", [v3], { waitConfirmations: 1 });
     console.log(`Balancer V3 vault set: ${v3}`);
   } else {
     console.warn(`No Balancer V3 for chainId=${chainId}. Skipping setBalancerV3.`);
@@ -132,7 +133,7 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
       const poolAddress = await provider.getPool();
 
       if (poolAddress && poolAddress !== ethers.ZeroAddress) {
-        await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setAavePool", poolAddress);
+        await safeExecute(hre, deployer, "KapanRouter", "setAavePool", [poolAddress], { waitConfirmations: 1 });
         console.log(`Aave pool set: ${poolAddress}`);
       } else {
         console.warn(`Aave pool address is zero for chainId=${chainId}. Skipping setAavePool.`);
@@ -149,7 +150,7 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
   if (morphoEntry) {
     const morphoAddress = process.env.MORPHO_BLUE_ADDRESS || morphoEntry.MORPHO;
     try {
-      await execute("KapanRouter", { from: deployer, waitConfirmations: 5 }, "setMorphoBluePool", morphoAddress);
+      await safeExecute(hre, deployer, "KapanRouter", "setMorphoBluePool", [morphoAddress], { waitConfirmations: 1 });
       console.log(`Morpho Blue pool set: ${morphoAddress}`);
     } catch (error) {
       console.warn(`Failed to set Morpho Blue pool for chainId=${chainId}:`, error);

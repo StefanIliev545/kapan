@@ -13,6 +13,17 @@ const ONEINCH_UNAVAILABLE = new Set([
   9745, // Plasma - 1inch not supported
 ]);
 
+// Chains where CoW Protocol (ComposableCoW + HooksTrampoline) IS available
+// AND we have flash loan providers configured in KapanCowAdapter.
+// Note: Optimism has HooksTrampoline but NOT ComposableCoW as of Jan 2025.
+const COW_PROTOCOL_AVAILABLE = new Set([
+  1,     // Mainnet
+  42161, // Arbitrum
+  8453,  // Base
+  59144, // Linea
+  31337, // Hardhat (for local dev with fork)
+]);
+
 // Chains where Pendle IS available (from deploy script PENDLE_ROUTERS)
 const PENDLE_AVAILABLE = new Set([
   1,     // Mainnet
@@ -62,13 +73,20 @@ const MORPHO_AVAILABLE = new Set([
 ]);
 
 // ZeroLend (from 04_deploy_zero_lend_gateway_write.ts MAP)
+// Note: Mainnet LRT market has frozen reserves as of Jan 2026, so excluded
 const ZEROLEND_AVAILABLE = new Set([
+  // 1,  // Mainnet (LRT market) - FROZEN, all reserves paused
   59144, // Linea
   8453,  // Base
 ]);
 
 // ==================== DESTINATION PROTOCOL AVAILABILITY ====================
 // IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/ gateway deploy scripts
+
+// Spark (from 05_deploy_spark_gateway_write.ts)
+const SPARK_AVAILABLE = new Set([
+  1,     // Mainnet only
+]);
 
 // Venus (from 03_deploy_venus_gateway_write.ts VENUS map)
 const VENUS_AVAILABLE = new Set([
@@ -147,6 +165,13 @@ export function getAvailableSwapRouters(chainId: number | undefined): Array<"1in
   return routers;
 }
 
+// ==================== COW PROTOCOL ====================
+
+export function isCowProtocolSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return COW_PROTOCOL_AVAILABLE.has(chainId);
+}
+
 // ==================== FLASH LOANS ====================
 
 export function isAaveV3Supported(chainId: number | undefined): boolean {
@@ -175,6 +200,11 @@ export function isZeroLendSupported(chainId: number | undefined): boolean {
 }
 
 // ==================== DESTINATION PROTOCOLS ====================
+
+export function isSparkSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return SPARK_AVAILABLE.has(chainId);
+}
 
 export function isVenusSupported(chainId: number | undefined): boolean {
   if (chainId === undefined) return false;

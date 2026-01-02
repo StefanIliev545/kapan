@@ -46,13 +46,14 @@ const FORK_CHAIN = matchForkChain(FORK_CHAIN_INPUT);
 const forkUrl = FORK_RPC_URLS[FORK_CHAIN];
 
 // Pin to specific block numbers for faster caching (update periodically)
-const FORK_BLOCK_NUMBERS: Record<string, number> = {
-  ethereum: 23988682,
-  eth: 21350000,
-  mainnet: 21350000,
+// Set to undefined to use latest block
+const FORK_BLOCK_NUMBERS: Record<string, number | undefined> = {
+  ethereum: undefined, // Use latest - contracts deployed recently
+  eth: undefined,
+  mainnet: undefined,
   arbitrum: 414729450, // ~Dec 2025
   arb: 414729450,
-  base: 23500000,      // ~Dec 2024
+  base: 40261400,      // ~Jan 2026 - after real CoW order created at 40261309
   optimism: 129000000, // ~Dec 2024
   op: 129000000,
   linea: 13000000,     // ~Dec 2024
@@ -81,12 +82,11 @@ const config: HardhatUserConfig = {
         version: "0.8.30",
         settings: {
           evmVersion: "cancun",
+          viaIR: true,
           optimizer: {
             enabled: true,
-            // https://docs.soliditylang.org/en/latest/using-the-compiler.html#optimizer-options
-            runs: 200,
+            runs: 10,  // Minimal runs for smallest bytecode (KapanRouter at limit)
           },
-          viaIR: true,
         },
       },
       {
@@ -122,7 +122,30 @@ const config: HardhatUserConfig = {
       mining: {
         auto: true,
         interval: 1000
-      }
+      },
+      // Chain configurations for fork support
+      chains: {
+        8453: { // Base
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        42161: { // Arbitrum One
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        10: { // Optimism
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        59144: { // Linea
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+      },
     },
     localhost: {
       url: "http://127.0.0.1:8545",

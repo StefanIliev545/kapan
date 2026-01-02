@@ -10,6 +10,7 @@ import {
   encodeFlashLoan,
   FlashLoanProvider,
   LendingOp,
+  deployRouterWithAuthHelper,
 } from "./helpers/instructionHelpers";
 
 /**
@@ -811,11 +812,8 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       // ============ Phase 1: Deploy Infrastructure ============
       console.log("\n--- Phase 1: Deploy Infrastructure ---");
 
-      // Deploy Router
-      const Router = await ethers.getContractFactory("KapanRouter");
-      const router = await Router.deploy(deployer.address);
-      await router.waitForDeployment();
-      const routerAddress = await router.getAddress();
+      // Deploy Router with AuthHelper
+      const { router, syncGateway, routerAddress } = await deployRouterWithAuthHelper(ethers, deployer.address);
       await router.setBalancerV3(BALANCER_VAULT3);
       console.log(`1. Router deployed: ${routerAddress}`);
 
@@ -823,6 +821,7 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       const AaveFactory = await ethers.getContractFactory("AaveGatewayWrite");
       const aaveGateway = await AaveFactory.deploy(routerAddress, AAVE_POOL_PROVIDER, 0);
       await router.addGateway("aave", await aaveGateway.getAddress());
+      await syncGateway("aave", await aaveGateway.getAddress());
       console.log(`2. Aave Gateway: ${await aaveGateway.getAddress()}`);
 
       // Deploy Morpho Blue Gateway
@@ -831,6 +830,7 @@ describe("v2 MorphoBlue Gateway (fork)", function () {
       await morphoGateway.waitForDeployment();
       const morphoGatewayAddress = await morphoGateway.getAddress();
       await router.addGateway("morpho-blue", morphoGatewayAddress);
+      await syncGateway("morpho-blue", morphoGatewayAddress);
       console.log(`3. Morpho Gateway: ${morphoGatewayAddress}`);
 
       // Register market

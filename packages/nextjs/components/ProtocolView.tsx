@@ -23,7 +23,7 @@ import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { formatBps } from "~~/utils/risk";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
 import { useAaveEMode } from "~~/hooks/useAaveEMode";
-import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { usePendlePTYields, usePTEnhancedApyMaps, isPTToken } from "~~/hooks/usePendlePTYields";
 
 
 export interface ProtocolPosition {
@@ -273,34 +273,17 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     return isAaveProtocol ? filterByEMode(result) : result;
   }, [availableCollaterals, borrowedPositions, isAaveProtocol, filterByEMode]);
 
-  // APY maps for multiply modal
-  // For PT tokens, use fixed yield from Pendle instead of lending APY
-  const supplyApyMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    suppliedPositions.forEach(p => {
-      const addrLower = p.tokenAddress.toLowerCase();
-      
-      // Check if this is a PT token and we have yield data
-      if (isPTToken(p.name)) {
-        // Try to find yield by address first, then by symbol
-        const ptYield = yieldsByAddress.get(addrLower) || yieldsBySymbol.get(p.name.toLowerCase());
-        if (ptYield) {
-          map[addrLower] = ptYield.fixedApy;
-          return;
-        }
-      }
-      
-      // Default to lending APY
-      map[addrLower] = p.currentRate;
-    });
-    return map;
-  }, [suppliedPositions, yieldsByAddress, yieldsBySymbol]);
-
-  const borrowApyMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    borrowedPositions.forEach(p => { map[p.tokenAddress.toLowerCase()] = Math.abs(p.currentRate); });
-    return map;
-  }, [borrowedPositions]);
+  // APY maps for multiply modal - PT tokens get Pendle fixed yields automatically
+  const apyMapTokens = useMemo(() => 
+    suppliedPositions.map(p => ({
+      address: p.tokenAddress,
+      symbol: p.name,
+      supplyRate: p.currentRate,
+      borrowRate: borrowedPositions.find(b => b.tokenAddress.toLowerCase() === p.tokenAddress.toLowerCase())?.currentRate || 0,
+    })),
+    [suppliedPositions, borrowedPositions]
+  );
+  const { supplyApyMap, borrowApyMap } = usePTEnhancedApyMaps(chainId, apyMapTokens);
 
   // Calculate net balance.
   const netBalance = useMemo(() => {

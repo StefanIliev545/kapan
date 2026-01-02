@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Address } from "viem";
 
 // Try direct Pendle API first (often works), fall back to proxy if CORS blocked
@@ -175,37 +176,44 @@ export function usePendlePTYields(
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
 
-  // Create a map for easy lookup by address
-  const yieldsByAddress = new Map<string, PTYield>();
-  const yieldsBySymbol = new Map<string, PTYield>();
-  
-  query.data?.forEach(y => {
-    yieldsByAddress.set(y.address.toLowerCase(), y);
-    yieldsBySymbol.set(y.symbol.toLowerCase(), y);
-  });
+  // Create memoized maps for easy lookup by address and symbol
+  const yieldsByAddress = useMemo(() => {
+    const map = new Map<string, PTYield>();
+    query.data?.forEach(y => map.set(y.address.toLowerCase(), y));
+    return map;
+  }, [query.data]);
+
+  const yieldsBySymbol = useMemo(() => {
+    const map = new Map<string, PTYield>();
+    query.data?.forEach(y => map.set(y.symbol.toLowerCase(), y));
+    return map;
+  }, [query.data]);
 
   // If tokens provided, match them to yields
-  const matchedYields = tokens?.map(t => {
-    // Try exact address match first
-    const byAddress = yieldsByAddress.get(t.address.toLowerCase());
-    if (byAddress) return { ...t, yield: byAddress };
-    
-    // Try symbol match
-    const bySymbol = yieldsBySymbol.get(t.symbol.toLowerCase());
-    if (bySymbol) return { ...t, yield: bySymbol };
-    
-    // Try fuzzy match based on base token
-    if (isPTToken(t.symbol)) {
-      const baseToken = extractPTBaseToken(t.symbol);
-      const match = query.data?.find(y => 
-        y.underlyingSymbol.toLowerCase().includes(baseToken) ||
-        y.symbol.toLowerCase().includes(baseToken)
-      );
-      if (match) return { ...t, yield: match };
-    }
-    
-    return { ...t, yield: undefined };
-  });
+  const matchedYields = useMemo(() => {
+    if (!tokens) return undefined;
+    return tokens.map(t => {
+      // Try exact address match first
+      const byAddress = yieldsByAddress.get(t.address.toLowerCase());
+      if (byAddress) return { ...t, yield: byAddress };
+      
+      // Try symbol match
+      const bySymbol = yieldsBySymbol.get(t.symbol.toLowerCase());
+      if (bySymbol) return { ...t, yield: bySymbol };
+      
+      // Try fuzzy match based on base token
+      if (isPTToken(t.symbol)) {
+        const baseToken = extractPTBaseToken(t.symbol);
+        const match = query.data?.find(y => 
+          y.underlyingSymbol.toLowerCase().includes(baseToken) ||
+          y.symbol.toLowerCase().includes(baseToken)
+        );
+        if (match) return { ...t, yield: match };
+      }
+      
+      return { ...t, yield: undefined };
+    });
+  }, [tokens, yieldsByAddress, yieldsBySymbol, query.data]);
 
 
   return {
@@ -218,6 +226,67 @@ export function usePendlePTYields(
     error: query.error,
     refetch: query.refetch,
   };
+}
+
+/**
+ * Build APY maps with PT yields automatically enhanced
+ * For PT tokens, uses Pendle fixed yield; for others, uses provided rate
+ * 
+ * @param chainId - The chain ID
+ * @param tokens - Array of tokens with address, symbol, and optional rates
+ * @returns supplyApyMap and borrowApyMap with PT yields applied
+ */
+export function usePTEnhancedApyMaps(
+  chainId: number | undefined,
+  tokens: Array<{
+    address: string;
+    symbol: string;
+    supplyRate?: number;
+    borrowRate?: number;
+  }>
+) {
+  const { yieldsByAddress, yieldsBySymbol, yields, isLoading } = usePendlePTYields(chainId);
+
+  const supplyApyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    tokens.forEach(t => {
+      const addrLower = t.address.toLowerCase();
+      
+      // Check if this is a PT token and we have yield data
+      if (isPTToken(t.symbol)) {
+        // Try to find yield by address first, then by symbol
+        let ptYield = yieldsByAddress.get(addrLower) || yieldsBySymbol.get(t.symbol.toLowerCase());
+        
+        // Fuzzy match if no exact match
+        if (!ptYield) {
+          const baseToken = extractPTBaseToken(t.symbol);
+          ptYield = yields.find(y => 
+            y.underlyingSymbol.toLowerCase().includes(baseToken) ||
+            y.symbol.toLowerCase().includes(baseToken)
+          );
+        }
+        
+        if (ptYield) {
+          map[addrLower] = ptYield.fixedApy;
+          return;
+        }
+      }
+      
+      // Default to provided rate
+      map[addrLower] = t.supplyRate || 0;
+    });
+    return map;
+  }, [tokens, yieldsByAddress, yieldsBySymbol, yields]);
+
+  const borrowApyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    tokens.forEach(t => {
+      map[t.address.toLowerCase()] = Math.abs(t.borrowRate || 0);
+    });
+    return map;
+  }, [tokens]);
+
+  return { supplyApyMap, borrowApyMap, isLoading };
 }
 
 /**

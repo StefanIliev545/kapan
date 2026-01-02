@@ -11,14 +11,15 @@ interface CollateralToken {
 }
 
 // Map protocol names to gateway view contract names
-const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView"> = {
+const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView" | "SparkGatewayView"> = {
   aave: "AaveGatewayView",
   compound: "CompoundGatewayView",
   venus: "VenusGatewayView",
   zerolend: "ZeroLendGatewayView",
+  spark: "SparkGatewayView",
 };
 
-export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean) => {
+export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean, chainId?: number) => {
   // Normalize protocol name and get gateway contract name
   const normalizedProtocol = protocolName.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
   const gatewayContractName = PROTOCOL_TO_GATEWAY_MAP[normalizedProtocol] || "AaveGatewayView";
@@ -27,6 +28,7 @@ export const useCollaterals = (tokenAddress: string, protocolName: string, userA
     contractName: gatewayContractName as ContractName,
     functionName: "getPossibleCollaterals",
     args: [tokenAddress, userAddress],
+    chainId: chainId as any,
     query: {
       enabled,
     },

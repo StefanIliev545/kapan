@@ -6424,6 +6424,7 @@ __metadata:
     framer-motion: ^12.4.10
     gray-matter: ^4.0.3
     heatmap.js: ^2.0.5
+    json-stringify-deterministic: ^1.0.12
     lodash.merge: ^4.6.2
     lucide-react: ^0.553.0
     moment: ^2.30.1
@@ -17891,6 +17892,13 @@ __metadata:
   version: 3.1.6
   resolution: "json-stream-stringify@npm:3.1.6"
   checksum: ce873e09fe18461960b7536f63e2f913a2cb242819513856ed1af58989d41846976e7177cb1fe3c835220023aa01e534d56b6d5c3290a5b23793a6f4cb93785e
+  languageName: node
+  linkType: hard
+
+"json-stringify-deterministic@npm:^1.0.12":
+  version: 1.0.12
+  resolution: "json-stringify-deterministic@npm:1.0.12"
+  checksum: b79f2bded0076e3f3b3d3b4c3ff16e9e40cdcb0144e936fc24294c47100972df2d4bcf3a75890ab2d7d30552ae09affde4fdce4faf6f064783411c1ade14a9c3
   languageName: node
   linkType: hard
 

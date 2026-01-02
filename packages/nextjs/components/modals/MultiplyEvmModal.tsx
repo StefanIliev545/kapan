@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import Image from "next/image";
 import { Address, formatUnits, parseUnits } from "viem";
-import { CheckIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ClockIcon } from "@heroicons/react/24/outline";
 
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
@@ -12,10 +12,34 @@ import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveLtv";
+import { useCowOrder } from "~~/hooks/useCowOrder";
+import { useCowQuote, getCowQuoteBuyAmount } from "~~/hooks/useCowQuote";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
-import { FlashLoanProvider, MorphoMarketContextForEncoding, encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
+import { 
+  FlashLoanProvider, 
+  MorphoMarketContextForEncoding, 
+  encodeMorphoContext,
+  createRouterInstruction,
+  createProtocolInstruction,
+  encodePullToken,
+  encodePushToken,
+  encodeApprove,
+  encodeAdd,
+  encodeLendingInstruction,
+  LendingOp,
+  normalizeProtocolName,
+  ProtocolInstruction,
+} from "~~/utils/v2/instructionHelpers";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, getCowBorrower, getPreferredFlashLoanLender, getKapanCowAdapter } from "~~/utils/cow";
+import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken } from "~~/utils/chainFeatures";
+import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { useAccount } from "wagmi";
+import { useSendCalls, useCallsStatus } from "wagmi/experimental";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { notification } from "~~/utils/scaffold-stark/notification";
+import { TransactionToast } from "~~/components/TransactionToast";
+import { encodeFunctionData, type Hex } from "viem";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -81,6 +105,35 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [leverageInput, setLeverageInput] = useState<string>("1.00");
   const [slippage, setSlippage] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Execution type: "market" (flash loan, instant) vs "limit" (CoW, async chunks)
+  type ExecutionType = "market" | "limit";
+  const [executionType, setExecutionType] = useState<ExecutionType>("market");
+  
+  // CoW limit order specific state
+  // Limit order slippage: how much worse than market price we accept (allows filling when price moves)
+  // Default 0.1% - will be auto-adjusted based on price impact on first quote
+  const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
+  const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
+  const [customMinPrice, setCustomMinPrice] = useState<string>(""); // User override for min price
+  const [showAdvancedPricing, setShowAdvancedPricing] = useState(false);
+  const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null); // Store salt for CoW Explorer link
+  const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null); // Track loading notification
+  const cowAvailable = isCowProtocolSupported(chainId);
+  
+  // Check if we're in a dev environment
+  const isDevEnvironment = process.env.NODE_ENV === 'development';
+  
+  // Flash loan toggle for limit orders - enables single-tx execution via CoW Protocol flash loans
+  const [useFlashLoan, setUseFlashLoan] = useState<boolean>(true); // Default ON
+  // Number of chunks for flash loan orders (each chunk is independent flash loan settlement)
+  const [flashLoanChunks, setFlashLoanChunks] = useState<number>(1);
+  
+  // Get user address for CoW order creation
+  const { address: userAddress } = useAccount();
+  
+  // CoW order hook
+  const { createOrder: createCowOrder, buildOrderCalls, isCreating: isCowCreating, isAvailable: cowContractAvailable, orderManagerAddress } = useCowOrder();
   
   // Check swap router availability for this chain
   const oneInchAvailable = is1inchSupported(chainId);
@@ -246,7 +299,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // In zap mode, margin is in debt token terms; otherwise collateral
   const marginAmountRaw = useMemo(() => {
-    try { return depositToken ? parseUnits(marginAmount || "0", depositDecimals) : 0n; }
+    try {
+      if (!depositToken) return 0n;
+      const parsed = parseUnits(marginAmount || "0", depositDecimals);
+      return parsed > 0n ? parsed : 0n; // Ensure non-negative
+    }
     catch { return 0n; }
   }, [depositToken, depositDecimals, marginAmount]);
 
@@ -312,14 +369,107 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     enabled: pendleAvailable && swapRouter === "pendle" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!pendleAdapter,
   });
 
+  // CoW Quote (for limit orders - provides reference price)
+  const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
+    sellToken: debt?.address || "",
+    buyToken: collateral?.address || "",
+    sellAmount: swapQuoteAmount.toString(),
+    from: userAddress || "",
+    enabled: cowAvailable && executionType === "limit" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!userAddress,
+  });
+
   // Unified loading state
-  const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchLoading : isPendleLoading;
+  const isSwapQuoteLoading = executionType === "limit" 
+    ? isCowQuoteLoading 
+    : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading);
+
+  // Get best quote from all available sources
+  const bestQuote = useMemo(() => {
+    const quotes: { source: string; amount: bigint }[] = [];
+    
+    if (oneInchQuote?.dstAmount) {
+      quotes.push({ source: "1inch", amount: BigInt(oneInchQuote.dstAmount) });
+    }
+    if (pendleQuote?.data) {
+      const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
+      if (outAmount !== "0") {
+        quotes.push({ source: "Pendle", amount: BigInt(outAmount) });
+      }
+    }
+    if (cowQuote?.quote?.buyAmount) {
+      quotes.push({ source: "CoW", amount: BigInt(cowQuote.quote.buyAmount) });
+    }
+    
+    if (quotes.length === 0) return null;
+    
+    // Return the best (highest output) quote
+    return quotes.reduce((best, current) => 
+      current.amount > best.amount ? current : best
+    );
+  }, [oneInchQuote, pendleQuote, cowQuote]);
+
+  // Market price (rate) from best quote
+  const marketRate = useMemo(() => {
+    if (!bestQuote || !debt || swapQuoteAmount === 0n) return null;
+    // Rate = buyAmount / sellAmount (how much collateral per debt token)
+    const sellAmountFloat = Number(formatUnits(swapQuoteAmount, debt.decimals));
+    const buyAmountFloat = Number(formatUnits(bestQuote.amount, collateral?.decimals ?? 18));
+    if (sellAmountFloat === 0) return null;
+    return buyAmountFloat / sellAmountFloat;
+  }, [bestQuote, debt, collateral, swapQuoteAmount]);
+
+  // Calculate price impact from available quote data (for limit order slippage estimation)
+  const quotesPriceImpact = useMemo(() => {
+    // Pendle provides priceImpact directly
+    if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
+      return Math.abs(pendleQuote.data.priceImpact * 100);
+    }
+    // 1inch: calculate from USD values
+    if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
+      const srcUSD = parseFloat(oneInchQuote.srcUSD);
+      const dstUSD = parseFloat(oneInchQuote.dstUSD);
+      if (srcUSD > 0) {
+        return Math.max(0, ((srcUSD - dstUSD) / srcUSD) * 100);
+      }
+    }
+    return null;
+  }, [swapRouter, pendleQuote, oneInchQuote]);
+
+  // Auto-estimate limit order slippage based on price impact (only on first quote)
+  useEffect(() => {
+    if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
+    if (quotesPriceImpact === null) return;
+    
+    const suggested = calculateSuggestedSlippage(quotesPriceImpact);
+    setLimitSlippage(suggested);
+    setHasAutoSetLimitSlippage(true);
+  }, [executionType, quotesPriceImpact, hasAutoSetLimitSlippage]);
+
+  // Reset limit slippage auto-set flag when switching execution type or tokens
+  useEffect(() => {
+    setHasAutoSetLimitSlippage(false);
+    setLimitSlippage(0.1); // Reset to default
+  }, [collateral?.address, debt?.address]);
 
   const minCollateralOut = useMemo(() => {
     if (!collateral) return { raw: 0n, formatted: "0" };
     
+    // For limit orders with custom min price
+    if (executionType === "limit" && customMinPrice && customMinPrice !== "") {
+      try {
+        const customRaw = parseUnits(customMinPrice, collateral.decimals);
+        return { raw: customRaw, formatted: customMinPrice };
+      } catch {
+        // Invalid input, fall through to calculated value
+      }
+    }
+    
+    // Get the relevant quote
     let quoted = 0n;
-    if (swapRouter === "1inch" && oneInchQuote) {
+    if (executionType === "limit") {
+      // For limit orders, use best quote from any source
+      quoted = bestQuote?.amount ?? 0n;
+    } else if (swapRouter === "1inch" && oneInchQuote) {
       quoted = BigInt(oneInchQuote.dstAmount || "0");
     } else if (swapRouter === "pendle" && pendleQuote) {
       const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
@@ -327,10 +477,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
     
     if (quoted === 0n) return { raw: 0n, formatted: "0" };
-    const bufferBps = BigInt(Math.round(slippage * 100));
+    
+    // Both limit and market orders: apply slippage tolerance (accept worse price)
+    // For limit orders, this allows the order to fill even if price moves against us
+    // e.g., 1% slippage means we accept 99% of the quoted amount
+    const slippageToUse = executionType === "limit" ? limitSlippage : slippage;
+    const bufferBps = BigInt(Math.round(slippageToUse * 100));
     const buffered = (quoted * (10000n - bufferBps)) / 10000n;
     return { raw: buffered, formatted: formatUnits(buffered, collateral.decimals) };
-  }, [collateral, slippage, swapRouter, oneInchQuote, pendleQuote]);
+  }, [collateral, slippage, swapRouter, oneInchQuote, pendleQuote, executionType, bestQuote, limitSlippage, customMinPrice]);
 
   const metrics = useMemo(() => {
     if (!collateral || !debt || marginAmountRaw === 0n) {
@@ -367,24 +522,58 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     return { totalCollateralUsd, debtUsd, ltv, liquidationPrice, healthFactor, totalCollateralTokens };
   }, [collateral, debt, marginAmountRaw, minCollateralOut.formatted, flashLoanAmountRaw, effectiveLltvBps, zapMode]);
 
-  // Net APY calculation
-  const netApy = useMemo(() => {
-    if (!collateral || !debt || metrics.totalCollateralUsd === 0) return null;
+  // Net APY and 30d yield calculation
+  const { netApy, netYield30d } = useMemo(() => {
+    if (!collateral || !debt || metrics.totalCollateralUsd === 0) return { netApy: null, netYield30d: null };
     const supplyApy = supplyApyMap[collateral.address.toLowerCase()] ?? 0;
     const borrowApy = borrowApyMap[debt.address.toLowerCase()] ?? 0;
 
     // Weighted: (collateral * supplyAPY - debt * borrowAPY) / equity
     const equity = metrics.totalCollateralUsd - metrics.debtUsd;
-    if (equity <= 0) return null;
+    if (equity <= 0) return { netApy: null, netYield30d: null };
 
     const earnedYield = (metrics.totalCollateralUsd * supplyApy) / 100;
     const paidInterest = (metrics.debtUsd * borrowApy) / 100;
-    const netYieldUsd = earnedYield - paidInterest;
+    const netYieldUsd = earnedYield - paidInterest; // Annual yield in USD
 
-    return (netYieldUsd / equity) * 100; // as percentage
+    const netApyValue = (netYieldUsd / equity) * 100; // as percentage
+    const netYield30dValue = netYieldUsd * (30 / 365); // 30 day yield in USD
+
+    return { netApy: netApyValue, netYield30d: netYield30dValue };
   }, [collateral, debt, metrics, supplyApyMap, borrowApyMap]);
 
-  const { buildMultiplyFlow } = useKapanRouterV2();
+  const { buildMultiplyFlow, executeFlowBatchedIfPossible, executeFlowWithApprovals, buildFlowCalls, sendCallsAsync, setBatchId, setSuppressBatchNotifications, batchStatus, isBatchConfirmed, routerContract, getAuthorizations } = useKapanRouterV2();
+
+  // Show success notification and close modal when limit order batch is confirmed
+  useEffect(() => {
+    if (isBatchConfirmed && executionType === "limit" && userAddress) {
+      console.log("[Limit Order] Batch confirmed, showing success and closing modal");
+      
+      // Remove loading notification
+      if (limitOrderNotificationId) {
+        notification.remove(limitOrderNotificationId);
+        setLimitOrderNotificationId(null);
+      }
+      
+      // Build CoW Explorer link - use orderManagerAddress since orders are created by the contract
+      const cowExplorerUrl = orderManagerAddress 
+        ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
+        : undefined;
+      const shortSalt = lastOrderSalt ? `${lastOrderSalt.slice(0, 10)}...${lastOrderSalt.slice(-6)}` : "";
+      
+      // Show success notification with CoW Explorer link
+      notification.success(
+        <TransactionToast
+          step="confirmed"
+          message={`Limit order created!${shortSalt ? ` (${shortSalt})` : ""}`}
+          secondaryLink={cowExplorerUrl}
+          secondaryLinkText="View on CoW Explorer"
+        />
+      );
+      
+      onClose();
+    }
+  }, [isBatchConfirmed, executionType, orderManagerAddress, chainId, lastOrderSalt, limitOrderNotificationId, onClose]);
 
   const buildFlow = () => {
     if (!collateral || !debt || flashLoanAmountRaw === 0n) return [];
@@ -421,6 +610,324 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     return flow;
   };
 
+  /**
+   * Calculate chunk parameters for limit orders
+   * With flash loan enabled: single chunk, full amount
+   * Without flash loan: calculate based on capacity constraints
+   */
+  const chunkParams = useMemo((): ChunkCalculationResult & { useFlashLoan?: boolean; flashLoanFee?: bigint; flashLoanLender?: string } => {
+    if (executionType !== "limit" || !collateral || !debt || flashLoanAmountRaw === 0n || marginAmountRaw === 0n) {
+      return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "" };
+    }
+
+    // Get LTV - prefer from reserve config, fall back to prop, then default
+    const ltvBps = collateralConfig?.ltv 
+      ? Number(collateralConfig.ltv) 
+      : (isEModeActive && eMode ? eMode.ltv : Number(maxLtvBps));
+
+    // Get prices (8 decimals like Aave oracle)
+    const collateralPrice = collateral.price ?? 0n;
+    const debtPrice = debt.price ?? 0n;
+
+    if (collateralPrice === 0n || debtPrice === 0n) {
+      return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "Missing price data" };
+    }
+
+    // If flash loan is enabled, calculate chunk sizes based on user-specified count
+    // KapanCowAdapter supports both Morpho (0% fee) and Aave V3 (0.05% fee)
+    if (useFlashLoan) {
+      // Get preferred lender (Morpho if available, else Aave)
+      const lenderInfo = getPreferredFlashLoanLender(chainId);
+      const flashLoanLender = lenderInfo?.address;
+      if (!flashLoanLender || !lenderInfo) {
+        console.warn("[Limit Order] Flash loans not available on this chain for CoW orders");
+        return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "Flash loans not available for limit orders on this chain" };
+      }
+      
+      // Use user-specified chunk count
+      const numChunks = flashLoanChunks;
+      const baseChunkSize = flashLoanAmountRaw / BigInt(numChunks);
+      const remainder = flashLoanAmountRaw % BigInt(numChunks);
+      
+      // Build chunk sizes array - last chunk gets remainder
+      const chunkSizes = Array(numChunks).fill(baseChunkSize).map((size, i) => 
+        i === numChunks - 1 ? size + remainder : size
+      ) as bigint[];
+      
+      // Calculate fee per chunk (based on base chunk size)
+      const flashLoanFeePerChunk = calculateFlashLoanFee(baseChunkSize, lenderInfo.provider);
+      
+      console.log(`[Limit Order] Flash loan mode (CoW/${lenderInfo.provider}):`, {
+        totalDebt: formatUnits(flashLoanAmountRaw, debt.decimals),
+        numChunks,
+        chunkSize: formatUnits(baseChunkSize, debt.decimals),
+        flashLoanFeePerChunk: formatUnits(flashLoanFeePerChunk, debt.decimals),
+        lender: flashLoanLender,
+        lenderType: lenderInfo.provider,
+      });
+      
+      return {
+        numChunks,
+        chunkSize: baseChunkSize,
+        chunkSizes,
+        needsChunking: numChunks > 1,
+        initialBorrowCapacityUsd: 0n,
+        geometricRatio: 0,
+        recommendFlashLoan: true,
+        useFlashLoan: true,
+        flashLoanFee: flashLoanFeePerChunk, // Fee per chunk
+        flashLoanLender,
+        explanation: numChunks === 1
+          ? (flashLoanFeePerChunk > 0n 
+              ? `Flash loan: single tx execution (fee: ${formatUnits(flashLoanFeePerChunk, debt.decimals)} ${debt.symbol})`
+              : `Flash loan: single tx execution (no fee)`)
+          : `Flash loan: ${numChunks} chunks of ~${formatUnits(baseChunkSize, debt.decimals)} ${debt.symbol}`,
+      };
+    }
+
+    // Calculate swap rate from best quote
+    const swapRate = bestQuote && swapQuoteAmount > 0n
+      ? calculateSwapRate(swapQuoteAmount, debt.decimals, bestQuote.amount, collateral.decimals)
+      : 0n;
+
+    const result = calculateChunkParams({
+      initialCollateralAmount: marginAmountRaw,
+      collateralPrice,
+      collateralDecimals: collateral.decimals,
+      debtPrice,
+      debtDecimals: debt.decimals,
+      totalDebtAmount: flashLoanAmountRaw,
+      ltvBps,
+      swapRate,
+      safetyBuffer: 0.90, // 90% of max capacity per chunk
+    });
+
+    console.log("[Limit Order] Chunk calculation:", {
+      initialCollateral: formatUnits(marginAmountRaw, collateral.decimals),
+      totalDebt: formatUnits(flashLoanAmountRaw, debt.decimals),
+      ltvBps,
+      result,
+    });
+
+    return result;
+  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, flashLoanChunks, chainId]);
+
+  /**
+   * Build per-iteration pre/post instructions for CoW limit order loop
+   * 
+   * FLASH LOAN MODE (useFlashLoan=true):
+   * - Single iteration
+   * - Pre-hook: Deposit initial collateral (if any)
+   * - Post-hook: Deposit all swapped collateral, then borrow to repay flash loan
+   * - The borrowed funds go to the settlement contract which repays the flash loan
+   * 
+   * MULTI-CHUNK MODE (useFlashLoan=false):
+   * - Pre-hook (before swap): Empty - tokens already at OrderManager
+   * - Post-hook (after swap): 
+   *   - Non-final chunks: Deposit + Borrow + Push (fund next chunk)
+   *   - Final chunk: Deposit only (no more borrowing needed)
+   */
+  const buildCowInstructions = useMemo(() => {
+    if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n || !orderManagerAddress) {
+      return { preInstructionsPerIteration: [[]], postInstructionsPerIteration: [[]] };
+    }
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const isMorpho = normalizedProtocol === "morpho-blue";
+    const isCompound = normalizedProtocol === "compound";
+    
+    // Get context for the protocol (Morpho market params, Compound market, etc.)
+    const context = isMorpho && morphoContext 
+      ? encodeMorphoContext(morphoContext) 
+      : (isCompound && market ? market : "0x");
+
+    const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    
+    // Common deposit instructions (used by all modes)
+    const depositInstructions: ProtocolInstruction[] = [
+      // 1. Approve collateral for lending protocol - amount comes from swap output (set as Output[0])
+      createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+      // 2. Deposit collateral received from swap
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 0)
+      ),
+    ];
+
+    // ========== FLASH LOAN MODE ==========
+    // Flow: Solver takes flash loan → swap (debt → collateral) → post-hook deposits all & borrows to repay
+    //
+    // ========== FLASH LOAN MODE ==========
+    // CoW Protocol flash loan flow:
+    // 1. Solver takes flash loan via FlashLoanRouter → funds at ERC3156Borrower (or AaveBorrower)
+    // 2. Pre-hooks in appData: 
+    //    a. Borrower.approve(token, OrderManager, amount)
+    //    b. token.transferFrom(Borrower, OrderManager, amount)
+    //    c. OrderManager.executePreHookBySalt() - empty, just marks execution
+    // 3. Swap executes: OrderManager sells debt tokens for collateral
+    // 4. Post-hooks:
+    //    a. OrderManager.executePostHookBySalt() - runs instructions below
+    // 5. Flash loan repaid from Borrower contract
+    //
+    // Post-hook receives swap output as Output[0] (prepended by OrderManager)
+    // We then:
+    // 1. Pull user's initial margin collateral → UTXO[1]
+    // 2. Add swap output + margin → UTXO[2] (total collateral)
+    // 3. Approve & Deposit total collateral
+    // 4. Borrow debt tokens to repay flash loan
+    // 5. Push borrowed tokens to CoW Borrower (KapanCowAdapter or fallback to standard borrower)
+    if (chunkParams.useFlashLoan && chunkParams.flashLoanLender) {
+      // Get the borrower address - use KapanCowAdapter if deployed, otherwise fall back to CoW's standard borrower
+      // This MUST match the adapter used in appData.ts for flash loan execution
+      const cowBorrowerAddress = getKapanCowAdapter(chainId) || getCowBorrower(chunkParams.flashLoanLender, chainId);
+      
+      const numChunks = chunkParams.numChunks;
+      const lenderInfo = getPreferredFlashLoanLender(chainId);
+      
+      // Split margin across chunks (last chunk gets remainder)
+      const baseMarginPerChunk = marginAmountRaw / BigInt(numChunks);
+      const marginRemainder = marginAmountRaw % BigInt(numChunks);
+      
+      const preInstructionsPerIteration: ProtocolInstruction[][] = [];
+      const postInstructionsPerIteration: ProtocolInstruction[][] = [];
+      
+      for (let i = 0; i < numChunks; i++) {
+        // Pre-hook: Empty - flash loan transfer hooks are added in appData.ts
+        preInstructionsPerIteration.push([]);
+        
+        // Calculate this chunk's amounts
+        const isLastChunk = i === numChunks - 1;
+        const marginThisChunk = isLastChunk ? baseMarginPerChunk + marginRemainder : baseMarginPerChunk;
+        const chunkSize = chunkParams.chunkSizes[i];
+        const feeThisChunk = lenderInfo ? calculateFlashLoanFee(chunkSize, lenderInfo.provider) : 0n;
+        const chunkRepayAmount = chunkSize + feeThisChunk;
+        
+        // Post-hook: Pull margin → Add → Approve → Deposit → Borrow → Push
+        // 
+        // UTXO Tracking:
+        // - OrderManager prepends: ToOutput(receivedAmount, collateralToken) → UTXO[0]
+        // - [0] PullToken(marginThisChunk) → UTXO[1]
+        // - [1] Add(0, 1) → UTXO[2] (total collateral)
+        // - [2] Approve(2) → UTXO[3] (empty, for index sync)
+        // - [3] Deposit(input=2) → (no UTXO, consumed)
+        // - [4] Borrow(chunkRepayAmount) → UTXO[4] (borrowed debt tokens)
+        // - [5] PushToken(4, cowBorrower) → sends borrowed tokens to CoW Borrower for flash loan repayment
+        const postInstructions: ProtocolInstruction[] = [
+          // 1. Pull this chunk's margin → UTXO[1]
+          createRouterInstruction(encodePullToken(marginThisChunk, collateral.address, userAddress)),
+          
+          // 2. Add swap output + margin → UTXO[2] (total collateral for this chunk)
+          createRouterInstruction(encodeAdd(0, 1)),
+          
+          // 3. Approve total collateral for lending protocol → UTXO[3] (empty)
+          createRouterInstruction(encodeApprove(2, normalizedProtocol)),
+          
+          // 4. Deposit all collateral (single deposit) - no UTXO created
+          createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 2)
+          ),
+          
+          // 5. Borrow to repay this chunk's flash loan → UTXO[4]
+          createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkRepayAmount, context, 999)
+          ),
+          
+          // 6. Push borrowed tokens to CoW Borrower for flash loan repayment
+          // UTXO[4] = Borrow output (after PullToken[1], Add[2], Approve[3])
+          createRouterInstruction(encodePushToken(4, cowBorrowerAddress)),
+        ];
+        
+        postInstructionsPerIteration.push(postInstructions);
+      }
+      
+      console.log("[buildCowInstructions] Flash loan mode:", {
+        totalFlashLoan: formatUnits(flashLoanAmountRaw, debt.decimals),
+        numChunks,
+        chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
+        flashLoanFeePerChunk: formatUnits(chunkParams.flashLoanFee ?? 0n, debt.decimals),
+        marginPerChunk: formatUnits(baseMarginPerChunk, collateral.decimals),
+        totalMargin: formatUnits(marginAmountRaw, collateral.decimals),
+        lender: chunkParams.flashLoanLender,
+        cowBorrower: cowBorrowerAddress,
+        flow: "swap[0] + pull[1] → add[2] → approve[3] → deposit → borrow[4] → push to Borrower",
+      });
+
+      return { preInstructionsPerIteration, postInstructionsPerIteration };
+    }
+
+    // ========== MULTI-CHUNK MODE (no flash loan) ==========
+    // Pre-hook instructions: Empty for all iterations
+    // Tokens are already at OrderManager from:
+    // - Chunk 0: seedAmount transferred during createOrder
+    // - Chunk 1+: borrowed and pushed during previous post-hook
+    const preInstructionsPerIteration: ProtocolInstruction[][] = [[]];
+    
+    // Post-hook for final chunk: Deposit only (no borrow needed)
+    const postInstructionsFinal: ProtocolInstruction[] = [...depositInstructions];
+    
+    // Build per-iteration post instructions
+    const numChunks = chunkParams.numChunks;
+    const chunkSize = chunkParams.chunkSize;
+    const postInstructionsPerIteration: ProtocolInstruction[][] = [];
+    
+    for (let i = 0; i < numChunks; i++) {
+      if (i === numChunks - 1) {
+        // Last chunk - deposit only
+        postInstructionsPerIteration.push(postInstructionsFinal);
+      } else {
+        // Non-final chunk - deposit + borrow + push
+        const postInstructionsWithBorrow: ProtocolInstruction[] = [
+          ...depositInstructions,
+          createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkSize, context, 999)
+          ),
+          createRouterInstruction(encodePushToken(2, orderManagerAddress)),
+        ];
+        postInstructionsPerIteration.push(postInstructionsWithBorrow);
+      }
+    }
+    
+    if (postInstructionsPerIteration.length === 0) {
+      postInstructionsPerIteration.push(postInstructionsFinal);
+    }
+
+    console.log("[buildCowInstructions] Multi-chunk mode:", numChunks, "chunks");
+
+    return { preInstructionsPerIteration, postInstructionsPerIteration };
+  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams]);
+
+  /**
+   * Build instructions to deposit initial collateral (executed before creating CoW order)
+   */
+  const buildInitialDepositFlow = useMemo(() => {
+    if (!collateral || !userAddress || marginAmountRaw <= 0n) return [];
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const isMorpho = normalizedProtocol === "morpho-blue";
+    const isCompound = normalizedProtocol === "compound";
+    
+    const context = isMorpho && morphoContext 
+      ? encodeMorphoContext(morphoContext) 
+      : (isCompound && market ? market : "0x");
+    
+    const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+
+    return [
+      // Pull collateral from user
+      createRouterInstruction(encodePullToken(marginAmountRaw, collateral.address, userAddress)),
+      // Approve lending protocol
+      createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+      // Deposit collateral
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 0)
+      ),
+    ];
+  }, [collateral, userAddress, marginAmountRaw, protocolName, morphoContext, market]);
+
   const { handleConfirm, batchingPreference } = useEvmTransactionFlow({
     isOpen, chainId, onClose, buildFlow, successMessage: "Loop position opened!",
     emptyFlowErrorMessage: "Unable to build loop instructions", simulateWhenBatching: false, // Disabled for now - zap mode has complex flows
@@ -431,18 +938,311 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      track("multiply_tx_begin", { protocol: protocolName, chainId, collateral: collateral?.symbol ?? "unknown", debt: debt?.symbol ?? "unknown", marginAmount, leverage, flashLoanProvider: selectedProvider?.name ?? "unknown", swapRouter });
-      await handleConfirm(marginAmount);
-      track("multiply_tx_complete", { status: "success" });
+      
+      if (executionType === "limit") {
+        // CoW Limit Order Loop - ALL IN ONE BATCHED TRANSACTION
+        track("multiply_limit_order_begin", { protocol: protocolName, chainId, collateral: collateral?.symbol ?? "unknown", debt: debt?.symbol ?? "unknown", marginAmount, leverage });
+        
+        if (!collateral || !debt || !userAddress || !orderManagerAddress || !routerContract || !sendCallsAsync) {
+          throw new Error("Missing required data for limit order");
+        }
+
+        const { preInstructionsPerIteration, postInstructionsPerIteration } = buildCowInstructions;
+        
+        // Calculate minBuyPerChunk - the minimum collateral expected per chunk
+        // minCollateralOut is the TOTAL expected collateral, so we divide by numChunks
+        // to get the proportional amount per chunk
+        const minBuyPerChunkRaw = minCollateralOut.raw > 0n && chunkParams.numChunks > 0
+          ? minCollateralOut.raw / BigInt(chunkParams.numChunks)
+          : 0n;
+        const minBuyAmount = minBuyPerChunkRaw > 0n
+          ? formatUnits(minBuyPerChunkRaw, collateral.decimals)
+          : "0";
+
+        console.log("[Limit Order] Building batched transaction with:", {
+          hasInitialDeposit: marginAmountRaw > 0n && buildInitialDepositFlow.length > 0,
+          sellToken: debt.address,
+          buyToken: collateral.address,
+          preTotalAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
+          totalMinBuy: formatUnits(minCollateralOut.raw, collateral.decimals),
+          minBuyPerChunk: minBuyAmount,
+          numChunks: chunkParams.numChunks,
+          preInstructionsCount: preInstructionsPerIteration.length,
+          postInstructionsCount: postInstructionsPerIteration.length,
+        });
+
+        // Build all calls for batching
+        const allCalls: { to: Address; data: Hex }[] = [];
+        
+        const normalizedProtocol = normalizeProtocolName(protocolName);
+        const isMorpho = normalizedProtocol === "morpho-blue";
+        const isCompound = normalizedProtocol === "compound";
+        const context = isMorpho && morphoContext 
+          ? encodeMorphoContext(morphoContext) 
+          : (isCompound && market ? market : "0x");
+
+        // Flash loan mode vs multi-chunk mode
+        const isFlashLoanMode = chunkParams.useFlashLoan === true;
+        
+        console.log("[Limit Order] Execution mode:", isFlashLoanMode ? "FLASH_LOAN" : "MULTI_CHUNK");
+        console.log("[Limit Order] Using chunk params:", {
+          numChunks: chunkParams.numChunks,
+          chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
+          geometricRatio: chunkParams.geometricRatio,
+          needsChunking: chunkParams.needsChunking,
+          useFlashLoan: chunkParams.useFlashLoan,
+          flashLoanFee: chunkParams.flashLoanFee ? formatUnits(chunkParams.flashLoanFee, debt.decimals) : "N/A",
+          explanation: chunkParams.explanation,
+        });
+        
+        // For multi-chunk mode: Build SEED BORROW instruction
+        // For flash loan mode: No seed borrow needed - solver provides funds via flash loan
+        const seedAmount = isFlashLoanMode ? 0n : chunkParams.chunkSize;
+        
+        let seedBorrowInstruction: ProtocolInstruction | undefined;
+        if (!isFlashLoanMode) {
+          seedBorrowInstruction = createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(
+              LendingOp.Borrow,
+              debt.address,
+              userAddress,
+              seedAmount,
+              context,
+              999 // No UTXO reference - fixed amount
+            )
+          );
+        }
+
+        // 1. Build authorization instructions explicitly
+        // Only include instructions that actually need user authorization:
+        // - PullToken needs ERC20 approve for router
+        // - Borrow needs credit delegation
+        // 
+        // FLASH LOAN MODE:
+        // - PullToken happens in post-hook (user's initial collateral pulled during hook execution)
+        // - Borrow to settlement contract for flash loan repayment
+        // - No initial deposit before order (everything happens in post-hook)
+        //
+        // MULTI-CHUNK MODE:
+        // - PullToken for initial deposit (before order creation)
+        // - Seed borrow (covers post-hook borrows too via same delegation)
+        const instructionsNeedingAuth: ProtocolInstruction[] = [];
+        
+        if (isFlashLoanMode) {
+          // Flash loan mode: collateral is pulled in post-hook, so we need approval for that
+          if (marginAmountRaw > 0n && collateral) {
+            // Create PullToken instruction for auth (same as what's in post-hook)
+            const pullForAuth = createRouterInstruction(
+              encodePullToken(marginAmountRaw, collateral.address, userAddress)
+            );
+            instructionsNeedingAuth.push(pullForAuth);
+          }
+          
+          // Credit delegation for flash loan repayment borrow
+          // Must use userAddress - this is whose collateral backs the borrow and who delegates credit
+          // Total delegation = totalFlashLoan + (feePerChunk * numChunks)
+          const totalFlashLoanFee = (chunkParams.flashLoanFee ?? 0n) * BigInt(chunkParams.numChunks);
+          const flashLoanRepayAmount = flashLoanAmountRaw + totalFlashLoanFee;
+          const borrowForAuth = createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(
+              LendingOp.Borrow,
+              debt.address,
+              userAddress, // Borrow on behalf of user (uses their collateral and credit delegation)
+              flashLoanRepayAmount,
+              context,
+              999
+            )
+          );
+          instructionsNeedingAuth.push(borrowForAuth);
+        } else {
+          // Multi-chunk mode: initial deposit before order creation
+          if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
+            // First instruction is PullToken which needs ERC20 approve
+            instructionsNeedingAuth.push(buildInitialDepositFlow[0]);
+          }
+          
+          // Seed borrow (covers post-hook borrows too)
+          if (seedBorrowInstruction) {
+            instructionsNeedingAuth.push(seedBorrowInstruction);
+          }
+        }
+
+        // Get authorizations only for instructions that need them
+        console.log("[Limit Order] instructionsNeedingAuth:", instructionsNeedingAuth.length, instructionsNeedingAuth.map(i => i.protocolName));
+        const allAuthCalls = await getAuthorizations(instructionsNeedingAuth);
+        console.log("[Limit Order] allAuthCalls from getAuthorizations:", allAuthCalls.length);
+        const filteredAuthCalls = allAuthCalls
+          .filter(({ target, data }) => target && target !== "0x0000000000000000000000000000000000000000" && data && data.length > 2)
+          .map(({ target, data }) => ({ to: target as Address, data: data as Hex }));
+        
+        if (filteredAuthCalls.length > 0) {
+          allCalls.push(...filteredAuthCalls);
+          console.log("[Limit Order] Added authorization calls:", filteredAuthCalls.length);
+        } else {
+          console.log("[Limit Order] No new authorizations needed (user may already have delegation)");
+        }
+
+        // 2. Build initial deposit router call (ONLY for multi-chunk mode)
+        // Flash loan mode does the deposit in the post-hook after the swap
+        if (!isFlashLoanMode && marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
+          const depositCalldata = encodeFunctionData({
+            abi: routerContract.abi,
+            functionName: "processProtocolInstructions",
+            args: [buildInitialDepositFlow.map(inst => ({
+              protocolName: inst.protocolName,
+              data: inst.data as `0x${string}`,
+            }))],
+          });
+          allCalls.push({ to: routerContract.address as Address, data: depositCalldata as Hex });
+          console.log("[Limit Order] Added deposit router call");
+        }
+
+        // 3. Build seed borrow router call (ONLY for multi-chunk mode)
+        // Flash loan mode skips this - solver provides funds via flash loan
+        if (!isFlashLoanMode && seedBorrowInstruction) {
+          const pushTokenInstruction = createRouterInstruction(encodePushToken(0, userAddress));
+          const seedBorrowCalldata = encodeFunctionData({
+            abi: routerContract.abi,
+            functionName: "processProtocolInstructions",
+            args: [[
+              {
+                protocolName: seedBorrowInstruction.protocolName,
+                data: seedBorrowInstruction.data as `0x${string}`,
+              },
+              {
+                protocolName: pushTokenInstruction.protocolName,
+                data: pushTokenInstruction.data as `0x${string}`,
+              },
+            ]],
+          });
+          allCalls.push({ to: routerContract.address as Address, data: seedBorrowCalldata as Hex });
+          console.log("[Limit Order] Added seed borrow + push router call");
+        }
+
+        // 4. Build CoW order calls (delegation + order creation)
+        // For flash loan mode: pass flash loan config so appData includes flash loan hint
+        // For multi-chunk: pass seedAmount so OrderManager pulls tokens from user
+        const cowCalls = await buildOrderCalls({
+          user: userAddress,
+          preInstructions: preInstructionsPerIteration,
+          postInstructions: postInstructionsPerIteration,
+          preTotalAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
+          preTotalAmountDecimals: debt.decimals,
+          sellToken: debt.address,
+          buyToken: collateral.address,
+          chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
+          chunkSizeDecimals: debt.decimals,
+          minBuyPerChunk: minBuyAmount,
+          minBuyPerChunkDecimals: collateral.decimals,
+          completion: CompletionType.Iterations,
+          targetValue: chunkParams.numChunks,
+          minHealthFactor: "1.1",
+          // Multi-chunk: seed with borrowed tokens; Flash loan: no seed needed
+          seedAmount: seedAmount,
+          // Flash loan config: tells CoW solvers to use flash loan for this order
+          // Amount is per-chunk (each chunk is independent flash loan settlement)
+          flashLoan: isFlashLoanMode && chunkParams.flashLoanLender ? {
+            lender: chunkParams.flashLoanLender,
+            token: debt.address,
+            amount: chunkParams.chunkSize, // Per-chunk amount
+          } : undefined,
+        });
+
+        if (!cowCalls) {
+          throw new Error("Failed to build CoW order calls");
+        }
+
+        // Add delegation call if needed
+        if (cowCalls.delegationCall) {
+          allCalls.push(cowCalls.delegationCall);
+          console.log("[Limit Order] Added delegation call");
+        }
+
+        // Note: cowCalls.authCalls are for pre/post instructions - already included above
+        // So we skip adding them again to avoid duplicates
+
+        // Add seed token approve call (user approves OrderManager to pull borrowed tokens)
+        if (cowCalls.seedApproveCall) {
+          allCalls.push(cowCalls.seedApproveCall);
+          console.log("[Limit Order] Added seed approve call");
+        }
+
+        // Add order creation call (will pull seedAmount via transferFrom)
+        allCalls.push(cowCalls.orderCall);
+        console.log("[Limit Order] Added order creation call");
+
+        console.log("[Limit Order] Total batched calls:", allCalls.length);
+
+        // Execute all calls in one batch
+        let notificationId: string | number = notification.loading(
+          <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
+        );
+
+        try {
+          const { id: newBatchId } = await sendCallsAsync({
+            calls: allCalls,
+            experimental_fallback: true,
+          });
+
+          // Store salt for CoW Explorer link in confirmation toast
+          setLastOrderSalt(cowCalls.salt);
+          
+          // Suppress hook's generic notifications - we'll show custom ones with CoW Explorer link
+          setSuppressBatchNotifications(true);
+          
+          // Set batch ID to trigger status tracking in useKapanRouterV2
+          setBatchId(newBatchId);
+
+          notification.remove(notificationId);
+          
+          // Show loading notification while waiting for confirmation
+          const loadingId = notification.loading(
+            <TransactionToast
+              step="sent"
+              message="Limit order submitted — waiting for confirmation..."
+            />
+          );
+          setLimitOrderNotificationId(loadingId);
+          
+          console.log("[Limit Order] Batch submitted:", newBatchId);
+          console.log("[Limit Order] Salt:", cowCalls.salt);
+          console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
+          
+          track("multiply_limit_order_complete", { status: "submitted", batchId: newBatchId });
+          
+          // Don't close immediately - the useEffect watching isBatchConfirmed will:
+          // 1. Remove loading notification
+          // 2. Show success notification with CoW Explorer link
+          // 3. Close the modal
+        } catch (batchError: any) {
+          notification.remove(notificationId);
+          throw batchError;
+        }
+      } else {
+        // Market Order (flash loan, instant execution)
+        track("multiply_tx_begin", { protocol: protocolName, chainId, collateral: collateral?.symbol ?? "unknown", debt: debt?.symbol ?? "unknown", marginAmount, leverage, flashLoanProvider: selectedProvider?.name ?? "unknown", swapRouter });
+        await handleConfirm(marginAmount);
+        track("multiply_tx_complete", { status: "success" });
+      }
     } catch (e) {
-      track("multiply_tx_complete", { status: "error", error: e instanceof Error ? e.message : String(e) });
+      const status = executionType === "limit" ? "multiply_limit_order_complete" : "multiply_tx_complete";
+      track(status, { status: "error", error: e instanceof Error ? e.message : String(e) });
       throw e;
     } finally { setIsSubmitting(false); }
   };
 
   const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
   const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
-  const canSubmit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
+  
+  // For market orders: need quote and adapter
+  // For limit orders: need CoW contract available (quote optional - just for preview) and dev environment
+  const canSubmitMarket = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
+  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating && isDevEnvironment;
+  const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
+  
+  const isSubmittingAny = isSubmitting || isCowCreating;
   // In zap mode, margin is in debt terms; otherwise collateral terms
   const marginUsd = depositToken && marginAmount 
     ? Number(marginAmount) * Number(formatUnits(depositToken.price ?? 0n, 8)) 
@@ -714,73 +1514,303 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               ))}
             </div>
 
-            {/* Config Grid - compact 2x2 layout with dropdowns */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 pt-3 border-t border-base-300/30 text-xs">
-              {/* Zap Mode */}
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/60">Zap Mode</span>
-                <input
-                  type="checkbox"
-                  checked={zapMode}
-                  onChange={e => setZapMode(e.target.checked)}
-                  className="toggle toggle-primary toggle-xs"
-                />
+            {/* Execution Type Toggle - Market vs Limit */}
+            {cowAvailable && (
+              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-base-300/30">
+                <button
+                  onClick={() => setExecutionType("market")}
+                  className={`flex-1 btn btn-xs ${executionType === "market" ? "btn-primary" : "btn-ghost"}`}
+                >
+                  <span className="mr-1">⚡</span> Market
+                </button>
+                <button
+                  onClick={() => setExecutionType("limit")}
+                  className={`flex-1 btn btn-xs ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
+                  disabled={!cowContractAvailable || !isDevEnvironment}
+                  title={
+                    !isDevEnvironment 
+                      ? "Limit orders are only available in development environment" 
+                      : !cowContractAvailable 
+                        ? "CoW contracts not deployed on this chain" 
+                        : "Execute via CoW Protocol limit order"
+                  }
+                >
+                  <ClockIcon className="w-3 h-3 mr-1" /> Limit
+                </button>
               </div>
+            )}
 
-              {/* Swap Router Dropdown */}
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/60">Swap Router</span>
-                {oneInchAvailable && pendleAvailable ? (
+            {/* Limit Order Pricing */}
+            {executionType === "limit" && (
+              <div className="bg-base-200/60 rounded-lg p-3 mt-3 text-xs border border-base-300/30">
+                {/* Market Rate Display */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-base-content/60">Market Rate</span>
+                  <div className="flex items-center gap-1.5">
+                    {isSwapQuoteLoading ? (
+                      <span className="loading loading-dots loading-xs" />
+                    ) : marketRate ? (
+                      <>
+                        <span className="font-medium">1 {debt?.symbol} = {marketRate.toFixed(6)} {collateral?.symbol}</span>
+                        <span className="text-base-content/40 text-[10px]">({bestQuote?.source})</span>
+                      </>
+                    ) : (
+                      <span className="text-base-content/40">-</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Slippage Slider for Limit Orders */}
+                <div className="mb-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-base-content/60">Max Slippage</span>
+                    <span className="font-medium text-warning">
+                      {limitSlippage < 0.1 ? limitSlippage.toFixed(2) : limitSlippage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="0.01"
+                    value={limitSlippage}
+                    onChange={e => {
+                      setLimitSlippage(parseFloat(e.target.value));
+                      setCustomMinPrice(""); // Reset custom price when using slider
+                      setHasAutoSetLimitSlippage(true); // Mark as manually adjusted
+                    }}
+                    className="range range-warning range-xs w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-base-content/40 mt-0.5">
+                    <span>0%</span>
+                    <span>0.1%</span>
+                    <span>1%</span>
+                    <span>5%</span>
+                  </div>
+                  {limitSlippage === 0 && (
+                    <div className="text-warning text-[10px] mt-1">
+                      0% slippage - order may not fill if price moves
+                    </div>
+                  )}
+                </div>
+
+                {/* Computed Min Output */}
+                <div className="flex items-center justify-between py-2 border-t border-base-300/30">
+                  <span className="text-base-content/60">Min Output</span>
+                  <span className="font-medium text-success">
+                    {minCollateralOut.raw > 0n ? (
+                      `${Number(minCollateralOut.formatted).toFixed(6)} ${collateral?.symbol}`
+                    ) : (
+                      "-"
+                    )}
+                  </span>
+                </div>
+
+                {/* Advanced: Custom Min Price Override */}
+                <button
+                  onClick={() => setShowAdvancedPricing(!showAdvancedPricing)}
+                  className="text-[10px] text-base-content/50 hover:text-base-content/70 flex items-center gap-1 mt-1"
+                >
+                  <svg 
+                    className={`w-3 h-3 transition-transform ${showAdvancedPricing ? "rotate-90" : ""}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Set custom min output
+                </button>
+                
+                {showAdvancedPricing && (
+                  <div className="mt-2 pt-2 border-t border-base-300/30">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={customMinPrice}
+                        onChange={e => setCustomMinPrice(e.target.value)}
+                        placeholder={minCollateralOut.formatted}
+                        className="flex-1 bg-base-300/50 rounded px-2 py-1 text-xs outline-none"
+                      />
+                      <span className="text-base-content/50">{collateral?.symbol}</span>
+                    </div>
+                    {customMinPrice && (
+                      <p className="text-[10px] text-warning mt-1">
+                        Using custom min output. Order will only fill if you receive at least this amount.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Flash Loan Toggle for Limit Orders */}
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base-content/60">Flash Loan</span>
+                    <span className="text-[10px] text-base-content/40">(single tx)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {chunkParams.useFlashLoan && chunkParams.flashLoanFee !== undefined && chunkParams.flashLoanFee > 0n && (
+                      <span className="text-[10px] text-warning">
+                        +{formatUnits(chunkParams.flashLoanFee, debt?.decimals ?? 18)} {debt?.symbol} fee
+                      </span>
+                    )}
+                    <input
+                      type="checkbox"
+                      checked={useFlashLoan}
+                      onChange={e => setUseFlashLoan(e.target.checked)}
+                      className="toggle toggle-primary toggle-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Flash Loan Chunks */}
+                {chunkParams.useFlashLoan && (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-base-content/60 text-xs">Chunks</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={999}
+                          value={flashLoanChunks}
+                          onChange={e => setFlashLoanChunks(Math.max(1, Math.min(999, parseInt(e.target.value) || 1)))}
+                          className="input input-bordered input-xs w-16 text-right"
+                        />
+                        {flashLoanChunks > 1 && debt && (
+                          <span className="text-[10px] text-base-content/50">
+                            ~{formatUnits(chunkParams.chunkSize, debt.decimals)} {debt.symbol}/chunk
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-1.5 text-[10px]">
+                      <svg className="w-3 h-3 shrink-0 mt-0.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <div>
+                        <span className="text-success font-medium">
+                          {flashLoanChunks === 1 ? "Single transaction execution" : `${flashLoanChunks} flash loan transactions`}
+                        </span>
+                        <p className="text-base-content/50 mt-0.5">
+                          {flashLoanChunks === 1 
+                            ? "Solver takes flash loan → swaps → you borrow to repay. All in one tx."
+                            : `Each chunk executes as independent flash loan. ~30 min between chunks for price discovery.`
+                          }
+                          {chunkParams.flashLoanFee === 0n && " No flash loan fee."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chunk Info - shown when multi-chunk execution needed (flash loan OFF) */}
+                {!chunkParams.useFlashLoan && chunkParams.needsChunking && (
+                  <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px]">
+                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <span className="text-info font-medium">Multi-chunk execution: {chunkParams.numChunks} iterations</span>
+                      <p className="text-base-content/50 mt-0.5">
+                        {chunkParams.explanation}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info note */}
+                <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50">
+                  <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
+                  <span>
+                    {chunkParams.useFlashLoan
+                      ? "Single transaction via CoW flash loan. MEV protected."
+                      : chunkParams.needsChunking 
+                        ? `Each chunk executes when solvers find a good price. Est. ${chunkParams.numChunks * 2}-${chunkParams.numChunks * 5} min total.`
+                        : "Order executes only when solvers find a price at or above your minimum."
+                    }
+                    {!chunkParams.useFlashLoan && " No flash loan fees."}
+                    {" "}MEV protected.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Config Grid - compact 2x2 layout with dropdowns */}
+            <div className={`grid grid-cols-2 gap-x-4 gap-y-2 ${executionType === "limit" && cowAvailable ? "mt-3" : "mt-4 pt-3 border-t border-base-300/30"} text-xs`}>
+              {/* Zap Mode - only for market orders */}
+              {executionType === "market" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-base-content/60">Zap Mode</span>
+                  <input
+                    type="checkbox"
+                    checked={zapMode}
+                    onChange={e => setZapMode(e.target.checked)}
+                    className="toggle toggle-primary toggle-xs"
+                  />
+                </div>
+              )}
+
+              {/* Swap Router Dropdown - only for market orders */}
+              {executionType === "market" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-base-content/60">Swap Router</span>
+                  {oneInchAvailable && pendleAvailable ? (
+                    <select
+                      value={swapRouter}
+                      onChange={e => setSwapRouter(e.target.value as SwapRouter)}
+                      className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                    >
+                      {SWAP_ROUTER_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="font-medium">{swapRouter === "pendle" ? "Pendle" : "1inch"}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Slippage Dropdown - only for market orders (limit orders use price improvement) */}
+              {executionType === "market" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-base-content/60">Slippage</span>
                   <select
-                    value={swapRouter}
-                    onChange={e => setSwapRouter(e.target.value as SwapRouter)}
+                    value={slippage}
+                    onChange={e => setSlippage(parseFloat(e.target.value))}
                     className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
                   >
-                    {SWAP_ROUTER_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    {[0.1, 0.3, 0.5, 1, 2, 3].map(s => (
+                      <option key={s} value={s}>{s}%</option>
                     ))}
                   </select>
-                ) : (
-                  <span className="font-medium">{swapRouter === "pendle" ? "Pendle" : "1inch"}</span>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Slippage Dropdown */}
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/60">Slippage</span>
-                <select
-                  value={slippage}
-                  onChange={e => setSlippage(parseFloat(e.target.value))}
-                  className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
-                >
-                  {[0.1, 0.3, 0.5, 1, 2, 3].map(s => (
-                    <option key={s} value={s}>{s}%</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Flash Loan Dropdown */}
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/60">Flash Loan</span>
-                <select
-                  value={selectedProvider?.name || ""}
-                  onChange={e => {
-                    const p = providerOptions.find(p => p.name === e.target.value);
-                    if (p) setSelectedProvider(p);
-                  }}
-                  className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
-                >
-                  {providerOptions.map(p => {
-                    const liq = liquidityData.find(l => l.provider === p.providerEnum);
-                    const hasLiquidity = liq?.hasLiquidity ?? true;
-                    return (
-                      <option key={p.name} value={p.name}>
-                        {p.name} {liq && (hasLiquidity ? "✓" : "⚠")}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              {/* Flash Loan Dropdown - only for market orders */}
+              {executionType === "market" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-base-content/60">Flash Loan</span>
+                  <select
+                    value={selectedProvider?.name || ""}
+                    onChange={e => {
+                      const p = providerOptions.find(p => p.name === e.target.value);
+                      if (p) setSelectedProvider(p);
+                    }}
+                    className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                  >
+                    {providerOptions.map(p => {
+                      const liq = liquidityData.find(l => l.provider === p.providerEnum);
+                      const hasLiquidity = liq?.hasLiquidity ?? true;
+                      return (
+                        <option key={p.name} value={p.name}>
+                          {p.name} {liq && (hasLiquidity ? "✓" : "⚠")}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -807,6 +1837,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 {netApy !== null ? `${netApy > 0 ? "+" : ""}${netApy.toFixed(2)}%` : "-"}
               </div>
             </div>
+            <div className="w-px h-6 bg-base-300/50" />
+            <div className="text-center flex-1">
+              <div className="text-base-content/50 mb-0.5">30D Yield</div>
+              <div className={`font-medium ${netYield30d !== null && netYield30d > 0 ? "text-success" : netYield30d !== null && netYield30d < 0 ? "text-error" : ""}`}>
+                {netYield30d !== null ? `${netYield30d >= 0 ? "+" : ""}$${Math.abs(netYield30d).toFixed(2)}` : "-"}
+              </div>
+            </div>
           </div>
 
           {/* Details - Compact 2-column grid */}
@@ -815,18 +1852,27 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-base-content/50">Swap</span>
                 <span className="truncate ml-2 text-right">
-                  {isSwapQuoteLoading ? <span className="loading loading-dots loading-xs" /> :
-                    flashLoanAmountRaw > 0n ? `${shortAmount.toFixed(2)} → ${Number(minCollateralOut.formatted).toFixed(2)}` : "-"}
+                  {executionType === "market" && isSwapQuoteLoading ? (
+                    <span className="loading loading-dots loading-xs" />
+                  ) : flashLoanAmountRaw > 0n ? (
+                    `${shortAmount.toFixed(2)} → ${Number(minCollateralOut.formatted).toFixed(2)}`
+                  ) : "-"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-base-content/50">Loop Fee</span>
-                <span className={fees.totalFeeUsd > 0 ? "text-warning" : ""}>
-                  {fees.totalFeeUsd > 0.01 
-                    ? `$${fees.totalFeeUsd.toFixed(2)} (${fees.feeOfPositionPercent.toFixed(3)}%)` 
-                    : fees.totalFeePercent > 0 
-                      ? `${fees.totalFeePercent.toFixed(3)}%` 
-                      : "free"}
+                <span className="text-base-content/50">
+                  {executionType === "limit" ? "Order Fee" : "Loop Fee"}
+                </span>
+                <span className={executionType === "limit" ? "text-success" : fees.totalFeeUsd > 0 ? "text-warning" : ""}>
+                  {executionType === "limit" ? (
+                    "No flash loan fee"
+                  ) : fees.totalFeeUsd > 0.01 ? (
+                    `$${fees.totalFeeUsd.toFixed(2)} (${fees.feeOfPositionPercent.toFixed(3)}%)`
+                  ) : fees.totalFeePercent > 0 ? (
+                    `${fees.totalFeePercent.toFixed(3)}%`
+                  ) : (
+                    "free"
+                  )}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -838,13 +1884,19 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 <span className="text-error">-{(borrowApyMap[debt?.address.toLowerCase() ?? ""] ?? 0).toFixed(2)}%</span>
               </div>
             </div>
-            {/* Fee breakdown tooltip */}
-            {fees.totalFeeUsd > 0 && (
+            {/* Fee breakdown tooltip - only for market orders */}
+            {executionType === "market" && fees.totalFeeUsd > 0 && (
               <div className="mt-1.5 pt-1.5 border-t border-base-300/30 text-[10px] text-base-content/40">
                 <span>FL: {fees.flashLoanFeePercent > 0 ? `${fees.flashLoanFeePercent}%` : "free"}</span>
                 {fees.priceImpactPercent > 0.001 && (
                   <span className="ml-2">Impact: {fees.priceImpactPercent.toFixed(3)}%</span>
                 )}
+              </div>
+            )}
+            {/* Limit order info */}
+            {executionType === "limit" && (
+              <div className="mt-1.5 pt-1.5 border-t border-base-300/30 text-[10px] text-base-content/40">
+                <span>CoW solver fee included in price • MEV protected</span>
               </div>
             )}
             <div className="flex justify-between mt-1.5 pt-1.5 border-t border-base-300/30">
@@ -855,21 +1907,40 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-1">
-            <button
-              type="button"
-              onClick={() => setPreferBatching(!preferBatching)}
-              className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
-            >
-              <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
-              Batch transactions
-            </button>
+            {/* Left side: batch toggle for market, info for limit */}
+            {executionType === "market" ? (
+              <button
+                type="button"
+                onClick={() => setPreferBatching(!preferBatching)}
+                className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
+              >
+                <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                Batch transactions
+              </button>
+            ) : (
+              <span className="text-xs text-base-content/50 inline-flex items-center gap-1">
+                <ClockIcon className="w-3.5 h-3.5" />
+                Executes via CoW Protocol
+              </span>
+            )}
 
             <button
               onClick={handleSubmit}
-              disabled={!canSubmit || isSubmitting}
+              disabled={!canSubmit || isSubmittingAny}
               className="btn btn-ghost btn-sm text-primary disabled:text-base-content/30"
             >
-              {isSubmitting ? <span className="loading loading-spinner loading-sm" /> : isSwapQuoteLoading ? "Loading..." : "Loop it"}
+              {isSubmittingAny ? (
+                <span className="loading loading-spinner loading-sm" />
+              ) : executionType === "market" && isSwapQuoteLoading ? (
+                "Loading..."
+              ) : executionType === "limit" ? (
+                <>
+                  <ClockIcon className="w-4 h-4 mr-1" />
+                  Create Order
+                </>
+              ) : (
+                "Loop it"
+              )}
             </button>
           </div>
         </div>

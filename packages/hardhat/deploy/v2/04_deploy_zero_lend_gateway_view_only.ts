@@ -5,6 +5,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
+import { getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Deploy only the ZeroLendGatewayView contract on Linea
@@ -40,7 +41,7 @@ const deployZeroLendGatewayViewOnly: DeployFunction = async function (hre: Hardh
   const POOL_ADDRESSES_PROVIDER = process.env.ZEROLEND_POOL_ADDRESSES_PROVIDER || entry.PROVIDER;
   const UI_POOL_DATA_PROVIDER  = process.env.ZEROLEND_UI_POOL_DATA_PROVIDER || entry.UI;
 
-  const WAIT = 3;
+  const WAIT = getWaitConfirmations(chainId);
 
   // Deploy only the view contract
   const zeroLendGatewayView = await deploy("ZeroLendGatewayView", {

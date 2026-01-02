@@ -4,19 +4,29 @@ import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 const faqItems = [
   {
-    question: "How does Kapan optimize DeFi lending rates?",
+    question: "How does it work?",
     answer:
-      "Kapan continuously monitors multiple lending protocols and automates refinancing so your debt moves to the lowest available rate without manual intervention.",
+      "Flash loans + atomic execution. Bundle any operation—deposit, borrow, swap, refinance—into one transaction. Succeeds completely or reverts entirely. No extra capital required.",
   },
   {
-    question: "Is Kapan Finance non-custodial?",
+    question: "Is it safe?",
     answer:
-      "Yes. You stay in control of your assets via smart contracts, and Kapan only automates interactions across supported protocols.",
+      "Fully non-custodial. Our contracts don't hold positions—yours do. Every action shows up on the underlying protocol under your address. Check Aave, check Morpho, check the block explorer. It's all you. We're just the remote control.",
   },
   {
-    question: "Which networks and protocols are supported?",
+    question: "What does it cost?",
     answer:
-      "Kapan integrates leading protocols like Aave, Compound, Vesu, and Nostra across multiple networks, with new markets added regularly.",
+      "Zero protocol fees. You pay gas and swap fees. We auto-select the cheapest flash loan source and route swaps through the lowest slippage provider. You get the best execution. We get nothing.",
+  },
+  {
+    question: "Why use Kapan?",
+    answer:
+      "One transaction for everything. No extra capital needed. No exposure during migrations. Atomic execution—all or nothing. Best rates auto-selected. Just works.",
+  },
+  {
+    question: "What can I do?",
+    answer:
+      "Refinance debt to better rates. Loop positions for leverage. Swap collateral without closing. Move entire positions across protocols. All in one click.",
   },
 ];
 

@@ -8,7 +8,9 @@
     ]
   },
   "scripts": {
-    "opencode": "opencode web --hostname 0.0.0.0 --port 4096",
+    "opencode": "PATH=\"$HOME/.bun/bin:$PATH\" opencode web --hostname 0.0.0.0 --port 4096",
+    "opencode:debug": "PATH=\"$HOME/.bun/bin:$PATH\" opencode web --hostname 0.0.0.0 --port 4096 --print-logs --log-level DEBUG",
+    "opencode:proxy": "node opencode-proxy.js",
     "dev": "yarn workspace @se-2/nextjs dev",
     "build": "yarn next:build",
     "snchain": "yarn workspace @ss-2/snfoundry chain",

@@ -89,9 +89,9 @@ export const useAutoSlippage = ({
         
         if (priceImpact !== null && hasQuoteData) {
             const suggested = calculateSuggestedSlippage(priceImpact);
-            // Only auto-set if current slippage is at the initial minimum (0.1)
+            // Only auto-set if current slippage is at the initial default (0.1)
             // This prevents overriding user's manual selection
-            if (slippage === 0.1) {
+            if (slippage === DEFAULT_SLIPPAGE) {
                 setSlippage(suggested);
             }
         }
@@ -100,7 +100,7 @@ export const useAutoSlippage = ({
     // Reset slippage to initial when resetDep changes
     useEffect(() => {
         if (enabled) {
-            setSlippage(0.1);
+            setSlippage(DEFAULT_SLIPPAGE);
         }
     }, [resetDep, enabled, setSlippage]);
 
@@ -117,5 +117,8 @@ export const useAutoSlippage = ({
     };
 };
 
-/** Standard slippage options for dropdown */
-export const SLIPPAGE_OPTIONS = [0.1, 0.3, 0.5, 1, 2, 3, 5];
+/** Standard slippage options for dropdown - includes low values for stable pairs */
+export const SLIPPAGE_OPTIONS = [0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5];
+
+/** Default initial slippage - will be auto-adjusted based on price impact */
+export const DEFAULT_SLIPPAGE = 0.1;

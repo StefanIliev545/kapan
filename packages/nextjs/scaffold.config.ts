@@ -48,6 +48,7 @@ const scaffoldConfig = {
   // The networks on which your DApp is live
   // Using custom localhost chain with chainId 31337 to match Hardhat network deployments
   targetEVMNetworks: [
+    chains.mainnet,
     chains.arbitrum,
     chains.base,
     chains.optimism,

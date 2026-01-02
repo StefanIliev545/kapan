@@ -103,13 +103,17 @@ contract AaveGatewayViewBase {
             uint8 dec = 18;
             try ERC20(reserves[i]).decimals() returns (uint8 d) { dec = d; } catch {}
 
+            // Wrap price fetch in try-catch to handle broken price feeds (e.g., ZeroLend pzETH)
+            uint256 price = 0;
+            try oracle.getAssetPrice(reserves[i]) returns (uint256 p) { price = p; } catch {}
+
             tokens[i] = TokenInfo({
                 token: reserves[i],
                 supplyRate: baseData.currentLiquidityRate,
                 borrowRate: baseData.currentVariableBorrowRate,
                 name: name,
                 symbol: symbol,
-                price: oracle.getAssetPrice(reserves[i]),
+                price: price,
                 borrowBalance: borrowBalance,
                 balance: balance,
                 aToken: aToken,
