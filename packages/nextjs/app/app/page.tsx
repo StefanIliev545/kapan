@@ -10,7 +10,7 @@ import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
-import { arbitrum, base, optimism, linea, plasma } from "wagmi/chains";
+import { arbitrum, base, optimism, linea, plasma, mainnet } from "wagmi/chains";
 import { hardhat } from "viem/chains";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
@@ -52,8 +52,14 @@ const MorphoProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Morpho" /> }
 );
 
+const SparkProtocolView = dynamic(
+  () => import("~~/components/specific/spark/SparkProtocolView").then(m => m.SparkProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Spark" /> }
+);
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
+  { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
   { id: "plasma", name: "Plasma", logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
@@ -66,6 +72,7 @@ const networkOptions: NetworkOption[] = [
 ];
 
 const protocolCountByNetwork: Record<string, number> = {
+  ethereum: 5, // Aave, Morpho, Spark, ZeroLend, Compound
   base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
   arbitrum: 4, // Aave, Compound, Venus, Morpho
   optimism: 3, // Aave, Morpho, Compound
@@ -107,6 +114,7 @@ const App: NextPage = () => {
         import("~~/components/specific/compound/CompoundProtocolView");
         import("~~/components/specific/venus/VenusProtocolView");
         import("~~/components/specific/morpho/MorphoProtocolView");
+        import("~~/components/specific/spark/SparkProtocolView");
       } else {
         import("~~/components/specific/vesu/VesuProtocolView");
         import("~~/components/specific/nostra/NostraProtocolView");
@@ -115,6 +123,7 @@ const App: NextPage = () => {
   }, [selectedNetwork]);
 
   const warnings = useMemo(() => ({
+    ethereum: "Ethereum mainnet support is experimental and pre-audit.",
     arbitrum: "Arbitrum support is experimental and pre-audit.",
     base: "Base support is experimental and pre-audit.",
     optimism: "Optimism support is experimental and pre-audit.",
@@ -186,6 +195,27 @@ const App: NextPage = () => {
         {/* Protocols */}
         <div className="space-y-3">
           {/* ---- Network panes: only render the active selection ---- */}
+          {/* ETHEREUM MAINNET */}
+          {selectedNetwork === "ethereum" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <AaveProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={mainnet.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <SparkProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <ZeroLendProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+              </StableArea>
+            </div>
+          )}
+
           {/* ARBITRUM */}
           {selectedNetwork === "arbitrum" && (
             <div className="space-y-3">

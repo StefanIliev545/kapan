@@ -13,16 +13,13 @@ const ONEINCH_UNAVAILABLE = new Set([
   9745, // Plasma - 1inch not supported
 ]);
 
-// Chains where CoW Protocol IS available (deterministic addresses on all these)
+// Chains where CoW Protocol (ComposableCoW + HooksTrampoline) IS available
+// AND we have flash loan providers configured in KapanCowAdapter.
+// Note: Optimism has HooksTrampoline but NOT ComposableCoW as of Jan 2025.
 const COW_PROTOCOL_AVAILABLE = new Set([
   1,     // Mainnet
   42161, // Arbitrum
   8453,  // Base
-  10,    // Optimism
-  100,   // Gnosis
-  137,   // Polygon
-  43114, // Avalanche
-  56,    // BNB Chain
   59144, // Linea
   31337, // Hardhat (for local dev with fork)
 ]);
@@ -77,6 +74,7 @@ const MORPHO_AVAILABLE = new Set([
 
 // ZeroLend (from 04_deploy_zero_lend_gateway_write.ts MAP)
 const ZEROLEND_AVAILABLE = new Set([
+  1,     // Mainnet (LRT market)
   59144, // Linea
   8453,  // Base
 ]);

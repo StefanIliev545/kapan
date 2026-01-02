@@ -40,7 +40,7 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
         args: [router.address, deployer],
         log: true,
         autoMine: true,
-        waitConfirmations: 3,
+        waitConfirmations: 1,
         deterministicDeployment: deterministicSalt(hre, "OneInchGateway"),
     });
 
@@ -50,7 +50,7 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
         args: [gateway.address, oneInchRouter],
         log: true,
         autoMine: true,
-        waitConfirmations: 3,
+        waitConfirmations: 1,
         deterministicDeployment: deterministicSalt(hre, "OneInchAdapter"),
     });
 
@@ -58,13 +58,13 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
     const gatewayContract = await ethers.getContractAt("OneInchGateway", gateway.address);
     if ((await gatewayContract.adapter()) !== adapter.address) {
         console.log("Setting adapter in OneInchGateway...");
-        await safeExecute(hre, deployer, "OneInchGateway", "setAdapter", [adapter.address], { waitConfirmations: 3, log: true });
+        await safeExecute(hre, deployer, "OneInchGateway", "setAdapter", [adapter.address], { waitConfirmations: 1, log: true });
     }
     const routerContract = await ethers.getContractAt("KapanRouter", router.address);
     const existingGateway = await routerContract.gateways("oneinch");
     if (existingGateway !== gateway.address) {
         console.log("Registering OneInchGateway in KapanRouter...");
-        await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["oneinch", gateway.address], { waitConfirmations: 3, log: true });
+        await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["oneinch", gateway.address], { waitConfirmations: 1, log: true });
     }
 
     console.log("OneInch integration deployed!");

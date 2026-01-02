@@ -278,13 +278,12 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
     // ============ Hook Functions (called via HooksTrampoline) ============
 
     /// @notice Transfer flash-loaned tokens to the order recipient (OrderManager)
-    /// @dev Called in pre-hook to fund the order. No access control to allow
-    ///      balance simulation during order validation (adapter should be empty outside flash loans)
+    /// @dev Called in pre-hook to fund the order. Only callable during active flash loan settlement.
     function fundOrder(
         address token,
         address recipient,
         uint256 amount
-    ) external {
+    ) external duringSettlement {
         console.log("fundOrder: START");
         console.log("fundOrder: amount =", amount);
         console.log("fundOrder: recipient =", recipient);

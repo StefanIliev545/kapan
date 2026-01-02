@@ -5,7 +5,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
-import { safeExecute } from "../../utils/safeExecute";
+import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -38,7 +38,7 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
   const REFERRAL_CODE = Number(process.env.SPARK_REFERRAL_CODE ?? entry.REFERRAL);
 
   const kapanRouter = await get("KapanRouter");
-  const WAIT = 3;
+  const WAIT = getWaitConfirmations(chainId);
 
   // Use AaveGatewayWrite contract since Spark is an Aave fork
   // Deploy with name "SparkGatewayWrite" to keep it separate from Aave deployments
@@ -54,7 +54,7 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   console.log(`SparkGatewayWrite (using AaveGatewayWrite contract) deployed to: ${sparkGatewayWrite.address}`);
 
-  // Use AaveGatewayView contract since Spark is an Aave fork
+  // Use AaveGatewayViewBase contract since Spark may have UiPoolDataProvider struct differences
   // Deploy with name "SparkGatewayView" to keep it separate from Aave deployments
   const sparkGatewayView = await deploy("SparkGatewayView", {
     from: deployer,
@@ -63,12 +63,12 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
     autoMine: true,
     deterministicDeployment: deterministicSalt(hre, "SparkGatewayView"),
     waitConfirmations: WAIT,
-    contract: "AaveGatewayView", // Use Aave contract artifact since Spark is a fork
+    contract: "AaveGatewayViewBase", // Use Base view that reads directly from Pool/Oracle
   });
 
   console.log(`SparkGatewayView (using AaveGatewayView contract) deployed to: ${sparkGatewayView.address}`);
 
-  await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["spark", sparkGatewayWrite.address], { waitConfirmations: 5 });
+  await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["spark", sparkGatewayWrite.address], { waitConfirmations: 1 });
   console.log(`SparkGatewayWrite registered with KapanRouter as "spark"`);
 
   // Temporarily disable Etherscan verification for v2 deploys

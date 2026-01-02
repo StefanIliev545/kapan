@@ -805,6 +805,16 @@ export function useCowOrder() {
   const getUserOrders = useCallback(async (): Promise<string[]> => {
     if (!userAddress || !orderManagerAddress || !publicClient || !orderManagerContract) return [];
 
+    // Check if the contract has getUserOrders function (older deployments may not)
+    const hasGetUserOrders = orderManagerContract.abi.some(
+      (item: { name?: string; type?: string }) => item.type === "function" && item.name === "getUserOrders"
+    );
+    
+    if (!hasGetUserOrders) {
+      logger.warn("[useCowOrder] OrderManager contract does not have getUserOrders function - needs redeployment");
+      return [];
+    }
+
     try {
       const result = await publicClient.readContract({
         address: orderManagerAddress,
@@ -815,6 +825,12 @@ export function useCowOrder() {
 
       return result as string[];
     } catch (error) {
+      // Handle case where function exists in ABI but not in deployed contract
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('returned no data') || errorMessage.includes('0x')) {
+        logger.warn("[useCowOrder] OrderManager contract needs redeployment - getUserOrders not available");
+        return [];
+      }
       logger.error("[useCowOrder] Get user orders failed:", error);
       return [];
     }

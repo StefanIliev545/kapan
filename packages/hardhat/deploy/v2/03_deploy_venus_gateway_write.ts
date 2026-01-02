@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute } from "../../utils/safeExecute";
+import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -54,7 +54,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
   const VENUS_ORACLE = process.env.VENUS_ORACLE || entry.ORACLE;
 
   const kapanRouter = await get("KapanRouter");
-  const WAIT = 3;
+  const WAIT = getWaitConfirmations(chainId);
 
   const venusGatewayWrite = await deploy("VenusGatewayWrite", {
     from: deployer,
@@ -93,7 +93,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
   }
 
   {
-    await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["venus", venusGatewayWrite.address], { waitConfirmations: 5 });
+    await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["venus", venusGatewayWrite.address], { waitConfirmations: 1 });
   }
   console.log(`VenusGatewayWrite registered with KapanRouter as "venus"`);
 

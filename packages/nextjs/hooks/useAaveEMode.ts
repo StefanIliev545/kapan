@@ -23,8 +23,8 @@ export interface EModeCategory {
   borrowableBitmap: bigint;
 }
 
-export type AaveLikeViewContractName = "AaveGatewayView" | "ZeroLendGatewayView";
-export type AaveLikeWriteContractName = "AaveGatewayWrite" | "ZeroLendGatewayWrite";
+export type AaveLikeViewContractName = "AaveGatewayView" | "ZeroLendGatewayView" | "SparkGatewayView";
+export type AaveLikeWriteContractName = "AaveGatewayWrite" | "ZeroLendGatewayWrite" | "SparkGatewayWrite";
 
 /**
  * Generic hook for Aave-like protocol E-Mode functionality
@@ -154,6 +154,15 @@ export function useAaveEMode(chainId?: number) {
  */
 export function useZeroLendEMode(chainId?: number) {
   return useAaveLikeEMode(chainId, "ZeroLendGatewayView", "ZeroLendGatewayWrite");
+}
+
+/**
+ * Hook for Spark E-Mode functionality (convenience wrapper)
+ * Uses the generic useAaveLikeEMode with Spark contract names
+ * Spark is an Aave V3 fork so E-Mode works the same way
+ */
+export function useSparkEMode(chainId?: number) {
+  return useAaveLikeEMode(chainId, "SparkGatewayView", "SparkGatewayWrite");
 }
 
 /**

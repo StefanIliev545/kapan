@@ -17,18 +17,16 @@ const COW_PROTOCOL = {
 } as const;
 
 /**
- * Chains where CoW Protocol with hooks is supported
- * https://docs.cow.fi/cow-protocol/reference/contracts/periphery#hookstrampoline
+ * Chains where CoW Protocol with ComposableCoW + HooksTrampoline is deployed
+ * AND where we have flash loan providers configured in KapanCowAdapter.
+ * 
+ * Note: Optimism has HooksTrampoline but NOT ComposableCoW as of Jan 2025.
+ * https://docs.cow.fi/cow-protocol/reference/contracts/periphery
  */
 const COW_SUPPORTED_CHAINS = [
   1,      // Ethereum Mainnet
   42161,  // Arbitrum One
   8453,   // Base
-  10,     // Optimism
-  100,    // Gnosis
-  137,    // Polygon
-  43114,  // Avalanche
-  56,     // BNB Chain
   59144,  // Linea
 ];
 

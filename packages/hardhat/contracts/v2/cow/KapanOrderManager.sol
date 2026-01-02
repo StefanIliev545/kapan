@@ -36,6 +36,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     error Unauthorized();
     error InvalidOrderState();
     error ZeroAddress();
+    error InstructionUserMismatch(address expected, address actual);
 
     // ============ Enums ============
     enum CompletionType {
@@ -220,9 +221,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         bytes32 salt,
         uint256 seedAmount
     ) external nonReentrant returns (bytes32 orderHash) {
-        // Validate
+        // Validate caller is the order user
         if (params.user != msg.sender) revert Unauthorized();
         if (orderHandler == address(0)) revert InvalidHandler();
+        
+        // Validate all instructions target the caller (prevents encoding instructions for other users)
+        _validateInstructionUsers(params.preInstructionsPerIteration, msg.sender);
+        _validateInstructionUsers(params.postInstructionsPerIteration, msg.sender);
         
         // Compute order hash
         orderHash = keccak256(abi.encode(params, salt, block.timestamp));
@@ -566,6 +571,53 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         
         // UntilCancelled never completes automatically
         return false;
+    }
+    
+    // ============ Instruction Validation ============
+    
+    /// @dev Constant hash for "router" protocol name comparison
+    bytes32 private constant ROUTER_PROTOCOL_HASH = keccak256(abi.encodePacked("router"));
+    
+    /// @notice Validate that all instructions in all iterations target the expected user
+    /// @dev Prevents attackers from encoding instructions that operate on other users' positions
+    /// @param instructionsPerIteration Array of encoded ProtocolInstruction[] per iteration
+    /// @param expectedUser The user who must be the target of all instructions
+    function _validateInstructionUsers(
+        bytes[] calldata instructionsPerIteration,
+        address expectedUser
+    ) internal pure {
+        for (uint256 i = 0; i < instructionsPerIteration.length; i++) {
+            ProtocolTypes.ProtocolInstruction[] memory instructions = 
+                abi.decode(instructionsPerIteration[i], (ProtocolTypes.ProtocolInstruction[]));
+            
+            for (uint256 j = 0; j < instructions.length; j++) {
+                address instrUser = _extractUserFromInstruction(instructions[j]);
+                if (instrUser != expectedUser) {
+                    revert InstructionUserMismatch(expectedUser, instrUser);
+                }
+            }
+        }
+    }
+    
+    /// @notice Extract the user address from a protocol instruction
+    /// @dev Handles both router instructions and lending (gateway) instructions
+    /// @param instruction The protocol instruction to extract user from
+    /// @return user The user address encoded in the instruction
+    function _extractUserFromInstruction(
+        ProtocolTypes.ProtocolInstruction memory instruction
+    ) internal pure returns (address user) {
+        bytes32 protocolHash = keccak256(abi.encodePacked(instruction.protocolName));
+        
+        if (protocolHash == ROUTER_PROTOCOL_HASH) {
+            // Router instruction: struct RouterInstruction { uint256 amount; address token; address user; uint8 instructionType; }
+            // User is at offset 64 bytes (after amount and token)
+            (, , user, ) = abi.decode(instruction.data, (uint256, address, address, uint8));
+        } else {
+            // Lending instruction (gateway): struct LendingInstruction { op, token, user, amount, context, input }
+            ProtocolTypes.LendingInstruction memory lending = 
+                abi.decode(instruction.data, (ProtocolTypes.LendingInstruction));
+            user = lending.user;
+        }
     }
     
     /// @notice Encode a ToOutput router instruction

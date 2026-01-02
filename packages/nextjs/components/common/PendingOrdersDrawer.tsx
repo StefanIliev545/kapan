@@ -59,24 +59,37 @@ export function PendingOrdersDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const [orders, setOrders] = useState<OrderWithHash[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasFetched, setHasFetched] = useState(false);
   const [cancellingHash, setCancellingHash] = useState<string | null>(null);
+  
+  // Track which user+chain combo we've fetched for to detect changes
+  const [fetchedFor, setFetchedFor] = useState<string | null>(null);
+  const currentKey = userAddress && chainId ? `${userAddress}-${chainId}` : null;
+  const hasFetched = fetchedFor === currentKey;
 
   const fetchOrders = useCallback(async () => {
-    if (!userAddress || !isAvailable) return;
+    if (!userAddress || !isAvailable || !currentKey) return;
     setIsLoading(true);
     try {
       const userOrders = await getUserOrdersWithDetails();
       setOrders(userOrders);
+      setFetchedFor(currentKey);
     } catch (error) {
       console.error("Failed to fetch orders:", error);
+      setFetchedFor(currentKey); // Mark as fetched even on error to prevent infinite retries
     } finally {
       setIsLoading(false);
-      setHasFetched(true);
     }
-  }, [userAddress, isAvailable, getUserOrdersWithDetails]);
+  }, [userAddress, isAvailable, getUserOrdersWithDetails, currentKey]);
 
-  // Fetch on mount to know if we should show the button
+  // Reset state when user or chain changes
+  useEffect(() => {
+    if (currentKey !== fetchedFor) {
+      setOrders([]);
+      setIsOpen(false);
+    }
+  }, [currentKey, fetchedFor]);
+
+  // Fetch on mount or when user/chain changes
   useEffect(() => {
     if (userAddress && isAvailable && !hasFetched) {
       fetchOrders();
