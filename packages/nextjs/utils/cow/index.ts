@@ -97,3 +97,15 @@ export {
   calculateChunkParams,
   calculateSwapRate,
 } from "./chunkCalculator";
+
+// Order execution utilities
+export {
+  type ExecutionSummary,
+  type ChunkDetail,
+  calculateExecutionSummary,
+  formatRate as formatExecutionRate,
+  formatSurplus,
+  storeOrderQuoteRate,
+  getOrderQuoteRate,
+  calculatePriceImpact,
+} from "./orderExecution";
