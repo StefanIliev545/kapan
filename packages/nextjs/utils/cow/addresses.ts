@@ -27,15 +27,15 @@ export const COW_PROTOCOL = {
 
 /** CoW Protocol API base URLs by chain ID */
 export const COW_API_URLS: Record<number, string> = {
-  1: "https://api.cow.fi/mainnet",      // Ethereum
-  42161: "https://api.cow.fi/arbitrum",  // Arbitrum One
-  8453: "https://api.cow.fi/base",       // Base
-  10: "https://api.cow.fi/optimism",     // Optimism
-  100: "https://api.cow.fi/xdai",        // Gnosis Chain
-  137: "https://api.cow.fi/polygon",     // Polygon
-  43114: "https://api.cow.fi/avalanche", // Avalanche
-  56: "https://api.cow.fi/bnb",          // BNB Chain
-  59144: "https://api.cow.fi/linea",     // Linea
+  1: "https://api.cow.fi/mainnet",        // Ethereum
+  42161: "https://api.cow.fi/arbitrum_one", // Arbitrum One (NOT "arbitrum"!)
+  8453: "https://api.cow.fi/base",         // Base
+  10: "https://api.cow.fi/optimism",       // Optimism
+  100: "https://api.cow.fi/xdai",          // Gnosis Chain
+  137: "https://api.cow.fi/polygon",       // Polygon
+  43114: "https://api.cow.fi/avalanche",   // Avalanche
+  56: "https://api.cow.fi/bnb",            // BNB Chain
+  59144: "https://api.cow.fi/linea",       // Linea
 };
 
 /** CoW Explorer base URLs by chain ID */
@@ -221,6 +221,7 @@ export const FLASH_LOAN_LENDERS: Record<number, Record<string, string>> = {
 export const MORPHO_BLUE: Record<number, string | undefined> = {
   1: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",     // Ethereum Mainnet
   8453: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",  // Base
+  42161: "0x6c247b1F6182318877311737BaC0844bAa518F5e", // Arbitrum
 };
 
 /**

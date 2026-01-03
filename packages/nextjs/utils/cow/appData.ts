@@ -474,6 +474,8 @@ export async function registerAppData(
     return { success: false, error: `Chain ${chainId} not supported by CoW Protocol` };
   }
 
+  console.log("[registerAppData] Chain ID:", chainId);
+
   try {
     // Use deterministic stringify for consistent serialization
     const fullAppDataJson = stringify(appDataDoc);
@@ -493,9 +495,12 @@ export async function registerAppData(
     });
     console.log("[registerAppData] Request body:", requestBody);
     
-    // Use the simpler endpoint that computes the hash server-side
-    // This avoids hash mismatch issues from JSON serialization differences
-    const response = await fetch(`${apiUrl}/api/v1/app_data`, {
+    // Use our Next.js API proxy to bypass browser-level interference
+    // (ad blockers, VPNs, corporate proxies can block direct CoW API calls)
+    const proxyUrl = `/api/cow/${chainId}/app-data`;
+    console.log("[registerAppData] Using proxy:", proxyUrl);
+    
+    const response = await fetch(proxyUrl, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

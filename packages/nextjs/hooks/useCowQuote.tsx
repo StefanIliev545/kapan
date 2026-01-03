@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useChainId } from "wagmi";
-import { getCowApiUrl, isChainSupported } from "~~/utils/cow";
+import { isChainSupported } from "~~/utils/cow";
 import { logger } from "~~/utils/logger";
 
 /**
@@ -63,17 +63,20 @@ export function useCowQuote({
   enabled = true,
 }: UseCowQuoteParams) {
   const chainId = useChainId();
-  const apiUrl = getCowApiUrl(chainId);
 
   return useQuery({
     queryKey: ["cow-quote", chainId, sellToken, buyToken, sellAmount, from],
     queryFn: async (): Promise<CowQuoteResponse | null> => {
-      if (!apiUrl || !sellToken || !buyToken || !sellAmount || sellAmount === "0" || !from) {
+      if (!sellToken || !buyToken || !sellAmount || sellAmount === "0" || !from) {
         return null;
       }
 
       try {
-        const response = await fetch(`${apiUrl}/api/v1/quote`, {
+        // Use our Next.js API proxy to bypass browser-level interference
+        // (ad blockers, VPNs, corporate proxies can block direct CoW API calls)
+        const proxyUrl = `/api/cow/${chainId}/quote`;
+        
+        const response = await fetch(proxyUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -106,7 +109,7 @@ export function useCowQuote({
         return null;
       }
     },
-    enabled: enabled && !!apiUrl && !!sellToken && !!buyToken && !!sellAmount && sellAmount !== "0" && !!from && isChainSupported(chainId),
+    enabled: enabled && !!sellToken && !!buyToken && !!sellAmount && sellAmount !== "0" && !!from && isChainSupported(chainId),
     staleTime: 10000, // 10 seconds
     refetchInterval: 15000, // Refresh every 15 seconds
   });
