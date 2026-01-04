@@ -232,8 +232,8 @@ export const COW_FLASH_LOAN_LENDERS: Record<number, string | undefined> = {
   // Prefer Morpho Blue (0% fee) on chains where it's available
   1: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",      // Ethereum - Morpho Blue (0% fee!)
   8453: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",   // Base - Morpho Blue (0% fee!)
+  42161: "0x6c247b1F6182318877311737BaC0844bAa518F5e",  // Arbitrum - Morpho Blue (0% fee!)
   // Fall back to Aave V3 on other chains (0.05% fee)
-  42161: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",  // Arbitrum - Aave V3
   10: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",     // Optimism - Aave V3
   137: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",    // Polygon - Aave V3
   59144: "0x3E5f750726cc1D0d4a9c62c507f890f984576507",  // Linea - Aave V3

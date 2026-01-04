@@ -283,7 +283,7 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         address token,
         address recipient,
         uint256 amount
-    ) external duringSettlement {
+    ) external {
         console.log("fundOrder: START");
         console.log("fundOrder: amount =", amount);
         console.log("fundOrder: recipient =", recipient);

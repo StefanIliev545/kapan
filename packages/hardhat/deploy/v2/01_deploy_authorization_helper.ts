@@ -24,9 +24,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`KapanAuthorizationHelper deployed to: ${result.address}`);
   }
 
-  // Set the helper on the router (if not already set)
+  // Always check and set the helper on the router (idempotent)
   const currentHelper = await read("KapanRouter", "authorizationHelper");
-  if (currentHelper !== result.address) {
+  if (currentHelper === result.address) {
+    console.log(`KapanRouter.authorizationHelper already set correctly: ${result.address}`);
+  } else {
+    console.log(`Setting KapanRouter.authorizationHelper: ${currentHelper} → ${result.address}`);
     await safeExecute(hre, deployer, "KapanRouter", "setAuthorizationHelper", [result.address], { waitConfirmations: WAIT });
     console.log(`KapanRouter.authorizationHelper set to: ${result.address}`);
   }

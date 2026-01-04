@@ -71,8 +71,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
     function deposit(address token, address user, uint256 amount) internal nonReentrant {
         address vToken = _getVTokenForUnderlying(token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(vToken, 0);
-        IERC20(token).approve(vToken, amount);
+        IERC20(token).forceApprove(vToken, amount);
         uint err = VTokenInterface(vToken).mint(amount);
         require(err == 0, "Venus: mint failed");
         uint vBal = VTokenInterface(vToken).balanceOf(address(this));
@@ -132,8 +131,7 @@ contract VenusGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         address vToken = _getVTokenForUnderlying(token);
         uint256 pre = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(vToken, 0);
-        IERC20(token).approve(vToken, amount);
+        IERC20(token).forceApprove(vToken, amount);
         uint err = VTokenInterface(vToken).repayBorrowBehalf(user, amount);
         require(err == 0, "Venus: repay failed");
         uint256 post = IERC20(token).balanceOf(address(this));

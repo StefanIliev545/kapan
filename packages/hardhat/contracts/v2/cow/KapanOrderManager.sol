@@ -225,7 +225,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     function approveVaultRelayer(address token) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
         address vaultRelayer = settlement.vaultRelayer();
-        IERC20(token).approve(vaultRelayer, type(uint256).max);
+        IERC20(token).forceApprove(vaultRelayer, type(uint256).max);
     }
 
     // ============ Order Creation ============
@@ -697,7 +697,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         address vaultRelayer = settlement.vaultRelayer();
         uint256 currentAllowance = IERC20(token).allowance(address(this), vaultRelayer);
         if (currentAllowance < type(uint256).max / 2) {
-            IERC20(token).approve(vaultRelayer, type(uint256).max);
+            IERC20(token).forceApprove(vaultRelayer, type(uint256).max);
         }
     }
 

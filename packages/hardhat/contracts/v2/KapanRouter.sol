@@ -333,8 +333,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             address tokenToApprove = outputs[inputPtr.index].token;
             uint256 amountToApprove = outputs[inputPtr.index].amount;
 
-            IERC20(tokenToApprove).approve(target, 0);
-            IERC20(tokenToApprove).approve(target, amountToApprove);
+            IERC20(tokenToApprove).forceApprove(target, amountToApprove);
 
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
         } else if (routerInstruction.instructionType == RouterInstructionType.Split) {
@@ -441,8 +440,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             address tokenToApprove = inputs[inputPtr.index].token;
             uint256 amountToApprove = inputs[inputPtr.index].amount;
 
-            IERC20(tokenToApprove).approve(target, 0);
-            IERC20(tokenToApprove).approve(target, amountToApprove);
+            IERC20(tokenToApprove).forceApprove(target, amountToApprove);
             // Always produce an output (even if empty) to ensure consistent indexing
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: address(0), amount: 0 });
