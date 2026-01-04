@@ -13,6 +13,7 @@ import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveLtv";
 import { useCowOrder } from "~~/hooks/useCowOrder";
+import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote, getCowQuoteBuyAmount } from "~~/hooks/useCowQuote";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import { 
@@ -137,8 +138,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   
-  // CoW order hook
-  const { createOrder: createCowOrder, buildOrderCalls, isCreating: isCowCreating, isAvailable: cowContractAvailable, orderManagerAddress } = useCowOrder();
+  // CoW order hooks
+  // useCowOrder: used for status tracking (isCowCreating) and availability check
+  const { isCreating: isCowCreating, isAvailable: cowContractAvailable } = useCowOrder();
+  // useCowLimitOrder: cleaner API for building limit orders with lending integration
+  const { buildOrderCalls: buildLimitOrderCalls, buildRouterCall, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
   
   // Check swap router availability for this chain
   const oneInchAvailable = is1inchSupported(chainId);
@@ -547,7 +551,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     return { netApy: netApyValue, netYield30d: netYield30dValue };
   }, [collateral, debt, metrics, supplyApyMap, borrowApyMap]);
 
-  const { buildMultiplyFlow, executeFlowBatchedIfPossible, executeFlowWithApprovals, buildFlowCalls, sendCallsAsync, setBatchId, setSuppressBatchNotifications, batchStatus, isBatchConfirmed, routerContract, getAuthorizations } = useKapanRouterV2();
+  const { buildMultiplyFlow, executeFlowBatchedIfPossible, executeFlowWithApprovals, buildFlowCalls, sendCallsAsync, setBatchId, setSuppressBatchNotifications, batchStatus, isBatchConfirmed, routerContract } = useKapanRouterV2();
 
   // Show success notification and close modal when limit order batch is confirmed
   useEffect(() => {
@@ -905,6 +909,30 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams]);
 
   /**
+   * Convert buildCowInstructions output to ChunkInstructions[] format for useCowLimitOrder
+   */
+  const cowChunks = useMemo((): ChunkInstructions[] => {
+    const { preInstructionsPerIteration, postInstructionsPerIteration } = buildCowInstructions;
+    
+    // Determine the number of chunks from the longer array
+    const numChunks = Math.max(preInstructionsPerIteration.length, postInstructionsPerIteration.length);
+    
+    const chunks: ChunkInstructions[] = [];
+    for (let i = 0; i < numChunks; i++) {
+      // Reuse last entry if fewer entries than iterations (matching contract behavior)
+      const preIdx = Math.min(i, preInstructionsPerIteration.length - 1);
+      const postIdx = Math.min(i, postInstructionsPerIteration.length - 1);
+      
+      chunks.push({
+        preInstructions: preInstructionsPerIteration[preIdx] ?? [],
+        postInstructions: postInstructionsPerIteration[postIdx] ?? [],
+      });
+    }
+    
+    return chunks;
+  }, [buildCowInstructions]);
+
+  /**
    * Build instructions to deposit initial collateral (executed before creating CoW order)
    */
   const buildInitialDepositFlow = useMemo(() => {
@@ -1019,34 +1047,21 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           );
         }
 
-        // 1. Build authorization instructions explicitly
-        // Only include instructions that actually need user authorization:
-        // - PullToken needs ERC20 approve for router
-        // - Borrow needs credit delegation
-        // 
-        // FLASH LOAN MODE:
-        // - PullToken happens in post-hook (user's initial collateral pulled during hook execution)
-        // - Borrow to settlement contract for flash loan repayment
-        // - No initial deposit before order (everything happens in post-hook)
-        //
-        // MULTI-CHUNK MODE:
-        // - PullToken for initial deposit (before order creation)
-        // - Seed borrow (covers post-hook borrows too via same delegation)
-        const instructionsNeedingAuth: ProtocolInstruction[] = [];
+        // 1. Build pre-order instructions list for authorization
+        // These are instructions that need user authorization (ERC20 approve, credit delegation)
+        // The useCowLimitOrder hook will handle getting authorizations for ALL instructions
+        const preOrderInstructions: ProtocolInstruction[] = [];
         
         if (isFlashLoanMode) {
           // Flash loan mode: collateral is pulled in post-hook, so we need approval for that
           if (marginAmountRaw > 0n && collateral) {
-            // Create PullToken instruction for auth (same as what's in post-hook)
             const pullForAuth = createRouterInstruction(
               encodePullToken(marginAmountRaw, collateral.address, userAddress)
             );
-            instructionsNeedingAuth.push(pullForAuth);
+            preOrderInstructions.push(pullForAuth);
           }
           
           // Credit delegation for flash loan repayment borrow
-          // Must use userAddress - this is whose collateral backs the borrow and who delegates credit
-          // Total delegation = totalFlashLoan + (feePerChunk * numChunks)
           const totalFlashLoanFee = (chunkParams.flashLoanFee ?? 0n) * BigInt(chunkParams.numChunks);
           const flashLoanRepayAmount = flashLoanAmountRaw + totalFlashLoanFee;
           const borrowForAuth = createProtocolInstruction(
@@ -1054,129 +1069,82 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             encodeLendingInstruction(
               LendingOp.Borrow,
               debt.address,
-              userAddress, // Borrow on behalf of user (uses their collateral and credit delegation)
+              userAddress,
               flashLoanRepayAmount,
               context,
               999
             )
           );
-          instructionsNeedingAuth.push(borrowForAuth);
+          preOrderInstructions.push(borrowForAuth);
         } else {
           // Multi-chunk mode: initial deposit before order creation
           if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
-            // First instruction is PullToken which needs ERC20 approve
-            instructionsNeedingAuth.push(buildInitialDepositFlow[0]);
+            preOrderInstructions.push(buildInitialDepositFlow[0]);
           }
           
           // Seed borrow (covers post-hook borrows too)
           if (seedBorrowInstruction) {
-            instructionsNeedingAuth.push(seedBorrowInstruction);
+            preOrderInstructions.push(seedBorrowInstruction);
           }
-        }
-
-        // Get authorizations only for instructions that need them
-        console.log("[Limit Order] instructionsNeedingAuth:", instructionsNeedingAuth.length, instructionsNeedingAuth.map(i => i.protocolName));
-        const allAuthCalls = await getAuthorizations(instructionsNeedingAuth);
-        console.log("[Limit Order] allAuthCalls from getAuthorizations:", allAuthCalls.length);
-        const filteredAuthCalls = allAuthCalls
-          .filter(({ target, data }) => target && target !== "0x0000000000000000000000000000000000000000" && data && data.length > 2)
-          .map(({ target, data }) => ({ to: target as Address, data: data as Hex }));
-        
-        if (filteredAuthCalls.length > 0) {
-          allCalls.push(...filteredAuthCalls);
-          console.log("[Limit Order] Added authorization calls:", filteredAuthCalls.length);
-        } else {
-          console.log("[Limit Order] No new authorizations needed (user may already have delegation)");
         }
 
         // 2. Build initial deposit router call (ONLY for multi-chunk mode)
         // Flash loan mode does the deposit in the post-hook after the swap
         if (!isFlashLoanMode && marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
-          const depositCalldata = encodeFunctionData({
-            abi: routerContract.abi,
-            functionName: "processProtocolInstructions",
-            args: [buildInitialDepositFlow.map(inst => ({
-              protocolName: inst.protocolName,
-              data: inst.data as `0x${string}`,
-            }))],
-          });
-          allCalls.push({ to: routerContract.address as Address, data: depositCalldata as Hex });
-          console.log("[Limit Order] Added deposit router call");
+          const depositCall = buildRouterCall(buildInitialDepositFlow);
+          if (depositCall) {
+            allCalls.push(depositCall);
+            console.log("[Limit Order] Added deposit router call");
+          }
         }
 
         // 3. Build seed borrow router call (ONLY for multi-chunk mode)
         // Flash loan mode skips this - solver provides funds via flash loan
         if (!isFlashLoanMode && seedBorrowInstruction) {
           const pushTokenInstruction = createRouterInstruction(encodePushToken(0, userAddress));
-          const seedBorrowCalldata = encodeFunctionData({
-            abi: routerContract.abi,
-            functionName: "processProtocolInstructions",
-            args: [[
-              {
-                protocolName: seedBorrowInstruction.protocolName,
-                data: seedBorrowInstruction.data as `0x${string}`,
-              },
-              {
-                protocolName: pushTokenInstruction.protocolName,
-                data: pushTokenInstruction.data as `0x${string}`,
-              },
-            ]],
-          });
-          allCalls.push({ to: routerContract.address as Address, data: seedBorrowCalldata as Hex });
-          console.log("[Limit Order] Added seed borrow + push router call");
+          const seedBorrowCall = buildRouterCall([seedBorrowInstruction, pushTokenInstruction]);
+          if (seedBorrowCall) {
+            allCalls.push(seedBorrowCall);
+            console.log("[Limit Order] Added seed borrow + push router call");
+          }
         }
 
-        // 4. Build CoW order calls (delegation + order creation)
-        // For flash loan mode: pass flash loan config so appData includes flash loan hint
-        // For multi-chunk: pass seedAmount so OrderManager pulls tokens from user
-        const cowCalls = await buildOrderCalls({
-          user: userAddress,
-          preInstructions: preInstructionsPerIteration,
-          postInstructions: postInstructionsPerIteration,
-          preTotalAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-          preTotalAmountDecimals: debt.decimals,
-          sellToken: debt.address,
-          buyToken: collateral.address,
-          chunkSize: formatUnits(chunkParams.chunkSize, debt.decimals),
-          chunkSizeDecimals: debt.decimals,
-          minBuyPerChunk: minBuyAmount,
-          minBuyPerChunkDecimals: collateral.decimals,
+        // 4. Build CoW order calls using the new useCowLimitOrder hook
+        // This hook handles: delegation, authorization, appData registration, order creation
+        // The hook returns all calls in correct order, ready for batching
+        const limitOrderResult = await buildLimitOrderCalls({
+          sellToken: debt.address as Address,
+          buyToken: collateral.address as Address,
+          chunkSize: chunkParams.chunkSize,
+          minBuyPerChunk: minBuyPerChunkRaw,
+          totalAmount: flashLoanAmountRaw,
+          chunks: cowChunks,
           completion: CompletionType.Iterations,
           targetValue: chunkParams.numChunks,
           minHealthFactor: "1.1",
-          // Multi-chunk: seed with borrowed tokens; Flash loan: no seed needed
           seedAmount: seedAmount,
-          // Flash loan config: tells CoW solvers to use flash loan for this order
-          // Amount is per-chunk (each chunk is independent flash loan settlement)
           flashLoan: isFlashLoanMode && chunkParams.flashLoanLender ? {
-            lender: chunkParams.flashLoanLender,
-            token: debt.address,
+            lender: chunkParams.flashLoanLender as Address,
+            token: debt.address as Address,
             amount: chunkParams.chunkSize, // Per-chunk amount
           } : undefined,
+          // Include pre-order instructions for auth checking
+          preOrderInstructions: preOrderInstructions,
         });
 
-        if (!cowCalls) {
+        if (!limitOrderResult) {
           throw new Error("Failed to build CoW order calls");
         }
 
-        // Add delegation call if needed
-        if (cowCalls.delegationCall) {
-          allCalls.push(cowCalls.delegationCall);
-          console.log("[Limit Order] Added delegation call");
-        }
+        // Add all order-related calls (already in correct order: delegation -> auth -> seed approve -> order)
+        allCalls.push(...limitOrderResult.calls);
+        console.log("[Limit Order] Added order calls:", limitOrderResult.calls.length);
 
-        // Note: cowCalls.authCalls are for pre/post instructions - already included above
-        // So we skip adding them again to avoid duplicates
-
-        // Add seed token approve call (user approves OrderManager to pull borrowed tokens)
-        if (cowCalls.seedApproveCall) {
-          allCalls.push(cowCalls.seedApproveCall);
-          console.log("[Limit Order] Added seed approve call");
-        }
-
-        // Add order creation call (will pull seedAmount via transferFrom)
-        allCalls.push(cowCalls.orderCall);
-        console.log("[Limit Order] Added order creation call");
+        // Store salt and appDataHash for later reference
+        const cowCalls = {
+          salt: limitOrderResult.salt,
+          appDataHash: limitOrderResult.appDataHash,
+        };
 
         console.log("[Limit Order] Total calls:", allCalls.length);
 

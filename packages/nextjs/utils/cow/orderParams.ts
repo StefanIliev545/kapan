@@ -42,8 +42,8 @@ export interface KapanOrderInput {
    */
   preInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
   
-  /** Total amount to process across all chunks */
-  preTotalAmount: string;
+  /** Total amount to process across all chunks (raw bigint or human-readable string with decimals) */
+  preTotalAmount: string | bigint;
   preTotalAmountDecimals?: number;
   
   /** Token being sold (output of pre-hook) */
@@ -52,12 +52,12 @@ export interface KapanOrderInput {
   /** Token being bought (input to post-hook) */
   buyToken: string;
   
-  /** Maximum sell amount per chunk */
-  chunkSize: string;
+  /** Maximum sell amount per chunk (raw bigint or human-readable string with decimals) */
+  chunkSize: string | bigint;
   chunkSizeDecimals?: number;
   
-  /** Minimum buy amount per chunk (slippage protection) */
-  minBuyPerChunk: string;
+  /** Minimum buy amount per chunk - slippage protection (raw bigint or human-readable string with decimals) */
+  minBuyPerChunk: string | bigint;
   minBuyPerChunkDecimals?: number;
   
   /** 
@@ -206,6 +206,16 @@ export function decodeInstructions(data: string): ProtocolInstruction[] {
 }
 
 /**
+ * Parse amount - handles both raw bigint and human-readable string
+ */
+function parseAmount(value: string | bigint, decimals: number): bigint {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+  return parseUnits(value, decimals);
+}
+
+/**
  * Build order parameters for KapanOrderManager.createOrder()
  * 
  * @param input - User-friendly order input
@@ -219,11 +229,11 @@ export function buildOrderParams(input: KapanOrderInput): KapanOrderParams {
   return {
     user: input.user,
     preInstructionsPerIteration: encodePerIterationInstructions(input.preInstructions),
-    preTotalAmount: parseUnits(input.preTotalAmount, preTotalAmountDecimals),
+    preTotalAmount: parseAmount(input.preTotalAmount, preTotalAmountDecimals),
     sellToken: input.sellToken,
     buyToken: input.buyToken,
-    chunkSize: parseUnits(input.chunkSize, chunkSizeDecimals),
-    minBuyPerChunk: parseUnits(input.minBuyPerChunk, minBuyDecimals),
+    chunkSize: parseAmount(input.chunkSize, chunkSizeDecimals),
+    minBuyPerChunk: parseAmount(input.minBuyPerChunk, minBuyDecimals),
     postInstructionsPerIteration: encodePerIterationInstructions(input.postInstructions),
     completion: input.completion ?? CompletionType.Iterations,
     targetValue: BigInt(input.targetValue ?? 1),
