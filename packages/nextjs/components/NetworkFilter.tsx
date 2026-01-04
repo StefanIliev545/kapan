@@ -33,10 +33,12 @@ const STORAGE_KEY = "kapan-network-filter-selection";
 
 // Map network IDs to EVM chain IDs
 const NETWORK_TO_CHAIN_ID: Record<string, number> = {
+  ethereum: 1,
   arbitrum: 42161,
   base: 8453,
   optimism: 10,
   linea: 59144,
+  plasma: 9745,
   hardhat: 31337,
 };
 

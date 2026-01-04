@@ -249,3 +249,13 @@ export function getOneInchAdapterInfo(chainId: number | undefined) {
   if (!chainId || !is1inchSupported(chainId)) return undefined;
   return contracts[chainId]?.OneInchAdapter;
 }
+
+export function getCowAdapterAddress(chainId: number | undefined): Address | undefined {
+  if (!chainId || !isCowProtocolSupported(chainId)) return undefined;
+  return contracts[chainId]?.KapanCowAdapter?.address;
+}
+
+export function getCowAdapterInfo(chainId: number | undefined) {
+  if (!chainId || !isCowProtocolSupported(chainId)) return undefined;
+  return contracts[chainId]?.KapanCowAdapter;
+}
