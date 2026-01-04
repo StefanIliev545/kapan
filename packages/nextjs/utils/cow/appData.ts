@@ -279,9 +279,9 @@ export function buildKapanAppData(
     };
   }
 ): AppDataDocument {
-  // Gas limits based on working Aave tx: pre=300000, post=800000
+  // Gas limits - generous post-hook limit for complex protocols like Venus
   const preHookGasLimit = options?.preHookGasLimit ?? "300000";
-  const postHookGasLimit = options?.postHookGasLimit ?? "800000";
+  const postHookGasLimit = options?.postHookGasLimit ?? "1750000";
 
   // Encode the hook calls to OrderManager using (user, salt) lookup
   // Note: chunkIndex is NOT passed - contract reads from iterationCount
