@@ -34,7 +34,7 @@ import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calcula
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
-import { useAccount } from "wagmi";
+import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { useSendCalls, useCallsStatus } from "wagmi/experimental";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-stark/notification";
@@ -128,9 +128,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [useFlashLoan, setUseFlashLoan] = useState<boolean>(true); // Default ON
   // Number of chunks for flash loan orders (each chunk is independent flash loan settlement)
   const [flashLoanChunks, setFlashLoanChunks] = useState<number>(1);
+  // Batched TX mode: when ON, uses EIP-5792 sendCalls (may not work with all wallets like MetaMask)
+  // When OFF, executes each call sequentially (more compatible but slower)
+  const [useBatchedTx, setUseBatchedTx] = useState<boolean>(false); // Default OFF for compatibility
   
   // Get user address for CoW order creation
   const { address: userAddress } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   
   // CoW order hook
   const { createOrder: createCowOrder, buildOrderCalls, isCreating: isCowCreating, isAvailable: cowContractAvailable, orderManagerAddress } = useCowOrder();
@@ -1173,49 +1178,121 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         allCalls.push(cowCalls.orderCall);
         console.log("[Limit Order] Added order creation call");
 
-        console.log("[Limit Order] Total batched calls:", allCalls.length);
+        console.log("[Limit Order] Total calls:", allCalls.length);
 
-        // Execute all calls in one batch
         let notificationId: string | number = notification.loading(
           <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
         );
 
         try {
-          const { id: newBatchId } = await sendCallsAsync({
-            calls: allCalls,
-            experimental_fallback: true,
-          });
+          if (useBatchedTx && sendCallsAsync) {
+            // EIP-5792 Batched execution (may not work with all wallets)
+            console.log("[Limit Order] Using batched TX mode (EIP-5792)");
+            const { id: newBatchId } = await sendCallsAsync({
+              calls: allCalls,
+              experimental_fallback: true,
+            });
 
-          // Store salt for CoW Explorer link in confirmation toast
-          setLastOrderSalt(cowCalls.salt);
-          
-          // Suppress hook's generic notifications - we'll show custom ones with CoW Explorer link
-          setSuppressBatchNotifications(true);
-          
-          // Set batch ID to trigger status tracking in useKapanRouterV2
-          setBatchId(newBatchId);
+            // Store salt for CoW Explorer link in confirmation toast
+            setLastOrderSalt(cowCalls.salt);
+            
+            // Suppress hook's generic notifications - we'll show custom ones with CoW Explorer link
+            setSuppressBatchNotifications(true);
+            
+            // Set batch ID to trigger status tracking in useKapanRouterV2
+            setBatchId(newBatchId);
 
-          notification.remove(notificationId);
-          
-          // Show loading notification while waiting for confirmation
-          const loadingId = notification.loading(
-            <TransactionToast
-              step="sent"
-              message="Limit order submitted — waiting for confirmation..."
-            />
-          );
-          setLimitOrderNotificationId(loadingId);
-          
-          console.log("[Limit Order] Batch submitted:", newBatchId);
-          console.log("[Limit Order] Salt:", cowCalls.salt);
-          console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
-          
-          track("multiply_limit_order_complete", { status: "submitted", batchId: newBatchId });
-          
-          // Don't close immediately - the useEffect watching isBatchConfirmed will:
-          // 1. Remove loading notification
-          // 2. Show success notification with CoW Explorer link
-          // 3. Close the modal
+            notification.remove(notificationId);
+            
+            // Show loading notification while waiting for confirmation
+            const loadingId = notification.loading(
+              <TransactionToast
+                step="sent"
+                message="Limit order submitted — waiting for confirmation..."
+              />
+            );
+            setLimitOrderNotificationId(loadingId);
+            
+            console.log("[Limit Order] Batch submitted:", newBatchId);
+            console.log("[Limit Order] Salt:", cowCalls.salt);
+            console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
+            
+            track("multiply_limit_order_complete", { status: "submitted", batchId: newBatchId });
+          } else {
+            // Sequential execution (more compatible with wallets like MetaMask)
+            console.log("[Limit Order] Using sequential TX mode");
+            if (!walletClient || !publicClient) {
+              throw new Error("Wallet not connected");
+            }
+
+            for (let i = 0; i < allCalls.length; i++) {
+              const call = allCalls[i];
+              notification.remove(notificationId);
+              notificationId = notification.loading(
+                <TransactionToast step="pending" message={`Simulating step ${i + 1}/${allCalls.length}...`} />
+              );
+
+              // Simulate first to get better error messages
+              try {
+                await publicClient.call({
+                  account: userAddress,
+                  to: call.to as `0x${string}`,
+                  data: call.data as `0x${string}`,
+                });
+                console.log(`[Limit Order] Step ${i + 1} simulation passed`);
+              } catch (simError: any) {
+                console.error(`[Limit Order] Step ${i + 1} simulation FAILED:`, simError);
+                const errorMsg = simError?.message || simError?.shortMessage || String(simError);
+                // Try to extract revert reason
+                const revertMatch = errorMsg.match(/reverted with.*?['"]([^'"]+)['"]/i) 
+                  || errorMsg.match(/reason:\s*([^\n]+)/i)
+                  || errorMsg.match(/error:\s*([^\n]+)/i);
+                const revertReason = revertMatch ? revertMatch[1] : errorMsg;
+                notification.remove(notificationId);
+                notification.error(`Step ${i + 1} would fail: ${revertReason}`);
+                throw new Error(`Transaction simulation failed at step ${i + 1}: ${revertReason}`);
+              }
+
+              notification.remove(notificationId);
+              notificationId = notification.loading(
+                <TransactionToast step="pending" message={`Executing step ${i + 1}/${allCalls.length}...`} />
+              );
+
+              const txHash = await walletClient.sendTransaction({
+                account: userAddress,
+                to: call.to as `0x${string}`,
+                data: call.data as `0x${string}`,
+              });
+
+              console.log(`[Limit Order] Step ${i + 1} tx sent:`, txHash);
+              await publicClient.waitForTransactionReceipt({ hash: txHash });
+              console.log(`[Limit Order] Step ${i + 1} confirmed`);
+            }
+
+            notification.remove(notificationId);
+            
+            // Store salt for CoW Explorer link
+            setLastOrderSalt(cowCalls.salt);
+            
+            // Show success notification
+            const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress!);
+            notification.success(
+              <TransactionToast
+                step="confirmed"
+                message="Limit order created!"
+                blockExplorerLink={explorerUrl}
+              />
+            );
+            
+            console.log("[Limit Order] All steps completed");
+            console.log("[Limit Order] Salt:", cowCalls.salt);
+            console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
+            
+            track("multiply_limit_order_complete", { status: "submitted", mode: "sequential" });
+            
+            // Close modal after success
+            onClose();
+          }
         } catch (batchError: any) {
           notification.remove(notificationId);
           throw batchError;
@@ -1716,6 +1793,35 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                         {chunkParams.explanation}
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Batched TX Toggle - for wallet compatibility */}
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base-content/60">Batched TX</span>
+                    <span className="text-[10px] text-base-content/40">(EIP-5792)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-base-content/40">
+                      {useBatchedTx ? "faster" : "compatible"}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={useBatchedTx}
+                      onChange={e => setUseBatchedTx(e.target.checked)}
+                      className="toggle toggle-primary toggle-xs"
+                    />
+                  </div>
+                </div>
+                {!useBatchedTx && (
+                  <div className="flex items-start gap-1.5 mt-1 text-[10px]">
+                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-warning/80">
+                      Sequential mode: each step requires separate wallet confirmation. More compatible with MetaMask.
+                    </span>
                   </div>
                 )}
 

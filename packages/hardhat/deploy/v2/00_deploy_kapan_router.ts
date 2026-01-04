@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, getWaitConfirmations, waitForPendingTxs } from "../../utils/safeExecute";
 
 /**
  * Router is chain-agnostic; we deploy it always.
@@ -158,6 +158,10 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
   } else {
     console.warn(`No Morpho Blue for chainId=${chainId}. Skipping setMorphoBluePool.`);
   }
+
+  // Wait for all pending transactions to clear before next deploy script runs
+  // This prevents nonce conflicts when script 01 starts immediately after
+  await waitForPendingTxs(hre, deployer);
 
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
   await verifyContract(hre, kapanRouter.address, [deployer]);

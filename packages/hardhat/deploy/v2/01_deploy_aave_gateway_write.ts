@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -71,7 +71,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   const kapanRouter = await get("KapanRouter");
   const WAIT = getWaitConfirmations(chainId);
 
-  const aaveGatewayWrite = await deploy("AaveGatewayWrite", {
+  const aaveGatewayWrite = await safeDeploy(hre, deployer, "AaveGatewayWrite", {
     from: deployer,
     args: [kapanRouter.address, POOL_ADDRESSES_PROVIDER, REFERRAL_CODE],
     log: true,
@@ -85,7 +85,7 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
   // On Base, deploy the Base-specific view implementation but keep the deployment name "AaveGatewayView"
   // Use effectiveChainId to handle Hardhat forks of Base
   const isBaseChain = effectiveChainId === 8453 || effectiveChainId === 84532;
-  const aaveGatewayView = await deploy("AaveGatewayView", {
+  const aaveGatewayView = await safeDeploy(hre, deployer, "AaveGatewayView", {
     from: deployer,
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],
     log: true,
@@ -113,6 +113,8 @@ const deployAaveGatewayWrite: DeployFunction = async function (hre: HardhatRunti
     POOL_ADDRESSES_PROVIDER,
     UI_POOL_DATA_PROVIDER,
   ]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployAaveGatewayWrite;

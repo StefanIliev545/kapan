@@ -1,5 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
+import { waitForPendingTxs } from "../../utils/safeExecute";
 
 /**
  * Syncs all deployed gateways with KapanAuthorizationHelper.
@@ -102,6 +103,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   console.log("\n=== Gateway Sync Complete ===\n");
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default func;

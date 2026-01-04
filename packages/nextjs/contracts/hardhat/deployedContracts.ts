@@ -25543,7 +25543,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0x7906fe3b144BC86F33B820AfeE2f22faf6Bb013F",
+      address: "0x9a503A4489eBEB2E6f13adCD28F315E972B63371",
       abi: [
         {
           inputs: [
@@ -25909,7 +25909,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x5C585a186D5d411903b0D00448eb124C74F25C29",
+      address: "0x12F80f5Fff3C0CCC283c7b2A2cC9742ddf8c093A",
       abi: [
         {
           inputs: [
@@ -27034,7 +27034,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x934Da3c71A866337dECb76bF216aB6615aE8382D",
+      address: "0xFA3B0Efb7E26CDd22F8b467B153626Ce5d34D64F",
       abi: [
         {
           inputs: [
@@ -40385,7 +40385,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0x248738a1f2d7F0B2586F977b6889eb408AeB5B95",
+      address: "0xf2f09B9AD5C6E88A8747EAa2e56d0cdF986d157c",
       abi: [
         {
           inputs: [
@@ -40751,7 +40751,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x7DF91eEc863979431213889aB7d7c5b342992b61",
+      address: "0x58e41e53c0627AD77689c9F80116A166bFc6f5e9",
       abi: [
         {
           inputs: [
@@ -41876,7 +41876,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xF520E8fF8C0bC3e4B3B84A77ac7Eb482a57e197B",
+      address: "0xc64bbF7B5eBb55307D90876d84fe259864F81EF3",
       abi: [
         {
           inputs: [

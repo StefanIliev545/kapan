@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
 
@@ -54,7 +54,7 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
 
   console.log(`\n🐄 Deploying KapanCowAdapter on chain ${effectiveChainId}...`);
 
-  const result = await deploy("KapanCowAdapter", {
+  const result = await safeDeploy(hre, deployer, "KapanCowAdapter", {
     from: deployer,
     args: [FLASH_LOAN_ROUTER, deployer],
     log: true,
@@ -78,6 +78,8 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
     await safeExecute(hre, deployer, "KapanCowAdapter", "setAaveLender", [aavePool, true], { log: true, gasLimit: 150000, waitConfirmations: WAIT });
     console.log(`   ✅ Aave pool configured`);
   }
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployKapanCowAdapter;

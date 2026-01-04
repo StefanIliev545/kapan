@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { deterministicSalt } from "../../utils/deploySalt";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, network } = hre;
@@ -12,7 +12,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const router = await get("KapanRouter");
 
-  const result = await deploy("KapanAuthorizationHelper", {
+  const result = await safeDeploy(hre, deployer, "KapanAuthorizationHelper", {
     from: deployer,
     args: [router.address, deployer],
     log: true,
@@ -33,8 +33,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Skip verification for local networks
   if (network.name === "hardhat" || network.name === "localhost") {
     console.log("⚠️  Skipping verification for local network:", network.name);
+    await waitForPendingTxs(hre, deployer);
     return;
   }
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default func;

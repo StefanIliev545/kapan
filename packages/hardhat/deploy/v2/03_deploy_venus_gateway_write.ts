@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -56,7 +56,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
   const kapanRouter = await get("KapanRouter");
   const WAIT = getWaitConfirmations(chainId);
 
-  const venusGatewayWrite = await deploy("VenusGatewayWrite", {
+  const venusGatewayWrite = await safeDeploy(hre, deployer, "VenusGatewayWrite", {
     from: deployer,
     args: [kapanRouter.address, VENUS_COMPTROLLER], // router, comptroller
     log: true,
@@ -69,7 +69,7 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   // View gateway (requires oracle)
   if (VENUS_ORACLE && VENUS_ORACLE !== "0x0000000000000000000000000000000000000000") {
-    const venusGatewayView = await deploy("VenusGatewayView", {
+    const venusGatewayView = await safeDeploy(hre, deployer, "VenusGatewayView", {
       from: deployer,
       args: [VENUS_COMPTROLLER, VENUS_ORACLE, deployer], // comptroller, oracle, owner
       log: true,
@@ -106,6 +106,8 @@ const deployVenusGatewayWrite: DeployFunction = async function (hre: HardhatRunt
       deployer,
     ]);
   }*/
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployVenusGatewayWrite;
