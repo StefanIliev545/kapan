@@ -31,7 +31,7 @@ import {
   normalizeProtocolName,
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, getCowBorrower, getPreferredFlashLoanLender, getKapanCowAdapter } from "~~/utils/cow";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, getPreferredFlashLoanLender } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
@@ -736,9 +736,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
    *   - Non-final chunks: Deposit + Borrow + Push (fund next chunk)
    *   - Final chunk: Deposit only (no more borrowing needed)
    */
-  const buildCowInstructions = useMemo(() => {
+  const buildCowInstructions = useMemo((): ChunkInstructions[] => {
     if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n || !orderManagerAddress) {
-      return { preInstructionsPerIteration: [[]], postInstructionsPerIteration: [[]] };
+      return [{ preInstructions: [], postInstructions: [] }];
     }
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -784,12 +784,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     // 2. Add swap output + margin → UTXO[2] (total collateral)
     // 3. Approve & Deposit total collateral
     // 4. Borrow debt tokens to repay flash loan
-    // 5. Push borrowed tokens to CoW Borrower (KapanCowAdapter or fallback to standard borrower)
+    // 5. PushToken is appended by useCowLimitOrder hook (via flashLoanRepaymentUtxoIndex)
     if (chunkParams.useFlashLoan && chunkParams.flashLoanLender) {
-      // Get the borrower address - use KapanCowAdapter if deployed, otherwise fall back to CoW's standard borrower
-      // This MUST match the adapter used in appData.ts for flash loan execution
-      const cowBorrowerAddress = getKapanCowAdapter(chainId) || getCowBorrower(chunkParams.flashLoanLender, chainId);
-      
       const numChunks = chunkParams.numChunks;
       const lenderInfo = getPreferredFlashLoanLender(chainId);
       
@@ -797,13 +793,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       const baseMarginPerChunk = marginAmountRaw / BigInt(numChunks);
       const marginRemainder = marginAmountRaw % BigInt(numChunks);
       
-      const preInstructionsPerIteration: ProtocolInstruction[][] = [];
-      const postInstructionsPerIteration: ProtocolInstruction[][] = [];
+      const chunks: ChunkInstructions[] = [];
       
       for (let i = 0; i < numChunks; i++) {
-        // Pre-hook: Empty - flash loan transfer hooks are added in appData.ts
-        preInstructionsPerIteration.push([]);
-        
         // Calculate this chunk's amounts
         const isLastChunk = i === numChunks - 1;
         const marginThisChunk = isLastChunk ? baseMarginPerChunk + marginRemainder : baseMarginPerChunk;
@@ -811,7 +803,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         const feeThisChunk = lenderInfo ? calculateFlashLoanFee(chunkSize, lenderInfo.provider) : 0n;
         const chunkRepayAmount = chunkSize + feeThisChunk;
         
-        // Post-hook: Pull margin → Add → Approve → Deposit → Borrow → Push
+        // Post-hook: Pull margin → Add → Approve → Deposit → Borrow
+        // PushToken is appended automatically by the hook
         // 
         // UTXO Tracking:
         // - OrderManager prepends: ToOutput(receivedAmount, collateralToken) → UTXO[0]
@@ -820,7 +813,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         // - [2] Approve(2) → UTXO[3] (empty, for index sync)
         // - [3] Deposit(input=2) → (no UTXO, consumed)
         // - [4] Borrow(chunkRepayAmount) → UTXO[4] (borrowed debt tokens)
-        // - [5] PushToken(4, cowBorrower) → sends borrowed tokens to CoW Borrower for flash loan repayment
+        // - Hook appends: PushToken(4, borrowerAddress) → flash loan repayment
         const postInstructions: ProtocolInstruction[] = [
           // 1. Pull this chunk's margin → UTXO[1]
           createRouterInstruction(encodePullToken(marginThisChunk, collateral.address, userAddress)),
@@ -842,13 +835,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             normalizedProtocol,
             encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkRepayAmount, context, 999)
           ),
-          
-          // 6. Push borrowed tokens to CoW Borrower for flash loan repayment
-          // UTXO[4] = Borrow output (after PullToken[1], Add[2], Approve[3])
-          createRouterInstruction(encodePushToken(4, cowBorrowerAddress)),
         ];
         
-        postInstructionsPerIteration.push(postInstructions);
+        chunks.push({
+          preInstructions: [], // Empty - flash loan transfer hooks are added in appData.ts
+          postInstructions,
+          flashLoanRepaymentUtxoIndex: 4, // UTXO[4] = Borrow output
+        });
       }
       
       console.log("[buildCowInstructions] Flash loan mode:", {
@@ -859,11 +852,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         marginPerChunk: formatUnits(baseMarginPerChunk, collateral.decimals),
         totalMargin: formatUnits(marginAmountRaw, collateral.decimals),
         lender: chunkParams.flashLoanLender,
-        cowBorrower: cowBorrowerAddress,
-        flow: "swap[0] + pull[1] → add[2] → approve[3] → deposit → borrow[4] → push to Borrower",
+        flow: "swap[0] + pull[1] → add[2] → approve[3] → deposit → borrow[4] → (hook appends push)",
       });
 
-      return { preInstructionsPerIteration, postInstructionsPerIteration };
+      return chunks;
     }
 
     // ========== MULTI-CHUNK MODE (no flash loan) ==========
@@ -871,22 +863,24 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     // Tokens are already at OrderManager from:
     // - Chunk 0: seedAmount transferred during createOrder
     // - Chunk 1+: borrowed and pushed during previous post-hook
-    const preInstructionsPerIteration: ProtocolInstruction[][] = [[]];
     
     // Post-hook for final chunk: Deposit only (no borrow needed)
     const postInstructionsFinal: ProtocolInstruction[] = [...depositInstructions];
     
-    // Build per-iteration post instructions
+    // Build per-iteration chunks
     const numChunks = chunkParams.numChunks;
     const chunkSize = chunkParams.chunkSize;
-    const postInstructionsPerIteration: ProtocolInstruction[][] = [];
+    const chunks: ChunkInstructions[] = [];
     
     for (let i = 0; i < numChunks; i++) {
       if (i === numChunks - 1) {
         // Last chunk - deposit only
-        postInstructionsPerIteration.push(postInstructionsFinal);
+        chunks.push({
+          preInstructions: [],
+          postInstructions: postInstructionsFinal,
+        });
       } else {
-        // Non-final chunk - deposit + borrow + push
+        // Non-final chunk - deposit + borrow + push to OrderManager for next chunk
         const postInstructionsWithBorrow: ProtocolInstruction[] = [
           ...depositInstructions,
           createProtocolInstruction(
@@ -895,42 +889,27 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           ),
           createRouterInstruction(encodePushToken(2, orderManagerAddress)),
         ];
-        postInstructionsPerIteration.push(postInstructionsWithBorrow);
+        chunks.push({
+          preInstructions: [],
+          postInstructions: postInstructionsWithBorrow,
+        });
       }
     }
     
-    if (postInstructionsPerIteration.length === 0) {
-      postInstructionsPerIteration.push(postInstructionsFinal);
+    if (chunks.length === 0) {
+      chunks.push({
+        preInstructions: [],
+        postInstructions: postInstructionsFinal,
+      });
     }
 
     console.log("[buildCowInstructions] Multi-chunk mode:", numChunks, "chunks");
 
-    return { preInstructionsPerIteration, postInstructionsPerIteration };
-  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams]);
-
-  /**
-   * Convert buildCowInstructions output to ChunkInstructions[] format for useCowLimitOrder
-   */
-  const cowChunks = useMemo((): ChunkInstructions[] => {
-    const { preInstructionsPerIteration, postInstructionsPerIteration } = buildCowInstructions;
-    
-    // Determine the number of chunks from the longer array
-    const numChunks = Math.max(preInstructionsPerIteration.length, postInstructionsPerIteration.length);
-    
-    const chunks: ChunkInstructions[] = [];
-    for (let i = 0; i < numChunks; i++) {
-      // Reuse last entry if fewer entries than iterations (matching contract behavior)
-      const preIdx = Math.min(i, preInstructionsPerIteration.length - 1);
-      const postIdx = Math.min(i, postInstructionsPerIteration.length - 1);
-      
-      chunks.push({
-        preInstructions: preInstructionsPerIteration[preIdx] ?? [],
-        postInstructions: postInstructionsPerIteration[postIdx] ?? [],
-      });
-    }
-    
     return chunks;
-  }, [buildCowInstructions]);
+  }, [collateral, debt, userAddress, flashLoanAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams, chainId, marginAmountRaw]);
+
+  // cowChunks is now directly returned by buildCowInstructions
+  const cowChunks = buildCowInstructions;
 
   /**
    * Build instructions to deposit initial collateral (executed before creating CoW order)
@@ -980,8 +959,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           throw new Error("Missing required data for limit order");
         }
 
-        const { preInstructionsPerIteration, postInstructionsPerIteration } = buildCowInstructions;
-        
         // Calculate minBuyPerChunk - the minimum collateral expected per chunk
         // minCollateralOut is the TOTAL expected collateral, so we divide by numChunks
         // to get the proportional amount per chunk
@@ -1000,8 +977,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           totalMinBuy: formatUnits(minCollateralOut.raw, collateral.decimals),
           minBuyPerChunk: minBuyAmount,
           numChunks: chunkParams.numChunks,
-          preInstructionsCount: preInstructionsPerIteration.length,
-          postInstructionsCount: postInstructionsPerIteration.length,
+          chunksCount: cowChunks.length,
         });
 
         // Build all calls for batching

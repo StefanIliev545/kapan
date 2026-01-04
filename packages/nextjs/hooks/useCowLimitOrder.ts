@@ -17,8 +17,14 @@ import {
   buildAndRegisterAppData,
   isChainSupported,
   CompletionType,
+  getKapanCowAdapter,
+  getCowBorrower,
 } from "~~/utils/cow";
-import { ProtocolInstruction } from "~~/utils/v2/instructionHelpers";
+import { 
+  ProtocolInstruction,
+  createRouterInstruction,
+  encodePushToken,
+} from "~~/utils/v2/instructionHelpers";
 import { logger } from "~~/utils/logger";
 
 // Re-export CompletionType for convenience
@@ -40,6 +46,12 @@ export interface ChunkInstructions {
   preInstructions: ProtocolInstruction[];
   /** Instructions to run after the swap (UTXO[0] = buyToken amount from swap) */
   postInstructions: ProtocolInstruction[];
+  /** 
+   * For flash loan mode: UTXO index to push for flash loan repayment.
+   * If set, the hook automatically appends PushToken(index, borrowerAddress) to postInstructions.
+   * The borrower address is resolved automatically based on the flash loan config.
+   */
+  flashLoanRepaymentUtxoIndex?: number;
 }
 
 /**
@@ -334,8 +346,19 @@ export function useCowLimitOrder() {
       logger.debug("[useCowLimitOrder] AppData registered:", appDataResult.appDataHash);
 
       // 3. Build order parameters
+      // For flash loan mode, append PushToken to chunks that have flashLoanRepaymentUtxoIndex
       const preInstructionsPerIteration = input.chunks.map((c) => c.preInstructions);
-      const postInstructionsPerIteration = input.chunks.map((c) => c.postInstructions);
+      const postInstructionsPerIteration = input.chunks.map((chunk) => {
+        // If flash loan mode and chunk specifies repayment UTXO index, append PushToken
+        if (input.flashLoan && chunk.flashLoanRepaymentUtxoIndex !== undefined) {
+          const borrowerAddress = getKapanCowAdapter(chainId) || getCowBorrower(input.flashLoan.lender, chainId);
+          const pushTokenInstruction = createRouterInstruction(
+            encodePushToken(chunk.flashLoanRepaymentUtxoIndex, borrowerAddress)
+          );
+          return [...chunk.postInstructions, pushTokenInstruction];
+        }
+        return chunk.postInstructions;
+      });
 
       const orderParams = buildOrderParams({
         user: userAddress,
