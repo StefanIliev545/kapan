@@ -31,8 +31,12 @@ export interface UseCowQuoteParams {
   sellToken: string;
   /** Token being bought */
   buyToken: string;
-  /** Amount to sell (in wei) */
-  sellAmount: string;
+  /** Amount to sell (in wei) - use for kind="sell" */
+  sellAmount?: string;
+  /** Amount to buy (in wei) - use for kind="buy" */
+  buyAmount?: string;
+  /** Order kind: "sell" (exact sell, min buy) or "buy" (exact buy, max sell) */
+  kind?: "sell" | "buy";
   /** Address that will sign the order */
   from: string;
   /** Whether the quote is enabled */
@@ -59,15 +63,20 @@ export function useCowQuote({
   sellToken,
   buyToken,
   sellAmount,
+  buyAmount,
+  kind = "sell",
   from,
   enabled = true,
 }: UseCowQuoteParams) {
   const chainId = useChainId();
 
+  // Determine the amount based on kind
+  const amount = kind === "buy" ? buyAmount : sellAmount;
+
   return useQuery({
-    queryKey: ["cow-quote", chainId, sellToken, buyToken, sellAmount, from],
+    queryKey: ["cow-quote", chainId, sellToken, buyToken, amount, kind, from],
     queryFn: async (): Promise<CowQuoteResponse | null> => {
-      if (!sellToken || !buyToken || !sellAmount || sellAmount === "0" || !from) {
+      if (!sellToken || !buyToken || !amount || amount === "0" || !from) {
         return null;
       }
 
@@ -76,24 +85,34 @@ export function useCowQuote({
         // (ad blockers, VPNs, corporate proxies can block direct CoW API calls)
         const proxyUrl = `/api/cow/${chainId}/quote`;
         
+        // Build request body based on order kind
+        // - kind="sell": specify sellAmountBeforeFee, get buyAmount
+        // - kind="buy": specify buyAmountAfterFee, get sellAmount
+        const requestBody: Record<string, unknown> = {
+          sellToken,
+          buyToken,
+          from,
+          kind,
+          receiver: from,
+          // appData must be valid JSON string, appDataHash is the keccak256 of it
+          appData: "{\"version\":\"1.0.0\",\"metadata\":{}}",
+          signingScheme: "eip1271",
+          onchainOrder: false,
+          partiallyFillable: false,
+        };
+
+        if (kind === "buy") {
+          requestBody.buyAmountAfterFee = amount;
+        } else {
+          requestBody.sellAmountBeforeFee = amount;
+        }
+        
         const response = await fetch(proxyUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            sellToken,
-            buyToken,
-            sellAmountBeforeFee: sellAmount,
-            from,
-            kind: "sell",
-            receiver: from,
-            appData: "0x0000000000000000000000000000000000000000000000000000000000000000",
-            appDataHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-            signingScheme: "eip1271",
-            onchainOrder: false,
-            partiallyFillable: false,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -109,7 +128,7 @@ export function useCowQuote({
         return null;
       }
     },
-    enabled: enabled && !!sellToken && !!buyToken && !!sellAmount && sellAmount !== "0" && !!from && isChainSupported(chainId),
+    enabled: enabled && !!sellToken && !!buyToken && !!amount && amount !== "0" && !!from && isChainSupported(chainId),
     staleTime: 10000, // 10 seconds
     refetchInterval: 15000, // Refresh every 15 seconds
   });
@@ -121,6 +140,14 @@ export function useCowQuote({
 export function getCowQuoteBuyAmount(quote: CowQuoteResponse | null | undefined): bigint {
   if (!quote?.quote?.buyAmount) return 0n;
   return BigInt(quote.quote.buyAmount);
+}
+
+/**
+ * Extract the sell amount from a CoW quote (useful for KIND_BUY quotes)
+ */
+export function getCowQuoteSellAmount(quote: CowQuoteResponse | null | undefined): bigint {
+  if (!quote?.quote?.sellAmount) return 0n;
+  return BigInt(quote.quote.sellAmount);
 }
 
 /**

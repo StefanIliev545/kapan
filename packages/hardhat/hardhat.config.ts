@@ -53,7 +53,7 @@ const FORK_BLOCK_NUMBERS: Record<string, number | undefined> = {
   mainnet: undefined,
   arbitrum: 414729450, // ~Dec 2025
   arb: 414729450,
-  base: 40348800,      // ~Jan 2026 - after real CoW order 0xbe45e6ad... created
+  base: undefined,     // Use latest - testing recent orders
   optimism: 129000000, // ~Dec 2024
   op: 129000000,
   linea: 13000000,     // ~Dec 2024

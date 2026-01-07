@@ -87,6 +87,13 @@ export interface KapanOrderInput {
   
   /** Flash loan mode: when true, order.receiver = Settlement (required by CoW solvers) */
   isFlashLoanOrder?: boolean;
+  
+  /** 
+   * Order kind: if true, creates KIND_BUY order instead of KIND_SELL.
+   * KIND_SELL: chunkSize = exact sell, minBuyPerChunk = minimum buy (slippage protection)
+   * KIND_BUY: chunkSize = max sell (slippage protection), minBuyPerChunk = exact buy amount
+   */
+  isKindBuy?: boolean;
 }
 
 /**
@@ -106,6 +113,7 @@ export interface KapanOrderParams {
   minHealthFactor: bigint;
   appDataHash: string;
   isFlashLoanOrder: boolean;  // When true, order.receiver = Settlement (required by CoW solvers)
+  isKindBuy: boolean;  // When true, creates KIND_BUY order instead of KIND_SELL
 }
 
 /**
@@ -240,6 +248,7 @@ export function buildOrderParams(input: KapanOrderInput): KapanOrderParams {
     minHealthFactor: parseUnits(input.minHealthFactor ?? "1.1", 18),
     appDataHash: input.appDataHash ?? keccak256(toUtf8Bytes("kapan-order")),
     isFlashLoanOrder: input.isFlashLoanOrder ?? false,
+    isKindBuy: input.isKindBuy ?? false,
   };
 }
 
@@ -296,6 +305,7 @@ export function parseOrderContext(rawContext: any): OrderContext {
       minHealthFactor: BigInt(rawContext.params.minHealthFactor),
       appDataHash: rawContext.params.appDataHash,
       isFlashLoanOrder: Boolean(rawContext.params.isFlashLoanOrder),
+      isKindBuy: Boolean(rawContext.params.isKindBuy),
     },
     status: Number(rawContext.status) as OrderStatus,
     executedAmount: BigInt(rawContext.executedAmount),

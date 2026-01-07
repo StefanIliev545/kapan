@@ -1,8 +1,10 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback } from "react";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address, encodeFunctionData, type Hex } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 
+import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useCowQuote, getCowQuoteBuyAmount } from "~~/hooks/useCowQuote";
@@ -154,6 +156,23 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     
     // CoW order hooks
     const { buildOrderCalls: buildLimitOrderCalls, buildRouterCall, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
+
+    // Limit order config from LimitOrderConfig component
+    const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
+    
+    // Callback for when LimitOrderConfig reports changes
+    const handleLimitOrderConfigChange = useCallback((config: LimitOrderResult) => {
+        setLimitOrderConfig(config);
+    }, []);
+
+    // Memoize sellToken for LimitOrderConfig to prevent infinite re-renders
+    const limitOrderSellToken = useMemo(() => 
+        selectedFrom ? {
+            symbol: selectedFrom.symbol,
+            decimals: selectedFrom.decimals,
+            address: selectedFrom.address,
+        } : null,
+    [selectedFrom?.symbol, selectedFrom?.decimals, selectedFrom?.address]);
 
     // Filter "To" assets (exclude selected "From")
     const targetAssets = useMemo(() =>
@@ -351,10 +370,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         return { raw: minRaw, formatted: formatUnits(minRaw, selectedTo.decimals) };
     }, [selectedTo, bestQuote, executionType, limitSlippage, slippage]);
 
-    // Flash loan info for CoW limit orders
+    // Flash loan info for CoW limit orders - uses selected provider from LimitOrderConfig
     const cowFlashLoanInfo = useMemo(() => {
         if (executionType !== "limit" || !selectedFrom) return null;
-        const lenderInfo = getPreferredFlashLoanLender(chainId);
+        
+        // Use provider from LimitOrderConfig if available
+        const providerType = limitOrderConfig?.selectedProvider?.provider;
+        const lenderInfo = getPreferredFlashLoanLender(chainId, providerType);
         if (!lenderInfo) return null;
         
         const fee = calculateFlashLoanFee(amountInBigInt, lenderInfo.provider);
@@ -363,7 +385,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             provider: lenderInfo.provider,
             fee,
         };
-    }, [executionType, selectedFrom, chainId, amountInBigInt]);
+    }, [executionType, selectedFrom, chainId, amountInBigInt, limitOrderConfig]);
 
     /**
      * Build CoW limit order instructions for collateral swap.
@@ -535,10 +557,27 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     },
                     // Include withdraw instruction for auth check
                     preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
+                    isKindBuy: false, // KIND_SELL: exact sell amount, min buy amount
                 });
 
                 if (!limitOrderResult) {
                     throw new Error("Failed to build CoW order calls");
+                }
+
+                // Check for AppData registration errors
+                if (!limitOrderResult.success) {
+                    const errorMsg = limitOrderResult.error || "Unknown error building order";
+                    const fullError = limitOrderResult.errorDetails?.apiResponse 
+                        ? `${errorMsg}\n\nAPI Response: ${limitOrderResult.errorDetails.apiResponse}`
+                        : errorMsg;
+                    console.error("[Limit Order] Build failed:", fullError, limitOrderResult.errorDetails);
+                    notification.error(
+                        <TransactionToast 
+                            step="failed" 
+                            message={`CoW API Error: ${errorMsg}`}
+                        />
+                    );
+                    throw new Error(errorMsg);
                 }
 
                 console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
@@ -821,13 +860,18 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         </span>
                     </div>
 
-                    {/* Flash Loan Fee */}
-                    {cowFlashLoanInfo && cowFlashLoanInfo.fee > 0n && selectedFrom && (
-                        <div className="flex items-center justify-between pt-2 border-t border-base-300/30">
-                            <span className="text-base-content/60">Flash Loan Fee</span>
-                            <span className="text-warning text-[10px]">
-                                +{formatUnits(cowFlashLoanInfo.fee, selectedFrom.decimals)} {selectedFrom.symbol}
-                            </span>
+                    {/* Flash Loan Provider Selection */}
+                    {selectedFrom && limitOrderSellToken && (
+                        <div className="pt-2 border-t border-base-300/30">
+                            <LimitOrderConfig
+                                chainId={chainId}
+                                sellToken={limitOrderSellToken}
+                                totalAmount={amountInBigInt}
+                                onConfigChange={handleLimitOrderConfigChange}
+                                showFlashLoanToggle={false}
+                                showChunksInput={false}
+                                compact
+                            />
                         </div>
                     )}
 

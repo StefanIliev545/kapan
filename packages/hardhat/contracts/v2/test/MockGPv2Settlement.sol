@@ -24,4 +24,17 @@ contract MockGPv2Settlement is IGPv2Settlement {
     function setVaultRelayer(address _vaultRelayer) external {
         vaultRelayer = _vaultRelayer;
     }
+
+    // Track invalidated orders for testing
+    mapping(bytes => bool) public invalidatedOrders;
+
+    /// @notice Invalidate an order (mock implementation)
+    function invalidateOrder(bytes calldata orderUid) external override {
+        invalidatedOrders[orderUid] = true;
+    }
+
+    /// @notice Check if an order is invalidated (test helper)
+    function isOrderInvalidated(bytes calldata orderUid) external view returns (bool) {
+        return invalidatedOrders[orderUid];
+    }
 }

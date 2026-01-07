@@ -105,9 +105,14 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // AppData (pre-computed by frontend, includes hooks)
         bytes32 appDataHash;
         
-        // Flash loan mode: when true, order.receiver = Settlement (required by CoW solvers)
-        // When false (multi-chunk mode), order.receiver = OrderManager
+        // Flash loan mode: indicates order uses CoW flash loan for funding
+        // NOTE: receiver is ALWAYS OrderManager regardless of this flag
         bool isFlashLoanOrder;
+        
+        // Order kind: if true, creates KIND_BUY order instead of KIND_SELL
+        // KIND_SELL: chunkSize = exact sell, minBuyPerChunk = minimum buy (slippage protection)
+        // KIND_BUY: chunkSize = max sell (slippage protection), minBuyPerChunk = exact buy amount
+        bool isKindBuy;
     }
 
     /// @notice Order context stored on-chain
@@ -427,27 +432,16 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     }
     
     /// @notice Internal post-hook execution
+    /// @dev For KIND_SELL: Prepends 1 UTXO (received buyToken amount)
+    ///      For KIND_BUY: Prepends 2 UTXOs (actual sell amount, leftover sell amount)
     function _executePostHook(bytes32 orderHash) internal {
-        console.log("_executePostHook: START");
-        
         // Only HooksTrampoline can call this
         if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
-        
-        console.log("_executePostHook: caller is HooksTrampoline");
         
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
         
-        // Get actual received amount
-        uint256 receivedAmount = IERC20(ctx.params.buyToken).balanceOf(address(this));
-        console.log("_executePostHook: receivedAmount =", receivedAmount);
-        
-        // Transfer tokens to router for processing
-        IERC20(ctx.params.buyToken).safeTransfer(address(router), receivedAmount);
-        console.log("_executePostHook: transferred to router");
-        
         // Get post-instructions for current iteration
-        // If fewer entries than iterations, reuse the last entry
         bytes memory postInstructionsData = _getInstructionsForIteration(
             ctx.params.postInstructionsPerIteration,
             ctx.iterationCount
@@ -457,43 +451,77 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         ProtocolTypes.ProtocolInstruction[] memory storedInstructions = 
             abi.decode(postInstructionsData, (ProtocolTypes.ProtocolInstruction[]));
         
-        // Create new array with ToOutput prepended
-        ProtocolTypes.ProtocolInstruction[] memory instructions = 
-            new ProtocolTypes.ProtocolInstruction[](storedInstructions.length + 1);
+        uint256 actualSellAmount;
+        uint256 actualBuyAmount;
+        ProtocolTypes.ProtocolInstruction[] memory instructions;
         
-        // Prepend ToOutput with receivedAmount - this becomes index 0
-        instructions[0] = ProtocolTypes.ProtocolInstruction({
-            protocolName: "router",
-            data: _encodeToOutput(receivedAmount, ctx.params.buyToken)
-        });
-        
-        // Copy stored instructions (their indices shift by 1, but they reference index 0)
-        for (uint256 i = 0; i < storedInstructions.length; i++) {
-            instructions[i + 1] = storedInstructions[i];
+        if (ctx.params.isKindBuy) {
+            // KIND_BUY: calculate actual sell amount and leftover
+            // We sent chunkSize to OrderManager (via fundOrder), CoW took some, rest remains
+            uint256 remainingSellToken = IERC20(ctx.params.sellToken).balanceOf(address(this));
+            actualSellAmount = ctx.params.chunkSize - remainingSellToken;
+            actualBuyAmount = ctx.params.minBuyPerChunk; // Exact for KIND_BUY
+            
+            // Transfer leftover sellToken to router (for flash loan repayment calculations)
+            if (remainingSellToken > 0) {
+                IERC20(ctx.params.sellToken).safeTransfer(address(router), remainingSellToken);
+            }
+            
+            // Approve router to pull buyToken (for PullToken instruction in post-hook)
+            // This is needed because KIND_BUY orders use PullToken to move debt from OM to Router
+            uint256 buyTokenBalance = IERC20(ctx.params.buyToken).balanceOf(address(this));
+            if (buyTokenBalance > 0) {
+                IERC20(ctx.params.buyToken).forceApprove(address(router), buyTokenBalance);
+            }
+            
+            // Prepend TWO UTXOs for KIND_BUY:
+            // UTXO[0] = actual sell amount (what we paid)
+            // UTXO[1] = leftover amount (what wasn't used, now at router)
+            instructions = new ProtocolTypes.ProtocolInstruction[](storedInstructions.length + 2);
+            instructions[0] = ProtocolTypes.ProtocolInstruction({
+                protocolName: "router",
+                data: _encodeToOutput(actualSellAmount, ctx.params.sellToken)
+            });
+            instructions[1] = ProtocolTypes.ProtocolInstruction({
+                protocolName: "router",
+                data: _encodeToOutput(remainingSellToken, ctx.params.sellToken)
+            });
+            
+            // Copy stored instructions (indices shift by 2)
+            for (uint256 i = 0; i < storedInstructions.length; i++) {
+                instructions[i + 2] = storedInstructions[i];
+            }
+        } else {
+            // KIND_SELL: get actual received amount
+            actualBuyAmount = IERC20(ctx.params.buyToken).balanceOf(address(this));
+            actualSellAmount = ctx.params.chunkSize; // Exact for KIND_SELL
+            
+            // Transfer tokens to router for processing
+            IERC20(ctx.params.buyToken).safeTransfer(address(router), actualBuyAmount);
+            
+            // Prepend ONE UTXO for KIND_SELL:
+            // UTXO[0] = received amount (what we got from swap)
+            instructions = new ProtocolTypes.ProtocolInstruction[](storedInstructions.length + 1);
+            instructions[0] = ProtocolTypes.ProtocolInstruction({
+                protocolName: "router",
+                data: _encodeToOutput(actualBuyAmount, ctx.params.buyToken)
+            });
+            
+            // Copy stored instructions (indices shift by 1)
+            for (uint256 i = 0; i < storedInstructions.length; i++) {
+                instructions[i + 1] = storedInstructions[i];
+            }
         }
-        
-        console.log("_executePostHook: instruction count =", instructions.length);
-        console.log("_executePostHook: calling router.processProtocolInstructions");
         
         // Execute via router
-        try router.processProtocolInstructions(instructions) {
-            console.log("_executePostHook: router call SUCCESS");
-        } catch Error(string memory reason) {
-            console.log("_executePostHook: router call FAILED with reason:", reason);
-            revert(reason);
-        } catch (bytes memory lowLevelData) {
-            console.log("_executePostHook: router call FAILED with low-level error");
-            console.logBytes(lowLevelData);
-            revert("Router call failed");
-        }
+        router.processProtocolInstructions(instructions);
         
-        // Update progress
-        uint256 chunkSellAmount = ctx.params.chunkSize;
-        ctx.executedAmount += chunkSellAmount;
+        // Update progress with actual amounts
+        ctx.executedAmount += actualSellAmount;
         ctx.iterationCount++;
         
-        // Emit chunk execution event with sell/buy amounts for frontend tracking
-        emit ChunkExecuted(orderHash, ctx.iterationCount, chunkSellAmount, receivedAmount);
+        // Emit chunk execution event with actual sell/buy amounts for frontend tracking
+        emit ChunkExecuted(orderHash, ctx.iterationCount, actualSellAmount, actualBuyAmount);
         
         // Check completion
         if (_isOrderComplete(ctx)) {
@@ -501,8 +529,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
             emit OrderCompleted(orderHash, ctx.params.user, ctx.executedAmount);
         }
         
-        emit PostHookExecuted(orderHash, ctx.iterationCount, receivedAmount);
-        console.log("_executePostHook: COMPLETE");
+        emit PostHookExecuted(orderHash, ctx.iterationCount, actualBuyAmount);
     }
 
     // ============ ERC-1271 Signature Verification ============

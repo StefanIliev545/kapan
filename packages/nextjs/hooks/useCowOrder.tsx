@@ -88,6 +88,7 @@ const ORDER_MANAGER_ABI = [
           { name: "minHealthFactor", type: "uint256" },
           { name: "appDataHash", type: "bytes32" },
           { name: "isFlashLoanOrder", type: "bool" },
+          { name: "isKindBuy", type: "bool" },
         ],
         name: "params",
         type: "tuple",
@@ -128,6 +129,7 @@ const ORDER_MANAGER_ABI = [
               { name: "minHealthFactor", type: "uint256" },
               { name: "appDataHash", type: "bytes32" },
               { name: "isFlashLoanOrder", type: "bool" },
+              { name: "isKindBuy", type: "bool" },
             ],
             name: "params",
             type: "tuple",
@@ -371,6 +373,7 @@ export function useCowOrder() {
       ...input,
       appDataHash: appDataResult.appDataHash,
       isFlashLoanOrder: !!input.flashLoan,
+      isKindBuy: input.isKindBuy ?? false,
     });
 
     // 4. Check delegation

@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback } from "react";
 import { track } from "@vercel/analytics";
 import Image from "next/image";
 import { Address, formatUnits, parseUnits } from "viem";
@@ -31,7 +32,7 @@ import {
   normalizeProtocolName,
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, getPreferredFlashLoanLender } from "~~/utils/cow";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, type ChunkCalculationResult, getFlashLoanLender, calculateFlashLoanFee, COW_PROTOCOL, getPreferredFlashLoanLender, mapFlashLoanProviderToCow } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
@@ -41,6 +42,7 @@ import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { encodeFunctionData, type Hex } from "viem";
+import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -129,6 +131,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [useFlashLoan, setUseFlashLoan] = useState<boolean>(true); // Default ON
   // Number of chunks for flash loan orders (each chunk is independent flash loan settlement)
   const [flashLoanChunks, setFlashLoanChunks] = useState<number>(1);
+  // Limit order config result from LimitOrderConfig component
+  const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
   // Batched TX mode: when ON, uses EIP-5792 sendCalls (may not work with all wallets like MetaMask)
   // When OFF, executes each call sequentially (more compatible but slower)
   const [useBatchedTx, setUseBatchedTx] = useState<boolean>(false); // Default OFF for compatibility
@@ -355,6 +359,20 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     flashLoanProviders: providerOptions, defaultProvider: defaultFlashLoanProvider ?? providerOptions[0],
     tokenAddress: debt?.address as Address, amount: flashLoanAmountRaw, chainId,
   });
+
+  // Callback for when LimitOrderConfig reports changes
+  const handleLimitOrderConfigChange = useCallback((config: LimitOrderResult) => {
+    setLimitOrderConfig(config);
+  }, []);
+
+  // Memoize sellToken for LimitOrderConfig to prevent infinite re-renders
+  const limitOrderSellToken = useMemo(() => 
+    debt ? {
+      symbol: debt.symbol,
+      decimals: debt.decimals,
+      address: debt.address,
+    } : null,
+  [debt?.symbol, debt?.decimals, debt?.address]);
 
   // Swap amount: in zap mode, swap everything (deposit + flash loan); otherwise just flash loan
   const swapQuoteAmount = zapMode ? totalSwapAmount : flashLoanAmountRaw;
@@ -642,13 +660,16 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "Missing price data" };
     }
 
-    // If flash loan is enabled, calculate chunk sizes based on user-specified count
-    // KapanCowAdapter supports both Morpho (0% fee) and Aave V3 (0.05% fee)
+    // If flash loan is enabled, use the config from LimitOrderConfig component
+    // KapanCowAdapter supports Morpho (0% fee), Balancer V2 (0% fee), and Aave V3 (0.05% fee)
     if (useFlashLoan) {
-      // Get preferred lender (Morpho if available, else Aave)
-      const lenderInfo = getPreferredFlashLoanLender(chainId);
-      const flashLoanLender = lenderInfo?.address;
-      if (!flashLoanLender || !lenderInfo) {
+      // Use limit order config from LimitOrderConfig component if available
+      // Otherwise fall back to calculating based on selectedProvider
+      const flashLoanLender = limitOrderConfig?.flashLoanLender 
+        ?? getPreferredFlashLoanLender(chainId, limitOrderConfig?.selectedProvider?.provider)?.address;
+      const providerType = limitOrderConfig?.selectedProvider?.provider ?? "morpho";
+      
+      if (!flashLoanLender) {
         console.warn("[Limit Order] Flash loans not available on this chain for CoW orders");
         return { numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw], needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0, recommendFlashLoan: false, explanation: "Flash loans not available for limit orders on this chain" };
       }
@@ -664,15 +685,16 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       ) as bigint[];
       
       // Calculate fee per chunk (based on base chunk size)
-      const flashLoanFeePerChunk = calculateFlashLoanFee(baseChunkSize, lenderInfo.provider);
+      const flashLoanFeePerChunk = limitOrderConfig?.flashLoanFee 
+        ?? calculateFlashLoanFee(baseChunkSize, providerType);
       
-      console.log(`[Limit Order] Flash loan mode (CoW/${lenderInfo.provider}):`, {
+      console.log(`[Limit Order] Flash loan mode (CoW/${providerType}):`, {
         totalDebt: formatUnits(flashLoanAmountRaw, debt.decimals),
         numChunks,
         chunkSize: formatUnits(baseChunkSize, debt.decimals),
         flashLoanFeePerChunk: formatUnits(flashLoanFeePerChunk, debt.decimals),
         lender: flashLoanLender,
-        lenderType: lenderInfo.provider,
+        lenderType: providerType,
       });
       
       return {
@@ -719,7 +741,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     });
 
     return result;
-  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, flashLoanChunks, chainId]);
+  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, flashLoanChunks, chainId, limitOrderConfig]);
 
   /**
    * Build per-iteration pre/post instructions for CoW limit order loop
@@ -1106,10 +1128,27 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           } : undefined,
           // Include pre-order instructions for auth checking
           preOrderInstructions: preOrderInstructions,
+          isKindBuy: false, // KIND_SELL: exact sell amount, min buy amount
         });
 
         if (!limitOrderResult) {
           throw new Error("Failed to build CoW order calls");
+        }
+
+        // Check for AppData registration errors
+        if (!limitOrderResult.success) {
+          const errorMsg = limitOrderResult.error || "Unknown error building order";
+          const fullError = limitOrderResult.errorDetails?.apiResponse 
+            ? `${errorMsg}\n\nAPI Response: ${limitOrderResult.errorDetails.apiResponse}`
+            : errorMsg;
+          console.error("[Limit Order] Build failed:", fullError, limitOrderResult.errorDetails);
+          notification.error(
+            <TransactionToast 
+              step="failed" 
+              message={`CoW API Error: ${errorMsg}`}
+            />
+          );
+          throw new Error(errorMsg);
         }
 
         // Add all order-related calls (already in correct order: delegation -> auth -> seed approve -> order)
@@ -1663,65 +1702,20 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   </div>
                 )}
 
-                {/* Flash Loan Toggle for Limit Orders */}
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-base-content/60">Flash Loan</span>
-                    <span className="text-[10px] text-base-content/40">(single tx)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {chunkParams.useFlashLoan && chunkParams.flashLoanFee !== undefined && chunkParams.flashLoanFee > 0n && (
-                      <span className="text-[10px] text-warning">
-                        +{formatUnits(chunkParams.flashLoanFee, debt?.decimals ?? 18)} {debt?.symbol} fee
-                      </span>
-                    )}
-                    <input
-                      type="checkbox"
-                      checked={useFlashLoan}
-                      onChange={e => setUseFlashLoan(e.target.checked)}
-                      className="toggle toggle-primary toggle-xs"
+                {/* Flash Loan Config - Provider selection, chunks, etc. */}
+                {debt && limitOrderSellToken && (
+                  <div className="mt-2 pt-2 border-t border-base-300/30">
+                    <LimitOrderConfig
+                      chainId={chainId}
+                      sellToken={limitOrderSellToken}
+                      totalAmount={flashLoanAmountRaw}
+                      onConfigChange={handleLimitOrderConfigChange}
+                      useFlashLoan={useFlashLoan}
+                      setUseFlashLoan={setUseFlashLoan}
+                      numChunks={flashLoanChunks}
+                      setNumChunks={setFlashLoanChunks}
+                      compact
                     />
-                  </div>
-                </div>
-
-                {/* Flash Loan Chunks */}
-                {chunkParams.useFlashLoan && (
-                  <div className="flex flex-col gap-2 mt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-base-content/60 text-xs">Chunks</span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          max={999}
-                          value={flashLoanChunks}
-                          onChange={e => setFlashLoanChunks(Math.max(1, Math.min(999, parseInt(e.target.value) || 1)))}
-                          className="input input-bordered input-xs w-16 text-right"
-                        />
-                        {flashLoanChunks > 1 && debt && (
-                          <span className="text-[10px] text-base-content/50">
-                            ~{formatUnits(chunkParams.chunkSize, debt.decimals)} {debt.symbol}/chunk
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-1.5 text-[10px]">
-                      <svg className="w-3 h-3 shrink-0 mt-0.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      <div>
-                        <span className="text-success font-medium">
-                          {flashLoanChunks === 1 ? "Single transaction execution" : `${flashLoanChunks} flash loan transactions`}
-                        </span>
-                        <p className="text-base-content/50 mt-0.5">
-                          {flashLoanChunks === 1 
-                            ? "Solver takes flash loan → swaps → you borrow to repay. All in one tx."
-                            : `Each chunk executes as independent flash loan. ~30 min between chunks for price discovery.`
-                          }
-                          {chunkParams.flashLoanFee === 0n && " No flash loan fee."}
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 )}
 

@@ -279,8 +279,10 @@ export function buildKapanAppData(
     };
   }
 ): AppDataDocument {
-  // Gas limits - generous post-hook limit for complex protocols like Venus
-  const preHookGasLimit = options?.preHookGasLimit ?? "300000";
+  // Gas limits - generous limits for complex operations
+  // Pre-hook: 800k for patterns like close-with-collateral (PullToken + Repay + Withdraw)
+  // Post-hook: 1.75M for complex protocols like Venus
+  const preHookGasLimit = options?.preHookGasLimit ?? "800000";
   const postHookGasLimit = options?.postHookGasLimit ?? "1750000";
 
   // Encode the hook calls to OrderManager using (user, salt) lookup
@@ -404,7 +406,7 @@ export function buildKapanAppData(
     console.log("[buildKapanAppData] Flash loan metadata:", {
       liquidityProvider: options.flashLoan.lender,
       protocolAdapter: protocolAdapter,
-      receiver: protocolAdapter, // Same as protocolAdapter (matches working Aave pattern)
+      receiver: protocolAdapter, // ProtocolAdapter or OrderManager .. both seem to work
       token: flashLoanToken,
       amount: flashLoanAmount.toString(),
       usingKapanAdapter: !!kapanAdapter,
@@ -412,13 +414,12 @@ export function buildKapanAppData(
     
     // Flash loan metadata for CoW API:
     // - protocolAdapter: The borrower contract that handles flash loan mechanics (KapanCowAdapter)
-    // - receiver: Same as protocolAdapter (balance override applies to adapter)
-    // - Pre-hook transfers tokens from adapter → OrderManager during simulation
-    // At settlement time, actual tokens flow: Lender → Adapter → (pre-hook) → OrderManager
+    // - receiver: OrderManager (balance override here, fundOrder pre-hook transfers tokens)
+    // At settlement time, actual tokens flow: Lender → Adapter → (fundOrder) → OrderManager
     appData.metadata.flashloan = {
       liquidityProvider: options.flashLoan.lender,
       protocolAdapter: protocolAdapter,
-      receiver: protocolAdapter, // Same as protocolAdapter (matches working Aave pattern)
+      receiver: protocolAdapter, // ProtocolAdapter or OrderManager .. both seem to work
       token: flashLoanToken,
       amount: flashLoanAmount.toString(),
     };
@@ -524,8 +525,24 @@ export async function registerAppData(
     const errorText = await response.text();
     console.error("[registerAppData] API error response:", errorText);
     console.error("[registerAppData] Request body was:", fullAppDataJson);
-    return { success: false, error: `API error ${response.status}: ${errorText}` };
+    console.error("[registerAppData] Full appData document:", JSON.stringify(appDataDoc, null, 2));
+    
+    // Try to parse error for more details
+    let parsedError = errorText;
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.description) {
+        parsedError = errorJson.description;
+      } else if (errorJson.errorType) {
+        parsedError = `${errorJson.errorType}: ${errorJson.description || errorText}`;
+      }
+    } catch {
+      // Keep original errorText
+    }
+    
+    return { success: false, error: `API error ${response.status}: ${parsedError}` };
   } catch (error) {
+    console.error("[registerAppData] Network error:", error);
     return { success: false, error: `Network error: ${error}` };
   }
 }

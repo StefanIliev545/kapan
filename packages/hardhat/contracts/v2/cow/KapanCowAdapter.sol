@@ -6,18 +6,17 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IMorphoBlue, IMorphoFlashLoanCallback } from "../interfaces/morpho/IMorphoBlue.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title KapanCowAdapter
  * @notice Adapter contract that integrates Kapan with CoW Protocol's FlashLoanRouter
  * @dev Implements IBorrower interface for CoW and handles flash loans from:
  *      - Morpho Blue (0% fee - RECOMMENDED)
+ *      - Balancer V2 (0% fee - wide token support)
  *      - Aave V3 (0.05% fee - fallback)
  * 
  * Flow:
  * 1. FlashLoanRouter calls flashLoanAndCallBack()
- * 2. We request flash loan from Morpho or Aave
+ * 2. We request flash loan from Morpho, Balancer, or Aave
  * 3. Lender sends tokens here and calls our callback
  * 4. We call router.borrowerCallBack() to proceed with settlement
  * 5. Settlement executes:
@@ -44,6 +43,23 @@ interface IAaveV3Pool {
     ) external;
 }
 
+// Balancer V2 Vault interface
+interface IBalancerV2Vault {
+    function flashLoan(
+        address recipient,
+        IERC20[] memory tokens,
+        uint256[] memory amounts,
+        bytes memory userData
+    ) external;
+}
+
+// Balancer V3 Vault interface
+interface IBalancerV3Vault {
+    function unlock(bytes calldata data) external returns (bytes memory result);
+    function sendTo(address token, address to, uint256 amount) external;
+    function settle(address token, uint256 amount) external returns (uint256 credit);
+}
+
 // Custom errors
 error OnlyRouter();
 error OnlySettlement();
@@ -56,13 +72,15 @@ error UnauthorizedCaller();
 enum LenderType {
     Unknown,
     Aave,
-    Morpho
+    Morpho,
+    BalancerV2,
+    BalancerV3
 }
 
 /**
  * @title KapanCowAdapter
  * @notice Bridges Kapan's OrderManager with CoW Protocol's flash loan system
- * @dev Supports both Morpho Blue (0% fee) and Aave V3 (0.05% fee)
+ * @dev Supports Morpho Blue (0% fee), Balancer V2 (0% fee), and Aave V3 (0.05% fee)
  */
 contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
     using SafeERC20 for IERC20;
@@ -141,6 +159,20 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         emit LenderUpdated(lender, allowed, LenderType.Morpho);
     }
 
+    /// @notice Add or remove an allowed Balancer V2 lender
+    function setBalancerV2Lender(address lender, bool allowed) external onlyOwner {
+        allowedLenders[lender] = allowed;
+        lenderTypes[lender] = allowed ? LenderType.BalancerV2 : LenderType.Unknown;
+        emit LenderUpdated(lender, allowed, LenderType.BalancerV2);
+    }
+
+    /// @notice Add or remove an allowed Balancer V3 lender
+    function setBalancerV3Lender(address lender, bool allowed) external onlyOwner {
+        allowedLenders[lender] = allowed;
+        lenderTypes[lender] = allowed ? LenderType.BalancerV3 : LenderType.Unknown;
+        emit LenderUpdated(lender, allowed, LenderType.BalancerV3);
+    }
+
     /// @notice Legacy function for backwards compatibility (defaults to Aave)
     function setLender(address lender, bool allowed) external onlyOwner {
         allowedLenders[lender] = allowed;
@@ -161,10 +193,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         uint256 amount,
         bytes calldata callbackData
     ) external onlyRouter {
-        console.log("flashLoanAndCallBack: START");
-        console.log("flashLoanAndCallBack: lender =", lender);
-        console.log("flashLoanAndCallBack: amount =", amount);
-        
         if (!allowedLenders[lender]) revert InvalidLender();
         if (_inFlashLoan) revert FlashLoanInProgress();
 
@@ -175,16 +203,32 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         emit FlashLoanRequested(lender, address(token), amount, lenderType);
 
         if (lenderType == LenderType.Morpho) {
-            console.log("flashLoanAndCallBack: calling Morpho.flashLoan");
             // Request flash loan from Morpho Blue (0% fee!)
             IMorphoBlue(lender).flashLoan(
                 address(token),
                 amount,
                 abi.encode(callbackData) // Pass router callback data
             );
-            console.log("flashLoanAndCallBack: Morpho.flashLoan returned SUCCESS");
+        } else if (lenderType == LenderType.BalancerV2) {
+            // Request flash loan from Balancer V2 (0% fee!)
+            IERC20[] memory tokens = new IERC20[](1);
+            tokens[0] = token;
+            uint256[] memory amounts = new uint256[](1);
+            amounts[0] = amount;
+            IBalancerV2Vault(lender).flashLoan(
+                address(this),
+                tokens,
+                amounts,
+                callbackData
+            );
+        } else if (lenderType == LenderType.BalancerV3) {
+            // Request flash loan from Balancer V3 (0% fee!)
+            // V3 uses unlock pattern - encode token, amount, and callbackData
+            bytes memory userData = abi.encode(address(token), amount, callbackData);
+            IBalancerV3Vault(lender).unlock(
+                abi.encodeWithSelector(this.receiveFlashLoanV3.selector, userData)
+            );
         } else {
-            console.log("flashLoanAndCallBack: calling Aave.flashLoanSimple");
             // Request flash loan from Aave (0.05% fee)
             IAaveV3Pool(lender).flashLoanSimple(
                 address(this),
@@ -193,7 +237,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
                 callbackData,
                 0
             );
-            console.log("flashLoanAndCallBack: Aave.flashLoanSimple returned SUCCESS");
         }
     }
 
@@ -203,9 +246,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
     /// @param assets The borrowed amount
     /// @param data Encoded callbackData for router
     function onMorphoFlashLoan(uint256 assets, bytes calldata data) external override {
-        console.log("onMorphoFlashLoan: START");
-        console.log("onMorphoFlashLoan: assets =", assets);
-        
         // Validate caller is the expected Morpho lender
         if (msg.sender != _currentLender) revert UnauthorizedCaller();
         if (lenderTypes[msg.sender] != LenderType.Morpho) revert InvalidLender();
@@ -218,22 +258,14 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
 
         // Pre-approve Morpho to pull repayment (0% fee, so repayment = assets)
         IERC20(_flashLoanToken).forceApprove(msg.sender, assets);
-        console.log("onMorphoFlashLoan: approved Morpho for repayment");
 
         // Call back to FlashLoanRouter to proceed with settlement
-        console.log("onMorphoFlashLoan: calling router.borrowerCallBack");
         router.borrowerCallBack(callbackData);
-        console.log("onMorphoFlashLoan: borrowerCallBack returned");
-
-        // Check balance before cleanup
-        uint256 balance = IERC20(_flashLoanToken).balanceOf(address(this));
-        console.log("onMorphoFlashLoan: adapter balance after callback =", balance);
 
         // Settlement complete, clean up
         _inFlashLoan = false;
         _flashLoanToken = address(0);
         _currentLender = address(0);
-        console.log("onMorphoFlashLoan: COMPLETE - Morpho will now pull repayment");
     }
 
     // ============ Aave Callback ============
@@ -269,6 +301,72 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         return true;
     }
 
+    // ============ Balancer V2 Callback ============
+
+    /// @notice Called by Balancer V2 Vault after flash loan tokens are sent
+    /// @param tokens Array of tokens borrowed (we only use single token)
+    /// @param amounts Array of amounts borrowed
+    /// @param feeAmounts Array of fee amounts (0 for Balancer)
+    /// @param userData Encoded callbackData for router
+    function receiveFlashLoan(
+        IERC20[] calldata tokens,
+        uint256[] calldata amounts,
+        uint256[] calldata feeAmounts,
+        bytes calldata userData
+    ) external {
+        // Validate caller is the expected Balancer lender
+        if (msg.sender != _currentLender) revert UnauthorizedCaller();
+        if (lenderTypes[msg.sender] != LenderType.BalancerV2) revert InvalidLender();
+
+        // Mark that we're in flash loan context
+        _inFlashLoan = true;
+
+        // Call back to FlashLoanRouter to proceed with settlement
+        router.borrowerCallBack(userData);
+
+        // Repay flash loan (Balancer requires direct transfer back, no approval)
+        uint256 repayment = amounts[0] + feeAmounts[0];
+        IERC20(address(tokens[0])).safeTransfer(msg.sender, repayment);
+
+        // Settlement complete, clean up
+        _inFlashLoan = false;
+        _flashLoanToken = address(0);
+        _currentLender = address(0);
+    }
+
+    // ============ Balancer V3 Callback ============
+
+    /// @notice Called by Balancer V3 Vault via unlock() pattern
+    /// @dev V3 uses a different flow: unlock() -> sendTo() to receive -> settle() to repay
+    /// @param userData Encoded (token, amount, callbackData)
+    function receiveFlashLoanV3(bytes calldata userData) external {
+        // Validate caller is the expected Balancer V3 lender
+        if (msg.sender != _currentLender) revert UnauthorizedCaller();
+        if (lenderTypes[msg.sender] != LenderType.BalancerV3) revert InvalidLender();
+
+        // Decode userData
+        (address token, uint256 amount, bytes memory callbackData) = 
+            abi.decode(userData, (address, uint256, bytes));
+
+        // Request tokens from V3 vault
+        IBalancerV3Vault(msg.sender).sendTo(token, address(this), amount);
+
+        // Mark that we're in flash loan context
+        _inFlashLoan = true;
+
+        // Call back to FlashLoanRouter to proceed with settlement
+        router.borrowerCallBack(callbackData);
+
+        // Repay flash loan (V3 requires transfer + settle)
+        IERC20(token).safeTransfer(msg.sender, amount);
+        IBalancerV3Vault(msg.sender).settle(token, amount);
+
+        // Settlement complete, clean up
+        _inFlashLoan = false;
+        _flashLoanToken = address(0);
+        _currentLender = address(0);
+    }
+
     /// @notice Approve a target to spend tokens (standard IBorrower function)
     /// @dev Only callable by Settlement contract
     function approve(IERC20 token, address target, uint256 amount) external onlySettlement {
@@ -284,15 +382,8 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         address recipient,
         uint256 amount
     ) external {
-        console.log("fundOrder: START");
-        console.log("fundOrder: amount =", amount);
-        console.log("fundOrder: recipient =", recipient);
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        console.log("fundOrder: adapter balance =", balance);
-        
         IERC20(token).safeTransfer(recipient, amount);
         emit OrderFunded(token, recipient, amount);
-        console.log("fundOrder: COMPLETE");
     }
 
     // ============ View Functions ============

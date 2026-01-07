@@ -22174,7 +22174,7 @@ const contracts = {
   },
   8453: {
     AaveGatewayView: {
-      address: "0x5648E29bF31c375d4ED4c9B5777B3DA77c0eD4A1",
+      address: "0x9eff92d738F29252b1F73e1A543cCE21F2AaB8FA",
       abi: [
         {
           inputs: [
@@ -22898,7 +22898,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x85D061B3ac438742DfE115a8B04494022D37Fa09",
+      address: "0x6e58d2bBBD95332813f91f324d4e8b388689c98f",
       abi: [
         {
           inputs: [
@@ -23307,7 +23307,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0xE9a8c4F080d03Ed6a42E5a4c044734feCE09B434",
+      address: "0xFA6914Fbc08a99bbe8766F90Fe145cf0e99f85F4",
       abi: [
         {
           inputs: [
@@ -24202,7 +24202,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x4d06Ad4e354f2595C72B543180e02A7Af895e0aF",
+      address: "0x9Ca516a75b155038dc4119F81d651f33b9601F7F",
       abi: [
         {
           inputs: [
@@ -24727,7 +24727,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0x218Eb21c7E09Bd8781813ada1a7eF0B23ce5d457",
+      address: "0xd4FE091515e3E5FA3e876325Aece3713AcfAe161",
       abi: [
         {
           inputs: [
@@ -24964,7 +24964,7 @@ const contracts = {
       },
     },
     KapanCowAdapter: {
-      address: "0xF6342053a12AdBc92C03831BF88029608dB4C0B6",
+      address: "0x0ade77E3BC1fa45F5D19853e2a49E0f773030266",
       abi: [
         {
           inputs: [
@@ -25408,6 +25408,47 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "contract IERC20[]",
+              name: "tokens",
+              type: "address[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "amounts",
+              type: "uint256[]",
+            },
+            {
+              internalType: "uint256[]",
+              name: "feeAmounts",
+              type: "uint256[]",
+            },
+            {
+              internalType: "bytes",
+              name: "userData",
+              type: "bytes",
+            },
+          ],
+          name: "receiveFlashLoan",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "userData",
+              type: "bytes",
+            },
+          ],
+          name: "receiveFlashLoanV3",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "renounceOwnership",
           outputs: [],
@@ -25464,6 +25505,42 @@ const contracts = {
             },
           ],
           name: "setAaveLender",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "lender",
+              type: "address",
+            },
+            {
+              internalType: "bool",
+              name: "allowed",
+              type: "bool",
+            },
+          ],
+          name: "setBalancerV2Lender",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "lender",
+              type: "address",
+            },
+            {
+              internalType: "bool",
+              name: "allowed",
+              type: "bool",
+            },
+          ],
+          name: "setBalancerV3Lender",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -25538,7 +25615,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0xA4F7612e7586429f0c259ebC86106035273286E6",
+      address: "0x5F6B301b506aE6a741Eb39F4c9B303E61aD3fB07",
       abi: [
         {
           inputs: [
@@ -25613,12 +25690,17 @@ const contracts = {
             },
             {
               internalType: "uint256",
-              name: "minBuyAmount",
+              name: "buyAmount",
               type: "uint256",
             },
             {
               internalType: "bool",
               name: "isComplete",
+              type: "bool",
+            },
+            {
+              internalType: "bool",
+              name: "isKindBuy",
               type: "bool",
             },
           ],
@@ -25904,7 +25986,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x9D817C9A60aF2d60a06cCAB74bd6d538c87624e5",
+      address: "0x9A5cA8E27d17eC708Dba13da2cB077DC9352e761",
       abi: [
         {
           inputs: [
@@ -26423,6 +26505,11 @@ const contracts = {
                   name: "isFlashLoanOrder",
                   type: "bool",
                 },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
               ],
               internalType: "struct KapanOrderManager.KapanOrderParams",
               name: "params",
@@ -26589,6 +26676,11 @@ const contracts = {
                     {
                       internalType: "bool",
                       name: "isFlashLoanOrder",
+                      type: "bool",
+                    },
+                    {
+                      internalType: "bool",
+                      name: "isKindBuy",
                       type: "bool",
                     },
                   ],
@@ -26807,6 +26899,11 @@ const contracts = {
                 {
                   internalType: "bool",
                   name: "isFlashLoanOrder",
+                  type: "bool",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
                   type: "bool",
                 },
               ],
@@ -27029,7 +27126,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xcd24FFCB8F0a71AE8132213d096Fb0F0197700b2",
+      address: "0xDe2d996f5C8b37d82d66871F0a8FD12365fA5cEF",
       abi: [
         {
           inputs: [
@@ -27974,7 +28071,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayView: {
-      address: "0xFBFda9c2c033cd928112cea40b4D0EE7A4803E98",
+      address: "0x51de2C8b217C1ecdBF7b8E9d9092d4eF013E5A55",
       abi: [
         {
           inputs: [
@@ -29357,7 +29454,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0x9BCf704CcF1Af33ec4150075A26bE4969528B7BC",
+      address: "0x20a3193efF9cA7336A45ED33711A13EF7FA8043E",
       abi: [
         {
           inputs: [
@@ -30015,7 +30112,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x6dB267A9D791f7FCe15756C67481F0bD962063f3",
+      address: "0x3b3eB894779c51B1C65bEbE2c6EB255C1c43D145",
       abi: [
         {
           inputs: [
@@ -30259,7 +30356,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x5ca1313e8AeD1AE0Cd065fd06765aBb562D13223",
+      address: "0x91Ef3C80Bc6D9fe4B184DdA79f458Ec70A6bD857",
       abi: [
         {
           inputs: [
@@ -31100,7 +31197,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xCA711A2c43FB3a3d328f02DE523AFBb161B17931",
+      address: "0xa65fA4dC1212E648770814E62c60bB4cD99679e3",
       abi: [
         {
           inputs: [
@@ -31344,7 +31441,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x967312E554DFA83c610D8a1A68ef51A55B31c029",
+      address: "0x3984315525054886664380987144189d547C0dE8",
       abi: [
         {
           inputs: [
@@ -31765,7 +31862,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x5aBd171f94F0f0D89342d8A948B100ABb7c22653",
+      address: "0x99dB2E380216E18CE3f3De52BDFAd6d9C9CD5909",
       abi: [
         {
           inputs: [
@@ -31790,7 +31887,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x25fD88E31b8119fDE6270b44939B3cb53D3D6aD2",
+      address: "0x8395C7A1C313066d8B2B94d70e5eaA8403C7F5D0",
       abi: [
         {
           inputs: [
@@ -32494,7 +32591,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0xffdA90bFd347714E5658bFa142CA93DaC0BB08b1",
+      address: "0x565Ac61b19cd1A155618fEd95dA861548fE1a875",
       abi: [
         {
           inputs: [
@@ -32848,7 +32945,7 @@ const contracts = {
       },
     },
     ZeroLendGatewayView: {
-      address: "0x818276d0532384B6acFCE3777fc9478D67Fa4eB7",
+      address: "0x47C378798Cffd603b15957E07bdb684B4156e7D9",
       abi: [
         {
           inputs: [
@@ -33572,7 +33669,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0xB225287578eBf8C684351570fCfe9d294F0A2871",
+      address: "0x17A3a35823e963980EFa8e55a04EE8184D5ECa76",
       abi: [
         {
           inputs: [

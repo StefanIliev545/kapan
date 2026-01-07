@@ -225,20 +225,79 @@ export const MORPHO_BLUE: Record<number, string | undefined> = {
 };
 
 /**
- * Flash loan lenders supported by KapanCowAdapter
- * Prefers Morpho (0% fee) when available, falls back to Aave (0.05% fee)
+ * CoW flash loan provider type
+ */
+export type CowFlashLoanProvider = {
+  address: string;
+  provider: "morpho" | "balancerV2" | "balancerV3" | "aaveV3";
+  feeBps: number;
+  name: string;
+};
+
+/**
+ * Flash loan lenders supported by KapanCowAdapter per chain
+ * Order matters: first provider is the default preference
+ */
+export const COW_FLASH_LOAN_PROVIDERS: Record<number, CowFlashLoanProvider[]> = {
+  // Ethereum Mainnet - Morpho (0%), Balancer V2/V3 (0%), Aave (0.05%)
+  1: [
+    { address: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb", provider: "morpho", feeBps: 0, name: "Morpho Blue" },
+    { address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", provider: "balancerV2", feeBps: 0, name: "Balancer V2" },
+    { address: "0xbA1333333333a1BA1108E8412f11850A5C319bA9", provider: "balancerV3", feeBps: 0, name: "Balancer V3" },
+    { address: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+  // Base - Morpho (0%), Balancer V2/V3 (0%), Aave (0.05%)
+  8453: [
+    { address: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb", provider: "morpho", feeBps: 0, name: "Morpho Blue" },
+    { address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", provider: "balancerV2", feeBps: 0, name: "Balancer V2" },
+    { address: "0xbA1333333333a1BA1108E8412f11850A5C319bA9", provider: "balancerV3", feeBps: 0, name: "Balancer V3" },
+    { address: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+  // Arbitrum - Morpho (0%), Balancer V2/V3 (0%), Aave (0.05%)
+  42161: [
+    { address: "0x6c247b1F6182318877311737BaC0844bAa518F5e", provider: "morpho", feeBps: 0, name: "Morpho Blue" },
+    { address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", provider: "balancerV2", feeBps: 0, name: "Balancer V2" },
+    { address: "0xbA1333333333a1BA1108E8412f11850A5C319bA9", provider: "balancerV3", feeBps: 0, name: "Balancer V3" },
+    { address: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+  // Optimism - Balancer V2/V3 (0%), Aave (0.05%)
+  10: [
+    { address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", provider: "balancerV2", feeBps: 0, name: "Balancer V2" },
+    { address: "0xbA1333333333a1BA1108E8412f11850A5C319bA9", provider: "balancerV3", feeBps: 0, name: "Balancer V3" },
+    { address: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+  // Polygon - Balancer (0%), Aave (0.05%)
+  137: [
+    { address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", provider: "balancerV2", feeBps: 0, name: "Balancer V2" },
+    { address: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+  // Gnosis - Balancer only (0%)
+  100: [
+    { address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8", provider: "balancerV2", feeBps: 0, name: "Balancer V2" },
+  ],
+  // Linea - Aave only (0.05%)
+  59144: [
+    { address: "0x3E5f750726cc1D0d4a9c62c507f890f984576507", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+  // Avalanche - Aave only (0.05%)
+  43114: [
+    { address: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
+};
+
+/**
+ * Legacy: Flash loan lenders supported by KapanCowAdapter (single per chain)
+ * @deprecated Use COW_FLASH_LOAN_PROVIDERS instead
  */
 export const COW_FLASH_LOAN_LENDERS: Record<number, string | undefined> = {
-  // Prefer Morpho Blue (0% fee) on chains where it's available
-  1: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",      // Ethereum - Morpho Blue (0% fee!)
-  8453: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",   // Base - Morpho Blue (0% fee!)
-  42161: "0x6c247b1F6182318877311737BaC0844bAa518F5e",  // Arbitrum - Morpho Blue (0% fee!)
-  // Fall back to Aave V3 on other chains (0.05% fee)
-  10: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",     // Optimism - Aave V3
-  137: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",    // Polygon - Aave V3
+  1: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",      // Ethereum - Morpho Blue
+  8453: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",   // Base - Morpho Blue
+  42161: "0x6c247b1F6182318877311737BaC0844bAa518F5e",  // Arbitrum - Morpho Blue
+  10: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",     // Optimism - Balancer V2
+  137: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",    // Polygon - Balancer V2
+  100: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",    // Gnosis - Balancer V2
   59144: "0x3E5f750726cc1D0d4a9c62c507f890f984576507",  // Linea - Aave V3
   43114: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",  // Avalanche - Aave V3
-  // Gnosis (100) - No flash loan providers available
 };
 
 /**
@@ -272,23 +331,55 @@ export function isMorphoLender(lenderAddress: string): boolean {
 }
 
 /**
- * Get the appropriate flash loan lender for a chain
- * Prefers Morpho (0% fee) when available
+ * Map FlashLoanProvider enum (from market orders) to CoW provider type
+ * @param providerEnum - The FlashLoanProvider enum value
+ * @returns CoW provider type string or undefined if not supported
  */
-export function getPreferredFlashLoanLender(chainId: number): { address: string; provider: string; feeBps: number } | undefined {
-  // Check Morpho first (0% fee)
-  const morpho = MORPHO_BLUE[chainId];
-  if (morpho) {
-    return { address: morpho, provider: "morpho", feeBps: 0 };
+export function mapFlashLoanProviderToCow(providerEnum: number): "morpho" | "balancerV2" | "balancerV3" | "aaveV3" | undefined {
+  // FlashLoanProvider enum: BalancerV2=0, BalancerV3=1, Aave=2, ZeroLend=3, UniswapV3=4, Morpho=5
+  switch (providerEnum) {
+    case 0: return "balancerV2";  // BalancerV2
+    case 1: return "balancerV3";  // BalancerV3
+    case 2: return "aaveV3";      // Aave
+    case 3: return "aaveV3";      // ZeroLend (Aave fork, uses same interface)
+    case 5: return "morpho";      // Morpho
+    default: return undefined;   // UniswapV3 not yet supported in CoW adapter
+  }
+}
+
+/**
+ * Get all available CoW flash loan providers for a chain
+ */
+export function getCowFlashLoanProviders(chainId: number): CowFlashLoanProvider[] {
+  return COW_FLASH_LOAN_PROVIDERS[chainId] ?? [];
+}
+
+/**
+ * Get the appropriate flash loan lender for a chain
+ * Prefers Morpho (0% fee) when available, then Balancer (0%), then Aave (0.05%)
+ * @param chainId - Chain ID
+ * @param preferredProvider - Optional: override the default selection
+ */
+export function getPreferredFlashLoanLender(
+  chainId: number,
+  preferredProvider?: "morpho" | "balancerV2" | "balancerV3" | "aaveV3"
+): { address: string; provider: string; feeBps: number } | undefined {
+  const providers = COW_FLASH_LOAN_PROVIDERS[chainId];
+  if (!providers || providers.length === 0) {
+    return undefined;
   }
   
-  // Fall back to Aave (0.05% fee)
-  const aave = AAVE_V3_POOLS[chainId];
-  if (aave) {
-    return { address: aave, provider: "aaveV3", feeBps: 5 };
+  // If user specified a preference, try to use it
+  if (preferredProvider) {
+    const preferred = providers.find(p => p.provider === preferredProvider);
+    if (preferred) {
+      return { address: preferred.address, provider: preferred.provider, feeBps: preferred.feeBps };
+    }
   }
   
-  return undefined;
+  // Otherwise use the first (default) provider
+  const defaultProvider = providers[0];
+  return { address: defaultProvider.address, provider: defaultProvider.provider, feeBps: defaultProvider.feeBps };
 }
 
 /**

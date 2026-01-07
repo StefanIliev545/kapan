@@ -28,6 +28,79 @@ User → MultiplyEvmModal → useCowOrder → KapanOrderManager → ComposableCo
 | KapanCowAdapter | `0xF6342053a12AdBc92C03831BF88029608dB4C0B6` | Flash loan borrower, funds OrderManager |
 | KapanRouter | `0xFA3B0Efb7E26CDd22F8b467B153626Ce5d34D64F` | Executes lending operations |
 
+## Orders Not Reaching Solvers (Autopilot Filtering)
+
+**Symptom**: Order shows as "open" on CoW Explorer but never fills, even for liquid pairs.
+
+### The Two Receiver Concepts
+
+CoW Protocol has TWO different "receiver" fields that serve different purposes:
+
+1. **`appData.metadata.flashloan.receiver`** - Used by CoW API for balance override validation during order submission
+2. **`GPv2Order.receiver`** - Used by autopilot to decide whether to skip balance filtering before sending to solvers
+
+### The Autopilot Balance Filtering Gap
+
+CoW Protocol's autopilot has a gap in flash loan handling:
+
+- **API validation** (`orderbook` crate): Correctly uses `flashloan.receiver` from appData for balance override
+- **Autopilot** (`solvable_orders.rs`): Ignores flashloan metadata entirely, only skips balance filtering when `GPv2Order.receiver == Settlement`
+
+```rust
+// CoW autopilot hack - only skips balance check if receiver is Settlement
+if order.data.receiver.as_ref() == Some(&settlement_contract) {
+    return true;  // Skip balance filtering - TODO: replace with proper detection
+}
+```
+
+### What This Means for Kapan
+
+- Our `GPv2Order.receiver = OrderManager` (set by KapanOrderHandler) - THIS IS CORRECT
+- Autopilot runs balance check on OrderManager
+- OrderManager doesn't have tokens pre-flash-loan
+- Orders may get filtered out before reaching solvers (not always)
+
+### CRITICAL: Do NOT Change GPv2Order.receiver
+
+**NEVER set `GPv2Order.receiver = Settlement`** for flash loan orders. This was tried and it BREAKS the flow:
+
+1. With `receiver = Settlement`, buyToken goes to Settlement after swap
+2. But `_executePostHook()` checks `balanceOf(address(this))` at OrderManager
+3. OrderManager has 0 buyToken because it went to Settlement
+4. Post-hook fails!
+
+The `appData.metadata.flashloan.receiver` is different - that's for CoW API balance validation, NOT for the GPv2Order.
+
+### Autopilot Filtering Reality
+
+In practice, autopilot filtering is not as aggressive as feared. Orders with flash loan metadata usually get through because:
+1. The appData.flashloan tells solvers to use flash loans
+2. Solvers that support flash loans will pick up the order
+3. The order may take longer to fill but will eventually fill for liquid pairs
+
+If orders aren't filling, check other causes first (token liquidity, solver routing, etc.).
+
+## Exotic Token Routing (GHO, PT Tokens)
+
+**Symptom**: Orders for GHO, Pendle PT tokens, or other exotic assets never fill.
+
+### Why This Happens
+
+Standard CoW solvers focus on high-volume pairs (WETH/USDC/USDT/DAI). They may not have routes for:
+- **GHO**: Aave's stablecoin, limited DEX liquidity (Balancer, some Curve)
+- **PT tokens**: Pendle principal tokens, very niche (Pendle AMM only)
+- Other low-liquidity or specialized tokens
+
+### Diagnosis
+
+If orders for common pairs (WETH → USDC) fill but exotic pairs don't, it's a solver routing issue, not balance filtering.
+
+### Options
+
+1. **Wait for liquidity** - As tokens get more DEX depth, solvers add routes
+2. **Custom solver** - Run a solver with 1inch/Paraswap integration for better routing
+3. **Different token** - Use more liquid alternatives if available
+
 ## Common Failure Points
 
 ### 1. OrderHandler Not Set
@@ -70,7 +143,8 @@ const [order, sig] = await composableCoW.getTradeableOrderWithSignature(
 );
 ```
 2. Compare with what you're passing to `settle()`
-3. Common issue: `receiver` must ALWAYS be OrderManager, not Settlement
+3. `receiver` must ALWAYS be OrderManager (for both flash loan and non-flash-loan orders)
+4. If receiver is anything else, post-hook will fail
 
 ### 4. Missing Token Approval (PullToken fails)
 
@@ -101,6 +175,25 @@ cast call <Adapter> "allowedLenders(address)(bool)" <lenderAddress> --rpc-url <R
 cast call <Adapter> "getLenderType(address)(uint8)" <lenderAddress> --rpc-url <RPC>
 # Type: 1=Aave, 2=Morpho
 ```
+
+## Known Issues / TODOs
+
+### `isFlashLoanOrder` Flag Purpose
+
+The `KapanOrderParams` struct has an `isFlashLoanOrder` boolean. This flag is used for:
+1. **Frontend logic** - Determines instruction building flow
+2. **OrderManager state** - Tracks that this is a flash loan order
+
+**IMPORTANT**: The `isFlashLoanOrder` flag does NOT change `GPv2Order.receiver`. Receiver is ALWAYS OrderManager because:
+- OrderManager._executePostHook() needs the bought tokens at `address(this)`
+- Setting receiver to Settlement would break this flow
+
+```solidity
+// KapanOrderHandler.sol - CORRECT, DO NOT CHANGE
+address receiver = address(orderManager);  // ALWAYS OrderManager
+```
+
+**Status**: Working as intended. Do not change receiver logic.
 
 ## Decoding Order Instructions
 
@@ -138,6 +231,15 @@ await flashLoanRouter.connect(solver).flashLoanAndSettle(loans, settlementCallda
 ```
 
 If direct settle works but flash loan fails, the issue is in the flash loan callback chain.
+
+### Flash Loan Settlement Test
+
+`test/v2/CowFlashLoanSettlement.fork.ts` tests the full flash loan flow:
+- Uses `receiver = OrderManager` (the correct production setting)
+- Simulates solver behavior with pre-fund and interactions
+- Verifies the complete flash loan → swap → post-hook → repay flow
+
+Note: The test manually builds settlement calldata because it's testing what solvers do. Production orders go through Watchtower → Solvers who build the settlement.
 
 ## Hook Execution Flow
 
@@ -182,12 +284,13 @@ cast 4byte <selector>
 ## Key Files
 
 - `packages/hardhat/contracts/v2/cow/KapanOrderManager.sol` - Order storage and hook execution
-- `packages/hardhat/contracts/v2/cow/KapanOrderHandler.sol` - GPv2 order generation
+- `packages/hardhat/contracts/v2/cow/KapanOrderHandler.sol:90` - GPv2 order generation (receiver logic)
 - `packages/hardhat/contracts/v2/cow/KapanCowAdapter.sol` - Flash loan handling
 - `packages/nextjs/hooks/useCowOrder.tsx` - Frontend order creation
 - `packages/nextjs/components/modals/MultiplyEvmModal.tsx` - UI and instruction building
-- `packages/nextjs/utils/cow/appData.ts` - AppData and hook building
+- `packages/nextjs/utils/cow/appData.ts:417` - AppData flashloan.receiver setting
 - `packages/hardhat/test/v2/CowRealFlow.fork.ts` - Integration tests
+- `packages/hardhat/test/v2/CowFlashLoanSettlement.fork.ts` - Flash loan with receiver=Settlement test
 
 ## Quick Diagnosis Checklist
 
@@ -198,4 +301,5 @@ cast 4byte <selector>
 5. [ ] User has credit delegation for borrow?
 6. [ ] Flash loan lender allowed on Adapter?
 7. [ ] VaultRelayer approved for sell token?
-8. [ ] Receiver is OrderManager (not Settlement)?
+8. [ ] Is token exotic (GHO, PT)? May need custom solver
+9. [ ] Flash loan order? Check autopilot filtering section

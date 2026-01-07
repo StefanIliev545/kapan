@@ -84,12 +84,26 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
         // preventing order spam where each poll creates a new CoW order.
         uint256 validTo = _calculateValidTo(orderCtx.createdAt, orderCtx.iterationCount);
         
-        // Receiver is always OrderManager - it needs the bought tokens for post-hook execution
-        // (Previously had flash loan special case for Settlement, but that was incorrect -
-        // Aave's working implementation shows receiver should be where post-hook runs)
+        // ============================================================================
+        // CRITICAL: RECEIVER MUST ALWAYS BE ORDER MANAGER - DO NOT CHANGE THIS!
+        // ============================================================================
+        // The receiver is where CoW Protocol sends the bought tokens after the swap.
+        // OrderManager._executePostHook() checks balanceOf(address(this)) to determine
+        // how much was received, then processes post-instructions with that amount.
+        //
+        // If receiver != OrderManager, the tokens go elsewhere and post-hook fails
+        // because OrderManager has 0 balance of the bought token.
+        //
+        // DO NOT set receiver = Settlement for "autopilot balance filtering bypass".
+        // That approach is BROKEN - it sends tokens to Settlement but post-hook
+        // expects them at OrderManager. The correct fix for autopilot filtering
+        // is in appData.flashloan.receiver (for API validation), NOT GPv2Order.receiver.
+        // ============================================================================
         address receiver = address(orderManager);
         
         // Build the order with deterministic validTo
+        // KIND_SELL: sellAmount = exact amount to sell, buyAmount = minimum to receive
+        // KIND_BUY: sellAmount = maximum to sell, buyAmount = exact amount to receive
         order = GPv2Order.Data({
             sellToken: IERC20(orderCtx.params.sellToken),
             buyToken: IERC20(orderCtx.params.buyToken),
@@ -99,7 +113,7 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
             validTo: uint32(validTo),
             appData: orderCtx.params.appDataHash,
             feeAmount: 0,  // Fee is taken from sellAmount in CoW Protocol
-            kind: GPv2Order.KIND_SELL,
+            kind: orderCtx.params.isKindBuy ? GPv2Order.KIND_BUY : GPv2Order.KIND_SELL,
             partiallyFillable: false,  // Each chunk must fill completely
             sellTokenBalance: GPv2Order.BALANCE_ERC20,
             buyTokenBalance: GPv2Order.BALANCE_ERC20
@@ -163,19 +177,29 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
             revert OrderNotValid("buy_token_mismatch");
         }
         
-        // Validate receiver - must always be OrderManager for post-hook token handling
+        // Validate receiver - MUST always be OrderManager for post-hook token handling
+        // See comment in getTradeableOrder() for why this must never be Settlement
         if (order.receiver != address(orderManager)) {
             revert OrderNotValid("invalid_receiver");
         }
         
-        // Validate sell amount doesn't exceed chunk size
-        if (order.sellAmount > orderCtx.params.chunkSize) {
-            revert OrderNotValid("sell_amount_exceeds_chunk");
-        }
-        
-        // Validate minimum buy amount
-        if (order.buyAmount < orderCtx.params.minBuyPerChunk) {
-            revert OrderNotValid("buy_amount_too_low");
+        // Validate amounts based on order kind
+        if (orderCtx.params.isKindBuy) {
+            // KIND_BUY: buyAmount must match exactly, sellAmount can be up to max
+            if (order.buyAmount != orderCtx.params.minBuyPerChunk) {
+                revert OrderNotValid("buy_amount_mismatch");
+            }
+            if (order.sellAmount > orderCtx.params.chunkSize) {
+                revert OrderNotValid("sell_amount_exceeds_max");
+            }
+        } else {
+            // KIND_SELL: sellAmount can be up to chunk size, buyAmount must meet minimum
+            if (order.sellAmount > orderCtx.params.chunkSize) {
+                revert OrderNotValid("sell_amount_exceeds_chunk");
+            }
+            if (order.buyAmount < orderCtx.params.minBuyPerChunk) {
+                revert OrderNotValid("buy_amount_too_low");
+            }
         }
         
         // Validate appData matches
@@ -190,13 +214,15 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
     
     /// @notice Get the current chunk parameters for an order
     /// @param orderHash The order hash
-    /// @return sellAmount The sell amount for the next chunk
-    /// @return minBuyAmount The minimum buy amount
+    /// @return sellAmount For KIND_SELL: exact sell amount. For KIND_BUY: max sell amount.
+    /// @return buyAmount For KIND_SELL: min buy amount. For KIND_BUY: exact buy amount.
     /// @return isComplete Whether the order is complete
+    /// @return isKindBuy True if this is a KIND_BUY order
     function getChunkParams(bytes32 orderHash) external view returns (
         uint256 sellAmount,
-        uint256 minBuyAmount,
-        bool isComplete
+        uint256 buyAmount,
+        bool isComplete,
+        bool isKindBuy
     ) {
         KapanOrderManager.OrderContext memory orderCtx = orderManager.getOrder(orderHash);
         
@@ -204,14 +230,15 @@ contract KapanOrderHandler is IConditionalOrderGenerator, IERC165 {
                      orderCtx.status != KapanOrderManager.OrderStatus.Active;
         
         if (isComplete) {
-            return (0, 0, true);
+            return (0, 0, true, false);
         }
         
         uint256 remaining = orderCtx.params.preTotalAmount - orderCtx.executedAmount;
         sellAmount = remaining < orderCtx.params.chunkSize 
             ? remaining 
             : orderCtx.params.chunkSize;
-        minBuyAmount = orderCtx.params.minBuyPerChunk;
+        buyAmount = orderCtx.params.minBuyPerChunk;
+        isKindBuy = orderCtx.params.isKindBuy;
     }
     
     /// @notice Get order progress

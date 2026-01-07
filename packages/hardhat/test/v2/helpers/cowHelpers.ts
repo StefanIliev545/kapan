@@ -138,6 +138,8 @@ export interface KapanOrderParamsInput {
   appDataHash?: string;
   /** Flash loan mode: when true, GPv2Order.receiver = Settlement (required by CoW solvers) */
   isFlashLoanOrder?: boolean;
+  /** Order kind: if true, creates KIND_BUY order instead of KIND_SELL */
+  isKindBuy?: boolean;
 }
 
 const coder = AbiCoder.defaultAbiCoder();
@@ -202,6 +204,7 @@ export function buildOrderParams(input: KapanOrderParamsInput) {
     minHealthFactor: input.minHealthFactor ?? ethers.parseEther("1.1"),
     appDataHash: input.appDataHash ?? ethers.keccak256(ethers.toUtf8Bytes("kapan-order")),
     isFlashLoanOrder: input.isFlashLoanOrder ?? false,
+    isKindBuy: input.isKindBuy ?? false,
   };
 }
 

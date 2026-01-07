@@ -24,6 +24,7 @@ import {
   ProtocolInstruction,
   createRouterInstruction,
   encodePushToken,
+  encodeToOutput,
 } from "~~/utils/v2/instructionHelpers";
 import { logger } from "~~/utils/logger";
 
@@ -113,6 +114,16 @@ export interface CowLimitOrderInput {
    * These will be included in authorization checks but executed separately.
    */
   preOrderInstructions?: ProtocolInstruction[];
+  
+  // === Order kind ===
+  /** 
+   * If true, creates a KIND_BUY order instead of KIND_SELL.
+   * KIND_SELL (default): chunkSize = exact sell, minBuyPerChunk = min buy (slippage)
+   * KIND_BUY: chunkSize = max sell (slippage), minBuyPerChunk = exact buy amount
+   * 
+   * Use KIND_BUY for close-with-collateral where you know exact debt to repay.
+   */
+  isKindBuy?: boolean;
 }
 
 /**
@@ -127,12 +138,21 @@ export interface Call {
  * Result of building order calls
  */
 export interface BuildOrderResult {
+  /** Whether the build succeeded */
+  success: boolean;
   /** All calls in correct execution order, ready for batching */
   calls: Call[];
   /** Order salt (deterministic ID) */
   salt: string;
   /** AppData hash registered with CoW API */
   appDataHash: string;
+  /** Error message if build failed */
+  error?: string;
+  /** Detailed error info for debugging */
+  errorDetails?: {
+    stage: "appData" | "authorization" | "build";
+    apiResponse?: string;
+  };
 }
 
 // Minimal ABI for order creation
@@ -154,6 +174,7 @@ const ORDER_MANAGER_ABI = [
           { name: "minHealthFactor", type: "uint256" },
           { name: "appDataHash", type: "bytes32" },
           { name: "isFlashLoanOrder", type: "bool" },
+          { name: "isKindBuy", type: "bool" },
         ],
         name: "params",
         type: "tuple",
@@ -184,13 +205,32 @@ const ERC20_APPROVE_ABI = [
 /**
  * Flatten per-iteration instructions to a single array for authorization.
  * Deduplicates by combining all unique instructions across iterations.
+ * 
+ * For KIND_BUY orders, prepends dummy ToOutput instructions to simulate the UTXOs
+ * that OrderManager will prepend at execution time. This ensures authorization
+ * correctly resolves inputIndex references for instructions like WithdrawCollateral.
  */
 function flattenInstructions(
   chunks: ChunkInstructions[],
-  preOrderInstructions?: ProtocolInstruction[]
+  preOrderInstructions?: ProtocolInstruction[],
+  isKindBuy?: boolean,
+  sellToken?: Address,
+  totalAmount?: bigint
 ): ProtocolInstruction[] {
   const flattened: ProtocolInstruction[] = [];
   const seen = new Set<string>();
+
+  // For KIND_BUY orders: prepend dummy ToOutput instructions matching what OrderManager
+  // prepends at execution time (UTXO[0] = actual sell, UTXO[1] = leftover, both sellToken).
+  // Assume maximum collateral sold (totalAmount) with no surplus (0n leftover).
+  // This ensures WithdrawCollateral(inputIndex=0) resolves to the correct collateral token
+  // during authorization, not the debt token from earlier instructions.
+  if (isKindBuy && sellToken && totalAmount !== undefined) {
+    // UTXO[0] = actual sell amount (assume full totalAmount = max collateral)
+    flattened.push(createRouterInstruction(encodeToOutput(totalAmount, sellToken)));
+    // UTXO[1] = leftover (assume 0 - no surplus)  
+    flattened.push(createRouterInstruction(encodeToOutput(0n, sellToken)));
+  }
 
   // Include pre-order instructions first
   if (preOrderInstructions) {
@@ -340,7 +380,17 @@ export function useCowLimitOrder() {
 
       if (!appDataResult.registered) {
         logger.error("[useCowLimitOrder] AppData registration failed:", appDataResult.error);
-        return undefined;
+        return {
+          success: false,
+          calls: [],
+          salt,
+          appDataHash: appDataResult.appDataHash || "",
+          error: `AppData registration failed: ${appDataResult.error}`,
+          errorDetails: {
+            stage: "appData",
+            apiResponse: appDataResult.error,
+          },
+        };
       }
 
       logger.debug("[useCowLimitOrder] AppData registered:", appDataResult.appDataHash);
@@ -374,6 +424,7 @@ export function useCowLimitOrder() {
         postInstructions: postInstructionsPerIteration,
         appDataHash: appDataResult.appDataHash,
         isFlashLoanOrder: !!input.flashLoan,
+        isKindBuy: input.isKindBuy ?? false,
       });
 
       // 4. Collect all calls in order
@@ -393,7 +444,14 @@ export function useCowLimitOrder() {
       }
 
       // 4b. Get authorization calls for all instructions (including pre-order)
-      const allInstructions = flattenInstructions(input.chunks, input.preOrderInstructions);
+      // For KIND_BUY orders, pass sellToken and totalAmount to prepend dummy UTXOs
+      const allInstructions = flattenInstructions(
+        input.chunks, 
+        input.preOrderInstructions,
+        input.isKindBuy,
+        input.sellToken,
+        input.totalAmount
+      );
       if (allInstructions.length > 0) {
         const rawAuthCalls = await getAuthorizations(allInstructions);
         for (const { target, data } of rawAuthCalls) {
@@ -427,6 +485,7 @@ export function useCowLimitOrder() {
       });
 
       return {
+        success: true,
         calls,
         salt,
         appDataHash: appDataResult.appDataHash,
