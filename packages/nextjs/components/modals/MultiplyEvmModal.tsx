@@ -43,6 +43,7 @@ import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { encodeFunctionData, type Hex } from "viem";
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import { saveOrderNote, createLeverageUpNote } from "~~/utils/orderNotes";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -1160,6 +1161,17 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           salt: limitOrderResult.salt,
           appDataHash: limitOrderResult.appDataHash,
         };
+
+        // Save order note for display on orders page
+        if (cowCalls.salt && debt && collateral) {
+          saveOrderNote(createLeverageUpNote(
+            cowCalls.salt,
+            protocolName,
+            debt.symbol,       // debt being borrowed
+            collateral.symbol, // collateral being deposited
+            chainId
+          ));
+        }
 
         console.log("[Limit Order] Total calls:", allCalls.length);
 

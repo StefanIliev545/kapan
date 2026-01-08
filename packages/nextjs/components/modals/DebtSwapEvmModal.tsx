@@ -38,6 +38,7 @@ import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
+import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
 
 interface DebtSwapEvmModalProps {
     isOpen: boolean;
@@ -446,13 +447,19 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         }
 
         const normalizedProtocol = normalizeProtocolName(protocolName);
+        const numChunks = limitOrderConfig?.numChunks ?? 1;
+        
+        // Calculate per-chunk amounts
+        const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
+        const chunkSellAmount = limitOrderNewDebt / BigInt(numChunks);
+        const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
         
         // PRE-HOOK: Empty - fundOrder handles transfer
         const preInstructions: ProtocolInstruction[] = [];
 
         const postInstructions: ProtocolInstruction[] = [
-            // [0] PullToken: pull oldDebt from OM (exact buyAmount) -> UTXO[2]
-            createRouterInstruction(encodePullToken(repayAmountRaw, debtFromToken, orderManagerAddress)),
+            // [0] PullToken: pull oldDebt from OM (per-chunk buyAmount) -> UTXO[2]
+            createRouterInstruction(encodePullToken(chunkBuyAmount, debtFromToken, orderManagerAddress)),
             
             // [1] Approve oldDebt for lending protocol (using UTXO[2]) -> UTXO[3]
             createRouterInstruction(encodeApprove(2, normalizedProtocol)),
@@ -460,7 +467,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             // [2] Repay user's oldDebt using UTXO[2] -> UTXO[4]
             createProtocolInstruction(
                 normalizedProtocol,
-                encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, repayAmountRaw, context || "0x", 2)
+                encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, chunkBuyAmount, context || "0x", 2)
             ),
             
             // [3] Borrow newDebt equal to actual sell amount (UTXO[0]) -> UTXO[5]
@@ -470,7 +477,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                     LendingOp.Borrow, 
                     selectedTo.address,
                     userAddress,
-                    cowFlashLoanInfo.amount,  // Max borrow for auth calculation
+                    chunkFlashLoanAmount,  // Per-chunk max borrow for auth calculation
                     context || "0x", 
                     0  // Use UTXO[0] = actual sell amount
                 )
@@ -485,18 +492,22 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         console.log("[buildCowInstructions] Debt Swap (KIND_BUY):", {
             sellToken: selectedTo.symbol,
             buyToken: debtFromName,
-            exactOldDebtToBuy: formatUnits(repayAmountRaw, debtFromDecimals),
+            totalOldDebtToBuy: formatUnits(repayAmountRaw, debtFromDecimals),
+            chunkOldDebtToBuy: formatUnits(chunkBuyAmount, debtFromDecimals),
             flashLoanToken: selectedTo.symbol,
-            flashLoanAmount: formatUnits(cowFlashLoanInfo.amount, selectedTo.decimals),
+            totalFlashLoanAmount: formatUnits(cowFlashLoanInfo.amount, selectedTo.decimals),
+            chunkFlashLoanAmount: formatUnits(chunkFlashLoanAmount, selectedTo.decimals),
+            numChunks,
             utxoLayout: "UTXO[0]=actualSell, UTXO[1]=leftover, UTXO[5]=borrowed, UTXO[6]=borrowed+leftover",
         });
 
-        return [{
+        // Return N identical chunks - each processes per-chunk amounts
+        return Array(numChunks).fill(null).map(() => ({
             preInstructions,
             postInstructions,
             flashLoanRepaymentUtxoIndex: 6,
-        }];
-    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo]);
+        }));
+    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderNewDebt, limitOrderConfig?.numChunks]);
 
     // amountOut = required new debt (what user will borrow)
     const amountOut = executionType === "limit" 
@@ -608,21 +619,26 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             });
 
             // Build limit order calls
+            const numChunks = limitOrderConfig?.numChunks ?? 1;
+            const chunkSellAmount = limitOrderNewDebt / BigInt(numChunks);
+            const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
+            const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
+
             const limitOrderResult = await buildLimitOrderCalls({
                 sellToken: selectedTo.address as Address,    // newDebt to sell
                 buyToken: debtFromToken,                      // oldDebt to receive
-                chunkSize: limitOrderNewDebt,                 // Max newDebt to sell
-                minBuyPerChunk: repayAmountRaw,               // Exact oldDebt amount needed
-                totalAmount: limitOrderNewDebt,               // Single chunk
+                chunkSize: chunkSellAmount,                   // Per-chunk newDebt to sell
+                minBuyPerChunk: chunkBuyAmount,               // Per-chunk oldDebt amount needed
+                totalAmount: limitOrderNewDebt,               // Total across all chunks
                 chunks: buildCowInstructions,
                 completion: CompletionType.Iterations,
-                targetValue: 1,
+                targetValue: numChunks,
                 minHealthFactor: "1.0",
                 seedAmount: 0n,
                 flashLoan: {
                     lender: cowFlashLoanInfo.lender as Address,
                     token: selectedTo.address as Address,
-                    amount: cowFlashLoanInfo.amount,
+                    amount: chunkFlashLoanAmount,
                 },
                 preOrderInstructions: [],
                 isKindBuy: true,
@@ -648,6 +664,17 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             }
 
             console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
+
+            // Save order note for display on orders page
+            if (limitOrderResult.salt) {
+                saveOrderNote(createDebtSwapNote(
+                    limitOrderResult.salt,
+                    protocolName,
+                    debtFromName,      // old debt being repaid
+                    selectedTo.symbol, // new debt being taken on
+                    chainId
+                ));
+            }
 
             const allCalls = limitOrderResult.calls;
             notificationId = notification.loading(
@@ -844,9 +871,23 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                         totalAmount={limitOrderNewDebt || requiredNewDebt}
                         onConfigChange={handleLimitOrderConfigChange}
                         showFlashLoanToggle={false}
-                        showChunksInput={false}
+                        showChunksInput={true}
                         compact
                     />
+                    {/* Chunk Info - shown when multi-chunk */}
+                    {(limitOrderConfig?.numChunks ?? 1) > 1 && (
+                        <div className="flex items-start gap-1.5 mt-2 text-[10px]">
+                            <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <div>
+                                <span className="text-info font-medium">Multi-chunk: {limitOrderConfig?.numChunks} iterations</span>
+                                <p className="text-base-content/50 mt-0.5">
+                                    ~30 min between chunks for price discovery.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {/* CoW quote info */}
                     {cowQuote && (
                         <div className="text-xs text-base-content/60 pt-1 border-t border-base-300">

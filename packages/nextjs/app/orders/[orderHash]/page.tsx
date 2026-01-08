@@ -18,6 +18,15 @@ import {
   calculatePriceImpact,
 } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
+import { 
+  getOrderNote, 
+  getOperationLabel, 
+  getOperationColorClass,
+  findPendingNoteForOrder,
+  linkNoteToOrderHash,
+  type OperationType,
+} from "~~/utils/orderNotes";
+import { getProtocolLogo } from "~~/utils/protocol";
 
 const ORDER_MANAGER_ADDRESSES: Record<number, Address | undefined> = {
   42161: "0x8F94351Ac17B4B5fb0923D229319805bB52616CD",
@@ -261,6 +270,27 @@ export default function OrderDetailPage() {
   const totalReceivedUsd = buyPrice && executionData ? parseFloat(formatUnits(executionData.totalReceived, buyDecimals)) * buyPrice : null;
   const surplusUsd = buyPrice && executionSummary ? parseFloat(formatUnits(executionSummary.surplusAmount, buyDecimals)) * buyPrice : null;
 
+  // Look up order note for operation type and protocol
+  let orderNote = getOrderNote(orderHash);
+  if (!orderNote) {
+    const pendingNote = findPendingNoteForOrder(
+      sellSymbol,
+      buySymbol,
+      chainId,
+      Number(order.createdAt)
+    );
+    if (pendingNote && pendingNote.salt) {
+      linkNoteToOrderHash(pendingNote.salt, orderHash);
+      orderNote = pendingNote;
+    }
+  }
+  
+  const operationType: OperationType = orderNote?.operationType ?? "unknown";
+  const operationLabel = getOperationLabel(operationType);
+  const operationColorClass = getOperationColorClass(operationType);
+  const protocolName = orderNote?.protocol;
+  const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
+
   return (
     <div className="min-h-screen px-4 py-8 md:px-8 lg:px-16">
       {/* Header */}
@@ -277,6 +307,31 @@ export default function OrderDetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto">
+        {/* Operation Type and Protocol Badge */}
+        {(operationType !== "unknown" || protocolName) && (
+          <div className="flex items-center gap-3 mb-6">
+            {operationType !== "unknown" && (
+              <span className={`text-sm px-3 py-1 rounded-full font-medium ${operationColorClass}`}>
+                {operationLabel}
+              </span>
+            )}
+            {protocolName && (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-base-200">
+                {protocolLogo && (
+                  <Image 
+                    src={protocolLogo} 
+                    alt={protocolName} 
+                    width={18} 
+                    height={18} 
+                    className="rounded-sm"
+                  />
+                )}
+                <span className="text-sm text-base-content/70">{protocolName}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Hero: Token Pair */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 mb-12">
           {/* Left: Token Pair */}

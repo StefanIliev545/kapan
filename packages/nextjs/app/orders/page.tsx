@@ -12,6 +12,8 @@ import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getOrderNote, getOperationLabel, getOperationColorClass, findPendingNoteForOrder, linkNoteToOrderHash, type OperationType } from "~~/utils/orderNotes";
+import { getProtocolLogo } from "~~/utils/protocol";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -201,6 +203,7 @@ export default function OrdersPage() {
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
+                      chainId={chainId}
                     />
                   ))}
                 </div>
@@ -221,6 +224,7 @@ export default function OrdersPage() {
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
+                      chainId={chainId}
                     />
                   ))}
                 </div>
@@ -241,6 +245,7 @@ export default function OrdersPage() {
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
+                      chainId={chainId}
                       dimmed
                     />
                   ))}
@@ -259,16 +264,18 @@ function OrderRow({
   executionDataMap, 
   getTokenSymbol, 
   getTokenDecimals,
+  chainId,
   dimmed = false 
 }: { 
   order: OrderWithHash;
   executionDataMap: Map<string, any>;
   getTokenSymbol: (address: string) => string;
   getTokenDecimals: (address: string) => number;
+  chainId: number;
   dimmed?: boolean;
 }) {
   const { orderHash, context } = order;
-  const { params, status, executedAmount, iterationCount, createdAt } = context;
+  const { params, status, iterationCount, createdAt } = context;
   
   const isActive = status === OrderStatus.Active;
   const isCompleted = status === OrderStatus.Completed;
@@ -291,8 +298,33 @@ function OrderRow({
   const totalReceived = executionData?.totalReceived ?? 0n;
   const hasSurplus = executionSummary && executionSummary.surplusAmount > 0n;
   
-  const sellAmountNum = parseFloat(formatUnits(params.preTotalAmount, sellDecimals));
   const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
+
+  // Look up order note by orderHash for operation type
+  // First try direct lookup, then try to match pending notes by order parameters
+  let orderNote = getOrderNote(orderHash);
+  
+  // If no note found, try to find and link a pending note
+  if (!orderNote) {
+    const pendingNote = findPendingNoteForOrder(
+      sellSymbol,
+      buySymbol,
+      chainId,
+      Number(createdAt)
+    );
+    
+    if (pendingNote && pendingNote.salt) {
+      // Link the pending note to this orderHash for future lookups
+      linkNoteToOrderHash(pendingNote.salt, orderHash);
+      orderNote = pendingNote;
+    }
+  }
+  
+  const operationType: OperationType = orderNote?.operationType ?? "unknown";
+  const operationLabel = getOperationLabel(operationType);
+  const operationColorClass = getOperationColorClass(operationType);
+  const protocolName = orderNote?.protocol;
+  const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
 
   return (
     <Link 
@@ -308,8 +340,31 @@ function OrderRow({
           </div>
           
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Operation type badge */}
+              {operationType !== "unknown" && (
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${operationColorClass}`}>
+                  {operationLabel}
+                </span>
+              )}
+              {/* Protocol with icon */}
+              {protocolName && (
+                <div className="flex items-center gap-1">
+                  {protocolLogo && (
+                    <Image 
+                      src={protocolLogo} 
+                      alt={protocolName} 
+                      width={14} 
+                      height={14} 
+                      className="rounded-sm"
+                    />
+                  )}
+                  <span className="text-xs text-base-content/40">{protocolName}</span>
+                </div>
+              )}
+              {/* Token pair */}
               <span className="font-semibold">{sellSymbol} → {buySymbol}</span>
+              {/* Status badge */}
               <span className={`text-xs px-1.5 py-0.5 rounded ${
                 isActive ? 'bg-warning/20 text-warning' :
                 isCompleted ? 'bg-success/20 text-success' :

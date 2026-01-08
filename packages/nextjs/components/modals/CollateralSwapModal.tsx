@@ -37,6 +37,7 @@ import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
+import { saveOrderNote, createCollateralSwapNote } from "~~/utils/orderNotes";
 
 // Extended type to include price info passed from parent
 interface ExtendedCollateral extends BasicCollateral {
@@ -390,18 +391,18 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     /**
      * Build CoW limit order instructions for collateral swap.
      * 
-     * Collateral Swap Flow:
+     * Collateral Swap Flow (KIND_SELL):
      * - Flash loan: old collateral (what we're swapping out)
      * - Sell: old collateral → Buy: new collateral
      * - Post-hook:
      *   UTXO[0] = swap output (new collateral, from OrderManager ToOutput prepend)
      *   [0] Approve(0, protocol) → UTXO[1] 
      *   [1] Deposit(newCollateral, input=0) → consumed
-     *   [2] Withdraw(oldCollateral, amount) → UTXO[2]
+     *   [2] Withdraw(oldCollateral, per-chunk amount + fee) → UTXO[2]
      *   [3] PushToken(2, borrower) → repay flash loan (appended by hook)
      */
     const buildCowInstructions = useMemo((): ChunkInstructions[] => {
-        if (!selectedFrom || !selectedTo || !userAddress || amountInBigInt === 0n || !orderManagerAddress) {
+        if (!selectedFrom || !selectedTo || !userAddress || amountInBigInt === 0n || !orderManagerAddress || !cowFlashLoanInfo) {
             return [{ preInstructions: [], postInstructions: [] }];
         }
 
@@ -412,48 +413,57 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         // Morpho and Compound use DepositCollateral, others use Deposit
         const depositOp = (isMorpho || isCompound) ? LendingOp.DepositCollateral : LendingOp.Deposit;
         
-        // Calculate withdraw amount including flash loan fee
-        const flashLoanFee = cowFlashLoanInfo?.fee ?? 0n;
-        const withdrawAmount = amountInBigInt + flashLoanFee;
+        const numChunks = limitOrderConfig?.numChunks ?? 1;
         
-        // Post-hook instructions (UTXO tracking after OrderManager prepends ToOutput as UTXO[0])
-        // UTXO[0] = swap output (new collateral)
-        // [0] Approve(0, protocol) → UTXO[1]
-        // [1] Deposit(newCollateral, input=0) → consumed
-        // [2] Withdraw(oldCollateral, amount) → UTXO[2]
-        // [3] PushToken(2, borrower) → appended by hook via flashLoanRepaymentUtxoIndex
-        const postInstructions: ProtocolInstruction[] = [
-            // 1. Approve new collateral for deposit → UTXO[1]
-            createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-            
-            // 2. Deposit new collateral (no UTXO created, consumed)
-            createProtocolInstruction(
-                normalizedProtocol,
-                encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, context || "0x", 0)
-            ),
-            
-            // 3. Withdraw old collateral to repay flash loan → UTXO[2]
-            createProtocolInstruction(
-                normalizedProtocol,
-                encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, withdrawAmount, context || "0x", 999)
-            ),
-        ];
-
-        console.log("[buildCowInstructions] Collateral swap:", {
+        // Calculate per-chunk amounts
+        const chunkSellAmount = amountInBigInt / BigInt(numChunks);
+        const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
+        const chunkWithdrawAmount = chunkSellAmount + chunkFlashLoanFee;
+        
+        console.log("[buildCowInstructions] Collateral swap (KIND_SELL):", {
             sellToken: selectedFrom.symbol,
             buyToken: selectedTo.symbol,
-            swapAmount: formatUnits(amountInBigInt, selectedFrom.decimals),
-            withdrawAmount: formatUnits(withdrawAmount, selectedFrom.decimals),
-            flashLoanFee: formatUnits(flashLoanFee, selectedFrom.decimals),
+            totalSellAmount: formatUnits(amountInBigInt, selectedFrom.decimals),
+            totalFlashLoanFee: formatUnits(cowFlashLoanInfo.fee, selectedFrom.decimals),
+            numChunks,
+            chunkSellAmount: formatUnits(chunkSellAmount, selectedFrom.decimals),
+            chunkWithdrawAmount: formatUnits(chunkWithdrawAmount, selectedFrom.decimals),
             flow: "swap[0] → approve[1] → deposit → withdraw[2] → (hook appends push)",
         });
 
-        return [{
-            preInstructions: [], // Empty - flash loan transfer hooks are in appData
-            postInstructions,
-            flashLoanRepaymentUtxoIndex: 2, // UTXO[2] = Withdraw output
-        }];
-    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo]);
+        // Build chunks - each chunk has same instructions but processes per-chunk amounts
+        return Array(numChunks).fill(null).map(() => {
+            // Post-hook instructions (UTXO tracking after OrderManager prepends ToOutput as UTXO[0])
+            // UTXO[0] = swap output (new collateral)
+            // [0] Approve(0, protocol) → UTXO[1]
+            // [1] Deposit(newCollateral, input=0) → consumed
+            // [2] Withdraw(oldCollateral, chunkWithdrawAmount) → UTXO[2]
+            // [3] PushToken(2, borrower) → appended by hook via flashLoanRepaymentUtxoIndex
+            const postInstructions: ProtocolInstruction[] = [
+                // 1. Approve new collateral for deposit → UTXO[1]
+                createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+                
+                // 2. Deposit new collateral (no UTXO created, consumed)
+                createProtocolInstruction(
+                    normalizedProtocol,
+                    encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, context || "0x", 0)
+                ),
+                
+                // 3. Withdraw old collateral to repay flash loan → UTXO[2]
+                // Use per-chunk amount (chunkSellAmount + fee), NOT total amount
+                createProtocolInstruction(
+                    normalizedProtocol,
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, context || "0x", 999)
+                ),
+            ];
+
+            return {
+                preInstructions: [], // Empty - flash loan transfer hooks are in appData
+                postInstructions,
+                flashLoanRepaymentUtxoIndex: 2, // UTXO[2] = Withdraw output
+            };
+        });
+    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, limitOrderConfig?.numChunks]);
 
     const buildFlow = () => {
         if (!selectedFrom || !selectedTo) return [];
@@ -539,21 +549,29 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 });
 
                 // Build CoW order calls
+                const numChunks = limitOrderConfig?.numChunks ?? 1;
+                const chunkSellAmount = amountInBigInt / BigInt(numChunks);
+                const chunkMinBuyAmount = minBuyAmount.raw / BigInt(numChunks);
+                const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
+                // Flash loan amount = sellAmount (what gets swapped)
+                // The fee is covered by withdrawing chunkSellAmount + chunkFlashLoanFee from protocol
+                const chunkFlashLoanAmount = chunkSellAmount;
+
                 const limitOrderResult = await buildLimitOrderCalls({
                     sellToken: selectedFrom.address as Address,
                     buyToken: selectedTo.address as Address,
-                    chunkSize: amountInBigInt, // Single chunk for collateral swap
-                    minBuyPerChunk: minBuyAmount.raw,
+                    chunkSize: chunkSellAmount,
+                    minBuyPerChunk: chunkMinBuyAmount,
                     totalAmount: amountInBigInt,
                     chunks: buildCowInstructions,
                     completion: CompletionType.Iterations,
-                    targetValue: 1, // Single iteration
+                    targetValue: numChunks,
                     minHealthFactor: "1.1",
                     seedAmount: 0n, // Flash loan mode
                     flashLoan: {
                         lender: cowFlashLoanInfo.lender,
                         token: selectedFrom.address as Address,
-                        amount: amountInBigInt,
+                        amount: chunkFlashLoanAmount,
                     },
                     // Include withdraw instruction for auth check
                     preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
@@ -581,6 +599,17 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 }
 
                 console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
+
+                // Save order note for display on orders page
+                if (limitOrderResult.salt) {
+                    saveOrderNote(createCollateralSwapNote(
+                        limitOrderResult.salt,
+                        protocolName,
+                        selectedFrom.symbol, // old collateral
+                        selectedTo.symbol,   // new collateral
+                        chainId
+                    ));
+                }
 
                 // Execute via wallet
                 const notificationId = notification.loading(
@@ -869,9 +898,23 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                                 totalAmount={amountInBigInt}
                                 onConfigChange={handleLimitOrderConfigChange}
                                 showFlashLoanToggle={false}
-                                showChunksInput={false}
+                                showChunksInput={true}
                                 compact
                             />
+                            {/* Chunk Info - shown when multi-chunk */}
+                            {(limitOrderConfig?.numChunks ?? 1) > 1 && (
+                                <div className="flex items-start gap-1.5 mt-2 text-[10px]">
+                                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    <div>
+                                        <span className="text-info font-medium">Multi-chunk: {limitOrderConfig?.numChunks} iterations</span>
+                                        <p className="text-base-content/50 mt-0.5">
+                                            ~30 min between chunks for price discovery.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -879,7 +922,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50">
                         <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
                         <span>
-                            Single transaction via CoW flash loan. MEV protected.
+                            {(limitOrderConfig?.numChunks ?? 1) === 1 
+                                ? "Single transaction via CoW flash loan. MEV protected."
+                                : `${limitOrderConfig?.numChunks} iterations. ~30 min between chunks. MEV protected.`
+                            }
                         </span>
                     </div>
                 </div>

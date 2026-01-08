@@ -36,6 +36,7 @@ import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrde
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
+import { saveOrderNote, createClosePositionNote } from "~~/utils/orderNotes";
 
 // Aave flash loan fee: 5 bps (0.05%)
 // We add a small buffer (10 bps total) to ensure swap covers repayment
@@ -475,6 +476,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         }
 
         const normalizedProtocol = normalizeProtocolName(protocolName);
+        const numChunks = limitOrderConfig?.numChunks ?? 1;
+        
+        // Calculate per-chunk amounts
+        const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
+        const chunkSellAmount = limitOrderCollateral / BigInt(numChunks);
         
         // PRE-HOOK: Empty! fundOrder already moves flash-loaned collateral to OrderManager
         const preInstructions: ProtocolInstruction[] = [];
@@ -489,8 +495,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             // UTXO[0] = actual sell (Y) - prepended by OrderManager
             // UTXO[1] = leftover (X - Y) - prepended by OrderManager, tokens at router
             
-            // [0] PullToken: pull debt from OM (exact buyAmount) → UTXO[2]
-            createRouterInstruction(encodePullToken(repayAmountRaw, debtToken, orderManagerAddress)),
+            // [0] PullToken: pull debt from OM (per-chunk buyAmount) → UTXO[2]
+            createRouterInstruction(encodePullToken(chunkBuyAmount, debtToken, orderManagerAddress)),
             
             // [1] Approve debt for lending protocol (using UTXO[2]) → UTXO[3] (empty)
             createRouterInstruction(encodeApprove(2, normalizedProtocol)),
@@ -498,7 +504,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             // [2] Repay user's debt using UTXO[2] - unlocks original collateral → UTXO[4]
             createProtocolInstruction(
                 normalizedProtocol,
-                encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, repayAmountRaw, context || "0x", 2)
+                encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, chunkBuyAmount, context || "0x", 2)
             ),
             
             // [3] Withdraw collateral equal to actual sell amount (UTXO[0] = Y) → UTXO[5]
@@ -523,19 +529,22 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         console.log("[buildCowInstructions] Close with Collateral (KIND_BUY):", {
             sellToken: selectedTo.symbol,
             buyToken: debtName,
-            exactDebtToBuy: formatUnits(repayAmountRaw, debtDecimals),
+            totalDebtToBuy: formatUnits(repayAmountRaw, debtDecimals),
+            chunkDebtToBuy: formatUnits(chunkBuyAmount, debtDecimals),
             flashLoanToken: selectedTo.symbol,
             flashLoanAmount: formatUnits(cowFlashLoanInfo.amount, selectedTo.decimals),
+            numChunks,
             utxoLayout: "UTXO[0]=actualSell(Y), UTXO[1]=leftover(X-Y), UTXO[5]=withdrawn(Y), UTXO[6]=Y+(X-Y)=X",
             flow: "pullDebt → approve → repay → withdraw(Y) → add(Y, X-Y) → implicit:push(X→adapter)",
         });
 
-        return [{
+        // Return N identical chunks - each processes per-chunk amounts
+        return Array(numChunks).fill(null).map(() => ({
             preInstructions,
             postInstructions,
             flashLoanRepaymentUtxoIndex: 6, // UTXO[6] = X (flash loan amount to repay)
-        }];
-    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, chainId]);
+        }));
+    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderCollateral, limitOrderConfig?.numChunks]);
 
     const buildFlow = () => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];
@@ -662,21 +671,26 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
             // Build limit order calls
             // Use KIND_BUY: exact buyAmount (debt needed), max sellAmount (collateral willing to spend)
+            const numChunks = limitOrderConfig?.numChunks ?? 1;
+            const chunkSellAmount = limitOrderCollateral / BigInt(numChunks);
+            const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
+            const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
+
             const limitOrderResult = await buildLimitOrderCalls({
                 sellToken: selectedTo.address as Address,   // Collateral to sell
                 buyToken: debtToken,                         // Debt to receive
-                chunkSize: limitOrderCollateral,             // Max collateral to sell (from CoW quote + slippage)
-                minBuyPerChunk: repayAmountRaw,              // Exact debt amount needed (KIND_BUY: this is exact)
-                totalAmount: limitOrderCollateral,           // Single chunk
+                chunkSize: chunkSellAmount,                  // Per-chunk collateral to sell
+                minBuyPerChunk: chunkBuyAmount,              // Per-chunk debt amount needed
+                totalAmount: limitOrderCollateral,           // Total across all chunks
                 chunks: buildCowInstructions,
                 completion: CompletionType.Iterations,
-                targetValue: 1,                              // Single iteration
+                targetValue: numChunks,
                 minHealthFactor: "1.0",
                 seedAmount: 0n,                              // No seed - flash loan provides funds
                 flashLoan: {
                     lender: cowFlashLoanInfo.lender as Address,
                     token: selectedTo.address as Address,    // Flash loan COLLATERAL (sellToken!)
-                    amount: cowFlashLoanInfo.amount,         // Collateral amount to flash loan
+                    amount: chunkFlashLoanAmount,            // Per-chunk flash loan amount
                 },
                 preOrderInstructions: [],                    // Empty - fundOrder handles collateral transfer
                 isKindBuy: true,                             // KIND_BUY: exact buyAmount, max sellAmount
@@ -703,6 +717,17 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             }
 
             console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
+
+            // Save order note for display on orders page
+            if (limitOrderResult.salt) {
+                saveOrderNote(createClosePositionNote(
+                    limitOrderResult.salt,
+                    protocolName,
+                    selectedTo.symbol, // collateral being sold
+                    debtName,          // debt being repaid
+                    chainId
+                ));
+            }
 
             const allCalls = limitOrderResult.calls;
             notificationId = notification.loading(
@@ -914,11 +939,24 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                         sellToken={limitOrderSellToken}
                         totalAmount={limitOrderCollateral || requiredCollateral}
                         onConfigChange={handleLimitOrderConfigChange}
-                        showChunksInput={false}
+                        showChunksInput={true}
                         showFlashLoanToggle={false}
-                        defaultChunks={1}
                         compact={true}
                     />
+                    {/* Chunk Info - shown when multi-chunk */}
+                    {(limitOrderConfig?.numChunks ?? 1) > 1 && (
+                        <div className="flex items-start gap-1.5 mt-2 text-[10px]">
+                            <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <div>
+                                <span className="text-info font-medium">Multi-chunk: {limitOrderConfig?.numChunks} iterations</span>
+                                <p className="text-base-content/50 mt-0.5">
+                                    ~30 min between chunks for price discovery.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {isCowQuoteLoading && (
                         <div className="flex items-center gap-2 text-xs text-base-content/60 mt-2">
                             <span className="loading loading-spinner loading-xs" />

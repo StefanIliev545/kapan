@@ -12,6 +12,16 @@ import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { 
+  getOrderNote, 
+  findPendingNoteForOrder, 
+  linkNoteToOrderHash,
+  getOperationLabel, 
+  getOperationColorClass,
+  type OrderNote,
+  type OperationType,
+} from "~~/utils/orderNotes";
+import { getProtocolLogo } from "~~/utils/protocol";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -155,6 +165,41 @@ export function PendingOrdersDrawer() {
     return info?.decimals ?? 18;
   };
 
+  // Look up order notes for operation type and protocol info
+  const orderNotesMap = useMemo(() => {
+    const notesMap = new Map<string, OrderNote>();
+    
+    for (const order of orders) {
+      const { orderHash, context } = order;
+      
+      // Try direct lookup by orderHash
+      let note = getOrderNote(orderHash);
+      
+      // If not found, try to match by tokens and timestamp
+      if (!note) {
+        const sellSymbol = getTokenSymbol(context.params.sellToken);
+        const buySymbol = getTokenSymbol(context.params.buyToken);
+        note = findPendingNoteForOrder(
+          sellSymbol,
+          buySymbol,
+          chainId,
+          Number(context.createdAt)
+        );
+        
+        // If found a pending note, link it to the orderHash
+        if (note && note.salt) {
+          linkNoteToOrderHash(note.salt, orderHash);
+        }
+      }
+      
+      if (note) {
+        notesMap.set(orderHash, note);
+      }
+    }
+    
+    return notesMap;
+  }, [orders, chainId, getTokenSymbol]);
+
   // Don't render anything if not available, not connected, or no orders
   if (!isAvailable || !userAddress) return null;
   if (hasFetched && orders.length === 0) return null;
@@ -245,8 +290,41 @@ export function PendingOrdersDrawer() {
                   const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
                   const surplusAmountNum = executionSummary ? parseFloat(formatUnits(executionSummary.surplusAmount, buyDecimals)) : 0;
 
+                  // Get order note for operation type and protocol
+                  const orderNote = orderNotesMap.get(orderHash);
+                  const operationType = orderNote?.operationType ?? "unknown";
+                  const operationLabel = getOperationLabel(operationType);
+                  const operationColorClass = getOperationColorClass(operationType);
+                  const protocolName = orderNote?.protocol;
+                  const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
+
                   return (
                     <div key={orderHash} className={`px-4 py-3 hover:bg-base-50 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
+                      {/* Row 0: Operation type + Protocol */}
+                      {(operationType !== "unknown" || protocolName) && (
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {operationType !== "unknown" && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${operationColorClass}`}>
+                              {operationLabel}
+                            </span>
+                          )}
+                          {protocolName && (
+                            <div className="flex items-center gap-1">
+                              {protocolLogo && (
+                                <Image 
+                                  src={protocolLogo} 
+                                  alt={protocolName} 
+                                  width={14} 
+                                  height={14} 
+                                  className="rounded-sm"
+                                />
+                              )}
+                              <span className="text-[10px] text-base-content/50">{protocolName}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
                       {/* Row 1: Token pair, status, time */}
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
