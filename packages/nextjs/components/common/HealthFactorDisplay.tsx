@@ -70,7 +70,7 @@ export function getHealthFactorBadgeClass(status: HealthFactorStatus): string {
  * @param decimals - Number of decimal places (default: 2)
  * @returns Formatted string (e.g., "1.45" or "∞")
  */
-export function formatHealthFactor(value: number | null | undefined, decimals: number = 2): string {
+export function formatHealthFactor(value: number | null | undefined, decimals = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value) || value >= 999) {
     return "∞";
   }
@@ -210,7 +210,7 @@ export const HealthFactorDisplay: FC<HealthFactorDisplayProps> = ({
  * Hook to get health factor display properties.
  * Useful when you need the color/status but want to render custom UI.
  */
-export function useHealthFactorDisplay(value: number | null | undefined, decimals: number = 2) {
+export function useHealthFactorDisplay(value: number | null | undefined, decimals = 2) {
   const status = useMemo(() => getHealthFactorStatus(value), [value]);
   const colorClass = useMemo(() => getHealthFactorColorClass(status), [status]);
   const badgeClass = useMemo(() => getHealthFactorBadgeClass(status), [status]);

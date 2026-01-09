@@ -225,7 +225,7 @@ export default function OrderDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <LoadingOverlay size="lg" label="Loading order details..." padded={false} />
       </div>
     );
@@ -233,9 +233,9 @@ export default function OrderDetailPage() {
   
   if (error || !order) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-error text-xl mb-4">{error || "Order not found"}</p>
+          <p className="text-error mb-4 text-xl">{error || "Order not found"}</p>
           <Link href="/" className="text-primary hover:underline">Back to Home</Link>
         </div>
       </div>
@@ -283,29 +283,29 @@ export default function OrderDetailPage() {
   return (
     <div className="min-h-screen px-4 py-8 md:px-8 lg:px-16">
       {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
+      <div className="mx-auto mb-8 max-w-7xl">
         <button 
           onClick={() => window.history.back()}
-          className="inline-flex items-center gap-2 text-base-content/50 hover:text-base-content transition-colors text-sm"
+          className="text-base-content/50 hover:text-base-content inline-flex items-center gap-2 text-sm transition-colors"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back
         </button>
       </div>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto max-w-7xl">
         {/* Operation Type and Protocol Badge */}
         {(operationType !== "unknown" || protocolName) && (
-          <div className="flex items-center gap-3 mb-6">
+          <div className="mb-6 flex items-center gap-3">
             {operationType !== "unknown" && (
-              <span className={`text-sm px-3 py-1 rounded-full font-medium ${operationColorClass}`}>
+              <span className={`rounded-full px-3 py-1 text-sm font-medium ${operationColorClass}`}>
                 {operationLabel}
               </span>
             )}
             {protocolName && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-base-200">
+              <div className="bg-base-200 flex items-center gap-2 rounded-full px-3 py-1">
                 {protocolLogo && (
                   <Image 
                     src={protocolLogo} 
@@ -315,14 +315,14 @@ export default function OrderDetailPage() {
                     className="rounded-sm"
                   />
                 )}
-                <span className="text-sm text-base-content/70">{protocolName}</span>
+                <span className="text-base-content/70 text-sm">{protocolName}</span>
               </div>
             )}
           </div>
         )}
 
         {/* Hero: Token Pair */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 mb-12">
+        <div className="mb-12 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Token Pair */}
           <div className="flex items-center gap-6 md:gap-10">
             {/* Sell Token */}
@@ -335,13 +335,13 @@ export default function OrderDetailPage() {
                 className="rounded-full"
               />
               <div>
-                <span className="text-base-content/50 text-sm block">Sell</span>
-                <span className="text-3xl md:text-4xl font-bold text-base-content">{sellSymbol}</span>
+                <span className="text-base-content/50 block text-sm">Sell</span>
+                <span className="text-base-content text-3xl font-bold md:text-4xl">{sellSymbol}</span>
               </div>
             </div>
             
             {/* Arrow */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="text-primary size-8 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
             
@@ -355,15 +355,15 @@ export default function OrderDetailPage() {
                 className="rounded-full"
               />
               <div>
-                <span className="text-base-content/50 text-sm block">Buy</span>
-                <span className="text-3xl md:text-4xl font-bold text-success">{buySymbol}</span>
+                <span className="text-base-content/50 block text-sm">Buy</span>
+                <span className="text-success text-3xl font-bold md:text-4xl">{buySymbol}</span>
               </div>
             </div>
           </div>
 
           {/* Right: Status */}
           <div className="flex items-center gap-4">
-            <div className={`px-4 py-2 rounded-full font-semibold text-sm ${
+            <div className={`rounded-full px-4 py-2 text-sm font-semibold ${
               isActive ? 'bg-warning/20 text-warning' :
               isCompleted ? 'bg-success/20 text-success' :
               isCancelled ? 'bg-error/20 text-error' :
@@ -377,49 +377,49 @@ export default function OrderDetailPage() {
 
         {/* Progress */}
         <div className="mb-12">
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <span className="text-base-content/50 text-sm">Progress</span>
             <span className="text-base-content/80 font-mono text-sm">{completedChunks} / {totalChunks} chunks</span>
           </div>
-          <div className="relative h-2 bg-base-300">
+          <div className="bg-base-300 relative h-2">
             <div 
-              className="absolute inset-y-0 left-0 bg-primary transition-all duration-700 ease-out"
+              className="bg-primary absolute inset-y-0 left-0 transition-all duration-700 ease-out"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <div className="text-right mt-1">
+          <div className="mt-1 text-right">
             <span className="text-primary font-semibold">{progressPercent.toFixed(0)}%</span>
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="mb-12 grid grid-cols-2 gap-6 lg:grid-cols-4">
           {/* Total Sold */}
           <div>
-            <span className="text-base-content/50 text-sm block mb-1">Total Sold</span>
+            <span className="text-base-content/50 mb-1 block text-sm">Total Sold</span>
             <span className="text-2xl font-bold">{formatAmount(order.executedAmount, sellDecimals)}</span>
             <span className="text-base-content/60 ml-1">{sellSymbol}</span>
             {totalSoldUsd !== null && (
-              <p className="text-base-content/50 text-sm mt-0.5">{formatUsd(totalSoldUsd)}</p>
+              <p className="text-base-content/50 mt-0.5 text-sm">{formatUsd(totalSoldUsd)}</p>
             )}
-            <p className="text-base-content/40 text-xs mt-1">
+            <p className="text-base-content/40 mt-1 text-xs">
               of {formatAmount(order.params.preTotalAmount, sellDecimals)} {sellSymbol}
             </p>
           </div>
 
           {/* Total Received */}
           <div>
-            <span className="text-base-content/50 text-sm block mb-1">Total Received</span>
+            <span className="text-base-content/50 mb-1 block text-sm">Total Received</span>
             {isLoadingEvents ? (
               <LoadingSpinner size="sm" />
             ) : executionData ? (
               <>
-                <span className="text-2xl font-bold text-success">{formatAmount(executionData.totalReceived, buyDecimals)}</span>
+                <span className="text-success text-2xl font-bold">{formatAmount(executionData.totalReceived, buyDecimals)}</span>
                 <span className="text-base-content/60 ml-1">{buySymbol}</span>
                 {totalReceivedUsd !== null && (
-                  <p className="text-success/80 text-sm mt-0.5">{formatUsd(totalReceivedUsd)}</p>
+                  <p className="text-success/80 mt-0.5 text-sm">{formatUsd(totalReceivedUsd)}</p>
                 )}
-                <p className="text-base-content/40 text-xs mt-1">
+                <p className="text-base-content/40 mt-1 text-xs">
                   min: {formatAmount(totalMinBuy, buyDecimals)} {buySymbol}
                 </p>
               </>
@@ -430,15 +430,15 @@ export default function OrderDetailPage() {
 
           {/* Surplus */}
           <div>
-            <span className="text-base-content/50 text-sm block mb-1">Surplus</span>
+            <span className="text-base-content/50 mb-1 block text-sm">Surplus</span>
             {executionSummary && executionSummary.surplusAmount > 0n ? (
               <>
-                <span className="text-2xl font-bold text-success">+{formatAmountPrecise(executionSummary.surplusAmount, buyDecimals)}</span>
+                <span className="text-success text-2xl font-bold">+{formatAmountPrecise(executionSummary.surplusAmount, buyDecimals)}</span>
                 <span className="text-success/80 ml-1">{buySymbol}</span>
                 {surplusUsd !== null && surplusUsd > 0 && (
-                  <p className="text-success/80 text-sm mt-0.5">{formatUsd(surplusUsd)}</p>
+                  <p className="text-success/80 mt-0.5 text-sm">{formatUsd(surplusUsd)}</p>
                 )}
-                <p className="text-success text-xs mt-1">+{executionSummary.surplusPercentage.toFixed(2)}% above min</p>
+                <p className="text-success mt-1 text-xs">+{executionSummary.surplusPercentage.toFixed(2)}% above min</p>
               </>
             ) : (
               <span className="text-base-content/40 text-2xl">-</span>
@@ -447,11 +447,11 @@ export default function OrderDetailPage() {
 
           {/* Rate */}
           <div>
-            <span className="text-base-content/50 text-sm block mb-1">Execution Rate</span>
+            <span className="text-base-content/50 mb-1 block text-sm">Execution Rate</span>
             {executionSummary ? (
               <>
-                <span className="text-2xl font-bold font-mono">{(1 / executionSummary.actualRate).toFixed(4)}</span>
-                <p className="text-base-content/40 text-xs mt-1">
+                <span className="font-mono text-2xl font-bold">{(1 / executionSummary.actualRate).toFixed(4)}</span>
+                <p className="text-base-content/40 mt-1 text-xs">
                   {buySymbol} per {sellSymbol}
                 </p>
               </>
@@ -462,33 +462,33 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Two Column Layout */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-12">
+        <div className="mb-12 grid gap-8 lg:grid-cols-2">
           {/* Left: Order Details */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-base-content/80">Order Parameters</h3>
+            <h3 className="text-base-content/80 mb-4 text-lg font-semibold">Order Parameters</h3>
             <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b border-base-300/50">
+              <div className="border-base-300/50 flex justify-between border-b py-2">
                 <span className="text-base-content/50">Chunk Size</span>
                 <span className="font-medium">{formatAmount(order.params.chunkSize, sellDecimals)} {sellSymbol}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-base-300/50">
+              <div className="border-base-300/50 flex justify-between border-b py-2">
                 <span className="text-base-content/50">Min Buy / Chunk</span>
                 <span className="font-medium">{formatAmount(order.params.minBuyPerChunk, buyDecimals)} {buySymbol}</span>
               </div>
               {executionSummary && (
                 <>
-                  <div className="flex justify-between py-2 border-b border-base-300/50">
+                  <div className="border-base-300/50 flex justify-between border-b py-2">
                     <span className="text-base-content/50">Min Rate</span>
-                    <span className="font-mono text-base-content/60">{executionSummary.minRate.toFixed(6)}</span>
+                    <span className="text-base-content/60 font-mono">{executionSummary.minRate.toFixed(6)}</span>
                   </div>
                   {executionSummary.rateImprovement > 0 && (
-                    <div className="flex justify-between py-2 border-b border-base-300/50">
+                    <div className="border-base-300/50 flex justify-between border-b py-2">
                       <span className="text-base-content/50">Rate Improvement</span>
                       <span className="text-success font-medium">+{executionSummary.rateImprovement.toFixed(2)}%</span>
                     </div>
                   )}
                   {priceImpact !== null && (
-                    <div className="flex justify-between py-2 border-b border-base-300/50">
+                    <div className="border-base-300/50 flex justify-between border-b py-2">
                       <span className="text-base-content/50">vs Initial Quote</span>
                       <span className={priceImpact < 0 ? 'text-success font-medium' : priceImpact > 0 ? 'text-warning font-medium' : ''}>
                         {priceImpact < 0 ? '+' : ''}{(-priceImpact).toFixed(2)}%
@@ -497,13 +497,13 @@ export default function OrderDetailPage() {
                   )}
                 </>
               )}
-              <div className="flex justify-between py-2 border-b border-base-300/50">
+              <div className="border-base-300/50 flex justify-between border-b py-2">
                 <span className="text-base-content/50">Flash Loan</span>
                 <span className={order.params.isFlashLoanOrder ? 'text-primary font-medium' : 'text-base-content/40'}>
                   {order.params.isFlashLoanOrder ? 'Enabled' : 'Disabled'}
                 </span>
               </div>
-              <div className="flex justify-between py-2 border-b border-base-300/50">
+              <div className="border-base-300/50 flex justify-between border-b py-2">
                 <span className="text-base-content/50">Min Health Factor</span>
                 <span className="font-medium">{formatUnits(order.params.minHealthFactor, 18)}</span>
               </div>
@@ -512,18 +512,18 @@ export default function OrderDetailPage() {
 
           {/* Right: Execution History */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-base-content/80">Execution History</h3>
+            <h3 className="text-base-content/80 mb-4 text-lg font-semibold">Execution History</h3>
             {executionSummary && executionSummary.chunkDetails.length > 0 ? (
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-2">
                 {executionSummary.chunkDetails.map((chunk) => (
-                  <div key={chunk.chunkIndex} className="flex items-center justify-between py-2 px-3 bg-base-200/50 rounded-lg">
+                  <div key={chunk.chunkIndex} className="bg-base-200/50 flex items-center justify-between rounded-lg px-3 py-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-base-content/40 text-xs font-mono w-6">#{chunk.chunkIndex}</span>
+                      <span className="text-base-content/40 w-6 font-mono text-xs">#{chunk.chunkIndex}</span>
                       <span className="text-sm">{formatAmount(chunk.sellAmount, sellDecimals)}</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="text-base-content/30 size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
-                      <span className="text-sm text-success">{formatAmount(chunk.buyAmount, buyDecimals)}</span>
+                      <span className="text-success text-sm">{formatAmount(chunk.buyAmount, buyDecimals)}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       {chunk.surplusPercentage > 0 && (
@@ -548,18 +548,18 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Footer: Order Hash & Links */}
-        <div className="border-t border-base-300/50 pt-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <span className="text-base-content/50 text-xs block mb-1">Order Hash</span>
+        <div className="border-base-300/50 border-t pt-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0 flex-1">
+              <span className="text-base-content/50 mb-1 block text-xs">Order Hash</span>
               <div className="flex items-center gap-2">
-                <code className="text-xs text-base-content/70 truncate">{orderHash}</code>
+                <code className="text-base-content/70 truncate text-xs">{orderHash}</code>
                 <button
                   onClick={() => copyToClipboard(orderHash)}
-                  className="p-1 hover:bg-base-200 rounded transition-colors flex-shrink-0"
+                  className="hover:bg-base-200 flex-shrink-0 rounded p-1 transition-colors"
                   title="Copy"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="text-base-content/40 size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                 </button>
@@ -571,20 +571,20 @@ export default function OrderDetailPage() {
                 href={getCowExplorerAddressUrl(chainId, orderManagerAddress || "")}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:text-primary/80 text-sm flex items-center gap-1"
+                className="text-primary hover:text-primary/80 flex items-center gap-1 text-sm"
               >
                 CoW Explorer
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
               
               <button
                 onClick={() => copyToClipboard(shareUrl)}
-                className="text-primary hover:text-primary/80 text-sm flex items-center gap-1"
+                className="text-primary hover:text-primary/80 flex items-center gap-1 text-sm"
               >
                 Share
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
               </button>
@@ -593,10 +593,10 @@ export default function OrderDetailPage() {
                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out my Kapan Finance order!`)}&url=${encodeURIComponent(shareUrl)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:text-primary/80 text-sm flex items-center gap-1"
+                className="text-primary hover:text-primary/80 flex items-center gap-1 text-sm"
               >
                 Tweet
-                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="size-3" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
               </a>

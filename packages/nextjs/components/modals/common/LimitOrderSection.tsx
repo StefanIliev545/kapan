@@ -63,9 +63,9 @@ export const LimitOrderSection: FC<LimitOrderSectionProps> = ({
     const numChunks = limitOrderConfig?.numChunks ?? 1;
 
     return (
-        <div className={`bg-base-200/50 rounded-lg p-3 space-y-2 ${className}`}>
-            <div className="text-xs font-medium text-base-content/70 flex items-center gap-1">
-                <ClockIcon className="w-3.5 h-3.5" />
+        <div className={`bg-base-200/50 space-y-2 rounded-lg p-3 ${className}`}>
+            <div className="text-base-content/70 flex items-center gap-1 text-xs font-medium">
+                <ClockIcon className="size-3.5" />
                 Limit Order Configuration
             </div>
 
@@ -86,7 +86,7 @@ export const LimitOrderSection: FC<LimitOrderSectionProps> = ({
 
             {/* CoW Quote Loading */}
             {isCowQuoteLoading && (
-                <div className="flex items-center gap-2 text-xs text-base-content/60 mt-2">
+                <div className="text-base-content/60 mt-2 flex items-center gap-2 text-xs">
                     <span className="loading loading-spinner loading-xs" />
                     Fetching CoW quote...
                 </div>
@@ -97,7 +97,7 @@ export const LimitOrderSection: FC<LimitOrderSectionProps> = ({
 
             {/* Slippage Selector */}
             {showSlippage && slippage !== undefined && setSlippage && (
-                <div className="flex justify-between items-center text-xs px-1 pt-2 border-t border-base-300/30">
+                <div className="border-base-300/30 flex items-center justify-between border-t px-1 pt-2 text-xs">
                     <span className="text-base-content/70">Slippage Buffer</span>
                     <div className="flex items-center gap-2">
                         <span>{slippage}%</span>
@@ -124,8 +124,8 @@ export interface ChunkInfoProps {
 
 export const ChunkInfo: FC<ChunkInfoProps> = ({ numChunks, className = "" }) => {
     return (
-        <div className={`flex items-start gap-1.5 mt-2 text-[10px] ${className}`}>
-            <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className={`mt-2 flex items-start gap-1.5 text-[10px] ${className}`}>
+            <svg className="text-info mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             <div>
@@ -150,13 +150,13 @@ export const BatchedTxToggle: FC<BatchedTxToggleProps> = ({
     className = "",
 }) => {
     return (
-        <div className={`flex items-center justify-between mt-2 pt-2 border-t border-base-300/30 ${className}`}>
+        <div className={`border-base-300/30 mt-2 flex items-center justify-between border-t pt-2 ${className}`}>
             <div className="flex items-center gap-1.5">
                 <span className="text-base-content/60 text-xs">Batched TX</span>
-                <span className="text-[10px] text-base-content/40">(EIP-5792)</span>
+                <span className="text-base-content/40 text-[10px]">(EIP-5792)</span>
             </div>
             <div className="flex items-center gap-2">
-                <span className="text-[10px] text-base-content/40">
+                <span className="text-base-content/40 text-[10px]">
                     {useBatchedTx ? "faster" : "compatible"}
                 </span>
                 <input
@@ -181,8 +181,8 @@ export const LimitOrderInfoNote: FC<LimitOrderInfoNoteProps> = ({
     className = "",
 }) => {
     return (
-        <div className={`flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50 ${className}`}>
-            <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
+        <div className={`border-base-300/30 text-base-content/50 mt-2 flex items-start gap-1.5 border-t pt-2 text-[10px] ${className}`}>
+            <ClockIcon className="mt-0.5 size-3 shrink-0" />
             <span>
                 {numChunks === 1
                     ? "Single transaction via CoW flash loan. MEV protected."

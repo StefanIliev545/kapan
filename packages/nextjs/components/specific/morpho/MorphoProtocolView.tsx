@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useMemo, useEffect, useCallback } from "react";
+import { FC, useState, useMemo, useEffect, ReactNode } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
@@ -20,6 +20,35 @@ import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { HealthStatus } from "../common/HealthStatus";
 import { formatSignedPercent } from "../utils";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common";
+
+/**
+ * Reusable collapsible section with animated expand/collapse.
+ * Extracts the shared AnimatePresence + motion.div + card wrapper pattern.
+ */
+interface CollapsibleSectionProps {
+  isOpen: boolean;
+  children: ReactNode;
+}
+
+const CollapsibleSection: FC<CollapsibleSectionProps> = ({ isOpen, children }) => (
+  <AnimatePresence initial={false}>
+    {isOpen && (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: "auto" }}
+        exit={{ opacity: 0, height: 0 }}
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        className="overflow-hidden"
+      >
+        <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
+          <div className="card-body p-4">
+            {children}
+          </div>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
 
 interface MorphoProtocolViewProps {
   chainId?: number;
@@ -165,15 +194,15 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   }, [hasLoadedOnce, hasPositions]);
 
   return (
-    <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
+    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
       {/* Protocol Header Card - matching ProtocolView exactly */}
       <div
         className="card-surface-interactive shadow-lg"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <div className="card-body px-3 sm:px-5 py-3">
+        <div className="card-body p-3 sm:px-5">
           {/* Mobile Layout (< sm) */}
-          <div className="sm:hidden space-y-3">
+          <div className="space-y-3 sm:hidden">
             {/* Row 1: Protocol name + Markets + Collapse */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -197,47 +226,47 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
                 >
-                  <span className="text-[9px] uppercase tracking-wider font-semibold">Markets</span>
-                  {isMarketsOpen ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
+                  <span className="text-[9px] font-semibold uppercase tracking-wider">Markets</span>
+                  {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
                 </button>
                 <ChevronDownIcon
-                  className={`w-4 h-4 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                  className={`text-base-content/40 size-4 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`}
                 />
               </div>
             </div>
             {/* Row 2: Stats in a 2x2 grid */}
             <div className="grid grid-cols-4 gap-1">
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Balance</span>
-                <span className={`text-xs font-mono font-bold tabular-nums ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Balance</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">30D</span>
-                <span className={`text-xs font-mono font-bold tabular-nums ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">30D</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Net APY</span>
-                <span className={`text-xs font-mono font-bold tabular-nums ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Net APY</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {hasPositions && metrics.netApyPercent != null ? formatSignedPercent(metrics.netApyPercent) : "—"}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">LTV</span>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">LTV</span>
                 {hasPositions ? (
                   <HealthStatus utilizationPercentage={metrics.avgUtilization} />
                 ) : (
-                  <span className="text-xs font-mono font-bold tabular-nums text-base-content/40">—</span>
+                  <span className="text-base-content/40 font-mono text-xs font-bold tabular-nums">—</span>
                 )}
               </div>
             </div>
           </div>
 
           {/* Desktop Layout (>= sm) */}
-          <div className="hidden sm:flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 sm:flex">
             {/* Protocol name + icon */}
             <div className="flex items-center gap-3">
               <div className="token-icon-wrapper-lg">
@@ -259,57 +288,57 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
             </div>
 
             {/* Divider */}
-            <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+            <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
 
             {/* Stats - spread evenly across available space */}
-            <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+            <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
               {/* Net Balance */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Balance</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
                 </span>
               </div>
 
               {/* 30D Yield */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">30D Yield</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
                 </span>
               </div>
 
               {/* Net APY */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Net APY</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {hasPositions && metrics.netApyPercent != null ? formatSignedPercent(metrics.netApyPercent) : "—"}
                 </span>
               </div>
 
               {/* Utilization */}
-              <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="group/util hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Utilization</span>
                 {hasPositions ? (
                   <HealthStatus utilizationPercentage={metrics.avgUtilization} />
                 ) : (
-                  <span className="text-sm font-mono font-bold tabular-nums text-base-content/40">—</span>
+                  <span className="text-base-content/40 font-mono text-sm font-bold tabular-nums">—</span>
                 )}
               </div>
             </div>
 
             {/* Markets Toggle + Collapse */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
+            <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
               <button
                 className="btn btn-sm btn-ghost gap-1.5"
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
               >
-                <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                {isMarketsOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
+                <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
+                {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
               </button>
               <ChevronDownIcon
-                className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                className={`text-base-content/40 size-5 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`}
               />
             </div>
           </div>
@@ -317,57 +346,29 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
       </div>
 
       {/* Markets Section - expandable */}
-      <AnimatePresence initial={false}>
-        {isMarketsOpen && !isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
-              <div className="card-body p-4">
-                <MorphoMarketsSection
-                  markets={markets}
-                  marketPairs={marketPairs}
-                  isLoading={isLoadingMarkets}
-                  chainId={effectiveChainId}
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>
+        <MorphoMarketsSection
+          markets={markets}
+          marketPairs={marketPairs}
+          isLoading={isLoadingMarkets}
+          chainId={effectiveChainId}
+        />
+      </CollapsibleSection>
 
       {/* Positions Container - collapsible with animation */}
-      <AnimatePresence initial={false}>
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
-              <div className="card-body p-4">
-                <MorphoPositionsSection
-                  title="Your Positions"
-                  rows={rows}
-                  markets={markets}
-                  userAddress={connectedAddress}
-                  hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
-                  isUpdating={isUpdating}
-                  chainId={chainId}
-                  yieldsByAddress={yieldsByAddress}
-                  yieldsBySymbol={yieldsBySymbol}
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CollapsibleSection isOpen={!isCollapsed}>
+        <MorphoPositionsSection
+          title="Your Positions"
+          rows={rows}
+          markets={markets}
+          userAddress={connectedAddress}
+          hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
+          isUpdating={isUpdating}
+          chainId={chainId}
+          yieldsByAddress={yieldsByAddress}
+          yieldsBySymbol={yieldsBySymbol}
+        />
+      </CollapsibleSection>
     </div>
   );
 };

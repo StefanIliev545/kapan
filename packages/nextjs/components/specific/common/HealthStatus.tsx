@@ -29,19 +29,19 @@ export const HealthStatus: FC<HealthStatusProps> = ({ utilizationPercentage, mob
   return (
     <>
       {/* Desktop: bar + percentage */}
-      <div className="hidden sm:flex items-center gap-2.5">
-        <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
+      <div className="hidden items-center gap-2.5 sm:flex">
+        <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
           <div
-            className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`}
+            className={`h-full ${colors.bar} rounded-full shadow-sm transition-all duration-500 ${colors.glow}`}
             style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
           />
         </div>
-        <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
+        <span className={`font-mono text-xs font-semibold tabular-nums ${colors.text}`}>
           {utilizationPercentage.toFixed(0)}%
         </span>
       </div>
       {/* Mobile: just percentage */}
-      <span className={`sm:hidden text-sm font-mono font-bold tabular-nums ${colors.text}`}>
+      <span className={`font-mono text-sm font-bold tabular-nums sm:hidden ${colors.text}`}>
         {utilizationPercentage.toFixed(0)}%
       </span>
     </>

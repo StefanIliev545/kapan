@@ -39,7 +39,7 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
     const isLimitDisabled = !limitReady;
 
     return (
-        <div className={`flex gap-1 bg-base-200 p-1 rounded-lg w-fit mx-auto ${className}`}>
+        <div className={`bg-base-200 mx-auto flex w-fit gap-1 rounded-lg p-1 ${className}`}>
             <button
                 onClick={() => onChange("market")}
                 className={`${buttonClass} ${value === "market" ? "btn-primary" : "btn-ghost"}`}
@@ -52,7 +52,7 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
                 disabled={isLimitDisabled}
                 title={isLimitDisabled ? limitDisabledReason : "Execute via CoW Protocol limit order"}
             >
-                <ClockIcon className="w-3 h-3 mr-1" />
+                <ClockIcon className="mr-1 size-3" />
                 Limit
             </button>
         </div>

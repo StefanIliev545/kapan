@@ -274,8 +274,8 @@ export const TokenBalanceWithUsd: FC<TokenBalanceWithUsdProps> = ({
   if (primaryDisplay === "usd") {
     return (
       <div className={`flex flex-col ${className}`}>
-        <span className="font-mono tabular-nums font-semibold">{usdFormatted}</span>
-        <span className="text-xs text-base-content/60 font-mono">
+        <span className="font-mono font-semibold tabular-nums">{usdFormatted}</span>
+        <span className="text-base-content/60 font-mono text-xs">
           {tokenFormatted} {symbol}
         </span>
       </div>
@@ -284,10 +284,10 @@ export const TokenBalanceWithUsd: FC<TokenBalanceWithUsdProps> = ({
 
   return (
     <div className={`flex flex-col ${className}`}>
-      <span className="font-mono tabular-nums font-semibold">
+      <span className="font-mono font-semibold tabular-nums">
         {tokenFormatted} {symbol}
       </span>
-      <span className="text-xs text-base-content/60 font-mono">{usdFormatted}</span>
+      <span className="text-base-content/60 font-mono text-xs">{usdFormatted}</span>
     </div>
   );
 };

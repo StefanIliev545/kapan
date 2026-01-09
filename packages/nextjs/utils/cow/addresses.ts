@@ -313,7 +313,7 @@ export function getCowFlashLoanLender(chainId: number): string | undefined {
  * @param provider - Flash loan provider name (aaveV3, balancerV2)
  * @returns Lender address or undefined
  */
-export function getFlashLoanLender(chainId: number, provider: string = "aaveV3"): string | undefined {
+export function getFlashLoanLender(chainId: number, provider = "aaveV3"): string | undefined {
   return FLASH_LOAN_LENDERS[chainId]?.[provider];
 }
 
@@ -322,7 +322,7 @@ export function getFlashLoanLender(chainId: number, provider: string = "aaveV3")
  * @param provider - Flash loan provider name
  * @returns Fee in basis points
  */
-export function getFlashLoanFeeBps(provider: string = "aaveV3"): number {
+export function getFlashLoanFeeBps(provider = "aaveV3"): number {
   return FLASH_LOAN_FEES[provider] ?? 5; // Default to 5 bps
 }
 
@@ -332,7 +332,7 @@ export function getFlashLoanFeeBps(provider: string = "aaveV3"): number {
  * @param provider - Flash loan provider
  * @returns Fee amount
  */
-export function calculateFlashLoanFee(amount: bigint, provider: string = "aaveV3"): bigint {
+export function calculateFlashLoanFee(amount: bigint, provider = "aaveV3"): bigint {
   const feeBps = getFlashLoanFeeBps(provider);
   return (amount * BigInt(feeBps)) / 10000n;
 }

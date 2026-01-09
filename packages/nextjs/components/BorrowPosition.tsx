@@ -1,5 +1,5 @@
 import React, { FC, useMemo } from "react";
-import { Address, encodeAbiParameters } from "viem";
+import { Address } from "viem";
 import { MinusIcon, PlusIcon, ArrowPathIcon, XMarkIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
@@ -12,7 +12,9 @@ import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModa
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { SwapAsset } from "./modals/SwapModalShell";
 import { BasePosition, usePositionState } from "./common/BasePosition";
+import { PositionInfoDropdown } from "./common/PositionInfoDropdown";
 import { SegmentedAction } from "./common/SegmentedActionBar";
+import { buildModalTokenInfo, encodeCompoundContext } from "./modals/common/modalUtils";
 import { useModal } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { PositionManager } from "~~/utils/position";
@@ -130,6 +132,18 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     [name, tokenAddress, tokenDecimals, tokenBalanceBn],
   );
 
+  // Shared token info for modals - eliminates duplicate token prop construction
+  const modalTokenInfo = useMemo(
+    () => buildModalTokenInfo({ name, icon, tokenAddress, currentRate, usdPrice, tokenDecimals }),
+    [name, icon, tokenAddress, currentRate, usdPrice, tokenDecimals],
+  );
+
+  // Computed context for Compound protocol - used by CloseWithCollateral and DebtSwap modals
+  const compoundAwareContext = useMemo(
+    () => encodeCompoundContext(protocolName, tokenAddress as Address, protocolContext),
+    [protocolName, tokenAddress, protocolContext],
+  );
+
   // Use shared position state hook
   const { isWalletConnected, hasBalance, disabledMessage } = usePositionState({
     networkType,
@@ -225,7 +239,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     actions.push({
       key: "repay",
       label: "Repay",
-      icon: <MinusIcon className="w-4 h-4" />,
+      icon: <MinusIcon className="size-4" />,
       onClick: repayModal.open,
       disabled: !hasBalance || !isWalletConnected || actionsDisabled,
       title: !isWalletConnected
@@ -241,7 +255,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     actions.push({
       key: "borrow",
       label: borrowCtaLabel ?? "Borrow",
-      icon: <PlusIcon className="w-4 h-4" />,
+      icon: <PlusIcon className="size-4" />,
       onClick: handleBorrowClick,
       disabled: !isWalletConnected || actionsDisabled,
       title: !isWalletConnected
@@ -257,7 +271,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     actions.push({
       key: "swap",
       label: "Swap",
-      icon: <ArrowPathIcon className="w-4 h-4" />,
+      icon: <ArrowPathIcon className="size-4" />,
       onClick: handleSwapClick,
       disabled: !hasBalance || !isWalletConnected || actionsDisabled,
       title: !isWalletConnected
@@ -274,7 +288,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     actions.push({
       key: "move",
       label: "Move",
-      icon: <ArrowRightIcon className="w-4 h-4" />,
+      icon: <ArrowRightIcon className="size-4" />,
       onClick: moveModal.open,
       disabled: !hasBalance || !isWalletConnected || actionsDisabled,
       title: !isWalletConnected
@@ -291,7 +305,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     actions.push({
       key: "close",
       label: "Close",
-      icon: <XMarkIcon className="w-4 h-4" />,
+      icon: <XMarkIcon className="size-4" />,
       onClick: handleCloseClick,
       disabled: !hasBalance || !isWalletConnected || actionsDisabled,
       title: !isWalletConnected
@@ -307,7 +321,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   // Quick "Move" badge shown in header when better rate available
   const headerQuickAction = hasBetterRate && showMoveButton ? (
     <button
-      className={`px-2 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
+      className={`flex-shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
         !isWalletConnected || actionsDisabled
           ? "bg-base-300 text-base-content/50 cursor-not-allowed"
           : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
@@ -334,57 +348,36 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
 
   // Collateral view content shown when expanded
   const collateralContent = collateralView ? (
-    <div className="overflow-hidden transition-all duration-300 mt-2">
+    <div className="mt-2 overflow-hidden transition-all duration-300">
       <div className="py-2">{collateralViewWithVisibility}</div>
     </div>
   ) : null;
 
-  // Custom info button with collateral value
+  // Custom info button with collateral value - uses PositionInfoDropdown
+  const collateralValueContent = collateralValue ? (
+    <>
+      <p className="text-base-content/70">Collateral Value:</p>
+      <p>
+        <FiatBalance
+          tokenAddress={tokenAddress}
+          rawValue={BigInt(Math.round(collateralValue * 10 ** 8))}
+          price={BigInt(10 ** 8)}
+          decimals={8}
+          tokenSymbol={name}
+          isNegative={false}
+        />
+      </p>
+    </>
+  ) : null;
+
   const customInfoButton = infoButton ?? (showInfoDropdown ? (
-    <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0">
-      <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-        </svg>
-      </div>
-      <div
-        tabIndex={0}
-        className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-        style={{
-          right: "auto",
-          transform: "translateX(-50%)",
-          left: "50%",
-          borderRadius: "4px",
-        }}
-      >
-        <div className="card-body p-3">
-          <h3 className="card-title text-sm">{name} Details</h3>
-          <div className="text-xs space-y-1">
-            <p className="text-base-content/70">Contract Address:</p>
-            <p className="font-mono break-all">{tokenAddress}</p>
-            <p className="text-base-content/70">Protocol:</p>
-            <p>{protocolName}</p>
-            <p className="text-base-content/70">Type:</p>
-            <p className="capitalize">Borrow Position</p>
-            {collateralValue && (
-              <>
-                <p className="text-base-content/70">Collateral Value:</p>
-                <p>
-                  <FiatBalance
-                    tokenAddress={tokenAddress}
-                    rawValue={BigInt(Math.round(collateralValue * 10 ** 8))}
-                    price={BigInt(10 ** 8)}
-                    decimals={8}
-                    tokenSymbol={name}
-                    isNegative={false}
-                  />
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <PositionInfoDropdown
+      name={name}
+      tokenAddress={tokenAddress}
+      protocolName={protocolName}
+      positionType="Borrow Position"
+      extraContent={collateralValueContent}
+    />
   ) : null);
 
   return (
@@ -443,14 +436,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <BorrowModalStark
             isOpen={borrowModal.isOpen}
             onClose={borrowModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={modalTokenInfo}
             protocolName={protocolName}
             currentDebt={debtAmount}
             position={position}
@@ -459,14 +445,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <RepayModalStark
             isOpen={repayModal.isOpen}
             onClose={repayModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={modalTokenInfo}
             protocolName={protocolName}
             debtBalance={tokenBalanceBn}
             position={position}
@@ -496,14 +475,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <BorrowModal
             isOpen={borrowModal.isOpen}
             onClose={borrowModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={modalTokenInfo}
             protocolName={protocolName}
             currentDebt={debtAmount}
             position={position}
@@ -513,14 +485,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           <RepayModal
             isOpen={repayModal.isOpen}
             onClose={repayModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={modalTokenInfo}
             protocolName={protocolName}
             debtBalance={tokenBalanceBn}
             position={position}
@@ -552,11 +517,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtPrice={tokenPrice}
             debtBalance={tokenBalanceBn}
             availableCollaterals={availableAssetsList as SwapAsset[]}
-            context={
-              protocolName.toLowerCase().includes("compound")
-                ? encodeAbiParameters([{ type: "address" }], [tokenAddress as Address]) as `0x${string}`
-                : protocolContext
-            }
+            context={compoundAwareContext}
           />
           <DebtSwapEvmModal
             isOpen={debtSwapModal.isOpen}
@@ -570,11 +531,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtFromDecimals={tokenDecimals || 18}
             debtFromPrice={tokenPrice}
             availableAssets={availableAssetsList as SwapAsset[]}
-            context={
-              protocolName.toLowerCase().includes("compound")
-                ? encodeAbiParameters([{ type: "address" }], [tokenAddress as Address]) as `0x${string}`
-                : protocolContext
-            }
+            context={compoundAwareContext}
           />
         </>
       )}

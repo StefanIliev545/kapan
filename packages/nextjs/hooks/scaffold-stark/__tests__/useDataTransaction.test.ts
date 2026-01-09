@@ -81,6 +81,7 @@ describe("useDataTransaction", () => {
   };
 
   beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op mock for tests
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     // Set up the mock for useTargetNetwork

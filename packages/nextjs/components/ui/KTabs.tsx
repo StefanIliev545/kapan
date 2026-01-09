@@ -15,7 +15,7 @@ export const KTabsList: React.FC<WithClassName<React.ComponentProps<typeof Tabs.
   return (
     <Tabs.List
       {...props}
-      className={`gap-2 justify-center flex-wrap mx-auto ${className ?? ""}`}
+      className={`mx-auto flex-wrap justify-center gap-2 ${className ?? ""}`}
     >
       {children}
     </Tabs.List>
@@ -30,7 +30,7 @@ export const KTabsTrigger: React.FC<WithClassName<React.ComponentProps<typeof Ta
   return (
     <Tabs.Trigger
       {...props}
-      className={`px-3 py-2 rounded-md text-base-content/80 hover:text-base-content border-t-2 border-transparent data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:font-semibold ${className ?? ""}`}
+      className={`text-base-content/80 hover:text-base-content data-[state=active]:text-primary data-[state=active]:border-primary rounded-md border-t-2 border-transparent px-3 py-2 data-[state=active]:font-semibold ${className ?? ""}`}
     >
       {children}
     </Tabs.Trigger>

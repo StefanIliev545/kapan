@@ -50,7 +50,7 @@ export const LoadingOverlay = ({
 }: LoadingOverlayProps) => (
   <div
     className={clsx(
-      "flex flex-col items-center justify-center w-full",
+      "flex w-full flex-col items-center justify-center",
       padded && "py-8",
       className
     )}
@@ -97,7 +97,7 @@ export const LoadingAlert = ({
   variant = "info",
   className,
 }: LoadingAlertProps) => (
-  <div className={clsx(`alert alert-${variant} text-xs py-2`, className)}>
+  <div className={clsx(`alert alert-${variant} py-2 text-xs`, className)}>
     <span className={clsx("loading loading-spinner", `loading-${size}`)} />
     <span>{message}</span>
   </div>
@@ -134,7 +134,7 @@ export const SkeletonCircle = ({
   size = "w-8 h-8",
   className,
 }: SkeletonCircleProps) => (
-  <div className={clsx("skeleton rounded-full flex-shrink-0", size, className)} />
+  <div className={clsx("skeleton flex-shrink-0 rounded-full", size, className)} />
 );
 
 /**
@@ -149,7 +149,7 @@ export const SkeletonCard = ({
   className,
   children,
 }: SkeletonCardProps) => (
-  <div className={clsx("card bg-base-100 shadow-md rounded-lg", className)}>
+  <div className={clsx("card bg-base-100 rounded-lg shadow-md", className)}>
     <div className="card-body p-4">
       {children || (
         <div className="flex flex-col gap-3">
@@ -179,9 +179,9 @@ export const SkeletonRow = ({
   lines = 2,
   className,
 }: SkeletonRowProps) => (
-  <div className={clsx("flex items-center gap-3 p-2 rounded-lg bg-base-200/30", className)}>
+  <div className={clsx("bg-base-200/30 flex items-center gap-3 rounded-lg p-2", className)}>
     {hasIcon && <SkeletonCircle />}
-    <div className="flex-1 flex flex-col gap-2">
+    <div className="flex flex-1 flex-col gap-2">
       {Array.from({ length: lines }).map((_, i) => (
         <SkeletonLine
           key={i}
@@ -214,7 +214,7 @@ export const ModalLoading = ({
     aria-live="polite"
   >
     <span className="loading loading-spinner loading-lg" />
-    <p className="mt-4 text-base-content/60">{message}</p>
+    <p className="text-base-content/60 mt-4">{message}</p>
     <span className="sr-only">{message}</span>
   </div>
 );
@@ -236,7 +236,7 @@ export const SectionLoading = ({
 }: SectionLoadingProps) => (
   <div className={clsx("w-full", className)} role="status" aria-busy="true">
     {title && (
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <SkeletonLine width="w-32" height="h-5" />
         <SkeletonLine width="w-8" height="h-5" rounded />
       </div>

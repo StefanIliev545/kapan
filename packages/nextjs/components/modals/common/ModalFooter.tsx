@@ -92,7 +92,7 @@ export const ModalFooter: FC<ModalFooterProps> = ({
       {leftContent && <div className="flex-1">{leftContent}</div>}
       {cancelLabel && onCancel && (
         <button
-          className="px-4 py-2 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
+          className="text-base-content/60 hover:text-base-content px-4 py-2 text-sm font-medium transition-colors"
           onClick={onCancel}
           disabled={isLoading}
         >
@@ -100,7 +100,7 @@ export const ModalFooter: FC<ModalFooterProps> = ({
         </button>
       )}
       <button
-        className="px-4 py-2 text-sm font-medium bg-base-content text-base-100 rounded-lg hover:bg-base-content/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="bg-base-content text-base-100 hover:bg-base-content/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         onClick={onAction}
         disabled={isActionDisabled || isLoading}
       >
@@ -134,16 +134,16 @@ export const ModalFooterConfirm: FC<{
   className = "",
 }) => {
   return (
-    <div className={`flex justify-end gap-3 mt-6 ${className}`}>
+    <div className={`mt-6 flex justify-end gap-3 ${className}`}>
       <button
-        className="px-4 py-2 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
+        className="text-base-content/60 hover:text-base-content px-4 py-2 text-sm font-medium transition-colors"
         onClick={onCancel}
         disabled={isLoading}
       >
         {cancelLabel}
       </button>
       <button
-        className="px-4 py-2 text-sm font-medium bg-base-content text-base-100 rounded-lg hover:bg-base-content/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="bg-base-content text-base-100 hover:bg-base-content/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         onClick={onConfirm}
         disabled={isConfirmDisabled || isLoading}
       >

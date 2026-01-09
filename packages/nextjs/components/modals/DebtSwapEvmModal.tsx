@@ -815,7 +815,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                     />
                     {/* Show USD values if available */}
                     {srcUSD !== null && dstUSD !== null && (
-                        <div className="flex justify-between text-xs text-base-content/60 px-1">
+                        <div className="text-base-content/60 flex justify-between px-1 text-xs">
                             <span>New debt: ~${srcUSD.toFixed(2)}</span>
                             <span>Repaying: ~${dstUSD.toFixed(2)}</span>
                         </div>
@@ -836,7 +836,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                     setSlippage={setSlippage}
                     showSlippage={true}
                     extraContent={cowQuote && selectedTo && (
-                        <div className="text-xs text-base-content/60 pt-1 border-t border-base-300">
+                        <div className="text-base-content/60 border-base-300 border-t pt-1 text-xs">
                             CoW quote: sell ~{formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals)} {selectedTo.symbol}
                             {limitOrderNewDebt > getCowQuoteSellAmount(cowQuote) && (
                                 <span className="text-warning ml-1">
@@ -854,7 +854,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const infoContent = executionType === "market" ? (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                <InformationCircleIcon className="size-5 flex-shrink-0" />
                 <span>
                     <strong>How Debt Swap Works</strong>
                     <br />
@@ -865,13 +865,13 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             <div className="space-y-4 px-2">
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">1</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Flash Loan</h4>
-                        <p className="text-xs text-base-content/70">We borrow the new debt asset via a Flash Loan.</p>
-                        <div className="mt-1 text-xs bg-base-200 p-1 rounded inline-block">
+                        <h4 className="text-sm font-medium">Flash Loan</h4>
+                        <p className="text-base-content/70 text-xs">We borrow the new debt asset via a Flash Loan.</p>
+                        <div className="bg-base-200 mt-1 inline-block rounded p-1 text-xs">
                             Provider: {selectedProvider?.name || "Auto"}
                         </div>
                     </div>
@@ -879,33 +879,33 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">2</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Swap</h4>
-                        <p className="text-xs text-base-content/70">We swap the new debt token for your current debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
+                        <h4 className="text-sm font-medium">Swap</h4>
+                        <p className="text-base-content/70 text-xs">We swap the new debt token for your current debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">3</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Repay Current Debt</h4>
-                        <p className="text-xs text-base-content/70">Your current debt is repaid with the swapped tokens.</p>
+                        <h4 className="text-sm font-medium">Repay Current Debt</h4>
+                        <p className="text-base-content/70 text-xs">Your current debt is repaid with the swapped tokens.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">4</div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">4</div>
                     </div>
                     <div>
-                        <h4 className="font-medium text-sm">Borrow New Debt</h4>
-                        <p className="text-xs text-base-content/70">New debt is borrowed to repay the Flash Loan.</p>
+                        <h4 className="text-sm font-medium">Borrow New Debt</h4>
+                        <p className="text-base-content/70 text-xs">New debt is borrowed to repay the Flash Loan.</p>
                     </div>
                 </div>
             </div>
@@ -914,7 +914,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         // Limit order info
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                <InformationCircleIcon className="size-5 flex-shrink-0" />
                 <span>
                     <strong>How Limit Order Debt Swap Works</strong>
                     <br />
@@ -925,44 +925,44 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             <div className="space-y-4 px-2">
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">1</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Create Order</h4>
-                        <p className="text-xs text-base-content/70">Your limit order is created and submitted to CoW Protocol.</p>
+                        <h4 className="text-sm font-medium">Create Order</h4>
+                        <p className="text-base-content/70 text-xs">Your limit order is created and submitted to CoW Protocol.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">2</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Solver Competition</h4>
-                        <p className="text-xs text-base-content/70">Solvers compete to fill your order at the best price.</p>
+                        <h4 className="text-sm font-medium">Solver Competition</h4>
+                        <p className="text-base-content/70 text-xs">Solvers compete to fill your order at the best price.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">3</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Flash Loan + Swap</h4>
-                        <p className="text-xs text-base-content/70">Solver takes flash loan, swaps new debt for old debt.</p>
+                        <h4 className="text-sm font-medium">Flash Loan + Swap</h4>
+                        <p className="text-base-content/70 text-xs">Solver takes flash loan, swaps new debt for old debt.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">4</div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">4</div>
                     </div>
                     <div>
-                        <h4 className="font-medium text-sm">Repay + Borrow</h4>
-                        <p className="text-xs text-base-content/70">Old debt repaid, new debt borrowed to cover flash loan. All atomic!</p>
+                        <h4 className="text-sm font-medium">Repay + Borrow</h4>
+                        <p className="text-base-content/70 text-xs">Old debt repaid, new debt borrowed to cover flash loan. All atomic!</p>
                     </div>
                 </div>
             </div>
@@ -992,7 +992,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 />
             )}
             {executionType === "limit" && isCowQuoteLoading && (
-                <div className="alert alert-info text-xs py-2">
+                <div className="alert alert-info py-2 text-xs">
                     <span className="loading loading-spinner loading-xs"></span>
                     <span>Fetching CoW quote...</span>
                 </div>

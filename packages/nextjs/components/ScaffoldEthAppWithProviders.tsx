@@ -73,7 +73,7 @@ const ScaffoldEthApp = ({
 
   const isAppSubdomain = hostname?.startsWith("app.") ?? false;
   const isAppExperience = pathname.startsWith("/app") || pathname.startsWith("/markets") || pathname.startsWith("/orders") || isAppSubdomain;
-  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/about") || pathname.startsWith("/automate");
+  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/about");
 
   const renderHeader = () => {
     if (isAppExperience) {
@@ -90,9 +90,9 @@ const ScaffoldEthApp = ({
   return (
     <SelectedGasTokenProvider>
       <LandingSectionProvider>
-        <div className={`flex flex-col min-h-screen `}>
+        <div className={`flex min-h-screen flex-col `}>
           {renderHeader()}
-          <main className="relative flex flex-col flex-1">{children}</main>
+          <main className="relative flex flex-1 flex-col">{children}</main>
           <Footer />
         </div>
         {!isLandingRoute && <FloatingSocials />}

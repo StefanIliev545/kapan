@@ -39,12 +39,12 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
   showCloseButton = true,
 }) => {
   return (
-    <div className={`flex items-center justify-between mb-4 pb-3 border-b border-base-200 ${className}`}>
+    <div className={`border-base-200 mb-4 flex items-center justify-between border-b pb-3 ${className}`}>
       <div className="flex items-center gap-4">
         <div>
-          <h3 className="font-semibold text-lg text-base-content">{title}</h3>
+          <h3 className="text-base-content text-lg font-semibold">{title}</h3>
           {subtitle && (
-            <span className="text-xs text-base-content/50 uppercase tracking-wider">{subtitle}</span>
+            <span className="text-base-content/50 text-xs uppercase tracking-wider">{subtitle}</span>
           )}
         </div>
         {centerContent}
@@ -52,10 +52,10 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
       {showCloseButton && (
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
+          className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors"
           aria-label="Close modal"
         >
-          <XMarkIcon className="w-5 h-5" />
+          <XMarkIcon className="size-5" />
         </button>
       )}
     </div>
@@ -74,20 +74,20 @@ export const ModalHeaderMinimal: FC<Omit<ModalHeaderProps, "centerContent">> = (
   showCloseButton = true,
 }) => {
   return (
-    <div className={`flex justify-between items-center mb-3 ${className}`}>
+    <div className={`mb-3 flex items-center justify-between ${className}`}>
       <div>
-        <h3 className="font-semibold text-lg text-base-content">{title}</h3>
+        <h3 className="text-base-content text-lg font-semibold">{title}</h3>
         {subtitle && (
-          <span className="text-xs text-base-content/50">{subtitle}</span>
+          <span className="text-base-content/50 text-xs">{subtitle}</span>
         )}
       </div>
       {showCloseButton && (
         <button
-          className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
+          className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors"
           onClick={onClose}
           aria-label="Close modal"
         >
-          <XMarkIcon className="w-5 h-5" />
+          <XMarkIcon className="size-5" />
         </button>
       )}
     </div>

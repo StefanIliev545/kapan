@@ -237,12 +237,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex items-center gap-0.5 p-1 bg-base-200/50 rounded-lg border border-base-content/10"
+      className="bg-base-200/50 border-base-content/10 relative inline-flex items-center gap-0.5 rounded-lg border p-1"
     >
       {/* Animated sliding indicator */}
       {indicatorStyle && (
         <div
-          className="absolute top-1 bottom-1 bg-base-content/10 rounded-md transition-all duration-300 ease-out"
+          className="bg-base-content/10 absolute inset-y-1 rounded-md transition-all duration-300 ease-out"
           style={{
             left: indicatorStyle.left,
             width: indicatorStyle.width,
@@ -261,7 +261,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
             type="button"
             aria-pressed={isActive}
             className={`
-              relative z-10 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-md transition-colors duration-200 min-w-[90px]
+              relative z-10 flex min-w-[90px] items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200
               ${isActive
                 ? "text-base-content"
                 : "text-base-content/35 hover:text-base-content/60"
@@ -269,7 +269,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
             `}
             onClick={() => handleNetworkChange(network.id)}
           >
-            <div className="w-4 h-4 relative shrink-0">
+            <div className="relative size-4 shrink-0">
               <Image
                 src={getNetworkOptionLogo(network, isDarkMode)}
                 alt={network.name}
@@ -290,7 +290,7 @@ export const NetworkFilter: React.FC<NetworkFilterProps> = (props) => {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
+        <div className="flex items-center gap-4 rounded-lg bg-transparent p-4">
           <div className="flex items-center gap-2">
             {props.networks.map((network) => (
               <button
@@ -298,9 +298,9 @@ export const NetworkFilter: React.FC<NetworkFilterProps> = (props) => {
                 type="button"
                 disabled
                 // keep pointer-events enabled for other parts of the page:
-                className="btn btn-sm normal-case inline-flex items-center gap-2 btn-outline opacity-60"
+                className="btn btn-sm btn-outline inline-flex items-center gap-2 normal-case opacity-60"
               >
-                <div className="w-5 h-5 relative">
+                <div className="relative size-5">
                   <Image
                     src={network.logo}
                     alt={network.name}

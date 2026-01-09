@@ -9,7 +9,7 @@ type TabHeadingProps = {
 
 export const TabHeading = ({ children, className }: TabHeadingProps) => {
   return (
-    <Heading as="h3" size="6" weight="light" className={`font-display mb-3 text-base-content ${className ?? ""}`}>
+    <Heading as="h3" size="6" weight="light" className={`font-display text-base-content mb-3 ${className ?? ""}`}>
       {children}
     </Heading>
   );

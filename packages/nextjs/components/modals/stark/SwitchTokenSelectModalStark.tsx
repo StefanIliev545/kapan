@@ -45,31 +45,31 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold">{title}</h3>
-          <div className="flex items-center gap-2 text-xs text-base-content/70">
+          <div className="text-base-content/70 flex items-center gap-2 text-xs">
             <span className="opacity-70">Current</span>
-            <Image src={current.icon} alt={current.name} width={16} height={16} className="w-4 h-4" />
+            <Image src={current.icon} alt={current.name} width={16} height={16} className="size-4" />
             <span className="font-medium">{current.symbol}</span>
           </div>
         </div>
 
         <div className="relative">
-          <div className="border border-base-300 divide-y divide-base-300 rounded-none max-h-80 overflow-y-auto" aria-label="Scrollable token options list">
+          <div className="border-base-300 divide-base-300 max-h-80 divide-y overflow-y-auto rounded-none border" aria-label="Scrollable token options list">
             {options.map(opt => { const o = resolveDisplay(opt); return (
               <button
                 key={o.address}
-                className="w-full flex items-center justify-between p-3 hover:bg-base-200/60 transition-colors"
+                className="hover:bg-base-200/60 flex w-full items-center justify-between p-3 transition-colors"
                 onClick={() => onSelect(o)}
               >
                 <div className="flex items-center gap-2 opacity-80">
-                  <Image src={current.icon} alt={current.name} width={16} height={16} className="w-4 h-4" />
+                  <Image src={current.icon} alt={current.name} width={16} height={16} className="size-4" />
                   <span className="text-xs">{current.symbol}</span>
                 </div>
-                <div className="mx-3 text-base-content/50">→</div>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Image src={o.icon} alt={o.name} width={16} height={16} className="w-4 h-4" />
-                  <div className="flex flex-col items-start min-w-0">
-                    <span className="text-sm font-medium truncate">{o.name}</span>
-                    <span className="text-[11px] text-base-content/60 truncate">{o.symbol}</span>
+                <div className="text-base-content/50 mx-3">→</div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <Image src={o.icon} alt={o.name} width={16} height={16} className="size-4" />
+                  <div className="flex min-w-0 flex-col items-start">
+                    <span className="truncate text-sm font-medium">{o.name}</span>
+                    <span className="text-base-content/60 truncate text-[11px]">{o.symbol}</span>
                   </div>
                 </div>
               </button>
@@ -77,14 +77,14 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
           </div>
           {showScrollHint && (
             <>
-              <div className="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-base-100 to-transparent" />
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-base-100 to-transparent" />
+              <div className="from-base-100 pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b to-transparent" />
+              <div className="from-base-100 pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t to-transparent" />
             </>
           )}
         </div>
 
         {showScrollHint && (
-          <div className="text-[11px] text-base-content/60 text-center">Scroll to see more options</div>
+          <div className="text-base-content/60 text-center text-[11px]">Scroll to see more options</div>
         )}
       </div>
     </BaseModal>

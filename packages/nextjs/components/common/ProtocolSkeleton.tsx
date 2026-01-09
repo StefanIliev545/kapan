@@ -3,6 +3,33 @@
 import * as React from "react";
 import { SkeletonLine, SkeletonCircle, SkeletonRow } from "./Loading";
 
+type SkeletonCardProps = {
+  /** Unique key prefix for skeleton rows */
+  keyPrefix: string;
+  /** Number of skeleton rows to display */
+  rowCount: number;
+};
+
+function SkeletonCard({ keyPrefix, rowCount }: SkeletonCardProps) {
+  return (
+    <div className="h-full">
+      <div className="card bg-base-100 h-full rounded-lg shadow-md">
+        <div className="card-body p-4">
+          <div className="border-base-200 mb-2 flex items-center justify-between border-b pb-2">
+            <SkeletonLine width="w-32" height="h-5" />
+            <SkeletonCircle size="w-8 h-5" />
+          </div>
+          <div className="space-y-3 pt-2">
+            {Array.from({ length: rowCount }).map((_, i) => (
+              <SkeletonRow key={`${keyPrefix}-${i}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type ProtocolSkeletonProps = {
   /** Centre the whole skeleton (useful for very small panes) */
   centered?: boolean;
@@ -32,11 +59,11 @@ export function ProtocolSkeleton({
       ].join(" ")}
     >
       {/* Protocol Header Card - Full width */}
-      <div className="card bg-base-100 shadow-lg rounded-lg">
+      <div className="card bg-base-100 rounded-lg shadow-lg">
         <div className="card-body p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+          <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-3">
             <div className="flex items-center gap-3">
-              <SkeletonLine width="w-12" height="h-12" className="rounded-lg flex-shrink-0" />
+              <SkeletonLine width="w-12" height="h-12" className="flex-shrink-0 rounded-lg" />
               <div className="flex flex-col gap-2">
                 <SkeletonLine width="w-32" height="h-6" />
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -53,40 +80,11 @@ export function ProtocolSkeleton({
       </div>
 
       {/* Positions Container: Two cards side by side */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {/* Supplied Assets Card */}
-        <div className="h-full">
-          <div className="card bg-base-100 shadow-md h-full rounded-lg">
-            <div className="card-body p-4">
-              <div className="flex items-center justify-between border-b border-base-200 pb-2 mb-2">
-                <SkeletonLine width="w-32" height="h-5" />
-                <SkeletonCircle size="w-8 h-5" />
-              </div>
-              <div className="pt-2 space-y-3">
-                {Array.from({ length: positionsPerCard }).map((_, i) => (
-                  <SkeletonRow key={`supplied-${i}`} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
+        <SkeletonCard keyPrefix="supplied" rowCount={positionsPerCard} />
         {/* Borrowed Assets Card */}
-        <div className="h-full">
-          <div className="card bg-base-100 shadow-md h-full rounded-lg">
-            <div className="card-body p-4">
-              <div className="flex items-center justify-between border-b border-base-200 pb-2 mb-2">
-                <SkeletonLine width="w-32" height="h-5" />
-                <SkeletonCircle size="w-8 h-5" />
-              </div>
-              <div className="pt-2 space-y-3">
-                {Array.from({ length: positionsPerCard }).map((_, i) => (
-                  <SkeletonRow key={`borrowed-${i}`} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <SkeletonCard keyPrefix="borrowed" rowCount={positionsPerCard} />
       </div>
 
       <span className="sr-only">Loading...</span>

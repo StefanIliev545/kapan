@@ -263,7 +263,7 @@ export function useCowOrder() {
   /**
    * Set delegation to OrderManager (required for CoW orders)
    */
-  const setDelegation = useCallback(async (approved: boolean = true): Promise<string | undefined> => {
+  const setDelegation = useCallback(async (approved = true): Promise<string | undefined> => {
     if (!userAddress || !orderManagerAddress || !walletClient || !routerContract) {
       notification.error("Wallet not connected or contracts not deployed");
       return undefined;

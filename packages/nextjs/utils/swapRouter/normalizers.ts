@@ -146,7 +146,7 @@ export function calculateRequiredInput(
   unitQuote: NormalizedQuote,
   sellDecimals: number,
   buyDecimals: number,
-  slippageBps: bigint = 0n
+  slippageBps = 0n
 ): bigint {
   if (unitQuote.buyAmount === 0n) return 0n;
 

@@ -217,37 +217,37 @@ export function PendingOrdersDrawer() {
       {showButton && (
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="fixed bottom-4 right-4 z-50 h-12 px-4 bg-primary text-primary-content rounded-lg shadow-lg flex items-center gap-2 hover:bg-primary/90 transition-colors"
+          className="bg-primary text-primary-content hover:bg-primary/90 fixed bottom-4 right-4 z-50 flex h-12 items-center gap-2 rounded-lg px-4 shadow-lg transition-colors"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
           <span className="font-medium">Orders</span>
           {activeCount > 0 && (
-            <span className="bg-primary-content text-primary text-xs font-bold px-1.5 py-0.5 rounded">{activeCount}</span>
+            <span className="bg-primary-content text-primary rounded px-1.5 py-0.5 text-xs font-bold">{activeCount}</span>
           )}
         </button>
       )}
 
       {/* Drawer */}
       {isOpen && (
-        <div className="fixed bottom-20 right-4 z-50 w-[420px] max-h-[75vh] bg-base-100 rounded-lg shadow-2xl border border-base-300 overflow-hidden flex flex-col">
+        <div className="bg-base-100 border-base-300 fixed bottom-20 right-4 z-50 flex max-h-[75vh] w-[420px] flex-col overflow-hidden rounded-lg border shadow-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-base-200">
+          <div className="border-base-200 flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="font-semibold">Orders</span>
               <button 
                 onClick={fetchOrders} 
                 disabled={isLoading}
-                className="p-1 hover:bg-base-200 rounded transition-colors"
+                className="hover:bg-base-200 rounded p-1 transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-base-content/50 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-4${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
             </div>
-            <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-base-200 rounded transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button onClick={() => setIsOpen(false)} className="hover:bg-base-200 rounded p-1 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="text-base-content/50 size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -260,16 +260,16 @@ export function PendingOrdersDrawer() {
                 <span className="loading loading-spinner loading-md"></span>
               </div>
             ) : recentOrders.length === 0 ? (
-              <div className="text-center py-16 text-base-content/50">
+              <div className="text-base-content/50 py-16 text-center">
                 <p className="text-sm">{orders.length > 0 ? 'No recent orders' : 'No orders yet'}</p>
                 {hasOlderOrders && (
-                  <Link href="/orders" className="text-primary text-sm hover:underline mt-2 inline-block">
+                  <Link href="/orders" className="text-primary mt-2 inline-block text-sm hover:underline">
                     View all orders
                   </Link>
                 )}
               </div>
             ) : (
-              <div className="divide-y divide-base-200">
+              <div className="divide-base-200 divide-y">
                 {recentOrders.map((order) => {
                   const { orderHash, context } = order;
                   const { params, status, executedAmount, iterationCount, createdAt } = context;
@@ -308,12 +308,12 @@ export function PendingOrdersDrawer() {
                   const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
 
                   return (
-                    <div key={orderHash} className={`px-4 py-3 hover:bg-base-50 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
+                    <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
                       {/* Row 0: Operation type + Protocol */}
                       {(operationType !== "unknown" || protocolName) && (
-                        <div className="flex items-center gap-2 mb-1.5">
+                        <div className="mb-1.5 flex items-center gap-2">
                           {operationType !== "unknown" && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${operationColorClass}`}>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${operationColorClass}`}>
                               {operationLabel}
                             </span>
                           )}
@@ -328,21 +328,21 @@ export function PendingOrdersDrawer() {
                                   className="rounded-sm"
                                 />
                               )}
-                              <span className="text-[10px] text-base-content/50">{protocolName}</span>
+                              <span className="text-base-content/50 text-[10px]">{protocolName}</span>
                             </div>
                           )}
                         </div>
                       )}
                       
                       {/* Row 1: Token pair, status, time */}
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center -space-x-1">
-                            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={24} height={24} className="rounded-full ring-2 ring-base-100" />
-                            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={24} height={24} className="rounded-full ring-2 ring-base-100" />
+                            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
+                            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
                           </div>
-                          <span className="font-medium text-sm">{sellSymbol} → {buySymbol}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          <span className="text-sm font-medium">{sellSymbol} → {buySymbol}</span>
+                          <span className={`rounded px-1.5 py-0.5 text-xs ${
                             isActive ? 'bg-warning/20 text-warning' :
                             isCompleted ? 'bg-success/20 text-success' :
                             'bg-error/20 text-error'
@@ -350,25 +350,25 @@ export function PendingOrdersDrawer() {
                             {isActive ? 'Active' : isCompleted ? 'Done' : 'Cancelled'}
                           </span>
                         </div>
-                        <span className="text-xs text-base-content/40">{timeAgo(createdAt, true)}</span>
+                        <span className="text-base-content/40 text-xs">{timeAgo(createdAt, true)}</span>
                       </div>
 
                       {/* Row 2: Progress bar */}
                       <div className="mb-2">
-                        <div className="h-1 bg-base-200 w-full">
+                        <div className="bg-base-200 h-1 w-full">
                           <div 
                             className={`h-full transition-all ${isActive ? 'bg-primary' : 'bg-success'}`}
                             style={{ width: `${progressPercent}%` }}
                           />
                         </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-xs text-base-content/40">{completedChunks}/{totalChunks} chunks</span>
-                          <span className="text-xs text-base-content/50 font-medium">{progressPercent.toFixed(0)}%</span>
+                        <div className="mt-1 flex justify-between">
+                          <span className="text-base-content/40 text-xs">{completedChunks}/{totalChunks} chunks</span>
+                          <span className="text-base-content/50 text-xs font-medium">{progressPercent.toFixed(0)}%</span>
                         </div>
                       </div>
 
                       {/* Row 3: Amounts */}
-                      <div className="flex justify-between text-sm mb-2">
+                      <div className="mb-2 flex justify-between text-sm">
                         <div>
                           <span className="text-base-content/50">Sell </span>
                           <span className="font-medium">{formatAmount(params.preTotalAmount, sellDecimals)}</span>
@@ -391,7 +391,7 @@ export function PendingOrdersDrawer() {
 
                       {/* Row 4: Surplus (if any) */}
                       {hasSurplus && executionSummary && (
-                        <div className="text-sm text-success mb-2">
+                        <div className="text-success mb-2 text-sm">
                           <span>+{formatAmount(executionSummary.surplusAmount, buyDecimals)} {buySymbol}</span>
                           <span className="text-success/70 ml-1">(+{executionSummary.surplusPercentage.toFixed(2)}%)</span>
                           <span className="ml-2"><UsdValue symbol={buySymbol} amount={surplusAmountNum} /></span>
@@ -422,7 +422,7 @@ export function PendingOrdersDrawer() {
 
           {/* Footer */}
           {recentOrders.length > 0 && (
-            <div className="px-4 py-2 border-t border-base-200 text-xs text-base-content/40 flex justify-between">
+            <div className="border-base-200 text-base-content/40 flex justify-between border-t px-4 py-2 text-xs">
               <span>{activeCount} active{hasOlderOrders ? ` · ${orders.length - recentOrders.length} older` : ''}</span>
               <Link href="/orders" className="text-primary hover:underline">
                 View all

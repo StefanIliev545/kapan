@@ -1,4 +1,5 @@
-import { useCallback, ReactNode } from "react";
+import { useCallback } from "react";
+import type { ReactNode } from "react";
 import type { Call } from "starknet";
 import type { TokenInfo } from "../TokenActionModal";
 import type { Network } from "~~/hooks/useTokenBalance";
@@ -76,6 +77,13 @@ export interface UseBorrowModalReturn {
 }
 
 /**
+ * Extended return type for EVM borrow modal that includes batching preference
+ */
+export interface UseEvmBorrowModalReturn extends UseBorrowModalReturn {
+  batchingPreference: ReturnType<typeof useEvmTransactionFlow>["batchingPreference"];
+}
+
+/**
  * Normalizes token decimals using the provided value or fetched balance decimals
  */
 function normalizeTokenDecimals(token: TokenInfo, fetchedDecimals?: number): TokenInfo {
@@ -91,7 +99,7 @@ function useEvmBorrowModal(
   config: BorrowModalEvmConfig,
   isOpen: boolean,
   onClose: () => void,
-): UseBorrowModalReturn {
+): UseEvmBorrowModalReturn {
   const { token, currentDebt, protocolName, position, chainId, context } = config;
   const { buildBorrowFlow } = useKapanRouterV2();
   const { balance, decimals: fetchedDecimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
@@ -115,13 +123,6 @@ function useEvmBorrowModal(
     emptyFlowErrorMessage: "Failed to build borrow instructions",
   });
 
-  // Import BatchingPreference lazily to avoid circular dependency
-  const renderExtraContent = useCallback(() => {
-    const { enabled, setEnabled, isLoaded } = batchingPreference;
-    // We return the raw preference data; the actual component is rendered by the modal
-    return { enabled, setEnabled, isLoaded };
-  }, [batchingPreference]);
-
   return {
     modalProps: {
       action: "Borrow",
@@ -136,9 +137,9 @@ function useEvmBorrowModal(
       chainId,
       position,
       onConfirm: handleConfirm,
-      // Batch preference will be added by the component
     },
     normalizedToken,
+    batchingPreference,
   };
 }
 
@@ -240,48 +241,8 @@ export function useEvmBorrow(
   config: Omit<BorrowModalEvmConfig, "network">,
   isOpen: boolean,
   onClose: () => void,
-): UseBorrowModalReturn & { batchingPreference: ReturnType<typeof useEvmTransactionFlow>["batchingPreference"] } {
-  const { token, currentDebt, protocolName, position, chainId, context } = config;
-  const { buildBorrowFlow } = useKapanRouterV2();
-  const { balance, decimals: fetchedDecimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
-
-  const normalizedToken = normalizeTokenDecimals(token, fetchedDecimals);
-  const normalizedProtocolName = protocolName.toLowerCase();
-  const decimals = normalizedToken.decimals!;
-
-  const buildFlow = useCallback(
-    (amount: string) =>
-      buildBorrowFlow(normalizedProtocolName, token.address, amount, decimals, context),
-    [buildBorrowFlow, context, decimals, normalizedProtocolName, token.address],
-  );
-
-  const { handleConfirm, batchingPreference } = useEvmTransactionFlow({
-    isOpen,
-    chainId,
-    onClose,
-    buildFlow,
-    successMessage: "Borrow transaction sent",
-    emptyFlowErrorMessage: "Failed to build borrow instructions",
-  });
-
-  return {
-    modalProps: {
-      action: "Borrow",
-      token: normalizedToken,
-      protocolName,
-      apyLabel: "Borrow APY",
-      apy: token.currentRate,
-      metricLabel: "Total debt",
-      before: currentDebt,
-      balance,
-      network: "evm",
-      chainId,
-      position,
-      onConfirm: handleConfirm,
-    },
-    normalizedToken,
-    batchingPreference,
-  };
+): UseEvmBorrowModalReturn {
+  return useEvmBorrowModal({ ...config, network: "evm" }, isOpen, onClose);
 }
 
 /**
@@ -293,36 +254,5 @@ export function useStarkBorrow(
   isOpen: boolean,
   onClose: () => void,
 ): UseBorrowModalReturn {
-  const { token, currentDebt, protocolName, position, vesuContext } = config;
-  const { balance, decimals: fetchedDecimals } = useTokenBalance(token.address, "stark", undefined, token.decimals);
-
-  const normalizedToken = normalizeTokenDecimals(token, fetchedDecimals);
-  const decimals = normalizedToken.decimals!;
-
-  const { execute, buildCalls } = useLendingAction(
-    "stark",
-    "Borrow",
-    token.address,
-    protocolName,
-    decimals,
-    vesuContext,
-  );
-
-  return {
-    modalProps: {
-      action: "Borrow",
-      token: normalizedToken,
-      protocolName,
-      apyLabel: "Borrow APY",
-      apy: token.currentRate,
-      metricLabel: "Total debt",
-      before: currentDebt,
-      balance,
-      network: "stark",
-      position,
-      onConfirm: execute,
-      buildCalls,
-    },
-    normalizedToken,
-  };
+  return useStarkBorrowModal({ ...config, network: "stark" }, isOpen, onClose);
 }

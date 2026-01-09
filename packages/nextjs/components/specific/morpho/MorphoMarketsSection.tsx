@@ -70,7 +70,7 @@ function UtilizationBar({ value }: { value: number }) {
   
   return (
     <Tooltip content={`${percent.toFixed(1)}% utilized`}>
-      <div className="w-14 h-1.5 bg-base-content/10 rounded-full overflow-hidden mx-auto">
+      <div className="bg-base-content/10 mx-auto h-1.5 w-14 overflow-hidden rounded-full">
         <div 
           className={`h-full ${color} rounded-full`}
           style={{ width: `${percent}%` }}
@@ -94,14 +94,14 @@ function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string
         radius="full"
         src={collateralSrc}
         fallback={(props.collateralSymbol ?? "?").slice(0, 2).toUpperCase()}
-        className="ring-2 ring-base-100"
+        className="ring-base-100 ring-2"
       />
       <Avatar 
         size="1" 
         radius="full" 
         src={loanSrc} 
         fallback={props.loanSymbol.slice(0, 2).toUpperCase()} 
-        className="ring-2 ring-base-100"
+        className="ring-base-100 ring-2"
       />
     </div>
   );
@@ -129,7 +129,7 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
   const src = tokenNameToLogo(symbol.toLowerCase());
   return (
     <div 
-      className="relative rounded-full overflow-hidden bg-base-300 flex-shrink-0"
+      className="bg-base-300 relative flex-shrink-0 overflow-hidden rounded-full"
       style={{ width: size, height: size, minWidth: size, minHeight: size }}
     >
       <Image
@@ -144,7 +144,7 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
         }}
       />
       <span 
-        className="absolute inset-0 flex items-center justify-center text-xs font-medium text-base-content/70"
+        className="text-base-content/70 absolute inset-0 flex items-center justify-center text-xs font-medium"
         style={{ fontSize: size * 0.4 }}
       >
         {symbol.slice(0, 2).toUpperCase()}
@@ -258,36 +258,36 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
     <div
       ref={dropdownRef}
-      className="fixed z-[9999] bg-base-100 border border-base-300 rounded-xl shadow-2xl w-80"
+      className="bg-base-100 border-base-300 fixed z-[9999] w-80 rounded-xl border shadow-2xl"
       style={{ top: position.top, left: position.left }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Search Input */}
-      <div className="p-3 border-b border-base-300">
+      <div className="border-base-300 border-b p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" />
+          <Search className="text-base-content/50 absolute left-3 top-1/2 size-4 -translate-y-1/2" />
           <input
             ref={inputRef}
             type="text"
             placeholder={`Search for ${placeholder.toLowerCase()} asset`}
             value={searchTerm}
             onChange={createTextChangeHandler(setSearchTerm)}
-            className="input input-sm input-bordered w-full pl-9 pr-8 bg-base-200/50"
+            className="input input-sm input-bordered bg-base-200/50 w-full pl-9 pr-8"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+              className="btn btn-ghost btn-xs btn-circle absolute right-2 top-1/2 -translate-y-1/2"
             >
-              <X className="w-3 h-3" />
+              <X className="size-3" />
             </button>
           )}
         </div>
       </div>
 
       {/* Category Tabs */}
-      <div className="px-3 py-2 border-b border-base-300">
-        <div className="flex items-center gap-1 flex-wrap">
+      <div className="border-base-300 border-b px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1">
           {(Object.keys(TOKEN_CATEGORIES) as TokenCategory[]).map(category => (
             <button
               key={category}
@@ -316,17 +316,17 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         {/* All Option */}
         <button
           onClick={() => handleSelect("all")}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
             value === "all" ? 'bg-primary/10' : 'hover:bg-base-200'
           }`}
         >
-          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+          <div className={`flex size-4 flex-shrink-0 items-center justify-center rounded border-2${
             value === "all" 
               ? 'bg-primary border-primary' 
               : 'border-base-content/30'
           }`}>
             {value === "all" && (
-              <svg className="w-2.5 h-2.5 text-primary-content" fill="none" viewBox="0 0 10 10">
+              <svg className="text-primary-content size-2.5" fill="none" viewBox="0 0 10 10">
                 <path d="M2 5L4 7L8 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
@@ -338,7 +338,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
 
         {/* Token Options */}
         {filteredOptions.length === 0 ? (
-          <div className="py-8 text-center text-sm text-base-content/50">
+          <div className="text-base-content/50 py-8 text-center text-sm">
             No matches found
           </div>
         ) : (
@@ -346,17 +346,17 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             <button
               key={option}
               onClick={() => handleSelect(option)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
                 value === option ? 'bg-primary/10' : 'hover:bg-base-200'
               }`}
             >
-              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+              <div className={`flex size-4 flex-shrink-0 items-center justify-center rounded border-2${
                 value === option 
                   ? 'bg-primary border-primary' 
                   : 'border-base-content/30'
               }`}>
                 {value === option && (
-                  <svg className="w-2.5 h-2.5 text-primary-content" fill="none" viewBox="0 0 10 10">
+                  <svg className="text-primary-content size-2.5" fill="none" viewBox="0 0 10 10">
                     <path d="M2 5L4 7L8 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 )}
@@ -378,7 +378,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
       <button
         ref={triggerRef}
         type="button"
-        className="btn btn-sm btn-ghost border border-base-300 hover:border-base-content/30 gap-2 min-w-[140px] justify-between font-normal"
+        className="btn btn-sm btn-ghost border-base-300 hover:border-base-content/30 min-w-[140px] justify-between gap-2 border font-normal"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex items-center gap-2 overflow-hidden">
@@ -386,7 +386,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
           <span className="truncate text-sm">{displayValue}</span>
         </div>
         <ChevronDown 
-          className={`w-4 h-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          className={`size-4 flex-shrink-0 opacity-60 transition-transform${isOpen ? 'rotate-180' : ''}`} 
         />
       </button>
 
@@ -422,7 +422,7 @@ function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: Mobi
 
   return (
     <div 
-      className={`rounded-lg border transition-colors cursor-pointer ${
+      className={`cursor-pointer rounded-lg border transition-colors ${
         isExpanded 
           ? 'border-primary/30 bg-base-200/40' 
           : 'border-base-300/50 bg-base-200/20 hover:bg-base-200/40'
@@ -433,18 +433,18 @@ function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: Mobi
       <div className="flex items-center gap-2 px-3 py-2">
         {/* Token pair icons + name */}
         <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
-            <span className="font-medium text-sm truncate" title={pairName}>{pairName}</span>
+            <span className="truncate text-sm font-medium" title={pairName}>{pairName}</span>
             {morphoUrl && (
               <a
                 href={morphoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
-                className="opacity-40 hover:opacity-80 transition-opacity"
+                className="opacity-40 transition-opacity hover:opacity-80"
               >
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="size-3" />
               </a>
             )}
           </div>
@@ -452,19 +452,19 @@ function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: Mobi
 
         {/* Stats - always visible */}
         <div className="flex items-center gap-3 text-[11px]">
-          <span className="font-mono tabular-nums text-base-content/70">{usd.format(row.supplyUsd)}</span>
-          <span className="font-mono tabular-nums text-success">{formatPercent(row.supplyApy01, 2)}</span>
+          <span className="text-base-content/70 font-mono tabular-nums">{usd.format(row.supplyUsd)}</span>
+          <span className="text-success font-mono tabular-nums">{formatPercent(row.supplyApy01, 2)}</span>
           <span className="font-mono tabular-nums">{formatPercent(row.borrowApy01, 2)}</span>
         </div>
 
         {/* Chevron */}
-        <ChevronDown className={`w-4 h-4 text-base-content/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`text-base-content/40 size-4 transition-transform${isExpanded ? 'rotate-180' : ''}`} />
       </div>
 
       {/* Expanded: action bar */}
       {isExpanded && (
         <div className="flex items-center gap-2 px-3 pb-2 pt-0">
-          <div className="flex-1 flex items-center gap-3 text-[10px] text-base-content/50">
+          <div className="text-base-content/50 flex flex-1 items-center gap-3 text-[10px]">
             <span>Util: <span className="text-base-content/70">{formatPercent(row.utilization01, 0)}</span></span>
             <span>LTV: <span className="text-base-content/70">{formatPercent(row.lltv01, 0)}</span></span>
           </div>
@@ -794,7 +794,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       ) : (
         <>
           {/* Mobile: Card-based layout */}
-          <div className="block md:hidden space-y-2">
+          <div className="block space-y-2 md:hidden">
             {rows.slice(0, visibleCount).map(r => {
               const { market } = r;
               const pairName = `${r.collateralSymbol}/${r.loanSymbol}`;
@@ -821,22 +821,22 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                 <Box px="3" pb="3">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-base-content/70 border-b border-base-300">
-                        <th className="text-left font-medium py-2.5 pl-3">Market</th>
-                        <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("tvl")}>
+                      <tr className="text-base-content/70 border-base-300 border-b text-xs">
+                        <th className="py-2.5 pl-3 text-left font-medium">Market</th>
+                        <th className="hover:text-base-content cursor-pointer py-2.5 pr-4 text-right font-medium" onClick={() => handleSort("tvl")}>
                           <span className={`inline-flex items-center gap-0.5 ${sortKey === "tvl" ? "text-primary" : ""}`}>
-                            TVL {sortKey === "tvl" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                            TVL {sortKey === "tvl" && (sortDirection === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
                           </span>
                         </th>
-                        <th className="text-center font-medium py-2.5 w-16">Util</th>
-                        <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("supplyApy")}>
+                        <th className="w-16 py-2.5 text-center font-medium">Util</th>
+                        <th className="hover:text-base-content cursor-pointer py-2.5 pr-4 text-right font-medium" onClick={() => handleSort("supplyApy")}>
                           <span className={`inline-flex items-center gap-0.5 ${sortKey === "supplyApy" ? "text-primary" : ""}`}>
-                            Earn {sortKey === "supplyApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                            Earn {sortKey === "supplyApy" && (sortDirection === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
                           </span>
                         </th>
-                        <th className="text-right font-medium py-2.5 pr-4 cursor-pointer hover:text-base-content" onClick={() => handleSort("borrowApy")}>
+                        <th className="hover:text-base-content cursor-pointer py-2.5 pr-4 text-right font-medium" onClick={() => handleSort("borrowApy")}>
                           <span className={`inline-flex items-center gap-0.5 ${sortKey === "borrowApy" ? "text-primary" : ""}`}>
-                            Borrow {sortKey === "borrowApy" && (sortDirection === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
+                            Borrow {sortKey === "borrowApy" && (sortDirection === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
                           </span>
                         </th>
                         <th className="w-28"></th>
@@ -853,7 +853,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         );
 
                         return (
-                          <tr key={market.uniqueKey} className="border-b border-base-300/50 hover:bg-base-200/30 transition-colors">
+                          <tr key={market.uniqueKey} className="border-base-300/50 hover:bg-base-200/30 border-b transition-colors">
                             <td className="py-2.5 pl-3">
                               <div className="flex items-center gap-2">
                                 <TokenPairAvatars collateralSymbol={r.collateralSymbol} loanSymbol={r.loanSymbol} />
@@ -862,10 +862,10 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                                     href={morphoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="font-medium hover:text-primary transition-colors group/link flex items-center gap-1"
+                                    className="hover:text-primary group/link flex items-center gap-1 font-medium transition-colors"
                                   >
                                     {r.collateralSymbol}/{r.loanSymbol}
-                                    <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-60 transition-opacity" />
+                                    <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
                                   </a>
                                 ) : (
                                   <span className="font-medium">{r.collateralSymbol}/{r.loanSymbol}</span>
@@ -878,7 +878,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                             <td className="py-2.5 text-center">
                               <UtilizationBar value={r.utilization01} />
                             </td>
-                            <td className="py-2.5 pr-4 text-right tabular-nums text-success">
+                            <td className="text-success py-2.5 pr-4 text-right tabular-nums">
                               {formatPercent(r.supplyApy01, 2)}
                             </td>
                             <td className="py-2.5 pr-4 text-right tabular-nums">

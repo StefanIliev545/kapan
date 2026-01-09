@@ -348,7 +348,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
     <div className={`flex flex-col gap-2 ${compact ? "" : "p-2"}`}>
       {/* Provider Selector */}
       {showProviderSelect && providers.length > 1 && (
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <span className="text-base-content/60 text-xs">Flash Loan Provider</span>
             {isLoadingLiquidity && (
@@ -369,17 +369,17 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
                     selectedProviderIndex === idx 
                       ? noLiquidity ? "btn-warning" : "btn-primary"
                       : noLiquidity 
-                        ? "btn-ghost opacity-40 line-through" 
+                        ? "btn-ghost line-through opacity-40" 
                         : "btn-ghost opacity-60 hover:opacity-100"
                   }`}
                   title={`${provider.name} - ${provider.feeBps === 0 ? "No fee" : `${provider.feeBps / 100}% fee`}${noLiquidity ? " (insufficient liquidity)" : ""}`}
                 >
                   {provider.name.replace(" Blue", "").replace(" V2", "").replace(" V3", "")}
                   {provider.feeBps === 0 && hasLiquidity && (
-                    <span className="ml-1 text-success text-[9px]">0%</span>
+                    <span className="text-success ml-1 text-[9px]">0%</span>
                   )}
                   {noLiquidity && (
-                    <span className="ml-1 text-warning text-[9px]">!</span>
+                    <span className="text-warning ml-1 text-[9px]">!</span>
                   )}
                 </button>
               );
@@ -390,12 +390,12 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
 
       {/* Single provider display */}
       {showProviderSelect && providers.length === 1 && selectedProvider && (
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <span className="text-base-content/60 text-xs">Flash Loan Provider</span>
           <span className="text-xs">
             {selectedProvider.name}
             {selectedProvider.feeBps === 0 && (
-              <span className="ml-1 text-success">(0% fee)</span>
+              <span className="text-success ml-1">(0% fee)</span>
             )}
           </span>
         </div>
@@ -403,8 +403,8 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
 
       {/* Liquidity warning */}
       {selectedProviderLiquidity && !selectedProviderLiquidity.hasLiquidity && totalAmount > 0n && (
-        <div className="flex items-start gap-1.5 text-[10px] text-warning">
-          <svg className="w-3 h-3 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-warning flex items-start gap-1.5 text-[10px]">
+          <svg className="mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <span>
@@ -416,7 +416,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
 
       {/* Flash Loan Toggle */}
       {showFlashLoanToggle && (
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <span className="text-base-content/60 text-xs">Use Flash Loan</span>
           <input
             type="checkbox"
@@ -429,7 +429,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
 
       {/* Chunks Input */}
       {showChunksInput && useFlashLoan && (
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <span className="text-base-content/60 text-xs">Chunks</span>
           <div className="flex items-center gap-2">
             <input
@@ -441,7 +441,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
               className="input input-bordered input-xs w-16 text-right"
             />
             {numChunks > 1 && (
-              <span className="text-[10px] text-base-content/50">
+              <span className="text-base-content/50 text-[10px]">
                 ~{formatUnits(chunkSize, sellToken.decimals)} {sellToken.symbol}/chunk
               </span>
             )}
@@ -452,7 +452,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
       {/* Explanation */}
       {useFlashLoan && (
         <div className="flex items-start gap-1.5 text-[10px]">
-          <svg className="w-3 h-3 shrink-0 mt-0.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="text-success mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
           <div>

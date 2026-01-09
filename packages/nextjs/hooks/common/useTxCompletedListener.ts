@@ -29,7 +29,7 @@ import { useEffect } from "react";
  */
 export function useTxCompletedListener(
   onTxCompleted: () => void,
-  enabled: boolean = true
+  enabled = true
 ): void {
   useEffect(() => {
     if (!enabled) return;
@@ -61,8 +61,8 @@ export function useTxCompletedListener(
  */
 export function useTxCompletedListenerDelayed(
   onTxCompleted: () => void,
-  delayMs: number = 2000,
-  enabled: boolean = true
+  delayMs = 2000,
+  enabled = true
 ): void {
   useEffect(() => {
     if (!enabled) return;

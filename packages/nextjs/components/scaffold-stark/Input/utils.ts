@@ -1,18 +1,15 @@
-export type CommonInputProps<T = string> = {
-  value: T;
-  onChange: (newValue: T) => void;
-  name?: string;
-  placeholder?: string;
-  disabled?: boolean;
-};
+// Import shared regex for internal validation
+import {
+  SIGNED_NUMBER_REGEX as SHARED_SIGNED_REGEX,
+  UNSIGNED_NUMBER_REGEX as SHARED_UNSIGNED_REGEX,
+} from "~~/components/common/Input";
 
-export const SIGNED_NUMBER_REGEX = /^-?\d*\.?\d*$/;
-export const UNSIGNED_NUMBER_REGEX = /^\d*\.?\d*$/;
+// Re-export shared types for backward compatibility
+export type { CommonInputProps } from "~~/components/common/Input";
+export { SIGNED_NUMBER_REGEX, UNSIGNED_NUMBER_REGEX, isENS } from "~~/components/common/Input";
 
-export const isValidInteger = (
-  dataType: string,
-  value: string | bigint,
-): boolean => {
+// Starknet-specific integer validation
+export const isValidInteger = (dataType: string, value: string | bigint): boolean => {
   const isSigned = isSignedType(dataType);
   const bitcount = extractBitCount(dataType, isSigned);
 
@@ -38,8 +35,8 @@ const extractBitCount = (dataType: string, isSigned: boolean): number => {
 
 const isValidFormat = (value: string | bigint, isSigned: boolean): boolean => {
   if (typeof value !== "string") return true;
-  if (isSigned) return SIGNED_NUMBER_REGEX.test(value);
-  return UNSIGNED_NUMBER_REGEX.test(value);
+  if (isSigned) return SHARED_SIGNED_REGEX.test(value);
+  return SHARED_UNSIGNED_REGEX.test(value);
 };
 
 const parseBigInt = (value: string | bigint): bigint | null => {
@@ -55,11 +52,7 @@ const isInvalidUnsignedValue = (value: bigint, isSigned: boolean): boolean => {
   return !isSigned && value < 0;
 };
 
-const fitsWithinBitCount = (
-  value: bigint,
-  bitcount: number,
-  isSigned: boolean,
-): boolean => {
+const fitsWithinBitCount = (value: bigint, bitcount: number, isSigned: boolean): boolean => {
   const hexString = value.toString(16);
   const significantHexDigits = hexString.match(/.*x0*(.*)$/)?.[1] ?? "";
 
@@ -67,15 +60,9 @@ const fitsWithinBitCount = (
 
   // Check if the value is a negative overflow for signed integers.
   if (isSigned && significantHexDigits.length * 4 === bitcount) {
-    const mostSignificantDigit = parseInt(
-      significantHexDigits.slice(-1)?.[0],
-      16,
-    );
+    const mostSignificantDigit = parseInt(significantHexDigits.slice(-1)?.[0], 16);
     if (mostSignificantDigit >= 8) return false;
   }
 
   return true;
 };
-// Treat any dot-separated string as a potential ENS name
-const ensRegex = /.+\..+/;
-export const isENS = (address = "") => ensRegex.test(address);

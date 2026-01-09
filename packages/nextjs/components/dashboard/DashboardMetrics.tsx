@@ -19,8 +19,8 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({
             <div className="flex items-center gap-4">
                 {[1, 2, 3].map((i) => (
                     <div key={i} className="flex items-center gap-1.5">
-                        <div className="h-3 w-10 bg-base-content/5 rounded animate-pulse" />
-                        <div className="h-4 w-16 bg-base-content/10 rounded animate-pulse" />
+                        <div className="bg-base-content/5 h-3 w-10 animate-pulse rounded" />
+                        <div className="bg-base-content/10 h-4 w-16 animate-pulse rounded" />
                     </div>
                 ))}
             </div>
@@ -39,10 +39,10 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({
                 <React.Fragment key={metric.label}>
                     {i > 0 && <span className="text-base-content/10 hidden sm:inline">|</span>}
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase tracking-wider text-base-content/35 font-medium">
+                        <span className="text-base-content/35 text-[10px] font-medium uppercase tracking-wider">
                             {metric.label}
                         </span>
-                        <span className={`text-sm font-mono font-semibold tabular-nums ${metric.color}`}>
+                        <span className={`font-mono text-sm font-semibold tabular-nums ${metric.color}`}>
                             {formatCurrency(metric.value)}
                         </span>
                     </div>

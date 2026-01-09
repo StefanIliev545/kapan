@@ -7,21 +7,21 @@ import Link from "next/link";
  */
 export const FloatingSocials = () => {
   return (
-    <div className="fixed flex justify-between items-end w-full z-10 p-4 bottom-0 left-0 pointer-events-none">
+    <div className="pointer-events-none fixed bottom-0 left-0 z-10 flex w-full items-end justify-between p-4">
       {/* Social links - left side */}
-      <div className="flex flex-col md:flex-row gap-2 pointer-events-auto">
+      <div className="pointer-events-auto flex flex-col gap-2 md:flex-row">
         <Link
           href="https://discord.gg/Vjk6NhkxGv"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 floating-action"
+          className="bg-base-100 dark:bg-base-200 floating-action flex items-center gap-1 rounded-full px-3 py-2 text-sm"
         >
           <Image
             src="/logos/discord.svg"
             alt="Discord Logo"
             width={20}
             height={20}
-            className="w-5 h-5 dark:invert dark:brightness-90"
+            className="size-5 dark:brightness-90 dark:invert"
           />
           <span className="text-base-content">Join our Discord</span>
         </Link>
@@ -29,14 +29,14 @@ export const FloatingSocials = () => {
           href="https://t.me/+vYCKr2TrOXRiODg0"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 floating-action"
+          className="bg-base-100 dark:bg-base-200 floating-action flex items-center gap-1 rounded-full px-3 py-2 text-sm"
         >
           <Image
             src="/logos/telegram.svg"
             alt="Telegram Logo"
             width={20}
             height={20}
-            className="w-5 h-5"
+            className="size-5"
           />
           <span className="text-base-content">Join our Telegram</span>
         </Link>
@@ -44,7 +44,7 @@ export const FloatingSocials = () => {
           href="https://x.com/KapanFinance"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-center bg-base-100 dark:bg-base-200 rounded-full w-10 h-10 floating-action"
+          className="flex-center bg-base-100 dark:bg-base-200 floating-action size-10 rounded-full"
           title="Follow us on X"
           aria-label="Follow us on X"
         >
@@ -53,7 +53,7 @@ export const FloatingSocials = () => {
             alt="X Logo"
             width={16}
             height={16}
-            className="w-4 h-4 dark:invert dark:brightness-90"
+            className="size-4 dark:brightness-90 dark:invert"
           />
         </Link>
       </div>

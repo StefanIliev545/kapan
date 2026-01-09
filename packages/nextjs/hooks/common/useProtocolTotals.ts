@@ -29,7 +29,7 @@ export function useProtocolTotals(
   protocolName: string,
   totalSupplied: number,
   totalBorrowed: number,
-  enabled: boolean = true
+  enabled = true
 ): void {
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
@@ -61,7 +61,7 @@ export function useProtocolTotalsFromPositions<
   protocolName: string,
   suppliedPositions: T[],
   borrowedPositions: T[],
-  enabled: boolean = true
+  enabled = true
 ): void {
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 

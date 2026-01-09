@@ -1,56 +1,20 @@
 import React, { FC, ReactNode } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { CheckIcon } from "@heroicons/react/24/outline";
 import { formatUnits } from "viem";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import { MorphoMarketSelector } from "../common/MorphoMarketSelector";
 import { ErrorDisplay } from "../common/ErrorDisplay";
 import { LoadingSpinner, ButtonLoading } from "../common/Loading";
+import { VesuPoolSelect, CollateralAmountInputStyled, clampAmount } from "./common";
 import type { MorphoMarket, MorphoMarketContext } from "~~/hooks/useMorphoLendingPositions";
-
-/* ------------------------------ Helpers ------------------------------ */
-const clampAmount = (value: string, max?: string) => {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-
-  const parsed = parseFloat(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0) return "";
-
-  if (max != null) {
-    const maxParsed = parseFloat(max);
-    if (Number.isFinite(maxParsed) && parsed > maxParsed) {
-      return max;
-    }
-  }
-
-  return trimmed;
-};
-
-type Collateral = {
-  address: string;
-  symbol: string;
-  icon: string;
-  decimals: number;
-  rawBalance: bigint;
-  balance: number;
-};
-
-type Protocol = {
-  name: string;
-  logo: string;
-};
-
-type FlashLoanProvider = {
-  name: string;
-  icon: string;
-  version: string;
-};
-
-type VesuPools = {
-  v1Pools: Array<{ name: string; id?: bigint }>;
-  v2Pools: Array<{ name: string; address?: string }>;
-};
+import type {
+  Collateral,
+  Protocol,
+  FlashLoanProvider,
+  VesuPools,
+} from "./common/useRefinanceTypes";
 
 export type RefinanceModalContentProps = {
   isOpen: boolean;
@@ -236,10 +200,10 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="modal-box relative bg-base-100 max-w-2xl max-h-[90vh] p-5 rounded-xl border border-base-300/50 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-lg text-base-content">Refinance Position</h3>
-          <button className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors" onClick={onClose}>✕</button>
+      <div className="modal-box bg-base-100 border-base-300/50 relative flex max-h-[90vh] max-w-2xl flex-col rounded-xl border p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base-content text-lg font-semibold">Refinance Position</h3>
+          <button className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors" onClick={onClose}>✕</button>
         </div>
 
         <div className="space-y-4 overflow-y-auto">
@@ -249,17 +213,17 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
           {/* Debt amount */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-base-content/80">Amount to Refinance</span>
+              <span className="text-base-content/80 text-sm">Amount to Refinance</span>
               {debtConfirmed && (
                 <div className="flex flex-col items-end gap-1">
-                  <span className="text-[11px] text-base-content/60 leading-none">Source Protocol</span>
+                  <span className="text-base-content/60 text-[11px] leading-none">Source Protocol</span>
                 </div>
               )}
             </div>
 
             {!debtConfirmed ? (
               <div className="flex items-center gap-3">
-                <div className="w-6 h-6 relative">
+                <div className="relative size-6">
                   <Image src={debtIcon} alt={debtSymbol} fill className="rounded-full" />
                 </div>
                 <span className="font-medium">{debtSymbol}</span>
@@ -275,7 +239,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                     }}
                     onKeyDown={e => e.key === "Enter" && setDebtConfirmed(Boolean(debtAmount && parseFloat(debtAmount) > 0))}
                     placeholder="0.00"
-                    className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-20 outline-none"
+                    className="border-base-300 w-full border-0 border-b-2 bg-transparent px-2 py-1 pr-20 outline-none"
                   />
                   {debtMaxLabel && (
                     <button
@@ -284,7 +248,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                         setIsDebtMaxClicked(true);
                         setDebtAmount(maxValue);
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-primary"
+                      className="text-primary absolute right-2 top-1/2 -translate-y-1/2"
                     >
                       {debtMaxLabel}
                     </button>
@@ -293,7 +257,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                 <button
                   onClick={() => setDebtConfirmed(Boolean(debtAmount && parseFloat(debtAmount) > 0))}
                   disabled={!debtAmount || parseFloat(debtAmount) <= 0}
-                  className="p-1 text-base-content/40 hover:text-success disabled:opacity-40"
+                  className="text-base-content/40 hover:text-success p-1 disabled:opacity-40"
                   title="Confirm amount"
                 >
                   ✓
@@ -301,8 +265,8 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => setDebtConfirmed(false)}>
-                  <div className="w-6 h-6 relative">
+                <div className="flex cursor-pointer items-center gap-3" onClick={() => setDebtConfirmed(false)}>
+                  <div className="relative size-6">
                     <Image src={debtIcon} alt={debtSymbol} fill className="rounded-full" />
                   </div>
                   <span className="font-medium">{debtSymbol}</span>
@@ -318,16 +282,16 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
 
           {/* Tabs */}
           <div className="space-y-2">
-            <div className="flex items-center gap-6 border-b border-base-300">
+            <div className="border-base-300 flex items-center gap-6 border-b">
               <button
-                className={`pb-2 -mb-[1px] border-b-2 ${activeTab === "protocol" ? "border-primary" : "border-transparent text-base-content/60"}`}
+                className={`-mb-[1px] border-b-2 pb-2 ${activeTab === "protocol" ? "border-primary" : "text-base-content/60 border-transparent"}`}
                 onClick={() => setActiveTab("protocol")}
               >
                 Destination Protocol
               </button>
               {showFlashLoanTab && (
                 <button
-                  className={`pb-2 -mb-[1px] border-b-2 ${activeTab === "flashloan" ? "border-primary" : "border-transparent text-base-content/60"}`}
+                  className={`-mb-[1px] border-b-2 pb-2 ${activeTab === "flashloan" ? "border-primary" : "text-base-content/60 border-transparent"}`}
                   onClick={() => setActiveTab("flashloan")}
                 >
                   Flash Loan Provider
@@ -343,7 +307,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 12 }}
                   transition={{ duration: 0.15 }}
-                  className="grid grid-cols-3 sm:grid-cols-4 gap-2"
+                  className="grid grid-cols-3 gap-2 sm:grid-cols-4"
                 >
                   {filteredDestinationProtocols.map(p => {
                     const isSelected = selectedProtocol === p.name;
@@ -353,108 +317,37 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                     return (
                       <div
                         key={p.name}
-                        className={`${shouldExpand ? "col-span-2 sm:col-span-3" : "col-span-1"} p-2 border ${isSelected ? "border-primary bg-primary/10" : "border-base-300"} rounded cursor-pointer transition-all`}
+                        className={`${shouldExpand ? "col-span-2 sm:col-span-3" : "col-span-1"} border p-2 ${isSelected ? "border-primary bg-primary/10" : "border-base-300"} cursor-pointer rounded transition-all`}
                         onClick={() => setSelectedProtocol(p.name)}
                       >
-                        <div className="flex items-center gap-2 flex-nowrap min-w-0">
-                          <Image src={p.logo} alt={p.name} width={24} height={24} className="rounded flex-shrink-0" />
-                          <span className="text-sm whitespace-nowrap flex-shrink-0">{p.name}</span>
+                        <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                          <Image src={p.logo} alt={p.name} width={24} height={24} className="flex-shrink-0 rounded" />
+                          <span className="flex-shrink-0 whitespace-nowrap text-sm">{p.name}</span>
 
                           {(isSelected && isVesu && vesuPools) && (
-                            <div className="flex items-center gap-1 flex-nowrap ml-auto flex-shrink-0">
-                              {/* Version toggle */}
-                              <div className="join join-xs flex-shrink-0">
-                                <button
-                                  className={`btn btn-ghost btn-xs join-item ${selectedVersion === "v1" ? "btn-active" : ""}`}
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    if (selectedVersion !== "v1") {
-                                      setSelectedVersion("v1");
-                                      if (selectedPoolId !== undefined && vesuPools.v1Pools[0]?.id) {
-                                        setSelectedPoolId?.(vesuPools.v1Pools[0].id);
-                                      }
-                                    }
-                                  }}
-                                >
-                                  V1
-                                </button>
-                                <button
-                                  className={`btn btn-ghost btn-xs join-item ${selectedVersion === "v2" ? "btn-active" : ""}`}
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    if (selectedVersion !== "v2") {
-                                      setSelectedVersion("v2");
-                                      if (selectedV2PoolAddress !== undefined && vesuPools.v2Pools[0]?.address) {
-                                        setSelectedV2PoolAddress?.(vesuPools.v2Pools[0].address);
-                                      }
-                                    }
-                                  }}
-                                >
-                                  V2
-                                </button>
-                              </div>
-
-                              {/* Pool select */}
-                              {selectedPool !== undefined && setSelectedPool ? (
-                                <select
-                                  className="select select-bordered select-xs flex-shrink-0 w-auto max-w-[140px] min-w-[100px] text-xs"
-                                  value={selectedPool}
-                                  onChange={e => {
-                                    e.stopPropagation();
-                                    setSelectedPool(e.target.value);
-                                  }}
-                                >
-                                  {selectedVersion === "v1"
-                                    ? vesuPools.v1Pools
-                                      .filter(pool => pool.name !== sourcePoolName)
-                                      .map(pool => (
-                                        <option key={pool.name} value={pool.name}>
-                                          {pool.name}
-                                        </option>
-                                      ))
-                                    : vesuPools.v2Pools
-                                      .filter(pool => pool.name !== sourcePoolName)
-                                      .map(pool => (
-                                        <option key={pool.name} value={pool.name}>
-                                          {pool.name}
-                                        </option>
-                                      ))}
-                                </select>
-                              ) : (
-                                <select
-                                  className="select select-bordered select-xs flex-shrink-0 w-auto max-w-[140px] min-w-[100px] text-xs"
-                                  value={selectedVersion === "v1"
-                                    ? vesuPools.v1Pools.find(p => p.id === selectedPoolId)?.name || ""
-                                    : vesuPools.v2Pools.find(p => p.address === selectedV2PoolAddress)?.name || ""}
-                                  onChange={e => {
-                                    e.stopPropagation();
-                                    if (selectedVersion === "v1") {
-                                      const pool = vesuPools.v1Pools.find(p => p.name === e.target.value);
-                                      if (pool?.id != null) setSelectedPoolId?.(pool.id);
-                                    } else {
-                                      const pool = vesuPools.v2Pools.find(p => p.name === e.target.value);
-                                      if (pool?.address) setSelectedV2PoolAddress?.(pool.address);
-                                    }
-                                  }}
-                                >
-                                  {selectedVersion === "v1"
-                                    ? vesuPools.v1Pools
-                                      .filter(pool => pool.name !== sourcePoolName)
-                                      .map(pool => (
-                                        <option key={pool.name} value={pool.name}>
-                                          {pool.name}
-                                        </option>
-                                      ))
-                                    : vesuPools.v2Pools
-                                      .filter(pool => pool.name !== sourcePoolName)
-                                      .map(pool => (
-                                        <option key={pool.name} value={pool.name}>
-                                          {pool.name}
-                                        </option>
-                                      ))}
-                                </select>
-                              )}
-                            </div>
+                            selectedPool !== undefined && setSelectedPool ? (
+                              <VesuPoolSelect
+                                mode="evm"
+                                selectedVersion={selectedVersion}
+                                vesuPools={vesuPools}
+                                sourcePoolName={sourcePoolName}
+                                onVersionChange={setSelectedVersion}
+                                selectedPool={selectedPool}
+                                onPoolChange={setSelectedPool}
+                              />
+                            ) : (
+                              <VesuPoolSelect
+                                mode="starknet"
+                                selectedVersion={selectedVersion}
+                                vesuPools={vesuPools}
+                                sourcePoolName={sourcePoolName}
+                                onVersionChange={setSelectedVersion}
+                                selectedPoolId={selectedPoolId}
+                                selectedV2PoolAddress={selectedV2PoolAddress}
+                                onPoolIdChange={id => setSelectedPoolId?.(id)}
+                                onV2PoolAddressChange={addr => setSelectedV2PoolAddress?.(addr)}
+                              />
+                            )
                           )}
                         </div>
                       </div>
@@ -468,7 +361,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 12 }}
                   transition={{ duration: 0.15 }}
-                  className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2"
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-5"
                 >
                   {flashLoanProviders.map(p => {
                     const displayName = p.name.replace(/\sV[0-9]+$/i, "");
@@ -476,7 +369,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                       <button
                         key={`${p.name}-${p.version}`}
                         onClick={() => setSelectedProvider(p.name)}
-                        className={`p-2 border rounded text-left ${selectedProvider === p.name ? "border-primary bg-primary/10" : "border-base-300"}`}
+                        className={`rounded border p-2 text-left ${selectedProvider === p.name ? "border-primary bg-primary/10" : "border-base-300"}`}
                       >
                         <div className="flex items-center gap-2">
                           <Image src={p.icon} alt={p.name} width={20} height={20} className="rounded" />
@@ -494,7 +387,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
 
           {/* Collaterals */}
           <div className="space-y-2">
-            <div className="text-sm text-base-content/80">
+            <div className="text-base-content/80 text-sm">
               {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0
                 ? "Collateral to Move"
                 : isMorphoSelected
@@ -502,12 +395,12 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   : "Select Collaterals to Move"}
             </div>
             {disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0 && (
-              <div className="text-xs text-base-content/60 mb-2 p-2 bg-info/10 rounded">
+              <div className="text-base-content/60 bg-info/10 mb-2 rounded p-2 text-xs">
                 <strong>Note:</strong> Vesu uses collateral-debt pair isolation. You can adjust the amount, but this collateral cannot be changed.
               </div>
             )}
             {isMorphoSelected && !disableCollateralSelection && (
-              <div className="text-xs text-base-content/60 mb-2 p-2 bg-info/10 rounded">
+              <div className="text-base-content/60 bg-info/10 mb-2 rounded p-2 text-xs">
                 <strong>Note:</strong> Morpho markets are isolated by collateral type. Select one collateral to see available markets.
               </div>
             )}
@@ -539,18 +432,18 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   return (
                     <div
                       key={c.address}
-                      className={`p-2 border rounded ${isExpanded ? "col-span-2" : ""} ${isAdded ? "border-success bg-success/10" : supported && !morphoHasOtherSelected ? "border-base-300" : "border-error/50 opacity-60"
-                        } ${c.balance <= 0 || morphoHasOtherSelected ? "opacity-50 cursor-not-allowed" : disableCollateralSelection ? "cursor-default" : "cursor-pointer"}`}
+                      className={`rounded border p-2 ${isExpanded ? "col-span-2" : ""} ${isAdded ? "border-success bg-success/10" : supported && !morphoHasOtherSelected ? "border-base-300" : "border-error/50 opacity-60"
+                        } ${c.balance <= 0 || morphoHasOtherSelected ? "cursor-not-allowed opacity-50" : disableCollateralSelection ? "cursor-default" : "cursor-pointer"}`}
                       onClick={() => {
                         if (c.balance <= 0 || disableCollateralSelection || morphoHasOtherSelected) return;
                         onCollateralTileClick(c.address);
                       }}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 relative">
+                        <div className="relative size-6">
                           <Image src={c.icon} alt={c.symbol} fill className="rounded-full" />
                         </div>
-                        <span className="font-medium flex items-center gap-1">
+                        <span className="flex items-center gap-1 font-medium">
                           {c.symbol}
                           {isAdded && <span className="text-success">✓</span>}
                         </span>
@@ -559,7 +452,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                             {isMorphoSelected ? "No market" : "Not supported"}
                           </span>
                         )}
-                        <span className="ml-auto text-sm text-base-content/70">
+                        <span className="text-base-content/70 ml-auto text-sm">
                           {addedCollaterals[key]
                             ? `$${getUsdValue(c.address, addedCollaterals[key]).toLocaleString(undefined, {
                               minimumFractionDigits: 2,
@@ -570,73 +463,40 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                       </div>
 
                       {isExpanded && !disableCollateralSelection && (
-                        <div className="mt-3 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                          <div className="relative flex-1">
-                            <input
-                              type="number"
-                              value={tempAmount}
-                              onChange={e => {
-                                setTempIsMax(false);
-                                setTempAmount(clampAmount(e.target.value, String(c.balance)));
-                              }}
-                              onKeyDown={e => e.key === "Enter" && onAddCollateral(c.address, c.balance)}
-                              placeholder="0.00"
-                              className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-20 outline-none"
-                              autoFocus
-                            />
-                            <button
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-primary"
-                              onClick={() => {
-                                setTempIsMax(true);
-                                setTempAmount(formatUnits(c.rawBalance, c.decimals));
-                              }}
-                            >
-                              {c.balance.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                            </button>
-                          </div>
-                          <button
-                            className="btn btn-ghost btn-sm text-success disabled:text-base-content/40"
-                            onClick={() => onAddCollateral(c.address, c.balance)}
-                            disabled={!tempAmount || parseFloat(tempAmount) <= 0}
-                            title="Add collateral"
-                          >
-                            ✓
-                          </button>
-                        </div>
+                        <CollateralAmountInputStyled
+                          variant="expanded"
+                          value={tempAmount}
+                          onChange={val => {
+                            setTempIsMax(false);
+                            setTempAmount(val);
+                          }}
+                          onMaxClick={() => {
+                            setTempIsMax(true);
+                            setTempAmount(formatUnits(c.rawBalance, c.decimals));
+                          }}
+                          onConfirm={() => onAddCollateral(c.address, c.balance)}
+                          rawBalance={c.rawBalance}
+                          decimals={c.decimals}
+                          balance={c.balance}
+                        />
                       )}
                       {disableCollateralSelection && !isAdded && (
-                        <div className="mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                          <div className="relative flex-1">
-                            <input
-                              type="number"
-                              value={tempAmount || ""}
-                              onChange={e => {
-                                setTempIsMax(false);
-                                setTempAmount(clampAmount(e.target.value, String(c.balance)));
-                              }}
-                              placeholder="0.00"
-                              className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-20 outline-none text-base-content"
-                              autoFocus
-                            />
-                            <button
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-primary"
-                              onClick={() => {
-                                setTempIsMax(true);
-                                setTempAmount(formatUnits(c.rawBalance, c.decimals));
-                              }}
-                            >
-                              {c.balance.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                            </button>
-                          </div>
-                          <button
-                            className="btn btn-ghost btn-sm text-success disabled:text-base-content/40"
-                            onClick={() => onAddCollateral(c.address, c.balance)}
-                            disabled={!tempAmount || parseFloat(tempAmount) <= 0}
-                            title="Add collateral"
-                          >
-                            ✓
-                          </button>
-                        </div>
+                        <CollateralAmountInputStyled
+                          variant="preselected"
+                          value={tempAmount || ""}
+                          onChange={val => {
+                            setTempIsMax(false);
+                            setTempAmount(val);
+                          }}
+                          onMaxClick={() => {
+                            setTempIsMax(true);
+                            setTempAmount(formatUnits(c.rawBalance, c.decimals));
+                          }}
+                          onConfirm={() => onAddCollateral(c.address, c.balance)}
+                          rawBalance={c.rawBalance}
+                          decimals={c.decimals}
+                          balance={c.balance}
+                        />
                       )}
                     </div>
                   );
@@ -664,23 +524,23 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4 text-center">
             <div>
-              <div className="text-xs text-base-content/70">Health Factor</div>
+              <div className="text-base-content/70 text-xs">Health Factor</div>
               <div className={`font-medium ${hfColor.tone}`}>
                 {refiHF >= 999 ? "∞" : refiHF.toFixed(2)}
               </div>
             </div>
             <div>
-              <div className="text-xs text-base-content/70">Collateral Amount</div>
+              <div className="text-base-content/70 text-xs">Collateral Amount</div>
               <div className="font-medium">
                 ${totalCollateralUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
             <div>
-              <div className="text-xs text-base-content/70">LTV</div>
+              <div className="text-base-content/70 text-xs">LTV</div>
               <div className="font-medium">{ltv}%</div>
             </div>
             <div>
-              <div className="text-xs text-base-content/70">Debt Amount</div>
+              <div className="text-base-content/70 text-xs">Debt Amount</div>
               <div className="font-medium">
                 ${debtUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
@@ -693,26 +553,26 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
           )}
 
           {/* Action */}
-          <div className="pt-2 flex items-center justify-between">
+          <div className="flex items-center justify-between pt-2">
             {showBatchingOption && setPreferBatching && (
               <div className="flex flex-col gap-1">
                 <button
                   type="button"
                   onClick={() => setPreferBatching(prev => !prev)}
-                  className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"
+                  className={`inline-flex cursor-pointer items-center gap-1 text-xs hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"
                     }`}
                 >
-                  <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                  <CheckIcon className={`size-4 ${preferBatching ? "" : "opacity-40"}`} />
                   Batch transactions
                 </button>
                 {setRevokePermissions && (
                   <button
                     type="button"
                     onClick={() => setRevokePermissions(prev => !prev)}
-                    className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${revokePermissions ? "text-success" : "text-base-content/60"
+                    className={`inline-flex cursor-pointer items-center gap-1 text-xs hover:opacity-80 ${revokePermissions ? "text-success" : "text-base-content/60"
                       }`}
                   >
-                    <CheckIcon className={`w-4 h-4 ${revokePermissions ? "" : "opacity-40"}`} />
+                    <CheckIcon className={`size-4 ${revokePermissions ? "" : "opacity-40"}`} />
                     Revoke permissions
                   </button>
                 )}
@@ -720,7 +580,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
             )}
             {!showBatchingOption && <div />}
 
-            <div className="flex-1 ml-4">
+            <div className="ml-4 flex-1">
               <SegmentedActionBar
                 className="w-full"
                 autoCompact

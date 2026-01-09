@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
@@ -8,6 +8,69 @@ import { CustomConnectButton } from "~~/components/scaffold-stark/CustomConnectB
 import { GasTokenSelector } from "~~/components/GasTokenSelector";
 
 const NETWORK_STORAGE_KEY = "kapan-network-filter-selection";
+
+// Shared animation config for wallet transitions
+const walletAnimationProps = {
+  initial: { opacity: 0, scale: 0.9 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.9 },
+  transition: { duration: 0.2 },
+} as const;
+
+// Base container styling for wallet buttons
+const containerClasses =
+  "bg-base-200/80 hover:bg-base-200 border-base-content/10 flex items-center rounded-lg border transition-colors duration-200";
+
+// Shared wrapper for wallet button content
+const WalletButtonContent = ({ children }: { children: ReactNode }) => (
+  <div className="relative flex-1 cursor-pointer px-3 py-1.5">{children}</div>
+);
+
+// Gas selector with divider (Starknet only)
+const GasSelectorSection = () => (
+  <>
+    <div className="bg-base-content/10 h-7 w-[1px]"></div>
+    <div className="px-3 py-1.5">
+      <GasTokenSelector />
+    </div>
+  </>
+);
+
+// Starknet wallet content with optional gas selector and glow effect
+const StarknetWalletContent = ({
+  showGasSelector,
+  withGlow = false,
+}: {
+  showGasSelector: boolean;
+  withGlow?: boolean;
+}) => {
+  const content = (
+    <div className={`${containerClasses}${withGlow ? " relative" : ""}`}>
+      <WalletButtonContent>
+        <CustomConnectButton />
+      </WalletButtonContent>
+      {showGasSelector && <GasSelectorSection />}
+    </div>
+  );
+
+  if (!withGlow) return content;
+
+  return (
+    <div className="relative">
+      <div className="absolute -inset-1 rounded-lg bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-orange-400/30 opacity-60 blur-sm" />
+      {content}
+    </div>
+  );
+};
+
+// EVM wallet content
+const EvmWalletContent = () => (
+  <div className={containerClasses}>
+    <WalletButtonContent>
+      <RainbowKitCustomConnectButton />
+    </WalletButtonContent>
+  </div>
+);
 
 export type WalletButtonVariant = "auto" | "evm" | "starknet";
 
@@ -114,25 +177,9 @@ export const WalletButton = ({
     return (
       <div className={`flex items-center ${className}`}>
         {showStarknet ? (
-          <div className="flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10">
-            <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-              <CustomConnectButton />
-            </div>
-            {showGasSelector && (
-              <>
-                <div className="h-7 w-[1px] bg-base-content/10"></div>
-                <div className="px-3 py-1.5">
-                  <GasTokenSelector />
-                </div>
-              </>
-            )}
-          </div>
+          <StarknetWalletContent showGasSelector={showGasSelector} />
         ) : (
-          <div className="flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10">
-            <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-              <RainbowKitCustomConnectButton />
-            </div>
-          </div>
+          <EvmWalletContent />
         )}
       </div>
     );
@@ -143,44 +190,12 @@ export const WalletButton = ({
     <div className={`flex items-center ${className}`}>
       <AnimatePresence mode="wait">
         {showStarknet ? (
-          <motion.div
-            key="starknet"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center gap-2"
-          >
-            {/* Starknet glow effect - subtle */}
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-orange-400/30 rounded-lg blur-sm opacity-60" />
-              <div className="relative flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10">
-                <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-                  <CustomConnectButton />
-                </div>
-                {showGasSelector && (
-                  <>
-                    <div className="h-7 w-[1px] bg-base-content/10"></div>
-                    <div className="px-3 py-1.5">
-                      <GasTokenSelector />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+          <motion.div key="starknet" {...walletAnimationProps} className="flex items-center gap-2">
+            <StarknetWalletContent showGasSelector={showGasSelector} withGlow />
           </motion.div>
         ) : (
-          <motion.div
-            key="evm"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10"
-          >
-            <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-              <RainbowKitCustomConnectButton />
-            </div>
+          <motion.div key="evm" {...walletAnimationProps}>
+            <EvmWalletContent />
           </motion.div>
         )}
       </AnimatePresence>

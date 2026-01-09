@@ -24,7 +24,7 @@ const duplicatedProtocols = [...protocols, ...protocols];
 
 const ProtocolMarquee = () => {
   return (
-    <div className="relative overflow-hidden w-full max-w-md">
+    <div className="relative w-full max-w-md overflow-hidden">
       <motion.div
         className="flex gap-6"
         animate={{ x: ["0%", "-50%"] }}
@@ -39,9 +39,9 @@ const ProtocolMarquee = () => {
         {duplicatedProtocols.map((protocol, index) => (
           <div
             key={`${protocol.name}-${index}`}
-            className="flex items-center gap-2 flex-shrink-0"
+            className="flex flex-shrink-0 items-center gap-2"
           >
-            <div className="w-5 h-5 relative">
+            <div className="relative size-5">
               <Image
                 src={protocol.logo}
                 alt={protocol.name}
@@ -49,15 +49,15 @@ const ProtocolMarquee = () => {
                 className="object-contain"
               />
             </div>
-            <span className="text-sm font-medium text-base-content/50">
+            <span className="text-base-content/50 text-sm font-medium">
               {protocol.name}
             </span>
           </div>
         ))}
       </motion.div>
       {/* Fade edges */}
-      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-base-100 to-transparent pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base-100 to-transparent pointer-events-none" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
     </div>
   );
 };
@@ -81,13 +81,13 @@ const LaunchAppButton = () => {
         track("To App conversion", { button: "Landing Hero" });
         window.location.assign(appUrl);
       }}
-      className="group relative h-16 md:h-20 px-10 md:px-14 bg-primary text-primary-content font-black uppercase tracking-[0.3em] text-[11px] md:text-xs hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-all duration-500 overflow-hidden flex items-center justify-center"
+      className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
     >
       <div className="relative z-10 flex items-center gap-4">
-        <span className="translate-x-2 group-hover:translate-x-0 transition-transform duration-500">
+        <span className="translate-x-2 transition-transform duration-500 group-hover:translate-x-0">
           Launch App
         </span>
-        <ArrowRightIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-500" />
+        <ArrowRightIcon className="size-4 opacity-0 transition-all duration-500 group-hover:translate-x-1 group-hover:opacity-100" />
       </div>
     </a>
   );
@@ -135,9 +135,9 @@ const duplicatedIntegrations = [...integrations, ...integrations];
 
 // Marquee row component
 const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => (
-  <div className="flex items-center gap-4 w-full">
-    <span className="text-[10px] uppercase tracking-wider text-base-content/30 w-20 flex-shrink-0 text-right">{label}</span>
-    <div className="relative overflow-hidden flex-1">
+  <div className="flex w-full items-center gap-4">
+    <span className="text-base-content/30 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
+    <div className="relative flex-1 overflow-hidden">
       <motion.div
         className="flex gap-6"
         animate={{ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}
@@ -150,17 +150,17 @@ const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; 
         }}
       >
         {items.map((item, index) => (
-          <div key={`${item.name}-${index}`} className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-5 h-5 relative">
+          <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
+            <div className="relative size-5">
               <Image src={item.logo} alt={item.name} fill className="object-contain" />
             </div>
-            <span className="text-xs text-base-content/40">{item.name}</span>
+            <span className="text-base-content/40 text-xs">{item.name}</span>
           </div>
         ))}
       </motion.div>
       {/* Fade edges */}
-      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-base-100 to-transparent pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base-100 to-transparent pointer-events-none" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
     </div>
   </div>
 );
@@ -174,24 +174,24 @@ const FeatureList = () => {
   ];
 
   return (
-    <div className="flex flex-col items-center gap-10 w-full max-w-4xl mx-auto px-4">
+    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 px-4">
       {/* Features grid - centered with consistent spacing */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 w-full max-w-2xl">
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-x-12 gap-y-8 md:grid-cols-2">
         {features.map((f, i) => (
           <div key={i} className="flex gap-4 text-left">
-            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-base-content/5 border border-base-content/5 flex items-center justify-center">
-              <f.icon className="w-5 h-5 text-base-content/60" />
+            <div className="bg-base-content/5 border-base-content/5 flex size-11 flex-shrink-0 items-center justify-center rounded-xl border">
+              <f.icon className="text-base-content/60 size-5" />
             </div>
             <div className="pt-0.5">
-              <div className="text-sm font-semibold text-base-content mb-1">{f.title}</div>
-              <div className="text-sm text-base-content/40 leading-relaxed">{f.desc}</div>
+              <div className="text-base-content mb-1 text-sm font-semibold">{f.title}</div>
+              <div className="text-base-content/40 text-sm leading-relaxed">{f.desc}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Supported networks/protocols/integrations marquees */}
-      <div className="w-full space-y-3 pt-6 border-t border-base-content/5">
+      <div className="border-base-content/5 w-full space-y-3 border-t pt-6">
         <MarqueeRow items={duplicatedNetworks} label="Networks" />
         <MarqueeRow items={duplicatedSupportedProtocols} label="Protocols" reverse />
         <MarqueeRow items={duplicatedIntegrations} label="Routers" />
@@ -224,7 +224,7 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
   const letters = "KAPAN".split("");
   
   return (
-    <div className="flex flex-col items-center gap-10 text-center px-4">
+    <div className="flex flex-col items-center gap-10 px-4 text-center">
       {/* Logo + KAPAN text - Fallout sign style */}
       <div className="flex flex-col items-center gap-4">
         {/* Logo flickers first */}
@@ -239,13 +239,13 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
             times: [0, 0.05, 0.1, 0.18, 0.28, 0.35, 0.4, 0.5, 0.58, 0.68, 0.78, 0.88, 0.94, 1],
             ease: "linear" as const,
           }}
-          className="w-16 h-16 md:w-20 md:h-20 relative"
+          className="relative size-16 md:size-20"
         >
           <Image src="/seal-logo.png" alt="Kapan" fill className="object-contain" />
         </motion.div>
         
         {/* Letters flicker on one by one */}
-        <div className="text-4xl md:text-5xl font-black tracking-[0.3em] uppercase">
+        <div className="text-4xl font-black uppercase tracking-[0.3em] md:text-5xl">
           {letters.map((letter, i) => (
             <NeonLetter key={i} letter={letter} delay={1.5 + i * 0.25} animate={isActive} />
           ))}
@@ -275,7 +275,7 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
         animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
         transition={{ delay: 4.2, duration: 0.6, ease: "easeOut" }}
       >
-        <div className="flex items-center gap-6 text-xs text-base-content/30">
+        <div className="text-base-content/30 flex items-center gap-6 text-xs">
           <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Discord</a>
           <a href="https://t.me/+vYCKr2TrOXRiODg0" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Telegram</a>
           <a href="https://x.com/KapanFinance" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Twitter</a>
@@ -285,7 +285,7 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
           href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" 
           target="_blank" 
           rel="noopener noreferrer" 
-          className="text-[10px] uppercase tracking-wider text-base-content/20 hover:text-base-content/40 transition-colors"
+          className="text-base-content/20 hover:text-base-content/40 text-[10px] uppercase tracking-wider transition-colors"
         >
           Starknet Audit by Codespect
         </a>
@@ -325,7 +325,7 @@ const HowItWorks = () => {
   const radiusY = 38; // percentage from center vertically
   
   // Helper to calculate position from angle
-  const getPosition = (angle: number, radius: number = 1) => {
+  const getPosition = (angle: number, radius = 1) => {
     const radians = ((angle - 90) * Math.PI) / 180;
     return {
       x: 50 + Math.cos(radians) * radiusX * radius,
@@ -334,21 +334,21 @@ const HowItWorks = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-10 max-w-5xl mx-auto px-4">
+    <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4">
       {/* Mobile: Just Kapan logo centered */}
-      <div className="md:hidden flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-6 md:hidden">
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
         >
-          <div className="w-20 h-20 rounded-2xl bg-base-200/80 border border-base-content/20 flex items-center justify-center shadow-lg">
+          <div className="bg-base-200/80 border-base-content/20 flex size-20 items-center justify-center rounded-2xl border shadow-lg">
             <Image src="/seal-logo.png" alt="Kapan" width={48} height={48} />
           </div>
         </motion.div>
         
         {/* Protocol logos in a row */}
-        <div className="flex flex-wrap items-center justify-center gap-3 max-w-xs">
+        <div className="flex max-w-xs flex-wrap items-center justify-center gap-3">
           {connectedProtocols.map((protocol, i) => (
             <motion.div
               key={protocol.name}
@@ -356,7 +356,7 @@ const HowItWorks = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 + i * 0.05 }}
             >
-              <div className="w-8 h-8 rounded-lg bg-base-200/60 border border-base-content/10 flex items-center justify-center">
+              <div className="bg-base-200/60 border-base-content/10 flex size-8 items-center justify-center rounded-lg border">
                 <Image src={protocol.logo} alt={protocol.name} width={18} height={18} />
               </div>
             </motion.div>
@@ -365,10 +365,10 @@ const HowItWorks = () => {
       </div>
 
       {/* Desktop: Full orchestrator visualization */}
-      <div className="hidden md:flex items-center justify-center w-full">
-        <div className="relative w-full max-w-2xl h-[350px]">
+      <div className="hidden w-full items-center justify-center md:flex">
+        <div className="relative h-[350px] w-full max-w-2xl">
           {/* Connection lines using same percentage system */}
-          <svg className="absolute inset-0 w-full h-full overflow-visible">
+          <svg className="absolute inset-0 size-full overflow-visible">
             {connectedProtocols.map((protocol, i) => {
               const pos = getPosition(protocol.angle);
               return (
@@ -396,7 +396,7 @@ const HowItWorks = () => {
               <React.Fragment key={i}>
                 {/* Outbound: instruction travels TO protocol */}
                 <motion.div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 z-5 pointer-events-none"
+                  className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
                   initial={{ left: "50%", top: "50%", opacity: 0 }}
                   animate={{ 
                     left: ["50%", "50%", `${endPos.x}%`, `${endPos.x}%`],
@@ -412,14 +412,14 @@ const HowItWorks = () => {
                     ease: "easeInOut",
                   }}
                 >
-                  <span className={`px-2 py-0.5 text-[10px] font-mono font-medium rounded border ${item.color} whitespace-nowrap`}>
+                  <span className={`rounded border px-2 py-0.5 font-mono text-[10px] font-medium ${item.color} whitespace-nowrap`}>
                     {item.instruction}
                   </span>
                 </motion.div>
                 
                 {/* Return: UTXO travels back FROM protocol */}
                 <motion.div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 z-5 pointer-events-none"
+                  className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
                   initial={{ left: `${endPos.x}%`, top: `${endPos.y}%`, opacity: 0 }}
                   animate={{ 
                     left: [`${endPos.x}%`, `${endPos.x}%`, "50%", "50%"],
@@ -435,7 +435,7 @@ const HowItWorks = () => {
                     ease: "easeInOut",
                   }}
                 >
-                  <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded border bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap">
+                  <span className="bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-medium">
                     UTXO
                   </span>
                 </motion.div>
@@ -445,14 +445,14 @@ const HowItWorks = () => {
 
           {/* Center - Kapan Router */}
           <motion.div 
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
+            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
           >
-            <div className="flex items-center gap-2 px-4 py-2 bg-base-100 border border-base-content/20 rounded-lg shadow-lg">
+            <div className="bg-base-100 border-base-content/20 flex items-center gap-2 rounded-lg border px-4 py-2 shadow-lg">
               <Image src="/seal-logo.png" alt="Kapan" width={24} height={24} />
-              <span className="font-bold text-sm tracking-wide">KAPAN</span>
+              <span className="text-sm font-bold tracking-wide">KAPAN</span>
             </div>
           </motion.div>
 
@@ -462,17 +462,17 @@ const HowItWorks = () => {
             return (
               <motion.div
                 key={protocol.name}
-                className="absolute -translate-x-1/2 -translate-y-1/2 z-20"
+                className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3 + i * 0.08, duration: 0.4 }}
               >
                 <div className="flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 rounded-xl bg-base-100 border border-base-content/10 flex items-center justify-center shadow-md">
+                  <div className="bg-base-100 border-base-content/10 flex size-12 items-center justify-center rounded-xl border shadow-md">
                     <Image src={protocol.logo} alt={protocol.name} width={28} height={28} />
                   </div>
-                  <span className="text-[10px] text-base-content/40 font-medium">{protocol.name}</span>
+                  <span className="text-base-content/40 text-[10px] font-medium">{protocol.name}</span>
                 </div>
               </motion.div>
             );
@@ -481,16 +481,16 @@ const HowItWorks = () => {
       </div>
 
       {/* Explanation text */}
-      <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-center">
+      <div className="flex flex-col items-center justify-center gap-8 text-center md:flex-row md:gap-16">
         <motion.div 
           className="max-w-[200px]"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
         >
-          <div className="text-[10px] uppercase tracking-widest text-primary mb-1">01</div>
-          <div className="text-sm font-medium mb-1">Bundle Instructions</div>
-          <div className="text-xs text-base-content/40">Combine deposit, borrow, swap, and repay into one bundle.</div>
+          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">01</div>
+          <div className="mb-1 text-sm font-medium">Bundle Instructions</div>
+          <div className="text-base-content/40 text-xs">Combine deposit, borrow, swap, and repay into one bundle.</div>
         </motion.div>
         <motion.div 
           className="max-w-[200px]"
@@ -498,9 +498,9 @@ const HowItWorks = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.95 }}
         >
-          <div className="text-[10px] uppercase tracking-widest text-primary mb-1">02</div>
-          <div className="text-sm font-medium mb-1">Flash Loan Powered</div>
-          <div className="text-xs text-base-content/40">No upfront capital needed. Borrow, execute, repay atomically.</div>
+          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">02</div>
+          <div className="mb-1 text-sm font-medium">Flash Loan Powered</div>
+          <div className="text-base-content/40 text-xs">No upfront capital needed. Borrow, execute, repay atomically.</div>
         </motion.div>
         <motion.div 
           className="max-w-[200px]"
@@ -508,9 +508,9 @@ const HowItWorks = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.1 }}
         >
-          <div className="text-[10px] uppercase tracking-widest text-primary mb-1">03</div>
-          <div className="text-sm font-medium mb-1">All or Nothing</div>
-          <div className="text-xs text-base-content/40">Transaction succeeds completely or reverts. No partial states.</div>
+          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">03</div>
+          <div className="mb-1 text-sm font-medium">All or Nothing</div>
+          <div className="text-base-content/40 text-xs">Transaction succeeds completely or reverts. No partial states.</div>
         </motion.div>
       </div>
     </div>
@@ -519,15 +519,15 @@ const HowItWorks = () => {
 
 // Wrapper to add fade effect to real components
 const FadedPreview = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`relative w-full max-w-6xl mx-auto px-4 ${className}`}>
+  <div className={`relative mx-auto w-full max-w-6xl px-4 ${className}`}>
     <div className="pointer-events-none">
       {children}
     </div>
     {/* Fade overlay on bottom */}
-    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-base-100 to-transparent pointer-events-none" />
+    <div className="from-base-100 pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t to-transparent" />
     {/* Fade overlay on sides */}
-    <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-base-100 to-transparent pointer-events-none" />
-    <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base-100 to-transparent pointer-events-none" />
+    <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
+    <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
   </div>
 );
 
@@ -542,7 +542,7 @@ const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string
 const MockActionButton = ({ icon, label, tip }: { icon: React.ReactNode; label: string; tip: string }) => (
   <Tooltip content={tip} delayDuration={100}>
     <button 
-      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-base-content/50 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-help"
+      className="text-base-content/50 hover:text-base-content/70 hover:bg-base-content/5 flex flex-1 cursor-help items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors"
     >
       {icon}
       <span>{label}</span>
@@ -552,12 +552,12 @@ const MockActionButton = ({ icon, label, tip }: { icon: React.ReactNode; label: 
 
 // Mock Morpho Blue protocol view - matches real dashboard layout with mobile responsiveness
 const MockMorphoView = () => (
-  <div className="w-full flex flex-col p-2 sm:p-3 space-y-2">
+  <div className="flex w-full flex-col space-y-2 p-2 sm:p-3">
     {/* Protocol Header Card */}
     <div className="card-surface shadow-lg">
-      <div className="card-body px-3 sm:px-5 py-2 sm:py-3">
+      <div className="card-body px-3 py-2 sm:px-5 sm:py-3">
         {/* Mobile Protocol Header */}
-        <div className="flex md:hidden items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 md:hidden">
           <div className="flex items-center gap-2">
             <div className="token-icon-wrapper-md">
               <Image src="/logos/morpho.svg" alt="Morpho Blue" width={18} height={18} className="object-contain" />
@@ -575,9 +575,9 @@ const MockMorphoView = () => (
         </div>
 
         {/* Desktop Protocol Header */}
-        <div className="hidden md:flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 md:flex">
           <MockTooltip tip="The lending protocol where this position lives">
-            <div className="flex items-center gap-3 cursor-help">
+            <div className="flex cursor-help items-center gap-3">
               <div className="token-icon-wrapper-lg">
                 <Image src="/logos/morpho.svg" alt="Morpho Blue" width={24} height={24} className="object-contain drop-shadow-sm" />
               </div>
@@ -587,42 +587,42 @@ const MockMorphoView = () => (
               </div>
             </div>
           </MockTooltip>
-          <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
-          <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+          <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
+          <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
             <MockTooltip tip="Total value of your positions (collateral minus debt)">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
                 <span className="label-text-xs-semibold">Balance</span>
-                <span className="text-sm font-mono font-bold tabular-nums text-success">$6.55K</span>
+                <span className="text-success font-mono text-sm font-bold tabular-nums">$6.55K</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="Estimated earnings over the last 30 days">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
                 <span className="label-text-xs-semibold">30D Yield</span>
-                <span className="text-sm font-mono font-bold tabular-nums text-success">$241.28</span>
+                <span className="text-success font-mono text-sm font-bold tabular-nums">$241.28</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="Net APY: supply yield minus borrow cost">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
                 <span className="label-text-xs-semibold">Net APY</span>
-                <span className="text-sm font-mono font-bold tabular-nums text-success">+44.79%</span>
+                <span className="text-success font-mono text-sm font-bold tabular-nums">+44.79%</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="How much of your borrowing capacity you're using">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
                 <span className="label-text-xs-semibold">Utilization</span>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-                    <div className="h-full bg-error rounded-full w-[90%]" />
+                  <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
+                    <div className="bg-error h-full w-[90%] rounded-full" />
                   </div>
-                  <span className="text-xs font-mono font-semibold tabular-nums text-error">90%</span>
+                  <span className="text-error font-mono text-xs font-semibold tabular-nums">90%</span>
                 </div>
               </div>
             </MockTooltip>
           </div>
           <MockTooltip tip="View available markets on this protocol">
-            <div className="flex items-center gap-1 text-xs text-base-content/50 cursor-help border border-base-content/20 rounded px-2 py-1">
+            <div className="text-base-content/50 border-base-content/20 flex cursor-help items-center gap-1 rounded border px-2 py-1 text-xs">
               <span>Markets</span>
-              <ChevronDownIcon className="w-4 h-4" />
+              <ChevronDownIcon className="size-4" />
             </div>
           </MockTooltip>
         </div>
@@ -630,32 +630,32 @@ const MockMorphoView = () => (
     </div>
 
     {/* YOUR POSITIONS section */}
-    <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
-      <div className="card-body p-3 sm:p-4 space-y-2 sm:space-y-3">
+    <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
+      <div className="card-body space-y-2 p-3 sm:space-y-3 sm:p-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-4 sm:h-5 rounded-full bg-primary" />
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Your Positions</span>
+            <div className="bg-primary h-4 w-1 rounded-full sm:h-5" />
+            <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest sm:text-[11px]">Your Positions</span>
           </div>
           <MockTooltip tip="Number of active markets you have positions in">
-            <div className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-primary/10 text-primary cursor-help">
-              <span className="text-[10px] sm:text-xs font-mono font-bold">1</span>
-              <span className="text-[8px] sm:text-[10px] uppercase tracking-wider opacity-70">market</span>
+            <div className="bg-primary/10 text-primary flex cursor-help items-center gap-1 rounded-full px-1.5 py-0.5 sm:px-2">
+              <span className="font-mono text-[10px] font-bold sm:text-xs">1</span>
+              <span className="text-[8px] uppercase tracking-wider opacity-70 sm:text-[10px]">market</span>
             </div>
           </MockTooltip>
         </div>
 
         {/* Market pair - expanded view */}
-        <div className="rounded-lg border border-primary/30 overflow-hidden ring-1 ring-primary/10">
+        <div className="border-primary/30 ring-primary/10 overflow-hidden rounded-lg border ring-1">
           {/* Market pair header - Mobile */}
-          <div className="flex md:hidden items-center justify-between bg-base-200/50 px-3 py-2 border-b border-base-300">
+          <div className="bg-base-200/50 border-base-300 flex items-center justify-between border-b px-3 py-2 md:hidden">
             <div className="flex items-center gap-2">
               <div className="flex -space-x-1">
-                <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={18} height={18} className="rounded-full border border-base-200 bg-base-200" />
-                <Image src="/logos/usdc.svg" alt="USDC" width={18} height={18} className="rounded-full border border-base-200 bg-base-200" />
+                <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={18} height={18} className="border-base-200 bg-base-200 rounded-full border" />
+                <Image src="/logos/usdc.svg" alt="USDC" width={18} height={18} className="border-base-200 bg-base-200 rounded-full border" />
               </div>
-              <span className="text-xs font-semibold truncate max-w-[120px]">PT-USDai/USDC</span>
+              <span className="max-w-[120px] truncate text-xs font-semibold">PT-USDai/USDC</span>
             </div>
             <div className="flex items-center gap-2 text-[10px]">
               <span className="text-success font-mono">$6.55K</span>
@@ -664,13 +664,13 @@ const MockMorphoView = () => (
           </div>
 
           {/* Market pair header - Desktop */}
-          <div className="hidden md:flex items-center justify-between bg-base-200/50 px-4 py-2.5 border-b border-base-300">
+          <div className="bg-base-200/50 border-base-300 hidden items-center justify-between border-b px-4 py-2.5 md:flex">
             <div className="flex items-center gap-3">
               <MockTooltip tip="Isolated lending market: PT-USDai collateral, USDC debt">
-                <div className="flex items-center gap-3 cursor-help">
+                <div className="flex cursor-help items-center gap-3">
                   <div className="flex -space-x-1.5">
-                    <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={22} height={22} className="rounded-full border-2 border-base-200 bg-base-200" />
-                    <Image src="/logos/usdc.svg" alt="USDC" width={22} height={22} className="rounded-full border-2 border-base-200 bg-base-200" />
+                    <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={22} height={22} className="border-base-200 bg-base-200 rounded-full border-2" />
+                    <Image src="/logos/usdc.svg" alt="USDC" width={22} height={22} className="border-base-200 bg-base-200 rounded-full border-2" />
                   </div>
                   <span className="text-sm font-semibold">PT-USDai-19FEB2026/USDC</span>
                 </div>
@@ -679,7 +679,7 @@ const MockMorphoView = () => (
                 <Image src="/logos/morpho.svg" alt="Morpho" width={14} height={14} />
                 <MockTooltip tip="View on Morpho">
                   <a href="#" className="text-base-content/40 hover:text-base-content/60">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    <svg className="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                   </a>
                 </MockTooltip>
               </div>
@@ -701,153 +701,153 @@ const MockMorphoView = () => (
           </div>
 
           {/* Mobile: Stacked layout */}
-          <div className="md:hidden bg-base-200/20">
+          <div className="bg-base-200/20 md:hidden">
             {/* Collateral */}
-            <div className="px-3 py-2 border-b border-base-300/50">
+            <div className="border-base-300/50 border-b px-3 py-2">
               <div className="flex items-center gap-2">
                 <div className="relative flex-shrink-0">
                   <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={28} height={28} className="rounded-full" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[9px] text-base-content/40 uppercase tracking-wider">Collateral</div>
-                  <div className="font-medium text-xs truncate">PT-USDai-1...</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-base-content/40 text-[9px] uppercase tracking-wider">Collateral</div>
+                  <div className="truncate text-xs font-medium">PT-USDai-1...</div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">Bal</div>
-                    <div className="text-xs font-mono font-semibold text-success">$63.8K</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">Bal</div>
+                    <div className="text-success font-mono text-xs font-semibold">$63.8K</div>
                   </div>
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">APY</div>
-                    <div className="text-xs font-mono font-semibold">7.46%</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">APY</div>
+                    <div className="font-mono text-xs font-semibold">7.46%</div>
                   </div>
                 </div>
               </div>
               {/* Mobile action buttons */}
-              <div className="flex items-center gap-1 mt-2">
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">+ Deposit</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">- Withdraw</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">Move</button>
+              <div className="mt-2 flex items-center gap-1">
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">+ Deposit</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">- Withdraw</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">Move</button>
               </div>
             </div>
             {/* Debt */}
             <div className="px-3 py-2">
               <div className="flex items-center gap-2">
-                <Image src="/logos/usdc.svg" alt="USDC" width={28} height={28} className="rounded-full flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[9px] text-base-content/40 uppercase tracking-wider">Debt</div>
-                  <div className="font-medium text-xs">USDC</div>
+                <Image src="/logos/usdc.svg" alt="USDC" width={28} height={28} className="flex-shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-base-content/40 text-[9px] uppercase tracking-wider">Debt</div>
+                  <div className="text-xs font-medium">USDC</div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">Bal</div>
-                    <div className="text-xs font-mono font-semibold text-error">-$57.3K</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">Bal</div>
+                    <div className="text-error font-mono text-xs font-semibold">-$57.3K</div>
                   </div>
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">APR</div>
-                    <div className="text-xs font-mono font-semibold">3.19%</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">APR</div>
+                    <div className="font-mono text-xs font-semibold">3.19%</div>
                   </div>
                 </div>
               </div>
               {/* Mobile action buttons */}
-              <div className="flex items-center gap-1 mt-2">
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">- Repay</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">+ Borrow</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">Move</button>
+              <div className="mt-2 flex items-center gap-1">
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">- Repay</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">+ Borrow</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">Move</button>
               </div>
             </div>
           </div>
 
           {/* Desktop: Two-column layout */}
-          <div className="hidden md:grid grid-cols-2 divide-x divide-base-300">
+          <div className="divide-base-300 hidden grid-cols-2 divide-x md:grid">
             {/* Collateral side */}
             <div className="bg-base-200/20">
               {/* Using 12-col grid like real app: token=3, stats=8, chevron=1 */}
-              <div className="grid grid-cols-12 items-center px-4 py-3 border-b border-base-300/50">
+              <div className="border-base-300/50 grid grid-cols-12 items-center border-b px-4 py-3">
                 {/* Token - col-span-3 */}
-                <div className="col-span-3 flex items-center gap-2 min-w-0">
+                <div className="col-span-3 flex min-w-0 items-center gap-2">
                   <MockTooltip tip="Pendle Principal Token - fixed yield until maturity">
-                    <div className="relative cursor-help flex-shrink-0">
+                    <div className="relative flex-shrink-0 cursor-help">
                       <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={36} height={36} className="rounded-full" />
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-base-200 border border-base-300 flex items-center justify-center">
+                      <div className="bg-base-200 border-base-300 absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full border">
                         <Image src="/logos/pendle.png" alt="Pendle" width={10} height={10} />
                       </div>
                     </div>
                   </MockTooltip>
                   <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">PT-USDai-1...</div>
+                    <div className="truncate text-sm font-medium">PT-USDai-1...</div>
                   </div>
                 </div>
                 {/* Stats - col-span-9, evenly distributed */}
                 <div className="col-span-9 grid grid-cols-4 gap-0">
                   <MockTooltip tip="Total collateral value">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Balance</div>
-                      <div className="text-sm font-mono font-semibold text-success">$63.83K</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Balance</div>
+                      <div className="text-success font-mono text-sm font-semibold">$63.83K</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current yield rate">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">APY</div>
-                      <div className="text-sm font-mono font-semibold">7.46%</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">APY</div>
+                      <div className="font-mono text-sm font-semibold">7.46%</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Best available rate across protocols">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Best APY</div>
-                      <div className="flex items-center gap-1 justify-center">
-                        <span className="text-sm font-mono font-semibold text-success">7.46%</span>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Best APY</div>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-success font-mono text-sm font-semibold">7.46%</span>
                         <Image src="/logos/morpho.svg" alt="Morpho" width={12} height={12} />
                       </div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Loan-to-Value ratio">
-                    <div className="text-center cursor-help px-2">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">LTV</div>
-                      <div className="text-sm font-mono font-semibold text-warning">89.7%</div>
+                    <div className="cursor-help px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">LTV</div>
+                      <div className="text-warning font-mono text-sm font-semibold">89.7%</div>
                     </div>
                   </MockTooltip>
                 </div>
               </div>
-              <div className="flex items-stretch divide-x divide-base-300/30">
-                <MockActionButton icon={<PlusIcon className="w-3.5 h-3.5" />} label="Deposit" tip="Add more collateral to reduce liquidation risk" />
-                <MockActionButton icon={<MinusIcon className="w-3.5 h-3.5" />} label="Withdraw" tip="Remove collateral from your position" />
-                <MockActionButton icon={<ArrowRightIcon className="w-3.5 h-3.5" />} label="Move" tip="Move collateral to another protocol" />
+              <div className="divide-base-300/30 flex items-stretch divide-x">
+                <MockActionButton icon={<PlusIcon className="size-3.5" />} label="Deposit" tip="Add more collateral to reduce liquidation risk" />
+                <MockActionButton icon={<MinusIcon className="size-3.5" />} label="Withdraw" tip="Remove collateral from your position" />
+                <MockActionButton icon={<ArrowRightIcon className="size-3.5" />} label="Move" tip="Move collateral to another protocol" />
               </div>
             </div>
 
             {/* Debt side */}
             <div className="bg-base-200/20">
               {/* Using 12-col grid: token=3, stats=8, chevron=1 */}
-              <div className="grid grid-cols-12 items-center px-4 py-3 border-b border-base-300/50">
+              <div className="border-base-300/50 grid grid-cols-12 items-center border-b px-4 py-3">
                 {/* Token - col-span-3 */}
-                <div className="col-span-3 flex items-center gap-2 min-w-0">
+                <div className="col-span-3 flex min-w-0 items-center gap-2">
                   <MockTooltip tip="USDC stablecoin borrowed against collateral">
-                    <Image src="/logos/usdc.svg" alt="USDC" width={36} height={36} className="rounded-full cursor-help flex-shrink-0" />
+                    <Image src="/logos/usdc.svg" alt="USDC" width={36} height={36} className="flex-shrink-0 cursor-help rounded-full" />
                   </MockTooltip>
                   <div className="min-w-0">
-                    <div className="font-medium text-sm">USDC</div>
+                    <div className="text-sm font-medium">USDC</div>
                   </div>
                 </div>
                 {/* Stats - col-span-8, evenly distributed */}
                 <div className="col-span-8 grid grid-cols-3 gap-0">
                   <MockTooltip tip="Total debt owed">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Balance</div>
-                      <div className="text-sm font-mono font-semibold text-error">-$57.28K</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Balance</div>
+                      <div className="text-error font-mono text-sm font-semibold">-$57.28K</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current borrow rate">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">APR</div>
-                      <div className="text-sm font-mono font-semibold">3.19%</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">APR</div>
+                      <div className="font-mono text-sm font-semibold">3.19%</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Best available borrow rate">
-                    <div className="text-center cursor-help px-2">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Best APR</div>
-                      <div className="flex items-center gap-1 justify-center">
-                        <span className="text-sm font-mono font-semibold text-success">3.72%</span>
+                    <div className="cursor-help px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Best APR</div>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-success font-mono text-sm font-semibold">3.72%</span>
                         <Image src="/logos/aave.svg" alt="Aave" width={12} height={12} />
                       </div>
                     </div>
@@ -856,17 +856,17 @@ const MockMorphoView = () => (
                 {/* Chevron - col-span-1 */}
                 <div className="col-span-1 flex justify-end">
                   <MockTooltip tip="Collapse position details">
-                    <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-base-300/30 cursor-help">
-                      <ChevronUpIcon className="w-4 h-4 text-base-content/50" />
+                    <div className="bg-base-300/30 flex size-8 cursor-help items-center justify-center rounded-lg">
+                      <ChevronUpIcon className="text-base-content/50 size-4" />
                     </div>
                   </MockTooltip>
                 </div>
               </div>
-              <div className="flex items-stretch divide-x divide-base-300/30">
-                <MockActionButton icon={<MinusIcon className="w-3.5 h-3.5" />} label="Repay" tip="Pay back debt to reduce interest costs" />
-                <MockActionButton icon={<PlusIcon className="w-3.5 h-3.5" />} label="Borrow" tip="Borrow more against your collateral" />
-                <MockActionButton icon={<ArrowRightIcon className="w-3.5 h-3.5" />} label="Move" tip="Move debt to another protocol" />
-                <MockActionButton icon={<XMarkIcon className="w-3.5 h-3.5" />} label="Close" tip="Close entire position" />
+              <div className="divide-base-300/30 flex items-stretch divide-x">
+                <MockActionButton icon={<MinusIcon className="size-3.5" />} label="Repay" tip="Pay back debt to reduce interest costs" />
+                <MockActionButton icon={<PlusIcon className="size-3.5" />} label="Borrow" tip="Borrow more against your collateral" />
+                <MockActionButton icon={<ArrowRightIcon className="size-3.5" />} label="Move" tip="Move debt to another protocol" />
+                <MockActionButton icon={<XMarkIcon className="size-3.5" />} label="Close" tip="Close entire position" />
               </div>
             </div>
           </div>
@@ -878,13 +878,13 @@ const MockMorphoView = () => (
 
 // Mock Aave header only (fades into darkness)
 const MockAaveHeader = () => (
-  <div className="w-full flex flex-col p-2 sm:p-3">
-    <div className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50">
-      <div className="card-body px-3 sm:px-5 py-2 sm:py-3">
+  <div className="flex w-full flex-col p-2 sm:p-3">
+    <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-lg">
+      <div className="card-body px-3 py-2 sm:px-5 sm:py-3">
         {/* Mobile */}
-        <div className="flex md:hidden items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 md:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center ring-1 ring-base-300/30">
+            <div className="from-base-200 to-base-300/50 ring-base-300/30 relative flex size-8 items-center justify-center rounded-lg bg-gradient-to-br p-1.5 ring-1">
               <Image src="/logos/aave.svg" alt="Aave V3" width={18} height={18} className="object-contain" />
             </div>
             <span className="text-sm font-bold">Aave V3</span>
@@ -896,43 +896,43 @@ const MockAaveHeader = () => (
         </div>
 
         {/* Desktop */}
-        <div className="hidden md:flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 md:flex">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+            <div className="from-base-200 to-base-300/50 ring-base-300/30 relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br p-2 shadow-sm ring-1">
               <Image src="/logos/aave.svg" alt="Aave V3" width={24} height={24} className="object-contain drop-shadow-sm" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
               <span className="text-base font-bold tracking-tight">Aave V3</span>
             </div>
           </div>
-          <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
-          <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
-              <span className="text-sm font-mono font-bold tabular-nums text-success">$2,356.66</span>
+          <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
+          <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Balance</span>
+              <span className="text-success font-mono text-sm font-bold tabular-nums">$2,356.66</span>
             </div>
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
-              <span className="text-sm font-mono font-bold tabular-nums text-error">-$7.45</span>
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">30D Yield</span>
+              <span className="text-error font-mono text-sm font-bold tabular-nums">-$7.45</span>
             </div>
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
-              <span className="text-sm font-mono font-bold tabular-nums text-error">-3.85%</span>
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Net APY</span>
+              <span className="text-error font-mono text-sm font-bold tabular-nums">-3.85%</span>
             </div>
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
               <div className="flex items-center gap-2.5">
-                <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-                  <div className="h-full bg-warning rounded-full w-[81%]" />
+                <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
+                  <div className="bg-warning h-full w-[81%] rounded-full" />
                 </div>
-                <span className="text-xs font-mono font-semibold tabular-nums text-warning">81%</span>
+                <span className="text-warning font-mono text-xs font-semibold tabular-nums">81%</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-base-content/50">
+          <div className="text-base-content/50 flex items-center gap-1 text-xs">
             <span>Markets</span>
-            <ChevronDownIcon className="w-4 h-4" />
+            <ChevronDownIcon className="size-4" />
           </div>
         </div>
       </div>
@@ -942,13 +942,13 @@ const MockAaveHeader = () => (
 
 // Dashboard preview - Morpho with positions, Aave header fading out
 const DashboardPreview = () => (
-  <div className="relative w-full max-w-5xl mx-auto">
+  <div className="relative mx-auto w-full max-w-5xl">
     <MockMorphoView />
     <div className="pointer-events-none">
       <MockAaveHeader />
     </div>
     {/* Fade overlay on bottom */}
-    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-base-100 via-base-100/90 to-transparent pointer-events-none" />
+    <div className="from-base-100 via-base-100/90 pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t to-transparent" />
   </div>
 );
 
@@ -1016,7 +1016,7 @@ const TokenDisplay = ({
     <div className="flex items-center gap-3">
       <Image src={logo} alt={symbol} width={s.img} height={s.img} className="rounded-full" />
       <div>
-        {label && <div className="text-[10px] uppercase tracking-wider text-base-content/30">{label}</div>}
+        {label && <div className="text-base-content/30 text-[10px] uppercase tracking-wider">{label}</div>}
         <div className="flex items-baseline gap-2">
           <span className={`font-mono ${s.amount} ${
             variant === "success" ? "text-success" : 
@@ -1061,11 +1061,11 @@ const RateDisplay = ({
   size?: "md" | "lg";
 }) => (
   <div className={`flex items-baseline gap-3 ${size === "md" ? "" : ""}`}>
-    <span className="text-xs uppercase tracking-wider text-base-content/30">{label}</span>
+    <span className="text-base-content/30 text-xs uppercase tracking-wider">{label}</span>
     {oldRate && (
-      <span className="text-base-content/30 line-through font-mono">{oldRate}</span>
+      <span className="text-base-content/30 font-mono line-through">{oldRate}</span>
     )}
-    <span className={`font-bold text-success font-mono ${size === "lg" ? "text-2xl sm:text-3xl" : "text-xl"}`}>{newRate}</span>
+    <span className={`text-success font-mono font-bold ${size === "lg" ? "text-2xl sm:text-3xl" : "text-xl"}`}>{newRate}</span>
   </div>
 );
 
@@ -1081,18 +1081,18 @@ const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?:
       animate={vertical ? { y: [0, 3, 0] } : { x: [0, 3, 0] }}
       transition={{ duration: 1.2, repeat: Infinity }}
     >
-      <ArrowRightIcon className={`w-5 h-5 text-base-content/20 ${vertical ? "rotate-90" : ""}`} />
+      <ArrowRightIcon className={`text-base-content/20 size-5${vertical ? "rotate-90" : ""}`} />
     </motion.div>
   </motion.div>
 );
 
 // Action content wrapper - horizontal on desktop, vertical on mobile
 const ActionContent = ({ children, description }: { children: React.ReactNode; description: string }) => (
-  <div className="w-full max-w-4xl mx-auto">
+  <div className="mx-auto w-full max-w-4xl">
     <motion.p 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="text-sm sm:text-base text-base-content/40 text-center mb-8 sm:mb-10"
+      className="text-base-content/40 mb-8 text-center text-sm sm:mb-10 sm:text-base"
     >
       {description}
     </motion.p>
@@ -1112,13 +1112,13 @@ const LendCard = () => (
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best</span>
           </div>
           <RateDisplay newRate="3.40%" label="APY" />
         </div>
       </FlowStep>
       <FlowStep delay={0.5}>
-        <div className="flex items-center gap-4 text-base-content/25 text-xs">
+        <div className="text-base-content/25 flex items-center gap-4 text-xs">
           <span className="flex items-center gap-1"><Image src="/logos/morpho.svg" alt="" width={12} height={12} className="opacity-50" />3.21%</span>
           <span className="flex items-center gap-1"><Image src="/logos/compound.svg" alt="" width={12} height={12} className="opacity-50" />2.89%</span>
         </div>
@@ -1126,7 +1126,7 @@ const LendCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/usdc.svg" symbol="USDC" amount="5,000" label="Deposit" size="lg" />
       </HFlowStep>
@@ -1135,13 +1135,13 @@ const LendCard = () => (
         <div className="flex flex-col items-center gap-2 px-6">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best rate</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best rate</span>
           </div>
           <RateDisplay newRate="3.40%" label="Supply APY" />
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
-        <div className="flex flex-col gap-2 text-base-content/25 text-xs pl-8 border-l border-base-content/10">
+        <div className="text-base-content/25 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="flex items-center gap-1.5"><Image src="/logos/morpho.svg" alt="" width={14} height={14} className="opacity-50" />Morpho 3.21%</span>
           <span className="flex items-center gap-1.5"><Image src="/logos/compound.svg" alt="" width={14} height={14} className="opacity-50" />Compound 2.89%</span>
         </div>
@@ -1165,7 +1165,7 @@ const BorrowCard = () => (
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/morpho.svg" name="Morpho" size="md" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best</span>
           </div>
           <RateDisplay newRate="3.20%" label="APR" />
         </div>
@@ -1173,7 +1173,7 @@ const BorrowCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/wsteth.svg" symbol="wstETH" amount="5.25" label="Collateral" size="lg" />
       </HFlowStep>
@@ -1186,13 +1186,13 @@ const BorrowCard = () => (
         <div className="flex flex-col items-center gap-2 px-6">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/morpho.svg" name="Morpho" size="lg" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best rate</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best rate</span>
           </div>
           <RateDisplay newRate="3.20%" label="Borrow APR" />
         </div>
       </HFlowStep>
       <HFlowStep delay={0.55}>
-        <div className="flex flex-col gap-2 text-base-content/25 text-xs pl-8 border-l border-base-content/10">
+        <div className="text-base-content/25 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="flex items-center gap-1.5"><Image src="/logos/aave.svg" alt="" width={14} height={14} className="opacity-50" />Aave 4.80%</span>
           <span className="flex items-center gap-1.5"><Image src="/logos/compound.svg" alt="" width={14} height={14} className="opacity-50" />Compound 5.12%</span>
         </div>
@@ -1215,31 +1215,31 @@ const SwapCard = () => (
       <FlowStep delay={0.4}>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-base-content/30">APY improvement</span>
-          <span className="text-xl font-bold text-success font-mono">+0.8%</span>
+          <span className="text-success font-mono text-xl font-bold">+0.8%</span>
         </div>
       </FlowStep>
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/weth.svg" symbol="WETH" amount="2.5" label="Current collateral" size="lg" />
       </HFlowStep>
       <HFlowStep delay={0.15}>
         <div className="flex flex-col items-center px-8">
           <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1.2, repeat: Infinity }}>
-            <ArrowRightIcon className="w-6 h-6 text-primary" />
+            <ArrowRightIcon className="text-primary size-6" />
           </motion.div>
-          <span className="text-[9px] uppercase tracking-widest text-base-content/20 mt-1">swap</span>
+          <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">swap</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.3}>
         <TokenDisplay logo="/logos/wsteth.svg" symbol="wstETH" amount="2.15" label="New collateral" size="lg" variant="success" />
       </HFlowStep>
       <HFlowStep delay={0.45}>
-        <div className="flex flex-col items-center pl-10 border-l border-base-content/10 ml-6">
-          <span className="text-[10px] uppercase tracking-wider text-base-content/30">APY improvement</span>
-          <span className="text-2xl font-bold text-success font-mono">+0.8%</span>
+        <div className="border-base-content/10 ml-6 flex flex-col items-center border-l pl-10">
+          <span className="text-base-content/30 text-[10px] uppercase tracking-wider">APY improvement</span>
+          <span className="text-success font-mono text-2xl font-bold">+0.8%</span>
         </div>
       </HFlowStep>
     </div>
@@ -1254,14 +1254,14 @@ const LoopCard = () => (
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={36} height={36} className="rounded-full" />
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">Deposit</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Deposit</div>
             <span className="font-mono text-lg">5.0 wstETH</span>
           </div>
         </div>
       </FlowStep>
       <FlowStep delay={0.2}>
         <div className="flex items-center gap-3">
-          <span className="text-sm px-3 py-1 bg-primary/10 text-primary rounded font-bold">3x Loop</span>
+          <span className="bg-primary/10 text-primary rounded px-3 py-1 text-sm font-bold">3x Loop</span>
         </div>
       </FlowStep>
       <FlowStep delay={0.35}>
@@ -1269,12 +1269,12 @@ const LoopCard = () => (
           <div className="flex items-center gap-2">
             <Image src="/logos/wsteth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Position:</span>
-            <span className="font-mono text-success">15.0 wstETH</span>
+            <span className="text-success font-mono">15.0 wstETH</span>
           </div>
           <div className="flex items-center gap-2">
             <Image src="/logos/weth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Debt:</span>
-            <span className="font-mono text-error">-10.0 WETH</span>
+            <span className="text-error font-mono">-10.0 WETH</span>
           </div>
         </div>
       </FlowStep>
@@ -1284,12 +1284,12 @@ const LoopCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={40} height={40} className="rounded-full" />
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">You deposit</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">You deposit</div>
             <span className="font-mono text-xl">5.0 wstETH</span>
           </div>
         </div>
@@ -1297,8 +1297,8 @@ const LoopCard = () => (
       <FlowArrow delay={0.15} />
       <HFlowStep delay={0.25}>
         <div className="flex flex-col items-center px-6">
-          <span className="text-sm px-4 py-1.5 bg-primary/10 text-primary rounded font-bold">3x Leverage</span>
-          <span className="text-[9px] uppercase tracking-widest text-base-content/20 mt-1">wstETH / WETH</span>
+          <span className="bg-primary/10 text-primary rounded px-4 py-1.5 text-sm font-bold">3x Leverage</span>
+          <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">wstETH / WETH</span>
         </div>
       </HFlowStep>
       <FlowArrow delay={0.35} />
@@ -1307,17 +1307,17 @@ const LoopCard = () => (
           <div className="flex items-center gap-2 text-sm">
             <Image src="/logos/wsteth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Position:</span>
-            <span className="font-mono text-success">15.0 wstETH</span>
+            <span className="text-success font-mono">15.0 wstETH</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Image src="/logos/weth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Debt:</span>
-            <span className="font-mono text-error">-10.0 WETH</span>
+            <span className="text-error font-mono">-10.0 WETH</span>
           </div>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.55}>
-        <div className="flex flex-col items-center pl-8 border-l border-base-content/10 ml-4">
+        <div className="border-base-content/10 ml-4 flex flex-col items-center border-l pl-8">
           <RateDisplay newRate="+4.2%" label="Net APY" />
         </div>
       </HFlowStep>
@@ -1333,12 +1333,12 @@ const PendleCard = () => (
         <div className="flex items-center gap-3">
           <div className="relative">
             <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={40} height={40} className="rounded-full" />
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-base-100 flex items-center justify-center">
+            <div className="bg-base-100 absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full">
               <Image src="/logos/pendle.png" alt="Pendle" width={14} height={14} />
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">Pendle PT</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Pendle PT</div>
             <div className="font-semibold">PT-USDai-19FEB2026</div>
           </div>
         </div>
@@ -1347,7 +1347,7 @@ const PendleCard = () => (
         <RateDisplay newRate="8.42%" label="Fixed APY" />
       </FlowStep>
       <FlowStep delay={0.4}>
-        <div className="flex items-center gap-4 text-xs text-base-content/30">
+        <div className="text-base-content/30 flex items-center gap-4 text-xs">
           <span className="uppercase tracking-wider">Leverage</span>
           <span className="text-base-content/10">|</span>
           <span className="uppercase tracking-wider">Swap</span>
@@ -1358,18 +1358,18 @@ const PendleCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={44} height={44} className="rounded-full" />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-base-100 flex items-center justify-center border border-base-content/10">
+            <div className="bg-base-100 border-base-content/10 absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full border">
               <Image src="/logos/pendle.png" alt="Pendle" width={16} height={16} />
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">Pendle PT Token</div>
-            <div className="font-semibold text-lg">PT-USDai-19FEB2026</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Pendle PT Token</div>
+            <div className="text-lg font-semibold">PT-USDai-19FEB2026</div>
           </div>
         </div>
       </HFlowStep>
@@ -1380,10 +1380,10 @@ const PendleCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
-        <div className="flex flex-col gap-2 pl-8 border-l border-base-content/10 text-xs text-base-content/30">
-          <span className="uppercase tracking-wider hover:text-base-content/60 transition-colors cursor-default">Leverage</span>
-          <span className="uppercase tracking-wider hover:text-base-content/60 transition-colors cursor-default">Swap</span>
-          <span className="uppercase tracking-wider hover:text-base-content/60 transition-colors cursor-default">Refinance</span>
+        <div className="border-base-content/10 text-base-content/30 flex flex-col gap-2 border-l pl-8 text-xs">
+          <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Leverage</span>
+          <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Swap</span>
+          <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Refinance</span>
         </div>
       </HFlowStep>
     </div>
@@ -1405,7 +1405,7 @@ const RefinanceCard = () => (
           </div>
           <div className="flex items-center gap-2">
             <Image src="/logos/usdc.svg" alt="USDC" width={20} height={20} />
-            <span className="font-mono text-error">-$12K</span>
+            <span className="text-error font-mono">-$12K</span>
           </div>
         </div>
       </FlowStep>
@@ -1419,25 +1419,25 @@ const RefinanceCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <div className="flex flex-col items-center gap-2">
           <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-          <span className="text-[10px] uppercase tracking-wider text-base-content/25">Current</span>
+          <span className="text-base-content/25 text-[10px] uppercase tracking-wider">Current</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.1}>
-        <div className="flex flex-col items-center gap-3 px-8 py-2 mx-4 border-x border-base-content/5">
-          <div className="text-[10px] uppercase tracking-wider text-base-content/30">Position</div>
+        <div className="border-base-content/5 mx-4 flex flex-col items-center gap-3 border-x px-8 py-2">
+          <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Position</div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Image src="/logos/wsteth.svg" alt="wstETH" width={24} height={24} />
               <span className="font-mono">5.25 wstETH</span>
             </div>
-            <div className="w-px h-6 bg-base-content/10" />
+            <div className="bg-base-content/10 h-6 w-px" />
             <div className="flex items-center gap-2">
               <Image src="/logos/usdc.svg" alt="USDC" width={24} height={24} />
-              <span className="font-mono text-error">-$12,000</span>
+              <span className="text-error font-mono">-$12,000</span>
             </div>
           </div>
         </div>
@@ -1448,17 +1448,17 @@ const RefinanceCard = () => (
           animate={{ x: [0, 4, 0] }} 
           transition={{ duration: 1.2, repeat: Infinity }}
         >
-          <ArrowRightIcon className="w-6 h-6 text-primary" />
+          <ArrowRightIcon className="text-primary size-6" />
         </motion.div>
       </HFlowStep>
       <HFlowStep delay={0.3}>
         <div className="flex flex-col items-center gap-2">
           <ProtocolBadge logo="/logos/morpho.svg" name="Morpho Blue" size="lg" />
-          <span className="text-[10px] uppercase tracking-wider text-success">Better rate</span>
+          <span className="text-success text-[10px] uppercase tracking-wider">Better rate</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.45}>
-        <div className="pl-8 border-l border-base-content/10 ml-4">
+        <div className="border-base-content/10 ml-4 border-l pl-8">
           <RateDisplay oldRate="4.80%" newRate="3.20%" label="APR" />
         </div>
       </HFlowStep>
@@ -1493,16 +1493,16 @@ const ActionTabs = () => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-4">
+    <div className="mx-auto w-full max-w-2xl px-4">
       {/* Tight tab bar */}
-      <div className="flex items-center justify-center mb-8">
-        <div className="inline-flex items-center gap-0 border-b border-base-content/10">
+      <div className="mb-8 flex items-center justify-center">
+        <div className="border-base-content/10 inline-flex items-center gap-0 border-b">
           {actionTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`
-                relative px-3 sm:px-5 py-3 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.15em] transition-colors
+                relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-5 sm:text-xs
                 ${activeTab === tab.id 
                   ? "text-base-content" 
                   : "text-base-content/30 hover:text-base-content/60"}
@@ -1512,7 +1512,7 @@ const ActionTabs = () => {
               {activeTab === tab.id && (
                 <motion.div
                   layoutId="action-underline"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-base-content"
+                  className="bg-base-content absolute inset-x-0 bottom-0 h-[2px]"
                   transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                 />
               )}
@@ -1522,7 +1522,7 @@ const ActionTabs = () => {
       </div>
 
       {/* Content area - allows breathing room for animated content */}
-      <div className="min-h-[320px] sm:min-h-[380px] flex items-start justify-center pt-4">
+      <div className="flex min-h-[320px] items-start justify-center pt-4 sm:min-h-[380px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -1630,7 +1630,7 @@ export const StickyLanding = () => {
 
   return (
     <div 
-      className="fixed inset-0 bg-base-100 text-base-content overflow-hidden"
+      className="bg-base-100 text-base-content fixed inset-0 overflow-hidden"
       onMouseMove={handleMouseMove}
     >
       {/* Background grid with parallax effect */}
@@ -1641,10 +1641,12 @@ export const StickyLanding = () => {
           y: smoothScrollGridY,
         }}
       >
-        <motion.div 
+        {/* eslint-disable tailwindcss/no-contradicting-classname -- bg-[linear-gradient] and bg-[size] are different CSS properties */}
+        <motion.div
           className="absolute -inset-24 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]"
           style={{ y: gridY }}
         />
+        {/* eslint-enable tailwindcss/no-contradicting-classname */}
       </motion.div>
       
       {/* Radial glow - fixed position, no parallax */}
@@ -1653,23 +1655,23 @@ export const StickyLanding = () => {
       {/* Scroll container */}
       <div
         ref={containerRef}
-        className="h-full w-full hide-scrollbar relative z-10 overflow-y-auto snap-y snap-mandatory scroll-smooth"
+        className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
         {/* Total height based on sections */}
         <div style={{ height: `${sections.length * 100}vh` }} className="relative">
           {/* Snap targets */}
-          <div className="absolute inset-0 flex flex-col pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 flex flex-col">
             {sections.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
           </div>
 
           {/* Sticky viewport */}
-          <div className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden">
+          <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
             {/* Scroll progress indicator */}
-            <div className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-48 w-[1px] bg-base-content/5 hidden lg:block">
+            <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
-                className="w-full bg-base-content/40 origin-top"
+                className="bg-base-content/40 w-full origin-top"
                 style={{ height: "100%", scaleY: smoothProgress }}
               />
             </div>
@@ -1688,10 +1690,10 @@ export const StickyLanding = () => {
             {/* Scroll hint on first section */}
             <motion.div
               style={{ opacity: useTransform(smoothProgress, [0, 0.1], [1, 0]) }}
-              className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 text-base-content/30"
+              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="landing-tag">Scroll to explore</span>
-              <ChevronDownIcon className="w-5 h-5 animate-bounce" />
+              <ChevronDownIcon className="size-5 animate-bounce" />
             </motion.div>
           </div>
         </div>

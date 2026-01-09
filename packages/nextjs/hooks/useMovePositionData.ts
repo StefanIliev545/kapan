@@ -260,13 +260,16 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   ]);
 
   // Stark branch: collaterals
-  const starkCollateralsData = networkType === "starknet" ? useStarkCollaterals({
-    protocolName: fromProtocol as "Vesu" | "VesuV2" | "Nostra",
+  // Call hook unconditionally to satisfy React's rules of hooks
+  const starkCollateralsData = useStarkCollaterals({
+    protocolName: (networkType === "starknet" ? fromProtocol : "Vesu") as "Vesu" | "VesuV2" | "Nostra",
     userAddress: "",
-    isOpen: isOpen,
-  }) : { collaterals: [], isLoading: false };
+    isOpen: networkType === "starknet" && isOpen,
+  });
 
-  const { collaterals: starkCollaterals, isLoading: starkIsLoading } = starkCollateralsData;
+  const { collaterals: starkCollaterals, isLoading: starkIsLoading } = networkType === "starknet"
+    ? starkCollateralsData
+    : { collaterals: [], isLoading: false };
 
   // Use ref for Stark data too
   const prevStarkDataRef = useRef<{

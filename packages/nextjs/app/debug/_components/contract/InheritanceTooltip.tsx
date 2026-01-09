@@ -7,7 +7,7 @@ export const InheritanceTooltip = ({ inheritedFrom }: { inheritedFrom?: string }
         className="tooltip tooltip-top tooltip-accent px-2 md:break-normal"
         data-tip={`Inherited from: ${inheritedFrom}`}
       >
-        <InformationCircleIcon className="h-4 w-4" aria-hidden="true" />
+        <InformationCircleIcon className="size-4" aria-hidden="true" />
       </span>
     )}
   </>

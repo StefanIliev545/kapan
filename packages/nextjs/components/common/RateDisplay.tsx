@@ -83,8 +83,8 @@ const VARIANT_CLASSES: Record<Exclude<RateVariant, "auto">, string> = {
  */
 export const formatRateValue = (
   rate: number,
-  decimals: number = 2,
-  showSign: boolean = false
+  decimals = 2,
+  showSign = false
 ): string => {
   const formatted = formatPercentage(rate, decimals, true);
   if (showSign && rate > 0) {
@@ -156,7 +156,7 @@ export const RateDisplay: FC<RateDisplayProps> = ({
   const labelElement = showLabel && (
     <span
       className={clsx(
-        "uppercase tracking-widest text-base-content/40 font-medium",
+        "text-base-content/40 font-medium uppercase tracking-widest",
         sizeClasses.label,
         labelClassName
       )}
@@ -168,7 +168,7 @@ export const RateDisplay: FC<RateDisplayProps> = ({
   const oldRateElement = formattedOldRate && (
     <span
       className={clsx(
-        "text-base-content/30 line-through font-mono tabular-nums",
+        "text-base-content/30 font-mono tabular-nums line-through",
         sizeClasses.oldRate
       )}
     >

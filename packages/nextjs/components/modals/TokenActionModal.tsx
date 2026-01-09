@@ -19,6 +19,240 @@ import {
   canSubmitForm,
 } from "~~/utils/validation";
 
+// --- Shared types for position calculations ---
+type TokenAction = "Borrow" | "Deposit" | "Withdraw" | "Repay";
+
+interface PositionCalculationsInput {
+  action: TokenAction;
+  amount: string;
+  price: number;
+  position?: PositionManager;
+  hf?: number;
+  utilization?: number;
+  ltv?: number;
+}
+
+interface PositionCalculationsResult {
+  beforeHf: number;
+  beforeUtil: number;
+  beforeLtv: number;
+  afterHf: number;
+  afterLtv: number;
+}
+
+/**
+ * Hook to calculate position metrics (health factor, utilization, LTV) before and after an action.
+ * Extracts common logic used by both TokenActionModal and TokenActionCard.
+ */
+function usePositionCalculations({
+  action,
+  amount,
+  price,
+  position,
+  hf = 1.9,
+  utilization = 65,
+  ltv = 75,
+}: PositionCalculationsInput): PositionCalculationsResult {
+  const parsed = parseFloat(amount || "0");
+
+  const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
+  const afterPosition = useMemo(
+    () => beforePosition.apply(action, parsed * price),
+    [beforePosition, action, parsed, price],
+  );
+
+  const beforeHf = position ? beforePosition.healthFactor() : hf;
+  const beforeUtil = position ? beforePosition.utilization() : utilization;
+  const beforeLtv = position ? beforePosition.loanToValue() : ltv;
+  const afterHf = position ? afterPosition.healthFactor() : hf;
+  const afterLtv = position ? afterPosition.loanToValue() : ltv;
+
+  // Override defaults for Deposit with no debt: HF = Infinity, LTV = 0%
+  const isDepositNoDebtFallback = action === "Deposit" && !position;
+
+  return {
+    beforeHf: isDepositNoDebtFallback ? Infinity : beforeHf,
+    beforeUtil,
+    beforeLtv: isDepositNoDebtFallback ? 0 : beforeLtv,
+    afterHf: isDepositNoDebtFallback ? Infinity : afterHf,
+    afterLtv: isDepositNoDebtFallback ? 0 : afterLtv,
+  };
+}
+
+/**
+ * Calculates the after value based on the action type.
+ * For Borrow/Deposit: adds to before value.
+ * For Withdraw/Repay: subtracts from before value (minimum 0).
+ */
+function calculateAfterValue(action: TokenAction, before: number, parsedAmount: number): number {
+  switch (action) {
+    case "Borrow":
+    case "Deposit":
+      return before + parsedAmount;
+    case "Withdraw":
+    case "Repay":
+      return Math.max(0, before - parsedAmount);
+    default:
+      return before;
+  }
+}
+
+/**
+ * Calculates the effective max borrowable amount based on position's free borrow capacity.
+ */
+function calculateEffectiveMax(
+  action: TokenAction,
+  position: PositionManager | undefined,
+  tokenUsdPrice: number | undefined,
+  decimals: number,
+  fallbackMax: bigint | undefined,
+): bigint | undefined {
+  if (action !== "Borrow" || !position || !tokenUsdPrice) return fallbackMax;
+  const freeUsd = position.freeBorrowUsd();
+  if (freeUsd <= 0 || tokenUsdPrice === 0) return 0n;
+  const amount = Math.floor((freeUsd / tokenUsdPrice) * 10 ** decimals);
+  return BigInt(amount);
+}
+
+// --- Shared hook for TokenActionModal and TokenActionCard state ---
+interface UseTokenActionStateInput {
+  action: TokenAction;
+  token: TokenInfo;
+  before: number;
+  position?: PositionManager;
+  hf?: number;
+  utilization?: number;
+  ltv?: number;
+  max?: bigint;
+}
+
+interface UseTokenActionStateResult {
+  amount: string;
+  setAmount: (value: string) => void;
+  parsed: number;
+  price: number;
+  decimals: number;
+  effectiveMax: bigint | undefined;
+  afterValue: number;
+  beforeHfEffective: number;
+  beforeUtil: number;
+  beforeLtvEffective: number;
+  afterHfEffective: number;
+  afterLtvEffective: number;
+}
+
+/**
+ * Shared hook that encapsulates common state and calculations for TokenActionModal and TokenActionCard.
+ * Eliminates duplication of amount state, position calculations, effectiveMax, and afterValue logic.
+ */
+function useTokenActionState({
+  action,
+  token,
+  before,
+  position,
+  hf = 1.9,
+  utilization = 65,
+  ltv = 75,
+  max,
+}: UseTokenActionStateInput): UseTokenActionStateResult {
+  const [amount, setAmount] = useState("");
+  const parsed = parseFloat(amount || "0");
+  const price = token.usdPrice || 0;
+  const decimals = token.decimals || 18;
+
+  const {
+    beforeHf: beforeHfEffective,
+    beforeUtil,
+    beforeLtv: beforeLtvEffective,
+    afterHf: afterHfEffective,
+    afterLtv: afterLtvEffective,
+  } = usePositionCalculations({
+    action,
+    amount,
+    price,
+    position,
+    hf,
+    utilization,
+    ltv,
+  });
+
+  const effectiveMax = useMemo(
+    () => calculateEffectiveMax(action, position, token.usdPrice, decimals, max),
+    [action, position, token.usdPrice, decimals, max],
+  );
+
+  const afterValue = useMemo(
+    () => calculateAfterValue(action, before, parsed),
+    [action, before, parsed],
+  );
+
+  return {
+    amount,
+    setAmount,
+    parsed,
+    price,
+    decimals,
+    effectiveMax,
+    afterValue,
+    beforeHfEffective,
+    beforeUtil,
+    beforeLtvEffective,
+    afterHfEffective,
+    afterLtvEffective,
+  };
+}
+
+// --- Shared component for After metrics grid ---
+interface AfterMetricsGridProps {
+  action: TokenAction;
+  afterHf: number;
+  afterLtv: number;
+  afterValue: number;
+  tokenIcon: string;
+  tokenName: string;
+}
+
+/**
+ * Renders the "After" metrics grid showing Health Factor, Loan To Value, and Debt/Balance.
+ * Used by both TokenActionModal and TokenActionCard.
+ */
+const AfterMetricsGrid: FC<AfterMetricsGridProps> = ({
+  action,
+  afterHf,
+  afterLtv,
+  afterValue,
+  tokenIcon,
+  tokenName,
+}) => {
+  const hfTextColor = !Number.isFinite(afterHf)
+    ? "text-success"
+    : afterHf >= 4
+      ? "text-success"
+      : afterHf > 2
+        ? "text-warning"
+        : "text-error";
+  const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
+
+  return (
+    <div className="pt-2 text-xs">
+      <div className="grid grid-cols-3">
+        <div className="text-center opacity-70">Health Factor</div>
+        <div className="border-base-300 border-l text-center opacity-70">Loan To Value</div>
+        <div className="border-base-300 border-l text-center opacity-70">{thirdLabel}</div>
+      </div>
+      <div className="mt-1 grid grid-cols-3 items-center">
+        <div className={`text-center ${hfTextColor}`}>
+          {Number.isFinite(afterHf) ? afterHf.toFixed(2) : "\u221e"}
+        </div>
+        <div className="border-base-300 border-l text-center">{formatPercentage(afterLtv)}%</div>
+        <div className="border-base-300 flex items-center justify-center gap-2 border-l">
+          <TokenPill value={afterValue} icon={tokenIcon} name={tokenName} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export interface TokenInfo {
   name: string;
   icon: string;
@@ -65,10 +299,10 @@ const HealthFactor = ({ value }: { value: number }) => {
   const percent = isFiniteValue ? Math.min(100, Math.max(0, ((value - 1) / 3) * 100)) : 100;
   return (
     <div className="flex flex-col text-xs">
-      <span className="mb-1 text-base-content/50">Health Factor</span>
+      <span className="text-base-content/50 mb-1">Health Factor</span>
       <div className="flex items-center gap-2">
-        <div className="w-20 h-1.5 bg-base-300 rounded-full overflow-hidden">
-          <div className="h-full bg-base-content/60 rounded-full" style={{ width: `${percent}%` }} />
+        <div className="bg-base-300 h-1.5 w-20 overflow-hidden rounded-full">
+          <div className="bg-base-content/60 h-full rounded-full" style={{ width: `${percent}%` }} />
         </div>
         <span className="text-base-content font-medium">{isFiniteValue ? value.toFixed(2) : "∞"}</span>
       </div>
@@ -79,10 +313,10 @@ const HealthFactor = ({ value }: { value: number }) => {
 // Render a labeled bar with percentage for Loan To Value
 const LoanToValueBar = ({ value }: { value: number }) => (
   <div className="flex flex-col text-xs">
-    <span className="mb-1 text-base-content/50">Loan To Value</span>
+    <span className="text-base-content/50 mb-1">Loan To Value</span>
     <div className="flex items-center gap-2">
-      <div className="w-20 h-1.5 bg-base-300 rounded-full overflow-hidden">
-        <div className="h-full bg-base-content/60 rounded-full" style={{ width: `${value}%` }} />
+      <div className="bg-base-300 h-1.5 w-20 overflow-hidden rounded-full">
+        <div className="bg-base-content/60 h-full rounded-full" style={{ width: `${value}%` }} />
       </div>
       <span className="text-base-content font-medium">{formatPercentage(value)}%</span>
     </div>
@@ -142,14 +376,14 @@ export const PercentInput: FC<{
           value={amount}
           onChange={e => handleChange(e.target.value)}
           placeholder="0.0"
-          className="w-full px-4 py-3 bg-base-200/50 border border-base-300/50 rounded-lg text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-base-content/30 pr-24"
+          className="bg-base-200/50 border-base-300/50 text-base-content placeholder:text-base-content/30 focus:border-base-content/30 w-full rounded-lg border px-4 py-3 pr-24 focus:outline-none"
         />
         {insufficientFunds && (
           <div className="absolute -top-4 right-1 z-10">
             <span className="badge badge-error badge-sm whitespace-nowrap">Insufficient funds</span>
           </div>
         )}
-        <div className="absolute inset-y-0 right-3 flex items-center divide-x divide-base-300 text-xs">
+        <div className="divide-base-300 absolute inset-y-0 right-3 flex items-center divide-x text-xs">
           {[25, 50, 100].map(p => (
             <button
               key={p}
@@ -162,7 +396,7 @@ export const PercentInput: FC<{
           ))}
         </div>
       </div>
-      <div className="text-xs opacity-70 mt-1 text-center">≈ ${usd}</div>
+      <div className="mt-1 text-center text-xs opacity-70">≈ ${usd}</div>
     </>
   );
 };
@@ -175,8 +409,8 @@ export const LeftMetrics: FC<{
   metricValue: number;
   token: TokenInfo;
 }> = ({ hf, ltv, metricLabel, metricValue, token }) => (
-  <div className="w-full md:w-52 p-5 space-y-4 text-sm bg-base-200/50 border-b md:border-b-0 md:border-r border-base-300/50">
-    <div className="text-xs uppercase tracking-wider text-base-content/40 font-medium">Before</div>
+  <div className="bg-base-200/50 border-base-300/50 w-full space-y-4 border-b p-5 text-sm md:w-52 md:border-b-0 md:border-r">
+    <div className="text-base-content/40 text-xs font-medium uppercase tracking-wider">Before</div>
     <div className="space-y-4">
       <HealthFactor value={hf} />
       <LoanToValueBar value={ltv} />
@@ -214,42 +448,32 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   const { address: evmAddress, chain } = useEvmAccount();
   const { address: starkAddress } = useStarkAccount();
 
-  const decimals = token.decimals || 18;
+  // Use shared hook for common state and calculations
+  const {
+    amount,
+    setAmount,
+    decimals,
+    effectiveMax,
+    afterValue,
+    beforeHfEffective,
+    beforeUtil,
+    beforeLtvEffective,
+    afterHfEffective,
+    afterLtvEffective,
+  } = useTokenActionState({
+    action,
+    token,
+    before,
+    position,
+    hf,
+    utilization,
+    ltv,
+    max,
+  });
 
-  const [amount, setAmount] = useState("");
   const [isMax, setIsMax] = useState(false);
   const [txState, setTxState] = useState<"idle" | "pending" | "success" | "error">("idle");
   const wasOpenRef = useRef(false);
-  const parsed = parseFloat(amount || "0");
-
-  const price = token.usdPrice || 0;
-  const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
-  const afterPosition = useMemo(
-    () => beforePosition.apply(action, parsed * price),
-    [beforePosition, action, parsed, price],
-  );
-
-  const beforeHf = position ? beforePosition.healthFactor() : hf;
-  const beforeUtil = position ? beforePosition.utilization() : utilization;
-  const beforeLtv = position ? beforePosition.loanToValue() : ltv;
-  const afterHf = position ? afterPosition.healthFactor() : hf;
-  // const afterUtil = position ? afterPosition.utilization() : utilization; // not shown
-  const afterLtv = position ? afterPosition.loanToValue() : ltv;
-
-  // Override defaults for Deposit with no debt: HF = ∞, LTV = 0%
-  const isDepositNoDebtFallback = action === "Deposit" && !position;
-  const beforeHfEffective = isDepositNoDebtFallback ? Infinity : beforeHf;
-  const beforeLtvEffective = isDepositNoDebtFallback ? 0 : beforeLtv;
-  const afterHfEffective = isDepositNoDebtFallback ? Infinity : afterHf;
-  const afterLtvEffective = isDepositNoDebtFallback ? 0 : afterLtv;
-
-  const effectiveMax = useMemo(() => {
-    if (action !== "Borrow" || !position || !token.usdPrice) return max;
-    const freeUsd = position.freeBorrowUsd();
-    if (freeUsd <= 0 || token.usdPrice === 0) return 0n;
-    const amount = Math.floor((freeUsd / token.usdPrice) * 10 ** decimals);
-    return BigInt(amount);
-  }, [action, position, token.usdPrice, decimals, max]);
 
   // Use shared validation utility for amount parsing
   const parsedAmountResult = useMemo(() => parseAmount(amount, decimals), [amount, decimals]);
@@ -274,19 +498,6 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   });
   const isActionComplete = txState === "success";
   const isConfirmDisabled = txState === "pending" || (!isActionComplete && !canSubmit);
-
-  const afterValue = useMemo(() => {
-    switch (action) {
-      case "Borrow":
-      case "Deposit":
-        return before + parsed;
-      case "Withdraw":
-      case "Repay":
-        return Math.max(0, before - parsed);
-      default:
-        return before;
-    }
-  }, [action, before, parsed]);
 
   const buildCallsForEstimate = useCallback(() => {
     if (!buildCalls) return null;
@@ -370,7 +581,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={handleClose} />
-      <div className="modal-box relative max-w-2xl p-0 rounded-xl overflow-hidden bg-base-100 border border-base-300/50">
+      <div className="modal-box bg-base-100 border-base-300/50 relative max-w-2xl overflow-hidden rounded-xl border p-0">
         <div className="flex flex-col md:flex-row">
           <LeftMetrics
             hf={beforeHfEffective}
@@ -380,17 +591,17 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             metricValue={before}
             token={token}
           />
-          <div className="flex-1 p-5 space-y-4">
+          <div className="flex-1 space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <Image src={token.icon} alt={token.name} width={28} height={28} className="rounded-full" />
-                <h3 className="font-semibold text-lg text-base-content">
+                <h3 className="text-base-content text-lg font-semibold">
                   {action} {token.name}
                 </h3>
               </div>
-              {protocolName && <div className="text-xs text-base-content/40 uppercase tracking-wider">{protocolName}</div>}
+              {protocolName && <div className="text-base-content/40 text-xs uppercase tracking-wider">{protocolName}</div>}
             </div>
-            <div className="flex items-center justify-between text-xs text-base-content/70">
+            <div className="text-base-content/70 flex items-center justify-between text-xs">
               <span>
                 {apyLabel} {formatRate(apy)}%
               </span>
@@ -409,32 +620,14 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               resetTrigger={isOpen}
               insufficientFunds={insufficientFunds}
             />
-            {(() => {
-              const hfTextColor = !Number.isFinite(afterHfEffective)
-                ? "text-success"
-                : afterHfEffective >= 4
-                  ? "text-success"
-                  : afterHfEffective > 2
-                    ? "text-warning"
-                    : "text-error";
-              const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
-              return (
-                <div className="text-xs pt-2">
-                  <div className="grid grid-cols-3">
-                    <div className="text-center opacity-70">Health Factor</div>
-                    <div className="text-center opacity-70 border-l border-base-300">Loan To Value</div>
-                    <div className="text-center opacity-70 border-l border-base-300">{thirdLabel}</div>
-                  </div>
-                  <div className="grid grid-cols-3 items-center mt-1">
-                    <div className={`text-center ${hfTextColor}`}>{Number.isFinite(afterHfEffective) ? afterHfEffective.toFixed(2) : "∞"}</div>
-                    <div className="text-center border-l border-base-300">{formatPercentage(afterLtvEffective)}%</div>
-                    <div className="flex items-center justify-center gap-2 border-l border-base-300">
-                      <TokenPill value={afterValue} icon={token.icon} name={token.name} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+            <AfterMetricsGrid
+              action={action}
+              afterHf={afterHfEffective}
+              afterLtv={afterLtvEffective}
+              afterValue={afterValue}
+              tokenIcon={token.icon}
+              tokenName={token.name}
+            />
             {renderExtraContent && renderExtraContent()}
             <div className="modal-action pt-2">
               <SegmentedActionBar
@@ -448,7 +641,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                       txState === "pending" ? (
                         <span className="loading loading-spinner loading-xs" />
                       ) : network === "stark" ? (
-                        <Fuel className="w-4 h-4 text-gray-400" />
+                        <Fuel className="size-4 text-gray-400" />
                       ) : undefined,
                     onClick: handleConfirm,
                     disabled: isConfirmDisabled,
@@ -481,52 +674,31 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
   ltv = 75,
   position,
 }) => {
-  const [amount, setAmount] = useState("");
-  const parsed = parseFloat(amount || "0");
-
-  const price = token.usdPrice || 0;
-  const beforePosition = useMemo(() => position ?? new PositionManager(0, 0), [position]);
-  const afterPosition = useMemo(
-    () => beforePosition.apply(action, parsed * price),
-    [beforePosition, action, parsed, price],
-  );
-
-  const beforeHf = position ? beforePosition.healthFactor() : hf;
-  const beforeUtil = position ? beforePosition.utilization() : utilization;
-  const beforeLtv = position ? beforePosition.loanToValue() : ltv;
-  const afterHf = position ? afterPosition.healthFactor() : hf;
-  const afterLtv = position ? afterPosition.loanToValue() : ltv;
-
-  const isDepositNoDebtFallback = action === "Deposit" && !position;
-  const beforeHfEffective = isDepositNoDebtFallback ? Infinity : beforeHf;
-  const beforeLtvEffective = isDepositNoDebtFallback ? 0 : beforeLtv;
-  const afterHfEffective = isDepositNoDebtFallback ? Infinity : afterHf;
-  const afterLtvEffective = isDepositNoDebtFallback ? 0 : afterLtv;
-
-  const effectiveMax = useMemo(() => {
-    if (action !== "Borrow" || !position || !token.usdPrice) return max;
-    const decimals = token.decimals || 18;
-    const freeUsd = position.freeBorrowUsd();
-    if (freeUsd <= 0 || token.usdPrice === 0) return 0n;
-    const amount = Math.floor((freeUsd / token.usdPrice) * 10 ** decimals);
-    return BigInt(amount);
-  }, [action, position, token.usdPrice, token.decimals, max]);
-
-  const afterValue = useMemo(() => {
-    switch (action) {
-      case "Borrow":
-      case "Deposit":
-        return before + parsed;
-      case "Withdraw":
-      case "Repay":
-        return Math.max(0, before - parsed);
-      default:
-        return before;
-    }
-  }, [action, before, parsed]);
+  // Use shared hook for common state and calculations
+  const {
+    amount,
+    setAmount,
+    decimals,
+    effectiveMax,
+    afterValue,
+    beforeHfEffective,
+    beforeUtil,
+    beforeLtvEffective,
+    afterHfEffective,
+    afterLtvEffective,
+  } = useTokenActionState({
+    action,
+    token,
+    before,
+    position,
+    hf,
+    utilization,
+    ltv,
+    max,
+  });
 
   return (
-    <div className="card bg-base-100 border border-base-300 rounded-none overflow-hidden">
+    <div className="card bg-base-100 border-base-300 overflow-hidden rounded-none border">
       <div className="flex flex-col md:flex-row">
         <LeftMetrics
           hf={beforeHfEffective}
@@ -536,53 +708,35 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
           metricValue={before}
           token={token}
         />
-        <div className="flex-1 p-6 space-y-4">
+        <div className="flex-1 space-y-4 p-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-xl">{action} {token.name}</h3>
+              <h3 className="text-xl font-bold">{action} {token.name}</h3>
               <Image src={token.icon} alt={token.name} width={32} height={32} />
             </div>
-            {protocolName && <div className="text-sm text-base-content/70">{protocolName}</div>}
+            {protocolName && <div className="text-base-content/70 text-sm">{protocolName}</div>}
           </div>
-          <div className="flex items-center justify-between text-xs text-base-content/70">
+          <div className="text-base-content/70 flex items-center justify-between text-xs">
             <span>{apyLabel} {formatRate(apy)}</span>
-            <span>Balance: {format(Number(formatUnits(balance, token.decimals || 18)))}</span>
+            <span>Balance: {format(Number(formatUnits(balance, decimals)))}</span>
           </div>
           <PercentInput
             balance={balance}
-            decimals={token.decimals || 18}
+            decimals={decimals}
             price={token.usdPrice}
             onChange={(val) => { setAmount(val); }}
             percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
             max={effectiveMax}
             resetTrigger={true}
           />
-          {(() => {
-            const hfTextColor = !Number.isFinite(afterHfEffective)
-              ? "text-success"
-              : afterHfEffective >= 4
-                ? "text-success"
-                : afterHfEffective > 2
-                  ? "text-warning"
-                  : "text-error";
-            const thirdLabel = action === "Borrow" || action === "Repay" ? "Debt" : "Balance";
-            return (
-              <div className="text-xs pt-2">
-                <div className="grid grid-cols-3">
-                  <div className="text-center opacity-70">Health Factor</div>
-                  <div className="text-center opacity-70 border-l border-base-300">Loan To Value</div>
-                  <div className="text-center opacity-70 border-l border-base-300">{thirdLabel}</div>
-                </div>
-                <div className="grid grid-cols-3 items-center mt-1">
-                  <div className={`text-center ${hfTextColor}`}>{Number.isFinite(afterHfEffective) ? afterHfEffective.toFixed(2) : "∞"}</div>
-                  <div className="text-center border-l border-base-300">{formatPercentage(afterLtvEffective)}%</div>
-                  <div className="flex items-center justify-center gap-2 border-l border-base-300">
-                    <TokenPill value={afterValue} icon={token.icon} name={token.name} />
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          <AfterMetricsGrid
+            action={action}
+            afterHf={afterHfEffective}
+            afterLtv={afterLtvEffective}
+            afterValue={afterValue}
+            tokenIcon={token.icon}
+            tokenName={token.name}
+          />
           <div className="pt-2">
             <SegmentedActionBar
               className="w-full"

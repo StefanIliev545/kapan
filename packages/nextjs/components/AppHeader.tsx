@@ -1,19 +1,22 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Bars3Icon,
-  XMarkIcon,
   RectangleStackIcon,
   BanknotesIcon,
   MagnifyingGlassIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { WalletButton } from "~~/components/common/WalletButton";
-import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import {
+  HeaderLogo,
+  MobileMenuButton,
+  MobileNavigationDrawer,
+  WalletButton,
+} from "~~/components/common";
+import { useHeaderState } from "~~/hooks/common/useHeaderState";
 import { useAccount } from "~~/hooks/useAccount";
 import { normalizeUserAddress } from "~~/utils/address";
 
@@ -27,12 +30,12 @@ const appMenuLinks: HeaderMenuLink[] = [
   {
     label: "Positions",
     href: "/app",
-    icon: <RectangleStackIcon className="h-5 w-5" />,
+    icon: <RectangleStackIcon className="size-5" />,
   },
   {
     label: "Markets",
     href: "/markets",
-    icon: <BanknotesIcon className="h-5 w-5" />,
+    icon: <BanknotesIcon className="size-5" />,
   },
 ];
 
@@ -69,14 +72,14 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
             <li key={href} className="relative">
               <Link
                 href={href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
                   isActive 
                     ? "bg-base-content/10 text-base-content" 
                     : "text-base-content/50 hover:bg-base-content/5 hover:text-base-content/70"
                 }`}
               >
                 <span>{icon}</span>
-                <span className="font-medium uppercase tracking-wider text-sm">{label}</span>
+                <span className="text-sm font-medium uppercase tracking-wider">{label}</span>
               </Link>
             </li>
           );
@@ -89,12 +92,12 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center p-1 bg-base-200/60 rounded-lg border border-base-300/40"
+      className="bg-base-200/60 border-base-300/40 relative flex items-center rounded-lg border p-1"
     >
       {/* Sliding indicator */}
       {indicatorStyle && (
         <motion.div
-          className="absolute top-1 bottom-1 bg-base-content/10 rounded-md"
+          className="bg-base-content/10 absolute inset-y-1 rounded-md"
           initial={false}
           animate={{
             left: indicatorStyle.left,
@@ -113,7 +116,7 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
             ref={(el) => {
               if (el) buttonRefs.current.set(href, el);
             }}
-            className={`relative z-10 flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
+            className={`relative z-10 flex items-center gap-2 rounded-md px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
               isActive 
                 ? "text-base-content" 
                 : "text-base-content/40 hover:text-base-content/70"
@@ -188,8 +191,8 @@ const AddressSearchBar = () => {
 
   return (
     <form onSubmit={handleSubmit} className="relative w-full max-w-xl">
-      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base-content/40">
-        <MagnifyingGlassIcon className="h-5 w-5" />
+      <span className="text-base-content/40 pointer-events-none absolute inset-y-0 left-3 flex items-center">
+        <MagnifyingGlassIcon className="size-5" />
       </span>
       <input
         value={value}
@@ -200,7 +203,7 @@ const AddressSearchBar = () => {
           }
         }}
         placeholder="Search address"
-        className={`w-full bg-base-200/60 border border-base-content/10 rounded-lg pl-10 pr-12 py-2.5 text-sm transition-colors focus:outline-none focus:ring-1 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/30 ${
+        className={`bg-base-200/60 border-base-content/10 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/30 w-full rounded-lg border py-2.5 pl-10 pr-12 text-sm transition-colors focus:outline-none focus:ring-1 ${
           isInvalid ? "border-error focus:ring-error/40" : ""
         }`}
       />
@@ -208,10 +211,10 @@ const AddressSearchBar = () => {
         <button
           type="button"
           onClick={handleClear}
-          className="absolute inset-y-0 right-2 flex items-center rounded-full p-1 text-base-content/40 transition-colors hover:text-error"
+          className="text-base-content/40 hover:text-error absolute inset-y-0 right-2 flex items-center rounded-full p-1 transition-colors"
           aria-label="Clear address override"
         >
-          <XMarkIcon className="h-5 w-5" />
+          <XMarkIcon className="size-5" />
         </button>
       )}
     </form>
@@ -221,155 +224,52 @@ const AddressSearchBar = () => {
  * App header for /app/app page with wallet connection and settings
  */
 export const AppHeader = () => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const burgerMenuRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
+  const { isDrawerOpen, scrolled, burgerMenuRef, pathname, toggleDrawer, closeDrawer } = useHeaderState();
   const isPositionsPage = pathname === "/app";
-
-  useOutsideClick(
-    burgerMenuRef,
-    useCallback(() => setIsDrawerOpen(false), []),
-  );
-
-  // Add scroll effect
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Close drawer when route changes
-  useEffect(() => {
-    setIsDrawerOpen(false);
-  }, [pathname]);
 
   return (
     <>
       <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
         {/* Background - simple dark with subtle border */}
         <div
-          className={`absolute inset-0 bg-base-100/95 backdrop-blur-md transition-all duration-300 ${
+          className={`bg-base-100/95 absolute inset-0 backdrop-blur-md transition-all duration-300 ${
             scrolled ? "shadow-[0_1px_3px_rgba(0,0,0,0.3)]" : ""
           }`}
           style={{ zIndex: -1 }}
         >
           {/* Subtle bottom border */}
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-base-content/5"></div>
+          <div className="bg-base-content/5 absolute inset-x-0 bottom-0 h-[1px]"></div>
         </div>
 
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="navbar justify-between min-h-0 h-auto py-0 gap-4">
+        <div className="container relative z-10 mx-auto px-4">
+          <div className="navbar h-auto min-h-0 justify-between gap-4 py-0">
             {/* Left section - Logo */}
-            <div className="flex items-center min-w-0">
+            <div className="flex min-w-0 items-center">
               <div
-                className="lg:hidden dropdown z-50 mr-2"
+                className="dropdown z-50 mr-2 lg:hidden"
                 ref={burgerMenuRef}
                 data-state={isDrawerOpen ? "open" : "closed"}
               >
-                <button
-                  aria-label="Menu"
-                  className="btn btn-circle btn-ghost btn-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:focus:ring-accent/50"
-                  onClick={() => {
-                    setIsDrawerOpen(prevIsOpenState => !prevIsOpenState);
-                  }}
-                  style={{ touchAction: "manipulation" }}
-                >
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={isDrawerOpen ? "close" : "open"}
-                      initial={{ rotate: isDrawerOpen ? -90 : 90, opacity: 0 }}
-                      animate={{ rotate: 0, opacity: 1 }}
-                      exit={{ rotate: isDrawerOpen ? 90 : -90, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {isDrawerOpen ? (
-                        <XMarkIcon className="h-6 w-6 text-base-content" />
-                      ) : (
-                        <Bars3Icon className="h-6 w-6 text-base-content" />
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
-                </button>
-
-                {/* Mobile Navigation Menu */}
-                <AnimatePresence>
-                  {isDrawerOpen && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-40 bg-black/30 lg:hidden"
-                      onClick={() => setIsDrawerOpen(false)}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.2 }}
-                        className="fixed top-16 left-4 z-50 w-72 rounded-lg shadow-2xl"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <div className="bg-base-200/95 backdrop-blur-md p-6 rounded-xl border border-base-content/10 shadow-lg">
-                          <div className="mb-6 pb-3 border-b border-base-content/10">
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-10 h-10">
-                                <Image
-                                  alt="Kapan logo"
-                                  className="object-contain opacity-60"
-                                  fill
-                                  src="/seal-logo.png"
-                                />
-                              </div>
-                              <span className="text-base font-bold text-base-content/60 uppercase tracking-wider">Kapan</span>
-                            </div>
-                          </div>
-                          {/* Mobile nav links */}
-                          <ul className="space-y-2">
-                            <AppHeaderMenuLinks isMobile />
-                          </ul>
-                          <div className="mt-6 pt-4 border-t border-base-content/10">
-                            <div className="flex flex-col space-y-3 items-stretch relative z-50">
-                              <WalletButton variant="auto" />
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <MobileMenuButton isOpen={isDrawerOpen} onClick={toggleDrawer} />
+                <MobileNavigationDrawer
+                  isOpen={isDrawerOpen}
+                  onClose={closeDrawer}
+                  menuLinks={<AppHeaderMenuLinks isMobile />}
+                  walletButtons={<WalletButton variant="auto" />}
+                />
               </div>
 
               {/* Logo */}
-              <Link href="/" className="flex items-center group">
-                <div className="relative flex items-center">
-                  <div className="relative">
-                    <div className={`relative w-9 h-9 transition-all duration-300 ${scrolled ? "scale-90" : ""}`}>
-                      <Image
-                        alt="Kapan logo"
-                        className="object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-                        fill
-                        src="/seal-logo.png"
-                        priority
-                      />
-                    </div>
-                  </div>
-                  <div className={`ml-2 transition-all duration-300 ${scrolled ? "scale-95" : ""}`}>
-                    <span className="text-sm font-bold text-base-content/60 group-hover:text-base-content transition-colors duration-300 uppercase tracking-wider">Kapan</span>
-                  </div>
-                </div>
-              </Link>
+              <HeaderLogo scrolled={scrolled} />
+
               {/* Desktop Nav */}
-              <div className="hidden lg:flex ml-6">
+              <div className="ml-6 hidden lg:flex">
                 <AppHeaderMenuLinks />
               </div>
             </div>
 
             {/* Middle section - Address search */}
-            <div className="flex-1 hidden md:flex justify-center">
+            <div className="hidden flex-1 justify-center md:flex">
               {isPositionsPage && <AddressSearchBar />}
             </div>
 
@@ -377,7 +277,7 @@ export const AppHeader = () => {
             <div className="flex items-center">
               {/* Smart connect button - adapts to selected network */}
               <motion.div
-                className="hidden md:flex items-center relative z-20"
+                className="relative z-20 hidden items-center md:flex"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.5 }}

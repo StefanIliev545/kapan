@@ -1,7 +1,7 @@
 import { FC, memo, useCallback, useMemo } from "react";
-import Image from "next/image";
-import { ArrowRightIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
-import { getProtocolLogo } from "~~/utils/protocol";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import { ProtocolLogo } from "./ProtocolLogo";
+import { ProtocolDropdownItem } from "./ProtocolDropdownItem";
 import formatPercentage from "~~/utils/formatPercentage";
 
 /**
@@ -71,7 +71,7 @@ const formatRate = (rate: number): string => `${formatPercentage(rate)}%`;
 /**
  * Get the display name for a protocol (removes version suffix for cleaner UI)
  */
-const formatProtocolName = (protocolId: string): string => {
+export const formatProtocolName = (protocolId: string): string => {
   const protocolNameMap: Record<string, string> = {
     aave: "Aave V3",
     compound: "Compound V3",
@@ -167,7 +167,7 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
     return (
       <div className={className}>
         {label && (
-          <label className="text-sm font-medium text-base-content/80 block mb-1">
+          <label className="text-base-content/80 mb-1 block text-sm font-medium">
             {label}
           </label>
         )}
@@ -176,24 +176,24 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
             tabIndex={disabled ? undefined : 0}
             role="button"
             className={`
-              w-full rounded-xl border border-base-300/60
+              border-base-300/60 w-full rounded-xl border
               ${compact ? "p-2" : "p-3"}
               flex items-center justify-between
-              ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-primary/40"}
+              ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-primary/40 cursor-pointer"}
               transition-colors
             `}
           >
             <div className="flex items-center gap-3">
-              <div className={`${compact ? "w-8 h-8" : "w-12 h-12"} relative rounded-full bg-base-200 overflow-hidden`}>
+              <div className={`${compact ? "size-8" : "size-12"} bg-base-200 relative overflow-hidden rounded-full`}>
                 {selectedOption ? (
-                  <Image
-                    src={selectedOption.logo || getProtocolLogo(selectedOption.name)}
-                    alt={selectedOption.name}
-                    fill
-                    className="object-cover"
+                  <ProtocolLogo
+                    protocolName={selectedOption.name}
+                    logoUrl={selectedOption.logo}
+                    size={compact ? "md" : "lg"}
+                    rounded="full"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-base-content/50 text-xs">
+                  <div className="text-base-content/50 flex size-full items-center justify-center text-xs">
                     Pick
                   </div>
                 )}
@@ -203,22 +203,22 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                   {selectedOption ? formatProtocolName(selectedOption.name) : placeholder}
                 </span>
                 {selectedOption && getRate(selectedOption) !== undefined && (
-                  <span className="text-xs text-base-content/60">
+                  <span className="text-base-content/60 text-xs">
                     {formatRate(getRate(selectedOption)!)} APY
                   </span>
                 )}
               </div>
             </div>
-            <ChevronDownIcon className="w-5 h-5 text-base-content/50" />
+            <ChevronDownIcon className="text-base-content/50 size-5" />
           </div>
 
           {!disabled && (
             <div
               tabIndex={0}
-              className="dropdown-content z-50 menu shadow-xl bg-base-100 rounded-2xl w-full p-0 border border-base-200 overflow-hidden"
+              className="dropdown-content menu bg-base-100 border-base-200 z-50 w-full overflow-hidden rounded-2xl border p-0 shadow-xl"
             >
               {protocols.length === 0 ? (
-                <div className="px-4 py-3 text-base-content/50">No protocols available</div>
+                <div className="text-base-content/50 px-4 py-3">No protocols available</div>
               ) : (
                 <div className="max-h-[240px] overflow-y-auto">
                   {protocols.map((protocol) => {
@@ -228,48 +228,20 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                     const isRateBetter = rateDiff !== undefined && rateDiff > 0;
 
                     return (
-                      <div
+                      <ProtocolDropdownItem
                         key={protocol.name}
-                        className={`
-                          px-4 py-3 cursor-pointer border-b border-base-200 last:border-b-0
-                          transition-colors
-                          ${protocol.disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-base-200"}
-                          ${protocol.name === selectedProtocol ? "bg-primary/5" : ""}
-                        `}
-                        onClick={() => !protocol.disabled && handleSelect(protocol.name)}
-                        title={protocol.disabled ? protocol.disabledReason : undefined}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-3">
-                            <Image
-                              src={protocol.logo || getProtocolLogo(protocol.name)}
-                              alt={protocol.name}
-                              width={24}
-                              height={24}
-                              className="rounded-full min-w-[24px]"
-                            />
-                            <span className="font-medium">{formatProtocolName(protocol.name)}</span>
-                            {protocol.isOptimal && (
-                              <span className="badge badge-success badge-xs">Best</span>
-                            )}
-                          </div>
-                          {rate !== undefined && (
-                            <span
-                              className={`font-medium ${
-                                protocol.isOptimal
-                                  ? "text-success"
-                                  : isRateWorse
-                                    ? "text-error"
-                                    : isRateBetter
-                                      ? "text-success"
-                                      : ""
-                              }`}
-                            >
-                              {formatRate(rate)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                        protocolName={protocol.name}
+                        displayName={formatProtocolName(protocol.name)}
+                        logoUrl={protocol.logo}
+                        rate={rate}
+                        isOptimal={protocol.isOptimal}
+                        isRateWorse={isRateWorse}
+                        isRateBetter={isRateBetter}
+                        isSelected={protocol.name === selectedProtocol}
+                        disabled={protocol.disabled}
+                        disabledReason={protocol.disabledReason}
+                        onClick={() => handleSelect(protocol.name)}
+                      />
                     );
                   })}
                 </div>
@@ -286,8 +258,8 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
     return (
       <div className={className}>
         {label && (
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-base-content/80">{label}</div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-base-content/80 text-sm font-semibold">{label}</div>
             {showRateBadges && selectedOption && currentRate !== undefined && (
               <RateBadge
                 selectedRate={getRate(selectedOption)}
@@ -310,22 +282,21 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                 key={protocol.name}
                 className={`
                   ${compact ? "p-2" : "p-2 sm:p-3"}
-                  border rounded-lg cursor-pointer transition-all
+                  cursor-pointer rounded-lg border transition-all
                   ${isSelected ? "border-primary bg-primary/10" : "border-base-300 hover:border-primary/40"}
-                  ${protocol.disabled ? "opacity-50 cursor-not-allowed" : ""}
+                  ${protocol.disabled ? "cursor-not-allowed opacity-50" : ""}
                 `}
                 onClick={() => !protocol.disabled && handleSelect(protocol.name)}
                 title={protocol.disabled ? protocol.disabledReason : undefined}
               >
                 <div className="flex items-center gap-2">
-                  <Image
-                    src={protocol.logo || getProtocolLogo(protocol.name)}
-                    alt={protocol.name}
-                    width={compact ? 20 : 24}
-                    height={compact ? 20 : 24}
-                    className="rounded flex-shrink-0"
+                  <ProtocolLogo
+                    protocolName={protocol.name}
+                    logoUrl={protocol.logo}
+                    size={compact ? "xs" : "sm"}
+                    rounded="md"
                   />
-                  <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`}>
+                  <span className={`${compact ? "text-xs" : "text-sm"} truncate font-medium`}>
                     {formatProtocolName(protocol.name)}
                   </span>
                   {protocol.isOptimal && (
@@ -349,7 +320,7 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
   return (
     <div className={className}>
       {label && (
-        <label className="text-sm font-medium text-base-content/80 block mb-2">
+        <label className="text-base-content/80 mb-2 block text-sm font-medium">
           {label}
         </label>
       )}
@@ -363,18 +334,17 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
               type="button"
               className={`
                 btn btn-sm gap-2
-                ${isSelected ? "btn-primary" : "btn-ghost border border-base-300"}
+                ${isSelected ? "btn-primary" : "btn-ghost border-base-300 border"}
                 ${protocol.disabled ? "btn-disabled" : ""}
               `}
               onClick={() => !protocol.disabled && handleSelect(protocol.name)}
               title={protocol.disabled ? protocol.disabledReason : undefined}
             >
-              <Image
-                src={protocol.logo || getProtocolLogo(protocol.name)}
-                alt={protocol.name}
-                width={16}
-                height={16}
-                className="rounded"
+              <ProtocolLogo
+                protocolName={protocol.name}
+                logoUrl={protocol.logo}
+                size="xs"
+                rounded="md"
               />
               <span>{formatProtocolName(protocol.name)}</span>
             </button>
@@ -406,7 +376,7 @@ const RateBadge: FC<RateBadgeProps> = memo(({ selectedRate, currentRate, rateTyp
 
   if (isSame) {
     return (
-      <span className="badge badge-sm border-0 bg-base-200 text-base-content/70">
+      <span className="badge badge-sm bg-base-200 text-base-content/70 border-0">
         Same APY
       </span>
     );

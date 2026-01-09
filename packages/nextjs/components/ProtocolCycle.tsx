@@ -81,7 +81,7 @@ export const ProtocolCycle = ({
       }}
     >
       {/* Invisible measuring container */}
-      <span ref={measureRef} className="absolute opacity-0 pointer-events-none">
+      <span ref={measureRef} className="pointer-events-none absolute opacity-0">
         {protocols.map(p => (
           <span key={p.name} className="inline-flex items-center gap-2 whitespace-nowrap">
             <Image src={p.icon} alt="" width={iconSizePx} height={iconSizePx} />

@@ -47,16 +47,16 @@ export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
       <div
         tabIndex={0}
         role="button"
-        className="cursor-pointer flex items-center justify-center h-[1.125em]"
+        className="flex h-[1.125em] cursor-pointer items-center justify-center"
       >
         <InformationCircleIcon
-          className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
+          className="text-base-content/50 hover:text-base-content/80 size-4 transition-colors"
           aria-hidden="true"
         />
       </div>
       <div
         tabIndex={0}
-        className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
+        className="dropdown-content card card-compact bg-base-100 z-[1] w-64 max-w-[90vw] p-2 shadow"
         style={{
           right: "auto",
           transform: "translateX(-50%)",
@@ -66,11 +66,11 @@ export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
       >
         <div className="card-body p-3">
           <h3 className="card-title text-sm">{name} Details</h3>
-          <div className="text-xs space-y-1">
+          <div className="space-y-1 text-xs">
             {tokenAddress && (
               <>
                 <p className="text-base-content/70">Contract Address:</p>
-                <p className="font-mono break-all">{tokenAddress}</p>
+                <p className="break-all font-mono">{tokenAddress}</p>
               </>
             )}
             <p className="text-base-content/70">Protocol:</p>

@@ -57,7 +57,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   const renderMarketContent = () => {
     if (assetsError) {
       return (
-        <div className="rounded-md bg-error/10 p-4 text-sm text-error">
+        <div className="bg-error/10 text-error rounded-md p-4 text-sm">
           Error loading markets. Please try again later.
           {headerExtra && <div className="ml-auto flex items-center">{headerExtra}</div>}
         </div>
@@ -74,7 +74,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
 
     if (suppliablePositions.length === 0 && borrowablePositions.length === 0) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           No markets available
         </div>
       );
@@ -85,7 +85,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
         {suppliablePositions.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+              <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
                 Suppliable assets
               </div>
               <button
@@ -113,7 +113,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
 
         {borrowablePositions.length > 0 && (
           <div className="space-y-3">
-            <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
               Borrowable assets
             </div>
             {borrowablePositions.map(position => (
@@ -134,7 +134,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   };
 
   return (
-    <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
+    <div className="card from-base-100 to-base-100/95 border-base-200/50 rounded-xl border bg-gradient-to-r shadow-lg transition-all duration-300 hover:shadow-xl">
       <div className="card-body px-5 py-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           {/* Protocol name + icon */}
@@ -149,31 +149,31 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
           </div>
 
           {/* Divider */}
-          <div className="hidden sm:block w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+          <div className="via-base-300 hidden h-10 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
 
           {/* Stats - spread evenly across available space */}
           {userAddress && (
-            <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+            <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
               {/* Net Balance */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Balance</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netBalanceUsd)}
                 </span>
               </div>
 
               {/* 30D Yield */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">30D Yield</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netYield30d)}
                 </span>
               </div>
 
               {/* Net APY */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Net APY</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                 </span>
               </div>
@@ -181,23 +181,23 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
           )}
 
           {/* Right side - status message + actions */}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="ml-auto flex items-center gap-3">
             {!userAddress ? (
-              <span className="text-[11px] text-primary/80 font-medium">Connect Starknet wallet</span>
+              <span className="text-primary/80 text-[11px] font-medium">Connect Starknet wallet</span>
             ) : hasPositions ? (
-              <span className="hidden md:inline text-[10px] text-base-content/40">Managing positions</span>
+              <span className="text-base-content/40 hidden text-[10px] md:inline">Managing positions</span>
             ) : null}
-            <div className="flex items-center gap-2 pl-2 border-l border-base-300/50">
+            <div className="border-base-300/50 flex items-center gap-2 border-l pl-2">
               <button className="btn btn-sm btn-ghost gap-1.5" type="button" onClick={onToggle}>
-                <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                {isOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
+                <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
+                {isOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
               </button>
               {headerExtra}
             </div>
           </div>
         </div>
 
-        {isOpen && <div className="space-y-4 border-t border-base-200/50 pt-4 mt-3">{renderMarketContent()}</div>}
+        {isOpen && <div className="border-base-200/50 mt-3 space-y-4 border-t pt-4">{renderMarketContent()}</div>}
       </div>
     </div>
   );

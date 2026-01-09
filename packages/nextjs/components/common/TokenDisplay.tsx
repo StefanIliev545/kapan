@@ -87,7 +87,7 @@ export const TokenIcon: FC<TokenIconProps> = ({
     return (
       <div
         className={clsx(
-          "relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-1 ring-1 ring-base-300/50 flex-shrink-0",
+          "from-base-200 to-base-300/50 ring-base-300/50 relative flex-shrink-0 rounded-xl bg-gradient-to-br p-1 ring-1",
           !customSize && sizeConfig.containerClass,
           className
         )}
@@ -323,7 +323,7 @@ export const TokenDisplay: FC<TokenDisplayProps> = ({
           fallbackIcon={fallbackIcon}
         />
         {showSymbol && (
-          <span className={clsx("font-medium mt-1", sizeConfig.text, textColorClass)}>
+          <span className={clsx("mt-1 font-medium", sizeConfig.text, textColorClass)}>
             {name || symbol || "Unknown"}
           </span>
         )}
@@ -353,9 +353,9 @@ export const TokenDisplay: FC<TokenDisplayProps> = ({
         showContainer={showContainer}
         fallbackIcon={fallbackIcon}
       />
-      <div className="flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-col">
         {showSymbol && (
-          <span className={clsx("font-medium truncate", sizeConfig.text, textColorClass)}>
+          <span className={clsx("truncate font-medium", sizeConfig.text, textColorClass)}>
             {name || symbol || "Unknown"}
           </span>
         )}
@@ -426,7 +426,7 @@ export const TokenPill: FC<TokenPillProps> = ({
           src={resolvedIcon}
           alt={displayName || "token"}
           fill
-          className="object-contain rounded-full"
+          className="rounded-full object-contain"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.src = "/logos/x-logo.svg";
@@ -434,7 +434,7 @@ export const TokenPill: FC<TokenPillProps> = ({
         />
       </div>
       {value !== undefined && (
-        <span className="font-mono tabular-nums text-base-content/80">
+        <span className="text-base-content/80 font-mono tabular-nums">
           {typeof value === "number" ? value.toLocaleString("en-US", { maximumFractionDigits: 2 }) : value}
         </span>
       )}

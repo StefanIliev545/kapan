@@ -55,7 +55,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   const renderPositions = () => {
     if (!userAddress) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           Connect your wallet to view your Morpho Blue positions
         </div>
       );
@@ -71,7 +71,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
     if (rows.length === 0) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           No positions found
         </div>
       );
@@ -142,22 +142,22 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         return (
         <div
           key={row.key}
-          className="relative rounded-md border border-base-300 transition-all duration-200 hover:border-base-content/15"
+          className="border-base-300 hover:border-base-content/15 relative rounded-md border transition-all duration-200"
         >
           {/* Market pair header */}
           <div 
-            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-base-200/50 px-3 py-2 border-b border-base-300 cursor-pointer transition-colors hover:bg-base-200/70"
+            className="bg-base-200/50 border-base-300 hover:bg-base-200/70 flex cursor-pointer flex-col gap-2 border-b px-3 py-2 transition-colors sm:flex-row sm:items-center sm:justify-between"
             onClick={() => toggleRowExpanded(row.key)}
           >
             {/* Market name row */}
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex -space-x-2 flex-shrink-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex flex-shrink-0 -space-x-2">
                 <Image
                   src={tokenNameToLogo(row.collateralSymbol.toLowerCase())}
                   alt={row.collateralSymbol}
                   width={20}
                   height={20}
-                  className="rounded-full border border-base-100 bg-base-200"
+                  className="border-base-100 bg-base-200 rounded-full border"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "/logos/default.svg";
                   }}
@@ -167,13 +167,13 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                   alt={row.loanSymbol}
                   width={20}
                   height={20}
-                  className="rounded-full border border-base-100 bg-base-200"
+                  className="border-base-100 bg-base-200 rounded-full border"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "/logos/default.svg";
                   }}
                 />
               </div>
-              <span className="text-sm font-medium truncate" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
+              <span className="truncate text-sm font-medium" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
                 {row.collateralSymbol}/{row.loanSymbol}
               </span>
               {(() => {
@@ -189,7 +189,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-0.5 opacity-50 hover:opacity-100 transition-opacity flex-shrink-0"
+                    className="inline-flex flex-shrink-0 items-center gap-0.5 opacity-50 transition-opacity hover:opacity-100"
                     title="View on Morpho"
                   >
                     <Image
@@ -229,12 +229,12 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
                 </span>
               )}
               {/* 30D Yield - hidden on very small screens */}
-              <span className="hidden min-[400px]:inline text-base-content/60 group relative cursor-help">
+              <span className="text-base-content/60 group relative hidden cursor-help min-[400px]:inline">
                 30D:{" "}
                 <span className={positionYieldMetrics.netYield30d >= 0 ? "text-success" : "text-error"}>
                   {formatCurrencyCompact(positionYieldMetrics.netYield30d)}
                 </span>
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[10px] bg-base-300 text-base-content rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                   Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? "text-success" : "text-error"}>{formatCurrencyCompact(positionYieldMetrics.netAnnualYield)}</span>
                 </span>
               </span>
@@ -242,7 +242,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           </div>
 
           {/* Side-by-side positions */}
-          <div className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}>
+          <div className={`divide-base-300 grid divide-y md:divide-y-0 ${containerColumns}`}>
             {/* Left: Collateral (Supply) */}
             <SupplyPosition
               {...supplyPosition}
@@ -311,14 +311,14 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   return (
     <div className="space-y-4">
       {/* Header with title and badge */}
-      <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+      <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
         <div className="flex items-center gap-2">
-          <div className="w-1 h-5 rounded-full bg-primary" />
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">{title}</span>
+          <div className="bg-primary h-5 w-1 rounded-full" />
+          <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">{title}</span>
         </div>
         {rows.length > 0 && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-            <span className="text-xs font-mono font-bold">{rows.length}</span>
+          <div className="bg-primary/10 text-primary flex items-center gap-1.5 rounded-full px-2 py-0.5">
+            <span className="font-mono text-xs font-bold">{rows.length}</span>
             <span className="text-[10px] uppercase tracking-wider opacity-70">{rows.length === 1 ? "market" : "markets"}</span>
           </div>
         )}

@@ -100,12 +100,12 @@ export const TupleArray = ({ abiTupleParameter, setParentForm, parentStateObject
 
   return (
     <div>
-      <div className="collapse collapse-arrow bg-base-200 pl-4 py-1.5 border-2 border-secondary">
-        <input type="checkbox" className="min-h-fit peer" />
-        <div className="collapse-title after:!top-3.5 p-0 min-h-fit peer-checked:mb-1 text-primary-content/50">
+      <div className="collapse-arrow bg-base-200 border-secondary collapse border-2 py-1.5 pl-4">
+        <input type="checkbox" className="peer min-h-fit" />
+        <div className="collapse-title text-primary-content/50 min-h-fit p-0 after:!top-3.5 peer-checked:mb-1">
           <p className="m-0 text-[1rem]">{abiTupleParameter.internalType}</p>
         </div>
-        <div className="ml-3 flex-col space-y-2 border-secondary/70 border-l-2 pl-4 collapse-content">
+        <div className="border-secondary/70 collapse-content ml-3 flex-col space-y-2 border-l-2 pl-4">
           {additionalInputs.map((additionalInput, additionalIndex) => (
             <div key={additionalIndex} className="space-y-1">
               <span className="badge bg-base-300 badge-sm">

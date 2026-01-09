@@ -250,28 +250,29 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <label className="text-sm font-medium text-base-content/80">Select Collateral to Move</label>
+        <label className="text-base-content/80 text-sm font-medium">Select Collateral to Move</label>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-6 bg-base-200/50 rounded-lg">
+        <div className="bg-base-200/50 flex items-center justify-center rounded-lg py-6">
           <LoadingSpinner size="md" label="Checking collateral support..." />
         </div>
       ) : sortedCollaterals.length > 0 ? (
-        <div className="bg-base-200/30 p-4 rounded-lg">
+        <div className="bg-base-200/30 rounded-lg p-4">
           <div className="space-y-2">
             {sortedCollaterals.map(collateral => {
               const hasZeroBalance = collateral.rawBalance <= 0n;
               const isDisabled = !collateral.supported || hasZeroBalance;
 
               return (
+                // eslint-disable-next-line tailwindcss/no-contradicting-classname -- btn-block is DaisyUI, not CSS block
                 <button
                   key={collateral.address}
                   onClick={() => handleCollateralToggle(collateral)}
                   className={`
-                    btn btn-block h-auto py-2 px-3 normal-case flex items-center gap-2 justify-start
+                    btn btn-block flex h-auto items-center justify-start gap-2 px-3 py-2 normal-case
                     ${isCollateralSelected(collateral.address) ? "btn-primary" : "btn-outline bg-base-100"}
-                    ${isDisabled ? "opacity-50 cursor-not-allowed tooltip" : ""}
+                    ${isDisabled ? "tooltip cursor-not-allowed opacity-50" : ""}
                   `}
                   disabled={isDisabled}
                   data-tip={
@@ -284,7 +285,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                       : undefined
                   }
                 >
-                  <div className="w-6 h-6 relative flex-shrink-0">
+                  <div className="relative size-6 flex-shrink-0">
                     <Image
                       src={tokenNameToLogo(collateral.symbol)}
                       alt={collateral.symbol}
@@ -293,20 +294,20 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                     />
                   </div>
                   <div className="flex flex-col items-start overflow-hidden">
-                    <span className="truncate font-medium w-full">{collateral.symbol}</span>
-                    <span className="text-xs opacity-70 tabular-nums">
+                    <span className="w-full truncate font-medium">{collateral.symbol}</span>
+                    <span className="text-xs tabular-nums opacity-70">
                       {formatBalance(collateral.balance)}
                     </span>
                   </div>
-                  {!collateral.supported && <span className="text-xs px-1 bg-base-300 rounded-full ml-auto">!</span>}
-                  {hasZeroBalance && <span className="text-xs px-1 bg-base-300 rounded-full ml-auto">0</span>}
+                  {!collateral.supported && <span className="bg-base-300 ml-auto rounded-full px-1 text-xs">!</span>}
+                  {hasZeroBalance && <span className="bg-base-300 ml-auto rounded-full px-1 text-xs">0</span>}
                 </button>
               );
             })}
           </div>
         </div>
       ) : (
-        <div className="text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg">
+        <div className="text-base-content/70 bg-base-200/50 rounded-lg p-6 text-center">
           No collateral available to move
         </div>
       )}
@@ -314,8 +315,8 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       {/* Vertical list of selected collaterals with amount inputs */}
       {!hideAmounts && selectedCollaterals.length > 0 && (
         <div className="mt-4 space-y-2">
-          <label className="block text-lg font-semibold text-center">Collateral</label>
-          <div className="bg-base-200/40 p-4 rounded-lg space-y-3">
+          <label className="block text-center text-lg font-semibold">Collateral</label>
+          <div className="bg-base-200/40 space-y-3 rounded-lg p-4">
             {selectedCollaterals.map((collateral) => {
               // Format human-readable amount for display
               const displayAmount = collateral.inputValue 
@@ -334,11 +335,11 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
               return (
                 <div 
                   key={collateral.token} 
-                  className={`flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}
+                  className={`bg-base-100 border-base-300/50 flex items-center gap-3 rounded-md border px-3 py-2.5 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}
                 >
                   {/* Left side: Token icon and info - fixed width */}
-                  <div className="flex items-center gap-2 w-[160px] flex-shrink-0">
-                    <div className="w-7 h-7 relative flex-shrink-0">
+                  <div className="flex w-[160px] flex-shrink-0 items-center gap-2">
+                    <div className="relative size-7 flex-shrink-0">
                       <Image
                         src={tokenNameToLogo(collateral.symbol)}
                         alt={collateral.symbol}
@@ -347,29 +348,29 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                       />
                     </div>
                     <div className="flex flex-col overflow-hidden">
-                      <span className="font-medium truncate">{collateral.symbol}</span>
-                      <span className="text-xs text-base-content/60">
+                      <span className="truncate font-medium">{collateral.symbol}</span>
+                      <span className="text-base-content/60 text-xs">
                         Available: {maxAmount}
                       </span>
                       {!isSupported && (
-                        <span className="text-xs text-error/80">Not supported in {selectedProtocol}</span>
+                        <span className="text-error/80 text-xs">Not supported in {selectedProtocol}</span>
                       )}
                     </div>
                   </div>
                   
                   {/* Input field - takes remaining space */}
                   <div className="flex-1">
-                    <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all ${!isSupported ? 'opacity-50' : ''}`}>
+                    <div className={`bg-base-200/60 border-base-300 focus-within:border-primary focus-within:ring-primary/30 flex items-center rounded-lg border transition-all focus-within:ring-1 ${!isSupported ? 'opacity-50' : ''}`}>
                       <input
                         type="text"
                         value={displayAmount}
                         onChange={(e) => handleAmountChange(collateral.token, e.target.value, collateral.decimals)}
-                        className="flex-1 bg-transparent border-none focus:outline-none px-3 py-2 h-10 text-base-content"
+                        className="text-base-content h-10 flex-1 border-none bg-transparent px-3 py-2 focus:outline-none"
                         placeholder="0.00"
                         disabled={!isSupported}
                       />
                       <button
-                        className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`bg-base-300 hover:bg-primary text-base-content/70 mr-2 rounded px-2 py-0.5 text-xs font-medium transition-colors duration-200 hover:text-white ${!isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
                         onClick={() => {
                           handleSetMax(collateral.token);
                         }}
@@ -383,11 +384,11 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   {/* Remove button - fixed width */}
                   <div className="flex-shrink-0">
                     <button
-                      className="btn btn-ghost btn-sm text-base-content/70 p-1 h-8 w-8 flex items-center justify-center hover:bg-error/10 hover:text-error"
+                      className="btn btn-ghost btn-sm text-base-content/70 hover:bg-error/10 hover:text-error flex size-8 items-center justify-center p-1"
                       onClick={() => handleRemoveCollateral(collateral.token)}
                       title="Remove collateral"
                     >
-                      <XMarkIcon className="w-4 h-4" />
+                      <XMarkIcon className="size-4" />
                     </button>
                   </div>
                 </div>

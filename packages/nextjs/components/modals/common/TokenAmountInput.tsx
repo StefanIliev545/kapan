@@ -65,9 +65,9 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <span className="text-sm text-base-content/80">{label}</span>
+                <span className="text-base-content/80 text-sm">{label}</span>
                 {showBalance && selectedToken && (
-                    <span className="text-xs text-base-content/60">
+                    <span className="text-base-content/60 text-xs">
                         Available: {formatUnits(selectedToken.rawBalance, selectedToken.decimals)}
                     </span>
                 )}
@@ -75,7 +75,7 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
 
             <div className="flex items-center gap-3">
                 {selectedToken && (
-                    <div className="w-8 h-8 relative flex-shrink-0">
+                    <div className="relative size-8 flex-shrink-0">
                         <Image
                             src={selectedToken.icon}
                             alt={selectedToken.symbol}
@@ -87,13 +87,13 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
 
                 {/* Token Selector */}
                 {readOnly || availableTokens.length <= 1 ? (
-                    <div className="font-medium min-w-[100px]">
+                    <div className="min-w-[100px] font-medium">
                         {selectedToken?.symbol || "-"}
                     </div>
                 ) : (
                     <div className="relative min-w-[100px]">
                         <select
-                            className="select select-ghost select-sm w-full max-w-xs font-medium pl-0 focus:outline-none"
+                            className="select select-ghost select-sm w-full max-w-xs pl-0 font-medium focus:outline-none"
                             value={selectedToken?.symbol || ""}
                             onChange={handleTokenChange}
                         >
@@ -109,7 +109,7 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
                 {/* Amount Input / Output */}
                 <div className="relative flex-1">
                     {isOutput ? (
-                        <div className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 outline-none font-medium text-right min-h-[32px] flex items-center justify-end">
+                        <div className="border-base-300 flex min-h-[32px] w-full items-center justify-end border-0 border-b-2 bg-transparent px-2 py-1 text-right font-medium outline-none">
                             {isLoading ? (
                                 <span className="loading loading-dots loading-xs"></span>
                             ) : (
@@ -123,12 +123,12 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
                                 value={amount}
                                 onChange={handleAmountChange}
                                 placeholder="0.00"
-                                className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-16 outline-none font-medium text-right"
+                                className="border-base-300 w-full border-0 border-b-2 bg-transparent px-2 py-1 pr-16 text-right font-medium outline-none"
                             />
                             {showMax && onMaxClick && (
                                 <button
                                     onClick={onMaxClick}
-                                    className="absolute right-0 top-1/2 -translate-y-1/2 text-primary text-xs font-bold hover:text-primary-focus"
+                                    className="text-primary hover:text-primary-focus absolute right-0 top-1/2 -translate-y-1/2 text-xs font-bold"
                                 >
                                     MAX
                                 </button>
@@ -141,7 +141,7 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
             {/* USD Value */}
             {usdValue !== undefined && (
                 <div className="flex justify-end">
-                    <span className="text-xs text-base-content/60">
+                    <span className="text-base-content/60 text-xs">
                         {"\u2248"} ${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </div>

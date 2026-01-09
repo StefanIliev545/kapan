@@ -13,8 +13,8 @@ export const BatchingPreference: FC<BatchingPreferenceProps> = ({ enabled, setEn
   }
 
   return (
-    <div className="pt-2 pb-1">
-      <label className="label cursor-pointer gap-2 justify-start">
+    <div className="pb-1 pt-2">
+      <label className="label cursor-pointer justify-start gap-2">
         <input
           type="checkbox"
           checked={enabled}

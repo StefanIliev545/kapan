@@ -40,7 +40,7 @@ export interface ParsedAmount {
  * // { value: null, isPositive: false, isValid: false }
  * ```
  */
-export function parseAmount(amount: string, decimals: number = 18): ParsedAmount {
+export function parseAmount(amount: string, decimals = 18): ParsedAmount {
   if (!amount || !amount.trim()) {
     return { value: null, isPositive: false, isValid: false };
   }
@@ -77,7 +77,7 @@ export function parseAmount(amount: string, decimals: number = 18): ParsedAmount
  * isAmountPositive("", 18)    // false
  * ```
  */
-export function isAmountPositive(amount: string, decimals: number = 18): boolean {
+export function isAmountPositive(amount: string, decimals = 18): boolean {
   return parseAmount(amount, decimals).isPositive;
 }
 
@@ -330,7 +330,7 @@ export function canSubmitForm(options: CanSubmitOptions): boolean {
 export function resolveDecimals(
   tokenDecimals: number | undefined | null,
   fetchedDecimals?: number | undefined | null,
-  defaultDecimals: number = 18
+  defaultDecimals = 18
 ): number {
   return tokenDecimals ?? fetchedDecimals ?? defaultDecimals;
 }

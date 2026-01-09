@@ -84,20 +84,20 @@ export const GasTokenSelector = () => {
     <div className="relative" ref={dropdownRef}>
       {/* Gas Token Button */}
       <motion.button
-        className="flex items-center gap-2 hover:bg-base-300/50 transition-colors duration-200 rounded p-1"
+        className="hover:bg-base-300/50 flex items-center gap-2 rounded p-1 transition-colors duration-200"
         onClick={() => setIsOpen(!isOpen)}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         {/* Gas Icon */}
-        <div className="w-4 h-4 text-base-content/70">
+        <div className="text-base-content/70 size-4">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-3h1c.55 0 1 .45 1 1v3.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM12 10H6V5h6v5z"/>
           </svg>
         </div>
 
         {/* Selected Token Icon (no text) */}
-        <div className="w-4 h-4 relative">
+        <div className="relative size-4">
           <Image
             src={selectedToken.icon}
             alt={selectedToken.name}
@@ -113,7 +113,7 @@ export const GasTokenSelector = () => {
 
         {/* Dropdown Arrow */}
         <ChevronDownIcon 
-          className={`w-4 h-4 text-base-content/50 transition-transform duration-200 ${
+          className={`text-base-content/50 size-4 transition-transform duration-200${
             isOpen ? 'rotate-180' : ''
           }`} 
         />
@@ -127,10 +127,10 @@ export const GasTokenSelector = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute top-full mt-2 right-0 z-50 bg-base-100 border border-base-300/50 rounded-lg shadow-xl min-w-[360px] max-h-[400px] overflow-auto"
+            className="bg-base-100 border-base-300/50 absolute right-0 top-full z-50 mt-2 max-h-[400px] min-w-[360px] overflow-auto rounded-lg border shadow-xl"
           >
             <div className="p-3">
-              <div className="text-sm font-medium text-base-content/70 mb-3 px-2">
+              <div className="text-base-content/70 mb-3 px-2 text-sm font-medium">
                 Select Gas Token
               </div>
 
@@ -138,13 +138,13 @@ export const GasTokenSelector = () => {
               {isLoading && (
                 <div className="flex items-center justify-center py-8">
                   <span className="loading loading-spinner loading-sm"></span>
-                  <span className="ml-2 text-sm text-base-content/60">Loading tokens...</span>
+                  <span className="text-base-content/60 ml-2 text-sm">Loading tokens...</span>
                 </div>
               )}
 
               {/* Error State */}
               {error && (
-                <div className="text-sm text-error px-2 py-4 text-center">
+                <div className="text-error px-2 py-4 text-center text-sm">
                   Failed to load gas tokens
                 </div>
               )}
@@ -163,8 +163,8 @@ export const GasTokenSelector = () => {
               </div>
 
               {/* Paymaster Info */}
-              <div className="mt-3 pt-3 border-t border-base-300/30">
-                <div className="text-xs text-base-content/50 text-center">
+              <div className="border-base-300/30 mt-3 border-t pt-3">
+                <div className="text-base-content/50 text-center text-xs">
                   Gas fees paid with selected token
                 </div>
               </div>

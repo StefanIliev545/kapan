@@ -1,6 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { ExclamationTriangleIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { Fuel } from "lucide-react";
 import { formatUnits } from "viem";
 import { useAccount, useReadContract, useSwitchChain } from "wagmi";
@@ -8,11 +8,12 @@ import { CollateralAmounts } from "~~/components/specific/collateral/CollateralA
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { DebtCollateralSummary, formatDisplayNumber } from "~~/components/common/ValueDisplay";
 import { ErrorDisplay } from "~~/components/common/ErrorDisplay";
+import { FlashLoanProviderSelector } from "~~/components/modals/common/FlashLoanProviderSelector";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
+import { useNetworkSwitch } from "~~/hooks/common";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
@@ -45,6 +46,9 @@ interface MovePositionModalProps {
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position, chainId }) => {
   const { address: userAddress, chain } = useAccount();
   const { switchChain } = useSwitchChain();
+
+  // Auto-switch network when modal opens
+  useNetworkSwitch(isOpen, chainId);
   
   // Build destination protocols from static chain config
   // IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/ gateway deploy scripts
@@ -216,20 +220,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
       setSelectedCollateralsWithAmounts([]);
     }
   }, [isOpen]);
-
-  // Ensure wallet is on the correct EVM network when modal opens
-  useEffect(() => {
-    if (!isOpen || !chainId) return;
-    if (chain?.id !== chainId) {
-      try {
-        switchChain?.({ chainId });
-      } catch (e) {
-        console.warn("Auto network switch failed", e);
-      }
-    }
-  }, [isOpen, chainId, chain?.id, switchChain]);
-
-  // Note: Flash loan provider balance check removed - handled by router
 
   // Memoize formatted token balance.
   const formattedTokenBalance = useMemo(() => {
@@ -411,21 +401,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
-      <div className="modal-box bg-base-100 max-w-5xl max-h-[90vh] min-h-[360px] p-6 rounded-none flex flex-col">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-full flex-grow">
+      <div className="modal-box bg-base-100 flex max-h-[90vh] min-h-[360px] max-w-5xl flex-col rounded-none p-6">
+        <div className="grid h-full flex-grow grid-cols-1 gap-8 md:grid-cols-12">
           {/* FROM SECTION */}
           <div className="space-y-6 md:col-span-3">
             <div>
-              <label className="text-sm font-medium text-base-content/80">From</label>
-              <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
+              <label className="text-base-content/80 text-sm font-medium">From</label>
+              <div className="border-base-300 flex h-14 items-center gap-3 border-b-2 px-1">
                 <Image
                   src={getProtocolLogo(fromProtocol)}
                   alt={fromProtocol}
                   width={32}
                   height={32}
-                  className="rounded-full min-w-[32px]"
+                  className="min-w-[32px] rounded-full"
                 />
-                <span className="truncate font-semibold text-lg">{fromProtocol}</span>
+                <span className="truncate text-lg font-semibold">{fromProtocol}</span>
               </div>
             </div>
             {position.type === "borrow" && (
@@ -445,18 +435,18 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           {/* AMOUNTS SECTION */}
           <div className="space-y-6 md:col-span-6">
             <div>
-              <div className="text-center mb-2">
-                <label className="block text-lg font-semibold flex items-center justify-center gap-1">
+              <div className="mb-2 text-center">
+                <label className="flex items-center justify-center gap-1 text-lg font-semibold">
                   Debt
-                  {position.type === "supply" && <LockClosedIcon className="text-emerald-500 w-4 h-4" title="Supplied asset" />}
+                  {position.type === "supply" && <LockClosedIcon className="size-4 text-emerald-500" title="Supplied asset" />}
                 </label>
-                <div className="text-xs text-base-content/60">
+                <div className="text-base-content/60 text-xs">
                   Available: {formatDisplayNumber(formattedTokenBalance)} {position.name}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 w-32 shrink-0">
-                  <div className="w-6 h-6 relative">
+                <div className="flex w-32 shrink-0 items-center gap-2">
+                  <div className="relative size-6">
                     <Image
                       src={tokenNameToLogo(position.name)}
                       alt={position.name}
@@ -468,14 +458,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 </div>
                 <input
                   type="text"
-                  className="flex-1 border-b-2 border-base-300 focus:border-primary bg-transparent px-2 h-14 text-lg text-right"
+                  className="border-base-300 focus:border-primary h-14 flex-1 border-b-2 bg-transparent px-2 text-right text-lg"
                   placeholder="0.00"
                   value={amount}
                   onChange={handleAmountChange}
                   disabled={loading || step !== "idle"}
                 />
                 <button
-                  className="text-xs font-medium px-2 py-1"
+                  className="px-2 py-1 text-xs font-medium"
                   onClick={handleSetMaxAmount}
                   disabled={loading || step !== "idle"}
                 >
@@ -505,13 +495,13 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
           {/* TO SECTION */}
           <div className="space-y-6 md:col-span-3">
             <div>
-              <label className="text-sm font-medium text-base-content/80">To</label>
+              <label className="text-base-content/80 text-sm font-medium">To</label>
               <div className="dropdown w-full">
                 <div
                   tabIndex={0}
-                  className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
+                  className="border-base-300 flex h-14 cursor-pointer items-center justify-between border-b-2 px-1 py-3"
                 >
-                  <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
+                  <div className="flex w-[calc(100%-32px)] items-center gap-3 overflow-hidden">
                     {selectedProtocol ? (
                       <>
                         <Image
@@ -519,21 +509,21 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                           alt={selectedProtocol}
                           width={32}
                           height={32}
-                          className="rounded-full min-w-[32px]"
+                          className="min-w-[32px] rounded-full"
                         />
-                        <span className="truncate font-semibold text-lg">{selectedProtocol}</span>
+                        <span className="truncate text-lg font-semibold">{selectedProtocol}</span>
                       </>
                     ) : (
                       <span className="text-base-content/50">Select protocol</span>
                     )}
                   </div>
-                  <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="size-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
                 <ul
                   tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
+                  className="dropdown-content menu bg-base-100 dropdown-bottom z-50 mt-1 w-full rounded-lg p-2 shadow-lg"
                 >
                   {protocols
                     .filter(p => p.name !== fromProtocol)
@@ -548,7 +538,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                             alt={protocol.name}
                             width={32}
                             height={32}
-                            className="rounded-full min-w-[32px]"
+                            className="min-w-[32px] rounded-full"
                           />
                           <span className="truncate text-lg">{protocol.name}</span>
                         </button>
@@ -558,82 +548,17 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               </div>
             </div>
 
-            {availableFlashLoanProviders.length > 0 && (
-              <div>
-                <label className="text-sm font-medium text-base-content/80">Flash Loan Provider</label>
-                {availableFlashLoanProviders.length === 1 ? (
-                  // Show as static display if only one provider available
-                  <div className="flex items-center gap-3 h-14 border-b-2 border-base-300 px-1">
-                    {selectedFlashLoanProvider && (
-                      <>
-                        <Image
-                          src={selectedFlashLoanProvider.icon}
-                          alt={selectedFlashLoanProvider.name}
-                          width={32}
-                          height={32}
-                          className="rounded-full min-w-[32px]"
-                        />
-                        <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  // Show dropdown if multiple providers available
-                  <div className="dropdown w-full">
-                    <div
-                      tabIndex={0}
-                      className="border-b-2 border-base-300 py-3 px-1 flex items-center justify-between cursor-pointer h-14"
-                    >
-                      <div className="flex items-center gap-3 w-[calc(100%-32px)] overflow-hidden">
-                        {selectedFlashLoanProvider && (
-                          <>
-                            <Image
-                              src={selectedFlashLoanProvider.icon}
-                              alt={selectedFlashLoanProvider.name}
-                              width={32}
-                              height={32}
-                              className="rounded-full min-w-[32px]"
-                            />
-                            <span className="truncate font-semibold text-lg">{selectedFlashLoanProvider.name}</span>
-                          </>
-                        )}
-                      </div>
-                      <svg className="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                    <ul
-                      tabIndex={0}
-                      className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-lg w-full z-50 dropdown-bottom mt-1"
-                    >
-                      {availableFlashLoanProviders.map(provider => (
-                        <li key={provider.name}>
-                          <button
-                            className="flex items-center gap-3 py-2"
-                            onClick={() => setSelectedFlashLoanProvider(provider)}
-                          >
-                            <Image
-                              src={provider.icon}
-                              alt={provider.name}
-                              width={32}
-                              height={32}
-                              className="rounded-full min-w-[32px]"
-                            />
-                            <span className="truncate text-lg">{provider.name}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+            <FlashLoanProviderSelector
+              providers={availableFlashLoanProviders}
+              selectedProvider={selectedFlashLoanProvider}
+              onSelectProvider={setSelectedFlashLoanProvider}
+            />
           </div>
         </div>
-        <div className="flex flex-col items-end gap-3 pt-6 mt-auto">
+        <div className="mt-auto flex flex-col items-end gap-3 pt-6">
           {isPreferenceLoaded && (
-            <div className="pb-1 flex flex-col items-end gap-1">
-              <label className="label cursor-pointer gap-2 justify-end p-0">
+            <div className="flex flex-col items-end gap-1 pb-1">
+              <label className="label cursor-pointer justify-end gap-2 p-0">
                 <input
                   type="checkbox"
                   checked={preferBatching}
@@ -642,7 +567,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 />
                 <span className="label-text text-xs">Batch Transactions with Smart Account</span>
               </label>
-              <label className="label cursor-pointer gap-2 justify-end p-0">
+              <label className="label cursor-pointer justify-end gap-2 p-0">
                 <input
                   type="checkbox"
                   checked={revokePermissions}
@@ -654,7 +579,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             </div>
           )}
           <button
-            className={`btn ${getActionButtonClass()} btn-lg w-60 h-14 flex justify-between shadow-md ${loading ? "animate-pulse" : ""
+            className={`btn ${getActionButtonClass()} btn-lg flex h-14 w-60 justify-between shadow-md ${loading ? "animate-pulse" : ""
               }`}
             onClick={step === "done" ? onClose : handleMoveDebt}
             disabled={step === "done" ? false : isActionDisabled}
@@ -664,7 +589,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
               {getActionButtonText()}
             </span>
             <span className="flex items-center gap-1 text-xs">
-              <Fuel className="w-4 h-4 text-gray-400" />
+              <Fuel className="size-4 text-gray-400" />
             </span>
           </button>
         </div>
@@ -672,7 +597,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
 
       <form
         method="dialog"
-        className="modal-backdrop backdrop-blur-sm bg-black/20"
+        className="modal-backdrop bg-black/20 backdrop-blur-sm"
         onClick={loading ? undefined : onClose}
       >
         <button disabled={loading}>close</button>

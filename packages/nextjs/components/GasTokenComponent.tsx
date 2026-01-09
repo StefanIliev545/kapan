@@ -151,14 +151,14 @@ functionName: "symbol",
   // Show loading state if still fetching data
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center p-2 rounded-lg border bg-base-200 border-base-300/30">
-        <div className="w-6 h-6 mb-1 flex items-center justify-center">
+      <div className="bg-base-200 border-base-300/30 flex flex-col items-center rounded-lg border p-2">
+        <div className="mb-1 flex size-6 items-center justify-center">
           <span className="loading loading-spinner loading-xs"></span>
         </div>
-        <div className="text-xs font-medium text-base-content/50 mb-1">
+        <div className="text-base-content/50 mb-1 text-xs font-medium">
           Loading...
         </div>
-        <div className="text-xs text-base-content/30">
+        <div className="text-base-content/30 text-xs">
           {truncateAddress(address, 6, 0)}
         </div>
       </div>
@@ -168,14 +168,14 @@ functionName: "symbol",
   // Show error state if failed to load
   if (hasError) {
     return (
-      <div className="flex flex-col items-center p-2 rounded-lg border bg-error/10 border-error/30">
-        <div className="w-6 h-6 mb-1 flex items-center justify-center text-error">
+      <div className="bg-error/10 border-error/30 flex flex-col items-center rounded-lg border p-2">
+        <div className="text-error mb-1 flex size-6 items-center justify-center">
           ⚠️
         </div>
-        <div className="text-xs font-medium text-error mb-1">
+        <div className="text-error mb-1 text-xs font-medium">
           Error
         </div>
-        <div className="text-xs text-error/70">
+        <div className="text-error/70 text-xs">
           {truncateAddress(address, 6, 0)}
         </div>
       </div>
@@ -185,10 +185,10 @@ functionName: "symbol",
   return (
     <motion.button
       className={`
-        flex flex-col items-center p-2 rounded-lg border transition-all duration-200 ${token.isSelectable ? 'hover:scale-[1.02]' : ''}
+        flex flex-col items-center rounded-lg border p-2 transition-all duration-200 ${token.isSelectable ? 'hover:scale-[1.02]' : ''}
         ${isSelected 
           ? 'bg-primary/10 border-primary/30 shadow-sm' 
-          : token.isSelectable ? 'bg-base-200 border-base-300/30 hover:bg-base-300' : 'bg-base-200 border-base-300/30 opacity-60 cursor-not-allowed'
+          : token.isSelectable ? 'bg-base-200 border-base-300/30 hover:bg-base-300' : 'bg-base-200 border-base-300/30 cursor-not-allowed opacity-60'
         }
       `}
       onClick={token.isSelectable ? handleSelect : undefined}
@@ -197,7 +197,7 @@ functionName: "symbol",
       whileTap={token.isSelectable ? { scale: 0.98 } : undefined}
     >
       {/* Token Icon */}
-      <div className="w-6 h-6 relative mb-1">
+      <div className="relative mb-1 size-6">
         <Image
           src={token.icon}
           alt={token.name}
@@ -211,12 +211,12 @@ functionName: "symbol",
       </div>
 
       {/* Token Name */}
-      <div className="text-xs font-medium text-base-content mb-1">
+      <div className="text-base-content mb-1 text-xs font-medium">
         {token.symbol}
       </div>
 
       {/* Balance */}
-      <div className="text-xs text-base-content/60">
+      <div className="text-base-content/60 text-xs">
         {token.balance}
       </div>
 
@@ -225,7 +225,7 @@ functionName: "symbol",
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full"
+          className="bg-primary absolute right-1 top-1 size-2 rounded-full"
         />
       )}
     </motion.button>

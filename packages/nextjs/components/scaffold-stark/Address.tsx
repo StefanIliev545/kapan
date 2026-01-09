@@ -8,6 +8,7 @@ import { Address as AddressType } from "@starknet-react/chains";
 import { devnet } from "@starknet-react/chains";
 import { getChecksumAddress, validateChecksumAddress } from "starknet";
 import { CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import { BalanceSkeleton } from "~~/components/common";
 import { BlockieAvatar } from "~~/components/scaffold-stark/BlockieAvatar";
 import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import { useScaffoldStarkProfile } from "~~/hooks/scaffold-stark/useScaffoldStarkProfile";
@@ -86,18 +87,11 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
 
   // Skeleton UI
   if (isLoading) {
-    return (
-      <div className="animate-pulse flex space-x-4">
-        <div className="rounded-md bg-slate-300 h-6 w-6"></div>
-        <div className="flex items-center space-y-6">
-          <div className="h-2 w-28 bg-slate-300 rounded"></div>
-        </div>
-      </div>
-    );
+    return <BalanceSkeleton />;
   }
 
   if (!checkSumAddress) {
-    return <div className="italic text-base font-bold ">Wallet not connected</div>;
+    return <div className="text-base font-bold italic ">Wallet not connected</div>;
   }
 
   if (!checkSumAddress) {
@@ -124,14 +118,14 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
         )}
       </div>
       {disableAddressLink ? (
-        <span className={`ml-1.5 text-${size} font-normal`}>{fetchedProfile?.name || displayAddress}</span>
+        <span className={`text- ml-1.5${size} font-normal`}>{fetchedProfile?.name || displayAddress}</span>
       ) : targetNetwork.network === devnet.network ? (
-        <span className={`ml-1.5 text-${size} font-normal`}>
+        <span className={`text- ml-1.5${size} font-normal`}>
           <Link href={blockExplorerAddressLink}>{fetchedProfile?.name || displayAddress}</Link>
         </span>
       ) : (
         <a
-          className={`ml-1.5 text-${size} font-normal`}
+          className={`text- ml-1.5${size} font-normal`}
           target="_blank"
           href={blockExplorerAddressLink}
           rel="noopener noreferrer"
@@ -141,17 +135,17 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
       )}
       <button
         onClick={() => copy(checkSumAddress)}
-        className="ml-1.5 p-0 border-0 bg-transparent cursor-pointer"
+        className="ml-1.5 cursor-pointer border-0 bg-transparent p-0"
         type="button"
       >
         {addressCopied ? (
           <CheckCircleIcon
-            className="text-xl font-normal text-sky-600 h-5 w-5"
+            className="size-5 text-xl font-normal text-sky-600"
             aria-hidden="true"
           />
         ) : (
           <DocumentDuplicateIcon
-            className="text-xl font-normal text-sky-600 h-5 w-5"
+            className="size-5 text-xl font-normal text-sky-600"
             aria-hidden="true"
           />
         )}

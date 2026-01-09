@@ -119,12 +119,12 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
         ) : (
           <>
             <div className="space-y-3">
-              <div className="flex items-center justify-between bg-base-200/40 p-2 rounded">
+              <div className="bg-base-200/40 flex items-center justify-between rounded p-2">
                 <div className="flex items-center gap-2">
                   {(() => {
                     const d = resolveDisplay(leftToken);
                     return (
-                      <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" />
+                      <Image src={d.icon} alt={d.name} width={24} height={24} className="size-6" />
                     );
                   })()}
                   <div>
@@ -140,7 +140,7 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
                   {(() => {
                     const d = resolveDisplay(rightToken);
                     return (
-                      <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" />
+                      <Image src={d.icon} alt={d.name} width={24} height={24} className="size-6" />
                     );
                   })()}
                   <div className="text-right">
@@ -152,7 +152,7 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
                   </div>
                 </div>
               </div>
-              <div className="space-y-1 pt-2 border-t border-gray-100">
+              <div className="space-y-1 border-t border-gray-100 pt-2">
                 <div className="flex justify-between text-[12px]">
                   <span className="text-gray-600">AVNU fee</span>
                   <span>

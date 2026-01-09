@@ -117,7 +117,7 @@ export const Address = ({
     return (
       <div className="flex items-center">
         <div
-          className="flex-shrink-0 skeleton rounded-full"
+          className="skeleton flex-shrink-0 rounded-full"
           style={{
             width: (blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"],
             height: (blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"],
@@ -125,11 +125,11 @@ export const Address = ({
         ></div>
         <div className="flex flex-col space-y-1">
           {!onlyEnsOrAddress && (
-            <div className={`ml-1.5 skeleton rounded-lg font-bold ${textSizeMap[ensSize]}`}>
+            <div className={`skeleton ml-1.5 rounded-lg font-bold ${textSizeMap[ensSize]}`}>
               <span className="invisible">0x1234...56789</span>
             </div>
           )}
-          <div className={`ml-1.5 skeleton rounded-lg ${textSizeMap[addressSize]}`}>
+          <div className={`skeleton ml-1.5 rounded-lg ${textSizeMap[addressSize]}`}>
             <span className="invisible">0x1234...56789</span>
           </div>
         </div>
@@ -144,7 +144,7 @@ export const Address = ({
   const blockExplorerAddressLink = getBlockExplorerAddressLink(targetNetwork, checkSumAddress);
 
   return (
-    <div className="flex items-center flex-shrink-0">
+    <div className="flex flex-shrink-0 items-center">
       <div className="flex-shrink-0">
         <BlockieAvatar
           address={checkSumAddress}
@@ -155,7 +155,7 @@ export const Address = ({
       <div className="flex flex-col">
         {showSkeleton &&
           (isEnsNameLoading ? (
-            <div className={`ml-1.5 skeleton rounded-lg font-bold ${textSizeMap[ensSize]}`}>
+            <div className={`skeleton ml-1.5 rounded-lg font-bold ${textSizeMap[ensSize]}`}>
               <span className="invisible">{shortAddress}</span>
             </div>
           ) : (

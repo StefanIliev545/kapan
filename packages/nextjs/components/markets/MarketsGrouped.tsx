@@ -469,10 +469,10 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       {/* Sort Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium">Sort by best</span>
-          <div className="flex rounded-lg bg-base-200/50 p-0.5">
+          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-widest">Sort by best</span>
+          <div className="bg-base-200/50 flex rounded-lg p-0.5">
             <button
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+              className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
                 sortBy === "supply" 
                   ? "bg-success/20 text-success shadow-sm" 
                   : "text-base-content/50 hover:text-base-content/80"
@@ -482,7 +482,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
               Supply APY
             </button>
             <button
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+              className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
                 sortBy === "borrow" 
                   ? "bg-error/20 text-error shadow-sm" 
                   : "text-base-content/50 hover:text-base-content/80"
@@ -493,7 +493,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             </button>
           </div>
         </div>
-        <span className="text-[10px] text-base-content/30">{filtered.length} tokens</span>
+        <span className="text-base-content/30 text-[10px]">{filtered.length} tokens</span>
       </div>
 
       {/* Market Groups */}
@@ -507,19 +507,19 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             return sortInfo.direction === "asc" ? aVal - bVal : bVal - aVal;
           });
           return (
-            <details key={group.name} className="group rounded-xl overflow-hidden">
-              <summary className="list-none cursor-pointer">
-                <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-base-100 to-base-100/80 border border-base-200/60 hover:border-base-300 hover:shadow-lg transition-all duration-300">
+            <details key={group.name} className="group overflow-hidden rounded-xl">
+              <summary className="cursor-pointer list-none">
+                <div className="from-base-100 to-base-100/80 border-base-200/60 hover:border-base-300 flex items-center gap-4 rounded-xl border bg-gradient-to-r p-4 transition-all duration-300 hover:shadow-lg">
                   {/* Token Icon & Name */}
-                  <div className="flex items-center gap-3 min-w-[120px]">
-                    <div className="w-10 h-10 relative rounded-xl bg-base-200/60 p-1.5 ring-1 ring-base-300/30 shadow-sm">
+                  <div className="flex min-w-[120px] items-center gap-3">
+                    <div className="bg-base-200/60 ring-base-300/30 relative size-10 rounded-xl p-1.5 shadow-sm ring-1">
                       <Image src={group.icon} alt={group.name} fill className="rounded-lg object-contain" />
                     </div>
-                    <span className="font-bold text-lg tracking-tight">{group.name}</span>
+                    <span className="text-lg font-bold tracking-tight">{group.name}</span>
                   </div>
 
                   {/* Rates */}
-                  <div className="flex-1 flex items-center justify-center gap-6 md:gap-12">
+                  <div className="flex flex-1 items-center justify-center gap-6 md:gap-12">
                     <RatePill
                       variant="supply"
                       label="Supply Rate"
@@ -540,12 +540,12 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
 
                   {/* Markets count & expand indicator */}
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] uppercase tracking-wider text-base-content/40 font-medium">
+                    <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">
                       {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
                     </span>
-                    <div className="w-6 h-6 rounded-lg bg-base-200/50 flex items-center justify-center group-open:bg-primary/20 transition-colors">
+                    <div className="bg-base-200/50 group-open:bg-primary/20 flex size-6 items-center justify-center rounded-lg transition-colors">
                       <svg 
-                        className="w-3.5 h-3.5 text-base-content/50 group-open:text-primary group-open:rotate-180 transition-all duration-200" 
+                        className="text-base-content/50 group-open:text-primary size-3.5 transition-all duration-200 group-open:rotate-180" 
                         fill="none" 
                         viewBox="0 0 24 24" 
                         stroke="currentColor"
@@ -558,15 +558,15 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
               </summary>
 
               {/* Expanded Content */}
-              <div className="mt-2 rounded-xl bg-base-200/30 border border-base-200/50 overflow-hidden">
+              <div className="bg-base-200/30 border-base-200/50 mt-2 overflow-hidden rounded-xl border">
                 {/* Table Header */}
-                <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-base-200/50">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">Network</span>
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">Protocol</span>
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold text-center">Utilization</span>
+                <div className="border-base-200/50 grid grid-cols-5 gap-4 border-b px-4 py-3">
+                  <span className="text-base-content/40 text-[10px] font-semibold uppercase tracking-widest">Network</span>
+                  <span className="text-base-content/40 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
+                  <span className="text-base-content/40 text-center text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
                   <button
                     type="button"
-                    className={`text-[10px] uppercase tracking-widest font-semibold text-center transition-colors ${
+                    className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
                       sortInfo.column === "supply" ? "text-success" : "text-base-content/40 hover:text-base-content/60"
                     }`}
                     onClick={() => toggleGroupSort(group.name, "supply")}
@@ -575,7 +575,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                   </button>
                   <button
                     type="button"
-                    className={`text-[10px] uppercase tracking-widest font-semibold text-center transition-colors ${
+                    className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
                       sortInfo.column === "borrow" ? "text-error" : "text-base-content/40 hover:text-base-content/60"
                     }`}
                     onClick={() => toggleGroupSort(group.name, "borrow")}
@@ -585,23 +585,23 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                 </div>
 
                 {/* Table Rows */}
-                <div className="divide-y divide-base-200/30">
+                <div className="divide-base-200/30 divide-y">
                   {sortedMarkets.map((m, idx) => (
                     <div
                       key={`${m.protocol}-${m.network}-${m.address}${m.poolName ? `-${m.poolName}` : ""}`}
-                      className={`grid grid-cols-5 items-center gap-4 px-4 py-3 hover:bg-base-200/30 transition-colors ${
+                      className={`hover:bg-base-200/30 grid grid-cols-5 items-center gap-4 px-4 py-3 transition-colors ${
                         idx === 0 ? "bg-base-100/50" : ""
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 relative">
+                        <div className="relative size-5">
                           <Image src={networkIcons[m.network]} alt={m.network} fill className="object-contain" />
                         </div>
                         <span className="text-sm font-medium">{networkNames[m.network]}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 relative">
-                          <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="object-contain rounded" />
+                        <div className="relative size-5">
+                          <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="rounded object-contain" />
                         </div>
                         <span className="text-sm font-medium">
                           {protocolNames[m.protocol]}
@@ -609,13 +609,13 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                         </span>
                       </div>
                       <div className="text-center">
-                        <span className="text-sm font-mono font-medium tabular-nums text-base-content/70">{m.utilization}%</span>
+                        <span className="text-base-content/70 font-mono text-sm font-medium tabular-nums">{m.utilization}%</span>
                       </div>
                       <div className="text-center">
-                        <span className="text-sm font-mono font-semibold tabular-nums text-success">{m.supplyRate}</span>
+                        <span className="text-success font-mono text-sm font-semibold tabular-nums">{m.supplyRate}</span>
                       </div>
                       <div className="text-center">
-                        <span className="text-sm font-mono font-semibold tabular-nums text-error">{m.borrowRate}</span>
+                        <span className="text-error font-mono text-sm font-semibold tabular-nums">{m.borrowRate}</span>
                       </div>
                     </div>
                   ))}
@@ -629,8 +629,8 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       {/* Empty State */}
       {filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-base-200/50 flex items-center justify-center mb-4">
-            <MagnifyingGlassIcon className="w-8 h-8 text-base-content/30" />
+          <div className="bg-base-200/50 mb-4 flex size-16 items-center justify-center rounded-2xl">
+            <MagnifyingGlassIcon className="text-base-content/30 size-8" />
           </div>
           <p className="text-base-content/50 text-sm">No markets found</p>
         </div>

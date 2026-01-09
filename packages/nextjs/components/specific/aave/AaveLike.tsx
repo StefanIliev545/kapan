@@ -6,7 +6,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import type { ContractName } from "~~/utils/scaffold-eth/contract";
-import { useGlobalState } from "~~/services/store/store";
+import { useProtocolTotalsFromPositions } from "~~/hooks/common";
 import { aaveRateToAPY } from "~~/utils/protocolRates";
 import { filterPositionsByWalletStatus } from "~~/utils/tokenSymbols";
 
@@ -129,20 +129,16 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
   const filteredSuppliedPositions = filterPositionsByWalletStatus(suppliedPositions, isWalletConnected);
   const filteredBorrowedPositions = filterPositionsByWalletStatus(borrowedPositions, isWalletConnected);
 
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  // Derive protocol name from contract name
+  const protocolName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : contractName === "SparkGatewayView" ? "Spark" : "Aave";
 
-  useEffect(() => {
-    if (!allTokensInfo) return;
-
-    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
-    const totalBorrowed = filteredBorrowedPositions.reduce(
-      (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
-      0,
-    );
-
-    const protoName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : contractName === "SparkGatewayView" ? "Spark" : "Aave";
-    setProtocolTotals(protoName, totalSupplied, totalBorrowed);
-  }, [allTokensInfo, contractName, filteredBorrowedPositions, filteredSuppliedPositions, setProtocolTotals, chainId]);
+  // Use the shared hook to update protocol totals in global state
+  useProtocolTotalsFromPositions(
+    protocolName,
+    filteredSuppliedPositions,
+    filteredBorrowedPositions,
+    !!allTokensInfo
+  );
 
   return <>{children({ suppliedPositions: filteredSuppliedPositions, borrowedPositions: filteredBorrowedPositions, forceShowAll, hasLoadedOnce })}</>;
 };

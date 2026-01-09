@@ -1352,25 +1352,25 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="modal-box relative bg-base-100 max-w-2xl p-0 rounded-2xl border border-base-300/30">
+      <div className="modal-box bg-base-100 border-base-300/30 relative max-w-2xl rounded-2xl border p-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base-300/30">
+        <div className="border-base-300/30 flex items-center justify-between border-b px-5 py-4">
           <h3 className="text-lg font-semibold">Loop Position</h3>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-base-content/50">{protocolName}</span>
+            <span className="text-base-content/50 text-sm">{protocolName}</span>
             <button className="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-base-content" onClick={onClose}>✕</button>
           </div>
         </div>
 
         <div className="p-5">
           {/* Two Column Layout: Collateral | Borrow */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="mb-4 grid grid-cols-2 gap-3">
             {/* Deposit section */}
-            <div className="bg-base-200/40 rounded-xl p-4 border border-base-300/20">
-              <div className="flex items-center justify-between text-sm text-base-content/60 mb-2">
+            <div className="bg-base-200/40 border-base-300/20 rounded-xl border p-4">
+              <div className="text-base-content/60 mb-2 flex items-center justify-between text-sm">
                 <span>Deposit</span>
                 <button
-                  className="hover:text-primary transition-colors text-xs"
+                  className="hover:text-primary text-xs transition-colors"
                   onClick={() => depositToken && setMarginAmount(formatUnits(walletBalance, depositDecimals))}
                 >
                   Bal: {walletBalanceFormatted.toFixed(2)}
@@ -1382,25 +1382,25 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   value={marginAmount}
                   onChange={e => setMarginAmount(e.target.value)}
                   placeholder="0"
-                  className="flex-1 bg-transparent text-xl font-medium outline-none min-w-0 placeholder:text-base-content/30"
+                  className="placeholder:text-base-content/30 min-w-0 flex-1 bg-transparent text-xl font-medium outline-none"
                 />
                 {/* In zap mode, show debt token selector (deposit = debt); otherwise show collateral selector */}
                 {zapMode ? (
                   disableAssetSelection ? (
-                    <div className="flex items-center gap-1.5 bg-primary/10 rounded-lg px-2 py-1">
+                    <div className="bg-primary/10 flex items-center gap-1.5 rounded-lg px-2 py-1">
                       {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
-                      <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                      <span className="text-xs font-medium">{debt?.symbol || "?"}</span>
                     </div>
                   ) : (
                     <div className="dropdown dropdown-end">
-                      <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                      <label tabIndex={0} className="btn btn-xs bg-primary/10 hover:bg-primary/20 gap-1.5 rounded-lg border-0 px-2">
                         {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
-                        <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
-                        <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="text-xs font-medium">{debt?.symbol || "?"}</span>
+                        <svg className="size-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </label>
-                      <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                      <ul tabIndex={0} className="dropdown-content menu bg-base-100 border-base-300/30 z-50 mt-2 w-52 rounded-xl border p-2 shadow-xl">
                         {debtWithWalletBalance.map(d => {
                           const bal = Number(formatUnits(d.walletBalance, d.decimals));
                           return (
@@ -1410,7 +1410,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                                   <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
                                   {d.symbol}
                                 </div>
-                                <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                                <span className="text-base-content/50 text-xs">{bal > 0 ? bal.toFixed(4) : "-"}</span>
                               </a>
                             </li>
                           );
@@ -1420,20 +1420,20 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   )
                 ) : (
                   disableAssetSelection ? (
-                    <div className="flex items-center gap-1.5 bg-primary/10 rounded-lg px-2 py-1">
+                    <div className="bg-primary/10 flex items-center gap-1.5 rounded-lg px-2 py-1">
                       {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
-                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                      <span className="text-xs font-medium">{collateral?.symbol || "?"}</span>
                     </div>
                   ) : (
                     <div className="dropdown dropdown-end">
-                      <label tabIndex={0} className="btn btn-xs gap-1.5 bg-primary/10 border-0 hover:bg-primary/20 rounded-lg px-2">
+                      <label tabIndex={0} className="btn btn-xs bg-primary/10 hover:bg-primary/20 gap-1.5 rounded-lg border-0 px-2">
                         {collateral && <Image src={collateral.icon} alt="" width={16} height={16} className="rounded-full" />}
-                        <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
-                        <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="text-xs font-medium">{collateral?.symbol || "?"}</span>
+                        <svg className="size-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </label>
-                      <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                      <ul tabIndex={0} className="dropdown-content menu bg-base-100 border-base-300/30 z-50 mt-2 w-52 rounded-xl border p-2 shadow-xl">
                         {collateralsWithWalletBalance.map(c => {
                           const bal = Number(formatUnits(c.walletBalance, c.decimals));
                           return (
@@ -1443,7 +1443,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                                   <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
                                   {c.symbol}
                                 </div>
-                                <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                                <span className="text-base-content/50 text-xs">{bal > 0 ? bal.toFixed(4) : "-"}</span>
                               </a>
                             </li>
                           );
@@ -1455,25 +1455,25 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               </div>
               {/* In zap mode, show collateral selector and swap arrow */}
               {zapMode && (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
-                  <div className="flex items-center gap-1.5 text-xs text-base-content/60">
+                <div className="border-base-300/30 mt-2 flex items-center justify-between border-t pt-2">
+                  <div className="text-base-content/60 flex items-center gap-1.5 text-xs">
                     <span>↓ swap to</span>
                   </div>
                   {disableAssetSelection ? (
-                    <div className="flex items-center gap-1.5 bg-success/10 rounded-lg px-2 py-1">
+                    <div className="bg-success/10 flex items-center gap-1.5 rounded-lg px-2 py-1">
                       {collateral && <Image src={collateral.icon} alt="" width={14} height={14} className="rounded-full" />}
-                      <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
+                      <span className="text-xs font-medium">{collateral?.symbol || "?"}</span>
                     </div>
                   ) : (
                     <div className="dropdown dropdown-end">
-                      <label tabIndex={0} className="btn btn-xs gap-1.5 bg-success/10 border-0 hover:bg-success/20 rounded-lg px-2">
+                      <label tabIndex={0} className="btn btn-xs bg-success/10 hover:bg-success/20 gap-1.5 rounded-lg border-0 px-2">
                         {collateral && <Image src={collateral.icon} alt="" width={14} height={14} className="rounded-full" />}
-                        <span className="font-medium text-xs">{collateral?.symbol || "?"}</span>
-                        <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="text-xs font-medium">{collateral?.symbol || "?"}</span>
+                        <svg className="size-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </label>
-                      <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                      <ul tabIndex={0} className="dropdown-content menu bg-base-100 border-base-300/30 z-50 mt-2 w-52 rounded-xl border p-2 shadow-xl">
                         {collateralsWithWalletBalance.map(c => {
                           const bal = Number(formatUnits(c.walletBalance, c.decimals));
                           return (
@@ -1483,7 +1483,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                                   <Image src={c.icon} alt="" width={18} height={18} className="rounded-full" />
                                   {c.symbol}
                                 </div>
-                                <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                                <span className="text-base-content/50 text-xs">{bal > 0 ? bal.toFixed(4) : "-"}</span>
                               </a>
                             </li>
                           );
@@ -1494,8 +1494,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 </div>
               )}
               {/* Show total after leverage inline */}
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
-                <span className="text-xs text-base-content/50">≈ ${marginUsd.toFixed(2)}</span>
+              <div className="border-base-300/30 mt-2 flex items-center justify-between border-t pt-2">
+                <span className="text-base-content/50 text-xs">≈ ${marginUsd.toFixed(2)}</span>
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-base-content/40">→</span>
                   <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)} {collateral?.symbol}</span>
@@ -1505,27 +1505,27 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             </div>
 
             {/* Borrow */}
-            <div className="bg-base-200/40 rounded-xl p-4 border border-base-300/20">
-              <div className="text-sm text-base-content/60 mb-2">Borrow</div>
+            <div className="bg-base-200/40 border-base-300/20 rounded-xl border p-4">
+              <div className="text-base-content/60 mb-2 text-sm">Borrow</div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 text-xl font-medium text-error truncate">
+                <div className="text-error flex-1 truncate text-xl font-medium">
                   {shortAmount > 0 ? shortAmount.toFixed(4) : "0"}
                 </div>
                 {disableAssetSelection ? (
-                  <div className="flex items-center gap-1.5 bg-base-300/30 rounded-lg px-2 py-1">
+                  <div className="bg-base-300/30 flex items-center gap-1.5 rounded-lg px-2 py-1">
                     {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
-                    <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
+                    <span className="text-xs font-medium">{debt?.symbol || "?"}</span>
                   </div>
                 ) : (
                   <div className="dropdown dropdown-end">
-                    <label tabIndex={0} className="btn btn-xs gap-1.5 bg-base-300/30 border-0 hover:bg-base-300/50 rounded-lg px-2 cursor-pointer">
+                    <label tabIndex={0} className="btn btn-xs bg-base-300/30 hover:bg-base-300/50 cursor-pointer gap-1.5 rounded-lg border-0 px-2">
                       {debt && <Image src={debt.icon} alt="" width={16} height={16} className="rounded-full" />}
-                      <span className="font-medium text-xs">{debt?.symbol || "?"}</span>
-                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="text-xs font-medium">{debt?.symbol || "?"}</span>
+                      <svg className="size-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </label>
-                    <ul tabIndex={0} className="dropdown-content z-50 menu p-2 shadow-xl bg-base-100 rounded-xl w-52 border border-base-300/30 mt-2">
+                    <ul tabIndex={0} className="dropdown-content menu bg-base-100 border-base-300/30 z-50 mt-2 w-52 rounded-xl border p-2 shadow-xl">
                       {debtWithWalletBalance.map(d => {
                         const bal = Number(formatUnits(d.walletBalance, d.decimals));
                         return (
@@ -1535,7 +1535,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                                 <Image src={d.icon} alt="" width={18} height={18} className="rounded-full" />
                                 {d.symbol}
                               </div>
-                              <span className="text-xs text-base-content/50">{bal > 0 ? bal.toFixed(4) : "-"}</span>
+                              <span className="text-base-content/50 text-xs">{bal > 0 ? bal.toFixed(4) : "-"}</span>
                             </a>
                           </li>
                         );
@@ -1544,13 +1544,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   </div>
                 )}
               </div>
-              <div className="text-xs text-base-content/50 mt-2 pt-2 border-t border-base-300/30">≈ ${metrics.debtUsd.toFixed(2)}</div>
+              <div className="text-base-content/50 border-base-300/30 mt-2 border-t pt-2 text-xs">≈ ${metrics.debtUsd.toFixed(2)}</div>
             </div>
           </div>
 
           {/* Multiplier Slider */}
-          <div className="bg-base-200/40 rounded-xl p-4 border border-base-300/20 mb-4">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-base-200/40 border-base-300/20 mb-4 rounded-xl border p-4">
+            <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-medium">Leverage</span>
               <div className="flex items-center gap-1">
                 <input
@@ -1558,7 +1558,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   value={leverageInput}
                   onChange={e => { setLeverageInput(e.target.value); const val = parseFloat(e.target.value); if (!isNaN(val)) updateLeverage(val); }}
                   onBlur={() => setLeverageInput(leverage.toFixed(2))}
-                  className="w-14 bg-base-300/50 rounded-lg px-2 py-1 text-sm text-right outline-none font-medium"
+                  className="bg-base-300/50 w-14 rounded-lg px-2 py-1 text-right text-sm font-medium outline-none"
                 />
                 <span className="text-base-content/50 text-sm">×</span>
               </div>
@@ -1568,7 +1568,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               onChange={e => updateLeverage(parseFloat(e.target.value))}
               className="range range-primary range-sm w-full"
             />
-            <div className="flex justify-between text-xs text-base-content/40 mt-1.5">
+            <div className="text-base-content/40 mt-1.5 flex justify-between text-xs">
               {ticks.map((t, i) => (
                 <span key={i}>{i === ticks.length - 1 ? `Max ${t.toFixed(1)}×` : `${t.toFixed(1)}×`}</span>
               ))}
@@ -1576,16 +1576,16 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
             {/* Execution Type Toggle - Market vs Limit */}
             {cowAvailable && (
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-base-300/30">
+              <div className="border-base-300/30 mt-4 flex items-center gap-2 border-t pt-3">
                 <button
                   onClick={() => setExecutionType("market")}
-                  className={`flex-1 btn btn-xs ${executionType === "market" ? "btn-primary" : "btn-ghost"}`}
+                  className={`btn btn-xs flex-1 ${executionType === "market" ? "btn-primary" : "btn-ghost"}`}
                 >
                   <span className="mr-1">⚡</span> Market
                 </button>
                 <button
                   onClick={() => setExecutionType("limit")}
-                  className={`flex-1 btn btn-xs ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
+                  className={`btn btn-xs flex-1 ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
                   disabled={!cowContractAvailable || !isDevEnvironment}
                   title={
                     !isDevEnvironment 
@@ -1595,16 +1595,16 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                         : "Execute via CoW Protocol limit order"
                   }
                 >
-                  <ClockIcon className="w-3 h-3 mr-1" /> Limit
+                  <ClockIcon className="mr-1 size-3" /> Limit
                 </button>
               </div>
             )}
 
             {/* Limit Order Pricing */}
             {executionType === "limit" && (
-              <div className="bg-base-200/60 rounded-lg p-3 mt-3 text-xs border border-base-300/30">
+              <div className="bg-base-200/60 border-base-300/30 mt-3 rounded-lg border p-3 text-xs">
                 {/* Market Rate Display */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex items-center justify-between">
                   <span className="text-base-content/60">Market Rate</span>
                   <div className="flex items-center gap-1.5">
                     {isSwapQuoteLoading ? (
@@ -1622,9 +1622,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
                 {/* Slippage Slider for Limit Orders */}
                 <div className="mb-2">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="mb-1 flex items-center justify-between">
                     <span className="text-base-content/60">Max Slippage</span>
-                    <span className="font-medium text-warning">
+                    <span className="text-warning font-medium">
                       {limitSlippage < 0.1 ? limitSlippage.toFixed(2) : limitSlippage.toFixed(1)}%
                     </span>
                   </div>
@@ -1641,23 +1641,23 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                     }}
                     className="range range-warning range-xs w-full"
                   />
-                  <div className="flex justify-between text-[10px] text-base-content/40 mt-0.5">
+                  <div className="text-base-content/40 mt-0.5 flex justify-between text-[10px]">
                     <span>0%</span>
                     <span>0.1%</span>
                     <span>1%</span>
                     <span>5%</span>
                   </div>
                   {limitSlippage === 0 && (
-                    <div className="text-warning text-[10px] mt-1">
+                    <div className="text-warning mt-1 text-[10px]">
                       0% slippage - order may not fill if price moves
                     </div>
                   )}
                 </div>
 
                 {/* Computed Min Output */}
-                <div className="flex items-center justify-between py-2 border-t border-base-300/30">
+                <div className="border-base-300/30 flex items-center justify-between border-t py-2">
                   <span className="text-base-content/60">Min Output</span>
-                  <span className="font-medium text-success">
+                  <span className="text-success font-medium">
                     {minCollateralOut.raw > 0n ? (
                       `${Number(minCollateralOut.formatted).toFixed(6)} ${collateral?.symbol}`
                     ) : (
@@ -1669,10 +1669,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 {/* Advanced: Custom Min Price Override */}
                 <button
                   onClick={() => setShowAdvancedPricing(!showAdvancedPricing)}
-                  className="text-[10px] text-base-content/50 hover:text-base-content/70 flex items-center gap-1 mt-1"
+                  className="text-base-content/50 hover:text-base-content/70 mt-1 flex items-center gap-1 text-[10px]"
                 >
                   <svg 
-                    className={`w-3 h-3 transition-transform ${showAdvancedPricing ? "rotate-90" : ""}`} 
+                    className={`size-3 transition-transform${showAdvancedPricing ? "rotate-90" : ""}`} 
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
@@ -1683,19 +1683,19 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 </button>
                 
                 {showAdvancedPricing && (
-                  <div className="mt-2 pt-2 border-t border-base-300/30">
+                  <div className="border-base-300/30 mt-2 border-t pt-2">
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         value={customMinPrice}
                         onChange={e => setCustomMinPrice(e.target.value)}
                         placeholder={minCollateralOut.formatted}
-                        className="flex-1 bg-base-300/50 rounded px-2 py-1 text-xs outline-none"
+                        className="bg-base-300/50 flex-1 rounded px-2 py-1 text-xs outline-none"
                       />
                       <span className="text-base-content/50">{collateral?.symbol}</span>
                     </div>
                     {customMinPrice && (
-                      <p className="text-[10px] text-warning mt-1">
+                      <p className="text-warning mt-1 text-[10px]">
                         Using custom min output. Order will only fill if you receive at least this amount.
                       </p>
                     )}
@@ -1704,7 +1704,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
                 {/* Flash Loan Config - Provider selection, chunks, etc. */}
                 {debt && limitOrderSellToken && (
-                  <div className="mt-2 pt-2 border-t border-base-300/30">
+                  <div className="border-base-300/30 mt-2 border-t pt-2">
                     <LimitOrderConfig
                       chainId={chainId}
                       sellToken={limitOrderSellToken}
@@ -1721,8 +1721,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
                 {/* Chunk Info - shown when multi-chunk execution needed (flash loan OFF) */}
                 {!chunkParams.useFlashLoan && chunkParams.needsChunking && (
-                  <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px]">
-                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="border-base-300/30 mt-2 flex items-start gap-1.5 border-t pt-2 text-[10px]">
+                    <svg className="text-info mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <div>
@@ -1735,13 +1735,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 )}
 
                 {/* Batched TX Toggle - for wallet compatibility */}
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
+                <div className="border-base-300/30 mt-2 flex items-center justify-between border-t pt-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-base-content/60">Batched TX</span>
-                    <span className="text-[10px] text-base-content/40">(EIP-5792)</span>
+                    <span className="text-base-content/40 text-[10px]">(EIP-5792)</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-base-content/40">
+                    <span className="text-base-content/40 text-[10px]">
                       {useBatchedTx ? "faster" : "compatible"}
                     </span>
                     <input
@@ -1753,8 +1753,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   </div>
                 </div>
                 {!useBatchedTx && (
-                  <div className="flex items-start gap-1.5 mt-1 text-[10px]">
-                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="mt-1 flex items-start gap-1.5 text-[10px]">
+                    <svg className="text-warning mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <span className="text-warning/80">
@@ -1764,8 +1764,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 )}
 
                 {/* Info note */}
-                <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50">
-                  <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
+                <div className="border-base-300/30 text-base-content/50 mt-2 flex items-start gap-1.5 border-t pt-2 text-[10px]">
+                  <ClockIcon className="mt-0.5 size-3 shrink-0" />
                   <span>
                     {chunkParams.useFlashLoan
                       ? "Single transaction via CoW flash loan. MEV protected."
@@ -1781,7 +1781,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             )}
 
             {/* Config Grid - compact 2x2 layout with dropdowns */}
-            <div className={`grid grid-cols-2 gap-x-4 gap-y-2 ${executionType === "limit" && cowAvailable ? "mt-3" : "mt-4 pt-3 border-t border-base-300/30"} text-xs`}>
+            <div className={`grid grid-cols-2 gap-x-4 gap-y-2 ${executionType === "limit" && cowAvailable ? "mt-3" : "border-base-300/30 mt-4 border-t pt-3"} text-xs`}>
               {/* Zap Mode - only for market orders */}
               {executionType === "market" && (
                 <div className="flex items-center justify-between">
@@ -1803,7 +1803,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                     <select
                       value={swapRouter}
                       onChange={e => setSwapRouter(e.target.value as SwapRouter)}
-                      className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                      className="select select-xs bg-base-300/50 h-6 min-h-0 border-0 pr-6 text-xs"
                     >
                       {SWAP_ROUTER_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1822,7 +1822,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                   <select
                     value={slippage}
                     onChange={e => setSlippage(parseFloat(e.target.value))}
-                    className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                    className="select select-xs bg-base-300/50 h-6 min-h-0 border-0 pr-6 text-xs"
                   >
                     {[0.1, 0.3, 0.5, 1, 2, 3].map(s => (
                       <option key={s} value={s}>{s}%</option>
@@ -1841,7 +1841,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                       const p = providerOptions.find(p => p.name === e.target.value);
                       if (p) setSelectedProvider(p);
                     }}
-                    className="select select-xs bg-base-300/50 border-0 text-xs min-h-0 h-6 pr-6"
+                    className="select select-xs bg-base-300/50 h-6 min-h-0 border-0 pr-6 text-xs"
                   >
                     {providerOptions.map(p => {
                       const liq = liquidityData.find(l => l.provider === p.providerEnum);
@@ -1859,30 +1859,30 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           </div>
 
           {/* Metrics - Compact horizontal layout */}
-          <div className="flex justify-between items-center gap-2 mb-3 text-xs bg-base-200/40 rounded-lg p-2 border border-base-300/20">
-            <div className="text-center flex-1">
+          <div className="bg-base-200/40 border-base-300/20 mb-3 flex items-center justify-between gap-2 rounded-lg border p-2 text-xs">
+            <div className="flex-1 text-center">
               <div className="text-base-content/50 mb-0.5">LTV</div>
               <div className="font-medium">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(effectiveLltvBps)}%</div>
             </div>
-            <div className="w-px h-6 bg-base-300/50" />
-            <div className="text-center flex-1">
+            <div className="bg-base-300/50 h-6 w-px" />
+            <div className="flex-1 text-center">
               <div className="text-base-content/50 mb-0.5">{collateral?.symbol}</div>
               <div className="font-medium">${collateralPrice > 0 ? collateralPrice.toFixed(2) : "-"}</div>
             </div>
-            <div className="w-px h-6 bg-base-300/50" />
-            <div className="text-center flex-1">
+            <div className="bg-base-300/50 h-6 w-px" />
+            <div className="flex-1 text-center">
               <div className="text-base-content/50 mb-0.5">{debt?.symbol}</div>
               <div className="font-medium">${debt ? Number(formatUnits(debt.price ?? 0n, 8)).toFixed(2) : "-"}</div>
             </div>
-            <div className="w-px h-6 bg-base-300/50" />
-            <div className="text-center flex-1">
+            <div className="bg-base-300/50 h-6 w-px" />
+            <div className="flex-1 text-center">
               <div className="text-base-content/50 mb-0.5">Net APY</div>
               <div className={`font-medium ${netApy !== null && netApy > 0 ? "text-success" : netApy !== null && netApy < 0 ? "text-error" : ""}`}>
                 {netApy !== null ? `${netApy > 0 ? "+" : ""}${netApy.toFixed(2)}%` : "-"}
               </div>
             </div>
-            <div className="w-px h-6 bg-base-300/50" />
-            <div className="text-center flex-1">
+            <div className="bg-base-300/50 h-6 w-px" />
+            <div className="flex-1 text-center">
               <div className="text-base-content/50 mb-0.5">30D Yield</div>
               <div className={`font-medium ${netYield30d !== null && netYield30d > 0 ? "text-success" : netYield30d !== null && netYield30d < 0 ? "text-error" : ""}`}>
                 {netYield30d !== null ? `${netYield30d >= 0 ? "+" : ""}$${Math.abs(netYield30d).toFixed(2)}` : "-"}
@@ -1891,11 +1891,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
           </div>
 
           {/* Details - Compact 2-column grid */}
-          <div className="bg-base-200/40 rounded-lg p-2.5 border border-base-300/20 mb-3 text-xs">
+          <div className="bg-base-200/40 border-base-300/20 mb-3 rounded-lg border p-2.5 text-xs">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               <div className="flex justify-between">
                 <span className="text-base-content/50">Swap</span>
-                <span className="truncate ml-2 text-right">
+                <span className="ml-2 truncate text-right">
                   {executionType === "market" && isSwapQuoteLoading ? (
                     <span className="loading loading-dots loading-xs" />
                   ) : flashLoanAmountRaw > 0n ? (
@@ -1930,7 +1930,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             </div>
             {/* Fee breakdown tooltip - only for market orders */}
             {executionType === "market" && fees.totalFeeUsd > 0 && (
-              <div className="mt-1.5 pt-1.5 border-t border-base-300/30 text-[10px] text-base-content/40">
+              <div className="border-base-300/30 text-base-content/40 mt-1.5 border-t pt-1.5 text-[10px]">
                 <span>FL: {fees.flashLoanFeePercent > 0 ? `${fees.flashLoanFeePercent}%` : "free"}</span>
                 {fees.priceImpactPercent > 0.001 && (
                   <span className="ml-2">Impact: {fees.priceImpactPercent.toFixed(3)}%</span>
@@ -1939,11 +1939,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             )}
             {/* Limit order info */}
             {executionType === "limit" && (
-              <div className="mt-1.5 pt-1.5 border-t border-base-300/30 text-[10px] text-base-content/40">
+              <div className="border-base-300/30 text-base-content/40 mt-1.5 border-t pt-1.5 text-[10px]">
                 <span>CoW solver fee included in price • MEV protected</span>
               </div>
             )}
-            <div className="flex justify-between mt-1.5 pt-1.5 border-t border-base-300/30">
+            <div className="border-base-300/30 mt-1.5 flex justify-between border-t pt-1.5">
               <span className="text-base-content/50">Total Position</span>
               <span className="font-medium">${metrics.totalCollateralUsd.toFixed(2)} ({leverage.toFixed(2)}×)</span>
             </div>
@@ -1956,14 +1956,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPreferBatching(!preferBatching)}
-                className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
+                className={`inline-flex cursor-pointer items-center gap-1 text-xs hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
               >
-                <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                <CheckIcon className={`size-4 ${preferBatching ? "" : "opacity-40"}`} />
                 Batch transactions
               </button>
             ) : (
-              <span className="text-xs text-base-content/50 inline-flex items-center gap-1">
-                <ClockIcon className="w-3.5 h-3.5" />
+              <span className="text-base-content/50 inline-flex items-center gap-1 text-xs">
+                <ClockIcon className="size-3.5" />
                 Executes via CoW Protocol
               </span>
             )}
@@ -1979,7 +1979,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 "Loading..."
               ) : executionType === "limit" ? (
                 <>
-                  <ClockIcon className="w-4 h-4 mr-1" />
+                  <ClockIcon className="mr-1 size-4" />
                   Create Order
                 </>
               ) : (

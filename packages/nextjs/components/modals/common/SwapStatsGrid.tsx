@@ -33,7 +33,7 @@ export const SwapStatsGrid: FC<SwapStatsGridProps> = ({
     const gridClass = cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-4";
 
     return (
-        <div className={`grid ${gridClass} gap-3 text-center bg-base-200/50 p-3 rounded text-xs ${className}`}>
+        <div className={`grid ${gridClass} bg-base-200/50 gap-3 rounded p-3 text-center text-xs ${className}`}>
             {stats.map((stat, index) => (
                 <div key={index}>
                     <div className="text-base-content/70 flex items-center justify-center gap-1">
@@ -65,10 +65,10 @@ export const SlippageSelector: FC<SlippageSelectorProps> = ({
 }) => {
     return (
         <div className="dropdown dropdown-top dropdown-hover">
-            <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                <Cog6ToothIcon className="w-3 h-3" />
+            <label tabIndex={0} className="hover:text-primary cursor-pointer">
+                <Cog6ToothIcon className="size-3" />
             </label>
-            <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
+            <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-[50] mb-1 w-32 p-2 text-xs shadow">
                 {options.map((s) => (
                     <li key={s}>
                         <a

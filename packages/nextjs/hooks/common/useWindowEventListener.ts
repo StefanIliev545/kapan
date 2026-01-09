@@ -23,7 +23,7 @@ import { useEffect, useCallback } from "react";
 export function useWindowEventListener<K extends keyof WindowEventMap>(
   eventName: K,
   handler: (event: WindowEventMap[K]) => void,
-  enabled: boolean = true,
+  enabled = true,
   options?: boolean | AddEventListenerOptions
 ): void {
   useEffect(() => {
@@ -55,7 +55,7 @@ export function useWindowEventListener<K extends keyof WindowEventMap>(
  */
 export function useScrollResizeListener(
   updatePosition: () => void,
-  enabled: boolean = true
+  enabled = true
 ): void {
   useEffect(() => {
     if (!enabled) return;
@@ -93,7 +93,7 @@ export function useScrollResizeListener(
 export function useClickOutside(
   refs: React.RefObject<HTMLElement | null>[],
   onClickOutside: () => void,
-  enabled: boolean = true
+  enabled = true
 ): void {
   const handleClick = useCallback(
     (event: MouseEvent) => {

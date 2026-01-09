@@ -34,11 +34,11 @@ export const NetworkSwitcher = () => {
   return (
     <div ref={dropdownRef} className="relative flex-1">
       <div 
-        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200 py-1"
+        className="flex cursor-pointer items-center gap-2 py-1 transition-opacity duration-200 hover:opacity-80"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Switch Network"
       >
-        <div className="relative w-5 h-5">
+        <div className="relative size-5">
           <Image 
             src={networkLogo} 
             alt={chain.name} 
@@ -48,13 +48,13 @@ export const NetworkSwitcher = () => {
         </div>
         <span className="text-sm font-medium">{chain.name}</span>
         {allowedNetworks.length > 1 && (
-          <ChevronDownIcon className="h-4 w-4 text-base-content/70" />
+          <ChevronDownIcon className="text-base-content/70 size-4" />
         )}
       </div>
       
       {isOpen && allowedNetworks.length > 1 && (
-        <div className="absolute right-0 mt-2 py-2 w-48 bg-base-200 rounded-box shadow-lg z-50 overflow-hidden">
-          <div className="px-4 py-2 text-xs font-semibold text-base-content/70 border-b border-base-300">
+        <div className="bg-base-200 rounded-box absolute right-0 z-50 mt-2 w-48 overflow-hidden py-2 shadow-lg">
+          <div className="text-base-content/70 border-base-300 border-b px-4 py-2 text-xs font-semibold">
             Select Network
           </div>
           <div className="max-h-80 overflow-y-auto">
@@ -65,7 +65,7 @@ export const NetworkSwitcher = () => {
               return (
                 <button
                   key={network.id}
-                  className={`w-full px-4 py-3 text-left hover:bg-base-300/50 ${isActive ? "bg-base-300/70" : ""} flex items-center gap-3`}
+                  className={`hover:bg-base-300/50 w-full px-4 py-3 text-left ${isActive ? "bg-base-300/70" : ""} flex items-center gap-3`}
                   onClick={() => {
                     if (!isActive) {
                       track("Network switched event", {
@@ -77,7 +77,7 @@ export const NetworkSwitcher = () => {
                     setIsOpen(false);
                   }}
                 >
-                  <div className="relative w-5 h-5 flex-shrink-0">
+                  <div className="relative size-5 flex-shrink-0">
                     <Image 
                       src={networkLogo} 
                       alt={network.name} 
@@ -87,13 +87,13 @@ export const NetworkSwitcher = () => {
                   </div>
                   <div className="flex flex-col">
                     <span 
-                      className="font-medium text-sm"
+                      className="text-sm font-medium"
                       style={{ color: isActive ? getNetworkColor(network, isDarkMode) : undefined }}
                     >
                       {network.name}
                     </span>
                     {isActive && (
-                      <span className="text-xs text-base-content/60">Connected</span>
+                      <span className="text-base-content/60 text-xs">Connected</span>
                     )}
                   </div>
                 </button>

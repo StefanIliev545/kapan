@@ -1,11 +1,15 @@
-import { FC, useMemo, useState } from "react";
-import Image from "next/image";
+import { FC, useMemo } from "react";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { DepositModalStark } from "./DepositModalStark";
+import {
+  TokenListItem,
+  TokenListContainer,
+  TokenSelectModalShell,
+} from "../common/TokenListItem";
+import { useTokenSelectModal } from "../common/useTokenSelectModal";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { VesuContext } from "~~/utils/vesu";
-import formatPercentage from "~~/utils/formatPercentage";
 import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";
 import { TokenMetadata } from "~~/utils/protocols";
@@ -32,6 +36,21 @@ interface TokenSelectModalStarkProps {
   suppressActionModals?: boolean;
 }
 
+/**
+ * Helper to normalize Starknet addresses to padded hex format.
+ */
+function normalizeStarkAddress(address: string | bigint): string {
+  return `0x${BigInt(address).toString(16).padStart(64, "0")}`;
+}
+
+/**
+ * Helper to get token symbol with fallback for tokens like xSTRK.
+ */
+function getTokenSymbol(token: TokenMetadata, address: string): string {
+  const raw = feltToString(token.symbol);
+  return raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
+}
+
 export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   isOpen,
   onClose,
@@ -44,12 +63,22 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   onSelectToken,
   suppressActionModals = false,
 }) => {
-  const [selectedToken, setSelectedToken] = useState<TokenWithRates | null>(null);
-  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
+  const {
+    selectedToken,
+    isActionModalOpen,
+    handleSelectToken,
+    handleActionModalClose,
+    handleDone,
+  } = useTokenSelectModal<TokenWithRates>({
+    onClose,
+    onSelectToken,
+    suppressActionModals,
+  });
+
   const starkTokens = useMemo(
     () =>
       tokens.map(asset => ({
-        address: `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` as `0x${string}`,
+        address: normalizeStarkAddress(asset.address) as `0x${string}`,
         decimals: asset.decimals,
       })),
     [tokens],
@@ -60,14 +89,14 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   const availableTokens = useMemo(
     () =>
       tokens.filter(
-        asset => !collateralAsset || `0x${BigInt(asset.address).toString(16).padStart(64, "0")}` !== collateralAsset,
+        asset => !collateralAsset || normalizeStarkAddress(asset.address) !== collateralAsset,
       ),
     [tokens, collateralAsset],
   );
 
   const sortedTokens = useMemo(() => {
     const withBalances = availableTokens.map(token => {
-      const address = `0x${BigInt(token.address).toString(16).padStart(64, "0")}`;
+      const address = normalizeStarkAddress(token.address);
       const balanceInfo = balances[address.toLowerCase()];
       const balance = balanceInfo?.balance ?? 0n;
       const displayBalance = parseFloat(formatTokenAmount(balance.toString(), token.decimals));
@@ -85,98 +114,48 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   }, [availableTokens, balances]);
 
   const modalTitle = action === "borrow" ? "Select a Token to Borrow" : "Select a Token to Deposit";
-
   const rateLabel = action === "borrow" ? "APR" : "APY";
+  const emptyMessage = `No tokens available to ${action === "borrow" ? "borrow" : "deposit"}`;
 
-  // Handle token selection
-  const handleSelectToken = (token: TokenWithRates) => {
-    if (suppressActionModals && onSelectToken) {
-      onSelectToken(token);
-      onClose();
-      return;
-    }
-    setSelectedToken(token);
-    setIsTokenModalOpen(true);
-  };
-
-  // Handle modal close
-  const handleModalClose = () => {
-    setIsTokenModalOpen(false);
-    // Don't close the token select modal yet to allow selecting another token
-  };
-
-  // Handle final close when done
-  const handleDone = () => {
-    onClose();
-  };
-
-  // Resolve selected token display values with fallback (needed for tokens like xSTRK)
-  const selectedAddress = selectedToken
-    ? `0x${BigInt(selectedToken.address).toString(16).padStart(64, "0")}`
-    : "";
-  const selectedRawSymbol = selectedToken ? feltToString(selectedToken.symbol) : "";
-  const selectedSymbol = selectedToken
-    ? (selectedRawSymbol && selectedRawSymbol.trim().length > 0
-      ? selectedRawSymbol
-      : getTokenNameFallback(selectedAddress) ?? selectedRawSymbol)
-    : "";
+  // Compute selected token display values with fallback (needed for tokens like xSTRK)
+  const selectedAddress = selectedToken ? normalizeStarkAddress(selectedToken.address) : "";
+  const selectedSymbol = selectedToken ? getTokenSymbol(selectedToken, selectedAddress) : "";
 
   return (
     <>
-      <dialog className={`modal ${isOpen && !isTokenModalOpen ? "modal-open" : ""}`}>
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={handleDone} />
-        <div className="modal-box relative max-w-md p-4 rounded-xl bg-base-100 border border-base-300/50">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-lg text-base-content">{modalTitle}</h3>
-            <button
-              className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
-              onClick={handleDone}
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="border border-base-300/50 rounded-lg divide-y divide-base-300/50 max-h-96 overflow-y-auto">
-            {sortedTokens.length > 0 ? (
-              sortedTokens.map(({ token, address, balanceLabel }) => {
-                const raw = feltToString(token.symbol);
-                const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
-                return (
-                  <button
-                    key={address}
-                    className="w-full flex items-center justify-between p-3 hover:bg-base-200/60 transition-colors cursor-pointer"
-                    onClick={() => handleSelectToken(token)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={24} height={24} className="rounded-full" />
-                      <span className="text-sm font-medium text-base-content">{symbol}</span>
-                    </div>
-                    <div className="flex flex-col text-right">
-                      <div className="text-xs text-base-content/50">
-                        {formatPercentage(
-                          getDisplayRate(protocolName, action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0),
-                        )}% {rateLabel}
-                      </div>
-                      <div className="text-xs text-base-content/70">Balance: {balanceLabel}</div>
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="p-6 text-center text-sm text-base-content/50">No tokens available to {action === "borrow" ? "borrow" : "deposit"}</div>
-            )}
-          </div>
-        </div>
-      </dialog>
+      <TokenSelectModalShell
+        isOpen={isOpen}
+        isActionModalOpen={isActionModalOpen}
+        onClose={handleDone}
+        title={modalTitle}
+      >
+        <TokenListContainer isEmpty={sortedTokens.length === 0} emptyMessage={emptyMessage}>
+          {sortedTokens.map(({ token, address, balanceLabel }) => {
+            const symbol = getTokenSymbol(token, address);
+            const rate = getDisplayRate(
+              protocolName,
+              action === "borrow" ? token.borrowAPR ?? 0 : token.supplyAPY ?? 0,
+            );
+            return (
+              <TokenListItem
+                key={address}
+                name={symbol}
+                icon={tokenNameToLogo(symbol.toLowerCase())}
+                rate={rate}
+                rateLabel={rateLabel}
+                balanceLabel={balanceLabel}
+                onClick={() => handleSelectToken(token)}
+              />
+            );
+          })}
+        </TokenListContainer>
+      </TokenSelectModalShell>
 
       {/* Render borrow modal if a token is selected */}
       {!suppressActionModals && selectedToken && action === "borrow" && (
-        // For VesuV2, enrich context with collateral metadata when available (needed for vToken migration)
-        // We do not mutate the original context; we pass an adjusted copy to the modal
-        // eslint-disable-next-line react/jsx-no-useless-fragment
         <BorrowModalStark
-          isOpen={isTokenModalOpen}
-          onClose={handleModalClose}
+          isOpen={isActionModalOpen}
+          onClose={handleActionModalClose}
           token={{
             name: selectedSymbol,
             icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
@@ -200,8 +179,8 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 
       {!suppressActionModals && selectedToken && action === "deposit" && (
         <DepositModalStark
-          isOpen={isTokenModalOpen}
-          onClose={handleModalClose}
+          isOpen={isActionModalOpen}
+          onClose={handleActionModalClose}
           token={{
             name: selectedSymbol,
             icon: tokenNameToLogo(selectedSymbol.toLowerCase()),

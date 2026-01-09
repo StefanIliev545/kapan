@@ -156,7 +156,7 @@ export function formatDateTime(timestamp: bigint | number): string {
  * timeAgo(olderTimestamp) // "5h ago"
  * timeAgo(olderTimestamp, true) // "5h"
  */
-export function timeAgo(timestamp: bigint | number, compact: boolean = false): string {
+export function timeAgo(timestamp: bigint | number, compact = false): string {
   const ts = typeof timestamp === 'bigint' ? Number(timestamp) : timestamp;
   const now = Math.floor(Date.now() / 1000);
   const diff = now - ts;

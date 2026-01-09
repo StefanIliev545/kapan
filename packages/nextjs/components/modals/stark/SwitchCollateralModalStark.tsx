@@ -1,18 +1,8 @@
 "use client";
 
-import { FC, useState } from "react";
-import Image from "next/image";
-import { BaseModal } from "../BaseModal";
-import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
-import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
-import { notification } from "~~/utils/scaffold-stark";
-import { formatTokenAmount } from "~~/utils/protocols";
-import { useVesuSwitch } from "~~/hooks/useVesuSwitch";
+import { FC } from "react";
+import { SwitchModalBase, BasicToken } from "./SwitchModalBase";
 import type { VesuProtocolKey } from "~~/utils/vesu";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
-
-type BasicToken = { name: string; address: string; decimals: number; icon: string };
 
 interface SwitchCollateralModalProps {
   isOpen: boolean;
@@ -37,136 +27,20 @@ export const SwitchCollateralModalStark: FC<SwitchCollateralModalProps> = ({
   collateralBalance,
   debtBalance,
 }) => {
-  const { address } = useStarkAccount();
-  const [submitting, setSubmitting] = useState(false);
-  const [preparedOnce, setPreparedOnce] = useState(false);
-  const { loading, error, selectedQuote, swapSummary, calls } = useVesuSwitch({
-    isOpen,
-    type: "collateral",
-    address,
-    currentCollateral,
-    currentDebt: debtToken,
-    targetToken: targetCollateral,
-    collateralBalance,
-    debtBalance,
-    poolKey,
-    protocolKey,
-  });
-
-  if (!preparedOnce && selectedQuote && calls.length > 0) {
-    setPreparedOnce(true);
-  }
-
-  const { sendAsync } = useScaffoldMultiWriteContract({ calls });
-
-  const onSubmit = async () => {
-    try {
-      setSubmitting(true);
-      await sendAsync();
-      notification.success("Collateral switched");
-      onClose();
-    } catch {
-      notification.error("Failed to switch collateral");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const formatUsd = (value?: number) => (value == null ? "-" : (() => { try { return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }); } catch { return `$${value.toFixed(2)}`; } })());
-
-  // Resolve display name/icon with fallbacks (handles tokens like xSTRK)
-  const resolveDisplay = (t: BasicToken | undefined | null) => {
-    if (!t) return { name: "", icon: "" };
-    const raw = t.name || "";
-    const name = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(t.address) ?? raw;
-    const icon = tokenNameToLogo((name || "").toLowerCase());
-    return { name, icon };
-  };
-
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
-      <div className="space-y-3">
-        {error && (
-          <div className="alert alert-error bg-error/10 text-error text-xs">
-            {error}
-          </div>
-        )}
-        {!selectedQuote ? (
-          <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
-        ) : (
-          <>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between bg-base-200/40 p-2 rounded">
-                <div className="flex items-center gap-2">
-                  {(() => { const d = resolveDisplay((swapSummary as any)?.sellToken || currentCollateral); return (
-                    <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" /> ); })()}
-                  <div>
-                    <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.sellAmount || 0n).toString(), (swapSummary?.sellToken.decimals || currentCollateral.decimals))} {resolveDisplay((swapSummary as any)?.sellToken || currentCollateral).name}
-                    </div>
-                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.sellAmountInUsd)}</div>
-                  </div>
-                </div>
-                <div className="text-gray-400">→</div>
-                <div className="flex items-center gap-2">
-                  {(() => { const d = resolveDisplay((swapSummary as any)?.buyToken || targetCollateral); return (
-                    <Image src={d.icon} alt={d.name} width={24} height={24} className="w-6 h-6" /> ); })()}
-                  <div className="text-right">
-                    <div className="text-base font-medium">
-                      {formatTokenAmount((swapSummary?.buyAmount || 0n).toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || targetCollateral).name}
-                    </div>
-                    <div className="text-[11px] text-gray-500">{formatUsd(selectedQuote.buyAmountInUsd)}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1 pt-2 border-t border-gray-100">
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-gray-600">AVNU fee</span>
-                  <span>
-                    {formatTokenAmount(selectedQuote.avnuFees.toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || targetCollateral).name}
-                    <span className="text-gray-500"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
-                  </span>
-                </div>
-                {selectedQuote.integratorFees > 0n && (
-                  <div className="flex justify-between text-[12px]">
-                    <span className="text-gray-600">Integrator fee</span>
-                    <span>
-                      {formatTokenAmount(selectedQuote.integratorFees.toString(), (swapSummary?.buyToken.decimals || targetCollateral.decimals))} {resolveDisplay((swapSummary as any)?.buyToken || targetCollateral).name}
-                      <span className="text-gray-500"> · {formatUsd(selectedQuote.integratorFeesInUsd)}</span>
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-gray-600">Network fee</span>
-                  <span className="text-gray-700">{formatUsd(selectedQuote.gasFeesInUsd)}</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-        <div className="mt-4 flex justify-end">
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={onSubmit}
-            disabled={submitting || (!preparedOnce && (loading || !selectedQuote || calls.length === 0))}
-          >
-            {submitting ? (
-              "Switching..."
-            ) : !preparedOnce && (loading || !selectedQuote || calls.length === 0) ? (
-              <span className="flex items-center gap-2"><span className="loading loading-spinner loading-xs" /> Preparing…</span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <span>Switch Collateral</span>
-                {(loading || calls.length === 0) && <span className="loading loading-spinner loading-xs" />}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-    </BaseModal>
+    <SwitchModalBase
+      isOpen={isOpen}
+      onClose={onClose}
+      poolKey={poolKey}
+      protocolKey={protocolKey}
+      currentCollateral={currentCollateral}
+      currentDebt={debtToken}
+      targetToken={targetCollateral}
+      collateralBalance={collateralBalance}
+      debtBalance={debtBalance}
+      type="collateral"
+    />
   );
 };
 
 export default SwitchCollateralModalStark;
-
-

@@ -113,8 +113,8 @@ export default function OrdersPage() {
   if (!userAddress) {
     return (
       <div className="min-h-screen px-4 py-12 md:px-8 lg:px-16">
-        <div className="max-w-5xl mx-auto text-center py-20">
-          <h1 className="text-3xl font-bold mb-4">Orders</h1>
+        <div className="mx-auto max-w-5xl py-20 text-center">
+          <h1 className="mb-4 text-3xl font-bold">Orders</h1>
           <p className="text-base-content/50">Connect your wallet to view your orders</p>
         </div>
       </div>
@@ -124,8 +124,8 @@ export default function OrdersPage() {
   if (!isAvailable) {
     return (
       <div className="min-h-screen px-4 py-12 md:px-8 lg:px-16">
-        <div className="max-w-5xl mx-auto text-center py-20">
-          <h1 className="text-3xl font-bold mb-4">Orders</h1>
+        <div className="mx-auto max-w-5xl py-20 text-center">
+          <h1 className="mb-4 text-3xl font-bold">Orders</h1>
           <p className="text-base-content/50">Limit orders are not available on this chain</p>
         </div>
       </div>
@@ -134,14 +134,14 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen px-4 py-8 md:px-8 lg:px-16">
-      <div className="max-w-5xl mx-auto">
+      <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8">
           <button 
             onClick={() => window.history.back()}
-            className="inline-flex items-center gap-2 text-base-content/50 hover:text-base-content transition-colors text-sm mb-6"
+            className="text-base-content/50 hover:text-base-content mb-6 inline-flex items-center gap-2 text-sm transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back
@@ -157,9 +157,9 @@ export default function OrdersPage() {
             <button 
               onClick={fetchOrders}
               disabled={isLoading}
-              className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+              className="hover:bg-base-200 rounded-lg p-2 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-base-content/50 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-5${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -169,16 +169,16 @@ export default function OrdersPage() {
         {isLoading && orders.length === 0 ? (
           <LoadingOverlay size="lg" label="Loading orders..." />
         ) : orders.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="py-20 text-center">
             <p className="text-base-content/50 text-lg">No orders found</p>
-            <p className="text-base-content/40 text-sm mt-2">Create a limit order from the Multiply modal</p>
+            <p className="text-base-content/40 mt-2 text-sm">Create a limit order from the Multiply modal</p>
           </div>
         ) : (
           <div className="space-y-8">
             {/* Active Orders */}
             {activeOrders.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium text-base-content/50 uppercase tracking-wide mb-4">
+                <h2 className="text-base-content/50 mb-4 text-sm font-medium uppercase tracking-wide">
                   Active ({activeOrders.length})
                 </h2>
                 <div className="space-y-3">
@@ -199,7 +199,7 @@ export default function OrdersPage() {
             {/* Completed Orders */}
             {completedOrders.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium text-base-content/50 uppercase tracking-wide mb-4">
+                <h2 className="text-base-content/50 mb-4 text-sm font-medium uppercase tracking-wide">
                   Completed ({completedOrders.length})
                 </h2>
                 <div className="space-y-3">
@@ -220,7 +220,7 @@ export default function OrdersPage() {
             {/* Cancelled Orders */}
             {cancelledOrders.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium text-base-content/50 uppercase tracking-wide mb-4">
+                <h2 className="text-base-content/50 mb-4 text-sm font-medium uppercase tracking-wide">
                   Cancelled ({cancelledOrders.length})
                 </h2>
                 <div className="space-y-3">
@@ -315,21 +315,21 @@ function OrderRow({
   return (
     <Link 
       href={`/orders/${orderHash}`}
-      className={`block p-4 rounded-lg border border-base-200 hover:border-base-300 hover:bg-base-100/50 transition-all ${dimmed ? 'opacity-50' : ''}`}
+      className={`border-base-200 hover:border-base-300 hover:bg-base-100/50 block rounded-lg border p-4 transition-all ${dimmed ? 'opacity-50' : ''}`}
     >
       <div className="flex items-center justify-between gap-4">
         {/* Left: Token pair and progress */}
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="flex items-center -space-x-2 flex-shrink-0">
-            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={32} height={32} className="rounded-full ring-2 ring-base-100" />
-            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={32} height={32} className="rounded-full ring-2 ring-base-100" />
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex flex-shrink-0 items-center -space-x-2">
+            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={32} height={32} className="ring-base-100 rounded-full ring-2" />
+            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={32} height={32} className="ring-base-100 rounded-full ring-2" />
           </div>
           
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Operation type badge */}
               {operationType !== "unknown" && (
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${operationColorClass}`}>
+                <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${operationColorClass}`}>
                   {operationLabel}
                 </span>
               )}
@@ -345,13 +345,13 @@ function OrderRow({
                       className="rounded-sm"
                     />
                   )}
-                  <span className="text-xs text-base-content/40">{protocolName}</span>
+                  <span className="text-base-content/40 text-xs">{protocolName}</span>
                 </div>
               )}
               {/* Token pair */}
               <span className="font-semibold">{sellSymbol} → {buySymbol}</span>
               {/* Status badge */}
-              <span className={`text-xs px-1.5 py-0.5 rounded ${
+              <span className={`rounded px-1.5 py-0.5 text-xs ${
                 isActive ? 'bg-warning/20 text-warning' :
                 isCompleted ? 'bg-success/20 text-success' :
                 'bg-error/20 text-error'
@@ -359,7 +359,7 @@ function OrderRow({
                 {isActive ? 'Active' : isCompleted ? 'Completed' : 'Cancelled'}
               </span>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-sm text-base-content/50">
+            <div className="text-base-content/50 mt-1 flex items-center gap-3 text-sm">
               <span>{formatAmount(params.preTotalAmount, sellDecimals)} {sellSymbol}</span>
               <span>·</span>
               <span>{completedChunks}/{totalChunks} chunks</span>
@@ -370,10 +370,10 @@ function OrderRow({
         </div>
 
         {/* Right: Amounts */}
-        <div className="text-right flex-shrink-0">
+        <div className="flex-shrink-0 text-right">
           {hasExecutionData ? (
             <>
-              <div className="font-semibold text-success">
+              <div className="text-success font-semibold">
                 {formatAmount(totalReceived, buyDecimals)} {buySymbol}
               </div>
               <div className="text-sm">
@@ -392,9 +392,9 @@ function OrderRow({
       {/* Progress bar */}
       {isActive && (
         <div className="mt-3">
-          <div className="h-1 bg-base-200 w-full">
+          <div className="bg-base-200 h-1 w-full">
             <div 
-              className="h-full bg-primary transition-all"
+              className="bg-primary h-full transition-all"
               style={{ width: `${progressPercent}%` }}
             />
           </div>

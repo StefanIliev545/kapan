@@ -3,10 +3,10 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { BaseModal } from "../BaseModal";
+import { NostraTokenCard } from "./NostraTokenCard";
+import { useNostraModalSubmit } from "./useNostraModalSubmit";
+import { SwapQuoteSummary, type AggregatedFees } from "../common/SwapQuoteSummary";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
-import { useScaffoldMultiWriteContract } from "~~/hooks/scaffold-stark";
-import { notification } from "~~/utils/scaffold-stark";
-import { formatTokenAmount } from "~~/utils/protocols";
 import { useCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import {
   useNostraClosePosition,
@@ -15,15 +15,6 @@ import {
 } from "~~/hooks/useNostraClosePosition";
 import type { CollateralToken } from "~~/components/specific/collateral/CollateralSelector";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-
-const formatUsd = (value?: number) => {
-  if (value == null) return "-";
-  try {
-    return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-  } catch {
-    return `$${value.toFixed(2)}`;
-  }
-};
 
 interface NostraClosePositionModalProps {
   isOpen: boolean;
@@ -83,8 +74,12 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
     debtBalance,
   });
 
-  const { sendAsync } = useScaffoldMultiWriteContract({ calls });
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, handleSubmit } = useNostraModalSubmit({
+    calls,
+    successMessage: "Position closed",
+    errorMessage: "Failed to close position",
+    onSuccess: onClose,
+  });
 
   const disabled =
     submitting ||
@@ -94,22 +89,7 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
     swapSummaries.length === 0 ||
     calls.length === 0;
 
-  const handleSubmit = async () => {
-    if (disabled) return;
-    try {
-      setSubmitting(true);
-      await sendAsync();
-      notification.success("Position closed");
-      onClose();
-    } catch (e) {
-      console.error(e);
-      notification.error("Failed to close position");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const aggregatedFees = useMemo(() => {
+  const aggregatedFees: AggregatedFees = useMemo(() => {
     if (swapSummaries.length === 0) {
       return { avnu: 0, integrator: 0, gas: 0 };
     }
@@ -123,6 +103,26 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
     );
   }, [swapSummaries]);
 
+  // Convert swap summaries to SwapQuoteItem format
+  const swapQuoteItems = useMemo(
+    () =>
+      swapSummaries.map(summary => ({
+        sellToken: {
+          name: summary.sellToken.name,
+          icon: summary.sellToken.icon,
+          decimals: summary.sellToken.decimals,
+        },
+        buyToken: {
+          name: summary.buyToken.name,
+          icon: debt?.icon ?? summary.buyToken.icon,
+          decimals: summary.buyToken.decimals,
+        },
+        sellAmount: summary.sellAmount,
+        buyAmount: summary.buyAmount,
+      })),
+    [swapSummaries, debt?.icon],
+  );
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="p-4 rounded-none">
       <div className="space-y-4">
@@ -132,26 +132,23 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
         </div>
 
         {!debt ? (
-          <div className="rounded-md bg-base-200/50 p-3 text-sm text-base-content/70">No debt position selected.</div>
+          <div className="bg-base-200/50 text-base-content/70 rounded-md p-3 text-sm">No debt position selected.</div>
         ) : (
           <>
             <div className="space-y-3">
-              <div className="rounded-md border border-base-300 p-3">
-                <div className="text-xs uppercase tracking-wide text-base-content/60 mb-2">Debt token</div>
-                <div className="flex items-center gap-2">
-                  <Image src={debt.icon} alt={debt.name} width={28} height={28} className="rounded-full" />
-                  <div>
-                    <div className="font-medium">{debt.name}</div>
-                    <div className="text-xs text-base-content/60">{formatTokenAmount(debtBalance.toString(), debt.decimals)}</div>
-                  </div>
-                </div>
-              </div>
+              <NostraTokenCard
+                label="Debt token"
+                name={debt.name}
+                icon={debt.icon}
+                decimals={debt.decimals}
+                balance={debtBalance}
+              />
 
-              <div className="rounded-md border border-base-300 p-3">
-                <div className="text-xs uppercase tracking-wide text-base-content/60 mb-2">Select collaterals</div>
-                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+              <div className="border-base-300 rounded-md border p-3">
+                <div className="text-base-content/60 mb-2 text-xs uppercase tracking-wide">Select collaterals</div>
+                <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
                   {availableCollaterals.length === 0 ? (
-                    <div className="text-sm text-base-content/60">No collateral balances found.</div>
+                    <div className="text-base-content/60 text-sm">No collateral balances found.</div>
                   ) : (
                     availableCollaterals.map(collateral => {
                       const isSelected = selectedAddresses.includes(collateral.address);
@@ -182,7 +179,7 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
                               />
                               <div>
                                 <div className="font-medium">{collateral.symbol}</div>
-                                <div className="text-xs text-base-content/60">
+                                <div className="text-base-content/60 text-xs">
                                   Balance: {collateral.balance.toFixed(4)}
                                 </div>
                               </div>
@@ -200,59 +197,11 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
                 </div>
               </div>
 
-              {swapSummaries.length > 0 && (
-                <div className="rounded-md bg-base-200/60 p-3 space-y-3 text-sm">
-                  {swapSummaries.map(summary => (
-                    <div key={`${summary.collateral.address}-${summary.buyAmount.toString()}`} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span>Swap</span>
-                        <span className="font-medium flex items-center gap-2">
-                          <Image
-                            src={summary.sellToken.icon}
-                            alt={summary.sellToken.name}
-                            width={20}
-                            height={20}
-                            className="rounded-full"
-                          />
-                          {formatTokenAmount(summary.sellAmount.toString(), summary.sellToken.decimals)} {summary.sellToken.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Receive</span>
-                        <span className="font-medium flex items-center gap-2">
-                          <Image
-                            src={debt?.icon ?? summary.buyToken.icon}
-                            alt={summary.buyToken.name}
-                            width={20}
-                            height={20}
-                            className="rounded-full"
-                          />
-                          {formatTokenAmount(summary.buyAmount.toString(), summary.buyToken.decimals)} {summary.buyToken.name}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="pt-2 border-t border-base-300 space-y-1 text-xs text-base-content/70">
-                    <div className="flex justify-between">
-                      <span>Total AVNU fees</span>
-                      <span>{formatUsd(aggregatedFees.avnu)}</span>
-                    </div>
-                    {aggregatedFees.integrator > 0 && (
-                      <div className="flex justify-between">
-                        <span>Total integrator fees</span>
-                        <span>{formatUsd(aggregatedFees.integrator)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span>Total network fees</span>
-                      <span>{formatUsd(aggregatedFees.gas)}</span>
-                    </div>
-                  </div>
-                </div>
+              {swapQuoteItems.length > 0 && (
+                <SwapQuoteSummary swaps={swapQuoteItems} fees={aggregatedFees} />
               )}
 
-              {error && <div className="rounded-md bg-error/10 border border-error/40 p-2 text-xs text-error">{error}</div>}
+              {error && <div className="bg-error/10 border-error/40 text-error rounded-md border p-2 text-xs">{error}</div>}
             </div>
           </>
         )}
@@ -271,4 +220,3 @@ export const NostraClosePositionModal: FC<NostraClosePositionModalProps> = ({ is
 };
 
 export default NostraClosePositionModal;
-

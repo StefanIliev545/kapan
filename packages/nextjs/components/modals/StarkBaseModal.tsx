@@ -66,13 +66,13 @@ export const StarkBaseModal: FC<StarkBaseModalProps> = ({
         {children}
         <div className="mt-6 flex justify-end gap-3">
           <button
-            className="px-4 py-2 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
+            className="text-base-content/60 hover:text-base-content px-4 py-2 text-sm font-medium transition-colors"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
-            className="px-4 py-2 text-sm font-medium bg-base-content text-base-100 rounded-lg hover:bg-base-content/90 transition-colors"
+            className="bg-base-content text-base-100 hover:bg-base-content/90 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
             onClick={handleSubmit}
           >
             Submit

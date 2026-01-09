@@ -135,7 +135,7 @@ export function extractPTBaseToken(symbol: string): string {
 export function usePendlePTYields(
   chainId?: number,
   tokens?: { address: Address; symbol: string }[],
-  enabled: boolean = true
+  enabled = true
 ) {
   const isSupported = !!chainId && !!PENDLE_CHAIN_MAP[chainId];
   
@@ -296,7 +296,7 @@ export function usePTYield(
   chainId?: number,
   tokenAddress?: Address,
   tokenSymbol?: string,
-  enabled: boolean = true
+  enabled = true
 ) {
   const { yieldsByAddress, yieldsBySymbol, yields, isLoading } = usePendlePTYields(
     chainId,

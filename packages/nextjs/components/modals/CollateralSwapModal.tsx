@@ -718,7 +718,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const infoContent = (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                <InformationCircleIcon className="size-5 flex-shrink-0" />
                 <span>
                     <strong>How Collateral Swap Works</strong>
                     <br />
@@ -729,13 +729,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             <div className="space-y-4 px-2">
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">1</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Flash Loan</h4>
-                        <p className="text-xs text-base-content/70">We borrow the new collateral asset via a Flash Loan.</p>
-                        <div className="mt-1 text-xs bg-base-200 p-1 rounded inline-block">
+                        <h4 className="text-sm font-medium">Flash Loan</h4>
+                        <p className="text-base-content/70 text-xs">We borrow the new collateral asset via a Flash Loan.</p>
+                        <div className="bg-base-200 mt-1 inline-block rounded p-1 text-xs">
                             Provider: {selectedProvider?.name || "Auto"}
                         </div>
                     </div>
@@ -743,15 +743,15 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">2</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Swap</h4>
-                        <p className="text-xs text-base-content/70">
+                        <h4 className="text-sm font-medium">Swap</h4>
+                        <p className="text-base-content/70 text-xs">
                             We swap your current collateral for the new asset using {swapRouter === "pendle" ? "Pendle" : "1inch"}.
                         </p>
-                        <div className="mt-1 text-xs bg-base-200 p-1 rounded inline-block">
+                        <div className="bg-base-200 mt-1 inline-block rounded p-1 text-xs">
                             Router: {swapRouter === "pendle" ? "Pendle" : "1inch"}
                         </div>
                     </div>
@@ -759,22 +759,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">3</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Deposit & Withdraw</h4>
-                        <p className="text-xs text-base-content/70">The new asset is deposited as collateral, and your old collateral is withdrawn.</p>
+                        <h4 className="text-sm font-medium">Deposit & Withdraw</h4>
+                        <p className="text-base-content/70 text-xs">The new asset is deposited as collateral, and your old collateral is withdrawn.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">4</div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">4</div>
                     </div>
                     <div>
-                        <h4 className="font-medium text-sm">Repay Flash Loan</h4>
-                        <p className="text-xs text-base-content/70">The withdrawn collateral is used to repay the Flash Loan.</p>
+                        <h4 className="text-sm font-medium">Repay Flash Loan</h4>
+                        <p className="text-base-content/70 text-xs">The withdrawn collateral is used to repay the Flash Loan.</p>
                     </div>
                 </div>
             </div>
@@ -826,9 +826,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
             {/* Limit Order Pricing Section */}
             {executionType === "limit" && (
-                <div className="bg-base-200/60 rounded-lg p-3 text-xs border border-base-300/30">
+                <div className="bg-base-200/60 border-base-300/30 rounded-lg border p-3 text-xs">
                     {/* Market Rate Display */}
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2 flex items-center justify-between">
                         <span className="text-base-content/60">Market Rate</span>
                         <div className="flex items-center gap-1.5">
                             {isQuoteLoading ? (
@@ -846,9 +846,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
                     {/* Slippage Slider */}
                     <div className="mb-2">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="mb-1 flex items-center justify-between">
                             <span className="text-base-content/60">Max Slippage</span>
-                            <span className="font-medium text-warning">
+                            <span className="text-warning font-medium">
                                 {limitSlippage < 0.1 ? limitSlippage.toFixed(2) : limitSlippage.toFixed(1)}%
                             </span>
                         </div>
@@ -864,7 +864,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                             }}
                             className="range range-warning range-xs w-full"
                         />
-                        <div className="flex justify-between text-[10px] text-base-content/40 mt-0.5">
+                        <div className="text-base-content/40 mt-0.5 flex justify-between text-[10px]">
                             <span>0%</span>
                             <span>0.1%</span>
                             <span>1%</span>
@@ -873,9 +873,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     </div>
 
                     {/* Min Output */}
-                    <div className="flex items-center justify-between py-2 border-t border-base-300/30">
+                    <div className="border-base-300/30 flex items-center justify-between border-t py-2">
                         <span className="text-base-content/60">Min Output</span>
-                        <span className="font-medium text-success">
+                        <span className="text-success font-medium">
                             {minBuyAmount.raw > 0n ? (
                                 `${Number(minBuyAmount.formatted).toFixed(6)} ${selectedTo?.symbol}`
                             ) : (
@@ -892,7 +892,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                             totalAmount={amountInBigInt}
                             onConfigChange={handleLimitOrderConfigChange}
                             limitOrderConfig={limitOrderConfig}
-                            className="pt-2 border-t border-base-300/30"
+                            className="border-base-300/30 border-t pt-2"
                         />
                     )}
 

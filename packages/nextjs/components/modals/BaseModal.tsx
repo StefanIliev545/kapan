@@ -29,16 +29,16 @@ export const BaseModal: FC<BaseModalProps> = ({
       />
 
       {/* Modal content */}
-      <div className={`modal-box relative bg-base-100 border border-base-300/50 rounded-xl shadow-xl ${maxWidthClass} ${boxClassName}`}>
+      <div className={`modal-box bg-base-100 border-base-300/50 relative rounded-xl border shadow-xl ${maxWidthClass} ${boxClassName}`}>
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-base-200">
-            <h3 className="text-lg font-semibold text-base-content">{title}</h3>
+          <div className="border-base-200 mb-4 flex items-center justify-between border-b pb-3">
+            <h3 className="text-base-content text-lg font-semibold">{title}</h3>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
+              className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors"
             >
-              <XMarkIcon className="w-5 h-5" />
+              <XMarkIcon className="size-5" />
             </button>
           </div>
         )}
@@ -47,9 +47,9 @@ export const BaseModal: FC<BaseModalProps> = ({
         {!title && (
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors"
+            className="text-base-content/40 hover:text-base-content hover:bg-base-200 absolute right-3 top-3 rounded-lg p-1.5 transition-colors"
           >
-            <XMarkIcon className="w-5 h-5" />
+            <XMarkIcon className="size-5" />
           </button>
         )}
 

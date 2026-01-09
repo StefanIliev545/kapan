@@ -105,7 +105,7 @@ export const InfoTooltip: FC<InfoTooltipProps> = ({
 
   return (
     <Tooltip content={tooltipContent} delayDuration={delayDuration} side={side}>
-      <span className={`inline-flex items-center gap-1 cursor-help ${className}`}>
+      <span className={`inline-flex cursor-help items-center gap-1 ${className}`}>
         {children}
         {iconElement}
       </span>
@@ -149,7 +149,7 @@ export const LabelWithTooltip: FC<LabelWithTooltipProps> = ({
 
   return (
     <Tooltip content={tooltipContent} delayDuration={100}>
-      <span className={`inline-flex items-center gap-1 cursor-help ${className}`}>
+      <span className={`inline-flex cursor-help items-center gap-1 ${className}`}>
         <span className={labelClassName}>{label}</span>
         <InformationCircleIcon
           className={`${iconClassName} text-base-content/40 hover:text-base-content/60 transition-colors`}

@@ -136,7 +136,7 @@ function getExistingLogos(): Set<string> {
  * - YT-USDe-27MAR2025 -> ytusde
  */
 function normalizeSymbol(symbol: string): string {
-  let result = symbol.toLowerCase();
+  const result = symbol.toLowerCase();
   
   // Handle PT tokens: remove "pt-" prefix, then strip date/timestamp suffixes
   if (result.startsWith("pt-")) {

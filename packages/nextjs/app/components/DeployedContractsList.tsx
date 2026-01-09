@@ -182,7 +182,7 @@ export const DeployedContractsList = () => {
 
   if (contractsToDisplay.length === 0) {
     return (
-      <div className="text-center py-5 space-y-4">
+      <div className="space-y-4 py-5 text-center">
         <NetworkFilter networks={networkOptions} defaultNetwork={selectedNetwork} onNetworkChange={setSelectedNetwork} />
         <p>No contracts deployed on the current network ({activeNetworkName}).</p>
       </div>
@@ -208,7 +208,7 @@ export const DeployedContractsList = () => {
                 <td className="font-medium">{contract.name}</td>
                 <td>
                   <div className="flex items-center gap-1">
-                    <span className="font-mono text-xs truncate max-w-[150px] md:max-w-[200px] lg:max-w-[300px]">
+                    <span className="max-w-[150px] truncate font-mono text-xs md:max-w-[200px] lg:max-w-[300px]">
                       {contract.address}
                     </span>
                     <button
@@ -216,9 +216,9 @@ export const DeployedContractsList = () => {
                       onClick={() => copy(contract.address)}
                     >
                       {isCopied ? (
-                        <CheckCircleIcon className="h-4 w-4 text-success" />
+                        <CheckCircleIcon className="text-success size-4" />
                       ) : (
-                        <DocumentDuplicateIcon className="h-4 w-4" />
+                        <DocumentDuplicateIcon className="size-4" />
                       )}
                     </button>
                   </div>
@@ -232,11 +232,11 @@ export const DeployedContractsList = () => {
                       rel="noopener noreferrer"
                       className="btn btn-xs btn-primary"
                     >
-                      <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-1" />
+                      <ArrowTopRightOnSquareIcon className="mr-1 size-4" />
                       View
                     </Link>
                   ) : (
-                    <span className="text-xs text-base-content/60">Explorer unavailable</span>
+                    <span className="text-base-content/60 text-xs">Explorer unavailable</span>
                   )}
                 </td>
               </tr>

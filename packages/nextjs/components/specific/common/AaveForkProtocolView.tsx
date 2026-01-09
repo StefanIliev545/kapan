@@ -55,7 +55,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, e
           writeContractName={writeContractName}
         />
         {userEModeId > 0 && userEMode && (
-          <span className="hidden sm:inline text-xs text-primary whitespace-nowrap">
+          <span className="text-primary hidden whitespace-nowrap text-xs sm:inline">
             {userEMode.label} (LTV {(userEMode.ltv / 100).toFixed(0)}%)
           </span>
         )}

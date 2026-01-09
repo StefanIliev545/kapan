@@ -36,7 +36,7 @@ const UserUtilization: FC<{ utilizationPercentage: number }> = ({ utilizationPer
 
   return (
     <div className="flex items-center gap-2">
-      <div className="w-20 h-1.5 bg-base-300 rounded-full overflow-hidden">
+      <div className="bg-base-300 h-1.5 w-20 overflow-hidden rounded-full">
         <div className={`h-full ${getColor()}`} style={{ width: `${Math.min(utilizationPercentage, 100)}%` }} />
       </div>
       <span className="text-xs font-medium">{utilizationPercentage.toFixed(0)}% borrowed</span>
@@ -345,11 +345,11 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   // Don't render anything until data is loaded when visible
   if (isVisible && (!collateralData || collateralData[0]?.length === 0) && !allCollateralPositions.length) {
     return (
-      <div className="bg-base-200/60 dark:bg-base-300/30 rounded-lg p-3 mt-2">
+      <div className="bg-base-200/60 dark:bg-base-300/30 mt-2 rounded-lg p-3">
         <div className="flex items-center justify-center py-4">
-          <div className="animate-pulse flex items-center">
-            <div className="h-4 w-4 bg-primary/30 rounded-full mr-2"></div>
-            <span className="text-sm text-base-content/70">Loading collateral data...</span>
+          <div className="flex animate-pulse items-center">
+            <div className="bg-primary/30 mr-2 size-4 rounded-full"></div>
+            <span className="text-base-content/70 text-sm">Loading collateral data...</span>
           </div>
         </div>
       </div>
@@ -358,14 +358,14 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   return (
     <>
-      <div className="bg-base-200/60 dark:bg-base-300/30 rounded-lg p-3 mt-2">
+      <div className="bg-base-200/60 dark:bg-base-300/30 mt-2 rounded-lg p-3">
         <div className="flex flex-col">
           <div className="mb-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2 md:gap-4">
                 {/* Collateral Assets title and count - highest priority */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-semibold text-base-content/80 flex items-center gap-1">
+                <div className="flex flex-shrink-0 items-center gap-2">
+                  <span className="text-base-content/80 flex items-center gap-1 text-sm font-semibold">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="14"
@@ -391,29 +391,29 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
                 {/* Utilization indicator - lowest priority, will disappear first */}
                 {totalCollateralValue > 0 && (
-                  <div className="group/util hidden sm:flex items-center gap-2 order-3 flex-shrink flex-grow">
-                    <span className="text-xs text-base-content/70 whitespace-nowrap">Utilization:</span>
+                  <div className="group/util order-3 hidden flex-shrink flex-grow items-center gap-2 sm:flex">
+                    <span className="text-base-content/70 whitespace-nowrap text-xs">Utilization:</span>
                     {/* Default: show bar */}
                     <div className="group-hover/util:hidden">
                       <UserUtilization utilizationPercentage={utilizationPercentage} />
                     </div>
                     {/* On hover: show Current and LLTV breakdown */}
-                    <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
+                    <div className="hidden items-center gap-2 font-mono text-xs tabular-nums group-hover/util:flex">
                       <span className="text-base-content/70">
-                        <span className="text-[10px] text-base-content/50">Current </span>
+                        <span className="text-base-content/50 text-[10px]">Current </span>
                         {utilizationPercentage.toFixed(1)}%
                       </span>
                       {weightedLltvBps > 0n && (
                         <>
                           <span className="text-base-content/30">•</span>
                           <span className="text-base-content/70">
-                            <span className="text-[10px] text-base-content/50">LLTV </span>
+                            <span className="text-base-content/50 text-[10px]">LLTV </span>
                             {formatBps(weightedLltvBps)}%
                           </span>
                         </>
                       )}
                     </div>
-                    <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline group-hover/util:hidden">
+                    <span className="text-base-content/70 hidden truncate text-xs group-hover/util:hidden md:inline">
                       ({formatCurrency(borrowDetails.borrowValue)} / {formatCurrency(totalCollateralValue)})
                     </span>
                   </div>
@@ -421,8 +421,8 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
               </div>
 
               {/* Toggle for showing all collateral - medium priority, always visible */}
-              <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-                <span className="text-xs text-base-content/70 whitespace-nowrap">Show all</span>
+              <div className="ml-auto flex flex-shrink-0 items-center gap-2">
+                <span className="text-base-content/70 whitespace-nowrap text-xs">Show all</span>
                 <input
                   type="checkbox"
                   className="toggle toggle-primary toggle-xs"
@@ -434,57 +434,57 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           </div>
 
           {collateralPositions.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
               {collateralPositions.map((position: CollateralPosition) => (
                 <div
                   key={position.address}
-                  className={`bg-base-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border
+                  className={`bg-base-100 rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md
                     ${position.balance > 0 ? "border-base-300/50" : "border-base-300/20"}
                     hover:bg-base-200/60 hover:border-base-content/15 flex items-center overflow-hidden`}
                 >
                   <div className="flex gap-1">
-                    <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">
+                    <div className="join join-vertical bg-base-100 z-10 w-6 overflow-hidden transition-all duration-300 hover:w-24">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); openSwap(position); }}
-                        className="join-item group btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-start overflow-hidden rounded-none rounded-tl-lg hover:bg-primary/20 hover:text-primary transition-colors w-full"
+                        className="join-item btn btn-xs btn-ghost hover:bg-primary/20 hover:text-primary group flex h-7 min-h-0 w-full items-center justify-start overflow-hidden rounded-none rounded-tl-lg px-0 transition-colors"
                         aria-label={`Swap ${position.name}`}
                         title="Swap"
                       >
-                        <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
-                          <ArrowPathIcon className="w-3 h-3" />
+                        <div className="flex h-7 w-6 flex-shrink-0 items-center justify-center">
+                          <ArrowPathIcon className="size-3" />
                         </div>
-                        <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
+                        <span className="ml-0 whitespace-nowrap text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                           Swap
                         </span>
                       </button>
                       <button
                         type="button"
                         disabled
-                        className="join-item btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-center overflow-hidden rounded-none rounded-bl-lg cursor-default opacity-0 w-full"
+                        className="join-item btn btn-xs btn-ghost flex h-7 min-h-0 w-full cursor-default items-center justify-center overflow-hidden rounded-none rounded-bl-lg px-0 opacity-0"
                       >
-                        <span className="w-3 h-3" />
+                        <span className="size-3" />
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 overflow-hidden flex-1 p-2">
+                  <div className="flex flex-1 items-center gap-2 overflow-hidden p-2">
                     <div className="avatar flex-shrink-0">
-                      <div className="w-7 h-7 rounded-full bg-base-200 p-1.5 flex items-center justify-center overflow-hidden">
+                      <div className="bg-base-200 flex size-7 items-center justify-center overflow-hidden rounded-full p-1.5">
                         <Image
                           src={position.icon}
                           alt={`${position.name} icon`}
                           width={20}
                           height={20}
-                          className="object-contain max-w-full max-h-full"
+                          className="max-h-full max-w-full object-contain"
                         />
                       </div>
                     </div>
                     <div className="flex flex-col overflow-hidden">
-                      <span className="font-medium text-sm truncate">{position.name}</span>
+                      <span className="truncate text-sm font-medium">{position.name}</span>
                       <div className="flex flex-col">
                         {position.balance > 0 ? (
                           <>
-                            <span className="text-xs text-success truncate">
+                            <span className="text-success truncate text-xs">
                               <FiatBalance
                                 tokenAddress={position.address}
                                 rawValue={position.balanceRaw}
@@ -498,7 +498,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                             </span>
                           </>
                         ) : (
-                          <span className="text-xs text-base-content/40 truncate">No balance</span>
+                          <span className="text-base-content/40 truncate text-xs">No balance</span>
                         )}
                       </div>
                     </div>
@@ -506,36 +506,36 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                   <div className="flex gap-1">
 
                     <div className="flex gap-1">
-                      <div className="join join-vertical w-6 hover:w-24 transition-all duration-300 overflow-hidden z-10 bg-base-100">
+                      <div className="join join-vertical bg-base-100 z-10 w-6 overflow-hidden transition-all duration-300 hover:w-24">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openDeposit(position); }}
-                          className="join-item group btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-start overflow-hidden rounded-none rounded-tr-lg hover:bg-primary/20 hover:text-primary transition-colors w-full"
+                          className="join-item btn btn-xs btn-ghost hover:bg-primary/20 hover:text-primary group flex h-7 min-h-0 w-full items-center justify-start overflow-hidden rounded-none rounded-tr-lg px-0 transition-colors"
                           aria-label={`Deposit ${position.name}`}
                           title="Deposit"
                         >
-                          <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                          <div className="flex h-7 w-6 flex-shrink-0 items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-3">
                               <path d="M12 5c.414 0 .75.336.75.75V11.25H18.25a.75.75 0 010 1.5H12.75V18.25a.75.75 0 01-1.5 0V12.75H5.75a.75.75 0 010-1.5H11.25V5.75c0-.414.336-.75.75-.75z" />
                             </svg>
                           </div>
-                          <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
+                          <span className="ml-0 whitespace-nowrap text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                             Deposit
                           </span>
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openWithdraw(position); }}
-                          className="join-item group btn btn-xs btn-ghost px-0 h-7 min-h-0 flex items-center justify-start overflow-hidden rounded-none rounded-br-lg hover:bg-primary/20 hover:text-primary transition-colors w-full"
+                          className="join-item btn btn-xs btn-ghost hover:bg-primary/20 hover:text-primary group flex h-7 min-h-0 w-full items-center justify-start overflow-hidden rounded-none rounded-br-lg px-0 transition-colors"
                           aria-label={`Withdraw ${position.name}`}
                           title="Withdraw"
                         >
-                          <div className="w-6 h-7 flex items-center justify-center flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                          <div className="flex h-7 w-6 flex-shrink-0 items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-3">
                               <path d="M5.75 12a.75.75 0 01.75-.75h11a.75.75 0 010 1.5h-11a.75.75 0 01-.75-.75z" />
                             </svg>
                           </div>
-                          <span className="ml-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap text-xs">
+                          <span className="ml-0 whitespace-nowrap text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                             Withdraw
                           </span>
                         </button>
@@ -546,7 +546,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center gap-2 bg-base-100/50 rounded-lg p-4">
+            <div className="bg-base-100/50 flex flex-col items-center justify-center gap-2 rounded-lg p-4 text-center">
               <div className="text-primary dark:text-white">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -554,7 +554,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                   viewBox="0 0 24 24"
                   strokeWidth={1.5}
                   stroke="currentColor"
-                  className="w-6 h-6"
+                  className="size-6"
                 >
                   <path
                     strokeLinecap="round"
@@ -563,7 +563,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                   />
                 </svg>
               </div>
-              <p className="text-sm text-base-content/70">
+              <p className="text-base-content/70 text-sm">
                 {showAll ? "No collateral assets available" : "No collateral assets with balance"}
               </p>
               {!showAll && (

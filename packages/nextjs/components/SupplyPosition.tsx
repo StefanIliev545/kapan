@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useMemo } from "react";
 import { PlusIcon, MinusIcon, ArrowPathIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
@@ -94,6 +94,22 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
 
+  // Memoize the token object to avoid recreating it multiple times
+  const tokenInfo = useMemo(
+    () => ({
+      name,
+      icon,
+      address: tokenAddress,
+      currentRate,
+      usdPrice,
+      decimals: tokenDecimals || 18,
+    }),
+    [name, icon, tokenAddress, currentRate, usdPrice, tokenDecimals],
+  );
+
+  // Normalized balance as bigint for modals
+  const normalizedBalance = typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0);
+
   // Use shared position state hook
   const { isWalletConnected, hasBalance, disabledMessage } = usePositionState({
     networkType,
@@ -126,7 +142,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     actions.push({
       key: "deposit",
       label: "Deposit",
-      icon: <PlusIcon className="w-4 h-4" />,
+      icon: <PlusIcon className="size-4" />,
       onClick: handleDepositClick,
       disabled: !isWalletConnected || actionsDisabled,
       title: !isWalletConnected
@@ -142,7 +158,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     actions.push({
       key: "withdraw",
       label: "Withdraw",
-      icon: <MinusIcon className="w-4 h-4" />,
+      icon: <MinusIcon className="size-4" />,
       onClick: handleWithdrawClick,
       disabled: !isWalletConnected || !hasBalance || actionsDisabled,
       title: !isWalletConnected
@@ -160,7 +176,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     actions.push({
       key: "move",
       label: "Move",
-      icon: <ArrowRightIcon className="w-4 h-4" />,
+      icon: <ArrowRightIcon className="size-4" />,
       onClick: handleMoveClick,
       disabled: !isWalletConnected || !hasBalance || actionsDisabled,
       title: !isWalletConnected
@@ -179,7 +195,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
     actions.push({
       key: "swap",
       label: "Swap",
-      icon: <ArrowPathIcon className="w-4 h-4" />,
+      icon: <ArrowPathIcon className="size-4" />,
       onClick: handleSwapClick ?? (() => { return; }),
       disabled: !isWalletConnected || actionsDisabled || !hasBalance,
       title: !isWalletConnected
@@ -198,7 +214,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const quickDepositButton = showQuickDepositButton ? (
     <div className="mt-2" onClick={e => e.stopPropagation()}>
       <button
-        className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-base-300 rounded-md text-sm text-primary hover:border-primary/70 hover:text-primary"
+        className="border-base-300 text-primary hover:border-primary/70 hover:text-primary flex w-full items-center justify-center gap-2 rounded-md border border-dashed py-2 text-sm"
         onClick={event => {
           event.stopPropagation();
           if (!actionsDisabled) {
@@ -214,7 +230,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
               : "Deposit more collateral"
         }
       >
-        <PlusIcon className="w-4 h-4" />
+        <PlusIcon className="size-4" />
         <span>Deposit</span>
       </button>
     </div>
@@ -229,7 +245,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         tokenAddress={tokenAddress}
         tokenPrice={tokenPrice}
         tokenDecimals={tokenDecimals}
-        tokenBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+        tokenBalance={normalizedBalance}
         // Protocol info
         protocolName={protocolName}
         networkType={networkType}
@@ -272,14 +288,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <DepositModalStark
             isOpen={depositModal.isOpen}
             onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={tokenInfo}
             protocolName={protocolName}
             position={position}
             vesuContext={vesuContext?.deposit}
@@ -287,16 +296,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <WithdrawModalStark
             isOpen={withdrawModal.isOpen}
             onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={tokenInfo}
             protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            supplyBalance={normalizedBalance}
             position={position}
             vesuContext={vesuContext?.withdraw}
           />
@@ -306,14 +308,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <DepositModal
             isOpen={depositModal.isOpen}
             onClose={depositModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={tokenInfo}
             protocolName={protocolName}
             position={position}
             chainId={chainId}
@@ -322,16 +317,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
           <WithdrawModal
             isOpen={withdrawModal.isOpen}
             onClose={withdrawModal.close}
-            token={{
-              name,
-              icon,
-              address: tokenAddress,
-              currentRate,
-              usdPrice,
-              decimals: tokenDecimals || 18,
-            }}
+            token={tokenInfo}
             protocolName={protocolName}
-            supplyBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            supplyBalance={normalizedBalance}
             position={position}
             chainId={chainId}
             context={protocolContext}
@@ -348,7 +336,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
             icon,
             address: tokenAddress,
             currentRate,
-            rawBalance: typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0),
+            rawBalance: normalizedBalance,
             decimals: tokenDecimals,
             price: tokenPrice,
           }}

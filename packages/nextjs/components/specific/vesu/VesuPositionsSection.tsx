@@ -210,7 +210,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
     if (!userAddress) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           Connect your Starknet wallet to view your Vesu positions
         </div>
       );
@@ -218,7 +218,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
     if (rows.length === 0) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           No positions found
         </div>
       );
@@ -251,9 +251,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       return (
         <div
           key={row.key}
-          className="relative overflow-hidden rounded-md border border-base-300"
+          className="border-base-300 relative overflow-hidden rounded-md border"
         >
-          <div className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}>
+          <div className={`divide-base-300 grid divide-y md:divide-y-0 ${containerColumns}`}>
             <SupplyPosition
               {...row.supply}
               protocolName={protocolName}
@@ -294,10 +294,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
                 onToggleExpanded={() => toggleRowExpanded(row.key)}
               />
             ) : (
-              <div className="flex h-full items-center justify-between gap-3 border border-dashed border-base-300 bg-base-200/60 p-3">
+              <div className="border-base-300 bg-base-200/60 flex h-full items-center justify-between gap-3 border border-dashed p-3">
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-base-content/70">No debt</span>
-                  <span className="text-xs text-base-content/50">You are not borrowing against this collateral yet.</span>
+                  <span className="text-base-content/70 text-sm font-semibold">No debt</span>
+                  <span className="text-base-content/50 text-xs">You are not borrowing against this collateral yet.</span>
                 </div>
                 <button
                   className="btn btn-sm btn-outline"
@@ -328,7 +328,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           <div className="flex flex-col gap-1">
             <h2 className="card-title text-lg">{title}</h2>
             {userAddress && (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/70">
+              <div className="text-base-content/70 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 <span className="flex items-center gap-1">
                   <span>Balance:</span>
                   <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
@@ -358,7 +358,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
             )}
           </div>
           {isUpdating && userAddress && (
-            <div className="flex items-center text-xs text-base-content/60">
+            <div className="text-base-content/60 flex items-center text-xs">
               <LoadingSpinner size="xs" label="Updating" />
             </div>
           )}
@@ -367,16 +367,16 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
         <div className="space-y-4">
           {renderPositions()}
 
-          <div className="overflow-hidden rounded-2xl border border-dashed border-base-300">
-            <div className="grid grid-cols-1 divide-y divide-base-300 md:grid-cols-2 md:divide-x md:divide-y-0">
-              <div className="flex h-full flex-col justify-center bg-base-200/60 p-3">
+          <div className="border-base-300 overflow-hidden rounded-2xl border border-dashed">
+            <div className="divide-base-300 grid grid-cols-1 divide-y md:grid-cols-2 md:divide-x md:divide-y-0">
+              <div className="bg-base-200/60 flex h-full flex-col justify-center p-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-base-content/70">Add collateral</span>
-                    <span className="text-xs text-base-content/50">Supply assets to start or grow your borrowing power.</span>
+                    <span className="text-base-content/70 text-sm font-semibold">Add collateral</span>
+                    <span className="text-base-content/50 text-xs">Supply assets to start or grow your borrowing power.</span>
                   </div>
                   <button className="btn btn-sm btn-outline" onClick={onDepositRequest} disabled={assetsWithRates.length === 0}>
-                    <PlusIcon className="h-4 w-4" />
+                    <PlusIcon className="size-4" />
                     <span>Deposit</span>
                   </button>
                 </div>

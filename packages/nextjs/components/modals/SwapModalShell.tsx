@@ -203,33 +203,33 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     return (
         <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
             <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-            <div className="modal-box relative bg-base-100 max-w-2xl p-5 rounded-xl border border-base-300/50 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
+            <div className="modal-box bg-base-100 border-base-300/50 relative flex max-w-2xl flex-col rounded-xl border p-5">
+                <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <h3 className="font-semibold text-lg text-base-content">{title}</h3>
-                        <div className="flex items-center gap-1 p-1 bg-base-200/50 rounded-lg">
+                        <h3 className="text-base-content text-lg font-semibold">{title}</h3>
+                        <div className="bg-base-200/50 flex items-center gap-1 rounded-lg p-1">
                             <button
-                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === "swap" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
+                                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${activeTab === "swap" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
                                 onClick={() => setActiveTab("swap")}
                             >
                                 Swap
                             </button>
                             <button
-                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === "info" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
+                                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${activeTab === "info" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
                                 onClick={() => setActiveTab("info")}
                             >
                                 Info
                             </button>
                         </div>
                     </div>
-                    <button className="p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors" onClick={onClose}>✕</button>
+                    <button className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors" onClick={onClose}>✕</button>
                 </div>
 
                 {activeTab === "info" ? (
                     <div className="space-y-4 py-2">
                         {infoContent || (
                             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                                <InformationCircleIcon className="size-5 flex-shrink-0" />
                                 <span>
                                     <strong>How {title} Works</strong>
                                     <br />
@@ -242,11 +242,11 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     <div className="space-y-6">
                         {/* Provider Selectors Row */}
                         {((flashLoanProviders && flashLoanProviders.length >= 1 && setSelectedProvider) || setSwapRouter) && (
-                            <div className="flex justify-end gap-2 mb-[-10px]">
+                            <div className="mb-[-10px] flex justify-end gap-2">
                                 {/* Swap Router Selector */}
                                 {setSwapRouter && (
                                     <select
-                                        className="select select-xs select-ghost font-normal text-base-content/60"
+                                        className="select select-xs select-ghost text-base-content/60 font-normal"
                                         value={swapRouter || "1inch"}
                                         onChange={(e) => setSwapRouter(e.target.value as SwapRouter)}
                                     >
@@ -261,7 +261,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                 {/* Flash Loan Provider Selector - show dropdown if multiple, read-only if single */}
                                 {flashLoanProviders && flashLoanProviders.length > 1 && setSelectedProvider && (
                                     <select
-                                        className="select select-xs select-ghost font-normal text-base-content/60"
+                                        className="select select-xs select-ghost text-base-content/60 font-normal"
                                         value={selectedProvider?.name || ""}
                                         onChange={(e) => {
                                             const p = flashLoanProviders.find(p => p.name === e.target.value);
@@ -282,7 +282,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                 )}
                                 {/* Show read-only flash loan provider when only one is available */}
                                 {flashLoanProviders && flashLoanProviders.length === 1 && selectedProvider && (
-                                    <span className="text-xs text-base-content/60 py-1">
+                                    <span className="text-base-content/60 py-1 text-xs">
                                         Flash Loan: {selectedProvider.name}
                                     </span>
                                 )}
@@ -292,15 +292,15 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                         {/* FROM Section */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-base-content/80">{fromLabel}</span>
-                                <span className="text-xs text-base-content/60">
+                                <span className="text-base-content/80 text-sm">{fromLabel}</span>
+                                <span className="text-base-content/60 text-xs">
                                     Available: {selectedFrom ? formatUnits(selectedFrom.rawBalance, selectedFrom.decimals) : "0"}
                                 </span>
                             </div>
 
                             <div className="flex items-center gap-3">
                                 {selectedFrom && (
-                                    <div className="w-8 h-8 relative flex-shrink-0">
+                                    <div className="relative size-8 flex-shrink-0">
                                         <Image src={selectedFrom.icon} alt={selectedFrom.symbol} fill className="rounded-full object-contain" />
                                     </div>
                                 )}
@@ -311,7 +311,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                 ) : (
                                     <div className="relative min-w-[100px]">
                                         <select
-                                            className="select select-ghost select-sm w-full max-w-xs font-medium pl-0 focus:outline-none"
+                                            className="select select-ghost select-sm w-full max-w-xs pl-0 font-medium focus:outline-none"
                                             value={selectedFrom?.symbol || ""}
                                             onChange={(e) => {
                                                 const token = fromAssets.find(t => t.symbol === e.target.value);
@@ -334,39 +334,39 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                             setIsMax(false);
                                         }}
                                         placeholder="0.00"
-                                        className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-16 outline-none font-medium text-right"
+                                        className="border-base-300 w-full border-0 border-b-2 bg-transparent px-2 py-1 pr-16 text-right font-medium outline-none"
                                     />
                                     <button
                                         onClick={handleSetMax}
-                                        className="absolute right-0 top-1/2 -translate-y-1/2 text-primary text-xs font-bold hover:text-primary-focus"
+                                        className="text-primary hover:text-primary-focus absolute right-0 top-1/2 -translate-y-1/2 text-xs font-bold"
                                     >
                                         MAX
                                     </button>
                                 </div>
                             </div>
                             <div className="flex justify-end">
-                                <span className="text-xs text-base-content/60">
+                                <span className="text-base-content/60 text-xs">
                                     ≈ ${usdValueIn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
                         </div>
 
                         {/* Arrow Divider */}
-                        <div className="flex justify-center -my-2 relative z-10">
-                            <div className="bg-base-100 p-2 rounded-full border border-base-300">
-                                <ArrowDownIcon className="w-4 h-4 text-base-content/60" />
+                        <div className="relative z-10 -my-2 flex justify-center">
+                            <div className="bg-base-100 border-base-300 rounded-full border p-2">
+                                <ArrowDownIcon className="text-base-content/60 size-4" />
                             </div>
                         </div>
 
                         {/* TO Section */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-base-content/80">{toLabel}</span>
+                                <span className="text-base-content/80 text-sm">{toLabel}</span>
                             </div>
 
                             <div className="flex items-center gap-3">
                                 {selectedTo && (
-                                    <div className="w-8 h-8 relative flex-shrink-0">
+                                    <div className="relative size-8 flex-shrink-0">
                                         <Image src={selectedTo.icon} alt={selectedTo.symbol} fill className="rounded-full object-contain" />
                                     </div>
                                 )}
@@ -377,7 +377,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                 ) : (
                                     <div className="relative min-w-[100px]">
                                         <select
-                                            className="select select-ghost select-sm w-full max-w-xs font-medium pl-0 focus:outline-none"
+                                            className="select select-ghost select-sm w-full max-w-xs pl-0 font-medium focus:outline-none"
                                             value={selectedTo?.symbol || ""}
                                             onChange={(e) => {
                                                 const token = toAssets.find(t => t.symbol === e.target.value);
@@ -392,7 +392,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                 )}
 
                                 <div className="relative flex-1">
-                                    <div className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 outline-none font-medium text-right min-h-[32px] flex items-center justify-end">
+                                    <div className="border-base-300 flex min-h-[32px] w-full items-center justify-end border-0 border-b-2 bg-transparent px-2 py-1 text-right font-medium outline-none">
                                         {isQuoteLoading ? (
                                             <span className="loading loading-dots loading-xs"></span>
                                         ) : (
@@ -402,7 +402,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                 </div>
                             </div>
                             <div className="flex justify-end">
-                                <span className="text-xs text-base-content/60">
+                                <span className="text-base-content/60 text-xs">
                                     ≈ ${usdValueOut.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             </div>
@@ -410,15 +410,15 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
                         {/* Stats Grid */}
                         {customStats ? customStats : !hideDefaultStats && (
-                            <div className={`grid ${priceImpact !== undefined ? "grid-cols-3" : "grid-cols-2"} gap-4 text-center bg-base-200/50 p-3 rounded`}>
+                            <div className={`grid ${priceImpact !== undefined ? "grid-cols-3" : "grid-cols-2"} bg-base-200/50 gap-4 rounded p-3 text-center`}>
                                 <div className="flex flex-col items-center">
-                                    <div className="text-xs text-base-content/70 flex items-center gap-1">
+                                    <div className="text-base-content/70 flex items-center gap-1 text-xs">
                                         Slippage
                                         <div className="dropdown dropdown-top dropdown-hover">
-                                            <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                                <Cog6ToothIcon className="w-3 h-3" />
+                                            <label tabIndex={0} className="hover:text-primary cursor-pointer">
+                                                <Cog6ToothIcon className="size-3" />
                                             </label>
-                                            <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
+                                            <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-[50] mb-1 w-32 p-2 text-xs shadow">
                                                 {SLIPPAGE_OPTIONS.map((s) => (
                                                     <li key={s}>
                                                         <a
@@ -432,23 +432,23 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                             </ul>
                                         </div>
                                     </div>
-                                    <div className="font-medium text-sm">{slippage}%</div>
+                                    <div className="text-sm font-medium">{slippage}%</div>
                                 </div>
                                 {priceImpact !== undefined && (
                                     <div>
-                                        <div className="text-xs text-base-content/70">Price Impact</div>
-                                        <div className={`font-medium text-sm ${getPriceImpactColorClass(getPriceImpactSeverity(priceImpact))}`}>
+                                        <div className="text-base-content/70 text-xs">Price Impact</div>
+                                        <div className={`text-sm font-medium ${getPriceImpactColorClass(getPriceImpactSeverity(priceImpact))}`}>
                                             {formatPriceImpact(priceImpact)}
                                         </div>
                                     </div>
                                 )}
                                 <div>
-                                    <div className="text-xs text-base-content/70">Min Output</div>
-                                    <div className="font-medium text-sm">
+                                    <div className="text-base-content/70 text-xs">Min Output</div>
+                                    <div className="text-sm font-medium">
                                         {minOutput ? (
                                             <>
                                                 {parseFloat(minOutput).toFixed(6)}
-                                                <span className="text-xs text-base-content/60 ml-1">
+                                                <span className="text-base-content/60 ml-1 text-xs">
                                                     (${getUsdValue(minOutput, selectedTo?.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                                                 </span>
                                             </>
@@ -469,21 +469,21 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                         {warnings}
 
                         {/* Actions */}
-                        <div className="pt-2 flex items-center justify-between">
+                        <div className="flex items-center justify-between pt-2">
                             <div className="flex flex-col gap-1">
                                 {setPreferBatching && (
                                     <button
                                         type="button"
                                         onClick={() => setPreferBatching(prev => !prev)}
-                                        className={`text-xs inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
+                                        className={`inline-flex cursor-pointer items-center gap-1 text-xs hover:opacity-80 ${preferBatching ? "text-success" : "text-base-content/60"}`}
                                     >
-                                        <CheckIcon className={`w-4 h-4 ${preferBatching ? "" : "opacity-40"}`} />
+                                        <CheckIcon className={`size-4 ${preferBatching ? "" : "opacity-40"}`} />
                                         Batch transactions
                                     </button>
                                 )}
                             </div>
 
-                            <div className="flex-1 ml-4">
+                            <div className="ml-4 flex-1">
                                 <SegmentedActionBar
                                     className="w-full"
                                     autoCompact

@@ -156,9 +156,9 @@ const App: NextPage = () => {
         {/* Compact header: title + metrics + network filter on one line (desktop) */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Title + Metrics */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-            <h1 className="text-lg font-bold text-base-content tracking-tight uppercase">Positions</h1>
-            <div className="hidden sm:block w-px h-6 bg-base-content/10" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <h1 className="text-base-content text-lg font-bold uppercase tracking-tight">Positions</h1>
+            <div className="bg-base-content/10 hidden h-6 w-px sm:block" />
             <DashboardMetrics
               netWorth={totalNet}
               totalSupply={totalSupplied}
@@ -187,7 +187,7 @@ const App: NextPage = () => {
 
         {/* Subtle warning */}
         {warnings[selectedNetwork as keyof typeof warnings] && (
-          <p className="text-[10px] uppercase tracking-wider text-base-content/30 border-l border-base-content/10 pl-3">
+          <p className="text-base-content/30 border-base-content/10 border-l pl-3 text-[10px] uppercase tracking-wider">
             {warnings[selectedNetwork as keyof typeof warnings]}
           </p>
         )}

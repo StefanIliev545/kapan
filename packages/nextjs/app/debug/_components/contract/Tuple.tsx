@@ -27,12 +27,12 @@ export const Tuple = ({ abiTupleParameter, setParentForm, parentStateObjectKey }
 
   return (
     <div>
-      <div className="collapse collapse-arrow bg-base-200 pl-4 py-1.5 border-2 border-secondary">
-        <input type="checkbox" className="min-h-fit peer" />
-        <div className="collapse-title after:!top-3.5 p-0 min-h-fit peer-checked:mb-2 text-primary-content/50">
+      <div className="collapse-arrow bg-base-200 border-secondary collapse border-2 py-1.5 pl-4">
+        <input type="checkbox" className="peer min-h-fit" />
+        <div className="collapse-title text-primary-content/50 min-h-fit p-0 after:!top-3.5 peer-checked:mb-2">
           <p className="m-0 p-0 text-[1rem]">{abiTupleParameter.internalType}</p>
         </div>
-        <div className="ml-3 flex-col space-y-4 border-secondary/80 border-l-2 pl-4 collapse-content">
+        <div className="border-secondary/80 collapse-content ml-3 flex-col space-y-4 border-l-2 pl-4">
           {abiTupleParameter?.components?.map((param, index) => {
             const key = getFunctionInputKey(abiTupleParameter.name || "tuple", param, index);
             return <ContractInput setForm={setForm} form={form} key={key} stateObjectKey={key} paramType={param} />;

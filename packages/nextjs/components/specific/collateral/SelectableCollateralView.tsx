@@ -17,16 +17,16 @@ interface SelectableCollateralViewProps {
 
 export const SelectableCollateralView: FC<SelectableCollateralViewProps> = ({ collaterals, onCollateralToggle }) => {
   return (
-    <div className="flex flex-wrap gap-2 justify-center">
+    <div className="flex flex-wrap justify-center gap-2">
       {collaterals.map((token) => (
         <button
           key={token.symbol}
           onClick={() => onCollateralToggle(token.symbol)}
-          className={`btn btn-sm normal-case flex items-center gap-2 h-auto py-2 ${
+          className={`btn btn-sm flex h-auto items-center gap-2 py-2 normal-case ${
             token.selected ? "btn-primary" : "btn-outline"
           }`}
         >
-          <div className="w-5 h-5 relative flex-shrink-0">
+          <div className="relative size-5 flex-shrink-0">
             <Image
               src={tokenNameToLogo(token.symbol)}
               alt={token.symbol}
@@ -35,7 +35,7 @@ export const SelectableCollateralView: FC<SelectableCollateralViewProps> = ({ co
             />
           </div>
           <span className="truncate">{token.symbol}</span>
-          <span className="opacity-70 tabular-nums">
+          <span className="tabular-nums opacity-70">
             {token.balance.toFixed(token.decimals > 6 ? 4 : token.decimals)}
           </span>
         </button>

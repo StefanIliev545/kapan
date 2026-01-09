@@ -295,7 +295,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
-        <h3 className="text-xl font-semibold mb-2">Close position with collateral</h3>
+        <h3 className="mb-2 text-xl font-semibold">Close position with collateral</h3>
         {selectedQuote && feeBreakdown ? (
           <ClosePositionSummary
             collateral={collateral}

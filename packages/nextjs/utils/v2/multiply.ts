@@ -22,7 +22,7 @@
  * @param swapEfficiency - Swap efficiency (e.g., 0.997 for 0.3% slippage)
  * @returns Maximum leverage multiplier
  */
-export function calculateMaxLeverage(ltvBps: number, swapEfficiency: number = 1.0): number {
+export function calculateMaxLeverage(ltvBps: number, swapEfficiency = 1.0): number {
   const ltv = ltvBps / 10000;
   const r = ltv * swapEfficiency;
   
@@ -52,9 +52,9 @@ export function calculateFlashLoanAmount(
   initialCollateral: bigint,
   targetLeverage: number,
   priceRatio: bigint,
-  swapEfficiency: number = 0.997,
-  collateralDecimals: number = 18,
-  debtDecimals: number = 18
+  swapEfficiency = 0.997,
+  collateralDecimals = 18,
+  debtDecimals = 18
 ): bigint {
   if (targetLeverage <= 1 || initialCollateral === 0n) return 0n;
   
@@ -130,7 +130,7 @@ export function verifyLeverageSafety(
   targetLeverage: number,
   maxLtvBps: number,
   liquidationLtvBps: number,
-  swapEfficiency: number = 0.997
+  swapEfficiency = 0.997
 ): { isSafe: boolean; maxLeverage: number; warnings: string[] } {
   const warnings: string[] = [];
   const maxLeverage = calculateMaxLeverage(maxLtvBps, swapEfficiency);

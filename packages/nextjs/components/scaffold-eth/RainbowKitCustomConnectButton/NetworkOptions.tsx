@@ -25,15 +25,15 @@ export const NetworkOptions = ({ hidden = false }: NetworkOptionsProps) => {
         .map(allowedNetwork => (
           <li key={allowedNetwork.id} className={hidden ? "hidden" : ""}>
             <button
-              className="menu-item btn-sm !rounded-xl flex gap-3 py-3 whitespace-nowrap"
+              className="menu-item btn-sm flex gap-3 whitespace-nowrap !rounded-xl py-3"
               type="button"
               onClick={() => {
                 switchChain?.({ chainId: allowedNetwork.id });
               }}
             >
               <div className="flex items-center gap-2">
-                <ArrowsRightLeftIcon className="h-5 w-4 ml-2 sm:ml-0" />
-                <div className="relative w-4 h-4">
+                <ArrowsRightLeftIcon className="ml-2 h-5 w-4 sm:ml-0" />
+                <div className="relative size-4">
                   <Image
                     src={getNetworkLogo(allowedNetwork, isDarkMode)}
                     alt={allowedNetwork.name}

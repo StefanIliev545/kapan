@@ -49,7 +49,7 @@ type PoolSelectorProps<T extends string> = {
 function PoolSelector<T extends string>({ pools, selectedValue, onChange, getPoolDisplay }: PoolSelectorProps<T>) {
   return (
     <div className="flex items-center gap-2">
-      <img src="/logos/vesu.svg" alt="Vesu" className="w-4 h-4" />
+      <img src="/logos/vesu.svg" alt="Vesu" className="size-4" />
       <select
         className="select select-sm select-bordered"
         value={selectedValue}
@@ -369,9 +369,9 @@ export const VesuProtocolView: FC = () => {
           }
         />
         {!userAddress && (
-          <div className="rounded-xl border border-base-300 bg-base-100 p-6 text-center text-base-content/80">
-            <h3 className="text-lg font-semibold text-base-content">Connect a wallet to view your Vesu V1 positions</h3>
-            <p className="mt-2 text-sm text-base-content/70">
+          <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
+            <h3 className="text-base-content text-lg font-semibold">Connect a wallet to view your Vesu V1 positions</h3>
+            <p className="text-base-content/70 mt-2 text-sm">
               Connect a Starknet wallet to load your deposits and borrows.
             </p>
           </div>
@@ -431,9 +431,9 @@ export const VesuProtocolView: FC = () => {
           }
         />
         {!userAddress && (
-          <div className="rounded-xl border border-base-300 bg-base-100 p-6 text-center text-base-content/80">
-            <h3 className="text-lg font-semibold text-base-content">Connect a wallet to view your Vesu V2 positions</h3>
-            <p className="mt-2 text-sm text-base-content/70">
+          <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
+            <h3 className="text-base-content text-lg font-semibold">Connect a wallet to view your Vesu V2 positions</h3>
+            <p className="text-base-content/70 mt-2 text-sm">
               Connect a Starknet wallet to load your deposits and borrows.
             </p>
           </div>

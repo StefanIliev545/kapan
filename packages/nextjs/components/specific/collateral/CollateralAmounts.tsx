@@ -44,8 +44,8 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-lg font-semibold text-center">Collateral</label>
-      <div className="space-y-4 max-h-48 overflow-y-auto pr-1">
+      <label className="block text-center text-lg font-semibold">Collateral</label>
+      <div className="max-h-48 space-y-4 overflow-y-auto pr-1">
         {collaterals.map(c => {
           const displayAmount = c.inputValue ?? (c.amount === 0n ? "" : formatUnits(c.amount, c.decimals));
           const isSupported = c.supported;
@@ -54,8 +54,8 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
               key={c.token}
               className={`flex items-center gap-2 ${!isSupported ? 'opacity-60' : ''}`}
             >
-              <div className="flex items-center gap-2 w-32 shrink-0">
-                <div className="w-6 h-6 relative">
+              <div className="flex w-32 shrink-0 items-center gap-2">
+                <div className="relative size-6">
                   <Image
                     src={tokenNameToLogo(c.symbol)}
                     alt={c.symbol}
@@ -69,12 +69,12 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
                 type="text"
                 value={displayAmount}
                 onChange={e => handleAmountChange(c.token, e.target.value, c.decimals)}
-                className="flex-1 border-b-2 border-base-300 focus:border-primary bg-transparent px-2 py-1 text-right"
+                className="border-base-300 focus:border-primary flex-1 border-b-2 bg-transparent px-2 py-1 text-right"
                 placeholder="0.00"
                 disabled={!isSupported}
               />
               <button
-                className={`text-xs font-medium px-2 py-1 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`px-2 py-1 text-xs font-medium ${!isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
                 onClick={() => handleSetMax(c.token, c.maxAmount, c.decimals)}
                 disabled={!isSupported}
               >

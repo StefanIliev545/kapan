@@ -4,7 +4,7 @@ export class PositionManager {
   /** LTV in basis points (e.g., 7700 = 77%). If 0, defaults to 100% (suppliedUsd = max borrow). */
   ltvBps: number;
 
-  constructor(suppliedUsd: number, borrowedUsd: number, ltvBps: number = 0) {
+  constructor(suppliedUsd: number, borrowedUsd: number, ltvBps = 0) {
     this.suppliedUsd = suppliedUsd;
     this.borrowedUsd = borrowedUsd;
     this.ltvBps = ltvBps;
@@ -13,7 +13,7 @@ export class PositionManager {
   static fromPositions(
     supplied: { balance: number }[],
     borrowed: { balance: number; collateralValue?: number }[],
-    ltvBps: number = 0,
+    ltvBps = 0,
   ): PositionManager {
     const suppliedTotal = supplied.reduce((acc, p) => acc + p.balance, 0);
     const collateralTotal = borrowed.reduce((acc, p) => acc + (p.collateralValue || 0), 0);

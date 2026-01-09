@@ -133,7 +133,7 @@ export const AmountInput: FC<AmountInputProps> = ({
           onChange={(e) => handleInputChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className={`w-full px-4 py-3 bg-base-200/50 border border-base-300/50 rounded-lg text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-base-content/30 ${
+          className={`bg-base-200/50 border-base-300/50 text-base-content placeholder:text-base-content/30 focus:border-base-content/30 w-full rounded-lg border px-4 py-3 focus:outline-none ${
             percentButtons.length > 0 ? "pr-24" : ""
           } ${inputClassName}`}
         />
@@ -143,7 +143,7 @@ export const AmountInput: FC<AmountInputProps> = ({
           </div>
         )}
         {percentButtons.length > 0 && (
-          <div className="absolute inset-y-0 right-3 flex items-center divide-x divide-base-300 text-xs">
+          <div className="divide-base-300 absolute inset-y-0 right-3 flex items-center divide-x text-xs">
             {percentButtons.map((p) => (
               <button
                 key={p}
@@ -159,7 +159,7 @@ export const AmountInput: FC<AmountInputProps> = ({
         )}
       </div>
       {usdPrice > 0 && (
-        <div className="text-xs opacity-70 mt-1 text-center">
+        <div className="mt-1 text-center text-xs opacity-70">
           ≈ ${usdValue}
         </div>
       )}
@@ -211,14 +211,14 @@ export const SimpleAmountInput: FC<{
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full bg-transparent border-0 border-b-2 border-base-300 px-2 py-1 pr-16 outline-none font-medium text-right"
+          className="border-base-300 w-full border-0 border-b-2 bg-transparent px-2 py-1 pr-16 text-right font-medium outline-none"
         />
         {showMaxButton && (
           <button
             onClick={onMax}
             disabled={disabled}
-            className={`absolute right-0 top-1/2 -translate-y-1/2 text-primary text-xs font-bold hover:text-primary-focus ${
-              disabled ? "opacity-50 cursor-not-allowed" : ""
+            className={`text-primary hover:text-primary-focus absolute right-0 top-1/2 -translate-y-1/2 text-xs font-bold ${
+              disabled ? "cursor-not-allowed opacity-50" : ""
             }`}
           >
             MAX
@@ -226,8 +226,8 @@ export const SimpleAmountInput: FC<{
         )}
       </div>
       {usdValue && (
-        <div className="flex justify-end mt-1">
-          <span className="text-xs text-base-content/60">≈ ${usdValue}</span>
+        <div className="mt-1 flex justify-end">
+          <span className="text-base-content/60 text-xs">≈ ${usdValue}</span>
         </div>
       )}
     </div>

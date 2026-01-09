@@ -441,15 +441,15 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   // const handleCloseDepositModal = () => undefined;
 
   return (
-    <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
+    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
       {/* Protocol Header Card */}
       <div
         className="card-surface-interactive shadow-lg"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <div className="card-body px-3 sm:px-5 py-3">
+        <div className="card-body p-3 sm:px-5">
           {/* Mobile Layout (< sm) */}
-          <div className="sm:hidden space-y-3">
+          <div className="space-y-3 sm:hidden">
             {/* Row 1: Protocol name + Markets + Collapse */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -471,41 +471,41 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     type="button"
                     onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
                   >
-                    <span className="text-[9px] uppercase tracking-wider font-semibold">Markets</span>
-                    {isMarketsOpen ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
+                    <span className="text-[9px] font-semibold uppercase tracking-wider">Markets</span>
+                    {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
                   </button>
                 )}
                 {forceShowAll && !readOnly && (
-                  <span className="text-[10px] text-primary/80 font-medium">Connect</span>
+                  <span className="text-primary/80 text-[10px] font-medium">Connect</span>
                 )}
                 <ChevronDownIcon
-                  className={`w-4 h-4 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                  className={`text-base-content/40 size-4 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`}
                 />
               </div>
             </div>
             {/* Row 2: Stats in a grid */}
             <div className={`grid gap-1 ${hideUtilization ? 'grid-cols-3' : 'grid-cols-4'}`}>
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Balance</span>
-                <span className={`text-xs font-mono font-bold tabular-nums ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Balance</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${netBalance >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netBalance)}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">30D</span>
-                <span className={`text-xs font-mono font-bold tabular-nums ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">30D</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netYield30d)}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
-                <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Net APY</span>
-                <span className={`text-xs font-mono font-bold tabular-nums ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Net APY</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                 </span>
               </div>
               {!hideUtilization && (
                 <div className="flex flex-col items-center py-1">
-                  <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">LTV</span>
+                  <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">LTV</span>
                   <HealthStatus utilizationPercentage={utilizationPercentage} />
                 </div>
               )}
@@ -513,7 +513,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             {/* Header Element - Mobile row */}
             {headerElement && (
               <div 
-                className="flex items-center justify-start pt-2 border-t border-base-300/30"
+                className="border-base-300/30 flex items-center justify-start border-t pt-2"
                 onClick={e => e.stopPropagation()}
               >
                 {headerElement}
@@ -542,55 +542,55 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               </div>
 
               {/* Divider */}
-              <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+              <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
 
               {/* Stats - spread evenly across available space */}
-              <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+              <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
                 {/* Net Balance */}
-                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                   <span className="label-text-xs-semibold">Balance</span>
-                  <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalance >= 0 ? "text-success" : "text-error"}`}>
+                  <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netBalance >= 0 ? "text-success" : "text-error"}`}>
                     {formatCurrency(netBalance)}
                   </span>
                 </div>
 
                 {/* 30D Yield */}
-                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                   <span className="label-text-xs-semibold">30D Yield</span>
-                  <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+                  <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                     {formatCurrency(netYield30d)}
                   </span>
                 </div>
 
                 {/* Net APY */}
-                <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                   <span className="label-text-xs-semibold">Net APY</span>
-                  <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+                  <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                     {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                   </span>
                 </div>
 
                 {/* Utilization */}
                 {!hideUtilization && (
-                  <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
+                  <div className="group/util hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                     <span className="label-text-xs-semibold">Utilization</span>
                     {/* Default: show bar */}
                     <div className="group-hover/util:hidden">
                       <HealthStatus utilizationPercentage={utilizationPercentage} />
                     </div>
                     {/* On hover: show Current and LLTV breakdown */}
-                    <div className="hidden group-hover/util:flex items-center gap-2 text-xs font-mono tabular-nums">
+                    <div className="hidden items-center gap-2 font-mono text-xs tabular-nums group-hover/util:flex">
                       {currentLtvBps > 0n || lltvBps > 0n ? (
                         <>
                           <span className="text-base-content/70">
-                            <span className="text-[10px] text-base-content/50">Current </span>
+                            <span className="text-base-content/50 text-[10px]">Current </span>
                             {currentLtvLabel || "0%"}
                           </span>
                           {lltvBps > 0n && (
                             <>
                               <span className="text-base-content/30">•</span>
                               <span className="text-base-content/70">
-                                <span className="text-[10px] text-base-content/50">LLTV </span>
+                                <span className="text-base-content/50 text-[10px]">LLTV </span>
                                 {formatBps(lltvBps)}%
                               </span>
                             </>
@@ -607,7 +607,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               {/* Header Element (e.g., E-Mode toggle) - hidden on mobile, shown in separate row */}
               {headerElement && (
                 <div 
-                  className="hidden md:flex items-center"
+                  className="hidden items-center md:flex"
                   onClick={e => e.stopPropagation()}
                 >
                   {headerElement}
@@ -615,22 +615,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               )}
 
               {/* Markets Toggle + Collapse */}
-              <div className="flex items-center gap-2.5 pl-2 border-l border-base-300/50">
+              <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
                 {!forceShowAll && !disableMarkets && (
                   <button
                     className="btn btn-sm btn-ghost gap-1.5"
                     type="button"
                     onClick={e => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
                   >
-                    <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                    {isMarketsOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
+                    <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
+                    {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
                   </button>
                 )}
                 {forceShowAll && !readOnly && (
-                  <span className="text-[11px] text-primary/80 font-medium">Connect wallet</span>
+                  <span className="text-primary/80 text-[11px] font-medium">Connect wallet</span>
                 )}
                 <ChevronDownIcon
-                  className={`w-5 h-5 text-base-content/40 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+                  className={`text-base-content/40 size-5 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`}
                 />
               </div>
             </div>
@@ -638,7 +638,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             {/* Header Element - Tablet row (shown below stats on md screens) */}
             {headerElement && (
               <div 
-                className="md:hidden flex items-center justify-start pt-2 mt-2 border-t border-base-300/30"
+                className="border-base-300/30 mt-2 flex items-center justify-start border-t pt-2 md:hidden"
                 onClick={e => e.stopPropagation()}
               >
                 {headerElement}
@@ -652,12 +652,12 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       {isMarketsOpen && !isCollapsed && !disableMarkets && !inlineMarkets && (
         <div className="card-surface">
           <div className="card-body p-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {/* Suppliable Assets */}
               {suppliedPositions.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                    <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
                       Suppliable assets
                     </div>
                     {!readOnly && (
@@ -698,7 +698,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               {borrowedPositions.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+                    <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
                       Borrowable assets
                     </div>
                     {!readOnly && filteredSuppliedPositions.length > 0 && (
@@ -740,23 +740,23 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
+            <div className="grid grid-cols-1 gap-4 pt-1 xl:grid-cols-2">
           {/* Supplied Assets */}
           <div className="h-full">
             <div className="card-surface-hover h-full">
-              <div className="card-body p-4 flex flex-col">
-                <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+              <div className="card-body flex flex-col p-4">
+                <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-success" />
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Supplied</span>
+                    <div className="bg-success h-5 w-1 rounded-full" />
+                    <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">Supplied</span>
                   </div>
                   <div className="count-badge-success">
-                    <span className="text-xs font-mono font-bold">{filteredSuppliedPositions.length}</span>
+                    <span className="font-mono text-xs font-bold">{filteredSuppliedPositions.length}</span>
                     <span className="label-text-xs-muted opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
                   </div>
                 </div>
                 {filteredSuppliedPositions.length > 0 ? (
-                  <div className="flex flex-col flex-1 pt-2">
+                  <div className="flex flex-1 flex-col pt-2">
                     <div className="space-y-3">
                       {filteredSuppliedPositions.map((position, index) => (
                         <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
@@ -778,20 +778,20 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
                     {/* Primary actions pinned to bottom */}
                     {!readOnly && (
-                      <div className="mt-auto pt-4 flex flex-col gap-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="mt-auto flex flex-col gap-2 pt-4">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <button
-                            className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary transition-all duration-200"
+                            className="border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary group flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-2 transition-all duration-200"
                             onClick={handleAddSupply}
                           >
-                            <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <PlusIcon className="size-3.5 transition-transform duration-200 group-hover:rotate-90" />
                             <span className="text-xs font-medium uppercase tracking-wider">Add Supply</span>
                           </button>
 
                           {/* Disable looping for Compound - needs fix for market context */}
                           {!loopingDisabled && (
                             <button
-                              className="group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary group flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-2 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={handleOpenMultiply}
                               disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
                               title={
@@ -800,7 +800,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                                   : "Build a flash-loan loop"
                               }
                             >
-                              <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                              <PlusIcon className="size-3.5 transition-transform duration-200 group-hover:rotate-90" />
                               <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
                             </button>
                           )}
@@ -809,23 +809,23 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
-                    <ExclamationTriangleIcon className="w-8 h-8 mb-3 opacity-40" />
+                  <div className="text-base-content/50 bg-base-200/30 border-base-300 mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center">
+                    <ExclamationTriangleIcon className="mb-3 size-8 opacity-40" />
                     <p className="text-sm">{effectiveShowAll ? "No available assets" : "No supplied assets"}</p>
                     {!readOnly && (
                       <div className="mt-4 flex items-center gap-2">
                         <button
-                          className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200"
+                          className="bg-primary/10 hover:bg-primary/20 text-primary group flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition-all duration-200"
                           onClick={handleAddSupply}
                         >
-                          <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <PlusIcon className="size-3.5 transition-transform duration-200 group-hover:rotate-90" />
                           <span className="text-xs font-medium uppercase tracking-wider">Supply Assets</span>
                         </button>
                         
                         {/* Disable looping for Compound - needs fix for market context */}
                         {!protocolName.toLowerCase().includes("compound") && (
                           <button
-                            className="group flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-primary/10 hover:bg-primary/20 text-primary group flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={handleOpenMultiply}
                             disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
                             title={
@@ -834,7 +834,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                                 : "Build a flash-loan loop"
                             }
                           >
-                            <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                            <PlusIcon className="size-3.5 transition-transform duration-200 group-hover:rotate-90" />
                             <span className="text-xs font-medium uppercase tracking-wider">Add Loop</span>
                           </button>
                         )}
@@ -849,19 +849,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
           {/* Borrowed Assets */}
           <div className="h-full">
             <div className="card-surface-hover h-full">
-              <div className="card-body p-4 flex flex-col">
-                <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
+              <div className="card-body flex flex-col p-4">
+                <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-error" />
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Borrowed</span>
+                    <div className="bg-error h-5 w-1 rounded-full" />
+                    <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">Borrowed</span>
                   </div>
                   <div className="count-badge-error">
-                    <span className="text-xs font-mono font-bold">{filteredBorrowedPositions.length}</span>
+                    <span className="font-mono text-xs font-bold">{filteredBorrowedPositions.length}</span>
                     <span className="label-text-xs-muted opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
                   </div>
                 </div>
                 {filteredBorrowedPositions.length > 0 ? (
-                  <div className="flex flex-col flex-1 pt-2">
+                  <div className="flex flex-1 flex-col pt-2">
                     <div className="space-y-3">
                       {filteredBorrowedPositions.map((position, index) => (
                         <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
@@ -886,7 +886,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     {!readOnly && (
                       <div className="mt-auto pt-4">
                         <button
-                          className={`group w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-dashed transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                          className={`group flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-2 transition-all duration-200 ${filteredSuppliedPositions.length > 0
                             ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary"
                             : "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed"
                             }`}
@@ -894,19 +894,19 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                           disabled={filteredSuppliedPositions.length === 0}
                           title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                         >
-                          <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                          <PlusIcon className="size-3.5 transition-transform duration-200 group-hover:rotate-90" />
                           <span className="text-xs font-medium uppercase tracking-wider">Borrow</span>
                         </button>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col flex-1 items-center justify-center text-base-content/50 text-center p-6 bg-base-200/30 rounded-xl mt-2 border border-dashed border-base-300">
-                    <ExclamationTriangleIcon className="w-8 h-8 mb-3 opacity-40" />
+                  <div className="text-base-content/50 bg-base-200/30 border-base-300 mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center">
+                    <ExclamationTriangleIcon className="mb-3 size-8 opacity-40" />
                     <p className="text-sm">{effectiveShowAll ? "No available assets" : "No borrowed assets"}</p>
                     {!readOnly && (
                       <button
-                        className={`group mt-4 flex items-center justify-center gap-2 py-2 px-4 rounded-lg transition-all duration-200 ${filteredSuppliedPositions.length > 0
+                        className={`group mt-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition-all duration-200 ${filteredSuppliedPositions.length > 0
                           ? "bg-primary/10 hover:bg-primary/20 text-primary"
                           : "bg-base-200/30 text-base-content/30 cursor-not-allowed"
                           }`}
@@ -914,7 +914,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                         disabled={filteredSuppliedPositions.length === 0}
                         title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
                       >
-                        <PlusIcon className="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-200" />
+                        <PlusIcon className="size-3.5 transition-transform duration-200 group-hover:rotate-90" />
                         <span className="text-xs font-medium uppercase tracking-wider">Borrow Assets</span>
                       </button>
                     )}

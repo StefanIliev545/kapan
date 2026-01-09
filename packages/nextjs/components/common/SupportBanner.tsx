@@ -25,21 +25,21 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
         }
       `}</style>
 
-            <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 ${className}`}>
+            <div className={`grid grid-cols-1 gap-3 md:grid-cols-3 ${className}`}>
                 {/* Support on X Card */}
-                <div className="relative group">
+                <div className="group relative">
                     {/* Animated glow border */}
-                    <div className="absolute -inset-[1px] rounded-lg overflow-hidden opacity-60">
-                        <div className="absolute inset-0 animate-rotate-glow">
+                    <div className="absolute -inset-[1px] overflow-hidden rounded-lg opacity-60">
+                        <div className="animate-rotate-glow absolute inset-0">
                             <div className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(168,85,247,0.3)_60deg,rgba(236,72,153,0.35)_120deg,transparent_180deg)]" />
                         </div>
                     </div>
 
                     {/* Card content */}
-                    <div className="relative bg-base-100 rounded-lg px-4 py-3 border border-base-200/40">
+                    <div className="bg-base-100 border-base-200/40 relative rounded-lg border px-4 py-3">
                         <div className="flex items-center gap-3">
                             {/* Icon */}
-                            <div className="flex-shrink-0 w-8 h-8 rounded-md bg-base-content/5 flex items-center justify-center">
+                            <div className="bg-base-content/5 flex size-8 flex-shrink-0 items-center justify-center rounded-md">
                                 <Image
                                     src="/logos/x-logo.svg"
                                     alt="X Logo"
@@ -50,16 +50,16 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-medium text-base-content/80">Support on X</h3>
-                                <p className="text-xs text-base-content/50 truncate">Follow us to stay updated</p>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-base-content/80 text-sm font-medium">Support on X</h3>
+                                <p className="text-base-content/50 truncate text-xs">Follow us to stay updated</p>
                             </div>
 
                             <a
                                 href="https://x.com/KapanFinance"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-medium text-base-content/70 bg-base-content/5 hover:bg-base-content/10 hover:text-base-content transition-colors duration-200"
+                                className="text-base-content/70 bg-base-content/5 hover:bg-base-content/10 hover:text-base-content flex-shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-200"
                             >
                                 Follow
                             </a>
@@ -68,21 +68,21 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                 </div>
 
                 {/* Fund via Giveth Card */}
-                <div className="relative group">
+                <div className="group relative">
                     {/* Animated glow border */}
-                    <div className="absolute -inset-[1px] rounded-lg overflow-hidden opacity-60">
-                        <div className="absolute inset-0 animate-rotate-glow" style={{ animationDelay: '-1.3s' }}>
+                    <div className="absolute -inset-[1px] overflow-hidden rounded-lg opacity-60">
+                        <div className="animate-rotate-glow absolute inset-0" style={{ animationDelay: '-1.3s' }}>
                             <div className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(34,197,94,0.3)_60deg,rgba(16,185,129,0.35)_120deg,transparent_180deg)]" />
                         </div>
                     </div>
 
                     {/* Card content */}
-                    <div className="relative bg-base-100 rounded-lg px-4 py-3 border border-base-200/40">
+                    <div className="bg-base-100 border-base-200/40 relative rounded-lg border px-4 py-3">
                         <div className="flex items-center gap-3">
                             {/* Icon */}
-                            <div className="flex-shrink-0 w-8 h-8 rounded-md bg-base-content/5 flex items-center justify-center">
+                            <div className="bg-base-content/5 flex size-8 flex-shrink-0 items-center justify-center rounded-md">
                                 <svg
-                                    className="w-4 h-4 text-base-content/60"
+                                    className="text-base-content/60 size-4"
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
@@ -93,16 +93,16 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-medium text-base-content/80">Fund via Giveth</h3>
-                                <p className="text-xs text-base-content/50 truncate">Help us keep going</p>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-base-content/80 text-sm font-medium">Fund via Giveth</h3>
+                                <p className="text-base-content/50 truncate text-xs">Help us keep going</p>
                             </div>
 
                             <a
                                 href="https://giveth.io/project/kapan-finance-defi-lending-management-protocol"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-medium text-base-content/70 bg-base-content/5 hover:bg-base-content/10 hover:text-base-content transition-colors duration-200"
+                                className="text-base-content/70 bg-base-content/5 hover:bg-base-content/10 hover:text-base-content flex-shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-200"
                             >
                                 Donate
                             </a>
@@ -111,19 +111,19 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                 </div>
 
                 {/* Join Our Community Card */}
-                <div className="relative group">
+                <div className="group relative">
                     {/* Animated glow border */}
-                    <div className="absolute -inset-[1px] rounded-lg overflow-hidden opacity-60">
-                        <div className="absolute inset-0 animate-rotate-glow" style={{ animationDelay: '-2.6s' }}>
+                    <div className="absolute -inset-[1px] overflow-hidden rounded-lg opacity-60">
+                        <div className="animate-rotate-glow absolute inset-0" style={{ animationDelay: '-2.6s' }}>
                             <div className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(99,102,241,0.3)_60deg,rgba(139,92,246,0.35)_120deg,transparent_180deg)]" />
                         </div>
                     </div>
 
                     {/* Card content */}
-                    <div className="relative bg-base-100 rounded-lg px-4 py-3 border border-base-200/40">
+                    <div className="bg-base-100 border-base-200/40 relative rounded-lg border px-4 py-3">
                         <div className="flex items-center gap-3">
                             {/* Icon */}
-                            <div className="flex-shrink-0 w-8 h-8 rounded-md bg-base-content/5 flex items-center justify-center">
+                            <div className="bg-base-content/5 flex size-8 flex-shrink-0 items-center justify-center rounded-md">
                                 <Image
                                     src="/logos/discord.svg"
                                     alt="Discord"
@@ -134,16 +134,16 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-medium text-base-content/80">Join Community</h3>
-                                <p className="text-xs text-base-content/50 truncate">Connect with builders</p>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-base-content/80 text-sm font-medium">Join Community</h3>
+                                <p className="text-base-content/50 truncate text-xs">Connect with builders</p>
                             </div>
 
                             <a
                                 href="https://discord.gg/Vjk6NhkxGv"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-medium text-base-content/70 bg-base-content/5 hover:bg-base-content/10 hover:text-base-content transition-colors duration-200"
+                                className="text-base-content/70 bg-base-content/5 hover:bg-base-content/10 hover:text-base-content flex-shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-200"
                             >
                                 Join
                             </a>

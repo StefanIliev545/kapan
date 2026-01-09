@@ -56,7 +56,7 @@ export const SwapExchangeDisplay: FC<SwapExchangeDisplayProps> = ({
 }) => (
   <div className="flex items-center justify-between">
     <div className="flex items-center gap-2">
-      <Image src={sellToken.icon} alt={sellToken.name} width={24} height={24} className="w-6 h-6" />
+      <Image src={sellToken.icon} alt={sellToken.name} width={24} height={24} className="size-6" />
       <div>
         <div className="text-base font-medium">
           {formatTokenAmount(sellAmount.toString(), sellToken.decimals)} {sellToken.name}
@@ -68,7 +68,7 @@ export const SwapExchangeDisplay: FC<SwapExchangeDisplayProps> = ({
     </div>
     <div className="text-gray-400">&rarr;</div>
     <div className="flex items-center gap-2">
-      <Image src={buyToken.icon} alt={buyToken.name} width={24} height={24} className="w-6 h-6" />
+      <Image src={buyToken.icon} alt={buyToken.name} width={24} height={24} className="size-6" />
       <div className="text-right">
         <div className="text-base font-medium">
           {formatTokenAmount(buyAmount.toString(), buyToken.decimals)} {buyToken.name}
@@ -98,7 +98,7 @@ export const FeeBreakdownDisplay: FC<FeeBreakdownDisplayProps> = ({ fees, showFe
     (fees.aggregatorFeeUsd ?? 0) + (fees.integratorFeeUsd ?? 0) + (fees.gasFeeUsd ?? 0);
 
   return (
-    <div className="space-y-1 pt-2 border-t border-gray-100">
+    <div className="space-y-1 border-t border-gray-100 pt-2">
       <div className="flex justify-between text-[12px]">
         <span className="text-gray-600">Aggregator fee</span>
         <span>
@@ -160,11 +160,11 @@ export const WithdrawRemainderDisplay: FC<WithdrawRemainderDisplayProps> = ({
   remainderInfo,
   action,
 }) => (
-  <div className="pt-2 border-t border-gray-100">
-    <div className="text-[12px] text-gray-600 mb-1">Withdraw</div>
+  <div className="border-t border-gray-100 pt-2">
+    <div className="mb-1 text-[12px] text-gray-600">Withdraw</div>
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <Image src={token.icon} alt={token.name} width={20} height={20} className="w-5 h-5" />
+        <Image src={token.icon} alt={token.name} width={20} height={20} className="size-5" />
         <div>
           <div className="text-base font-medium">
             {remainderInfo.remainderFormatted} {token.name}

@@ -32,27 +32,27 @@ const Wallet = ({
 
   return isMounted ? (
     <button
-      className={`flex gap-4 items-center text-base-content  rounded-[4px] p-3 transition-all ${
+      className={`text-base-content flex items-center gap-4  rounded-[4px] p-3 transition-all ${
         isDarkMode
-          ? "hover:bg-[#385183] border-[#4f4ab7]"
-          : "hover:bg-slate-200 border-[#5c4fe5]"
+          ? "border-[#4f4ab7] hover:bg-[#385183]"
+          : "border-[#5c4fe5] hover:bg-slate-200"
       } border ${clicked ? "bg-ligth" : ""}`}
       onClick={(e) => {
         setClicked(true);
         handleConnectWallet(e, connector);
       }}
     >
-      <div className="h-[1.5rem] w-[1.5rem] rounded-[5px]">
+      <div className="size-[1.5rem] rounded-[5px]">
         <Image
           alt={connector.name}
           src={icon}
           width={70}
           height={70}
-          className="h-full w-full object-cover rounded-[5px]"
+          className="size-full rounded-[5px] object-cover"
           unoptimized={icon.startsWith("data:")}
         />
       </div>
-      <span className=" text-start m-0">{connector.name}</span>
+      <span className=" m-0 text-start">{connector.name}</span>
     </button>
   ) : null;
 };

@@ -29,7 +29,7 @@ const ScrambleText = ({
   const scrambleReveal = useCallback(() => {
     const length = text.length;
     const startTime = performance.now();
-    let scrambledChars = text.split("").map((char) => 
+    const scrambledChars = text.split("").map((char) => 
       char === " " || char === "." ? char : getRandomChar()
     );
     let lastScrambleTime = 0;
@@ -139,16 +139,16 @@ interface SectionData {
 
 // FAQ Accordion item
 const FAQAccordion = ({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; onToggle: () => void }) => (
-  <div className="border-b border-base-content/10">
+  <div className="border-base-content/10 border-b">
     <button
       onClick={onToggle}
-      className="w-full flex items-center justify-between py-5 text-left group"
+      className="group flex w-full items-center justify-between py-5 text-left"
     >
-      <span className="text-sm md:text-base font-medium text-base-content/70 group-hover:text-base-content transition-colors pr-4">
+      <span className="text-base-content/70 group-hover:text-base-content pr-4 text-sm font-medium transition-colors md:text-base">
         {item.question}
       </span>
       <ChevronDownIcon 
-        className={`w-4 h-4 text-base-content/40 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} 
+        className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`} 
       />
     </button>
     <motion.div
@@ -157,7 +157,7 @@ const FAQAccordion = ({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boole
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="overflow-hidden"
     >
-      <p className="pb-5 text-base-content/40 text-sm leading-relaxed">
+      <p className="text-base-content/40 pb-5 text-sm leading-relaxed">
         {item.answer}
       </p>
     </motion.div>
@@ -183,13 +183,13 @@ const LaunchAppButton = () => {
         track("To App conversion", { button: "Info Page CTA" });
         window.location.assign(getAppUrl());
       }}
-      className="group relative h-14 md:h-16 px-8 md:px-12 bg-primary text-primary-content font-bold uppercase tracking-[0.2em] text-[11px] md:text-xs hover:shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all duration-500 overflow-hidden flex items-center justify-center"
+      className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden px-8 text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.1)] md:h-16 md:px-12 md:text-xs"
     >
       <div className="relative z-10 flex items-center gap-3">
-        <span className="translate-x-2 group-hover:translate-x-0 transition-transform duration-500">
+        <span className="translate-x-2 transition-transform duration-500 group-hover:translate-x-0">
           Launch App
         </span>
-        <ArrowRightIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-500" />
+        <ArrowRightIcon className="size-4 opacity-0 transition-all duration-500 group-hover:translate-x-1 group-hover:opacity-100" />
       </div>
     </a>
   );
@@ -198,10 +198,10 @@ const LaunchAppButton = () => {
 // Integration item
 const IntegrationItem = ({ name, logo }: { name: string; logo: string }) => (
   <div className="flex items-center gap-2 px-3 py-2">
-    <div className="w-6 h-6 relative flex-shrink-0">
+    <div className="relative size-6 flex-shrink-0">
       <Image src={logo} alt={name} fill className="object-contain" />
     </div>
-    <span className="text-xs text-base-content/50">{name}</span>
+    <span className="text-base-content/50 text-xs">{name}</span>
   </div>
 );
 
@@ -249,14 +249,14 @@ const StickySection = ({
       style={{ opacity, scale, y, zIndex: index, pointerEvents }}
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
     >
-      <div className="w-full max-w-4xl px-6 md:px-8 flex flex-col items-center text-center">
+      <div className="flex w-full max-w-4xl flex-col items-center px-6 text-center md:px-8">
         {/* Tag + Title */}
-        <div className="flex flex-col items-center gap-3 mb-8 md:mb-12">
-          <div className="h-px w-10 bg-base-content/20" />
-          <span className="text-[10px] uppercase tracking-[0.2em] text-base-content/40 font-medium">
+        <div className="mb-8 flex flex-col items-center gap-3 md:mb-12">
+          <div className="bg-base-content/20 h-px w-10" />
+          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-[0.2em]">
             {section.tag}
           </span>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight">
+          <h2 className="text-4xl font-black uppercase tracking-tight md:text-5xl lg:text-6xl">
             <ScrambleText text={section.title} isActive={hasBeenActive} duration={600} />
           </h2>
         </div>
@@ -276,11 +276,11 @@ const StickySection = ({
 
 // Mission content
 const MissionContent = ({ isActive }: { isActive: boolean }) => (
-  <div className="max-w-2xl mx-auto space-y-6">
-    <p className="text-lg md:text-xl text-base-content/50 leading-relaxed">
+  <div className="mx-auto max-w-2xl space-y-6">
+    <p className="text-base-content/50 text-lg leading-relaxed md:text-xl">
       <ScrambleText text="Deposit. Borrow. Swap. Refinance. Loop. Close." isActive={isActive} duration={700} />
     </p>
-    <p className="text-lg md:text-xl text-base-content/50 leading-relaxed">
+    <p className="text-base-content/50 text-lg leading-relaxed md:text-xl">
       <ScrambleText text="Any combination. Any protocol. One transaction." isActive={isActive} duration={700} />
     </p>
   </div>
@@ -316,13 +316,13 @@ const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
   const featureStates = [feature1Active, feature2Active, feature3Active];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 max-w-3xl mx-auto">
+    <div className="mx-auto grid max-w-3xl grid-cols-1 gap-8 md:grid-cols-3 md:gap-12">
       {features.map((f, i) => (
         <div key={f.title} className="text-center">
-          <h3 className="text-lg md:text-xl font-bold tracking-tight mb-2">
+          <h3 className="mb-2 text-lg font-bold tracking-tight md:text-xl">
             <ScrambleText text={f.title} isActive={featureStates[i]} duration={500} />
           </h3>
-          <p className="text-sm text-base-content/40">
+          <p className="text-base-content/40 text-sm">
             <ScrambleText text={f.desc} isActive={featureStates[i]} duration={600} />
           </p>
         </div>
@@ -333,9 +333,9 @@ const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
 
 // Integrations content
 const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
-  <div className="space-y-6 max-w-2xl mx-auto">
+  <div className="mx-auto max-w-2xl space-y-6">
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.15em] text-base-content/30 mb-3">
+      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Networks" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -343,7 +343,7 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
       </div>
     </div>
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.15em] text-base-content/30 mb-3">
+      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Protocols" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -351,7 +351,7 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
       </div>
     </div>
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.15em] text-base-content/30 mb-3">
+      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Routers" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -366,7 +366,7 @@ const FAQContent = ({ faqItems, isActive }: { faqItems: FAQItem[]; isActive: boo
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   
   return (
-    <div className="max-w-xl mx-auto text-left">
+    <div className="mx-auto max-w-xl text-left">
       {faqItems.map((item, i) => (
         <FAQAccordionScramble
           key={i}
@@ -405,16 +405,16 @@ const FAQAccordionScramble = ({
   }, [isActive, delay]);
 
   return (
-    <div className="border-b border-base-content/10">
+    <div className="border-base-content/10 border-b">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between py-5 text-left group"
+        className="group flex w-full items-center justify-between py-5 text-left"
       >
-        <span className="text-sm md:text-base font-medium text-base-content/70 group-hover:text-base-content transition-colors pr-4">
+        <span className="text-base-content/70 group-hover:text-base-content pr-4 text-sm font-medium transition-colors md:text-base">
           <ScrambleText text={item.question} isActive={itemActive} duration={500} />
         </span>
         <ChevronDownIcon 
-          className={`w-4 h-4 text-base-content/40 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} 
+          className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`} 
         />
       </button>
       <motion.div
@@ -423,7 +423,7 @@ const FAQAccordionScramble = ({
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="overflow-hidden"
       >
-        <p className="pb-5 text-base-content/40 text-sm leading-relaxed">
+        <p className="text-base-content/40 pb-5 text-sm leading-relaxed">
           {item.answer}
         </p>
       </motion.div>
@@ -434,25 +434,25 @@ const FAQAccordionScramble = ({
 // Security content
 const SecurityContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-6">
-    <p className="text-base-content/40 text-sm max-w-md">
+    <p className="text-base-content/40 max-w-md text-sm">
       <ScrambleText text="Audited. Verified. Open source." isActive={isActive} duration={500} />
     </p>
     <a
       href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-center gap-3 px-5 py-3 border border-base-content/10 hover:border-base-content/20 transition-colors"
+      className="border-base-content/10 hover:border-base-content/20 group flex items-center gap-3 border px-5 py-3 transition-colors"
     >
-      <ShieldCheckIcon className="w-6 h-6 text-success" />
+      <ShieldCheckIcon className="text-success size-6" />
       <div className="text-left">
-        <div className="text-sm font-medium text-base-content/80 group-hover:text-success transition-colors">
+        <div className="text-base-content/80 group-hover:text-success text-sm font-medium transition-colors">
           <ScrambleText text="Starknet Audit" isActive={isActive} duration={500} />
         </div>
-        <div className="text-[10px] text-base-content/40">
+        <div className="text-base-content/40 text-[10px]">
           <ScrambleText text="Codespect" isActive={isActive} duration={400} />
         </div>
       </div>
-      <DocumentTextIcon className="w-4 h-4 text-base-content/30" />
+      <DocumentTextIcon className="text-base-content/30 size-4" />
     </a>
   </div>
 );
@@ -461,7 +461,7 @@ const SecurityContent = ({ isActive }: { isActive: boolean }) => (
 const CTAContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-8">
     <LaunchAppButton />
-    <div className="flex items-center gap-6 text-xs text-base-content/30">
+    <div className="text-base-content/30 flex items-center gap-6 text-xs">
       <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">
         <ScrambleText text="Discord" isActive={isActive} duration={300} />
       </a>
@@ -526,30 +526,31 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
 
   return (
-    <div className="fixed inset-0 bg-base-100 text-base-content overflow-hidden">
+    <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
       {/* Background grid */}
+      {/* eslint-disable-next-line tailwindcss/no-contradicting-classname -- bg-[linear-gradient] and bg-[size] are different CSS properties */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
       {/* Scroll container */}
       <div
         ref={containerRef}
-        className="h-full w-full hide-scrollbar relative z-10 overflow-y-auto snap-y snap-mandatory scroll-smooth"
+        className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
         <div style={{ height: `${sections.length * 100}vh` }} className="relative">
           {/* Snap targets */}
-          <div className="absolute inset-0 flex flex-col pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 flex flex-col">
             {sections.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
           </div>
 
           {/* Sticky viewport */}
-          <div className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden">
+          <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
             {/* Progress indicator */}
-            <div className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-48 w-[1px] bg-base-content/5 hidden lg:block">
+            <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
-                className="w-full bg-base-content/40 origin-top"
+                className="bg-base-content/40 w-full origin-top"
                 style={{ height: "100%", scaleY: smoothProgress }}
               />
             </div>
@@ -568,10 +569,10 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
             {/* Scroll hint */}
             <motion.div
               style={{ opacity: useTransform(smoothProgress, [0, 0.1], [1, 0]) }}
-              className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 text-base-content/30"
+              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
-              <ChevronDownIcon className="w-4 h-4 animate-bounce" />
+              <ChevronDownIcon className="size-4 animate-bounce" />
             </motion.div>
           </div>
         </div>

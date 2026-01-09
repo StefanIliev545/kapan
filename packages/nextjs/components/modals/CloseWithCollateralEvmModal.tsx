@@ -931,7 +931,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                     showBatchedToggle={true}
                     useBatchedTx={useBatchedTx}
                     setUseBatchedTx={setUseBatchedTx}
-                    className="bg-base-200/30 rounded p-2 mb-2"
+                    className="bg-base-200/30 mb-2 rounded p-2"
                 />
             )}
 
@@ -966,7 +966,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
             {/* Show USD values if available (market order only) */}
             {executionType === "market" && srcUSD !== null && dstUSD !== null && (
-                <div className="flex justify-between text-xs text-base-content/60 px-1">
+                <div className="text-base-content/60 flex justify-between px-1 text-xs">
                     <span>Selling: ~${srcUSD.toFixed(2)}</span>
                     <span>Receiving: ~${dstUSD.toFixed(2)}</span>
                 </div>
@@ -978,7 +978,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const infoContent = (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                <InformationCircleIcon className="size-5 flex-shrink-0" />
                 <span>
                     <strong>How Close with Collateral Works</strong>
                     <br />
@@ -989,38 +989,38 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             <div className="space-y-4 px-2">
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">1</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Withdraw Collateral</h4>
-                        <p className="text-xs text-base-content/70">Your collateral is withdrawn from the protocol.</p>
+                        <h4 className="text-sm font-medium">Withdraw Collateral</h4>
+                        <p className="text-base-content/70 text-xs">Your collateral is withdrawn from the protocol.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">2</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
+                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
                     </div>
                     <div className="pb-4">
-                        <h4 className="font-medium text-sm">Swap</h4>
-                        <p className="text-xs text-base-content/70">Collateral is swapped for the debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
+                        <h4 className="text-sm font-medium">Swap</h4>
+                        <p className="text-base-content/70 text-xs">Collateral is swapped for the debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">3</div>
+                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
                     </div>
                     <div>
-                        <h4 className="font-medium text-sm">Repay Debt</h4>
-                        <p className="text-xs text-base-content/70">Your debt is repaid with the swapped tokens.</p>
+                        <h4 className="text-sm font-medium">Repay Debt</h4>
+                        <p className="text-base-content/70 text-xs">Your debt is repaid with the swapped tokens.</p>
                     </div>
                 </div>
             </div>
 
-            <div className="text-xs text-base-content/60 mt-4">
+            <div className="text-base-content/60 mt-4 text-xs">
                 Total debt: {formatUnits(debtBalance, debtDecimals)} {debtName}
             </div>
         </div>

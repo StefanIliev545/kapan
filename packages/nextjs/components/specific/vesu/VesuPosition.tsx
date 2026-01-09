@@ -161,19 +161,39 @@ export const VesuPosition: FC<VesuPositionProps> = ({
     },
   ];
 
+  // Shared token objects for modals to avoid duplication
+  const collateralTokenInfo = {
+    name: collateralSymbol,
+    icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+    address: collateralAsset,
+    currentRate: collateralRates.supplyAPY * 100,
+    usdPrice: collateralUsdPrice,
+    decimals: Number(collateralMetadata.decimals),
+  };
+
+  const debtTokenInfo = debtMetadata
+    ? {
+        name: debtSymbol,
+        icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+        address: debtAsset,
+        currentRate: debtRates.borrowAPR * 100,
+        usdPrice: debtUsdPrice,
+        decimals: Number(debtMetadata.decimals),
+      }
+    : null;
 
   return (
     <>
       <div className="card bg-base-100 shadow-md">
         <div className="card-body p-4">
-          <div className="flex justify-between items-center mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Image
                 src={tokenNameToLogo(collateralSymbol.toLowerCase())}
                 alt={collateralSymbol}
                 width={24}
                 height={24}
-                className="w-6 h-6"
+                className="size-6"
               />
               <span className="font-medium">{collateralSymbol}</span>
               {isVtoken && <span className="badge badge-sm badge-primary">vToken</span>}
@@ -185,7 +205,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                   alt={debtSymbol}
                   width={24}
                   height={24}
-                  className="w-6 h-6"
+                  className="size-6"
                 />
                 <span className="font-medium">{debtSymbol}</span>
               </div>
@@ -203,9 +223,9 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               <div className="divider my-1"></div>
 
               <div className="space-y-1">
-                <div className="flex justify-between w-full gap-1">
+                <div className="flex w-full justify-between gap-1">
                   <span className="text-sm text-gray-500">Supply APY</span>
-                  <span className="text-sm font-medium text-success">
+                  <span className="text-success text-sm font-medium">
                     {formatPercentage(collateralRates.supplyAPY * 100, 3)}%
                   </span>
                 </div>
@@ -235,15 +255,15 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
               <div className="space-y-1">
                 {nominalDebt === "0" ? (
-                  <div className="flex justify-between w-full gap-1">
+                  <div className="flex w-full justify-between gap-1">
                     <span className="text-sm text-gray-400">No debt</span>
                     <span className="text-sm font-medium text-gray-400">-</span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex justify-between w-full gap-1">
+                    <div className="flex w-full justify-between gap-1">
                       <span className="text-sm text-gray-500">Borrow APR</span>
-                      <span className="text-sm font-medium text-error">
+                      <span className="text-error text-sm font-medium">
                         {formatPercentage(debtRates.borrowAPR * 100, 3)}%
                       </span>
                     </div>
@@ -258,7 +278,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
 
           <div className="divider my-2"></div>
 
-          <div className="flex justify-between items-center mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <span className="text-sm text-gray-500">
               Loan-to-value: <span className="font-medium">{formatPercentage(Number(ltv))}%</span>
             </span>
@@ -277,13 +297,13 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex">
                 <button
-                  className="btn btn-xs btn-primary rounded-r-none px-2 w-16"
+                  className="btn btn-xs btn-primary w-16 rounded-r-none px-2"
                   onClick={() => setIsDepositModalOpen(true)}
                 >
                   Deposit
                 </button>
                 <button
-                  className="btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16"
+                  className="btn btn-xs btn-secondary w-16 rounded-l-none border-l-0 px-2"
                   onClick={() => setIsWithdrawModalOpen(true)}
                 >
                   Withdraw
@@ -292,7 +312,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               <div className="flex justify-end">
                 <div className="flex">
                   <button
-                    className="btn btn-xs btn-primary rounded-r-none px-2 w-16"
+                    className="btn btn-xs btn-primary w-16 rounded-r-none px-2"
                     onClick={() => {
                       if (nominalDebt === "0") {
                         setIsTokenSelectModalOpen(true);
@@ -304,7 +324,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                     Borrow
                   </button>
                   <button
-                    className={`btn btn-xs btn-secondary rounded-l-none border-l-0 px-2 w-16 ${nominalDebt === "0" ? "btn-disabled" : ""}`}
+                    className={`btn btn-xs btn-secondary w-16 rounded-l-none border-l-0 px-2 ${nominalDebt === "0" ? "btn-disabled" : ""}`}
                     onClick={() => {
                       if (nominalDebt !== "0" && debtMetadata) {
                         setIsRepayModalOpen(true);
@@ -324,14 +344,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <DepositModalStark
             isOpen={isDepositModalOpen}
             onClose={() => setIsDepositModalOpen(false)}
-            token={{
-              name: collateralSymbol,
-              icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
-              address: collateralAsset,
-              currentRate: collateralRates.supplyAPY * 100,
-              usdPrice: collateralUsdPrice,
-              decimals: Number(collateralMetadata.decimals),
-            }}
+            token={collateralTokenInfo}
             protocolName="Vesu"
             vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
             position={position}
@@ -340,14 +353,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
           <WithdrawModalStark
             isOpen={isWithdrawModalOpen}
             onClose={() => setIsWithdrawModalOpen(false)}
-            token={{
-              name: collateralSymbol,
-              icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
-              address: collateralAsset,
-              currentRate: collateralRates.supplyAPY * 100,
-              usdPrice: collateralUsdPrice,
-              decimals: Number(collateralMetadata.decimals),
-            }}
+            token={collateralTokenInfo}
             protocolName="Vesu"
             supplyBalance={BigInt(collateralAmount)}
             vesuContext={nominalDebt !== "0" ? createVesuContextV1(poolId, debtAsset) : undefined}
@@ -364,19 +370,12 @@ export const VesuPosition: FC<VesuPositionProps> = ({
             position={position}
           />
 
-          {debtMetadata && (
+          {debtTokenInfo && (
             <>
               <BorrowModalStark
                 isOpen={isBorrowModalOpen}
                 onClose={() => setIsBorrowModalOpen(false)}
-                token={{
-                  name: debtSymbol,
-                  icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-                  address: debtAsset,
-                  currentRate: debtRates.borrowAPR * 100,
-                  usdPrice: debtUsdPrice,
-                  decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-                }}
+                token={debtTokenInfo}
                 protocolName="Vesu"
                 currentDebt={debtNum}
                 vesuContext={createVesuContextV1(poolId, collateralAsset)}
@@ -386,14 +385,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
               <RepayModalStark
                 isOpen={isRepayModalOpen}
                 onClose={() => setIsRepayModalOpen(false)}
-                token={{
-                  name: debtSymbol,
-                  icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-                  address: debtAsset,
-                  currentRate: debtRates.borrowAPR * 100,
-                  usdPrice: debtUsdPrice,
-                  decimals: debtMetadata ? Number(debtMetadata.decimals) : 18,
-                }}
+                token={debtTokenInfo}
                 protocolName="Vesu"
                 debtBalance={BigInt(nominalDebt)}
                 vesuContext={createVesuContextV1(poolId, collateralAsset)}
@@ -409,7 +401,7 @@ export const VesuPosition: FC<VesuPositionProps> = ({
                   balance: BigInt(nominalDebt),
                   type: "borrow",
                   tokenAddress: debtAsset,
-                  decimals: debtMetadata ? Number(debtMetadata.decimals) : Number(18),
+                  decimals: debtTokenInfo.decimals,
                   poolId: poolId,
                 }}
                 preSelectedCollaterals={preSelectedCollateral}

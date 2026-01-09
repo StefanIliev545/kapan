@@ -11,10 +11,10 @@ export const VesuVersionToggle: FC<VesuVersionToggleProps> = ({
 }) => {
   return (
     <div className="flex items-center space-x-2">
-      <span className="text-sm font-medium text-base-content/60">Version:</span>
-      <div className="flex bg-base-200 rounded-lg p-1">
+      <span className="text-base-content/60 text-sm font-medium">Version:</span>
+      <div className="bg-base-200 flex rounded-lg p-1">
         <button
-          className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+          className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
             selectedVersion === "v1"
               ? "bg-primary text-primary-content"
               : "text-base-content/60 hover:text-base-content"
@@ -24,7 +24,7 @@ export const VesuVersionToggle: FC<VesuVersionToggleProps> = ({
           V1
         </button>
         <button
-          className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+          className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
             selectedVersion === "v2"
               ? "bg-primary text-primary-content"
               : "text-base-content/60 hover:text-base-content"

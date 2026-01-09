@@ -112,52 +112,52 @@ const MarketsPageContent: NextPage = () => {
   });
 
   return (
-    <div className="container mx-auto px-5 min-h-[calc(100vh-6rem)] py-6">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="container mx-auto min-h-[calc(100vh-6rem)] px-5 py-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Page Header */}
-        <div className="flex flex-col gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-4">
           {/* Title & Controls Row */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Markets</h1>
-              <p className="text-sm text-base-content/50 mt-0.5">Compare rates across protocols</p>
+              <p className="text-base-content/50 mt-0.5 text-sm">Compare rates across protocols</p>
             </div>
 
             <div className="flex items-center gap-3">
               {/* View Mode Toggle (Protocol view only) */}
               {groupMode === "protocol" && (
-                <div className="flex rounded-lg bg-base-200/50 p-0.5">
+                <div className="bg-base-200/50 flex rounded-lg p-0.5">
                   <button
-                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                    className={`rounded-md p-1.5 transition-all duration-200 ${
                       viewMode === "list"
-                        ? "bg-base-100 shadow-sm text-base-content"
+                        ? "bg-base-100 text-base-content shadow-sm"
                         : "text-base-content/50 hover:text-base-content/80"
                     }`}
                     onClick={() => setViewMode("list")}
                     aria-label="List view"
                   >
-                    <ListBulletIcon className="h-4 w-4" />
+                    <ListBulletIcon className="size-4" />
                   </button>
                   <button
-                    className={`p-1.5 rounded-md transition-all duration-200 ${
+                    className={`rounded-md p-1.5 transition-all duration-200 ${
                       viewMode === "grid"
-                        ? "bg-base-100 shadow-sm text-base-content"
+                        ? "bg-base-100 text-base-content shadow-sm"
                         : "text-base-content/50 hover:text-base-content/80"
                     }`}
                     onClick={() => setViewMode("grid")}
                     aria-label="Grid view"
                   >
-                    <Squares2X2Icon className="h-4 w-4" />
+                    <Squares2X2Icon className="size-4" />
                   </button>
                 </div>
               )}
 
               {/* Group Mode Toggle */}
-              <div className="flex rounded-lg bg-base-200/50 p-0.5">
+              <div className="bg-base-200/50 flex rounded-lg p-0.5">
                 <button
-                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                  className={`rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
                     groupMode === "token"
-                      ? "bg-base-100 shadow-sm text-base-content"
+                      ? "bg-base-100 text-base-content shadow-sm"
                       : "text-base-content/50 hover:text-base-content/80"
                   }`}
                   onClick={() => setGroupMode("token")}
@@ -165,9 +165,9 @@ const MarketsPageContent: NextPage = () => {
                   By Token
                 </button>
                 <button
-                  className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
+                  className={`rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
                     groupMode === "protocol"
-                      ? "bg-base-100 shadow-sm text-base-content"
+                      ? "bg-base-100 text-base-content shadow-sm"
                       : "text-base-content/50 hover:text-base-content/80"
                   }`}
                   onClick={() => setGroupMode("protocol")}
@@ -187,13 +187,13 @@ const MarketsPageContent: NextPage = () => {
                 onNetworkChange={handleNetworkChange}
               />
             )}
-            <div className="flex-1 max-w-md">
+            <div className="max-w-md flex-1">
               <div className="relative">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
+                <MagnifyingGlassIcon className="text-base-content/40 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search tokens..."
-                  className="w-full py-2 pl-10 pr-4 text-sm bg-base-200/50 border border-base-300/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-base-content/30"
+                  className="bg-base-200/50 border-base-300/50 focus:ring-primary/30 focus:border-primary/50 placeholder:text-base-content/30 w-full rounded-xl border py-2 pl-10 pr-4 text-sm transition-all focus:outline-none focus:ring-2"
                   value={search}
                   onChange={createTextChangeHandler(setSearch)}
                 />
@@ -218,7 +218,7 @@ const MarketsPageContent: NextPage = () => {
               return (
                 <div
                   key={option.id}
-                  className={isActive ? "space-y-6" : "space-y-6 hidden"}
+                  className={isActive ? "space-y-6" : "hidden space-y-6"}
                   aria-hidden={isActive ? undefined : true}
                 >
                   {protocols.map(protocol => {
