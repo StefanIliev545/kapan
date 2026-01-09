@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { NetworkOptions } from "./NetworkOptions";
-import CopyToClipboard from "react-copy-to-clipboard";
 import { getAddress } from "viem";
 import { Address } from "viem";
 import { useDisconnect } from "wagmi";
@@ -16,8 +15,9 @@ import {
   ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { BlockieAvatar, isENS } from "~~/components/scaffold-eth";
-import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { useOutsideClick, useCopyToClipboard } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
+import { truncateAddress } from "~~/utils/address";
 
 const allowedNetworks = getTargetNetworks();
 
@@ -37,7 +37,7 @@ export const AddressInfoDropdown = ({
   const { disconnect } = useDisconnect();
   const checkSumAddress = getAddress(address);
 
-  const [addressCopied, setAddressCopied] = useState(false);
+  const { copy, isCopied: addressCopied } = useCopyToClipboard();
   const [selectingNetwork, setSelectingNetwork] = useState(false);
   const dropdownRef = useRef<HTMLDetailsElement>(null);
   
@@ -52,7 +52,7 @@ export const AddressInfoDropdown = ({
       <summary tabIndex={0} className="flex items-center gap-2 cursor-pointer hover:bg-base-200 transition-colors rounded-lg px-2 py-1.5">
         <BlockieAvatar address={checkSumAddress} size={24} ensImage={ensAvatar} />
         <span className="text-sm font-medium">
-          {isENS(displayName) ? displayName : `${checkSumAddress?.slice(0, 6)}...${checkSumAddress?.slice(-4)}`}
+          {isENS(displayName) ? displayName : truncateAddress(checkSumAddress)}
         </span>
         <ChevronDownIcon className="h-4 w-4 text-base-content/50" />
       </summary>
@@ -71,7 +71,7 @@ export const AddressInfoDropdown = ({
                     <p className="font-medium truncate">{displayName}</p>
                   )}
                   <p className="text-sm text-base-content/50 font-mono">
-                    {checkSumAddress?.slice(0, 6)}...{checkSumAddress?.slice(-4)}
+                    {truncateAddress(checkSumAddress)}
                   </p>
                 </div>
               </div>
@@ -90,22 +90,17 @@ export const AddressInfoDropdown = ({
               </Link>
 
               {/* Copy Address */}
-              <CopyToClipboard
-                text={checkSumAddress}
-                onCopy={() => {
-                  setAddressCopied(true);
-                  setTimeout(() => setAddressCopied(false), 800);
-                }}
+              <button
+                onClick={() => copy(checkSumAddress)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 transition-colors"
               >
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 transition-colors">
-                  {addressCopied ? (
-                    <CheckCircleIcon className="h-5 w-5 text-success" />
-                  ) : (
-                    <DocumentDuplicateIcon className="h-5 w-5 text-base-content/60" />
-                  )}
-                  <span className="text-sm">{addressCopied ? "Copied!" : "Copy Address"}</span>
-                </button>
-              </CopyToClipboard>
+                {addressCopied ? (
+                  <CheckCircleIcon className="h-5 w-5 text-success" />
+                ) : (
+                  <DocumentDuplicateIcon className="h-5 w-5 text-base-content/60" />
+                )}
+                <span className="text-sm">{addressCopied ? "Copied!" : "Copy Address"}</span>
+              </button>
 
               {/* QR Code */}
               <label

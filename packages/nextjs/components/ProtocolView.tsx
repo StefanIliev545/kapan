@@ -24,6 +24,7 @@ import { formatBps } from "~~/utils/risk";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
 import { useAaveEMode } from "~~/hooks/useAaveEMode";
 import { usePendlePTYields, usePTEnhancedApyMaps, isPTToken } from "~~/hooks/usePendlePTYields";
+import { HealthStatus } from "./specific/common";
 
 
 export interface ProtocolPosition {
@@ -84,38 +85,6 @@ interface ProtocolViewProps {
   /** Optional element to render in the header (e.g., E-Mode toggle) */
   headerElement?: React.ReactNode;
 }
-
-// Health status indicator component that shows utilization percentage
-const HealthStatus: FC<{ utilizationPercentage: number; mobileLabel?: string }> = ({ utilizationPercentage, mobileLabel = "LTV" }) => {
-  // Determine color based on utilization percentage
-  const getColorClasses = () => {
-    if (utilizationPercentage < 50) return { bar: "bg-success", text: "text-success", glow: "shadow-success/30" };
-    if (utilizationPercentage < 70) return { bar: "bg-warning", text: "text-warning", glow: "shadow-warning/30" };
-    return { bar: "bg-error", text: "text-error", glow: "shadow-error/30" };
-  };
-  const colors = getColorClasses();
-
-  return (
-    <>
-      {/* Desktop: bar + percentage */}
-      <div className="hidden sm:flex items-center gap-2.5">
-        <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-          <div
-            className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`}
-            style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
-          />
-        </div>
-        <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
-          {utilizationPercentage.toFixed(0)}%
-        </span>
-      </div>
-      {/* Mobile: just percentage */}
-      <span className={`sm:hidden text-sm font-mono font-bold tabular-nums ${colors.text}`}>
-        {utilizationPercentage.toFixed(0)}%
-      </span>
-    </>
-  );
-};
 
 export const ProtocolView: FC<ProtocolViewProps> = ({
   protocolName,
@@ -475,7 +444,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
       {/* Protocol Header Card */}
       <div
-        className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50 cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15"
+        className="card-surface-interactive shadow-lg"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="card-body px-3 sm:px-5 py-3">
@@ -484,7 +453,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             {/* Row 1: Protocol name + Markets + Collapse */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+                <div className="token-icon-wrapper-md">
                   <Image
                     src={protocolIcon}
                     alt={`${protocolName} icon`}
@@ -557,7 +526,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
               {/* Protocol name + icon */}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+                <div className="token-icon-wrapper-lg">
                   <Image
                     src={protocolIcon}
                     alt={`${protocolName} icon`}
@@ -567,7 +536,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                   />
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+                  <span className="label-text-xs-semibold">Protocol</span>
                   <span className="text-base font-bold tracking-tight">{protocolName}</span>
                 </div>
               </div>
@@ -579,7 +548,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
               <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
                 {/* Net Balance */}
                 <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                  <span className="label-text-xs-semibold">Balance</span>
                   <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalance >= 0 ? "text-success" : "text-error"}`}>
                     {formatCurrency(netBalance)}
                   </span>
@@ -587,7 +556,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
                 {/* 30D Yield */}
                 <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                  <span className="label-text-xs-semibold">30D Yield</span>
                   <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                     {formatCurrency(netYield30d)}
                   </span>
@@ -595,7 +564,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
                 {/* Net APY */}
                 <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                  <span className="label-text-xs-semibold">Net APY</span>
                   <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                     {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                   </span>
@@ -604,7 +573,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 {/* Utilization */}
                 {!hideUtilization && (
                   <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                    <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+                    <span className="label-text-xs-semibold">Utilization</span>
                     {/* Default: show bar */}
                     <div className="group-hover/util:hidden">
                       <HealthStatus utilizationPercentage={utilizationPercentage} />
@@ -681,7 +650,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
       {/* Markets Section - expandable (only if not inlineMarkets) */}
       {isMarketsOpen && !isCollapsed && !disableMarkets && !inlineMarkets && (
-        <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
+        <div className="card-surface">
           <div className="card-body p-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Suppliable Assets */}
@@ -774,16 +743,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
           {/* Supplied Assets */}
           <div className="h-full">
-            <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
+            <div className="card-surface-hover h-full">
               <div className="card-body p-4 flex flex-col">
                 <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-success" />
                     <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Supplied</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-success">
+                  <div className="count-badge-success">
                     <span className="text-xs font-mono font-bold">{filteredSuppliedPositions.length}</span>
-                    <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
+                    <span className="label-text-xs-muted opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
                   </div>
                 </div>
                 {filteredSuppliedPositions.length > 0 ? (
@@ -879,16 +848,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 
           {/* Borrowed Assets */}
           <div className="h-full">
-            <div className="card bg-base-200/40 shadow-md hover:shadow-lg transition-all duration-300 h-full rounded-xl border border-base-300/50">
+            <div className="card-surface-hover h-full">
               <div className="card-body p-4 flex flex-col">
                 <div className="flex items-center justify-between pb-3 mb-1 border-b border-base-200/50">
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-error" />
                     <span className="text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Borrowed</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error/10 text-error">
+                  <div className="count-badge-error">
                     <span className="text-xs font-mono font-bold">{filteredBorrowedPositions.length}</span>
-                    <span className="text-[10px] uppercase tracking-wider opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
+                    <span className="label-text-xs-muted opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
                   </div>
                 </div>
                 {filteredBorrowedPositions.length > 0 ? (
@@ -1198,7 +1167,6 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
 };
 
 // Added display name to fix linting issue
-HealthStatus.displayName = "HealthStatus";
 ProtocolView.displayName = "ProtocolView";
 
 export const ExampleProtocolView: FC = () => {

@@ -35,6 +35,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useGlobalState } from "~~/services/store/store";
 import { useRiskParams } from "~~/hooks/useRiskParams";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { filterPositionsByWalletStatus } from "~~/utils/tokenSymbols";
 
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
@@ -268,15 +269,11 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     };
   }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress, getTokenDisplay]);
 
-  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
-  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
-
-  const filteredSuppliedPositions = isWalletConnected
-    ? (suppliedPositions as SupplyPositionProps[])
-    : (suppliedPositions as SupplyPositionProps[]).filter(p => tokenFilter.includes(sanitize(p.name)));
-  const filteredBorrowedPositions = isWalletConnected
-    ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+  const filteredSuppliedPositions = filterPositionsByWalletStatus(
+    suppliedPositions as SupplyPositionProps[],
+    isWalletConnected,
+  );
+  const filteredBorrowedPositions = filterPositionsByWalletStatus(borrowedPositions, isWalletConnected);
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 

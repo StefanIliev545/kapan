@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { COW_API_URLS } from "~~/utils/constants";
 
 /**
  * Proxy for CoW Protocol quote API
  * This bypasses browser-level interference (extensions, CORS, etc.)
  */
-
-const COW_API_URLS: Record<number, string> = {
-  1: "https://api.cow.fi/mainnet",
-  42161: "https://api.cow.fi/arbitrum_one",  // NOT "arbitrum"!
-  8453: "https://api.cow.fi/base",
-  10: "https://api.cow.fi/optimism",
-  100: "https://api.cow.fi/xdai",
-  137: "https://api.cow.fi/polygon",
-  43114: "https://api.cow.fi/avalanche",
-  56: "https://api.cow.fi/bnb",
-  59144: "https://api.cow.fi/linea",
-};
 
 export async function POST(
   request: NextRequest,

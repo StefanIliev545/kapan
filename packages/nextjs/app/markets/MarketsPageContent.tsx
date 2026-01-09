@@ -12,6 +12,7 @@ import { VESU_V1_POOLS } from "~~/components/specific/vesu/pools";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import StableArea from "~~/components/common/StableArea";
 import { arbitrum, base, linea, optimism } from "wagmi/chains";
+import { createTextChangeHandler } from "~~/utils/handlers";
 
 const MarketLoader = () => (
   <div className="flex justify-center py-10">
@@ -194,7 +195,7 @@ const MarketsPageContent: NextPage = () => {
                   placeholder="Search tokens..."
                   className="w-full py-2 pl-10 pr-4 text-sm bg-base-200/50 border border-base-300/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-base-content/30"
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={createTextChangeHandler(setSearch)}
                 />
               </div>
             </div>

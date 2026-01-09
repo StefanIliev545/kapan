@@ -1,5 +1,7 @@
 import React, { FC, ReactNode } from "react";
-import { ChevronDownIcon, ChevronUpIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+// Re-export the consolidated PositionInfoDropdown from common
+export { PositionInfoDropdown } from "~~/components/common/PositionInfoDropdown";
 
 type PositionCardProps = {
   isExpanded: boolean;
@@ -68,55 +70,6 @@ export const PositionCard: FC<PositionCardProps> = ({
     </>
   );
 };
-
-type PositionInfoDropdownProps = {
-  name: string;
-  protocolName: string;
-  tokenAddress?: string;
-  typeLabel: string;
-  extraDetails?: React.ReactNode;
-};
-
-export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
-  name,
-  protocolName,
-  tokenAddress,
-  typeLabel,
-  extraDetails,
-}) => (
-  <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0 ml-1" onClick={e => e.stopPropagation()}>
-    <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-      <InformationCircleIcon className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true" />
-    </div>
-    <div
-      tabIndex={0}
-      className="dropdown-content z-[1] card card-compact p-2 shadow bg-base-100 w-64 max-w-[90vw]"
-      style={{
-        right: "auto",
-        transform: "translateX(-50%)",
-        left: "50%",
-        borderRadius: "4px",
-      }}
-    >
-      <div className="card-body p-3">
-        <h3 className="card-title text-sm">{name} Details</h3>
-        <div className="text-xs space-y-1">
-          {tokenAddress ? (
-            <>
-              <p className="text-base-content/70">Contract Address:</p>
-              <p className="font-mono break-all">{tokenAddress}</p>
-            </>
-          ) : null}
-          <p className="text-base-content/70">Protocol:</p>
-          <p>{protocolName}</p>
-          <p className="text-base-content/70">Type:</p>
-          <p className="capitalize">{typeLabel}</p>
-          {extraDetails}
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 type PositionToggleIndicatorProps = {
   isExpanded: boolean;

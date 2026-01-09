@@ -11,6 +11,7 @@ Prints feedback that Claude will see.
 import sys
 import json
 import subprocess
+import re
 from pathlib import Path
 import os
 
@@ -65,8 +66,10 @@ def handle_react(file_path):
 
     # 1. Auto-fix: ESLint
     success, output = run(f"npx eslint --fix {file_path} 2>&1")
-    if "error" in output.lower():
-        error_count = output.lower().count("error")
+    # Check for actual errors (not just the word "error" in "0 errors")
+    error_match = re.search(r'(\d+) errors?[,\)]', output)
+    error_count = int(error_match.group(1)) if error_match else 0
+    if error_count > 0:
         actions.append(f"❌ ESLint: {error_count} error(s) remain")
     else:
         actions.append("✓ ESLint passed/fixed")

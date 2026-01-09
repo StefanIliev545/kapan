@@ -5,10 +5,11 @@ import type { Quote } from "@avnu/avnu-sdk";
 import { useLendingAuthorizations, type BaseProtocolInstruction, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildVesuContextOption, createVesuContext, type VesuProtocolKey } from "~~/utils/vesu";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
+import { DEBOUNCE_DELAYS } from "~~/hooks/useDebouncedEffect";
 
 const SLIPPAGE = 0.05;
 const BUFFER_BPS = 500n; // 5%
-const DEBOUNCE_MS = 450;
+const DEBOUNCE_MS = DEBOUNCE_DELAYS.STANDARD;
 
 const withBuffer = (amount: bigint, bufferBps: bigint = BUFFER_BPS) => {
   if (amount === 0n) return 0n;

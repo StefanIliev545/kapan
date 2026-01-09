@@ -35,10 +35,10 @@ import {
   encodeFlashLoan,
   encodeSplit,
   encodeAdd,
-  FlashLoanProvider,
   LendingOp,
   normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
+import { FlashLoanProvider, FlashLoanVersion, versionToProviderEnum } from "~~/utils/flashLoan";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { simulateTransaction, formatErrorForDisplay, decodeRevertReason } from "~~/utils/errorDecoder";
@@ -1590,7 +1590,7 @@ export const useKapanRouterV2 = () => {
 
   // --- Move Flow Builder ---
 
-  type FlashConfig = { version: "v3" | "v2" | "aave" | "zerolend" | "morpho"; premiumBps?: number; bufferBps?: number; };
+  type FlashConfig = { version: FlashLoanVersion; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
   };
@@ -1649,12 +1649,8 @@ export const useKapanRouterV2 = () => {
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
 
         // 2. Flash Loan (creates UTXO)
-        // Map version string to FlashLoanProvider enum
-        const provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.Aave 
-          : version === "zerolend" ? FlashLoanProvider.ZeroLend
-          : version === "morpho" ? FlashLoanProvider.Morpho
-          : version === "v3" ? FlashLoanProvider.BalancerV3 
-          : FlashLoanProvider.BalancerV2;
+        // Use centralized version-to-enum mapping
+        const provider = versionToProviderEnum(version);
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount;
         addRouter(flashData as `0x${string}`, true);

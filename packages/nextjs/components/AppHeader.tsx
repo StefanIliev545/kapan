@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bars3Icon,
@@ -13,8 +12,7 @@ import {
   BanknotesIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
-import { GasTokenSelector } from "~~/components/GasTokenSelector";
-import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { WalletButton } from "~~/components/common/WalletButton";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { useAccount } from "~~/hooks/useAccount";
 import { normalizeUserAddress } from "~~/utils/address";
@@ -128,107 +126,6 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
           </Link>
         );
       })}
-    </div>
-  );
-};
-
-// Smart connect button that shows the right wallet based on selected network
-const NETWORK_STORAGE_KEY = "kapan-network-filter-selection";
-
-const SmartConnectButton = () => {
-  const searchParams = useSearchParams();
-  const [selectedNetwork, setSelectedNetwork] = useState("base");
-  
-  // Function to get current network from URL or cache
-  const getCurrentNetwork = useCallback(() => {
-    // Check URL first
-    const url = new URL(window.location.href);
-    const urlNetwork = url.searchParams.get("network");
-    if (urlNetwork) return urlNetwork;
-    
-    // Fall back to localStorage cache
-    try {
-      const cached = localStorage.getItem(NETWORK_STORAGE_KEY);
-      if (cached) return cached;
-    } catch { }
-    
-    return "base";
-  }, []);
-
-  // Initialize and sync with URL/cache
-  useEffect(() => {
-    setSelectedNetwork(getCurrentNetwork());
-  }, [searchParams, getCurrentNetwork]);
-
-  // Listen for popstate (browser back/forward)
-  useEffect(() => {
-    const handlePopState = () => {
-      setSelectedNetwork(getCurrentNetwork());
-    };
-    
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [getCurrentNetwork]);
-
-  // Poll for URL changes (since NetworkFilter uses shallow updates that don't trigger React)
-  useEffect(() => {
-    let lastNetwork = selectedNetwork;
-    
-    const checkNetwork = () => {
-      const current = getCurrentNetwork();
-      if (current !== lastNetwork) {
-        lastNetwork = current;
-        setSelectedNetwork(current);
-      }
-    };
-    
-    const interval = setInterval(checkNetwork, 200);
-    return () => clearInterval(interval);
-  }, [selectedNetwork, getCurrentNetwork]);
-
-  const isStarknet = selectedNetwork === "starknet";
-
-  return (
-    <div className="flex items-center">
-      <AnimatePresence mode="wait">
-        {isStarknet ? (
-          <motion.div
-            key="starknet"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center gap-2"
-          >
-            {/* Starknet glow effect - subtle */}
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-orange-400/30 rounded-lg blur-sm opacity-60" />
-              <div className="relative flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10">
-                <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-                  <CustomConnectButton />
-                </div>
-                <div className="h-7 w-[1px] bg-base-content/10"></div>
-                <div className="px-3 py-1.5">
-                  <GasTokenSelector />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="evm"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center bg-base-200/80 hover:bg-base-200 transition-colors duration-200 rounded-lg border border-base-content/10"
-          >
-            <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-              <RainbowKitCustomConnectButton />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
@@ -436,7 +333,7 @@ export const AppHeader = () => {
                           </ul>
                           <div className="mt-6 pt-4 border-t border-base-content/10">
                             <div className="flex flex-col space-y-3 items-stretch relative z-50">
-                              <SmartConnectButton />
+                              <WalletButton variant="auto" />
                             </div>
                           </div>
                         </div>
@@ -485,7 +382,7 @@ export const AppHeader = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.5 }}
               >
-                <SmartConnectButton />
+                <WalletButton variant="auto" />
               </motion.div>
             </div>
           </div>

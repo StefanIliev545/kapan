@@ -8,60 +8,9 @@ import { track } from "@vercel/analytics";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { getNetworkColor } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
+import { getNetworkLogo } from "~~/utils/networkLogos";
 
 const allowedNetworks = getTargetNetworks();
-
-// Network logo mapping with theme support
-// logo = dark mode, logoDark = light mode (following NetworkFilter pattern)
-interface NetworkLogoConfig {
-  logo: string;
-  logoDark?: string;
-}
-
-const networkLogos: Record<string, NetworkLogoConfig> = {
-  Arbitrum: { logo: "/logos/arb.svg" },
-  "Arbitrum One": { logo: "/logos/arb.svg" },
-  Ethereum: { logo: "/logos/ethereum.svg" },
-  Optimism: { logo: "/logos/optimism.svg" },
-  Base: { logo: "/logos/base.svg" },
-  Linea: { logo: "/logos/linea.svg" },
-  Plasma: { logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
-  "Arbitrum Sepolia": { logo: "/logos/arb.svg" },
-};
-
-// Chain ID to logo config mapping
-const chainIdLogos: Record<number, NetworkLogoConfig> = {
-  42161: { logo: "/logos/arb.svg" }, // Arbitrum
-  1: { logo: "/logos/ethereum.svg" }, // Ethereum Mainnet
-  10: { logo: "/logos/optimism.svg" }, // Optimism
-  8453: { logo: "/logos/base.svg" }, // Base
-  59144: { logo: "/logos/linea.svg" }, // Linea
-  9745: { logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" }, // Plasma
-  130: { logo: "/logos/unichain.svg" }, // Base Sepolia
-};
-
-/**
- * Helper function to get network logo by ID or name, theme-aware
- */
-const getNetworkLogo = (chain: Chain | null | undefined, isDarkMode: boolean): string => {
-  if (!chain) return "/logos/eth.svg";
-  
-  // Try to get logo config by name first
-  let config = networkLogos[chain.name];
-  
-  // If not found by name, check by chain ID
-  if (!config) {
-    config = chainIdLogos[chain.id];
-  }
-  
-  if (!config) return "/logos/eth.svg";
-  
-  // In dark mode, use logo. In light mode, use logoDark if available
-  if (!isDarkMode && config.logoDark) {
-    return config.logoDark;
-  }
-  return config.logo;
-};
 
 /**
  * Network switcher component that displays just the network icon

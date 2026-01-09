@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePublicClient, useChainId } from "wagmi";
-import { type Address } from "viem";
 import {
   parseOrderContext,
   type OrderContext,
@@ -9,24 +8,8 @@ import {
   calculateOrderProgress,
   getOrderStatusText,
 } from "~~/utils/cow";
+import { getKapanOrderManagerAddress } from "~~/utils/constants";
 import { logger } from "~~/utils/logger";
-
-/**
- * KapanOrderManager addresses by chain ID
- * These are populated after deployment via hardhat-deploy
- */
-const ORDER_MANAGER_ADDRESSES: Record<number, Address | undefined> = {
-  // Deployed addresses
-  42161: "0x8F94351Ac17B4B5fb0923D229319805bB52616CD", // Arbitrum
-  8453: "0xB4755FAE3997FbE4beCD34B4FC5a7F53d3b7143F",  // Base
-  // Not deployed yet
-  1: undefined,     // Mainnet
-  10: undefined,    // Optimism
-  100: undefined,   // Gnosis
-  137: undefined,   // Polygon
-  59144: undefined, // Linea
-  31337: undefined, // Hardhat
-};
 
 // Minimal ABI for reading order state
 const ORDER_MANAGER_READ_ABI = [
@@ -130,12 +113,12 @@ export function useCowOrderStatus(
 ): OrderStatusInfo {
   const publicClient = usePublicClient();
   const chainId = useChainId();
-  
-  // Get order manager address for current chain
+
+  // Get order manager address for current chain from deployed contracts
   const orderManagerAddress = useMemo(() => {
-    return ORDER_MANAGER_ADDRESSES[chainId];
+    return getKapanOrderManagerAddress(chainId);
   }, [chainId]);
-  
+
   const pollingInterval = options?.pollingInterval ?? 10000;
   const enabled = options?.enabled ?? true;
 
@@ -215,12 +198,12 @@ export function useCowOrdersStatus(
 ): Map<string, OrderStatusInfo> {
   const publicClient = usePublicClient();
   const chainId = useChainId();
-  
-  // Get order manager address for current chain
+
+  // Get order manager address for current chain from deployed contracts
   const orderManagerAddress = useMemo(() => {
-    return ORDER_MANAGER_ADDRESSES[chainId];
+    return getKapanOrderManagerAddress(chainId);
   }, [chainId]);
-  
+
   const pollingInterval = options?.pollingInterval ?? 15000;
   const enabled = options?.enabled ?? true;
 
@@ -302,10 +285,10 @@ export function useCowOrderEvents(
   const publicClient = usePublicClient();
   const chainId = useChainId();
   const queryClient = useQueryClient();
-  
-  // Get order manager address for current chain
+
+  // Get order manager address for current chain from deployed contracts
   const orderManagerAddress = useMemo(() => {
-    return ORDER_MANAGER_ADDRESSES[chainId];
+    return getKapanOrderManagerAddress(chainId);
   }, [chainId]);
 
   useEffect(() => {

@@ -10,106 +10,13 @@ import { feltToString } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { createVesuContextV2, normalizeStarknetAddress, type VesuProtocolKey } from "~~/utils/vesu";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import {
+  normalizePrice,
+  computeUsdValue,
+  parsePositionTuples,
+} from "./useProtocolPositions";
 
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
-
-const normalizePrice = (price: { value: bigint; is_valid: boolean }) => (price.is_valid ? price.value / 10n ** 10n : 0n);
-
-const computeUsdValue = (amount: bigint, decimals: number, price: bigint): number => {
-  if (amount === 0n || price === 0n) {
-    return 0;
-  }
-
-  const safeDecimals = Number.isFinite(decimals) ? decimals : 18;
-  const amountAsNumber = Number(formatUnits(amount, safeDecimals));
-  const priceAsNumber = Number(price) / 1e8;
-
-  return amountAsNumber * priceAsNumber;
-};
-
-type PositionTuple = [
-  bigint,
-  bigint,
-  {
-    collateral_shares: bigint;
-    collateral_amount: bigint;
-    nominal_debt: bigint;
-    is_vtoken: boolean;
-  },
-];
-
-const toBoolean = (value: unknown, fallback = false): boolean => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "bigint") return value !== 0n;
-  return fallback;
-};
-
-const parsePositionTuples = (positions: unknown): PositionTuple[] => {
-  if (!positions) return [];
-
-  const entries = Array.isArray(positions)
-    ? positions
-    : typeof positions === "object"
-      ? Object.values(positions as Record<string, unknown>)
-      : [];
-
-  return entries.flatMap(entry => {
-    if (!entry) return [];
-
-    let collateralRaw: unknown;
-    let debtRaw: unknown;
-    let statsRaw: unknown;
-
-    if (Array.isArray(entry)) {
-      if (entry.length < 3) return [];
-      [collateralRaw, debtRaw, statsRaw] = entry;
-    } else if (typeof entry === "object") {
-      const obj = entry as Record<string, unknown>;
-      collateralRaw = obj[0] ?? obj["0"];
-      debtRaw = obj[1] ?? obj["1"];
-      statsRaw = obj[2] ?? obj["2"];
-    } else {
-      return [];
-    }
-
-    if (typeof collateralRaw !== "bigint" || typeof debtRaw !== "bigint" || !statsRaw || typeof statsRaw !== "object") {
-      return [];
-    }
-
-    const stats = statsRaw as {
-      collateral_shares?: unknown;
-      collateral_amount?: unknown;
-      nominal_debt?: unknown;
-      is_vtoken?: unknown;
-    };
-
-    const collateralShares = stats.collateral_shares;
-    const collateralAmount = stats.collateral_amount;
-    const nominalDebt = stats.nominal_debt;
-
-    if (
-      typeof collateralShares !== "bigint" ||
-      typeof collateralAmount !== "bigint" ||
-      typeof nominalDebt !== "bigint"
-    ) {
-      return [];
-    }
-
-    const tuple: PositionTuple = [
-      collateralRaw,
-      debtRaw,
-      {
-        collateral_shares: collateralShares,
-        collateral_amount: collateralAmount,
-        nominal_debt: nominalDebt,
-        is_vtoken: toBoolean(stats.is_vtoken, false),
-      },
-    ];
-
-    return [tuple];
-  });
-};
 
 
 interface UseVesuV2LendingPositionsResult {

@@ -17,35 +17,9 @@ import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
 import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
-
-// Health status indicator component matching ProtocolView
-const HealthStatus: FC<{ utilizationPercentage: number }> = ({ utilizationPercentage }) => {
-  const getColorClasses = () => {
-    if (utilizationPercentage < 50) return { bar: "bg-success", text: "text-success", glow: "shadow-success/30" };
-    if (utilizationPercentage < 70) return { bar: "bg-warning", text: "text-warning", glow: "shadow-warning/30" };
-    return { bar: "bg-error", text: "text-error", glow: "shadow-error/30" };
-  };
-  const colors = getColorClasses();
-
-  return (
-    <>
-      <div className="hidden sm:flex items-center gap-2.5">
-        <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-          <div
-            className={`h-full ${colors.bar} rounded-full transition-all duration-500 shadow-sm ${colors.glow}`}
-            style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
-          />
-        </div>
-        <span className={`text-xs font-mono font-semibold tabular-nums ${colors.text}`}>
-          {utilizationPercentage.toFixed(0)}%
-        </span>
-      </div>
-      <span className={`sm:hidden text-sm font-mono font-bold tabular-nums ${colors.text}`}>
-        {utilizationPercentage.toFixed(0)}%
-      </span>
-    </>
-  );
-};
+import { HealthStatus } from "../common/HealthStatus";
+import { formatSignedPercent } from "../utils";
+import { useTxCompletedListenerDelayed } from "~~/hooks/common";
 
 interface MorphoProtocolViewProps {
   chainId?: number;
@@ -95,22 +69,12 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     hasLoadedOnce && marketsWithPositions.length > 0 // Only enable after initial load
   );
 
-  // Listen for transaction completion to trigger fast refresh
-  useEffect(() => {
-    if (!hasLoadedOnce || marketsWithPositions.length === 0) return;
-
-    const handleTxCompleted = () => {
-      // Small delay to ensure transaction is mined
-      setTimeout(() => {
-        refetchPositions();
-      }, 2000);
-    };
-
-    window.addEventListener("txCompleted", handleTxCompleted);
-    return () => {
-      window.removeEventListener("txCompleted", handleTxCompleted);
-    };
-  }, [hasLoadedOnce, marketsWithPositions.length, refetchPositions]);
+  // Listen for transaction completion to trigger fast refresh (with delay to ensure tx is mined)
+  useTxCompletedListenerDelayed(
+    refetchPositions,
+    2000,
+    hasLoadedOnce && marketsWithPositions.length > 0
+  );
 
   // Prioritize refreshed data when available, fallback to API data
   const rows = useMemo(() => {
@@ -187,11 +151,6 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     setProtocolTotals("Morpho", totalSupplied, totalBorrowed);
   }, [hasLoadedOnce, rows, setProtocolTotals, effectiveChainId]);
 
-  const formatSignedPercentage = (val: number) => {
-    const sign = val >= 0 ? "+" : "";
-    return `${sign}${val.toFixed(2)}%`;
-  };
-
   const hasPositions = rows.length > 0;
 
   // Auto-expand when positions are found, stay collapsed when empty
@@ -209,7 +168,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     <div className={`w-full flex flex-col hide-scrollbar ${isCollapsed ? 'p-1' : 'p-3 space-y-2'}`}>
       {/* Protocol Header Card - matching ProtocolView exactly */}
       <div
-        className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50 cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15"
+        className="card-surface-interactive shadow-lg"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="card-body px-3 sm:px-5 py-3">
@@ -218,7 +177,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
             {/* Row 1: Protocol name + Markets + Collapse */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+                <div className="token-icon-wrapper-md">
                   <Image
                     src="/logos/morpho.svg"
                     alt="Morpho Blue icon"
@@ -263,7 +222,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               <div className="flex flex-col items-center py-1">
                 <span className="text-[8px] uppercase tracking-wider text-base-content/40 font-medium">Net APY</span>
                 <span className={`text-xs font-mono font-bold tabular-nums ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
-                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercentage(metrics.netApyPercent) : "—"}
+                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercent(metrics.netApyPercent) : "—"}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
@@ -281,7 +240,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
           <div className="hidden sm:flex flex-wrap items-center gap-x-6 gap-y-4">
             {/* Protocol name + icon */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+              <div className="token-icon-wrapper-lg">
                 <Image
                   src="/logos/morpho.svg"
                   alt="Morpho Blue icon"
@@ -294,7 +253,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
                 />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+                <span className="label-text-xs-semibold">Protocol</span>
                 <span className="text-base font-bold tracking-tight">Morpho Blue</span>
               </div>
             </div>
@@ -306,7 +265,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
             <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
               {/* Net Balance */}
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                <span className="label-text-xs-semibold">Balance</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
                 </span>
@@ -314,7 +273,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
               {/* 30D Yield */}
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                <span className="label-text-xs-semibold">30D Yield</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
                   {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
                 </span>
@@ -322,15 +281,15 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
               {/* Net APY */}
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                <span className="label-text-xs-semibold">Net APY</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
-                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercentage(metrics.netApyPercent) : "—"}
+                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercent(metrics.netApyPercent) : "—"}
                 </span>
               </div>
 
               {/* Utilization */}
               <div className="group/util flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+                <span className="label-text-xs-semibold">Utilization</span>
                 {hasPositions ? (
                   <HealthStatus utilizationPercentage={metrics.avgUtilization} />
                 ) : (

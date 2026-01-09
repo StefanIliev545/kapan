@@ -3,6 +3,7 @@ import Image from "next/image";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { LoadingSpinner } from "~~/components/common/Loading";
 
 // Define types for collateral
 export interface CollateralToken {
@@ -254,8 +255,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
 
       {isLoading ? (
         <div className="flex items-center justify-center py-6 bg-base-200/50 rounded-lg">
-          <span className="loading loading-spinner loading-md"></span>
-          <span className="ml-2 text-base-content/70">Checking collateral support...</span>
+          <LoadingSpinner size="md" label="Checking collateral support..." />
         </div>
       ) : sortedCollaterals.length > 0 ? (
         <div className="bg-base-200/30 p-4 rounded-lg">

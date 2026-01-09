@@ -3,6 +3,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { getEffectiveChainId } from "../utils/forkChain";
 import { PendleConvertParams, PendleConvertResponse, fetchPendleConvert } from "../utils/pendle";
 import { isPendleSupported } from "../utils/chainFeatures";
+import { queryOptions, queryKeys, DebounceTiming, isQueryEnabled } from "../lib/queryConfig";
 
 type UsePendleConvertProps = PendleConvertParams & {
     chainId: number;
@@ -32,37 +33,36 @@ export const usePendleConvert = ({
     enabled = true,
     ...params
 }: UsePendleConvertProps) => {
-    const [debouncedAmounts] = useDebounceValue(params.amountsIn, 400);
+    const [debouncedAmounts] = useDebounceValue(params.amountsIn, DebounceTiming.FAST);
 
     // Check chain support and use debounced amounts for consistency
     const chainSupported = isPendleSupported(chainId);
-    const isReady =
-        chainSupported &&
-        enabled &&
-        !!params.receiver &&
-        hasPositiveAmount(debouncedAmounts) && // Use debounced value for consistency
-        (Array.isArray(params.tokensIn) ? params.tokensIn.length > 0 : !!params.tokensIn) &&
-        (Array.isArray(params.tokensOut) ? params.tokensOut.length > 0 : !!params.tokensOut);
+    const hasTokensIn = Array.isArray(params.tokensIn) ? params.tokensIn.length > 0 : !!params.tokensIn;
+    const hasTokensOut = Array.isArray(params.tokensOut) ? params.tokensOut.length > 0 : !!params.tokensOut;
+    const isReady = isQueryEnabled(
+        chainSupported,
+        enabled,
+        params.receiver,
+        hasPositiveAmount(debouncedAmounts),
+        hasTokensIn,
+        hasTokensOut
+    );
 
     return useQuery<PendleConvertResponse, Error>({
-        queryKey: [
-            "pendle-convert",
+        queryKey: queryKeys.pendleConvert(
             chainId,
             params.receiver,
-            JSON.stringify(params.tokensIn),
-            JSON.stringify(params.tokensOut),
-            JSON.stringify(debouncedAmounts),
-            params.slippage,
-            params.enableAggregator,
-            params.aggregators,
-        ],
+            params.tokensIn,
+            params.tokensOut,
+            debouncedAmounts,
+            params.slippage
+        ),
         queryFn: () =>
             fetchPendleConvert(getEffectiveChainId(chainId), {
                 ...params,
                 amountsIn: debouncedAmounts,
             }),
         enabled: isReady,
-        refetchInterval: 10000,
-        retry: false,
+        ...queryOptions.quote,
     });
 };

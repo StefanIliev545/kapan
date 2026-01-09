@@ -14,6 +14,9 @@ import type { OrderContext } from "~~/utils/cow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getOrderNote, getOperationLabel, getOperationColorClass, findPendingNoteForOrder, linkNoteToOrderHash, type OperationType } from "~~/utils/orderNotes";
 import { getProtocolLogo } from "~~/utils/protocol";
+import { LoadingOverlay } from "~~/components/common/Loading";
+import { timeAgo } from "~~/utils/deadline";
+import { truncateAddress } from "~~/utils/address";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -27,21 +30,6 @@ function formatUsd(amount: number): string {
   if (amount < 0.01) return "<$0.01";
   if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}k`;
   return `$${amount.toFixed(2)}`;
-}
-
-function formatDate(timestamp: bigint): string {
-  const date = new Date(Number(timestamp) * 1000);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function timeAgo(timestamp: bigint): string {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = now - Number(timestamp);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return formatDate(timestamp);
 }
 
 interface OrderWithHash {
@@ -109,7 +97,7 @@ export default function OrdersPage() {
 
   const getTokenSymbol = (address: string): string => {
     const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.symbol ?? `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return info?.symbol ?? truncateAddress(address);
   };
 
   const getTokenDecimals = (address: string): number => {
@@ -179,9 +167,7 @@ export default function OrdersPage() {
         </div>
 
         {isLoading && orders.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <span className="loading loading-spinner loading-lg"></span>
-          </div>
+          <LoadingOverlay size="lg" label="Loading orders..." />
         ) : orders.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-base-content/50 text-lg">No orders found</p>

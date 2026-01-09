@@ -6,12 +6,14 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { BaseModal } from "./BaseModal";
 import { FiatBalance } from "~~/components/FiatBalance";
+import { LoadingSpinner } from "~~/components/common/Loading";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
 import { useProtocolRates } from "~~/hooks/kapan/useProtocolRates";
 import formatPercentage from "~~/utils/formatPercentage";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { notification } from "~~/utils/scaffold-eth";
+import { createCheckboxHandler } from "~~/utils/handlers";
 
 interface MoveSupplyModalProps {
   isOpen: boolean;
@@ -413,7 +415,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
         </div>
         {ratesLoading ? (
           <div className="flex justify-center py-4">
-            <span className="loading loading-spinner loading-md"></span>
+            <LoadingSpinner size="md" />
           </div>
         ) : (
           <div className="dropdown dropdown-bottom w-full">
@@ -652,10 +654,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
             disabled={!selectedProtocol || isLoading || !address}
           >
             {isLoading ? (
-              <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Moving position...
-              </>
+              <LoadingSpinner size="sm" label="Moving position..." />
             ) : (
               "Move position"
             )}
@@ -665,7 +664,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
               <input
                 type="checkbox"
                 checked={preferBatching}
-                onChange={(e) => setPreferBatching(e.target.checked)}
+                onChange={createCheckboxHandler(setPreferBatching)}
                 className="checkbox checkbox-sm"
               />
               <div className="flex flex-col">

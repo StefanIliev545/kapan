@@ -8,10 +8,10 @@ import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { formatBps } from "~~/utils/risk";
 import { sanitizeSymbol } from "~~/utils/tokenSymbols";
+import { formatCurrency } from "~~/utils/formatNumber";
 import type { Address } from "viem";
 
 interface CollateralPosition {
@@ -80,24 +80,6 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
   // Only fetch data when the component is visible or when first mounted
   const shouldFetch = isVisible;
-
-  // Format currency with 2 decimal places
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(num);
-  };
-
-  // Format currency in USD
-  const formatUSD = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   // Fetch collateral data directly in this component
   const { data: collateralData } = useScaffoldReadContract({
@@ -432,7 +414,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                       )}
                     </div>
                     <span className="text-xs text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap hidden md:inline group-hover/util:hidden">
-                      ({formatUSD(borrowDetails.borrowValue)} / {formatUSD(totalCollateralValue)})
+                      ({formatCurrency(borrowDetails.borrowValue)} / {formatCurrency(totalCollateralValue)})
                     </span>
                   </div>
                 )}

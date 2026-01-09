@@ -7,6 +7,7 @@ import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { createMorphoContext, type MorphoMarketContext } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
+import { LoadingSpinner } from "./Loading";
 
 // ============ Types ============
 
@@ -100,7 +101,7 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
       <div className={`space-y-2 ${className}`}>
         <div className="text-sm text-base-content/80">Select Morpho Market</div>
         <div className="flex items-center justify-center py-6 border border-base-300 rounded-lg">
-          <span className="loading loading-spinner loading-md" />
+          <LoadingSpinner size="md" />
         </div>
       </div>
     );

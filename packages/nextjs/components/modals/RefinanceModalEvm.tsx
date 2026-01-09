@@ -11,8 +11,7 @@ import React, {
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import type { Address } from "viem";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits, type Address } from "viem";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";

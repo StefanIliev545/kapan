@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { MorphoPositionRow, MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { SupplyPosition } from "~~/components/SupplyPosition";
 import { BorrowPosition } from "~~/components/BorrowPosition";
+import { LoadingSpinner } from "~~/components/common/Loading";
 import { PositionManager } from "~~/utils/position";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -14,6 +15,7 @@ import { ExternalLink } from "lucide-react";
 import { isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
+import { formatSignedPercent } from "../utils";
 
 interface MorphoPositionsSectionProps {
   title: string;
@@ -62,7 +64,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
     if (!hasLoadedOnce) {
       return (
         <div className="flex justify-center py-6">
-          <span className="loading loading-spinner loading-md" />
+          <LoadingSpinner size="md" />
         </div>
       );
     }
@@ -134,11 +136,6 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         [{ balance: row.collateralBalanceUsd, currentRate: collateralRate }],
         row.hasDebt ? [{ balance: row.borrowBalanceUsd, currentRate: row.borrowApy }] : []
       );
-
-      const formatSignedPercentage = (val: number) => {
-        const sign = val >= 0 ? "+" : "";
-        return `${sign}${val.toFixed(2)}%`;
-      };
 
       const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
@@ -220,7 +217,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
               <span className="text-base-content/60">
                 APY:{" "}
                 <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? "text-success" : "text-error"}>
-                  {positionYieldMetrics.netApyPercent != null ? formatSignedPercentage(positionYieldMetrics.netApyPercent) : "—"}
+                  {positionYieldMetrics.netApyPercent != null ? formatSignedPercent(positionYieldMetrics.netApyPercent) : "—"}
                 </span>
               </span>
               {/* LTV - show first on mobile since it's important */}

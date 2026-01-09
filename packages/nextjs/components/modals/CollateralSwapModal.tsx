@@ -1,8 +1,8 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
-import { useCallback } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address, encodeFunctionData, type Hex } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
+import { parseAmount } from "~~/utils/validation";
 
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
@@ -34,6 +34,14 @@ import { CompletionType, getCowExplorerAddressUrl, getPreferredFlashLoanLender, 
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { ExclamationTriangleIcon, InformationCircleIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
+import {
+    ExecutionTypeToggle,
+    type ExecutionType,
+    MarketSwapStats,
+    LimitOrderSection,
+    LimitOrderInfoNote,
+} from "./common";
+import { WarningDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
@@ -138,7 +146,6 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Execution type: "market" (flash loan, instant) vs "limit" (CoW, async)
-    type ExecutionType = "market" | "limit";
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
     
     // CoW limit order specific state
@@ -192,11 +199,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     // Flash Loan Liquidity Check & Auto-Selection
     const amountInBigInt = useMemo(() => {
-        try {
-            return selectedFrom && amountIn ? parseUnits(amountIn, selectedFrom.decimals) : 0n;
-        } catch {
-            return 0n;
-        }
+        if (!selectedFrom) return 0n;
+        const result = parseAmount(amountIn || "0", selectedFrom.decimals);
+        return result.value ?? 0n;
     }, [amountIn, selectedFrom]);
 
     const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
@@ -780,22 +785,23 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const warnings = (
         <>
             {swapRouter === "1inch" && oneInchQuote && oneInchAdapter && oneInchQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
-                </div>
+                <WarningDisplay
+                    message="Warning: Quote 'from' address mismatch!"
+                    size="sm"
+                    breakAll
+                />
             )}
             {swapRouter === "1inch" && !oneInchAdapter && isOpen && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>1inch Adapter not found on this network. Try Pendle for PT swaps.</span>
-                </div>
+                <WarningDisplay
+                    message="1inch Adapter not found on this network. Try Pendle for PT swaps."
+                    size="sm"
+                />
             )}
             {swapRouter === "pendle" && !pendleAdapter && isOpen && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>Pendle Adapter not found on this network.</span>
-                </div>
+                <WarningDisplay
+                    message="Pendle Adapter not found on this network."
+                    size="sm"
+                />
             )}
         </>
     );
@@ -804,30 +810,19 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const customStats = (
         <div className="space-y-3">
             {/* Execution Type Toggle */}
-            {cowAvailable && (
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setExecutionType("market")}
-                        className={`flex-1 btn btn-xs ${executionType === "market" ? "btn-primary" : "btn-ghost"}`}
-                    >
-                        <span className="mr-1">⚡</span> Market
-                    </button>
-                    <button
-                        onClick={() => setExecutionType("limit")}
-                        className={`flex-1 btn btn-xs ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
-                        disabled={!limitOrderReady || !isDevEnvironment}
-                        title={
-                            !isDevEnvironment 
-                                ? "Limit orders are only available in development environment" 
-                                : !limitOrderReady 
-                                    ? "CoW contracts not deployed on this chain" 
-                                    : "Execute via CoW Protocol limit order"
-                        }
-                    >
-                        <ClockIcon className="w-3 h-3 mr-1" /> Limit
-                    </button>
-                </div>
-            )}
+            <ExecutionTypeToggle
+                value={executionType}
+                onChange={setExecutionType}
+                limitAvailable={cowAvailable}
+                limitReady={limitOrderReady && isDevEnvironment}
+                limitDisabledReason={
+                    !isDevEnvironment
+                        ? "Limit orders are only available in development environment"
+                        : !limitOrderReady
+                            ? "CoW contracts not deployed on this chain"
+                            : undefined
+                }
+            />
 
             {/* Limit Order Pricing Section */}
             {executionType === "limit" && (
@@ -889,72 +884,32 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         </span>
                     </div>
 
-                    {/* Flash Loan Provider Selection */}
+                    {/* Flash Loan Provider Selection with Limit Order Config */}
                     {selectedFrom && limitOrderSellToken && (
-                        <div className="pt-2 border-t border-base-300/30">
-                            <LimitOrderConfig
-                                chainId={chainId}
-                                sellToken={limitOrderSellToken}
-                                totalAmount={amountInBigInt}
-                                onConfigChange={handleLimitOrderConfigChange}
-                                showFlashLoanToggle={false}
-                                showChunksInput={true}
-                                compact
-                            />
-                            {/* Chunk Info - shown when multi-chunk */}
-                            {(limitOrderConfig?.numChunks ?? 1) > 1 && (
-                                <div className="flex items-start gap-1.5 mt-2 text-[10px]">
-                                    <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    <div>
-                                        <span className="text-info font-medium">Multi-chunk: {limitOrderConfig?.numChunks} iterations</span>
-                                        <p className="text-base-content/50 mt-0.5">
-                                            ~30 min between chunks for price discovery.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <LimitOrderSection
+                            chainId={chainId}
+                            sellToken={limitOrderSellToken}
+                            totalAmount={amountInBigInt}
+                            onConfigChange={handleLimitOrderConfigChange}
+                            limitOrderConfig={limitOrderConfig}
+                            className="pt-2 border-t border-base-300/30"
+                        />
                     )}
 
                     {/* Info note */}
-                    <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-base-300/30 text-[10px] text-base-content/50">
-                        <ClockIcon className="w-3 h-3 shrink-0 mt-0.5" />
-                        <span>
-                            {(limitOrderConfig?.numChunks ?? 1) === 1 
-                                ? "Single transaction via CoW flash loan. MEV protected."
-                                : `${limitOrderConfig?.numChunks} iterations. ~30 min between chunks. MEV protected.`
-                            }
-                        </span>
-                    </div>
+                    <LimitOrderInfoNote numChunks={limitOrderConfig?.numChunks ?? 1} />
                 </div>
             )}
 
             {/* Default stats for market orders */}
             {executionType === "market" && (
-                <div className={`grid ${priceImpact !== undefined ? "grid-cols-3" : "grid-cols-2"} gap-4 text-center bg-base-200/50 p-3 rounded`}>
-                    <div className="flex flex-col items-center">
-                        <div className="text-xs text-base-content/70">Slippage</div>
-                        <div className="font-medium text-sm">{slippage}%</div>
-                    </div>
-                    {priceImpact !== undefined && priceImpact !== null && (
-                        <div>
-                            <div className="text-xs text-base-content/70">Price Impact</div>
-                            <div className="font-medium text-sm">
-                                {priceImpact.toFixed(2)}%
-                            </div>
-                        </div>
-                    )}
-                    <div>
-                        <div className="text-xs text-base-content/70">Min Output</div>
-                        <div className="font-medium text-sm">
-                            {amountOut && parseFloat(amountOut) > 0 ? (
-                                (parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6)
-                            ) : "-"}
-                        </div>
-                    </div>
-                </div>
+                <MarketSwapStats
+                    slippage={slippage}
+                    setSlippage={setSlippage}
+                    priceImpact={priceImpact}
+                    formattedPriceImpact={priceImpact !== undefined && priceImpact !== null ? `${priceImpact.toFixed(2)}%` : undefined}
+                    expectedOutput={amountOut && parseFloat(amountOut) > 0 ? (parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6) : undefined}
+                />
             )}
         </div>
     );

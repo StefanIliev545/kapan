@@ -1,11 +1,14 @@
 import { FC, useState, useMemo, useEffect, ReactNode } from "react";
 import Image from "next/image";
-import { formatUnits, parseUnits, Address } from "viem";
+import { formatUnits, Address } from "viem";
 import { CheckIcon, ExclamationTriangleIcon, ArrowDownIcon, InformationCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
+import { ErrorDisplay } from "../common/ErrorDisplay";
+import { ButtonLoading } from "../common/Loading";
 import { FlashLoanProviderOption } from "~~/hooks/useMovePositionData";
 import { SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 import { getPriceImpactSeverity, getPriceImpactColorClass, formatPriceImpact } from "~~/utils/slippage";
+import { parseAmount } from "~~/utils/validation";
 
 // Shared asset type
 export interface SwapAsset {
@@ -190,13 +193,11 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
     const minOutput = useMemo(() => {
         if (!amountOut || parseFloat(amountOut) === 0) return null;
-        try {
-            const outRaw = parseUnits(amountOut, selectedTo?.decimals || 18);
-            const minRaw = (outRaw * (10000n - BigInt(Math.round(slippage * 100)))) / 10000n;
-            return formatUnits(minRaw, selectedTo?.decimals || 18);
-        } catch {
-            return null;
-        }
+        const decimals = selectedTo?.decimals || 18;
+        const result = parseAmount(amountOut, decimals);
+        if (!result.value) return null;
+        const minRaw = (result.value * (10000n - BigInt(Math.round(slippage * 100)))) / 10000n;
+        return formatUnits(minRaw, decimals);
     }, [amountOut, slippage, selectedTo?.decimals]);
 
     return (
@@ -459,10 +460,11 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
                         {/* Warnings/Errors */}
                         {quoteError && (
-                            <div className="alert alert-error text-xs py-2">
-                                <ExclamationTriangleIcon className="w-4 h-4" />
-                                <span className="break-all">Error fetching quote: {quoteError.message}</span>
-                            </div>
+                            <ErrorDisplay
+                                message={`Error fetching quote: ${quoteError.message}`}
+                                size="sm"
+                                breakAll
+                            />
                         )}
                         {warnings}
 
@@ -489,7 +491,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                                         {
                                             key: "swap",
                                             label: isSubmitting ? "Processing..." : isQuoteLoading ? "Fetching Quote..." : submitLabel,
-                                            icon: isSubmitting ? <span className="loading loading-spinner loading-xs" /> : undefined,
+                                            icon: isSubmitting ? <ButtonLoading size="xs" /> : undefined,
                                             onClick: onSubmit,
                                             disabled: !canSubmit || isQuoteLoading || isSubmitting,
                                             variant: "ghost",

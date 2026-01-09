@@ -8,6 +8,7 @@ import { useEnsAvatar, useEnsName } from "wagmi";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
+import { truncateAddress } from "~~/utils/address";
 
 const textSizeMap = {
   "3xs": "text-[10px]",
@@ -102,7 +103,7 @@ export const Address = ({
     },
   });
 
-  const shortAddress = checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4);
+  const shortAddress = truncateAddress(checkSumAddress);
   const displayAddress = format === "long" ? checkSumAddress : shortAddress;
   const displayEnsOrAddress = ens || displayAddress;
 

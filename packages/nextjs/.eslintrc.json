@@ -1,10 +1,9 @@
 {
   "extends": [
     "next/core-web-vitals",
-    "plugin:@typescript-eslint/recommended",
-    "plugin:sonarjs/recommended-legacy"
+    "plugin:@typescript-eslint/recommended"
   ],
-  "plugins": ["sonarjs"],
+  "plugins": ["sonarjs", "tailwindcss"],
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/ban-ts-comment": "off",
@@ -13,6 +12,17 @@
     "sonarjs/no-identical-functions": "warn",
     "sonarjs/no-collapsible-if": "warn",
     "sonarjs/prefer-single-boolean-return": "warn",
-    "sonarjs/no-redundant-jump": "warn"
+    "sonarjs/no-redundant-jump": "warn",
+    "tailwindcss/classnames-order": "warn",
+    "tailwindcss/enforces-shorthand": "warn",
+    "tailwindcss/enforces-negative-arbitrary-values": "warn",
+    "tailwindcss/no-custom-classname": "off",
+    "tailwindcss/no-contradicting-classname": "error"
+  },
+  "settings": {
+    "tailwindcss": {
+      "callees": ["cn", "clsx", "twMerge"],
+      "config": "tailwind.config.ts"
+    }
   }
 }

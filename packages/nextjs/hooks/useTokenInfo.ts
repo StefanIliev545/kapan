@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { usePublicClient } from "wagmi";
 import { type Address, type Abi } from "viem";
 import { ERC20ABI } from "~~/contracts/externalContracts";
+import { truncateAddress } from "~~/utils/address";
 
 export interface TokenInfo {
   symbol: string;
@@ -61,7 +62,7 @@ export function useTokenInfo(
             
             const symbol = symbolResult.status === "success" 
               ? (symbolResult.result as string)
-              : `${address.slice(0, 6)}...${address.slice(-4)}`;
+              : truncateAddress(address);
             
             const decimals = decimalsResult.status === "success"
               ? Number(decimalsResult.result)
@@ -77,7 +78,7 @@ export function useTokenInfo(
           // Fallback for failed fetches
           for (const address of uncachedAddresses) {
             newMap.set(address.toLowerCase(), {
-              symbol: `${address.slice(0, 6)}...${address.slice(-4)}`,
+              symbol: truncateAddress(address),
               decimals: 18,
             });
           }

@@ -5,6 +5,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
+import { LoadingSpinner } from "~~/components/common/Loading";
 import formatPercentage from "~~/utils/formatPercentage";
 
 interface VesuMarketSectionProps {
@@ -66,7 +67,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
     if (isLoadingAssets) {
       return (
         <div className="flex justify-center py-8">
-          <span className="loading loading-spinner loading-md" />
+          <LoadingSpinner size="md" />
         </div>
       );
     }
@@ -138,11 +139,11 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           {/* Protocol name + icon */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+            <div className="token-icon-wrapper-lg">
               <Image src={iconSrc} alt={`${title} icon`} width={24} height={24} className="object-contain drop-shadow-sm" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+              <span className="label-text-xs-semibold">Protocol</span>
               <span className="text-base font-bold tracking-tight">{title}</span>
             </div>
           </div>
@@ -155,7 +156,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
             <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
               {/* Net Balance */}
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                <span className="label-text-xs-semibold">Balance</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netBalanceUsd)}
                 </span>
@@ -163,7 +164,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
 
               {/* 30D Yield */}
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                <span className="label-text-xs-semibold">30D Yield</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netYield30d)}
                 </span>
@@ -171,7 +172,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
 
               {/* Net APY */}
               <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                <span className="label-text-xs-semibold">Net APY</span>
                 <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                 </span>

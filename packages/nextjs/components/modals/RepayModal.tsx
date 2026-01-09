@@ -1,9 +1,10 @@
 import { FC, useCallback } from "react";
+import { BatchingPreference } from "./common/BatchingPreference";
+import { REPAY_MODAL_CONFIG, ensureTokenDecimals, useRepayModal } from "./common/useRepayModal";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { formatUnits } from "viem";
+import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
-import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
 
 interface RepayModalProps {
@@ -32,34 +33,21 @@ export const RepayModal: FC<RepayModalProps> = ({
   const { buildRepayFlowAsync } = useKapanRouterV2();
   const normalizedProtocolName = protocolName.toLowerCase();
 
-  if (token.decimals == null) {
-    token.decimals = decimals;
-  }
+  // Ensure token has decimals set (backwards compatibility)
+  ensureTokenDecimals(token, decimals);
 
-  const before = decimals ? Number(formatUnits(debtBalance, decimals)) : 0;
-  const bump = (debtBalance * 101n) / 100n;
-  const maxInput = walletBalance < bump ? walletBalance : bump;
+  // Use shared hook for common repay calculations
+  const { before, maxInput, effectiveDecimals } = useRepayModal({
+    token,
+    debtBalance,
+    walletBalance,
+    decimals,
+  });
 
   const buildFlow = useCallback(
     (amount: string, isMax?: boolean) =>
-      buildRepayFlowAsync(
-        normalizedProtocolName,
-        token.address,
-        amount,
-        token.decimals || decimals || 18,
-        isMax,
-        maxInput,
-        context,
-      ),
-    [
-      buildRepayFlowAsync,
-      context,
-      decimals,
-      maxInput,
-      normalizedProtocolName,
-      token.address,
-      token.decimals,
-    ],
+      buildRepayFlowAsync(normalizedProtocolName, token.address, amount, effectiveDecimals, isMax, maxInput, context),
+    [buildRepayFlowAsync, context, effectiveDecimals, maxInput, normalizedProtocolName, token.address],
   );
 
   const { handleConfirm: handleRepay, batchingPreference } = useEvmTransactionFlow({
@@ -78,12 +66,12 @@ export const RepayModal: FC<RepayModalProps> = ({
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
-      action="Repay"
+      action={REPAY_MODAL_CONFIG.action}
       token={token}
       protocolName={protocolName}
-      apyLabel="Borrow APY"
+      apyLabel={REPAY_MODAL_CONFIG.apyLabel}
       apy={token.currentRate}
-      metricLabel="Total debt"
+      metricLabel={REPAY_MODAL_CONFIG.metricLabel}
       before={before}
       balance={walletBalance}
       percentBase={debtBalance}
@@ -92,19 +80,9 @@ export const RepayModal: FC<RepayModalProps> = ({
       chainId={chainId}
       position={position}
       onConfirm={handleRepay}
-      renderExtraContent={() => isPreferenceLoaded ? (
-        <div className="pt-2 pb-1">
-          <label className="label cursor-pointer gap-2 justify-start">
-            <input
-              type="checkbox"
-              checked={preferBatching}
-              onChange={(e) => setPreferBatching(e.target.checked)}
-              className="checkbox checkbox-sm"
-            />
-            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-          </label>
-        </div>
-      ) : null}
+      renderExtraContent={() => (
+        <BatchingPreference enabled={preferBatching} setEnabled={setPreferBatching} isLoaded={isPreferenceLoaded} />
+      )}
     />
   );
 };

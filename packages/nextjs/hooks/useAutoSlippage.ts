@@ -1,13 +1,17 @@
 // Auto-slippage calculation hook
 import { useEffect, useMemo } from "react";
-import { 
-    calculateSuggestedSlippage, 
-    calculatePriceImpactFromUSD, 
-    getPriceImpactSeverity, 
-    getPriceImpactColorClass, 
+import {
+    calculateSuggestedSlippage,
+    calculatePriceImpactFromUSD,
+    getPriceImpactSeverity,
+    getPriceImpactColorClass,
     formatPriceImpact,
-    PriceImpactSeverity 
+    PriceImpactSeverity,
+    DEFAULT_SLIPPAGE,
 } from "~~/utils/slippage";
+
+// Re-export from central slippage module for backward compatibility
+export { SLIPPAGE_OPTIONS, DEFAULT_SLIPPAGE } from "~~/utils/slippage";
 
 interface UseAutoSlippageParams {
     /** Current slippage value (managed by parent component) */
@@ -117,9 +121,3 @@ export const useAutoSlippage = ({
         formattedPriceImpact,
     };
 };
-
-/** Standard slippage options for dropdown - includes low values for stable pairs */
-export const SLIPPAGE_OPTIONS = [0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5];
-
-/** Default initial slippage - will be auto-adjusted based on price impact */
-const DEFAULT_SLIPPAGE = 0.1;

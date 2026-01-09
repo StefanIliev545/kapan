@@ -9,6 +9,7 @@ import { universalErc20Abi } from "~~/utils/Constants";
 import { feltToString, formatTokenAmount } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
+import { truncateAddress } from "~~/utils/address";
 
 interface GasTokenComponentProps {
   address: string;
@@ -158,7 +159,7 @@ functionName: "symbol",
           Loading...
         </div>
         <div className="text-xs text-base-content/30">
-          {address.slice(0, 6)}...
+          {truncateAddress(address, 6, 0)}
         </div>
       </div>
     );
@@ -175,7 +176,7 @@ functionName: "symbol",
           Error
         </div>
         <div className="text-xs text-error/70">
-          {address.slice(0, 6)}...
+          {truncateAddress(address, 6, 0)}
         </div>
       </div>
     );

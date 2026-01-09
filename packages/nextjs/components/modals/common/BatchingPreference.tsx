@@ -1,4 +1,5 @@
 import { FC } from "react";
+import { createCheckboxHandler } from "~~/utils/handlers";
 
 interface BatchingPreferenceProps {
   enabled: boolean;
@@ -17,7 +18,7 @@ export const BatchingPreference: FC<BatchingPreferenceProps> = ({ enabled, setEn
         <input
           type="checkbox"
           checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
+          onChange={createCheckboxHandler(setEnabled)}
           className="checkbox checkbox-sm"
         />
         <span className="label-text text-xs">Batch Transactions with Smart Account</span>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { CommonInputProps, InputBase, SIGNED_NUMBER_REGEX } from "~~/components/scaffold-eth";
 import { useDisplayUsdMode } from "~~/hooks/scaffold-eth/useDisplayUsdMode";
@@ -65,9 +65,15 @@ export const EtherInput = ({
     if (transitoryDisplayValue && parseFloat(newDisplayValue) === parseFloat(transitoryDisplayValue)) {
       return transitoryDisplayValue;
     }
-    // Clear any transitory display values that might be set
-    setTransitoryDisplayValue(undefined);
     return newDisplayValue;
+  }, [nativeCurrencyPrice, transitoryDisplayValue, displayUsdMode, value]);
+
+  // Clear transitory display value when the computed value changes
+  useEffect(() => {
+    const newDisplayValue = etherValueToDisplayValue(displayUsdMode, value, nativeCurrencyPrice || 0);
+    if (transitoryDisplayValue && parseFloat(newDisplayValue) !== parseFloat(transitoryDisplayValue)) {
+      setTransitoryDisplayValue(undefined);
+    }
   }, [nativeCurrencyPrice, transitoryDisplayValue, displayUsdMode, value]);
 
   const handleChangeNumber = (newValue: string) => {

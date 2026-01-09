@@ -1,5 +1,13 @@
 "use client";
 
+// BigInt JSON serialization polyfill - prevents "Cannot serialize BigInt" errors
+// This must be at the top level, before any other code runs
+if (typeof BigInt !== "undefined") {
+  (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
+    return this.toString();
+  };
+}
+
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import {

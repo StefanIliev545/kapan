@@ -1,8 +1,9 @@
-import { useMemo, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
+import { useLogError } from "~~/hooks/common";
 
 const normalizeDecimals = (value: unknown): number | null => {
   if (value === undefined || value === null) return 18;
@@ -100,11 +101,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
     refetchInterval: 0,
   });
 
-  useEffect(() => {
-    if (assetsError) {
-      console.error("Error fetching V2 supported assets:", assetsError);
-    }
-  }, [assetsError]);
+  useLogError(assetsError, "Error fetching V2 supported assets:");
 
   type RateField = { value?: unknown; decimals?: unknown } | null | undefined;
   type ApiAsset = {

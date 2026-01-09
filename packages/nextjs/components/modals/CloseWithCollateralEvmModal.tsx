@@ -2,6 +2,7 @@ import { FC, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address, type Hex, encodeFunctionData } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
+import { parseAmount } from "~~/utils/validation";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { use1inchQuoteOnly } from "~~/hooks/use1inchQuoteOnly";
@@ -33,10 +34,20 @@ import { is1inchSupported, isPendleSupported, getBestSwapRouter, getOneInchAdapt
 import { ExclamationTriangleIcon, InformationCircleIcon, Cog6ToothIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import {
+    ExecutionTypeToggle,
+    type ExecutionType,
+    MarketSwapStats,
+    LimitOrderSection,
+    BatchedTxToggle,
+    hasEnoughCollateral as checkCollateralSufficiency,
+} from "./common";
+import { WarningDisplay, InfoDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
 import { saveOrderNote, createClosePositionNote } from "~~/utils/orderNotes";
+import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
 
 // Aave flash loan fee: 5 bps (0.05%)
 // We add a small buffer (10 bps total) to ensure swap covers repayment
@@ -147,7 +158,6 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // ============ Limit Order State ============
-    type ExecutionType = "market" | "limit";
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
     const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
@@ -188,7 +198,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     }) : null, [selectedTo]);
 
     // Ensure "From" is always the debt token
-    useMemo(() => {
+    useEffect(() => {
         if (!selectedFrom || selectedFrom.address !== debtToken) {
             setSelectedFrom(fromAsset);
         }
@@ -250,11 +260,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Amount of debt to repay in raw
     const repayAmountRaw = useMemo(() => {
-        try {
-            return amountIn ? parseUnits(amountIn, debtDecimals) : 0n;
-        } catch {
-            return 0n;
-        }
+        const result = parseAmount(amountIn || "0", debtDecimals);
+        return result.value ?? 0n;
     }, [amountIn, debtDecimals]);
 
     // Flash Loan selection - we flash loan the DEBT token to repay, then withdraw collateral
@@ -336,8 +343,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         };
     }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtDecimals, slippage]);
 
-    // Check if user has enough collateral
-    const hasEnoughCollateral = selectedTo ? requiredCollateral <= selectedTo.rawBalance : false;
+    // Check if user has enough collateral (using shared utility)
+    const hasEnoughCollateral = selectedTo ? checkCollateralSufficiency(requiredCollateral, selectedTo.rawBalance) : false;
 
     // Step 2: Get actual swap quote with the required collateral amount (needs `from` for tx.data)
     const minSwapAmount = selectedTo ? parseUnits("0.0001", selectedTo.decimals) : 0n;
@@ -422,8 +429,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     }, [cowQuote, selectedTo, slippage]);
 
     // Check if user has enough collateral for limit order (uses CoW quote-based calculation)
-    const hasEnoughCollateralForLimit = selectedTo && limitOrderCollateral > 0n 
-        ? limitOrderCollateral <= selectedTo.rawBalance 
+    const hasEnoughCollateralForLimit = selectedTo && limitOrderCollateral > 0n
+        ? checkCollateralSufficiency(limitOrderCollateral, selectedTo.rawBalance)
         : hasEnoughCollateral;  // Fall back to market order check if quote not ready
 
     // ============ Limit Order: Flash Loan Info ============
@@ -776,46 +783,38 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             } else {
                 // Sequential execution (more compatible with wallets like MetaMask)
                 console.log("[Limit Order] Using sequential TX mode");
-                
-                for (let i = 0; i < allCalls.length; i++) {
-                    const call = allCalls[i];
-                    notification.remove(notificationId);
-                    notificationId = notification.loading(
-                        <TransactionToast step="pending" message={`Simulating step ${i + 1}/${allCalls.length}...`} />
-                    );
 
-                    // Simulate first to get better error messages
-                    try {
-                        await publicClient.call({
-                            account: userAddress,
-                            to: call.to as `0x${string}`,
-                            data: call.data as `0x${string}`,
-                        });
-                        console.log(`[Limit Order] Step ${i + 1} simulation passed`);
-                    } catch (simError: any) {
-                        console.error(`[Limit Order] Step ${i + 1} simulation FAILED:`, simError);
-                        const errorMsg = simError?.message || simError?.shortMessage || String(simError);
-                        const revertMatch = errorMsg.match(/reverted with.*?['"]([^'"]+)['"]/i) 
-                            || errorMsg.match(/reason:\s*([^\n]+)/i)
-                            || errorMsg.match(/error:\s*([^\n]+)/i);
-                        const revertReason = revertMatch ? revertMatch[1] : errorMsg;
-                        notification.remove(notificationId);
-                        notification.error(`Step ${i + 1} would fail: ${revertReason}`);
-                        throw new Error(`Transaction simulation failed at step ${i + 1}: ${revertReason}`);
+                const result = await executeSequentialTransactions(
+                    publicClient,
+                    walletClient,
+                    allCalls as TransactionCall[],
+                    userAddress,
+                    {
+                        simulateFirst: true,
+                        onProgress: (step, total, phase) => {
+                            if (notificationId !== undefined) notification.remove(notificationId as string | number);
+                            const message = phase === "simulating"
+                                ? `Simulating step ${step}/${total}...`
+                                : phase === "executing"
+                                    ? `Executing step ${step}/${total}...`
+                                    : `Step ${step}/${total} confirmed`;
+                            notificationId = notification.loading(
+                                <TransactionToast step="pending" message={message} />
+                            );
+                            if (phase === "confirmed") {
+                                console.log(`[Limit Order] Step ${step} complete`);
+                            }
+                        },
+                        onError: (step, error) => {
+                            console.error(`[Limit Order] Step ${step} FAILED:`, error);
+                            if (notificationId !== undefined) notification.remove(notificationId as string | number);
+                            notification.error(`Step ${step} would fail: ${error}`);
+                        },
                     }
+                );
 
-                    notification.remove(notificationId);
-                    notificationId = notification.loading(
-                        <TransactionToast step="pending" message={`Executing step ${i + 1}/${allCalls.length}...`} />
-                    );
-
-                    const hash = await walletClient.sendTransaction({
-                        to: call.to as Address,
-                        data: call.data as Hex,
-                        account: userAddress,
-                    });
-                    await publicClient.waitForTransactionReceipt({ hash });
-                    console.log(`[Limit Order] Step ${i + 1} complete:`, hash);
+                if (!result.success) {
+                    throw new Error(result.error || "Transaction failed");
                 }
 
                 notification.remove(notificationId);
@@ -905,178 +904,64 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         resetDep: selectedTo?.address,
     });
 
-    // Custom stats for close with collateral
+    // Custom stats for close with collateral - using shared components
     const customStats = (
         <div className="space-y-2">
             {/* Execution Type Toggle */}
-            {cowAvailable && (
-                <div className="flex gap-2 mb-2">
-                    <button
-                        className={`btn btn-xs flex-1 ${executionType === "market" ? "btn-primary" : "btn-ghost"}`}
-                        onClick={() => setExecutionType("market")}
-                    >
-                        Market Order
-                    </button>
-                    <button
-                        className={`btn btn-xs flex-1 ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
-                        onClick={() => {
-                            setExecutionType("limit");
-                            // Set higher default slippage for limit orders (1% minimum for better fill rates)
-                            if (slippage < 1) setSlippage(1);
-                        }}
-                    >
-                        <ClockIcon className="w-3 h-3 mr-1" />
-                        Limit Order
-                    </button>
-                </div>
-            )}
+            <ExecutionTypeToggle
+                value={executionType}
+                onChange={(type) => {
+                    setExecutionType(type);
+                    // Set higher default slippage for limit orders (1% minimum for better fill rates)
+                    if (type === "limit" && slippage < 1) setSlippage(1);
+                }}
+                limitAvailable={cowAvailable}
+                limitReady={limitOrderReady}
+            />
 
             {/* Limit Order Config */}
             {executionType === "limit" && selectedTo && limitOrderSellToken && (
-                <div className="bg-base-200/30 rounded p-2 mb-2">
-                    <LimitOrderConfig
-                        chainId={chainId}
-                        sellToken={limitOrderSellToken}
-                        totalAmount={limitOrderCollateral || requiredCollateral}
-                        onConfigChange={handleLimitOrderConfigChange}
-                        showChunksInput={true}
-                        showFlashLoanToggle={false}
-                        compact={true}
-                    />
-                    {/* Chunk Info - shown when multi-chunk */}
-                    {(limitOrderConfig?.numChunks ?? 1) > 1 && (
-                        <div className="flex items-start gap-1.5 mt-2 text-[10px]">
-                            <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            <div>
-                                <span className="text-info font-medium">Multi-chunk: {limitOrderConfig?.numChunks} iterations</span>
-                                <p className="text-base-content/50 mt-0.5">
-                                    ~30 min between chunks for price discovery.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                    {isCowQuoteLoading && (
-                        <div className="flex items-center gap-2 text-xs text-base-content/60 mt-2">
-                            <span className="loading loading-spinner loading-xs" />
-                            Fetching CoW quote...
-                        </div>
-                    )}
-                    
-                    {/* Batched TX Toggle */}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300/30">
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-base-content/60 text-xs">Batched TX</span>
-                            <span className="text-[10px] text-base-content/40">(EIP-5792)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-base-content/40">
-                                {useBatchedTx ? "faster" : "compatible"}
-                            </span>
-                            <input
-                                type="checkbox"
-                                checked={useBatchedTx}
-                                onChange={e => setUseBatchedTx(e.target.checked)}
-                                className="toggle toggle-xs toggle-primary"
-                            />
-                        </div>
-                    </div>
-                </div>
+                <LimitOrderSection
+                    chainId={chainId}
+                    sellToken={limitOrderSellToken}
+                    totalAmount={limitOrderCollateral || requiredCollateral}
+                    onConfigChange={handleLimitOrderConfigChange}
+                    limitOrderConfig={limitOrderConfig}
+                    isCowQuoteLoading={isCowQuoteLoading}
+                    showBatchedToggle={true}
+                    useBatchedTx={useBatchedTx}
+                    setUseBatchedTx={setUseBatchedTx}
+                    className="bg-base-200/30 rounded p-2 mb-2"
+                />
             )}
 
             {/* Market order stats */}
             {executionType === "market" && (
-                <div className="grid grid-cols-4 gap-3 text-center bg-base-200/50 p-3 rounded text-xs">
-                    <div>
-                        <div className="text-base-content/70 flex items-center justify-center gap-1">
-                            Slippage
-                            <div className="dropdown dropdown-top dropdown-hover">
-                                <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                    <Cog6ToothIcon className="w-3 h-3" />
-                                </label>
-                                <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                    {SLIPPAGE_OPTIONS.map((s) => (
-                                        <li key={s}>
-                                            <a
-                                                className={slippage === s ? "active" : ""}
-                                                onClick={() => setSlippage(s)}
-                                            >
-                                                {s}%
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                        <div className="font-medium">{slippage}%</div>
-                    </div>
-                    <div>
-                        <div className="text-base-content/70">Price Impact</div>
-                        <div className={`font-medium ${priceImpactColorClass}`}>
-                            {formattedPriceImpact}
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-base-content/70">Swap Rate</div>
-                        <div className="font-medium">
-                            1 {selectedTo?.symbol || "?"} ≈ {parseFloat(exchangeRate).toFixed(2)} {debtName}
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-base-content/70">Swap Output</div>
-                        <div className={`font-medium ${outputCoversRepay ? "text-success" : "text-warning"}`}>
-                            {swapQuote ? `${parseFloat(expectedOutput).toFixed(4)} ${debtName}` : "-"}
-                        </div>
-                    </div>
-                </div>
+                <MarketSwapStats
+                    slippage={slippage}
+                    setSlippage={setSlippage}
+                    priceImpact={priceImpact}
+                    priceImpactClass={priceImpactColorClass}
+                    formattedPriceImpact={formattedPriceImpact}
+                    exchangeRate={parseFloat(exchangeRate).toFixed(2)}
+                    fromSymbol={selectedTo?.symbol}
+                    toSymbol={debtName}
+                    expectedOutput={swapQuote ? parseFloat(expectedOutput).toFixed(4) : undefined}
+                    outputCoversRequired={outputCoversRepay}
+                />
             )}
 
             {/* Limit order stats */}
             {executionType === "limit" && cowQuote && (
-                <div className="grid grid-cols-4 gap-3 text-center bg-base-200/50 p-3 rounded text-xs">
-                    <div>
-                        <div className="text-base-content/70 flex items-center justify-center gap-1">
-                            Slippage
-                            <div className="dropdown dropdown-top dropdown-hover">
-                                <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                    <Cog6ToothIcon className="w-3 h-3" />
-                                </label>
-                                <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                    {SLIPPAGE_OPTIONS.map((s) => (
-                                        <li key={s}>
-                                            <a
-                                                className={slippage === s ? "active" : ""}
-                                                onClick={() => setSlippage(s)}
-                                            >
-                                                {s}%
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                        <div className="font-medium">{slippage}%</div>
-                    </div>
-                    <div>
-                        <div className="text-base-content/70">Swap Rate</div>
-                        <div className="font-medium">
-                            1 {selectedTo?.symbol || "?"} ≈ {parseFloat(exchangeRate).toFixed(2)} {debtName}
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-base-content/70">Expected Output</div>
-                        <div className="font-medium text-success">
-                            {formatUnits(getCowQuoteBuyAmount(cowQuote), debtDecimals)} {debtName}
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-base-content/70">Flash Loan Fee</div>
-                        <div className="font-medium">
-                            {cowFlashLoanInfo?.fee && selectedTo ? formatUnits(cowFlashLoanInfo.fee, selectedTo.decimals) : "0"} {selectedTo?.symbol || ""}
-                        </div>
-                    </div>
-                </div>
+                <MarketSwapStats
+                    slippage={slippage}
+                    setSlippage={setSlippage}
+                    exchangeRate={parseFloat(exchangeRate).toFixed(2)}
+                    fromSymbol={selectedTo?.symbol}
+                    toSymbol={debtName}
+                    expectedOutput={formatUnits(getCowQuoteBuyAmount(cowQuote), debtDecimals)}
+                    outputCoversRequired={true}
+                />
             )}
 
             {/* Show USD values if available (market order only) */}
@@ -1145,25 +1030,23 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const warnings = (
         <>
             {!hasEnoughCollateral && requiredCollateral > 0n && selectedTo && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>
-                        Insufficient collateral. Need ~{requiredCollateralFormatted} {selectedTo.symbol}, 
-                        but you only have {formatUnits(selectedTo.rawBalance, selectedTo.decimals)} {selectedTo.symbol}.
-                    </span>
-                </div>
+                <WarningDisplay
+                    message={`Insufficient collateral. Need ~${requiredCollateralFormatted} ${selectedTo.symbol}, but you only have ${formatUnits(selectedTo.rawBalance, selectedTo.decimals)} ${selectedTo.symbol}.`}
+                    size="sm"
+                />
             )}
             {swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
-                </div>
+                <WarningDisplay
+                    message="Warning: Quote 'from' address mismatch!"
+                    size="sm"
+                    breakAll
+                />
             )}
             {!hasAdapter && isOpen && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>{swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.</span>
-                </div>
+                <WarningDisplay
+                    message={`${swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
+                    size="sm"
+                />
             )}
         </>
     );

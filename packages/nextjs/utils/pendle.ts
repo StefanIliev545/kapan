@@ -1,5 +1,7 @@
 import { Address, Hex, encodeAbiParameters } from "viem";
 import { ProtocolInstruction } from "./v2/instructionHelpers";
+import { withRetry, isNetworkError, isRateLimitError } from "./retry";
+import { getDefaultSwapDeadline } from "./deadline";
 
 export const PENDLE_API_BASE = "/api/pendle";
 
@@ -84,7 +86,8 @@ export const fetchPendleConvert = async (
     appendValue(searchParams, "receiver", params.receiver);
     appendValue(searchParams, "slippage", params.slippage);
     appendValue(searchParams, "enableAggregator", true); // Always enable aggregators
-    appendValue(searchParams, "deadline", params.deadline);
+    // Use provided deadline or default to 20 minutes from now
+    appendValue(searchParams, "deadline", params.deadline ?? getDefaultSwapDeadline());
 
     appendValue(searchParams, "tokensIn", Array.isArray(params.tokensIn) ? params.tokensIn : [params.tokensIn]);
     appendValue(searchParams, "tokensOut", Array.isArray(params.tokensOut) ? params.tokensOut : [params.tokensOut]);
@@ -93,42 +96,59 @@ export const fetchPendleConvert = async (
 
     const url = `${PENDLE_API_BASE}/${chainId}/convert?${searchParams.toString()}`;
 
-    const response = await fetch(url, {
-        headers: {
-            Accept: "application/json",
+    return withRetry(
+        async () => {
+            const response = await fetch(url, {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            // Handle rate limiting explicitly
+            if (response.status === 429) {
+                throw new Error("Pendle API rate limit exceeded");
+            }
+
+            const json = await response.json();
+
+            if (!response.ok || (json as { error?: string }).error) {
+                const error = json as { error?: string; description?: string; message?: string };
+                throw new Error(error.error || error.description || error.message || "Pendle convert request failed");
+            }
+
+            // Transform raw API response to normalized format
+            const raw = json as PendleRawResponse;
+
+            if (!raw.routes || raw.routes.length === 0) {
+                throw new Error("Pendle API returned no routes");
+            }
+
+            const bestRoute = raw.routes[0];
+            const outputAmount = bestRoute.outputs?.[0]?.amount || "0";
+            const priceImpact = bestRoute.data?.priceImpact;
+
+            return {
+                transaction: {
+                    to: bestRoute.tx.to,
+                    data: bestRoute.tx.data,
+                    from: bestRoute.tx.from,
+                },
+                data: {
+                    amountTokenOut: outputAmount,
+                    amountPtOut: outputAmount, // Use same value for compatibility
+                    priceImpact,
+                },
+            } as PendleConvertResponse;
         },
-    });
-
-    const json = await response.json();
-
-    if (!response.ok || (json as { error?: string }).error) {
-        const error = json as { error?: string; description?: string; message?: string };
-        throw new Error(error.error || error.description || error.message || "Pendle convert request failed");
-    }
-
-    // Transform raw API response to normalized format
-    const raw = json as PendleRawResponse;
-    
-    if (!raw.routes || raw.routes.length === 0) {
-        throw new Error("Pendle API returned no routes");
-    }
-
-    const bestRoute = raw.routes[0];
-    const outputAmount = bestRoute.outputs?.[0]?.amount || "0";
-    const priceImpact = bestRoute.data?.priceImpact;
-
-    return {
-        transaction: {
-            to: bestRoute.tx.to,
-            data: bestRoute.tx.data,
-            from: bestRoute.tx.from,
-        },
-        data: {
-            amountTokenOut: outputAmount,
-            amountPtOut: outputAmount, // Use same value for compatibility
-            priceImpact,
-        },
-    } as PendleConvertResponse;
+        {
+            retries: 2,
+            baseDelay: 1000,
+            isRetryable: (error) => isNetworkError(error) || isRateLimitError(error),
+            onRetry: (attempt, error, delay) => {
+                console.warn(`[Pendle convert] Retry ${attempt}, waiting ${delay}ms`, error);
+            },
+        }
+    );
 };
 
 export const encodePendleContext = (tokenOut: Address, minAmountOut: bigint, callData: Hex): Hex => {

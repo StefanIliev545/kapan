@@ -4,6 +4,7 @@ import { PlusIcon } from "@heroicons/react/24/outline";
 
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
+import { LoadingSpinner } from "~~/components/common/Loading";
 import { PositionManager } from "~~/utils/position";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
@@ -17,6 +18,7 @@ import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { isVesuContextV1, type VesuProtocolKey } from "~~/utils/vesu";
 import formatPercentage from "~~/utils/formatPercentage";
+import { useModal, useModalWithData } from "~~/hooks/useModal";
 
 interface BorrowSelectionRequest {
   tokens: AssetWithRates[];
@@ -58,22 +60,20 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   netApyPercent,
   formatCurrency,
 }) => {
-  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-  const [closeParams, setCloseParams] = useState<
-    | {
-      collateral: { name: string; address: string; decimals: number; icon: string };
-      debt: { name: string; address: string; decimals: number; icon: string };
-      collateralBalance: bigint;
-      debtBalance: bigint;
-      poolKey: string;
-      protocolKey: VesuProtocolKey;
-    }
-    | null
-  >(null);
+  // Close position modal state - uses useModalWithData for combined open/data state
+  type CloseParams = {
+    collateral: { name: string; address: string; decimals: number; icon: string };
+    debt: { name: string; address: string; decimals: number; icon: string };
+    collateralBalance: bigint;
+    debtBalance: bigint;
+    poolKey: string;
+    protocolKey: VesuProtocolKey;
+  };
+  const closeModal = useModalWithData<CloseParams>();
 
   const openCloseForRow = (row: VesuPositionRow) => {
     if (!row.borrow || !row.borrowContext) return;
-    setCloseParams({
+    closeModal.openWithData({
       collateral: {
         name: row.supply.name,
         address: row.supply.tokenAddress,
@@ -91,22 +91,16 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       poolKey: row.poolKey,
       protocolKey: row.protocolKey,
     });
-    setIsCloseModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsCloseModalOpen(false);
-    setCloseParams(null);
-  };
-
-  // Swap state (debt or collateral)
-  const [isSwapSelectOpen, setIsSwapSelectOpen] = useState(false);
+  // Swap state (debt or collateral) - using consolidated modal hooks
+  const swapSelectModal = useModal();
+  const switchDebtModal = useModal();
+  const switchCollateralModal = useModal();
   const [swapType, setSwapType] = useState<"debt" | "collateral" | null>(null);
   const [swapRow, setSwapRow] = useState<VesuPositionRow | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<TokenWithRates | null>(null);
-  const [isSwitchDebtOpen, setIsSwitchDebtOpen] = useState(false);
-  const [isSwitchCollateralOpen, setIsSwitchCollateralOpen] = useState(false);
-  const [useNewSelector, setUseNewSelector] = useState(true);
+  const useNewSelector = true;
 
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
@@ -127,11 +121,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     setSwapType(type);
     setSwapRow(row);
     setSelectedTarget(null);
-    setIsSwapSelectOpen(true);
-  };
-
-  const closeSwapSelector = () => {
-    setIsSwapSelectOpen(false);
+    swapSelectModal.open();
   };
 
   const swapCandidateTokens = useMemo(() => {
@@ -155,12 +145,12 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
   const handleSelectSwapTarget = (token: TokenWithRates) => {
     setSelectedTarget(token);
-    setIsSwapSelectOpen(false);
+    swapSelectModal.close();
     if (!swapRow || !swapType) return;
     if (swapType === "debt") {
-      setIsSwitchDebtOpen(true);
+      switchDebtModal.open();
     } else {
-      setIsSwitchCollateralOpen(true);
+      switchCollateralModal.open();
     }
   };
 
@@ -213,7 +203,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     if (accountStatus === "connecting" || (userAddress && !hasLoadedOnce)) {
       return (
         <div className="flex justify-center py-6">
-          <span className="loading loading-spinner loading-md" />
+          <LoadingSpinner size="md" />
         </div>
       );
     }
@@ -369,7 +359,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           </div>
           {isUpdating && userAddress && (
             <div className="flex items-center text-xs text-base-content/60">
-              <span className="loading loading-spinner loading-xs mr-1" /> Updating
+              <LoadingSpinner size="xs" label="Updating" />
             </div>
           )}
         </div>
@@ -396,24 +386,24 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           </div>
         </div>
       </div>
-      {closeParams && (
+      {closeModal.data && (
         <ClosePositionModalStark
-          isOpen={isCloseModalOpen}
-          onClose={handleCloseModal}
-          collateral={closeParams.collateral}
-          debt={closeParams.debt}
-          collateralBalance={closeParams.collateralBalance}
-          debtBalance={closeParams.debtBalance}
-          poolKey={closeParams.poolKey}
-          protocolKey={closeParams.protocolKey}
+          isOpen={closeModal.isOpen}
+          onClose={closeModal.close}
+          collateral={closeModal.data.collateral}
+          debt={closeModal.data.debt}
+          collateralBalance={closeModal.data.collateralBalance}
+          debtBalance={closeModal.data.debtBalance}
+          poolKey={closeModal.data.poolKey}
+          protocolKey={closeModal.data.protocolKey}
         />
       )}
 
       {/* Token selector for swap target */}
       {swapRow && swapType && useNewSelector ? (
         <SwitchTokenSelectModalStark
-          isOpen={isSwapSelectOpen}
-          onClose={closeSwapSelector}
+          isOpen={swapSelectModal.isOpen}
+          onClose={swapSelectModal.close}
           kind={swapType}
           currentToken={{
             address: swapType === "debt" ? swapRow.borrow!.tokenAddress : swapRow.supply.tokenAddress,
@@ -447,8 +437,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       ) : (
         swapRow && swapType && swapRow.borrowContext && isVesuContextV1(swapRow.borrowContext) && (
           <TokenSelectModalStark
-            isOpen={isSwapSelectOpen}
-            onClose={closeSwapSelector}
+            isOpen={swapSelectModal.isOpen}
+            onClose={swapSelectModal.close}
             tokens={swapCandidateTokens.map(asset => ({
               ...asset,
               borrowAPR: asset.borrowAPR,
@@ -468,8 +458,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       {/* Switch debt modal */}
       {swapType === "debt" && swapRow && selectedTarget && swapRow.borrowContext && (
         <SwitchDebtModalStark
-          isOpen={isSwitchDebtOpen}
-          onClose={() => setIsSwitchDebtOpen(false)}
+          isOpen={switchDebtModal.isOpen}
+          onClose={switchDebtModal.close}
           poolKey={swapRow.poolKey}
           protocolKey={swapRow.protocolKey}
           collateral={{
@@ -498,8 +488,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       {/* Switch collateral modal */}
       {swapType === "collateral" && swapRow && selectedTarget && swapRow.borrowContext && (
         <SwitchCollateralModalStark
-          isOpen={isSwitchCollateralOpen}
-          onClose={() => setIsSwitchCollateralOpen(false)}
+          isOpen={switchCollateralModal.isOpen}
+          onClose={switchCollateralModal.close}
           poolKey={swapRow.poolKey}
           protocolKey={swapRow.protocolKey}
           currentCollateral={{

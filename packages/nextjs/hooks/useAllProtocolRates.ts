@@ -3,6 +3,7 @@ import { useReadContracts } from "wagmi";
 import { Address, Abi } from "viem";
 import { useScaffoldReadContract, useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useAccount } from "wagmi";
+import { aaveRateToAPY, compoundRateToAPR, venusRateToAPY } from "~~/utils/protocolRates";
 
 type ProtocolKey = "aave" | "compound" | "venus" | "zerolend" | "spark";
 
@@ -12,22 +13,6 @@ interface TokenRate {
   borrowRate: number;
   protocol: ProtocolKey;
 }
-
-// Rate conversion helpers
-const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
-
-const convertCompoundRate = (ratePerSecond: bigint): number => {
-  const SECONDS_PER_YEAR = 60 * 60 * 24 * 365; // 31536000
-  return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / 1e18;
-};
-
-const convertVenusRate = (ratePerBlock: bigint): number => {
-  const ethMantissa = 1e18;
-  const blocksPerDay = 60 * 60 * 24; // 86400
-  const daysPerYear = 365;
-  const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
-  return (Math.pow(ratePerBlockNum * blocksPerDay + 1, daysPerYear - 1) - 1) * 100;
-};
 
 /**
  * Fetches rates for ALL tokens from all protocols in batched calls
@@ -137,8 +122,8 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
             }
             map.get(token)?.set(protocol, {
               token,
-              supplyRate: convertAaveRate(BigInt(tokenInfo.supplyRate || 0)),
-              borrowRate: convertAaveRate(BigInt(tokenInfo.borrowRate || 0)),
+              supplyRate: aaveRateToAPY(BigInt(tokenInfo.supplyRate || 0)),
+              borrowRate: aaveRateToAPY(BigInt(tokenInfo.borrowRate || 0)),
               protocol,
             });
           }
@@ -165,8 +150,8 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
             }
             map.get(token)?.set("venus", {
               token,
-              supplyRate: convertVenusRate(supplyRates[i] || 0n),
-              borrowRate: convertVenusRate(borrowRates[i] || 0n),
+              supplyRate: venusRateToAPY(supplyRates[i] || 0n),
+              borrowRate: venusRateToAPY(borrowRates[i] || 0n),
               protocol: "venus",
             });
           }
@@ -186,8 +171,8 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
           }
           map.get(token)?.set("compound", {
             token,
-            supplyRate: convertCompoundRate(supplyRate || 0n),
-            borrowRate: convertCompoundRate(borrowRate || 0n),
+            supplyRate: compoundRateToAPR(supplyRate || 0n),
+            borrowRate: compoundRateToAPR(borrowRate || 0n),
             protocol: "compound",
           });
         }

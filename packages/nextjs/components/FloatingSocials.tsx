@@ -14,7 +14,7 @@ export const FloatingSocials = () => {
           href="https://discord.gg/Vjk6NhkxGv"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 shadow-md hover:shadow-lg transition-all"
+          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 floating-action"
         >
           <Image
             src="/logos/discord.svg"
@@ -29,7 +29,7 @@ export const FloatingSocials = () => {
           href="https://t.me/+vYCKr2TrOXRiODg0"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 shadow-md hover:shadow-lg transition-all"
+          className="flex items-center gap-1 text-sm bg-base-100 dark:bg-base-200 rounded-full px-3 py-2 floating-action"
         >
           <Image
             src="/logos/telegram.svg"
@@ -44,7 +44,7 @@ export const FloatingSocials = () => {
           href="https://x.com/KapanFinance"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center bg-base-100 dark:bg-base-200 rounded-full w-10 h-10 shadow-md hover:shadow-lg transition-all"
+          className="flex-center bg-base-100 dark:bg-base-200 rounded-full w-10 h-10 floating-action"
           title="Follow us on X"
           aria-label="Follow us on X"
         >

@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use LoadingSpinner from './Loading' instead
+ * This file is kept for backward compatibility
+ */
+
 import clsx from "clsx";
 
 export type SpinnerProps = {
@@ -10,3 +15,18 @@ const Spinner = ({ size = "loading-md", className }: SpinnerProps) => (
 );
 
 export default Spinner;
+
+// Re-export new components for gradual migration
+export {
+  LoadingSpinner,
+  LoadingOverlay,
+  ButtonLoading,
+  LoadingAlert,
+  SkeletonLine,
+  SkeletonCircle,
+  SkeletonCard,
+  SkeletonRow,
+  ModalLoading,
+  SectionLoading,
+  type LoadingSize,
+} from "./Loading";

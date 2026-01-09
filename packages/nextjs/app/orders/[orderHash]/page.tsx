@@ -6,27 +6,32 @@ import Link from "next/link";
 import Image from "next/image";
 import { useChainId, usePublicClient } from "wagmi";
 import { formatUnits, type Address } from "viem";
+import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import { useChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { 
-  OrderStatus, 
+import {
+  OrderStatus,
   getCowExplorerAddressUrl,
   calculateExecutionSummary,
   getOrderQuoteRate,
   calculatePriceImpact,
 } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
-import { 
-  getOrderNote, 
-  getOperationLabel, 
+import {
+  getOrderNote,
+  getOperationLabel,
   getOperationColorClass,
   findPendingNoteForOrder,
   linkNoteToOrderHash,
   type OperationType,
 } from "~~/utils/orderNotes";
 import { getProtocolLogo } from "~~/utils/protocol";
+import { LoadingOverlay, LoadingSpinner } from "~~/components/common/Loading";
+import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
+import { formatDateTime } from "~~/utils/deadline";
+import { truncateAddress } from "~~/utils/address";
 
 const ORDER_MANAGER_ADDRESSES: Record<number, Address | undefined> = {
   42161: "0x8F94351Ac17B4B5fb0923D229319805bB52616CD",
@@ -55,20 +60,6 @@ function formatAmountPrecise(amount: bigint, decimals: number): string {
 function formatUsd(amount: number): string {
   if (amount < 0.01) return "<$0.01";
   return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(timestamp: bigint): string {
-  return new Date(Number(timestamp) * 1000).toLocaleString();
-}
-
-function getBlockExplorerTxUrl(chainId: number, txHash: string): string {
-  const explorers: Record<number, string> = {
-    1: "https://etherscan.io",
-    42161: "https://arbiscan.io",
-    8453: "https://basescan.org",
-    10: "https://optimistic.etherscan.io",
-  };
-  return `${explorers[chainId] || "https://etherscan.io"}/tx/${txHash}`;
 }
 
 const ORDER_MANAGER_ABI = [
@@ -188,7 +179,7 @@ export default function OrderDetailPage() {
   
   const getTokenSymbol = (address: string): string => {
     const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.symbol ?? `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return info?.symbol ?? truncateAddress(address);
   };
   
   const getTokenDecimals = (address: string): number => {
@@ -229,15 +220,13 @@ export default function OrderDetailPage() {
     if (!quoteData || !executionSummary) return null;
     return calculatePriceImpact(executionSummary.actualRate, quoteData.quoteRate);
   }, [quoteData, executionSummary]);
-  
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-  
+
+  const { copy: copyToClipboard } = useCopyToClipboard();
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
+        <LoadingOverlay size="lg" label="Loading order details..." padded={false} />
       </div>
     );
   }
@@ -382,7 +371,7 @@ export default function OrderDetailPage() {
             }`}>
               {isActive ? 'Active' : isCompleted ? 'Completed' : isCancelled ? 'Cancelled' : 'Unknown'}
             </div>
-            <span className="text-base-content/40 text-sm">{formatDate(order.createdAt)}</span>
+            <span className="text-base-content/40 text-sm">{formatDateTime(order.createdAt)}</span>
           </div>
         </div>
 
@@ -422,7 +411,7 @@ export default function OrderDetailPage() {
           <div>
             <span className="text-base-content/50 text-sm block mb-1">Total Received</span>
             {isLoadingEvents ? (
-              <span className="loading loading-spinner loading-sm"></span>
+              <LoadingSpinner size="sm" />
             ) : executionData ? (
               <>
                 <span className="text-2xl font-bold text-success">{formatAmount(executionData.totalReceived, buyDecimals)}</span>
@@ -541,7 +530,7 @@ export default function OrderDetailPage() {
                         <span className="text-success text-xs font-medium">+{chunk.surplusPercentage.toFixed(2)}%</span>
                       )}
                       <a
-                        href={getBlockExplorerTxUrl(chainId, chunk.txHash)}
+                        href={getBlockExplorerTxLink(chainId, chunk.txHash)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:text-primary/80 text-xs"

@@ -20,18 +20,7 @@ import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
 import { arbitrum, base, linea, optimism } from "wagmi/chains";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
-
-// Helper: Aave rate conversion
-const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
-
-// Helper: Venus rate conversion
-const convertVenusRate = (ratePerBlock: bigint): number => {
-  const ethMantissa = 1e18;
-  const blocksPerDay = 60 * 60 * 24;
-  const daysPerYear = 365;
-  const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
-  return (Math.pow(ratePerBlockNum * blocksPerDay + 1, daysPerYear - 1) - 1) * 100;
-};
+import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 
 const TOKEN_ALIASES: Record<string, string> = {
   usdt: "USDT",
@@ -41,13 +30,6 @@ const TOKEN_ALIASES: Record<string, string> = {
 };
 
 const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
-
-const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
-  [arbitrum.id]: "arbitrum",
-  [base.id]: "base",
-  [optimism.id]: "optimism",
-  [linea.id]: "linea",
-};
 
 const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
 const ZEROLEND_CHAIN_IDS = [base.id, linea.id];
@@ -106,8 +88,8 @@ const useAaveLikeData = (
       const chainId = contracts[index]?.chainId;
       const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
       return (result.result as any[]).map(token => {
-        const supplyAPY = convertAaveRate(token.supplyRate);
-        const borrowAPY = convertAaveRate(token.borrowRate);
+        const supplyAPY = aaveRateToAPY(token.supplyRate);
+        const borrowAPY = aaveRateToAPY(token.borrowRate);
         const price = Number(formatUnits(token.price, 8));
         const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
         return {
@@ -229,8 +211,8 @@ const useVenusData = (): MarketData[] => {
 
       tokens.forEach((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return;
-        const supplyAPY = convertVenusRate(supplyRates[i]);
-        const borrowAPY = convertVenusRate(borrowRates[i]);
+        const supplyAPY = venusRateToAPY(supplyRates[i]);
+        const borrowAPY = venusRateToAPY(borrowRates[i]);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
         const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
         aggregated.push({

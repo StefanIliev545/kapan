@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CustomConnectButton } from "./scaffold-stark/CustomConnectButton";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BanknotesIcon,
@@ -13,8 +12,7 @@ import {
   SparklesIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { GasTokenSelector } from "~~/components/GasTokenSelector";
-import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { WalletButton } from "~~/components/common/WalletButton";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 
 type HeaderMenuLink = {
@@ -233,21 +231,8 @@ export const Header = () => {
                         </ul>
                         <div className="mt-6 pt-4 border-t border-base-300/50 dark:border-base-content/10">
                           <div className="flex flex-col space-y-2 items-stretch relative z-50">
-                            <div className="flex items-center bg-base-200 rounded-[18px] shadow-md relative p-0.5">
-                              <div className="relative flex-1 px-3 py-1.5">
-                                <RainbowKitCustomConnectButton />
-                              </div>
-                            </div>
-                            <div className="flex items-center bg-base-200 rounded-[18px] shadow-md relative p-0.5">
-                              <div className="relative flex-1 px-3 py-1.5">
-                                <CustomConnectButton />
-                              </div>
-                              <div className="h-7 w-[1px] bg-base-300"></div>
-                              <div className="px-3 py-1.5">
-                                <GasTokenSelector />
-                              </div>
-                            </div>
-                            {/* Removed Stark faucet and FaucetButton from mobile drawer */}
+                            <WalletButton variant="evm" />
+                            <WalletButton variant="starknet" showGasSelector />
                           </div>
                         </div>
                       </div>
@@ -310,27 +295,15 @@ export const Header = () => {
               </motion.div>
             </div>
 
-            {/* Connect button */}
+            {/* Connect buttons - Both EVM and Starknet */}
             <motion.div
               className="hidden md:flex gap-2 items-center relative z-20"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.5 }}
             >
-              <div className="flex items-center bg-base-200 hover:bg-base-300 transition-colors duration-200 rounded-[18px] shadow-md relative">
-                <div className="relative flex-1 px-3 py-1.5 cursor-pointer">
-                  <RainbowKitCustomConnectButton />
-                </div>
-                <div className="h-7 w-[1px] bg-base-300"></div>
-                <div className="relative px-3 py-1.5 cursor-pointer">
-                  <CustomConnectButton />
-                </div>
-                <div className="h-7 w-[1px] bg-base-300"></div>
-                <div className="px-3 py-1.5">
-                  <GasTokenSelector />
-                </div>
-              </div>
-              {/* Removed Stark faucet and FaucetButton from desktop header */}
+              <WalletButton variant="evm" />
+              <WalletButton variant="starknet" showGasSelector />
             </motion.div>
 
           </div>

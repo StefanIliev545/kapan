@@ -3,6 +3,7 @@ import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address, type Hex } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { useSendCalls } from "wagmi/experimental";
+import { parseAmount } from "~~/utils/validation";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { use1inchQuoteOnly } from "~~/hooks/use1inchQuoteOnly";
@@ -36,6 +37,14 @@ import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAd
 import { ExclamationTriangleIcon, InformationCircleIcon, Cog6ToothIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import {
+    ExecutionTypeToggle,
+    type ExecutionType,
+    MarketSwapStats,
+    SlippageSelector,
+    LimitOrderSection,
+} from "./common";
+import { WarningDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
@@ -146,7 +155,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // ============ Limit Order State ============
-    type ExecutionType = "market" | "limit";
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
     const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
@@ -182,7 +190,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }) : null, [selectedTo]);
 
     // Ensure "From" is always the debt token
-    useMemo(() => {
+    useEffect(() => {
         if (!selectedFrom || selectedFrom.address !== debtFromToken) {
             setSelectedFrom(fromAsset);
         }
@@ -227,11 +235,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Amount to repay in raw
     const repayAmountRaw = useMemo(() => {
-        try {
-            return amountIn ? parseUnits(amountIn, debtFromDecimals) : 0n;
-        } catch {
-            return 0n;
-        }
+        const result = parseAmount(amountIn || "0", debtFromDecimals);
+        return result.value ?? 0n;
     }, [amountIn, debtFromDecimals]);
 
     // Step 1: Get unit quote (1 newDebt -> X currentDebt) to estimate exchange rate
@@ -782,114 +787,55 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         resetDep: selectedTo?.address,
     });
 
-    // Custom stats for debt swap
-    const customStats = executionType === "market" ? (
-        <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-3 text-center bg-base-200/50 p-3 rounded text-xs">
-                <div>
-                    <div className="text-base-content/70 flex items-center justify-center gap-1">
-                        Slippage
-                        <div className="dropdown dropdown-top dropdown-hover">
-                            <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                <Cog6ToothIcon className="w-3 h-3" />
-                            </label>
-                            <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                {SLIPPAGE_OPTIONS.map((s) => (
-                                    <li key={s}>
-                                        <a
-                                            className={slippage === s ? "active" : ""}
-                                            onClick={() => setSlippage(s)}
-                                        >
-                                            {s}%
-                                        </a>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="font-medium">{slippage}%</div>
-                </div>
-                <div>
-                    <div className="text-base-content/70">Price Impact</div>
-                    <div className={`font-medium ${priceImpactColorClass}`}>
-                        {formattedPriceImpact}
-                    </div>
-                </div>
-                <div>
-                    <div className="text-base-content/70">Rate</div>
-                    <div className="font-medium">
-                        1 {selectedTo?.symbol || "?"} ≈ {parseFloat(exchangeRate).toFixed(4)} {debtFromName}
-                    </div>
-                </div>
-                <div>
-                    <div className="text-base-content/70">Swap Output</div>
-                    <div className={`font-medium ${outputCoversRepay ? "text-success" : "text-warning"}`}>
-                        {swapQuote ? `${parseFloat(expectedOutput).toFixed(4)} ${debtFromName}` : "-"}
-                    </div>
-                </div>
-            </div>
-            {/* Show USD values if available */}
-            {srcUSD !== null && dstUSD !== null && (
-                <div className="flex justify-between text-xs text-base-content/60 px-1">
-                    <span>New debt: ~${srcUSD.toFixed(2)}</span>
-                    <span>Repaying: ~${dstUSD.toFixed(2)}</span>
-                </div>
-            )}
-        </div>
-    ) : (
-        // Limit order stats
+    // Custom stats for debt swap - using shared components
+    const customStatsWithToggle = (
         <div className="space-y-2">
             {/* Execution Type Toggle */}
-            {cowAvailable && (
-                <div className="flex gap-1 bg-base-200 p-1 rounded-lg w-fit mx-auto mb-2">
-                    <button
-                        onClick={() => setExecutionType("market")}
-                        className="btn btn-xs flex-1 btn-ghost"
-                    >
-                        Market
-                    </button>
-                    <button
-                        onClick={() => setExecutionType("limit")}
-                        className="btn btn-xs flex-1 btn-primary"
-                    >
-                        <ClockIcon className="w-3 h-3 mr-1" />
-                        Limit
-                    </button>
-                </div>
-            )}
+            <ExecutionTypeToggle
+                value={executionType}
+                onChange={setExecutionType}
+                limitAvailable={cowAvailable}
+                limitReady={limitOrderReady}
+            />
 
-            {/* Limit Order Config */}
-            {selectedTo && limitOrderSellToken && (
-                <div className="bg-base-200/50 rounded-lg p-3 space-y-2">
-                    <div className="text-xs font-medium text-base-content/70 flex items-center gap-1">
-                        <ClockIcon className="w-3.5 h-3.5" />
-                        Limit Order Configuration
-                    </div>
-                    <LimitOrderConfig
-                        chainId={chainId}
-                        sellToken={limitOrderSellToken}
-                        totalAmount={limitOrderNewDebt || requiredNewDebt}
-                        onConfigChange={handleLimitOrderConfigChange}
-                        showFlashLoanToggle={false}
-                        showChunksInput={true}
-                        compact
+            {/* Market order stats */}
+            {executionType === "market" && (
+                <>
+                    <MarketSwapStats
+                        slippage={slippage}
+                        setSlippage={setSlippage}
+                        priceImpact={priceImpact}
+                        priceImpactClass={priceImpactColorClass}
+                        formattedPriceImpact={formattedPriceImpact}
+                        exchangeRate={parseFloat(exchangeRate).toFixed(4)}
+                        fromSymbol={selectedTo?.symbol}
+                        toSymbol={debtFromName}
+                        expectedOutput={swapQuote ? parseFloat(expectedOutput).toFixed(4) : undefined}
+                        outputCoversRequired={outputCoversRepay}
                     />
-                    {/* Chunk Info - shown when multi-chunk */}
-                    {(limitOrderConfig?.numChunks ?? 1) > 1 && (
-                        <div className="flex items-start gap-1.5 mt-2 text-[10px]">
-                            <svg className="w-3 h-3 shrink-0 mt-0.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            <div>
-                                <span className="text-info font-medium">Multi-chunk: {limitOrderConfig?.numChunks} iterations</span>
-                                <p className="text-base-content/50 mt-0.5">
-                                    ~30 min between chunks for price discovery.
-                                </p>
-                            </div>
+                    {/* Show USD values if available */}
+                    {srcUSD !== null && dstUSD !== null && (
+                        <div className="flex justify-between text-xs text-base-content/60 px-1">
+                            <span>New debt: ~${srcUSD.toFixed(2)}</span>
+                            <span>Repaying: ~${dstUSD.toFixed(2)}</span>
                         </div>
                     )}
-                    {/* CoW quote info */}
-                    {cowQuote && (
+                </>
+            )}
+
+            {/* Limit order stats */}
+            {executionType === "limit" && selectedTo && limitOrderSellToken && (
+                <LimitOrderSection
+                    chainId={chainId}
+                    sellToken={limitOrderSellToken}
+                    totalAmount={limitOrderNewDebt || requiredNewDebt}
+                    onConfigChange={handleLimitOrderConfigChange}
+                    limitOrderConfig={limitOrderConfig}
+                    isCowQuoteLoading={isCowQuoteLoading}
+                    slippage={slippage}
+                    setSlippage={setSlippage}
+                    showSlippage={true}
+                    extraContent={cowQuote && selectedTo && (
                         <div className="text-xs text-base-content/60 pt-1 border-t border-base-300">
                             CoW quote: sell ~{formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals)} {selectedTo.symbol}
                             {limitOrderNewDebt > getCowQuoteSellAmount(cowQuote) && (
@@ -899,56 +845,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                             )}
                         </div>
                     )}
-                </div>
+                />
             )}
-
-            {/* Slippage selector for limit orders */}
-            <div className="flex justify-between items-center text-xs px-1">
-                <span className="text-base-content/70">Slippage Buffer</span>
-                <div className="dropdown dropdown-top dropdown-end">
-                    <label tabIndex={0} className="btn btn-xs btn-ghost gap-1">
-                        {slippage}%
-                        <Cog6ToothIcon className="w-3 h-3" />
-                    </label>
-                    <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                        {SLIPPAGE_OPTIONS.map((s) => (
-                            <li key={s}>
-                                <a
-                                    className={slippage === s ? "active" : ""}
-                                    onClick={() => setSlippage(s)}
-                                >
-                                    {s}%
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
-        </div>
-    );
-
-    // Prepend execution type toggle for market mode
-    const customStatsWithToggle = (
-        <div className="space-y-2">
-            {/* Execution Type Toggle - shown in market mode only (limit mode has its own toggle in customStats) */}
-            {cowAvailable && executionType === "market" && (
-                <div className="flex gap-1 bg-base-200 p-1 rounded-lg w-fit mx-auto mb-2">
-                    <button
-                        onClick={() => setExecutionType("market")}
-                        className="btn btn-xs flex-1 btn-primary"
-                    >
-                        Market
-                    </button>
-                    <button
-                        onClick={() => setExecutionType("limit")}
-                        className="btn btn-xs flex-1 btn-ghost"
-                    >
-                        <ClockIcon className="w-3 h-3 mr-1" />
-                        Limit
-                    </button>
-                </div>
-            )}
-            {customStats}
         </div>
     );
 
@@ -1075,22 +973,23 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const warnings = (
         <>
             {executionType === "market" && swapQuote && !outputCoversRepay && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>Swap output ({expectedOutput} {debtFromName}) may not fully cover repay amount. Consider increasing slippage or reducing amount.</span>
-                </div>
+                <WarningDisplay
+                    message={`Swap output (${expectedOutput} ${debtFromName}) may not fully cover repay amount. Consider increasing slippage or reducing amount.`}
+                    size="sm"
+                />
             )}
             {executionType === "market" && swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
-                </div>
+                <WarningDisplay
+                    message="Warning: Quote 'from' address mismatch!"
+                    size="sm"
+                    breakAll
+                />
             )}
             {executionType === "market" && !hasAdapter && isOpen && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>{swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.</span>
-                </div>
+                <WarningDisplay
+                    message={`${swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
+                    size="sm"
+                />
             )}
             {executionType === "limit" && isCowQuoteLoading && (
                 <div className="alert alert-info text-xs py-2">

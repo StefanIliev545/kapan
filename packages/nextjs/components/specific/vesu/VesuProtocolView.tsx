@@ -1,7 +1,8 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
+import { useTxCompletedListener } from "~~/hooks/common";
 import {
   createVesuContextV1,
   createVesuContextV2,
@@ -261,16 +262,12 @@ export const VesuProtocolView: FC = () => {
     }
   }, [userAddress]);
 
-  useEffect(() => {
-    const handler = () => {
-      refetchPositionsV1();
-      refetchPositionsV2();
-    };
-    window.addEventListener("txCompleted", handler);
-    return () => {
-      window.removeEventListener("txCompleted", handler);
-    };
+  const handleTxCompleted = useCallback(() => {
+    refetchPositionsV1();
+    refetchPositionsV2();
   }, [refetchPositionsV1, refetchPositionsV2]);
+
+  useTxCompletedListener(handleTxCompleted);
 
   useEffect(() => {
     const allRows = [

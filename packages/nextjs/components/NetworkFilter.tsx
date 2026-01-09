@@ -4,17 +4,8 @@ import { track } from "@vercel/analytics";
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
-
 import Image from "next/image";
-
-// Helper to get the correct logo based on theme
-const getNetworkLogo = (network: NetworkOption, isDarkMode: boolean): string => {
-  // In dark mode, use the light logo (logo). In light mode, use logoDark if available
-  if (!isDarkMode && network.logoDark) {
-    return network.logoDark;
-  }
-  return network.logo;
-};
+import { getNetworkOptionLogo, NETWORK_ID_TO_CHAIN_ID } from "~~/utils/networkLogos";
 
 export interface NetworkOption {
   id: string;
@@ -30,17 +21,6 @@ interface NetworkFilterProps {
 }
 
 const STORAGE_KEY = "kapan-network-filter-selection";
-
-// Map network IDs to EVM chain IDs
-const NETWORK_TO_CHAIN_ID: Record<string, number> = {
-  ethereum: 1,
-  arbitrum: 42161,
-  base: 8453,
-  optimism: 10,
-  linea: 59144,
-  plasma: 9745,
-  hardhat: 31337,
-};
 
 // --- tweakable behavior flags ---
 const SHALLOW_URL_SYNC = true; // ✅ don't trigger app-router navigation
@@ -102,7 +82,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
           localStorage.setItem(STORAGE_KEY, urlNetwork!);
         } catch { }
         // non-blocking wallet network switch
-        const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork!];
         if (chainId && chainId !== chain?.id) {
           try {
             void switchChain?.({ chainId });
@@ -139,7 +119,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       onNetworkChange(initial);
 
       // Switch wallet network if it's an EVM network (non-blocking)
-      const chainId = NETWORK_TO_CHAIN_ID[initial];
+      const chainId = NETWORK_ID_TO_CHAIN_ID[initial];
       if (chainId && chainId !== chain?.id) {
         try {
           void switchChain?.({ chainId });
@@ -166,7 +146,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       try {
         localStorage.setItem(STORAGE_KEY, urlNetwork!);
       } catch { }
-      const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+      const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork!];
       if (chainId && chainId !== chain?.id) {
         try {
           void switchChain?.({ chainId });
@@ -208,7 +188,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     } catch { }
 
     // Switch wallet network if it's an EVM network (non-blocking)
-    const chainId = NETWORK_TO_CHAIN_ID[networkId];
+    const chainId = NETWORK_ID_TO_CHAIN_ID[networkId];
     if (chainId && chainId !== chain?.id) {
       try {
         void switchChain?.({ chainId });
@@ -291,7 +271,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
           >
             <div className="w-4 h-4 relative shrink-0">
               <Image
-                src={getNetworkLogo(network, isDarkMode)}
+                src={getNetworkOptionLogo(network, isDarkMode)}
                 alt={network.name}
                 fill
                 sizes="16px"

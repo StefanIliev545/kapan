@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { createSafeContext } from "./createSafeContext";
 
 interface LandingSectionContextType {
   currentSection: number;
@@ -9,14 +10,10 @@ interface LandingSectionContextType {
   setTotalSections: (total: number) => void;
 }
 
-const LandingSectionContext = createContext<LandingSectionContextType>({
-  currentSection: 0,
-  totalSections: 6,
-  setCurrentSection: () => {},
-  setTotalSections: () => {},
-});
+const { Context: LandingSectionContext, useContextValue } =
+  createSafeContext<LandingSectionContextType>("LandingSection");
 
-export const useLandingSection = () => useContext(LandingSectionContext);
+export const useLandingSection = useContextValue;
 
 export const LandingSectionProvider = ({ children }: { children: ReactNode }) => {
   const [currentSection, setCurrentSection] = useState(0);

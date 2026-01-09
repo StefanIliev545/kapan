@@ -554,12 +554,12 @@ const MockActionButton = ({ icon, label, tip }: { icon: React.ReactNode; label: 
 const MockMorphoView = () => (
   <div className="w-full flex flex-col p-2 sm:p-3 space-y-2">
     {/* Protocol Header Card */}
-    <div className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50">
+    <div className="card-surface shadow-lg">
       <div className="card-body px-3 sm:px-5 py-2 sm:py-3">
         {/* Mobile Protocol Header */}
         <div className="flex md:hidden items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center ring-1 ring-base-300/30">
+            <div className="token-icon-wrapper-md">
               <Image src="/logos/morpho.svg" alt="Morpho Blue" width={18} height={18} className="object-contain" />
             </div>
             <span className="text-sm font-bold">Morpho Blue</span>
@@ -578,11 +578,11 @@ const MockMorphoView = () => (
         <div className="hidden md:flex flex-wrap items-center gap-x-6 gap-y-4">
           <MockTooltip tip="The lending protocol where this position lives">
             <div className="flex items-center gap-3 cursor-help">
-              <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+              <div className="token-icon-wrapper-lg">
                 <Image src="/logos/morpho.svg" alt="Morpho Blue" width={24} height={24} className="object-contain drop-shadow-sm" />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+                <span className="label-text-xs-semibold">Protocol</span>
                 <span className="text-base font-bold tracking-tight">Morpho Blue</span>
               </div>
             </div>
@@ -591,25 +591,25 @@ const MockMorphoView = () => (
           <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
             <MockTooltip tip="Total value of your positions (collateral minus debt)">
               <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
+                <span className="label-text-xs-semibold">Balance</span>
                 <span className="text-sm font-mono font-bold tabular-nums text-success">$6.55K</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="Estimated earnings over the last 30 days">
               <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
+                <span className="label-text-xs-semibold">30D Yield</span>
                 <span className="text-sm font-mono font-bold tabular-nums text-success">$241.28</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="Net APY: supply yield minus borrow cost">
               <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
+                <span className="label-text-xs-semibold">Net APY</span>
                 <span className="text-sm font-mono font-bold tabular-nums text-success">+44.79%</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="How much of your borrowing capacity you're using">
               <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+                <span className="label-text-xs-semibold">Utilization</span>
                 <div className="flex items-center gap-2.5">
                   <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
                     <div className="h-full bg-error rounded-full w-[90%]" />

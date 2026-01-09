@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const MORPHO_GRAPHQL_API = "https://blue-api.morpho.org/graphql";
+import { MORPHO_GRAPHQL_API } from "~~/utils/constants";
 
 const USER_POSITIONS_QUERY = `
   query GetUserPositions($userAddress: String!, $chainId: Int!) {

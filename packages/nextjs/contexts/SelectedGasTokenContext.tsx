@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { useEffect, useState, type ReactNode } from "react";
+import { createSafeContext } from "./createSafeContext";
 
 interface SelectedGasToken {
   address: string;
@@ -24,7 +25,8 @@ const DEFAULT_TOKEN: SelectedGasToken = {
   balance: "0.000"
 };
 
-const SelectedGasTokenContext = createContext<SelectedGasTokenContextType | undefined>(undefined);
+const { Context: SelectedGasTokenContext, useContextValue } =
+  createSafeContext<SelectedGasTokenContextType>("SelectedGasToken");
 
 export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedToken, setSelectedToken] = useState<SelectedGasToken>(DEFAULT_TOKEN);
@@ -59,10 +61,4 @@ export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ ch
   );
 };
 
-export const useSelectedGasToken = () => {
-  const context = useContext(SelectedGasTokenContext);
-  if (context === undefined) {
-    throw new Error('useSelectedGasToken must be used within a SelectedGasTokenProvider');
-  }
-  return context;
-};
+export const useSelectedGasToken = useContextValue;

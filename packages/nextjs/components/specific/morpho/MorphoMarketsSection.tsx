@@ -33,11 +33,16 @@ import { notification } from "~~/utils/scaffold-eth/notification";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { parseUnits } from "viem";
 import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { createTextChangeHandler } from "~~/utils/handlers";
+import {
+  toNumberSafe,
+  pow10,
+  makeUsdFormatter,
+  formatPercent,
+} from "../utils";
 
 type SortKey = "tvl" | "supplyApy" | "borrowApy" | "utilization";
 type SortDirection = "desc" | "asc";
-
-
 
 interface MorphoMarketsSectionProps {
   markets: MorphoMarket[];
@@ -58,27 +63,6 @@ interface MorphoMarketsSectionProps {
 
 const DEFAULT_PAGE_SIZE = 20;
 
-function toNumberSafe(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string") {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-}
-
-function pow10(decimals: number): number {
-  // decimals are typically <= 18; safe for JS numbers in this context.
-  return 10 ** Math.max(0, Math.min(36, decimals));
-}
-
-function utilizationColor(utilization: number): string {
-  if (utilization >= 0.95) return "text-error";
-  if (utilization >= 0.85) return "text-warning";
-  return "text-base-content/70";
-}
-
 // Minimal utilization indicator - just bar, no text
 function UtilizationBar({ value }: { value: number }) {
   const percent = Math.min(100, Math.max(0, value * 100));
@@ -94,24 +78,6 @@ function UtilizationBar({ value }: { value: number }) {
       </div>
     </Tooltip>
   );
-}
-
-function makeUsdFormatter() {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatPercent(value01: number, digits: number): string {
-  const fmt = new Intl.NumberFormat("en-US", {
-    style: "percent",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-  return fmt.format(value01);
 }
 
 function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string }) {
@@ -305,7 +271,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             type="text"
             placeholder={`Search for ${placeholder.toLowerCase()} asset`}
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            onChange={createTextChangeHandler(setSearchTerm)}
             className="input input-sm input-bordered w-full pl-9 pr-8 bg-base-200/50"
           />
           {searchTerm && (

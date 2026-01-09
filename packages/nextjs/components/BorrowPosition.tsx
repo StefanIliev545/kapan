@@ -1,25 +1,20 @@
 import React, { FC, useMemo } from "react";
-import Image from "next/image";
-import clsx from "clsx";
+import { Address, encodeAbiParameters } from "viem";
+import { MinusIcon, PlusIcon, ArrowPathIcon, XMarkIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "./FiatBalance";
 import { ProtocolPosition } from "./ProtocolView";
 import { BorrowModal } from "./modals/BorrowModal";
 import { RefinanceModal } from "./modals/RefinanceModal";
 import { RepayModal } from "./modals/RepayModal";
 import { BorrowModalStark } from "./modals/stark/BorrowModalStark";
-import { MovePositionModal as MovePositionModalStark } from "./modals/stark/MovePositionModal";
 import { RepayModalStark } from "./modals/stark/RepayModalStark";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { SwapAsset } from "./modals/SwapModalShell";
-import { Address, encodeAbiParameters } from "viem";
-import { ChevronDownIcon, ChevronUpIcon, InformationCircleIcon, MinusIcon, PlusIcon, ArrowPathIcon, XMarkIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
-import { SegmentedActionBar } from "./common/SegmentedActionBar";
-import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
-import { useModal, useToggle } from "~~/hooks/useModal";
+import { BasePosition, usePositionState } from "./common/BasePosition";
+import { SegmentedAction } from "./common/SegmentedActionBar";
+import { useModal } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
-import { useWalletConnection } from "~~/hooks/useWalletConnection";
-import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { normalizeProtocolName } from "~~/utils/protocol";
 import { isVesuContextV1, isVesuContextV2 } from "~~/utils/vesu";
@@ -112,8 +107,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const borrowModal = useModal();
   const closeWithCollateralModal = useModal();
   const debtSwapModal = useModal();
-  const expanded = useToggle(defaultExpanded);
-  const isExpanded = controlledExpanded ?? expanded.isOpen;
 
   const usdPrice = useMemo(() => {
     if (typeof usdPriceOverride === "number") return usdPriceOverride;
@@ -121,7 +114,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   }, [tokenPrice, usdPriceOverride]);
   const debtAmount = tokenBalance ? Number(tokenBalance) / 10 ** (tokenDecimals || 18) : 0;
 
-  // Stable position object for RefinanceModal (avoid hook re-ordering; defined at top-level)
+  // Stable position object for RefinanceModal
   const tokenBalanceBn = useMemo(
     () => (typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)),
     [tokenBalance],
@@ -137,21 +130,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     [name, tokenAddress, tokenDecimals, tokenBalanceBn],
   );
 
-  // Get wallet connection status for both networks
-  const { evm, starknet } = useWalletConnection();
-  const isWalletConnected = networkType === "evm" ? evm.isConnected : starknet.isConnected;
+  // Use shared position state hook
+  const { isWalletConnected, hasBalance, disabledMessage } = usePositionState({
+    networkType,
+    tokenBalance: tokenBalanceBn,
+    actionsDisabled,
+    actionsDisabledReason,
+  });
 
-  // Check if position has a balance (debt)
-  const hasBalance =
-    typeof tokenBalance === "bigint" ? tokenBalance > 0n : (tokenBalance ?? 0) > 0;
-
-  const disabledMessage =
-    actionsDisabledReason ||
-    (networkType === "starknet"
-      ? "Action unavailable for this market"
-      : "Action unavailable");
-
-  // Fetch optimal rate
+  // Fetch optimal rate for "better rate" badge calculation
   const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
     networkType,
     tokenAddress,
@@ -159,12 +146,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   });
 
   const hasOptimalProtocol = Boolean(optimalProtocol);
-  const displayedOptimalProtocol = (typeof demoOptimalOverride !== "undefined" && demoOptimalOverride?.protocol)
-    ? demoOptimalOverride.protocol
-    : (hasOptimalProtocol ? optimalProtocol : protocolName);
-  const displayedOptimalRate = (typeof demoOptimalOverride !== "undefined" && typeof demoOptimalOverride?.rate === "number")
-    ? demoOptimalOverride.rate
-    : (hasOptimalProtocol ? optimalRateDisplay : currentRate);
+  const displayedOptimalProtocol =
+    demoOptimalOverride?.protocol ??
+    (hasOptimalProtocol ? optimalProtocol : protocolName);
+  const displayedOptimalRate =
+    demoOptimalOverride?.rate ??
+    (hasOptimalProtocol ? optimalRateDisplay : currentRate);
 
   // Determine if there's a better rate available on another protocol
   const ratesAreSame = Math.abs(currentRate - displayedOptimalRate) < 0.000001;
@@ -174,15 +161,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     !ratesAreSame &&
     normalizeProtocolName(displayedOptimalProtocol) !== normalizeProtocolName(protocolName) &&
     displayedOptimalRate < currentRate;
-
-  // const formatNumber = (num: number) =>
-  //   new Intl.NumberFormat("en-US", {
-  //     minimumFractionDigits: 2,
-  //     maximumFractionDigits: 2,
-  //   }).format(Math.abs(num));
-
-  // Use shared protocol logo resolver to support keys like "vesu_v2"
-  const getProtocolLogo = (protocol: string) => getProtocolLogoUtil(protocol);
 
   const actionConfig = {
     borrow: availableActions?.borrow !== false,
@@ -198,19 +176,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   const showBorrowButton = actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow);
   const showRepayButton = actionConfig.repay;
   const showMoveButton = actionConfig.move && hasBalance;
-  // Enable buttons if either external handler exists OR we can open local modal (EVM)
   const showCloseButton =
     (networkType === "evm" ? true : Boolean(onClosePosition)) && actionConfig.close && hasBalance;
   const showSwapButton =
     (networkType === "evm" ? true : Boolean(onSwap)) && actionConfig.swap && hasBalance;
 
-  const visibleActionCount = [showRepayButton, showMoveButton, showBorrowButton, showCloseButton, showSwapButton].filter(Boolean).length;
-  const hasAnyActions = visibleActionCount > 0;
-
-  // Render actions in a single horizontal row for both mobile and desktop
-
   const handleBorrowClick = onBorrow ?? borrowModal.open;
-  // For EVM, always open local modals to avoid state lifting issues
   const handleCloseClick = networkType === "evm" ? closeWithCollateralModal.open : (onClosePosition ?? (() => { return; }));
   const handleSwapClick = networkType === "evm" ? debtSwapModal.open : (onSwap ?? (() => { return; }));
 
@@ -236,40 +207,145 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     return "Vesu";
   })();
 
-  // Toggle expanded state
-  const toggleExpanded = (e: React.MouseEvent) => {
-    // Don't expand if clicking on the info button or its dropdown
-    if ((e.target as HTMLElement).closest(".dropdown")) {
-      return;
-    }
-    if (!hasAnyActions) {
-      return;
-    }
-    if (onToggleExpanded) {
-      onToggleExpanded();
-    } else {
-      expanded.toggle();
-    }
-  };
-
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
     ? React.cloneElement(
         collateralView as React.ReactElement<{ isVisible?: boolean; initialShowAll?: boolean }>,
         {
-          isVisible: isExpanded,
+          isVisible: controlledExpanded ?? defaultExpanded,
           initialShowAll: false,
         },
       )
     : null;
 
-  const defaultInfoButton = (
+  // Build actions array for SegmentedActionBar
+  const actions: SegmentedAction[] = [];
+
+  if (showRepayButton) {
+    actions.push({
+      key: "repay",
+      label: "Repay",
+      icon: <MinusIcon className="w-4 h-4" />,
+      onClick: repayModal.open,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: !isWalletConnected
+        ? "Connect wallet to repay"
+        : actionsDisabled
+          ? disabledMessage
+          : "Repay debt",
+      variant: "ghost",
+    });
+  }
+
+  if (showBorrowButton) {
+    actions.push({
+      key: "borrow",
+      label: borrowCtaLabel ?? "Borrow",
+      icon: <PlusIcon className="w-4 h-4" />,
+      onClick: handleBorrowClick,
+      disabled: !isWalletConnected || actionsDisabled,
+      title: !isWalletConnected
+        ? "Connect wallet to borrow"
+        : actionsDisabled
+          ? disabledMessage
+          : "Borrow more tokens",
+      variant: "ghost",
+    });
+  }
+
+  if (showSwapButton) {
+    actions.push({
+      key: "swap",
+      label: "Swap",
+      icon: <ArrowPathIcon className="w-4 h-4" />,
+      onClick: handleSwapClick,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: !isWalletConnected
+        ? "Connect wallet to switch debt"
+        : actionsDisabled
+          ? disabledMessage
+          : "Switch debt token",
+      variant: "ghost",
+      compactOnHover: true,
+    });
+  }
+
+  if (showMoveButton) {
+    actions.push({
+      key: "move",
+      label: "Move",
+      icon: <ArrowRightIcon className="w-4 h-4" />,
+      onClick: moveModal.open,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: !isWalletConnected
+        ? "Connect wallet to move debt"
+        : actionsDisabled
+          ? disabledMessage
+          : "Move debt to another protocol",
+      variant: "ghost",
+      compactOnHover: true,
+    });
+  }
+
+  if (showCloseButton) {
+    actions.push({
+      key: "close",
+      label: "Close",
+      icon: <XMarkIcon className="w-4 h-4" />,
+      onClick: handleCloseClick,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: !isWalletConnected
+        ? "Connect wallet to close position"
+        : actionsDisabled
+          ? disabledMessage
+          : "Close position with collateral",
+      variant: "ghost",
+      compactOnHover: true,
+    });
+  }
+
+  // Quick "Move" badge shown in header when better rate available
+  const headerQuickAction = hasBetterRate && showMoveButton ? (
+    <button
+      className={`px-2 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
+        !isWalletConnected || actionsDisabled
+          ? "bg-base-300 text-base-content/50 cursor-not-allowed"
+          : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
+      }`}
+      onClick={e => {
+        e.stopPropagation();
+        if (isWalletConnected && !actionsDisabled) {
+          moveModal.open();
+        }
+      }}
+      disabled={!isWalletConnected || actionsDisabled}
+      aria-label="Move"
+      title={
+        !isWalletConnected
+          ? "Connect wallet to move debt"
+          : actionsDisabled
+            ? disabledMessage
+            : "Move debt to another protocol"
+      }
+    >
+      Move
+    </button>
+  ) : null;
+
+  // Collateral view content shown when expanded
+  const collateralContent = collateralView ? (
+    <div className="overflow-hidden transition-all duration-300 mt-2">
+      <div className="py-2">{collateralViewWithVisibility}</div>
+    </div>
+  ) : null;
+
+  // Custom info button with collateral value
+  const customInfoButton = infoButton ?? (showInfoDropdown ? (
     <div className="dropdown dropdown-end dropdown-bottom flex-shrink-0">
       <div tabIndex={0} role="button" className="cursor-pointer flex items-center justify-center h-[1.125em]">
-        <InformationCircleIcon
-          className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
-          aria-hidden="true"
-        />
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+        </svg>
       </div>
       <div
         tabIndex={0}
@@ -309,318 +385,57 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
         </div>
       </div>
     </div>
-  );
-
-  const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
+  ) : null);
 
   return (
     <>
-      {/* Container */}
-      <div
-        className={clsx(
-          "w-full bg-base-200/30 border border-base-300/40 transition-all duration-200",
-          isExpanded && hasAnyActions ? "px-4 sm:px-5 pt-4 pb-0" : "p-4 sm:p-5",
-          hasAnyActions ? "cursor-pointer hover:bg-base-200/60 hover:border-base-content/15" : "cursor-default",
-          // Only apply rounded-xl if containerClassName doesn't override it
-          !containerClassName?.includes("rounded") && "rounded-xl",
-          containerClassName
-        )}
-        onClick={toggleExpanded}
-      >
-        {/* Mobile Layout (< md) - single row, spread out */}
-        <div className="md:hidden flex items-center gap-2 sm:gap-3">
-          {/* Token icon + name */}
-          <div className="flex items-center gap-1.5 flex-shrink-0" title={name}>
-            <div className="w-7 h-7 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-0.5 ring-1 ring-base-300/50 flex-shrink-0">
-              <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
-            </div>
-            <span className="font-bold text-sm tracking-tight leading-none truncate max-w-[100px]" title={name}>
-              {renderName ? renderName(name) : name}
-            </span>
-            {infoButtonNode && (
-              <div className="flex-shrink-0 hidden sm:block" onClick={e => e.stopPropagation()}>
-                {infoButtonNode}
-              </div>
-            )}
-            {afterInfoContent && <div className="hidden sm:block" onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
-          </div>
-          
-          {/* Stats - spread out across available space */}
-          <div className="flex-1 flex items-center justify-around min-w-0">
-            {!hideBalanceColumn && (
-              <div className="flex flex-col items-center text-center">
-                <div className="text-[8px] uppercase tracking-widest text-base-content/40 font-medium">Bal</div>
-                <div className="text-[11px] font-mono font-semibold tabular-nums">
-                  {showNoDebtLabel ? (
-                    <span className="text-base-content/50">—</span>
-                  ) : (
-                    <FiatBalance
-                      tokenAddress={tokenAddress}
-                      rawValue={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
-                      price={tokenPrice}
-                      decimals={tokenDecimals}
-                      tokenSymbol={name}
-                      isNegative={true}
-                      className="text-error"
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col items-center text-center">
-              <div className="text-[8px] uppercase tracking-widest text-base-content/40 font-medium">APR</div>
-              <div className="text-[11px] font-mono font-semibold tabular-nums text-base-content">
-                {formatPercentage(currentRate)}%
-              </div>
-            </div>
-            {/* Best APR - hidden on very narrow screens */}
-            <div className="hidden min-[400px]:flex flex-col items-center text-center">
-              <div className="text-[8px] uppercase tracking-widest text-base-content/40 font-medium">Best</div>
-              <div className="flex items-center gap-0.5">
-                <span className="text-[11px] font-mono font-semibold tabular-nums text-success">
-                  {formatPercentage(displayedOptimalRate)}%
-                </span>
-                <div className="w-3 h-3 relative flex-shrink-0">
-                  <Image
-                    src={getProtocolLogo(displayedOptimalProtocol)}
-                    alt={displayedOptimalProtocol}
-                    fill
-                    className="object-contain rounded"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Move badge + expand indicator */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {hasBetterRate && showMoveButton && (
-              <button
-                className={`px-1.5 py-0.5 text-[7px] uppercase tracking-wider font-semibold rounded transition-colors ${
-                  !isWalletConnected || actionsDisabled
-                    ? "bg-base-300 text-base-content/50 cursor-not-allowed"
-                    : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
-                }`}
-                onClick={e => {
-                  e.stopPropagation();
-                  if (isWalletConnected && !actionsDisabled) {
-                    moveModal.open();
-                  }
-                }}
-                disabled={!isWalletConnected || actionsDisabled}
-                aria-label="Move"
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to move debt"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : "Move debt to another protocol"
-                }
-              >
-                Move
-              </button>
-            )}
-            {hasAnyActions && (
-              <div
-                className={`flex items-center justify-center w-5 h-5 rounded-md ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
-                  } transition-all duration-200`}
-              >
-                {isExpanded ? (
-                  <ChevronUpIcon className="w-3 h-3 text-primary" />
-                ) : (
-                  <ChevronDownIcon className="w-3 h-3 text-base-content/50" />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Desktop Layout (>= md) */}
-        <div className="hidden md:grid md:grid-cols-12 relative gap-0">
-          {/* Token */}
-          <div className="md:col-span-3 flex items-center">
-            <div className="w-10 h-10 relative min-w-[40px] min-h-[40px] rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 ring-1 ring-base-300/50">
-              <Image src={icon} alt={`${name} icon`} fill className="rounded-lg object-contain" />
-            </div>
-            <div className="ml-3 flex items-center gap-1.5 min-w-0">
-              {renderName ? (
-                <>{renderName(name)}</>
-              ) : (
-                <span className="font-bold text-base text-base-content truncate" title={name}>{name}</span>
-              )}
-            </div>
-            {infoButtonNode && (
-              <div className="flex-shrink-0 ml-1.5" onClick={e => e.stopPropagation()}>
-                {infoButtonNode}
-              </div>
-            )}
-            {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
-          </div>
-
-          {/* Stats: Rates */}
-          <div
-            className={`md:col-span-8 grid gap-0 items-center ${hideBalanceColumn ? "grid-cols-2" : "grid-cols-3"
-              }`}
-          >
-            {!hideBalanceColumn && (
-              <div className="px-3 border-r border-base-300/50">
-                <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Balance</div>
-                <div className="text-xs font-mono font-semibold tabular-nums">
-                  {showNoDebtLabel ? (
-                    <span className="text-base-content/50">No debt</span>
-                  ) : (
-                    <FiatBalance
-                      tokenAddress={tokenAddress}
-                      rawValue={
-                        typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)
-                      }
-                      price={tokenPrice}
-                      decimals={tokenDecimals}
-                      tokenSymbol={name}
-                      isNegative={true}
-                      className="text-error"
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-            <div className="px-3 border-r border-base-300/50">
-              <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">APR</div>
-              <div className="text-xs font-mono font-semibold tabular-nums text-base-content">
-                {formatPercentage(currentRate)}%
-              </div>
-            </div>
-            <div className="px-3">
-              <div className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium mb-0.5">Best APR</div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-mono font-semibold tabular-nums text-success">
-                  {formatPercentage(displayedOptimalRate)}%
-                </span>
-                <div className="w-4 h-4 relative flex-shrink-0">
-                  <Image
-                    src={getProtocolLogo(displayedOptimalProtocol)}
-                    alt={displayedOptimalProtocol}
-                    fill
-                    className="object-contain rounded"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Expand Indicator and quick Move action */}
-          <div className="md:col-span-1 flex items-center justify-end gap-2">
-            {hasBetterRate && showMoveButton && (
-              <button
-                className={`px-2 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
-                  !isWalletConnected || actionsDisabled
-                    ? "bg-base-300 text-base-content/50 cursor-not-allowed"
-                    : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
-                }`}
-                onClick={e => {
-                  e.stopPropagation();
-                  if (isWalletConnected && !actionsDisabled) {
-                    moveModal.open();
-                  }
-                }}
-                disabled={!isWalletConnected || actionsDisabled}
-                aria-label="Move"
-                title={
-                  !isWalletConnected
-                    ? "Connect wallet to move debt"
-                    : actionsDisabled
-                      ? disabledMessage
-                      : "Move debt to another protocol"
-                }
-              >
-                Move
-              </button>
-            )}
-            {hasAnyActions && (
-              <div
-                className={`flex items-center justify-center w-6 h-6 rounded-lg flex-shrink-0 ${isExpanded ? "bg-primary/20 ring-1 ring-primary/30" : "bg-base-300/30"
-                  } transition-all duration-200`}
-              >
-                {isExpanded ? (
-                  <ChevronUpIcon className="w-3.5 h-3.5 text-primary" />
-                ) : (
-                  <ChevronDownIcon className="w-3.5 h-3.5 text-base-content/50" />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons - Only visible when expanded */}
-        {isExpanded && hasAnyActions && (
-          <div className="-mx-4 mt-3 pt-2 border-t border-base-300/50" onClick={e => e.stopPropagation()}>
-            {/* Mobile layout - unified segmented bar (centered) */}
-            <div className="md:hidden flex justify-center w-full pb-0">
-              <SegmentedActionBar
-                className="w-full"
-                autoCompact
-                actions={[
-                  ...(showRepayButton
-                    ? [{ key: "repay", label: "Repay", icon: <MinusIcon className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
-                    : []),
-                  ...(showBorrowButton
-                    ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <PlusIcon className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
-                    : []),
-                  ...(showSwapButton
-                    ? [{ key: "swap", label: "Swap", icon: <ArrowPathIcon className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
-                    : []),
-                  ...(showMoveButton
-                    ? [{ key: "move", label: "Move", icon: <ArrowRightIcon className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
-                    : []),
-                  ...(showCloseButton
-                    ? [{ key: "close", label: "Close", icon: <XMarkIcon className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
-                    : []),
-                ]}
-              />
-            </div>
-
-            {/* Desktop layout - unified segmented bar (centered) */}
-            <div className="hidden md:flex justify-center w-full pb-0">
-              <SegmentedActionBar
-                className="w-full"
-                autoCompact
-                actions={[
-                  ...(showRepayButton
-                    ? [{ key: "repay", label: "Repay", icon: <MinusIcon className="w-4 h-4" />, onClick: repayModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to repay" : actionsDisabled ? disabledMessage : "Repay debt", variant: "ghost" as const }]
-                    : []),
-                  ...(showBorrowButton
-                    ? [{ key: "borrow", label: borrowCtaLabel ?? "Borrow", icon: <PlusIcon className="w-4 h-4" />, onClick: handleBorrowClick, disabled: !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to borrow" : actionsDisabled ? disabledMessage : "Borrow more tokens", variant: "ghost" as const }]
-                    : []),
-                  ...(showSwapButton
-                    ? [{ key: "swap", label: "Swap", icon: <ArrowPathIcon className="w-4 h-4" />, onClick: handleSwapClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to switch debt" : actionsDisabled ? disabledMessage : "Switch debt token", variant: "ghost" as const, compactOnHover: true }]
-                    : []),
-                  ...(showMoveButton
-                    ? [{ key: "move", label: "Move", icon: <ArrowRightIcon className="w-4 h-4" />, onClick: moveModal.open, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to move debt" : actionsDisabled ? disabledMessage : "Move debt to another protocol", variant: "ghost" as const, compactOnHover: true }]
-                    : []),
-                  ...(showCloseButton
-                    ? [{ key: "close", label: "Close", icon: <XMarkIcon className="w-4 h-4" />, onClick: handleCloseClick, disabled: !hasBalance || !isWalletConnected || actionsDisabled, title: !isWalletConnected ? "Connect wallet to close position" : actionsDisabled ? disabledMessage : "Close position with collateral", variant: "ghost" as const, compactOnHover: true }]
-                    : []),
-                ]}
-              />
-            </div>
-
-            {actionsDisabled && !suppressDisabledMessage && (
-              <div className="mt-3 text-sm text-base-content/50">
-                {disabledMessage}
-              </div>
-            )}
-
-            {extraActions && <div className="mt-3">{extraActions}</div>}
-          </div>
-        )}
-      </div>
+      <BasePosition
+        // Token info
+        icon={icon}
+        name={name}
+        tokenAddress={tokenAddress}
+        tokenPrice={tokenPrice}
+        tokenDecimals={tokenDecimals}
+        tokenBalance={tokenBalanceBn}
+        // Protocol info
+        protocolName={protocolName}
+        networkType={networkType}
+        currentRate={currentRate}
+        // Position type
+        positionType="borrow"
+        rateLabel="APR"
+        // UI customization
+        containerClassName={containerClassName}
+        hideBalanceColumn={hideBalanceColumn}
+        infoButton={customInfoButton}
+        afterInfoContent={afterInfoContent}
+        renderName={renderName}
+        showInfoDropdown={showInfoDropdown}
+        showExpandIndicator={true}
+        defaultExpanded={defaultExpanded}
+        suppressDisabledMessage={suppressDisabledMessage}
+        // Actions
+        actionsDisabled={actionsDisabled}
+        actionsDisabledReason={actionsDisabledReason}
+        extraActions={extraActions}
+        // Controlled expansion
+        controlledExpanded={controlledExpanded}
+        onToggleExpanded={onToggleExpanded}
+        // Action bar
+        actions={actions}
+        // Optimal rate override for demo
+        optimalRateOverride={demoOptimalOverride}
+        // Balance display
+        balanceClassName="text-error"
+        isNegativeBalance={true}
+        showNoBalanceLabel={showNoDebtLabel}
+        noBalanceText="No debt"
+        // Header quick action (Move badge)
+        headerQuickAction={headerQuickAction}
+      />
 
       {/* Collateral View (if provided) - Only visible when expanded */}
-      {collateralView && isExpanded && (
-        <div className="overflow-hidden transition-all duration-300 mt-2">
-          <div className="py-2">{collateralViewWithVisibility}</div>
-        </div>
-      )}
+      {collateralView && (controlledExpanded ?? defaultExpanded) && collateralContent}
 
       {/* Modals */}
       {networkType === "starknet" ? (
@@ -653,7 +468,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            debtBalance={tokenBalanceBn}
             position={position}
             vesuContext={vesuContext?.repay}
           />
@@ -707,7 +522,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               decimals: tokenDecimals || 18,
             }}
             protocolName={protocolName}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            debtBalance={tokenBalanceBn}
             position={position}
             chainId={chainId}
             context={protocolContext}
@@ -735,7 +550,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtIcon={icon}
             debtDecimals={tokenDecimals || 18}
             debtPrice={tokenPrice}
-            debtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            debtBalance={tokenBalanceBn}
             availableCollaterals={availableAssetsList as SwapAsset[]}
             context={
               protocolName.toLowerCase().includes("compound")
@@ -749,7 +564,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             protocolName={protocolName}
             chainId={chainId || 1}
             debtFromToken={tokenAddress as Address}
-            currentDebtBalance={typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0)}
+            currentDebtBalance={tokenBalanceBn}
             debtFromName={name}
             debtFromIcon={icon}
             debtFromDecimals={tokenDecimals || 18}

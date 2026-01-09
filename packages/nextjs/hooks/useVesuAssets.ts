@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useMemo, useEffect } from "react";
 
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import { toAnnualRates } from "~~/utils/protocols";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { useLogError } from "~~/hooks/common";
 
 const normalizeDecimals = (value: unknown): number | null => {
   if (value === undefined || value === null) return 18;
@@ -117,11 +118,7 @@ export const useVesuAssets = (poolId: bigint) => {
     refetchInterval: 0,
   });
 
-  useEffect(() => {
-    if (assetsError) {
-      console.error("Error fetching supported assets:", assetsError);
-    }
-  }, [assetsError]);
+  useLogError(assetsError, "Error fetching supported assets:");
 
   const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 

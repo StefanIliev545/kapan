@@ -12,6 +12,7 @@ import {
   TagIcon,
 } from "@heroicons/react/24/outline";
 import { BlogPost } from "~~/utils/blog";
+import { createTextChangeHandler } from "~~/utils/handlers";
 
 // Categories list
 const categories = ["All", "DeFi Strategies", "Market Analysis", "Ecosystem", "Risk Management", "Tutorials"];
@@ -186,7 +187,7 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
                   className="block w-full p-4 pl-10 input input-bordered bg-base-100/80 backdrop-blur-sm focus:ring-2 focus:ring-primary/50 dark:focus:ring-accent/50"
                   placeholder="Search articles..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  onChange={createTextChangeHandler(setSearchQuery)}
                 />
               </div>
             </motion.div>

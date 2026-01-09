@@ -12,6 +12,7 @@ import { TokenMetadata } from "~~/utils/protocols";
 import { feltToString } from "~~/utils/protocols";
 import { formatTokenAmount } from "~~/utils/protocols";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
+import { sortByBalance } from "~~/utils/tokenSymbols";
 
 export type TokenWithRates = TokenMetadata & {
   borrowAPR: number;
@@ -75,15 +76,12 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
         token,
         address,
         hasBalance: balance > 0n,
-        displayBalance,
+        formattedBalance: displayBalance,
         balanceLabel: formatTokenAmount(balance.toString(), token.decimals),
       };
     });
 
-    return withBalances.sort((a, b) => {
-      if (a.hasBalance !== b.hasBalance) return Number(b.hasBalance) - Number(a.hasBalance);
-      return b.displayBalance - a.displayBalance;
-    });
+    return withBalances.sort(sortByBalance);
   }, [availableTokens, balances]);
 
   const modalTitle = action === "borrow" ? "Select a Token to Borrow" : "Select a Token to Deposit";

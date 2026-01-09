@@ -6,14 +6,15 @@ import Link from "next/link";
 import ConnectModal from "./CustomConnectButton/ConnectModal";
 import { Address as AddressType } from "@starknet-react/chains";
 import { devnet } from "@starknet-react/chains";
-import CopyToClipboard from "react-copy-to-clipboard";
 import { getChecksumAddress, validateChecksumAddress } from "starknet";
 import { CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { BlockieAvatar } from "~~/components/scaffold-stark/BlockieAvatar";
+import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import { useScaffoldStarkProfile } from "~~/hooks/scaffold-stark/useScaffoldStarkProfile";
 import { useTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
 import { getStarknetPFPIfExists } from "~~/utils/profile";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-stark";
+import { truncateAddress } from "~~/utils/address";
 
 type AddressProps = {
   address?: AddressType;
@@ -37,7 +38,7 @@ const blockieSizeMap = {
  */
 export const Address = ({ address, disableAddressLink, format, size = "base" }: AddressProps) => {
   const [ensAvatar, setEnsAvatar] = useState<string | null>();
-  const [addressCopied, setAddressCopied] = useState(false);
+  const { copy, isCopied: addressCopied } = useCopyToClipboard();
 
   const { targetNetwork } = useTargetNetwork();
   const { data: fetchedProfile, isLoading } = useScaffoldStarkProfile(address);
@@ -68,7 +69,7 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
   };
 
   const [displayAddress, setDisplayAddress] = useState(
-    checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4),
+    truncateAddress(checkSumAddress),
   );
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
     } else if (format === "long") {
       setDisplayAddress(addressWithFallback || "");
     } else {
-      setDisplayAddress(addressWithFallback.slice(0, 6) + "..." + addressWithFallback.slice(-4));
+      setDisplayAddress(truncateAddress(addressWithFallback));
     }
   }, [fetchedProfile, checkSumAddress, address, format]);
 
@@ -138,28 +139,23 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
           {fetchedProfile?.name || displayAddress}
         </a>
       )}
-      {addressCopied ? (
-        <CheckCircleIcon
-          className="ml-1.5 text-xl font-normal text-sky-600 h-5 w-5 cursor-pointer"
-          aria-hidden="true"
-        />
-      ) : (
-        //@ts-ignore
-        <CopyToClipboard
-          text={checkSumAddress}
-          onCopy={() => {
-            setAddressCopied(true);
-            setTimeout(() => {
-              setAddressCopied(false);
-            }, 800);
-          }}
-        >
-          <DocumentDuplicateIcon
-            className="ml-1.5 text-xl font-normal text-sky-600 h-5 w-5 cursor-pointer"
+      <button
+        onClick={() => copy(checkSumAddress)}
+        className="ml-1.5 p-0 border-0 bg-transparent cursor-pointer"
+        type="button"
+      >
+        {addressCopied ? (
+          <CheckCircleIcon
+            className="text-xl font-normal text-sky-600 h-5 w-5"
             aria-hidden="true"
           />
-        </CopyToClipboard>
-      )}
+        ) : (
+          <DocumentDuplicateIcon
+            className="text-xl font-normal text-sky-600 h-5 w-5"
+            aria-hidden="true"
+          />
+        )}
+      </button>
     </div>
   );
 };

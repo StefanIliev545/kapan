@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon, CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { arbitrum, base, linea, optimism } from "viem/chains";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
+import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import starknetContractsData, {
   type SNContract,
   type SNContractsType,
@@ -79,6 +80,7 @@ export const DeployedContractsList = () => {
   const { targetNetwork: targetStarknetNetwork } = useStarknetTargetNetwork();
   const setTargetEvmNetwork = useGlobalState(state => state.setTargetEVMNetwork);
   const evmNetworks = useMemo(() => getTargetNetworks(), []);
+  const { copy, isCopied } = useCopyToClipboard();
   const [selectedNetwork, setSelectedNetwork] = useState<string>(() => {
     const activeNetworkId = chainIdToNetworkOptionId[targetEvmNetwork.id];
     return activeNetworkId ?? defaultEvmNetworkId;
@@ -211,11 +213,13 @@ export const DeployedContractsList = () => {
                     </span>
                     <button
                       className="btn btn-xs btn-ghost"
-                      onClick={() => {
-                        navigator.clipboard.writeText(contract.address);
-                      }}
+                      onClick={() => copy(contract.address)}
                     >
-                      📋
+                      {isCopied ? (
+                        <CheckCircleIcon className="h-4 w-4 text-success" />
+                      ) : (
+                        <DocumentDuplicateIcon className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                 </td>

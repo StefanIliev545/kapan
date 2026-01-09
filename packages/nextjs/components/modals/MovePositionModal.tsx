@@ -6,6 +6,8 @@ import { formatUnits } from "viem";
 import { useAccount, useReadContract, useSwitchChain } from "wagmi";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
+import { DebtCollateralSummary, formatDisplayNumber } from "~~/components/common/ValueDisplay";
+import { ErrorDisplay } from "~~/components/common/ErrorDisplay";
 import { ERC20ABI, tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useBatchingPreference } from "~~/hooks/useBatchingPreference";
@@ -15,7 +17,9 @@ import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport
 import { useCollaterals } from "~~/hooks/scaffold-eth/useCollaterals";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { getProtocolLogo } from "~~/utils/protocol";
-import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
+import { isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
+import { getAvailableFlashLoanProviders, type FlashLoanProviderOption } from "~~/utils/flashLoan";
+import { createCheckboxHandler } from "~~/utils/handlers";
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -34,20 +38,8 @@ interface MovePositionModalProps {
   chainId?: number;
 }
 
-type FlashLoanProvider = {
-  name: "Balancer V2" | "Balancer V3" | "Aave V3" | "ZeroLend" | "Morpho";
-  icon: string;
-  version: "v2" | "v3" | "aave" | "zerolend" | "morpho";
-  providerEnum: 0 | 1 | 2 | 3 | 5; // FlashLoanProvider enum: BalancerV2=0, BalancerV3=1, Aave=2, ZeroLend=3, Morpho=5
-};
-
-const ALL_FLASH_LOAN_PROVIDERS: FlashLoanProvider[] = [
-  { name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 },
-  { name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 },
-  { name: "Aave V3", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 },
-  { name: "ZeroLend", icon: "/logos/zerolend.svg", version: "zerolend", providerEnum: 3 },
-  { name: "Morpho", icon: "/logos/morpho.svg", version: "morpho", providerEnum: 5 },
-] as const;
+// Use centralized flash loan provider types from utils/flashLoan
+// This avoids duplication of provider definitions across components
 
 // Extend the collateral type with rawBalance
 export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose, fromProtocol, position, chainId }) => {
@@ -84,33 +76,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
   const [step, setStep] = useState<MoveStep>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  // Flash loan providers - built from static chain config (no contract reads needed)
+  // Flash loan providers - use centralized utility
   // Chain support is defined in chainFeatures.ts, synced with deployment scripts
   const availableFlashLoanProviders = useMemo(() => {
-    const providers: FlashLoanProvider[] = [];
-
-    // Order by preference: zero-fee providers first
-    if (isBalancerV2Supported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[0]); // Balancer V2
-    }
-    if (isMorphoSupported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[4]); // Morpho
-    }
-    if (isBalancerV3Supported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[1]); // Balancer V3
-    }
-    if (isAaveV3Supported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[2]); // Aave V3
-    }
-    if (isZeroLendSupported(chainId)) {
-      providers.push(ALL_FLASH_LOAN_PROVIDERS[3]); // ZeroLend
-    }
-
-    return providers;
+    return getAvailableFlashLoanProviders(chainId);
   }, [chainId]);
 
   // Set default selected provider (first available)
-  const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProvider | null>(null);
+  const [selectedFlashLoanProvider, setSelectedFlashLoanProvider] = useState<FlashLoanProviderOption | null>(null);
 
   useEffect(() => {
     if (availableFlashLoanProviders.length > 0) {
@@ -263,16 +236,6 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
     if (!tokenBalance || !decimals) return "0";
     return formatUnits(tokenBalance, decimals as number);
   }, [tokenBalance, decimals]);
-
-  // Format number with thousands separators for display
-  const formatDisplayNumber = (value: string | number) => {
-    const num = typeof value === "string" ? parseFloat(value) : value;
-    if (isNaN(num)) return "0.00";
-    return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6,
-    }).format(num);
-  };
 
   const debtUsdValue = useMemo(() => {
     if (!amount) return 0;
@@ -529,16 +492,14 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
             )}
 
             {error && (
-              <div className="alert alert-error shadow-lg">
-                <ExclamationTriangleIcon className="w-6 h-6" />
-                <div className="text-sm flex-1">{error}</div>
-              </div>
+              <ErrorDisplay message={error} size="lg" />
             )}
 
-            <div className="flex justify-between text-sm text-base-content/70">
-              <span>Debt Value: ${formatDisplayNumber(debtUsdValue)}</span>
-              {position.type === "borrow" && <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>}
-            </div>
+            <DebtCollateralSummary
+              debtValue={debtUsdValue}
+              collateralValue={totalCollateralUsd}
+              showCollateral={position.type === "borrow"}
+            />
           </div>
 
           {/* TO SECTION */}
@@ -676,7 +637,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 <input
                   type="checkbox"
                   checked={preferBatching}
-                  onChange={(e) => setPreferBatching(e.target.checked)}
+                  onChange={createCheckboxHandler(setPreferBatching)}
                   className="checkbox checkbox-sm"
                 />
                 <span className="label-text text-xs">Batch Transactions with Smart Account</span>
@@ -685,7 +646,7 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({ isOpen, onClose,
                 <input
                   type="checkbox"
                   checked={revokePermissions}
-                  onChange={(e) => setRevokePermissions(e.target.checked)}
+                  onChange={createCheckboxHandler(setRevokePermissions)}
                   className="checkbox checkbox-sm"
                 />
                 <span className="label-text text-xs">Revoke permissions after execution</span>

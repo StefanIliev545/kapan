@@ -120,3 +120,117 @@ img[src$="/logos/ethereum.svg"] {
   -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 70%, rgba(0,0,0,0) 100%);
   mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 70%, rgba(0,0,0,0) 100%);
 }
+
+/* ============================================
+   SHARED UI UTILITY CLASSES
+   Extracted from repeated Tailwind patterns
+   ============================================ */
+
+/* Label text - small uppercase tracking labels */
+.label-text-xs {
+  @apply text-[10px] uppercase tracking-wider text-base-content/40 font-medium;
+}
+
+.label-text-xs-semibold {
+  @apply text-[10px] uppercase tracking-widest text-base-content/35 font-semibold;
+}
+
+.label-text-xs-muted {
+  @apply text-[10px] uppercase tracking-wider text-base-content/30;
+}
+
+/* Token icon wrappers - gradient background with ring */
+.token-icon-wrapper {
+  @apply relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 ring-1 ring-base-300/50 flex-shrink-0 flex items-center justify-center;
+}
+
+.token-icon-wrapper-sm {
+  @apply token-icon-wrapper w-7 h-7 p-0.5 rounded-lg;
+}
+
+.token-icon-wrapper-md {
+  @apply token-icon-wrapper w-8 h-8 p-1.5 rounded-lg shadow-sm ring-base-300/30;
+}
+
+.token-icon-wrapper-lg {
+  @apply token-icon-wrapper w-10 h-10 p-2 shadow-sm ring-base-300/30;
+}
+
+/* Card surfaces - consistent card styling */
+.card-surface {
+  @apply card bg-base-200/40 shadow-md rounded-xl border border-base-300/50;
+}
+
+.card-surface-hover {
+  @apply card-surface hover:shadow-lg transition-all duration-300;
+}
+
+.card-surface-interactive {
+  @apply card-surface cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15;
+}
+
+/* Badge/Tag styles - small status indicators */
+.badge-tag {
+  @apply px-2 py-0.5 text-[10px] uppercase tracking-wider rounded border;
+}
+
+.badge-tag-success {
+  @apply badge-tag text-success border-success/20;
+}
+
+.badge-tag-primary {
+  @apply badge-tag text-primary border-primary/20 bg-primary/10;
+}
+
+.badge-tag-muted {
+  @apply badge-tag text-base-content/60 border-base-content/20 bg-base-content/10;
+}
+
+/* Floating action style - for floating buttons/socials */
+.floating-action {
+  @apply shadow-md hover:shadow-lg transition-all;
+}
+
+/* Flex center - common centered flex pattern */
+.flex-center {
+  @apply flex items-center justify-center;
+}
+
+/* Position count badges - for asset/market counts */
+.count-badge {
+  @apply flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm;
+}
+
+.count-badge-success {
+  @apply count-badge bg-success/10 text-success;
+}
+
+.count-badge-error {
+  @apply count-badge bg-error/10 text-error;
+}
+
+.count-badge-primary {
+  @apply count-badge bg-primary/10 text-primary;
+}
+
+/* Protocol icon badge - small chain/protocol overlay */
+.protocol-badge {
+  @apply absolute -bottom-0.5 -right-0.5 rounded-full bg-base-200 border border-base-300 flex items-center justify-center;
+}
+
+.protocol-badge-sm {
+  @apply protocol-badge w-4 h-4;
+}
+
+.protocol-badge-md {
+  @apply protocol-badge w-5 h-5;
+}
+
+.protocol-badge-lg {
+  @apply protocol-badge w-6 h-6 border-base-content/10;
+}
+
+/* Step indicator - numbered step circles */
+.step-circle {
+  @apply w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary;
+}

@@ -4,7 +4,6 @@ import { NetworkOptions } from "./NetworkOptions";
 import { Address } from "@starknet-react/chains";
 import { useConnect, useDisconnect, useNetwork } from "@starknet-react/core";
 import { useTheme } from "next-themes";
-import CopyToClipboard from "react-copy-to-clipboard";
 import { createPortal } from "react-dom";
 import {
   ArrowLeftEndOnRectangleIcon,
@@ -17,10 +16,11 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { BlockieAvatar, isENS } from "~~/components/scaffold-stark";
-import { useOutsideClick } from "~~/hooks/scaffold-stark";
+import { useOutsideClick, useCopyToClipboard } from "~~/hooks/scaffold-stark";
 import { useScaffoldStarkProfile } from "~~/hooks/scaffold-stark/useScaffoldStarkProfile";
 import { getStarknetPFPIfExists } from "~~/utils/profile";
 import { getTargetNetworks } from "~~/utils/scaffold-stark";
+import { truncateAddress } from "~~/utils/address";
 
 type AddressInfoDropdownProps = {
   address: Address;
@@ -36,7 +36,7 @@ export const AddressInfoDropdown = ({
   blockExplorerAddressLink,
 }: AddressInfoDropdownProps) => {
   const { disconnect } = useDisconnect();
-  const [addressCopied, setAddressCopied] = useState(false);
+  const { copy, isCopied: addressCopied } = useCopyToClipboard();
   const { data: profile } = useScaffoldStarkProfile(address);
   const { chain } = useNetwork();
   const [selectingNetwork, setSelectingNetwork] = useState(false);
@@ -62,7 +62,7 @@ export const AddressInfoDropdown = ({
             <BlockieAvatar address={address} size={24} ensImage={profile?.profilePicture || ensAvatar} />
           </div>
           <span className="text-sm font-medium truncate min-w-0">
-            {isENS(displayName) ? displayName : profile?.name || address?.slice(0, 6) + "..." + address?.slice(-4)}
+            {isENS(displayName) ? displayName : profile?.name || truncateAddress(address)}
           </span>
           <ChevronDownIcon className="h-4 w-4 text-base-content/70" />
         </summary>
@@ -72,28 +72,18 @@ export const AddressInfoDropdown = ({
         >
           <NetworkOptions hidden={!selectingNetwork} />
           <li className={selectingNetwork ? "hidden" : ""}>
-            {addressCopied ? (
-              <div className="btn-sm !rounded-xl flex gap-3 py-3">
+            <button
+              onClick={() => copy(address)}
+              className="btn-sm !rounded-xl flex gap-3 py-3"
+              type="button"
+            >
+              {addressCopied ? (
                 <CheckCircleIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
-                <span className=" whitespace-nowrap">Copy address</span>
-              </div>
-            ) : (
-              // @ts-ignore
-              <CopyToClipboard
-                text={address}
-                onCopy={() => {
-                  setAddressCopied(true);
-                  setTimeout(() => {
-                    setAddressCopied(false);
-                  }, 800);
-                }}
-              >
-                <div className="btn-sm !rounded-xl flex gap-3 py-3">
-                  <DocumentDuplicateIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
-                  <span className=" whitespace-nowrap">Copy address</span>
-                </div>
-              </CopyToClipboard>
-            )}
+              ) : (
+                <DocumentDuplicateIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
+              )}
+              <span className="whitespace-nowrap">Copy address</span>
+            </button>
           </li>
           {chain.network != "devnet" ? (
             <li className={selectingNetwork ? "hidden" : ""}>

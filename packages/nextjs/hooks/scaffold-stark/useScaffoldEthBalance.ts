@@ -1,37 +1,21 @@
 import { Address } from "@starknet-react/chains";
-import { useDeployedContractInfo } from "./useDeployedContractInfo";
-import { useReadContract } from "@starknet-react/core";
-import { BlockNumber } from "starknet";
-import { Abi } from "abi-wan-kanabi";
-import { formatUnits } from "ethers";
-import { useStarkBlockNumber } from "./useBlockNumberContext";
+import { useScaffoldTokenBalance } from "./useScaffoldTokenBalance";
 
 type UseScaffoldEthBalanceProps = {
   address?: Address | string;
 };
 
+/**
+ * Hook to fetch ETH balance on Starknet.
+ * Uses the base useScaffoldTokenBalance hook.
+ */
 const useScaffoldEthBalance = ({ address }: UseScaffoldEthBalanceProps) => {
-  const { data: deployedContract } = useDeployedContractInfo("Eth");
-
-  const blockNumber = useStarkBlockNumber();
-
-  const { data, ...props } = useReadContract({
-    functionName: "balance_of",
-    address: deployedContract?.address,
-    abi: deployedContract?.abi as Abi as any[],
-    watch: false,
-    enabled: true,
-    args: address ? [address] : [],
-    blockIdentifier: (blockNumber as unknown as BlockNumber) ?? ("latest" as BlockNumber),
-  });
-
-  return {
-    value: data as unknown as bigint,
-    decimals: 18,
+  return useScaffoldTokenBalance({
+    address,
+    tokenContractName: "Eth",
     symbol: "ETH",
-    formatted: data ? formatUnits(data as unknown as bigint) : "0",
-    ...props,
-  };
+    decimals: 18,
+  });
 };
 
 export default useScaffoldEthBalance;

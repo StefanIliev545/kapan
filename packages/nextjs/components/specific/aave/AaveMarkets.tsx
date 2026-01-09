@@ -6,16 +6,7 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import formatPercentage from "~~/utils/formatPercentage";
-
-// Helper: Convert Aave RAY (1e27) rates to APY percentage
-const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
-
-const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
-  42161: "arbitrum",
-  8453: "base",
-  10: "optimism",
-  59144: "linea",
-};
+import { aaveRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 
 interface AaveMarketsProps {
   viewMode: "list" | "grid";
@@ -40,8 +31,8 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
     if (!allTokensInfo) return [];
     const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
     return (allTokensInfo as any[]).map(token => {
-      const supplyAPY = convertRateToAPY(token.supplyRate);
-      const borrowAPY = convertRateToAPY(token.borrowRate);
+      const supplyAPY = aaveRateToAPY(token.supplyRate);
+      const borrowAPY = aaveRateToAPY(token.borrowRate);
       const price = Number(formatUnits(token.price, 8));
       const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
       return {

@@ -1,8 +1,7 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
-import { useCallback } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { track } from "@vercel/analytics";
 import Image from "next/image";
-import { Address, formatUnits, parseUnits } from "viem";
+import { Address, formatUnits, parseUnits, encodeFunctionData, type Hex } from "viem";
 import { CheckIcon, ClockIcon } from "@heroicons/react/24/outline";
 
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
@@ -41,9 +40,9 @@ import { useSendCalls, useCallsStatus } from "wagmi/experimental";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
-import { encodeFunctionData, type Hex } from "viem";
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { saveOrderNote, createLeverageUpNote } from "~~/utils/orderNotes";
+import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
 
 interface MultiplyEvmModalProps {
   isOpen: boolean;
@@ -351,9 +350,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     if (defaultFlashLoanProvider) return [defaultFlashLoanProvider];
     // Chain-appropriate fallback - prefer Aave on chains where Balancer isn't available
     if (isAaveV3Supported(chainId) && !isBalancerV2Supported(chainId)) {
-      return [{ name: "Aave", icon: "/logos/aave.svg", version: "aave", providerEnum: FlashLoanProvider.Aave }];
+      return [{ name: "Aave", icon: "/logos/aave.svg", version: "aave" as const, providerEnum: FlashLoanProvider.Aave, feeBps: 5 }];
     }
-    return [{ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: FlashLoanProvider.BalancerV2 }];
+    return [{ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2" as const, providerEnum: FlashLoanProvider.BalancerV2, feeBps: 0 }];
   }, [defaultFlashLoanProvider, flashLoanProviders, chainId]);
 
   const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
@@ -1220,55 +1219,44 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
               throw new Error("Wallet not connected");
             }
 
-            for (let i = 0; i < allCalls.length; i++) {
-              const call = allCalls[i];
-              notification.remove(notificationId);
-              notificationId = notification.loading(
-                <TransactionToast step="pending" message={`Simulating step ${i + 1}/${allCalls.length}...`} />
-              );
-
-              // Simulate first to get better error messages
-              try {
-                await publicClient.call({
-                  account: userAddress,
-                  to: call.to as `0x${string}`,
-                  data: call.data as `0x${string}`,
-                });
-                console.log(`[Limit Order] Step ${i + 1} simulation passed`);
-              } catch (simError: any) {
-                console.error(`[Limit Order] Step ${i + 1} simulation FAILED:`, simError);
-                const errorMsg = simError?.message || simError?.shortMessage || String(simError);
-                // Try to extract revert reason
-                const revertMatch = errorMsg.match(/reverted with.*?['"]([^'"]+)['"]/i) 
-                  || errorMsg.match(/reason:\s*([^\n]+)/i)
-                  || errorMsg.match(/error:\s*([^\n]+)/i);
-                const revertReason = revertMatch ? revertMatch[1] : errorMsg;
-                notification.remove(notificationId);
-                notification.error(`Step ${i + 1} would fail: ${revertReason}`);
-                throw new Error(`Transaction simulation failed at step ${i + 1}: ${revertReason}`);
+            const result = await executeSequentialTransactions(
+              publicClient,
+              walletClient,
+              allCalls as TransactionCall[],
+              userAddress!,
+              {
+                simulateFirst: true,
+                onProgress: (step, total, phase) => {
+                  notification.remove(notificationId);
+                  const message = phase === "simulating"
+                    ? `Simulating step ${step}/${total}...`
+                    : phase === "executing"
+                      ? `Executing step ${step}/${total}...`
+                      : `Step ${step}/${total} confirmed`;
+                  notificationId = notification.loading(
+                    <TransactionToast step="pending" message={message} />
+                  );
+                  if (phase === "confirmed") {
+                    console.log(`[Limit Order] Step ${step} confirmed`);
+                  }
+                },
+                onError: (step, error) => {
+                  console.error(`[Limit Order] Step ${step} FAILED:`, error);
+                  notification.remove(notificationId);
+                  notification.error(`Step ${step} would fail: ${error}`);
+                },
               }
+            );
 
-              notification.remove(notificationId);
-              notificationId = notification.loading(
-                <TransactionToast step="pending" message={`Executing step ${i + 1}/${allCalls.length}...`} />
-              );
-
-              const txHash = await walletClient.sendTransaction({
-                account: userAddress,
-                to: call.to as `0x${string}`,
-                data: call.data as `0x${string}`,
-              });
-
-              console.log(`[Limit Order] Step ${i + 1} tx sent:`, txHash);
-              await publicClient.waitForTransactionReceipt({ hash: txHash });
-              console.log(`[Limit Order] Step ${i + 1} confirmed`);
+            if (!result.success) {
+              throw new Error(result.error || "Transaction failed");
             }
 
             notification.remove(notificationId);
-            
+
             // Store salt for CoW Explorer link
             setLastOrderSalt(cowCalls.salt);
-            
+
             // Show success notification
             const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress!);
             notification.success(
@@ -1278,13 +1266,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
                 blockExplorerLink={explorerUrl}
               />
             );
-            
+
             console.log("[Limit Order] All steps completed");
             console.log("[Limit Order] Salt:", cowCalls.salt);
             console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
-            
+
             track("multiply_limit_order_complete", { status: "submitted", mode: "sequential" });
-            
+
             // Close modal after success
             onClose();
           }

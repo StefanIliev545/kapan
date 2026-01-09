@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { COW_API_URLS } from "~~/utils/constants";
 
 /**
  * Proxy for CoW Protocol orders API
- * 
+ *
  * POST /api/cow/[chainId]/orders - Submit an order to the orderbook
  * GET /api/cow/[chainId]/orders/[uid] - Get order details
  */
-
-const COW_API_URLS: Record<number, string> = {
-  1: "https://api.cow.fi/mainnet",
-  42161: "https://api.cow.fi/arbitrum_one",
-  8453: "https://api.cow.fi/base",
-  10: "https://api.cow.fi/optimism",
-  100: "https://api.cow.fi/xdai",
-  137: "https://api.cow.fi/polygon",
-  43114: "https://api.cow.fi/avalanche",
-  56: "https://api.cow.fi/bnb",
-  59144: "https://api.cow.fi/linea",
-};
 
 /**
  * POST /api/cow/[chainId]/orders

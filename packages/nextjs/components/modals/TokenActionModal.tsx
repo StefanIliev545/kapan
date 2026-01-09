@@ -1,11 +1,11 @@
 import { track } from "@vercel/analytics";
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Fuel } from "lucide-react";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
+import { TokenPill } from "../common/TokenDisplay";
 import type { Call } from "starknet";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits } from "viem";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
@@ -13,6 +13,11 @@ import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import formatPercentage from "~~/utils/formatPercentage";
 import { formatRate } from "~~/utils/protocols";
 import { PositionManager } from "~~/utils/position";
+import {
+  parseAmount,
+  shouldShowInsufficientFunds,
+  canSubmitForm,
+} from "~~/utils/validation";
 
 export interface TokenInfo {
   name: string;
@@ -84,12 +89,7 @@ const LoanToValueBar = ({ value }: { value: number }) => (
   </div>
 );
 
-const TokenPill = ({ value, icon, name }: { value: number; icon: string; name: string }) => (
-  <div className="flex items-center gap-1 text-xs text-base-content/80">
-    <Image src={icon} alt={name} width={12} height={12} />
-    <span>{format(value)}</span>
-  </div>
-);
+// TokenPill imported from common/TokenDisplay.tsx for standardized token display
 
 type PercentOnChange = (amount: string, isMax: boolean) => void;
 
@@ -120,22 +120,18 @@ export const PercentInput: FC<{
     onChange(formatted, p === 100);
   };
   const handleChange = (val: string) => {
-    let parsed: bigint;
-    try {
-      parsed = parseUnits(val || "0", decimals);
-    } catch {
-      parsed = 0n;
-    }
+    const result = parseAmount(val || "0", decimals);
+    let parsed = result.value ?? 0n;
     const base = percentBase ?? balance;
     const limit = max ?? base;
-    const isMax = false;
+    const isMaxFlag = false;
     if (limit > 0n && parsed >= limit) {
       parsed = limit;
       val = formatUnits(limit, decimals);
     }
     setAmount(val);
     setActive(null);
-    onChange(val, isMax);
+    onChange(val, isMaxFlag);
   };
   const usd = (parseFloat(amount || "0") * price).toFixed(2);
   return (
@@ -255,27 +251,27 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     return BigInt(amount);
   }, [action, position, token.usdPrice, decimals, max]);
 
-  const parsedAmount = useMemo(() => {
-    if (!amount.trim()) return null;
-    try {
-      return parseUnits(amount, decimals);
-    } catch {
-      return null;
-    }
-  }, [amount, decimals]);
+  // Use shared validation utility for amount parsing
+  const parsedAmountResult = useMemo(() => parseAmount(amount, decimals), [amount, decimals]);
+  const parsedAmount = parsedAmountResult.value;
+  const isAmountPositive = parsedAmountResult.isPositive;
 
-  const isAmountPositive = parsedAmount !== null && parsedAmount > 0n;
-
-  const insufficientFunds = useMemo(() => {
-    if (!parsedAmount || !isAmountPositive) return false;
-    // Borrow/withdraw amounts are clamped to protocol limits rather than wallet balance.
-    if (action === "Borrow" || action === "Withdraw") return false;
-    return parsedAmount > balance;
-  }, [action, balance, isAmountPositive, parsedAmount]);
+  // Use shared validation utility for insufficient funds check
+  const insufficientFunds = useMemo(
+    () => shouldShowInsufficientFunds(action, parsedAmount, balance),
+    [action, parsedAmount, balance]
+  );
 
   const isCorrectChain = network !== "evm" || !chainId || chain?.id === chainId;
   const isWalletConnected = network === "evm" ? Boolean(evmAddress) : Boolean(starkAddress);
-  const canSubmit = isAmountPositive && !insufficientFunds && isWalletConnected && isCorrectChain;
+
+  // Use shared validation utility for form submission check
+  const canSubmit = canSubmitForm({
+    isAmountPositive,
+    hasSufficientFunds: !insufficientFunds,
+    isWalletConnected,
+    isCorrectChain,
+  });
   const isActionComplete = txState === "success";
   const isConfirmDisabled = txState === "pending" || (!isActionComplete && !canSubmit);
 

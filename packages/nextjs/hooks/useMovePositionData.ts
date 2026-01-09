@@ -42,12 +42,8 @@ export type BasicCollateral = {
   usdPrice?: bigint; // 1e8 scaled where available (EVM UiHelper)
 };
 
-export type FlashLoanProviderOption = {
-  name: string;
-  version: string;
-  icon: string;
-  providerEnum?: number; // matches router enum on EVM
-};
+// Re-export FlashLoanProviderOption from the centralized flashLoan utils
+export type { FlashLoanProviderOption } from "~~/utils/flashLoan";
 
 export type DestinationProtocolOption = {
   name: string;
@@ -82,7 +78,8 @@ export type UseMovePositionDataResult = {
   vesuPools?: VesuPoolsData;
 };
 
-import { isBalancerV2Supported, isBalancerV3Supported, isAaveV3Supported, isMorphoSupported, isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
+import { isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
+import { getAvailableFlashLoanProviders, FlashLoanProvider, type FlashLoanProviderOption } from "~~/utils/flashLoan";
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
   const { isOpen, networkType, fromProtocol, chainId, position } = params;
@@ -301,30 +298,22 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   }, [starkCollaterals, starkIsLoading, networkType]);
 
   // Flash loan providers - built from static chain config (no contract reads needed)
+  // Uses centralized getAvailableFlashLoanProviders() to avoid duplication
   const flashLoanProviders = useMemo<FlashLoanProviderOption[]>(() => {
     if (networkType !== "evm") {
       // Stark: show placeholder Vesu flash loan provider
-      return [{ name: "Vesu", version: "v1", icon: "/logos/vesu.svg" }];
+      // Note: Vesu flash loans use a different mechanism, not the FlashLoanProvider enum
+      const starkProvider: FlashLoanProviderOption = {
+        name: "Vesu",
+        version: "v1",
+        icon: "/logos/vesu.svg",
+        providerEnum: FlashLoanProvider.BalancerV2, // Placeholder value, not used for Starknet
+        feeBps: 0,
+      };
+      return [starkProvider];
     }
 
-    const providers: FlashLoanProviderOption[] = [];
-    // Order by preference: zero-fee providers first
-    if (isBalancerV2Supported(chainId)) {
-      providers.push({ name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2", providerEnum: 0 });
-    }
-    if (isMorphoSupported(chainId)) {
-      providers.push({ name: "Morpho", icon: "/logos/morpho.svg", version: "morpho", providerEnum: 5 });
-    }
-    if (isBalancerV3Supported(chainId)) {
-      providers.push({ name: "Balancer V3", icon: "/logos/balancer.svg", version: "v3", providerEnum: 1 });
-    }
-    if (isAaveV3Supported(chainId)) {
-      providers.push({ name: "Aave", icon: "/logos/aave.svg", version: "aave", providerEnum: 2 });
-    }
-    if (isZeroLendSupported(chainId)) {
-      providers.push({ name: "ZeroLend", icon: "/logos/zerolend.svg", version: "zerolend", providerEnum: 3 });
-    }
-    return providers;
+    return getAvailableFlashLoanProviders(chainId);
   }, [networkType, chainId]);
 
   const defaultFlashLoanProvider = useMemo(() => flashLoanProviders[0], [flashLoanProviders]);

@@ -12,16 +12,20 @@ import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { 
-  getOrderNote, 
-  findPendingNoteForOrder, 
+import {
+  getOrderNote,
+  findPendingNoteForOrder,
   linkNoteToOrderHash,
-  getOperationLabel, 
+  getOperationLabel,
   getOperationColorClass,
+  ORDER_CREATED_EVENT,
   type OrderNote,
   type OperationType,
 } from "~~/utils/orderNotes";
 import { getProtocolLogo } from "~~/utils/protocol";
+import { timeAgo } from "~~/utils/deadline";
+import { truncateAddress } from "~~/utils/address";
+import { useIntervalWhen } from "~~/hooks/common";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -35,15 +39,6 @@ function formatUsd(amount: number): string {
   if (amount < 0.01) return "<$0.01";
   if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}k`;
   return `$${amount.toFixed(2)}`;
-}
-
-function timeAgo(timestamp: bigint): string {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = now - Number(timestamp);
-  if (diff < 60) return "now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
 }
 
 interface OrderWithHash {
@@ -107,11 +102,20 @@ export function PendingOrdersDrawer() {
   }, [userAddress, isAvailable, hasFetched, fetchOrders]);
 
   // Auto-refresh when drawer is open
+  useIntervalWhen(fetchOrders, 15000, isOpen);
+
+  // Listen for new order created events and refetch
   useEffect(() => {
-    if (!isOpen) return;
-    const interval = setInterval(fetchOrders, 15000);
-    return () => clearInterval(interval);
-  }, [isOpen, fetchOrders]);
+    const handleOrderCreated = () => {
+      // Small delay to allow the order to be indexed
+      setTimeout(() => {
+        fetchOrders();
+      }, 2000);
+    };
+
+    window.addEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
+    return () => window.removeEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
+  }, [fetchOrders]);
 
   const handleCancel = async (orderHash: string) => {
     setCancellingHash(orderHash);
@@ -157,7 +161,7 @@ export function PendingOrdersDrawer() {
 
   const getTokenSymbol = (address: string): string => {
     const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.symbol ?? `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return info?.symbol ?? truncateAddress(address);
   };
 
   const getTokenDecimals = (address: string): number => {
@@ -200,25 +204,30 @@ export function PendingOrdersDrawer() {
     return notesMap;
   }, [orders, chainId, getTokenSymbol]);
 
-  // Don't render anything if not available, not connected, or no orders
+  // Don't render anything if CoW not available or not connected
   if (!isAvailable || !userAddress) return null;
-  if (hasFetched && orders.length === 0) return null;
+
+  // If no orders, still mount but don't show anything visible
+  // This allows us to receive ORDER_CREATED_EVENT and fetch when orders are placed
+  const showButton = orders.length > 0;
 
   return (
     <>
       {/* Floating Button - only show if we have orders */}
-      {orders.length > 0 && <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 right-4 z-50 h-12 px-4 bg-primary text-primary-content rounded-lg shadow-lg flex items-center gap-2 hover:bg-primary/90 transition-colors"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-        <span className="font-medium">Orders</span>
-        {activeCount > 0 && (
-          <span className="bg-primary-content text-primary text-xs font-bold px-1.5 py-0.5 rounded">{activeCount}</span>
-        )}
-      </button>}
+      {showButton && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="fixed bottom-4 right-4 z-50 h-12 px-4 bg-primary text-primary-content rounded-lg shadow-lg flex items-center gap-2 hover:bg-primary/90 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span className="font-medium">Orders</span>
+          {activeCount > 0 && (
+            <span className="bg-primary-content text-primary text-xs font-bold px-1.5 py-0.5 rounded">{activeCount}</span>
+          )}
+        </button>
+      )}
 
       {/* Drawer */}
       {isOpen && (
@@ -341,7 +350,7 @@ export function PendingOrdersDrawer() {
                             {isActive ? 'Active' : isCompleted ? 'Done' : 'Cancelled'}
                           </span>
                         </div>
-                        <span className="text-xs text-base-content/40">{timeAgo(createdAt)}</span>
+                        <span className="text-xs text-base-content/40">{timeAgo(createdAt, true)}</span>
                       </div>
 
                       {/* Row 2: Progress bar */}

@@ -1,18 +1,19 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits, parseAbi, Address } from "viem";
 import { usePublicClient } from "wagmi";
-import { 
-  getCowFlashLoanProviders, 
+import {
+  getCowFlashLoanProviders,
   getPreferredFlashLoanLender,
   type CowFlashLoanProvider,
   calculateFlashLoanFee,
   MORPHO_BLUE,
   AAVE_V3_POOLS,
 } from "~~/utils/cow";
+import { BALANCER } from "~~/utils/constants";
 
-// Balancer Vault addresses (same on all chains)
-const BALANCER_V2_VAULT = "0xBA12222222228d8Ba445958a75a0704d566BF2C8";
-const BALANCER_V3_VAULT = "0xbA1333333333a1BA1108E8412f11850A5C319bA9";
+// Use shared Balancer constants
+const BALANCER_V2_VAULT = BALANCER.v2Vault;
+const BALANCER_V3_VAULT = BALANCER.v3Vault;
 
 const ERC20_ABI = parseAbi([
   "function balanceOf(address account) view returns (uint256)",

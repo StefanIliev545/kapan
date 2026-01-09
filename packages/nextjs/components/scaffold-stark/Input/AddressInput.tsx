@@ -3,7 +3,7 @@ import { blo } from "blo";
 import { useDebounceValue } from "usehooks-ts";
 import { CommonInputProps, InputBase } from "~~/components/scaffold-stark";
 import { Address } from "@starknet-react/chains";
-import { isAddress } from "~~/utils/scaffold-stark/common";
+import { isValidStarknetAddressInput } from "~~/utils/validation";
 import Image from "next/image";
 
 /**
@@ -28,8 +28,8 @@ export const AddressInput = ({
         return;
       }
 
-      const isValid = /^0x[a-f0-9]{1,64}$/.test(sanitizedValue);
-      if (!isValid) {
+      // Use shared validation utility for Starknet address input
+      if (!isValidStarknetAddressInput(sanitizedValue)) {
         return;
       }
 

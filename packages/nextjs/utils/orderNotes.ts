@@ -40,6 +40,17 @@ export interface OrderNote {
 const STORAGE_KEY = "kapan_order_notes";
 const MAX_NOTES = 100; // Keep last 100 orders to avoid storage bloat
 
+// Custom event for order creation - drawer listens for this to refresh
+export const ORDER_CREATED_EVENT = "kapan:order-created";
+
+/**
+ * Dispatch event to notify listeners (like PendingOrdersDrawer) that a new order was created
+ */
+export function dispatchOrderCreated(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(ORDER_CREATED_EVENT));
+}
+
 /**
  * Get all stored order notes
  */
@@ -80,6 +91,9 @@ export function saveOrderNote(note: OrderNote): void {
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
     }
+
+    // Notify listeners (like PendingOrdersDrawer) that a new order was created
+    dispatchOrderCreated();
   } catch (error) {
     console.warn("[orderNotes] Failed to save to localStorage:", error);
   }

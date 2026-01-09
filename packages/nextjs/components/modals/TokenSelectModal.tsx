@@ -7,6 +7,7 @@ import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import formatPercentage from "~~/utils/formatPercentage";
 import { PositionManager } from "~~/utils/position";
 import { formatUnits } from "viem";
+import { sortByBalance } from "~~/utils/tokenSymbols";
 
 interface TokenSelectModalProps {
   isOpen: boolean;
@@ -57,11 +58,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
   );
 
   const sortedTokens = useMemo(
-    () =>
-      [...tokensWithBalances].sort((a, b) => {
-        if (a.hasBalance !== b.hasBalance) return Number(b.hasBalance) - Number(a.hasBalance);
-        return b.formattedBalance - a.formattedBalance;
-      }),
+    () => [...tokensWithBalances].sort(sortByBalance),
     [tokensWithBalances],
   );
   // Handle token selection

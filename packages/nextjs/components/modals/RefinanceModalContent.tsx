@@ -5,6 +5,8 @@ import { CheckIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline"
 import { formatUnits } from "viem";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import { MorphoMarketSelector } from "../common/MorphoMarketSelector";
+import { ErrorDisplay } from "../common/ErrorDisplay";
+import { LoadingSpinner, ButtonLoading } from "../common/Loading";
 import type { MorphoMarket, MorphoMarketContext } from "~~/hooks/useMorphoLendingPositions";
 
 /* ------------------------------ Helpers ------------------------------ */
@@ -512,7 +514,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
             <div className="grid grid-cols-2 gap-2">
               {isLoadingCollaterals ? (
                 <div className="col-span-2 flex items-center justify-center py-6">
-                  <span className="loading loading-spinner loading-md" />
+                  <LoadingSpinner size="md" />
                 </div>
               ) : (
                 (disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0
@@ -687,10 +689,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
 
           {/* Error display */}
           {errorMessage && (
-            <div className="alert alert-error">
-              <ExclamationTriangleIcon className="w-4 h-4" />
-              <span>{errorMessage}</span>
-            </div>
+            <ErrorDisplay message={errorMessage} size="sm" />
           )}
 
           {/* Action */}
@@ -729,7 +728,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   {
                     key: "refinance",
                     label: isSubmitting ? "Processing..." : "Refinance",
-                    icon: isSubmitting ? <span className="loading loading-spinner loading-xs" /> : undefined,
+                    icon: isSubmitting ? <ButtonLoading size="xs" /> : undefined,
                     onClick: handleExecuteMove,
                     disabled: isActionDisabled || isSubmitting,
                     variant: "ghost",

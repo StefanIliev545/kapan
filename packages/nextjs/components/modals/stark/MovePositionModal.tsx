@@ -1,5 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useState } from "react";
-import { useRef } from "react";
+import { FC, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Image from "next/image";
 import { useAccount } from "~~/hooks/useAccount";
 import { useReadContract } from "@starknet-react/core";
@@ -10,6 +9,7 @@ import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import { formatUnits, parseUnits } from "viem";
 import { CollateralSelector, CollateralWithAmount } from "~~/components/specific/collateral/CollateralSelector";
 import { CollateralAmounts } from "~~/components/specific/collateral/CollateralAmounts";
+import { DebtCollateralSummary, formatDisplayNumber } from "~~/components/common/ValueDisplay";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
@@ -26,16 +26,6 @@ import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAdd
 import { useLendingAuthorizations, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
 import { normalizeStarknetAddress } from "~~/utils/vesu";
-
-// Format number with thousands separators for display
-const formatDisplayNumber = (value: string | number) => {
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "0.00";
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(num);
-};
 
 // Define the step type for tracking the move flow
 type MoveStep = "idle" | "executing" | "done";
@@ -1125,12 +1115,11 @@ export const MovePositionModal: FC<MovePositionModalProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-between text-sm text-base-content/70">
-                <span>Debt Value: ${formatDisplayNumber(debtUsdValue)}</span>
-                {position.type === "borrow" && (
-                  <span>Collateral Value: ${formatDisplayNumber(totalCollateralUsd)}</span>
-                )}
-              </div>
+              <DebtCollateralSummary
+                debtValue={debtUsdValue}
+                collateralValue={totalCollateralUsd}
+                showCollateral={position.type === "borrow"}
+              />
 
             </div>
 

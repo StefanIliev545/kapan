@@ -5,7 +5,10 @@
  * Pendle: Mainnet, Arbitrum, Base, Optimism, Plasma (per deploy script)
  */
 
-import deployedContracts from "~~/contracts/hardhat/deployedContracts";
+import {
+  getContractAddress,
+  getContractInfo,
+} from "~~/utils/constants/contracts";
 import { Address } from "viem";
 
 // Chains where 1inch is NOT available
@@ -227,35 +230,34 @@ export const CHAIN_IDS = {
 
 // ==================== ADAPTER ADDRESSES ====================
 // Get adapter addresses directly from deployed contracts - no RPC calls needed
-
-const contracts = deployedContracts as unknown as Record<number, Record<string, { address: Address; abi: unknown[] }>>;
+// Uses shared utilities from utils/constants/contracts.ts
 
 export function getPendleAdapterAddress(chainId: number | undefined): Address | undefined {
   if (!chainId || !isPendleSupported(chainId)) return undefined;
-  return contracts[chainId]?.PendleAdapter?.address;
+  return getContractAddress(chainId, "PendleAdapter");
 }
 
 export function getOneInchAdapterAddress(chainId: number | undefined): Address | undefined {
   if (!chainId || !is1inchSupported(chainId)) return undefined;
-  return contracts[chainId]?.OneInchAdapter?.address;
+  return getContractAddress(chainId, "OneInchAdapter");
 }
 
 export function getPendleAdapterInfo(chainId: number | undefined) {
   if (!chainId || !isPendleSupported(chainId)) return undefined;
-  return contracts[chainId]?.PendleAdapter;
+  return getContractInfo(chainId, "PendleAdapter");
 }
 
 export function getOneInchAdapterInfo(chainId: number | undefined) {
   if (!chainId || !is1inchSupported(chainId)) return undefined;
-  return contracts[chainId]?.OneInchAdapter;
+  return getContractInfo(chainId, "OneInchAdapter");
 }
 
 export function getCowAdapterAddress(chainId: number | undefined): Address | undefined {
   if (!chainId || !isCowProtocolSupported(chainId)) return undefined;
-  return contracts[chainId]?.KapanCowAdapter?.address;
+  return getContractAddress(chainId, "KapanCowAdapter");
 }
 
 export function getCowAdapterInfo(chainId: number | undefined) {
   if (!chainId || !isCowProtocolSupported(chainId)) return undefined;
-  return contracts[chainId]?.KapanCowAdapter;
+  return getContractInfo(chainId, "KapanCowAdapter");
 }
